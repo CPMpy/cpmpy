@@ -109,3 +109,10 @@ class TestModel(unittest.TestCase):
 
         for cons in flatlist(m2.constraints):
             self.assertTrue(cons.value())
+
+
+    def test_unknown_solver(self):
+
+        model = cp.Model(cp.any(cp.boolvar(shape=3)))
+
+        self.assertRaises(ValueError, lambda : model.solve(solver="notasolver"))

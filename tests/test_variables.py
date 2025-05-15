@@ -1,6 +1,7 @@
 import unittest
 import cpmpy as cp
-from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
+import numpy as np
+from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray, _gen_var_names
 
 
 class TestSolvers(unittest.TestCase):
@@ -71,3 +72,41 @@ class TestSolvers(unittest.TestCase):
         bv.clear()
         self.assertEqual(n_none(bv), 9)
 
+
+class TestGenVarNames(unittest.TestCase):
+
+    def test_gen_var_names_basic_string(self):
+        self.assertEqual(_gen_var_names('x', (2, 2)), ['x[0,0]', 'x[0,1]', 'x[1,0]', 'x[1,1]'])
+        self.assertEqual(_gen_var_names('y', (1, 3)), ['y[0,0]', 'y[0,1]', 'y[0,2]'])
+        self.assertEqual(_gen_var_names('z', 4), ['z[0]', 'z[1]', 'z[2]', 'z[3]'])
+
+    def test_gen_var_names_none_name(self):
+        self.assertEqual(_gen_var_names(None, (2, 2)), [None, None, None, None])
+        self.assertEqual(_gen_var_names(None, (1, 3)), [None, None, None])
+        self.assertEqual(_gen_var_names(None, 4), [None, None, None, None])
+
+    def test_gen_var_names_invalid_name_type(self):
+        with self.assertRaises(TypeError):
+            _gen_var_names(123, (2, 2))
+        with self.assertRaises(TypeError):
+            _gen_var_names(45.6, (1, 3))
+
+    def test_gen_var_names_enumerable_name_matching_shape(self):
+        self.assertEqual(_gen_var_names(list("abcd"), (4)), ['a', 'b', 'c', 'd'])
+        self.assertEqual(_gen_var_names(np.array([list("wx"), list("yz")]), (2, 2)), ['w', 'x', 'y', 'z'])
+
+    def test_gen_var_names_shape_mismatch(self):
+        with self.assertRaises(ValueError):
+            _gen_var_names(list("abc"), (2,2))
+        with self.assertRaises(ValueError):
+            _gen_var_names(np.array(list("abc")), (2,2))
+
+    def test_gen_var_names_duplicated_names(self):
+        with self.assertRaises(ValueError):
+            _gen_var_names(list("aabd"), (4))
+        with self.assertRaises(ValueError):
+            _gen_var_names(np.array(list("xxyz")), (4))
+
+
+if __name__ == "__main__":
+    unittest.main()

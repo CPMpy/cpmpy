@@ -1,29 +1,31 @@
-import copy
+"""
+  Transforms non-equality comparisons into equality comparisons as needed.
+  
+  Let <op> be one of `==` or `!=`, `<`, `<=`, `>`, `>=`. Numeric expressions in **Flat Normal Form** are of the kind:
 
+    - `NumExpr <op> IV`
+    - `BoolVar == NumExpr <op> IV`
+    - `BoolVar -> NumExpr <op> IV`
+    - `NumExpr <op> IV -> BoolVar`
+
+  The `NumExpr` can be a sum, wsum or global function with a non-bool return type.
+    
+  This file implements:
+    - :func:`only_numexpr_equality()`:    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
+"""
+
+import copy
 from .flatten_model import get_or_make_var
 from ..expressions.core import Comparison, Operator
 from ..expressions.utils import is_boolexpr
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
-"""
-  Transformations regarding Comparison constraints.
-  
-  Comparisons in Flat Normal Form are of the kind
-    - NumExpr == IV
-    - BoolExpr == BV
-    
-  The latter is a reified expression, not considered here.
-  (for handling of all reified expressions, see `reification.py` transformations)
-  
-  This file implements:
-    - only_numexpr_equality():    transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
-"""
-
 def only_numexpr_equality(constraints, supported=frozenset()):
     """
-        transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
+        Transforms ``NumExpr <op> IV`` to ``(NumExpr == A) & (A <op> IV)`` if not supported.
+        Also for the reified uses of `NumExpr`
 
-        :param supported  a (frozen)set of expression names that supports all comparisons in the solver
+        :param supported:  a (frozen)set of expression names that supports all comparisons in the solver
     """
 
     # shallow copy (could support inplace too this way...)
@@ -39,7 +41,7 @@ def only_numexpr_equality(constraints, supported=frozenset()):
                     newcons[i] = res[1].implies(subexpr)
                     newcons.insert(i, res[0])
 
-            elif not isinstance(subexpr, _BoolVarImpl):  # expr -> bv
+            elif not isinstance(subexpr, _BoolVarImpl):  # bv -> expr
                 res = only_numexpr_equality([subexpr], supported)
                 if len(res) > 1:
                     newcons[i] = cond.implies(res[1])

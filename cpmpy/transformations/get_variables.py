@@ -1,10 +1,11 @@
 """
-Returns an list of all variables in the model or expressions
+Getting and printing variables in the model or expression.
 
-Variables are ordered by appearance, e.g. first encountered first
+Variables are ordered by appearance, e.g. first encountered first.
 """
 import warnings # for deprecation warning
 import numpy as np
+import cpmpy as cp
 
 from ..expressions.core import Expression
 from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray
@@ -32,8 +33,9 @@ def get_variables(expr, collect=None):
     """
         Get variables of an expression
 
-        - expr: Expression or list of expressions
-        - collect: optional set, variables will be added to this set of given
+        Arguments:
+            expr: Expression or list of expressions
+            collect: optional set, variables will be added to this set of given
    """
     def extract(lst, append):
         for e in lst:
@@ -77,12 +79,13 @@ def get_variables(expr, collect=None):
 
 def print_variables(expr_or_model):
     """
-        Print variables _and their domains_
+        Print variables **and their domains**
 
-        argument 'expr_or_model' can be an expression or a model
+        Arguments:
+            expr_or_model: can be an expression or a model
     """
-    from ..model import Model
-    if isinstance(expr_or_model, Model):
+
+    if isinstance(expr_or_model, cp.Model):
         vars_ = get_variables_model(expr_or_model)
     else:
         vars_ = get_variables(expr_or_model)

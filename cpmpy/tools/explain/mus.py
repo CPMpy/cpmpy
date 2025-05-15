@@ -1,16 +1,18 @@
 """
-Deletion-based Minimum Unsatisfiable Subset (MUS) algorithm.
+    Re-impementation of MUS-computation techniques in CPMPy
 
-Loosely based on PySat's MUSX:
-https://github.com/pysathq/pysat/blob/master/examples/musx.py
-
+    - Deletion-based MUS
+    - QuickXplain
+    - Optimal MUS
 """
+import warnings
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
 
 from .utils import make_assump_model
+from ...expressions.utils import is_num
 
 
 def mus(soft, hard=[], solver="ortools"):
@@ -29,9 +31,11 @@ def mus(soft, hard=[], solver="ortools"):
 
         :param: soft: soft constraints, list of expressions
         :param: hard: hard constraints, optional, list of expressions
-        :param: solver: name of a solver, see SolverLookup.solvernames()
-            "z3" and "gurobi" are incremental, "ortools" restarts the solver
+        :param: solver: name of a solver, must support assumptions (e.g, "ortools", "exact", "z3" or "pysat")
     """
+
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"mus requires a solver that supports assumption variables, use mus_naive with {solver} instead"
+
     # make assumption (indicator) variables and soft-constrained model
     (m, soft, assump) = make_assump_model(soft, hard=hard)
     s = cp.SolverLookup.get(solver, m)
@@ -41,22 +45,20 @@ def mus(soft, hard=[], solver="ortools"):
 
     # setting all assump vars to true should be UNSAT
     assert not s.solve(assumptions=assump), "MUS: model must be UNSAT"
-    core = s.get_core()  # start from solver's UNSAT core
-
-    # order so that constraints with many variables are tried and removed first
-    core = sorted(core, key=lambda c: -len(get_variables(dmap[c])))
+    core = set(s.get_core())  # start from solver's UNSAT core
 
     # deletion-based MUS
-    mus = []
-    for i in range(len(core)):
-        subassump = mus + core[i + 1:]  # all but the 'i'th constraint
+    # order so that constraints with many variables are tried and removed first
+    for c in sorted(core, key=lambda c : -len(get_variables(dmap[c]))):
+        if c not in core:
+            continue # already removed
+        core.remove(c)
+        if s.solve(assumptions=list(core)) is True:
+            core.add(c)
+        else: # UNSAT, use new solver core (clause set refinement)
+            core = set(s.get_core())
 
-        if s.solve(assumptions=subassump):
-            # removing 'i' makes the problem SAT, must keep for UNSAT
-            mus.append(core[i])
-        # else: still UNSAT so don't need this candidate, not in mus
-
-    return [dmap[avar] for avar in mus]
+    return [dmap[avar] for avar in core]
 
 
 def quickxplain(soft, hard=[], solver="ortools"):
@@ -69,10 +71,16 @@ def quickxplain(soft, hard=[], solver="ortools"):
         Assumption-based implementation for solvers that support s.solve(assumptions=...) and s.get_core()
         More naive version available as `quickxplain_naive` to use with other solvers.
 
+        :param: soft: list of soft constraints to find a preferred minimal unsatisfiable subset of
+        :param: hard: list of hard constraints, will be added to the model before solving
+        :param: solver: name of a solver, must support assumptions (e.g, "ortools", "exact", "z3" or "pysat")
+
         CPMpy implementation of the QuickXplain algorithm by Junker:
             Junker, Ulrich. "Preferred explanations and relaxations for over-constrained problems." AAAI-2004. 2004.
             https://cdn.aaai.org/AAAI/2004/AAAI04-027.pdf
     """
+
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"quickxplain requires a solver that supports assumption variables, use quickxplain_naive with {solver} instead"
 
     model, soft, assump = make_assump_model(soft, hard)
     s = cp.SolverLookup.get(solver, model)
@@ -108,6 +116,72 @@ def quickxplain(soft, hard=[], solver="ortools"):
     return [dmap[a] for a in core]
 
 
+def optimal_mus(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools", do_solution_hint=True):
+    """
+        Find an optimal MUS according to a linear objective function.
+        By not providing a weightvector, this function will return the smallest mus.
+        Works by iteratively generating correction subsets and computing optimal hitting sets to those enumerated sets.
+        For better performance of the algorithm, use an incemental solver to compute the hitting sets such as Gurobi.
+
+        Assumption-based implementation for solvers that support s.solve(assumptions=...)
+        More naive version available as `optimal_mus_naive` to use with other solvers.
+
+        :param: soft: list of soft constraints to find an optimal MUS of
+        :param: hard: list of hard constraints, will be added to the model before solving
+        :param: solver: name of a solver, must support assumptions (e.g, "ortools", "exact", "z3" or "pysat")
+        :param: hs_solver: the hitting-set solver to use, ideally incremental such as "gurobi"
+        :param: do_solution_hint: when true, will favor large satisfiable subsets generated by the SAT-solver
+
+        CPMpy implementation loosely based on the "OCUS" algorithm from:
+
+            Gamba, Emilio, Bart Bogaerts, and Tias Guns. "Efficiently explaining CSPs with unsatisfiable subset optimization."
+            Journal of Artificial Intelligence Research 78 (2023): 709-746.
+
+    """
+    assert hasattr(cp.SolverLookup.get(solver), "get_core"), f"optimal_mus requires a solver that supports assumption variables, use optimal_mus_naive with {solver} instead"
+    
+    model, soft, assump = make_assump_model(soft, hard)
+    dmap = dict(zip(assump, soft)) # map assumption variables to constraints
+
+    s = cp.SolverLookup.get(solver, model)
+    if do_solution_hint and hasattr(s, 'solution_hint'): # algo is constructive, so favor large subsets
+        s.solution_hint(assump, [1]*len(assump))
+
+    assert s.solve(assumptions=assump) is False
+
+    # initialize hitting set solver
+    if weights is None:
+        weights = np.ones(len(assump), dtype=int)
+
+    hs_solver = cp.SolverLookup.get(hs_solver)
+    hs_solver.minimize(cp.sum(assump * np.array(weights)))
+
+    while hs_solver.solve() is True:
+        hitting_set = [a for a in assump if a.value()]
+        if s.solve(assumptions=hitting_set) is False:
+            break
+
+        # else, the hitting set is SAT, now try to extend it without extra solve calls.
+        # Check which other assumptions/constraints are satisfied (using c.value())
+        # complement of grown subset is a correction subset
+        # Assumptions encode indicator constraints a -> c, find all false assumptions
+        #   that really have to be false given the current solution.
+        new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
+        hs_solver += cp.sum(new_corr_subset) >= 1
+
+        # greedily search for other corr subsets disjoint to this one
+        sat_subset = list(new_corr_subset)
+        while s.solve(assumptions=sat_subset) is True:
+            new_corr_subset = [a for a,c in zip(assump, soft) if a.value() is False and c.value() is False]
+            sat_subset += new_corr_subset # extend sat subset with new corr subset, guaranteed to be disjoint
+            hs_solver += cp.sum(new_corr_subset) >= 1 # add new corr subset to hitting set solver
+
+    return [dmap[a] for a in hitting_set]
+
+def smus(soft, hard=[], solver="ortools", hs_solver="ortools"):
+    return optimal_mus(soft, hard=hard, weights=None, solver=solver, hs_solver=hs_solver)
+
+
 ## Naive, non-assumption based versions of MUS-algos above
 def mus_naive(soft, hard=[], solver="ortools"):
     """
@@ -119,9 +193,9 @@ def mus_naive(soft, hard=[], solver="ortools"):
         Best to only use for testing on solvers that do not support assumptions.
         For others, use `mus()`
 
-        :param: soft: soft constraints, list of expressions
-        :param: hard: hard constraints, optional, list of expressions
-        :param: solver: name of a solver, see SolverLookup.solvernames()
+        :param soft: soft constraints, list of expressions
+        :param hard: hard constraints, optional, list of expressions
+        :param solver: name of a solver, see SolverLookup.solvernames()
     """
     # ensure toplevel list
     soft = toplevel_list(soft, merge_and=False)
@@ -184,3 +258,44 @@ def quickxplain_naive(soft, hard=[], solver="ortools"):
 
     core = do_recursion(soft, hard, [])
     return core
+
+def optimal_mus_naive(soft, hard=[], weights=None, solver="ortools", hs_solver="ortools"):
+    """
+        Naive implementation of `optimal_mus` without assumption variables and incremental solving
+    """
+
+    soft = toplevel_list(soft, merge_and=False)
+    bvs = cp.boolvar(shape=len(soft))
+
+    if weights is None:
+        weights = np.ones(len(bvs), dtype=int)
+    hs_solver = cp.SolverLookup.get(hs_solver)
+    hs_solver.minimize(cp.sum(bvs * np.array(weights)))
+
+    while hs_solver.solve() is True:
+
+        hitting_set = [c for bv, c in zip(bvs, soft) if bv.value()]
+        if cp.Model(hard + hitting_set).solve(solver=solver) is False:
+            break
+
+        # else, the hitting set is SAT, now try to extend it without extra solve calls.
+        # Check which other assumptions/constraints are satisfied using its value() function
+        #       sidenote: some vars may not be know to model and are None!
+        # complement of grown subset is a correction subset
+        false_constraints = [s for s in soft if s.value() is False or s.value() is None]
+        corr_subset = [bv for bv,c in zip(bvs, soft) if c in frozenset(false_constraints)]
+        hs_solver += cp.sum(corr_subset) >= 1
+
+        # find more corr subsets, disjoint to this one
+        sat_subset = hitting_set + false_constraints
+        while cp.Model(hard + sat_subset).solve(solver=solver) is True:
+            false_constraints = [s for s in soft if s.value() is False or s.value() is None]
+            corr_subset = [bv for bv, c in zip(bvs, soft) if c in frozenset(false_constraints)]
+            hs_solver += cp.sum(corr_subset) >= 1
+            sat_subset += false_constraints
+
+    return hitting_set
+
+
+
+

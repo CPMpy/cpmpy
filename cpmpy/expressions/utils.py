@@ -12,16 +12,25 @@ Internal utilities for expression handling.
     .. autosummary::
         :nosignatures:
 
+        is_bool
         is_int
         is_num
+        is_false_cst
+        is_true_cst
+        is_boolexpr
         is_pure_list
         is_any_list
+        is_transition
         flatlist
         all_pairs
         argval
+        argvals
         eval_comparison
+        get_bounds     
 """
+import copy
 
+import cpmpy as cp
 import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
@@ -32,29 +41,27 @@ from cpmpy.exceptions import IncompleteFunctionError
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
     """
-    from cpmpy import BoolVal
-    return isinstance(arg, (bool, np.bool_, BoolVal))
+    return isinstance(arg, (bool, np.bool_, cp.BoolVal))
 
 
 def is_int(arg):
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
-    return is_bool(arg) or isinstance(arg, (int, np.integer))
+    return isinstance(arg, (bool, np.bool_, cp.BoolVal, int, np.integer))
 
 
 def is_num(arg):
     """ is it an int or float? (incl numpy variants)
     """
-    return is_int(arg) or isinstance(arg, (float, np.floating))
+    return isinstance(arg, (bool, np.bool_, cp.BoolVal, int, np.integer, float, np.floating))
 
 
 def is_false_cst(arg):
     """ is the argument the constant False (can be of type bool, np.bool and BoolVal)
     """
-    from cpmpy import BoolVal
     if arg is False or arg is np.False_:
         return True
-    elif isinstance(arg, BoolVal):
+    elif isinstance(arg, cp.BoolVal):
         return not arg.value()
     return False
 
@@ -62,10 +69,9 @@ def is_false_cst(arg):
 def is_true_cst(arg):
     """ is the argument the constant True (can be of type bool, np.bool and BoolVal)
     """
-    from cpmpy import BoolVal
     if arg is True or arg is np.True_:
         return True
-    elif isinstance(arg, BoolVal):
+    elif isinstance(arg, cp.BoolVal):
         return arg.value()
     return False
 
@@ -174,17 +180,16 @@ def eval_comparison(str_op, lhs, rhs):
     else:
         raise Exception("Not a known comparison:", str_op)
 
-
 def get_bounds(expr):
     """ return the bounds of the expression
     returns appropriately rounded integers
     """
 
     # import here to avoid circular import
-    from cpmpy.expressions.core import Expression
-    from cpmpy.expressions.variables import cpm_array
+    # from cpmpy.expressions.core import Expression
+    # from cpmpy.expressions.variables import cpm_array
 
-    if isinstance(expr, Expression):
+    if isinstance(expr, cp.expressions.core.Expression):
         return expr.get_bounds()
     elif is_any_list(expr):
         lbs, ubs = zip(*[get_bounds(e) for e in expr])
@@ -194,3 +199,24 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+
+def implies(expr, other):
+    """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
+    if isinstance(expr, cp.expressions.core.Expression):
+        return expr.implies(other)
+    elif is_true_cst(expr):
+        return other
+    elif is_false_cst(expr):
+        return BoolVal(True)
+    else:
+        return expr.implies(other)
+
+# Specific stuff for ShortTabel global (should this be in globalconstraints.py instead?)
+STAR = "*" # define constant here
+def is_star(arg):
+    """
+        Check if arg is star as used in the ShortTable global constraint
+    """
+    return isinstance(arg, type(STAR)) and arg == STAR
+
+

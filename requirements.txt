@@ -1,2 +1,3 @@
 numpy < 2.0
 ortools >= 9.9
+setuptools # for pkg_resources to check solver versions

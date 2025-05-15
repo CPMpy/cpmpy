@@ -1,14 +1,32 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
 ## choco.py
 ##
 """
-    Interface to Choco solver's Python API
+    Interface to Choco solver's Python API.
 
-    ...
+    Choco-solver is an open-source Java library for Constraint Programming (see https://choco-solver.org/).
+    It comes with many features such as various types of variables, various state-of-the-art constraints, various search strategies, etc.
 
-    Documentation of the solver's own Python API:
-    https://pypi.org/project/pychoco/
-    https://pychoco.readthedocs.io/en/latest/
+    Always use :func:`cp.SolverLookup.get("choco") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'pychoco' python package is installed:
+
+    .. code-block:: console
+
+        $ pip install pychoco
+
+    Detailed installation instructions available at:
+    
+    - https://pypi.org/project/pychoco/
+    - https://pychoco.readthedocs.io/en/latest/
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -18,10 +36,18 @@
         :nosignatures:
 
         CPM_choco
+
+    ==============
+    Module details
+    ==============
 """
 import time
 
 import numpy as np
+
+import warnings
+import pkg_resources
+from pkg_resources import VersionConflict
 
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -29,30 +55,30 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals
+from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
-from ..transformations.reification import only_bv_reifies, reify_rewrite
-from ..exceptions import ChocoBoundsException, ChocoTypeException, NotSupportedError
+from ..transformations.safening import no_partial_functions
+from ..transformations.reification import reify_rewrite
+from ..exceptions import ChocoBoundsException
 
 
 class CPM_choco(SolverInterface):
     """
     Interface to the Choco solver python API
 
-    Requires that the 'pychoco' python package is installed:
-    $ pip install pychoco
-
-    See detailed installation instructions at:
-    https://pypi.org/project/pychoco/
-    https://pychoco.readthedocs.io/en/latest/
-
     Creates the following attributes (see parent constructor for more):
-    chc_model: the pychoco.Model() created by _model()
-    chc_solver: the choco Model().get_solver() instance used in solve()
+    
+    - ``chc_model`` : the pychoco.Model() created by _model()
+    - ``chc_solver`` : the choco Model().get_solver() instance used in solve()
+
+    Documentation of the solver's own Python API:
+    
+    - https://pypi.org/project/pychoco/
+    - https://pychoco.readthedocs.io/en/latest/
 
     """
 
@@ -60,10 +86,20 @@ class CPM_choco(SolverInterface):
     def supported():
         # try to import the package
         try:
+            # check if pychoco is installed
             import pychoco as chc
+            # check it's the correct version
+            # CPMPy uses features only available from 0.2.1
+            pkg_resources.require("pychoco>=0.2.1")
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
+        except VersionConflict: # unsupported version of pychoco
+            warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
+                          f"but you have version {pkg_resources.get_distribution('pychoco').version}.")
+            return False
+        except Exception as e:
+            raise e
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -76,11 +112,11 @@ class CPM_choco(SolverInterface):
         calling solve(), a prime way to use more advanced solver features
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None
         """
         if not self.supported():
-            raise Exception("Install the python 'pychoco' package to use this solver interface")
+            raise Exception("CPM_choco: Install the python package 'pychoco' to use this solver interface.")
 
         import pychoco as chc
 
@@ -98,13 +134,20 @@ class CPM_choco(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="choco", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.chc_model
+
     def solve(self, time_limit=None, **kwargs):
         """
             Call the Choco solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit (float, optional):   maximum solve time in seconds 
+                kwargs:                         any keyword argument, sets parameters of solver object
 
         """
         # ensure all vars are known to solver
@@ -114,8 +157,11 @@ class CPM_choco(SolverInterface):
         self.chc_solver = self.chc_model.get_solver()
 
         start = time.time()
-
+        
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.chc_solver.limit_time(str(time_limit) + "s")
 
         if self.has_objective():
@@ -159,6 +205,9 @@ class CPM_choco(SolverInterface):
             # translate objective
             if self.has_objective():
                 self.objective_value_ = sol.get_int_val(self.solver_var(self.obj))
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var._value = None
 
         return has_sol
 
@@ -167,12 +216,13 @@ class CPM_choco(SolverInterface):
             Compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
-                - solution_limit: stop after this many solutions (default: None)
-                - time_limit:  maximum solve time in seconds (float, default: None)
+                solution_limit: stop after this many solutions (default: None)
+                time_limit (float, optional):   maximum solve time in seconds
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found
         """
 
         # ensure all vars are known to solver
@@ -195,6 +245,11 @@ class CPM_choco(SolverInterface):
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
+
+        # if no solutions, clear values of variables
+        if len(sols) == 0:
+            for var in self.user_vars:
+                var._value = None
 
         # display if needed
         if display is not None:
@@ -253,14 +308,16 @@ class CPM_choco(SolverInterface):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
 
-            (technical side note: constraints created during conversion of the objective
-            are premanently posted to the solver. Choco accepts variables to maximize or minimize
-            so it is needed to post constraints and create auxiliary variables)
+            .. note::
+                technical side note: constraints created during conversion of the objective
+                are premanently posted to the solver. Choco accepts variables to maximize or minimize
+                so it is needed to post constraints and create auxiliary variables
         """
 
         # make objective function non-nested
@@ -303,35 +360,29 @@ class CPM_choco(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", 'negative_table', "short_table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
-                     
-        # choco supports reification of any constraint, but has a bug in increasing and decreasing
-        supported_reified = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0",
-                             "allequal", "table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue",
-                             "lex_lesseq", "lex_less",  "among"}
 
-        # for when choco new release comes, fixing the bug on increasing and decreasing
-        #supported_reified = supported
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported_reified)
+        cpm_cons = no_partial_functions(cpm_cons)
+        cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons, supported = supported_reified | {"sum", "wsum"})  # constraints that support reification
+        cpm_cons = reify_rewrite(cpm_cons, supported = supported | {"sum", "wsum"})  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
 
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -360,6 +411,7 @@ class CPM_choco(SolverInterface):
                 c.post()
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _get_constraint(self, cpm_expr):
         """
@@ -378,31 +430,16 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == 'or':
                 return self.chc_model.or_(self.solver_vars(cpm_expr.args))
 
-            # elif cpm_expr.name == "->": # prepared for if pychoco releases if_then addition
-            #     cond, subexpr = cpm_expr.args
-            #     if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl):
-            #         return self.chc_model.or_(self.solver_vars([~cond, subexpr]))
-            #     elif isinstance(cond, _BoolVarImpl):
-            #         return self._get_constraint(subexpr).implied_by(self.solver_var(cond))
-            #     elif isinstance(subexpr, _BoolVarImpl):
-            #         return self._get_constraint(cond).implies(self.solver_var(subexpr))
-            #     else:
-            #         ValueError(f"Unexpected implication: {cpm_expr}")
-
-            elif cpm_expr.name == '->':
+            elif cpm_expr.name == "->":
                 cond, subexpr = cpm_expr.args
-                if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl): # bv -> bv
-                    chc_cond, chc_subexpr = self.solver_vars([cond, subexpr])
-                elif isinstance(cond, _BoolVarImpl): # bv -> expr
-                    chc_cond = self.solver_var(cond)
-                    chc_subexpr = self._get_constraint(subexpr).reify()
-                elif isinstance(subexpr, _BoolVarImpl): # expr -> bv
-                    chc_cond = self._get_constraint(cond).reify()
-                    chc_subexpr = self.solver_var(subexpr)
+                if isinstance(cond, _BoolVarImpl) and isinstance(subexpr, _BoolVarImpl):
+                    return self.chc_model.or_(self.solver_vars([~cond, subexpr]))
+                elif isinstance(cond, _BoolVarImpl):
+                    return self._get_constraint(subexpr).implied_by(self.solver_var(cond))
+                elif isinstance(subexpr, _BoolVarImpl):
+                    return self._get_constraint(cond).implies(self.solver_var(subexpr))
                 else:
-                    raise ValueError(f"Unexpected implication {cpm_expr}")
-
-                return self.chc_model.or_([self.chc_model.bool_not_view(chc_cond), chc_subexpr])
+                    ValueError(f"Unexpected implication: {cpm_expr}")
 
             else:
                 raise NotImplementedError("Not a known supported Choco Operator '{}' {}".format(
@@ -412,30 +449,16 @@ class CPM_choco(SolverInterface):
         # numexpr `comp` bvar|const
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            op = cpm_expr.name if cpm_expr.name != "==" else "="
-
+            op = "=" if cpm_expr.name == "==" else cpm_expr.name
             if is_boolexpr(lhs) and is_boolexpr(rhs): #boolean equality -- Reification
-                # # prepared for if pychoco releases reify_with addition
-                # if isinstance(lhs, _BoolVarImpl) and isinstance(lhs, _BoolVarImpl):
-                #     return self.chc_model.all_equal(self.solver_vars([lhs, rhs]))
-                # elif isinstance(lhs, _BoolVarImpl):
-                #     return self._get_constraint(rhs).reify_with(self.solver_var(lhs))
-                # elif isinstance(rhs, _BoolVarImpl):
-                #     return self._get_constraint(lhs).reify_with(self.solver_var(rhs))
-                # else:
-                #     raise ValueError(f"Unexpected reification {cpm_expr}")
-
                 if isinstance(lhs, _BoolVarImpl) and isinstance(lhs, _BoolVarImpl):
-                    chc_var, bv = self.solver_vars([lhs, rhs])
+                    return self.chc_model.all_equal(self.solver_vars([lhs, rhs]))
                 elif isinstance(lhs, _BoolVarImpl):
-                    bv = self._get_constraint(rhs).reify()
-                    chc_var = self.solver_var(lhs)
+                    return self._get_constraint(rhs).reify_with(self.solver_var(lhs))
                 elif isinstance(rhs, _BoolVarImpl):
-                    bv = self._get_constraint(lhs).reify()
-                    chc_var = self.solver_var(rhs)
+                    return self._get_constraint(lhs).reify_with(self.solver_var(rhs))
                 else:
                     raise ValueError(f"Unexpected reification {cpm_expr}")
-                return self.chc_model.all_equal([chc_var, bv])
 
             elif isinstance(lhs, _NumVarImpl):
                 return self.chc_model.arithm(self.solver_var(lhs), op, self.solver_var(rhs))
@@ -537,6 +560,21 @@ class CPM_choco(SolverInterface):
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.table(array, table)
+            elif cpm_expr.name == 'negative_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = self.solver_vars(cpm_expr.args)
+                return self.chc_model.table(array, table, False)
+            elif cpm_expr.name == 'short_table':
+                assert (len(cpm_expr.args) == 2)  # args = [array, table]
+                array, table = cpm_expr.args
+                table = np.array(table)
+                table[table == STAR] = np.nan
+                table = table.astype(float) # nan's require float dtype
+                # Choco requires a wildcard value not present in dom of args,
+                # take value lower than anything else
+                chc_star = min(np.nanmin(table), *get_bounds(array)[0]) -1
+                chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
+                return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
@@ -554,7 +592,7 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args
-                return self.chc_model.global_cardinality(*self.solver_vars([vars, vals]), self._to_vars(occ), cpm_expr.closed)
+                return self.chc_model.global_cardinality(self._to_vars(vars), self.solver_vars(vals), self._to_vars(occ), cpm_expr.closed)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 
