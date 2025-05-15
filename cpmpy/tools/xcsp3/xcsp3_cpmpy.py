@@ -440,27 +440,18 @@ def xcsp3_cpmpy(benchname: str,
         print_comment(f"took {time_parse:.4f} seconds to parse XCSP3 model [{benchname}]")
 
         if time_limit and time_limit < (time.time() - time_start):
-            print_comment("Time's up!")
-            print_status(ExitStatus.unknown)
-            return 
+            raise TimeoutError("Time's up after parse")
 
         # ---------------- Convert XCSP3 to CPMpy model with callbacks --------------- #
 
         time_callback = time.time()
-        try:
-            model = _load_xcsp3(parser)
-        except NotImplementedError as e:
-            print_status(ExitStatus.unsupported)
-            print_comment(str(e))
-            return
-            #exit(1)
+        model = _load_xcsp3(parser)
         time_callback = time.time() - time_callback
         print_comment(f"took {time_callback:.4f} seconds to convert to CPMpy model")
         
         if time_limit and time_limit < (time.time() - time_start):
-            print_comment("Time's up!")
-            print_status(ExitStatus.unknown)
-            return 
+            raise TimeoutError("Time's up after callback")
+
 
         # ------------------------ Post CPMpy model to solver ------------------------ #
 
@@ -497,9 +488,7 @@ def xcsp3_cpmpy(benchname: str,
         print_comment(f"took {time_post:.4f} seconds to post model to {solver}")
 
         if time_limit and time_limit < (time.time() - time_start):
-            print_comment("Time's up!")
-            print_status(ExitStatus.unknown)
-            return 
+            raise TimeoutError("Time's up after post")
 
 
         # ------------------------------- Solve model ------------------------------- #
@@ -517,22 +506,17 @@ def xcsp3_cpmpy(benchname: str,
         # ------------------------------- Print result ------------------------------- #
 
         if s.status().exitstatus == CPMStatus.OPTIMAL:
-            # TODO: simplify and let print_status take a CPMStatus?
+            print_value(solution_xml(s))
             print_status(ExitStatus.optimal)
-            print_value(solution_xml(s))
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
-            print_status(ExitStatus.sat)
             print_value(solution_xml(s))
+            print_status(ExitStatus.sat)
         elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
             print_status(ExitStatus.unsat)
-        elif s.status().exitstatus == CPMStatus.UNKNOWN:
-            print_status(ExitStatus.unknown)
         else:
             print_status(ExitStatus.unknown)
         
     except MemoryError as e:
-        # TODO: simplify all error throwing/handling with a single outer catch here?
-        # everything inside would simply raise and nothing would be catched?
         print_comment(f"MemoryError raised. Reached limit of {mem_limit} MiB")
         print_status(ExitStatus.unknown)
     except ParseError as e:
@@ -541,6 +525,9 @@ def xcsp3_cpmpy(benchname: str,
             print_status(ExitStatus.unknown)
         else:
             raise e
+    except NotImplementedError as e:
+        print_comment(str(e))
+        print_status(ExitStatus.unsupported)
     except Exception as e:
         print_comment(f"An {type(e)} got raised: {e}")
         import traceback
