@@ -30,38 +30,7 @@ def test_solve(model, exp_sols, user_vars, description=None):
 
 class TestSolvers(unittest.TestCase):
 
-    def test_empty_model(self):
-        test_solve(
-            cp.Model().solveAll(),
-            [tuple()],
-            tuple(),
-            description="An empty CSP (with 0 user variables) should have one solution (with an empty assignment)"
-        )
-
-    def test_true_constant(self):
-        test_solve(
-            cp.Model(cp.BoolVal(True)).solveAll(),
-            [tuple()],
-            tuple(),
-            description="A CSP with one True constant (and 0 user variables) should have one solution (with an empty assignment)"
-        )
-
-    def test_two_true_constants(self):
-        test_solve(
-            cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(),
-            [tuple()],
-            tuple(),
-            description="A CSP with two True constants (and 0 user variables) should have one solution (with an empty assignment)"
-        )
-
-    def test_false_constant(self):
-        test_solve(
-            cp.Model(cp.BoolVal(False)).solveAll(),
-            [],
-            tuple(),
-            description="A CSP with a False constant (and 0 user variables) should have no solutions"
-        )
-
+    
     @pytest.mark.skip(reason="upstream bug, waiting on release for https://github.com/google/or-tools/issues/4640")
     def test_implied_linear(self):
         x,y,z = cp.intvar(0, 2, shape=3,name="xyz")
@@ -910,3 +879,27 @@ class TestSupportedSolvers:
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
         assert s.solveAll() == 4     # check if still correct number of solutions, even though empty model
+
+
+    def test_model_no_vars(self, solver):
+
+        if solver == "gurobi":
+            solution_limit = 10
+        else:
+            solution_limit = None
+
+        # empty model
+        num_sols = cp.Model().solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1    
+
+        # model with one True constant
+        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1        
+
+        # model with two True constants
+        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1
+
+        # model with one False constant
+        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 0
