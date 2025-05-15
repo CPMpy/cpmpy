@@ -1,5 +1,6 @@
 import argparse
 import csv
+import multiprocessing
 import os
 import io
 import time
@@ -13,6 +14,7 @@ import sys
 from datetime import datetime
 from tqdm import tqdm
 import concurrent.futures
+import traceback
 
 import cpmpy
 from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
@@ -96,8 +98,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         
         try:
             # Call xcsp3_cpmpy with the solver and limits
-            with stopit.ThreadingTimeout(time_limit*2) as to_ctx_mgr: # ensure process doesn't hang forever
-                xcsp3_cpmpy(xml_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
+            xcsp3_cpmpy(xml_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
                             
             # Get the output and restore stdout
             output = captured_output.getvalue()
@@ -136,6 +137,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                 result['is_sat'] = False
             else:
                 result['is_sat'] = None
+
+        except Exception as e:
+            raise e
                 
         finally:
             result['time_total'] = time.time() - total_start
@@ -170,6 +174,34 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         if os.path.exists(lock_file):
             os.remove(lock_file)
 
+def run_with_timeout(func, args, timeout):
+    def wrapper(queue):
+        try:
+            result = func(args)
+            queue.put((True, result))
+        except Exception as e:
+            queue.put((False, traceback.format_exc()))
+
+    queue = multiprocessing.Queue()
+    p = multiprocessing.Process(target=wrapper, args=(queue,))
+    p.start()
+    p.join(timeout)
+
+    if p.is_alive():
+        p.terminate()
+        p.join()
+        raise TimeoutError("Function timed out")
+    
+    success, result = queue.get()
+    if not success:
+        raise RuntimeError(f"Function raised exception:\n{result}")
+    return result
+    
+def submit_wrapped(filename, metadata, solver, time_limit, mem_limit, output_file, verbose):
+    return run_with_timeout(execute_instance, 
+                            (filename, metadata, solver, time_limit, mem_limit, output_file, verbose),
+                            timeout=time_limit*2) # <- change limiut as needed, now a very gracious doubling of the tilme
+
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300, mem_limit: int = 4096, output_dir: str = 'results',
                    verbose: bool = False) -> str:
@@ -201,17 +233,19 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     
     # Initialize dataset
     dataset = XCSP3Dataset(year=year, track=track, download=True)
-    
+
     # Process instances in parallel
     with ProcessPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
-        futures = [executor.submit(execute_instance,  # below: args
-                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose))
+        futures = [executor.submit(submit_wrapped,  # below: args
+                                   filename, metadata, solver, time_limit, mem_limit, output_file, verbose)
                    for filename, metadata in dataset]
         # Process results as they complete
-        for future in tqdm(as_completed(futures), total=len(futures), desc=f"Running {solver}"):
+        for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
             try:
-                _ = future.result()  # for cleanliness sake, result is empty
+                _ = future.result(timeout=10)  # for cleanliness sake, result is empty
+            except TimeoutError:
+                print(f"Timeout on job {i}")
             except Exception as e:
                 print(f"ProcessPoolExecutor caught: {e}")
     
