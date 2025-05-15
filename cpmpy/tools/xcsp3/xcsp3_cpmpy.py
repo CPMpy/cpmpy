@@ -18,6 +18,7 @@ from dataclasses import dataclass
 # import psutil
 from io import StringIO 
 import json
+import warnings
 
 
 # sys.path.insert(1, os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
@@ -400,6 +401,10 @@ def xcsp3_cpmpy(benchname: str,
 
         # --------------------------- Global Configuration --------------------------- #
 
+        if solver == "choco" and mem_limit is not None:
+            warnings.warn("'mem_limit' is currently not supported with choco, issues with GraalVM")
+            mem_limit = None
+
         if seed is not None:
             random.seed(seed)
         if mem_limit is not None:
@@ -534,6 +539,8 @@ def xcsp3_cpmpy(benchname: str,
 
 
 if __name__ == "__main__":
+    warnings.filterwarnings("ignore")
+    
     # Configure signal handles
     # signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGTERM, sigterm_handler)

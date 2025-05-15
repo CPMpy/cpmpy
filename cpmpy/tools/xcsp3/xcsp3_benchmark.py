@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, Tuple
 from io import StringIO
 import sys
 from datetime import datetime
+import warnings
 from tqdm import tqdm
 import concurrent.futures
 import traceback
@@ -67,6 +68,8 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         output_file: Path to the output CSV file
         verbose: Whether to show solver output
     """
+    warnings.filterwarnings("ignore")
+    
     filename, metadata, solver, time_limit, mem_limit, output_file, verbose = args
 
     # Fieldnames for the CSV file
@@ -203,7 +206,7 @@ def run_with_timeout(func, args, timeout):
 def submit_wrapped(filename, metadata, solver, time_limit, mem_limit, output_file, verbose):
     return run_with_timeout(execute_instance, 
                             (filename, metadata, solver, time_limit, mem_limit, output_file, verbose),
-                            timeout=time_limit*2) # <- change limiut as needed, now a very gracious doubling of the tilme
+                            timeout=time_limit*2) # <- change limit as needed, now a very gracious doubling of the tilme
 
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
@@ -255,6 +258,8 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     return output_file
 
 if __name__ == "__main__":
+    warnings.filterwarnings("ignore")
+
     parser = argparse.ArgumentParser(description='Benchmark solvers on XCSP3 instances')
     parser.add_argument('--year', type=int, required=True, help='Competition year (e.g., 2023)')
     parser.add_argument('--track', type=str, required=True, help='Track type (e.g., COP, CSP, MiniCOP)')
