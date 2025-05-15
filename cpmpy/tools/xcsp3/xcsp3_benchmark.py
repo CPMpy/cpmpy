@@ -4,6 +4,7 @@ import os
 import io
 import time
 import lzma
+import stopit
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Any, Tuple
@@ -95,8 +96,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         
         try:
             # Call xcsp3_cpmpy with the solver and limits
-            xcsp3_cpmpy(xml_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
-            
+            with stopit.ThreadingTimeout(time_limit*2) as to_ctx_mgr: # ensure process doesn't hang forever
+                xcsp3_cpmpy(xml_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
+                            
             # Get the output and restore stdout
             output = captured_output.getvalue()
             sys.stdout = original_stdout
