@@ -112,7 +112,8 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
             for line in output.split('\n'):
                 if line.startswith('s '):
                     result['status'] = line[2:].strip()
-                elif line.startswith('v '):
+                elif line.startswith('v ') and result['solution'] is None:
+                    # only record first line, contains 'type' and 'cost'
                     result['solution'] = line[2:].strip()
                 elif line.startswith('o '):
                     result['objective_value'] = int(line[2:].strip())
@@ -130,6 +131,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                             result['time_post'] = time_val
                         elif action.startswith('solve'):
                             result['time_solve'] = time_val
+
+        except Exception as e:
+            raise e
             
         finally:
             # Restore stdout in case of exception
@@ -139,7 +143,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         
     except Exception as e:
         result['status'] = ExitStatus.unknown.value
-        result['solution'] = str(e)  # abuse solution field for error message
+        result['solution'] = type(e).__name__ + " -- " + str(e)  # abuse solution field for error message
 
     result['time_total'] = time.time() - total_start
 
