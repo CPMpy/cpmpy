@@ -455,8 +455,6 @@ def xcsp3_cpmpy(benchname: str,
                                        **kwargs)
         # time_limit is generic for all, done later
 
-        print(mem_limit, solver_args)
-
         # Additional XCSP3-specific native transformations
         added_natives = {
             "ortools": {
