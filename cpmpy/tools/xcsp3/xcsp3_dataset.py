@@ -81,8 +81,9 @@ class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
                     self.track_dir.mkdir(parents=True, exist_ok=True)
                     
                     # Extract files for the specified track
+                    prefix = f"{main_folder}/{track}/"
                     for file_info in zip_ref.infolist():
-                        if file_info.filename.startswith(f"{main_folder}/{track}/"):
+                        if file_info.filename.startswith(prefix):
                             # Extract file to track_dir, removing main_folder/track prefix
                             filename = pathlib.Path(file_info.filename).name
                             with zip_ref.open(file_info) as source, open(self.track_dir / filename, 'wb') as target:
@@ -114,21 +115,22 @@ class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
         files = sorted(list(self.track_dir.glob("*.xml.lzma")))
         file_path = files[index]
 
+        filename = str(file_path)
+        if self.transform:
+            # does not need to remain a filename...
+            filename = self.transform(filename)
+            
         # Basic metadata about the instance
         metadata = {
             'year': self.year,
             'track': self.track,
             'name': file_path.stem.replace('.xml.lzma', ''),
-            'path': str(file_path),
+            'path': filename,
         }
-        
-        if self.transform:
-            tree = self.transform(tree)
-            
         if self.target_transform:
             metadata = self.target_transform(metadata)
             
-        return str(file_path), metadata
+        return filename, metadata
 
 if __name__ == "__main__":
     dataset = XCSP3Dataset(year=2024, track="MiniCOP", download=True)
