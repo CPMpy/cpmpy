@@ -251,7 +251,7 @@ if __name__ == "__main__":
     parser.add_argument('--solver', type=str, required=True, help='Solver name (e.g., ortools, exact, choco, ...)')
     parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
     parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
-    parser.add_argument('--mem-limit', type=int, default=4096, help='Memory limit in MB per instance')
+    parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     
