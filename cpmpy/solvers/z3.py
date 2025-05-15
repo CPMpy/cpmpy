@@ -45,6 +45,7 @@
     Module details
     ==============
 """
+from typing import Dict
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -87,7 +88,7 @@ class CPM_z3(SolverInterface):
             raise e
 
 
-    def __init__(self, cpm_model=None, subsolver="sat"):
+    def __init__(self, cpm_model=None, subsolver="sat", added_natives=Dict[str, callable]):
         """
         Constructor of the native solver object
 

@@ -43,6 +43,7 @@
 """
 
 import shutil
+from typing import Dict
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -108,7 +109,7 @@ class CPM_cpo(SolverInterface):
             except:
                 return False
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives=Dict[str, callable]):
         """
         Constructor of the native solver object
 

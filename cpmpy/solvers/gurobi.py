@@ -42,6 +42,7 @@
     ==============
 """
 
+from typing import Dict
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
@@ -109,7 +110,7 @@ class CPM_gurobi(SolverInterface):
             warnings.warn(f"Problem encountered with Gurobi license: {e}")
             return False
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives=Dict[str, callable]):
         """
         Constructor of the native solver object
 

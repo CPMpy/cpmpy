@@ -51,6 +51,7 @@
     Module details
     ==============
 """
+from typing import Dict
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
@@ -130,7 +131,7 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives=Dict[str, callable]):
         """
         Constructor of the native solver object
 
