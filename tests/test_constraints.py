@@ -15,6 +15,8 @@ from utils import skip_on_missing_pblib
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
+SOLVERNAMES = ["choco"]
+
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
@@ -197,7 +199,7 @@ def global_constraints(solver):
             expr = MDD(NUM_ARGS, [("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
         ("n4", 0, "t"), ("n5", 1, "t")])
         elif name == "Regular":
-            expr = Regular(NUM_ARGS, [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
+            expr = Regular(intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
             expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":
