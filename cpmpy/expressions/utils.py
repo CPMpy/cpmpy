@@ -103,9 +103,11 @@ def flatlist(args):
     Flattens an arbitrarily nested list
     from: https://stackoverflow.com/questions/10823877/what-is-the-fastest-way-to-flatten-arbitrarily-nested-lists-in-python
     """
+    if not isinstance(args, list):
+        args = list(args)
     try:
         for i, x in enumerate(args):
-            while isinstance(x, list):    
+            while isinstance(x, Iterable) and not isinstance(x, (str, bytes)):  
                 args[i:i+1] = x
                 x = args[i]
     except IndexError:
