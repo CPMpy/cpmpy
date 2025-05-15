@@ -7,7 +7,7 @@ import time
 import lzma
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Optional, Tuple
 from io import StringIO
 import sys
 from datetime import datetime
@@ -206,7 +206,7 @@ def submit_wrapped(filename, metadata, solver, time_limit, mem_limit, output_fil
                             timeout=time_limit*2) # <- change limiut as needed, now a very gracious doubling of the tilme
 
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
-                   time_limit: int = 300, mem_limit: int = 4096, output_dir: str = 'results',
+                   time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
                    verbose: bool = False) -> str:
     """
     Benchmark a solver on XCSP3 instances.

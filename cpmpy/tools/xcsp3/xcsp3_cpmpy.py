@@ -446,9 +446,11 @@ def xcsp3_cpmpy(benchname: str,
 
         solver_args = solver_arguments(solver, model=model, seed=seed,
                                        intermediate=intermediate,
-                                       cores=cores, mem_limit=mem_limit,
+                                       cores=cores, mem_limit=mib_as_bytes(mem_limit) if mem_limit is not None else None,
                                        **kwargs)
         # time_limit is generic for all, done later
+
+        print(mem_limit, solver_args)
 
         # Additional XCSP3-specific native transformations
         added_natives = {
@@ -545,22 +547,22 @@ if __name__ == "__main__":
     # BENCHNAME: Name of the XCSP3 XML file with path and extension
     parser.add_argument("benchname", type=dir_path) 
     # RANDOMSEED: Seed between 0 and 4294967295
-    parser.add_argument("-s", "--seed", required=False, type=int)
+    parser.add_argument("-s", "--seed", required=False, type=int, default=None)
     # TIMELIMIT: Total CPU time in seconds (before it gets killed)
-    parser.add_argument("-l", "--time-limit", required=False, type=int) # TIMELIMIT
+    parser.add_argument("-l", "--time-limit", required=False, type=int, default=None) # TIMELIMIT
     # MEMLIMIT: Total amount of memory in MiB (mebibyte = 1024 * 1024 bytes)
-    parser.add_argument("-m", "--mem-limit", required=False, type=int)
+    parser.add_argument("-m", "--mem-limit", required=False, type=int, default=None)
     # TMPDIR: Only location where temporary read/write is allowed
     parser.add_argument("-t","--tmpdir", required=False, type=dir_path)
     # NBCORE: Number of processing units (can by any of the following: a processor / a processor core / logical processor (hyper-threading))
-    parser.add_argument("-c", "--cores", required=False, type=int)
+    parser.add_argument("-c", "--cores", required=False, type=int, default=None)
     # DIR: not needed, e.g. we just import files
 
     ## CPMpy optional arguments:
     # The underlying solver which should be used (can also be "solver:subsolver")
     parser.add_argument("--solver", required=True, type=str)
     # How much time before SIGTERM should we halt solver (for the final post-processing steps and solution printing)
-    parser.add_argument("--time-buffer", required=False, type=int)
+    parser.add_argument("--time-buffer", required=False, type=int, default=None)
     # If intermediate solutions should be printed (if the solver supports it)
     parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
 
