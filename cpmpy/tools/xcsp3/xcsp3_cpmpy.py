@@ -17,6 +17,7 @@ import pathlib
 from dataclasses import dataclass
 # import psutil
 from io import StringIO 
+import lzma
 import json
 import warnings
 
@@ -585,7 +586,11 @@ if __name__ == "__main__":
     print_comment(f"Arguments: {args}")
 
     try:
+        if args.benchname.name.endswith(".lzma"):
+            # Decompress the XZ file
+            with lzma.open(args.benchname, 'rt', encoding='utf-8') as f:
+                xml_file = StringIO(f.read()) # read to memory-mapped file
+                args.benchname = xml_file
         xcsp3_cpmpy(**vars(args))
-    except:
-        # exceptions are already printed in the xcsp3 output
-        pass
+    except Exception as e:
+        print_comment(f"{type(e).__name__} -- {e}")
