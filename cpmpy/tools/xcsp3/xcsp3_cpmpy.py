@@ -353,7 +353,7 @@ def solver_arguments(solver: str,
     elif solver.startswith("minizinc"):  # also can have a subsolver
         return minizinc_arguments(solver, cores=cores, seed=seed, **kwargs)
     elif solver == "gurobi":
-        return gurobi_arguments(solver, model, cores=cores, seed=seed, mem_limit=mem_limit, intermediate=intermediate, opt=opt, **kwargs)
+        return gurobi_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, intermediate=intermediate, opt=opt, **kwargs)
     else:
         print_comment(f"setting parameters of {solver} is not (yet) supported")
         return dict()
@@ -538,7 +538,7 @@ def xcsp3_cpmpy(benchname: str,
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
-    
+
     # Configure signal handles
     # signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGTERM, sigterm_handler)
