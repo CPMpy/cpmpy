@@ -138,7 +138,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
             captured_output.close()  # Close the captured output StringIO
         
     except Exception as e:
-        result['status'] = ExitStatus.unknown
+        result['status'] = ExitStatus.unknown.value
         result['solution'] = str(e)  # abuse solution field for error message
 
     result['time_total'] = time.time() - total_start
