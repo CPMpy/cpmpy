@@ -477,7 +477,7 @@ class IfThenElseNum(GlobalFunction):
         Function returning x if b is True and otherwise y
     """
     def __init__(self, b, x,y):
-        super().__init__("IfThenElseNum",[b,x,y])
+        super().__init__("ite_num",[b,x,y])
 
     def decompose_comparison(self, cmp_op, cpm_rhs):
         b,x,y = self.args

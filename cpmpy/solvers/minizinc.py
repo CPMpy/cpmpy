@@ -483,7 +483,7 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite", "IfThenElseNum", "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
+                     "inverse", "ite", "ite_num", "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
                      "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
                      "lex_chain_lesseq", "among"}
@@ -673,7 +673,7 @@ class CPM_minizinc(SolverInterface):
             format_str = "forall(" + durstr + " ++ [disjunctive({},{})])"
             return format_str.format(args_str[0], args_str[1])
 
-        elif expr.name == 'ite' or expr.name == "IfThenElseNum":
+        elif expr.name == 'ite' or expr.name == "ite_num":
             cond, tr, fal = expr.args
             return "if {} then {} else {} endif".format(self._convert_expression(cond), self._convert_expression(tr),
                                                         self._convert_expression(fal))
