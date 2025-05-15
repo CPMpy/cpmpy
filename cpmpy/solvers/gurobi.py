@@ -182,10 +182,13 @@ class CPM_gurobi(SolverInterface):
         self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
-        if grb_status == GRB.OPTIMAL and not self.has_objective():
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif grb_status == GRB.OPTIMAL and self.has_objective():
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        if grb_status == GRB.OPTIMAL:
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif grb_status == GRB.TIME_LIMIT:
@@ -478,6 +481,7 @@ class CPM_gurobi(SolverInterface):
 
             Returns: number of solutions found
         """
+        from gurobipy import GRB
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
@@ -537,5 +541,16 @@ class CPM_gurobi(SolverInterface):
 
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
+
+        if opt_sol_count:
+            if opt_sol_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
+            else:
+                grb_status = self.grb_model.Status
+                if grb_status == GRB.TIME_LIMIT: # reached time limit
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                else: # found all solutions   
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        # if unsat or timout with no solution, .solve() will have already set the state accordingly (so nothing to update)
 
         return opt_sol_count

@@ -43,7 +43,7 @@
 """
 
 import shutil
-from typing import Dict
+import time
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -235,14 +235,28 @@ class CPM_cpo(SolverInterface):
 
         docp = self.get_docp()
         solution_count = 0
-        while solution_limit is None or solution_count < solution_limit:
-            cpo_result = self.solve(time_limit=time_limit, **kwargs)
-            if not cpo_result:
-                break
+        start = time.time()
+        while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
+
+            # display if needed
+            if display is not None:
+                if isinstance(display, Expression):
+                    print(argval(display))
+                elif isinstance(display, list):
+                    print(argvals(display))
+                else:
+                    display()  # callback
+
+            # count and stop
             solution_count += 1
+            if solution_count == solution_limit:
+                break
+
             if self.has_objective():
                 # only find all optimal solutions
                 self.cpo_model.add(self.cpo_model.get_objective_expression().children[0] == self.objective_value_)
+
+            # add nogood on the user variables
             solvars = []
             vals = []
             for cpm_var in self.user_vars:
@@ -256,13 +270,26 @@ class CPM_cpo(SolverInterface):
                 solvars.append(sol_var)
                 vals.append(cpm_value)
             self.cpo_model.add(docp.modeler.forbidden_assignments(solvars, [vals]))
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
+
+            if time_limit is not None: # update remaining time
+                time_limit -= self.status().runtime
+        end = time.time()
+
+        # update solver status
+        self.cpm_status.runtime = end - start
+        if solution_count:
+            if solution_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        # else: <- is implicit since nothing needs to update
+        #     if self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+        #         self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        #     elif self.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+        #         self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         return solution_count
 
     def solver_var(self, cpm_var):
