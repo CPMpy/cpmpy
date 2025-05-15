@@ -402,6 +402,7 @@ def prepend_print():
         sys.stdout = original_stdout
 
  
+# Run the instance; exceptions are caught and printed but also re-raised
 def xcsp3_cpmpy(benchname: str,
                 seed: Optional[int] = None,
                 time_limit: Optional[int] = None,
@@ -514,20 +515,25 @@ def xcsp3_cpmpy(benchname: str,
         elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
             print_status(ExitStatus.unsat)
         else:
+            print_comment("Solver did not find any solution within the time/memory limit")
             print_status(ExitStatus.unknown)
         
     except MemoryError as e:
         print_comment(f"MemoryError raised. Reached limit of {mem_limit} MiB")
         print_status(ExitStatus.unknown)
+        raise e
     except ParseError as e:
         if "out of memory" in e.msg:
             print_comment(f"MemoryError raised by parser. Reached limit of {mem_limit} MiB")
             print_status(ExitStatus.unknown)
         else:
-            raise e
+            print_comment(f"An {type(e)} got raised: {e}")
+            print_status(ExitStatus.unknown)
+        raise e
     except NotImplementedError as e:
         print_comment(str(e))
         print_status(ExitStatus.unsupported)
+        raise e
     except Exception as e:
         print_comment(f"An {type(e)} got raised: {e}")
         import traceback
@@ -536,6 +542,7 @@ def xcsp3_cpmpy(benchname: str,
             if line.strip():
                 print_comment(line)
         print_status(ExitStatus.unknown)
+        raise e
 
 
 if __name__ == "__main__":
@@ -577,4 +584,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print_comment(f"Arguments: {args}")
 
-    xcsp3_cpmpy(**vars(args))
+    try:
+        xcsp3_cpmpy(**vars(args))
+    except:
+        # exceptions are already printed in the xcsp3 output
+        pass

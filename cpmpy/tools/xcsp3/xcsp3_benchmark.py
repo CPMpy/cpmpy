@@ -131,9 +131,6 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                         elif action.startswith('solve'):
                             result['time_solve'] = time_val
             
-        except Exception as e:
-            raise e
-                
         finally:
             # Restore stdout in case of exception
             if not verbose:
