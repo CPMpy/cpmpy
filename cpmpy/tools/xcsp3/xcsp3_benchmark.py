@@ -5,7 +5,6 @@ import os
 import io
 import time
 import lzma
-import stopit
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, Any, Tuple
@@ -15,6 +14,7 @@ from datetime import datetime
 from tqdm import tqdm
 import concurrent.futures
 import traceback
+from filelock import FileLock
 
 import cpmpy
 from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
@@ -151,28 +151,31 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         result['is_sat'] = False
         result['solution'] = str(e)  # abuse solution field for error message
         result['time_total'] = time.time() - total_start
-    
+
     # Use a lock file to prevent concurrent writes
     lock_file = f"{output_file}.lock"
-    while os.path.exists(lock_file):
-        time.sleep(0.1)
-    
+    lock = FileLock(lock_file)
+
     try:
-        # Create lock file
-        open(lock_file, 'w').close()
-            
-        # Pre-check if file exists to determine if we need to write header
-        write_header = not os.path.exists(output_file)
-        
-        with open(output_file, 'a', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            if write_header:
-                writer.writeheader()
-            writer.writerow(result)
+
+        with lock:
+            # Pre-check if file exists to determine if we need to write header
+            write_header = not os.path.exists(output_file)
+
+            with open(output_file, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                if write_header:
+                    writer.writeheader()
+                writer.writerow(result)
+
     finally:
-        # Remove lock file
+        # Optional: cleanup if the lock file somehow persists
         if os.path.exists(lock_file):
-            os.remove(lock_file)
+            try:
+                os.remove(lock_file)
+            except Exception:
+                pass  # avoid crashing on cleanup
+
 
 def run_with_timeout(func, args, timeout):
     def wrapper(queue):
