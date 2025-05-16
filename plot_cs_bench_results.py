@@ -2,58 +2,86 @@
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
 
-df = pd.read_csv("xcsp3_stats.csv")
-df.set_index("instance", inplace=True)
-df.sort_values(by="nb_cons_trans", inplace=True)
-df['variant'] = 'master'
-df['instance'] = df.index
-df = df.sort_index()
+year = 2023
+track = "CSP"
 
-df_cse = pd.read_csv("xcsp3_stats_cse.csv")
-df_cse.set_index("instance", inplace=True)
-df_cse.sort_values(by="nb_cons_trans", inplace=True)
-df_cse['variant'] = 'cse'
-df_cse['instance'] = df_cse.index
-df_cse = df_cse.sort_index()
+dfs = []
+for fname in os.listdir("."):
+    if fname.startswith("xcsp3_stats"):
+        if "cse" in fname:
+            df = pd.read_csv(fname)
+            df['variant'] = "cse"
+            dfs.append(df)
+        else:
+            df = pd.read_csv(fname)
+            df['variant'] = "master"
+            dfs.append(df)
 
-df_all = pd.concat([df, df_cse], axis=0)
 
+dfs = pd.concat(dfs, axis=0, ignore_index=True)
+dfs['full_variant'] = dfs['solver'] + "_" + dfs['variant']
 
+print(dfs[['instance','transform_time','full_variant']][dfs['transform_time'] > 20])
 
 import seaborn as sns
 
 # info for variables
 
-fig, ax = plt.subplots(figsize=(5, 5))
+if False:
 
-ax.scatter(x = df['nb_vars_trans'], y= df_cse['nb_vars_trans'])
+    fig, ax = plt.subplots(figsize=(5, 5))
+    sns.ecdfplot(
+        data =dfs, 
+        y = "nb_vars_trans",
+        hue = "full_variant",
+        ax = ax,
+        stat="count"
+    )
 
-ax.set_title("Number of variables after transformation (ortools)")
-ax.set_xlabel("master")
-ax.set_ylabel("cse")
+    ax.set_xlim(0,200)
+    ax.set_title("Number of variables after transformation")
+    ax.set_xlabel("Number of variables")
+    ax.set_ylabel("Number of instances")
+    plt.show()
 
-ax.set_xscale("log")
-ax.set_yscale("log")
+    fig, ax = plt.subplots(figsize=(5, 5))
+    sns.ecdfplot(
+        data =dfs, 
+        y = "nb_cons_trans",
+        hue = "full_variant",
+        ax = ax,
+        stat="count"
+    )
 
-lim = max(*ax.get_xlim(), *ax.get_ylim())
-ax.plot([0, lim], [0, lim], ls="--", c=".3")
+    ax.set_xlim(0,200)
+    ax.set_title("Number of constraints after transformation")
+    ax.set_xlabel("Number of instances")
+    ax.set_ylabel("Number of constraints")
+    plt.show()
 
-plt.show()
+    
 
 
-fig, ax = plt.subplots(figsize=(5, 5))
+if False:
 
-ax.scatter(x = df['nb_cons_trans'], y= df_cse['nb_cons_trans'])
+    fig, ax = plt.subplots(figsize=(5, 5))
 
-ax.set_title("Number of constraints after transformation (ortools)")
-ax.set_xlabel("master")
-ax.set_ylabel("cse")
+    sns.ecdfplot(
+        data =dfs, 
+        y = "transform_time",
+        hue = "full_variant",
+        ax = ax,
+        stat="count"
+    )
 
-ax.set_xscale("log")
-ax.set_yscale("log")
+    ax.set_title("Transformation time")
+    ax.set_xlabel("Number of instances")
+    ax.set_ylabel("Time (s)")
 
-lim = max(*ax.get_xlim(), *ax.get_ylim())
-ax.plot([0, lim], [0, lim], ls="--", c=".3")
+    ax.set_xlim(0,200)
+    plt.show()
 
-plt.show()
+
+

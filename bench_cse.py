@@ -16,16 +16,16 @@ import multiprocessing as mp
 import signal
 import time
 
-def do_transform(fname, solver):
+def do_transform(fname, solvername):
     signal.signal(signal.SIGALRM, signal_handler)
     signal.alarm(60)
 
-    with open(os.path.join("2023/CSP23", fname), "rb") as f:
+    with open(os.path.join(dirname, fname), "rb") as f:
         
         xml_str = lzma.decompress(f.read()).decode("utf-8")
         model = read_xcsp3(StringIO(xml_str))
 
-        solver = cp.SolverLookup.get(solver)
+        solver = cp.SolverLookup.get(solvername)
         start = time.time()
         transformed = solver.transform(model.constraints)
         transform_time = time.time() - start
@@ -37,7 +37,8 @@ def do_transform(fname, solver):
             "nb_cons_orig": len(toplevel_list(model.constraints)),
             "nb_cons_trans": len(transformed),
 
-            "transform_time": transform_time
+            "transform_time": transform_time,
+            "solver": solvername
         }
     
     
@@ -53,7 +54,7 @@ def read_file_and_transform(fname):
     
     with open(os.path.join("2023/CSP23", fname), "rb") as f:
         try:
-            stats = do_transform(fname, "ortools")
+            stats = do_transform(fname, "exact")
             stats['instance'] = pretty_instance
         except TimeoutError:
             stats = dict(instance=pretty_instance, error="timeout")
@@ -65,7 +66,11 @@ def read_file_and_transform(fname):
 
 if __name__ == "__main__":
 
-    fnames = sorted(os.listdir("2023/CSP23"))
+    year = 2023
+    track = "CSP"
+
+    dirname = f"{year}/{track}{str(year)[2:]}"
+    fnames = sorted(os.listdir(dirname))
 
     import pandas as pd
     all_stats = []
@@ -75,7 +80,7 @@ if __name__ == "__main__":
 
     df = pd.DataFrame(all_stats)
     df.set_index("instance", inplace=True)
-    df.to_csv("xcsp3_stats_cse.csv")
+    df.to_csv(f"xcsp3_stats_{str(year)[2:]}_{track}_cse_exact.csv")
 
     print(df)
 
