@@ -83,12 +83,3 @@ if __name__ == "__main__":
     df.to_csv(f"xcsp3_stats_{str(year)[2:]}_{track}_cse_exact.csv")
 
     print(df)
-
-        
-        
-
-
-
-
-
-
