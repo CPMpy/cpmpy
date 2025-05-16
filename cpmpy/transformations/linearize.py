@@ -252,7 +252,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
                             raise ValueError("Attempting linerarization of unsafe division, safen expression first (cpmpy/transformations/safen.py)")
 
                         r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
-                        mult_res, side_cons = get_or_make_var(b * rhs)
+                        mult_res, side_cons = get_or_make_var(b * rhs, expr_dict=expr_dict)
                         cpm_expr = eval_comparison(cpm_expr.name, a, mult_res + r)
 
                         # need absolute values of variables later
@@ -265,7 +265,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
                         side_cons.append(abs_of_r < abs_of_b)
 
                         # ensure we round towards zero
-                        mul_abs, extra_cons = get_or_make_var(abs_of_b * abs_of_rhs)
+                        mul_abs, extra_cons = get_or_make_var(abs_of_b * abs_of_rhs, expr_dict=expr_dict)
                         side_cons += extra_cons + [mul_abs <= abs_of_a]
                         newlist += linearize_constraint(side_cons, supported=supported, reified=reified, expr_dict=expr_dict)
 
