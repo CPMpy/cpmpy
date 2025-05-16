@@ -502,7 +502,7 @@ class CPM_ortools(SolverInterface):
                     # catch tricky-to-find ortools limitation
                     x,y = lhs.args
                     if get_bounds(y)[0] <= 0: # not supported, but result of modulo is agnositic to sign of second arg
-                        y, link = get_or_make_var(-lhs.args[1])
+                        y, link = get_or_make_var(-lhs.args[1], expr_dict=self.expr_dict)
                         self += link
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars([x,y]))
                 elif lhs.name == 'pow':
@@ -516,7 +516,7 @@ class CPM_ortools(SolverInterface):
                         b, n = lhs.args
                         new_lhs = 1
                         for exp in range(n):
-                            new_lhs, new_cons = get_or_make_var(b * new_lhs)
+                            new_lhs, new_cons = get_or_make_var(b * new_lhs, expr_dict=self.expr_dict)
                             self += new_cons
                         return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
 

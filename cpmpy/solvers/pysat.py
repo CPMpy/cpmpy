@@ -297,12 +297,12 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({"alldifferent"}), expr_dict=self.expr_dict)
-        cpm_cons = simplify_boolean(cpm_cons, expr_dict=self.expr_dict)
+        cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, expr_dict=self.expr_dict)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, expr_dict=self.expr_dict)
         cpm_cons = only_implies(cpm_cons, expr_dict=self.expr_dict)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or"}), expr_dict=self.expr_dict)  # the core of the MIP-linearization
-        cpm_cons = only_positive_coefficients(cpm_cons, expr_dict=self.expr_dict)
+        cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
     def add(self, cpm_expr_orig):

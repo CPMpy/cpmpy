@@ -357,7 +357,7 @@ class CPM_gcs(SolverInterface):
         self += flat_cons # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
-        (obj, obj_cons) = get_or_make_var(flat_obj)
+        (obj, obj_cons) = get_or_make_var(flat_obj, expr_dict=self.expr_dict)
         self += obj_cons
 
         self.objective_var = obj
