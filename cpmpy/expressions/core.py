@@ -433,7 +433,7 @@ class Expression(object):
     def __bool__(self):
         raise ValueError(f"__bool__ should not be called on a CPMPy expression {self} as it will always return True\n"
                          "Do not use an expression as argument in an `if` statement and use cpmpy.any, cpmpy.max instead of python builtins\n"
-                         "To check whether an expression is part of a collection, make sure to convert the collection to a set first.   ")
+                         "If you think this is an error, please report on github")
 
 class BoolVal(Expression):
     """
