@@ -131,6 +131,7 @@ def reify_rewrite(constraints, supported=frozenset(), expr_dict=None):
         :param supported: a (frozen)set of expression names that support reification in the solver, including
                           supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. ``BV -> (LHS == V)``
     """
+    assert expr_dict is not None
     if expr_dict is None:
         expr_dict = dict()
 

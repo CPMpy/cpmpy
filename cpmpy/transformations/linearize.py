@@ -127,7 +127,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
 
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
-                    lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True)
+                    lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True, expr_dict=expr_dict)
                     # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
                     indicator_constraints=[]
                     for lin in lin_sub:
@@ -291,7 +291,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
                         lhs_is_pos = cp.boolvar()
                         newcons = [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x <= -1),
                                    lhs_is_pos.implies(x == rhs), (~lhs_is_pos).implies(x + rhs == 0)]
-                        newlist += linearize_constraint(newcons, supported=supported, reified=reified)
+                        newlist += linearize_constraint(newcons, supported=supported, reified=reified, expr_dict=expr_dict)
                     continue # all should be linear now
 
 
@@ -310,7 +310,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
                 if t_lb and t_ub:
                     continue
                 elif not t_lb and not t_ub:
-                    newlist += linearize_constraint([BoolVal(False)], supported=supported) # post the linear version of False
+                    newlist += linearize_constraint([BoolVal(False)], supported=supported, expr_dict=expr_dict) # post the linear version of False
                     break
 
             # now fix the comparisons themselves
@@ -399,8 +399,7 @@ def only_positive_bv(lst_of_expr, expr_dict=None):
 
         Resulting expression is linear if the original expression was linear.
     """
-    if expr_dict is None:
-        expr_dict = dict()
+    assert expr_dict is not None
     newlist = []
     for cpm_expr in lst_of_expr:
 

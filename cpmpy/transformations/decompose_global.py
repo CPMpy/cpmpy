@@ -67,7 +67,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 continue
 
             if any(isinstance(a,GlobalFunction) for a in expr.args):
-                expr, base_con = normalized_numexpr(expr, expr_dict)
+                expr, base_con = normalized_numexpr(expr, expr_dict=expr_dict)
                 _toplevel.extend(base_con)  # should be added toplevel
             # recurse into arguments, recreate through constructor (we know it stores no other state)
             args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, expr_dict=expr_dict)

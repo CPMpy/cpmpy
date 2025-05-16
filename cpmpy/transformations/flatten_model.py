@@ -254,18 +254,18 @@ def flatten_constraint(expr, expr_dict=None):
                 continue
 
             # ensure rhs is var
-            (rvar, rcons) = get_or_make_var(rexpr, expr_dict)
+            (rvar, rcons) = get_or_make_var(rexpr, expr_dict=expr_dict)
             # Reification (double implication): Boolexpr == Var
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
                 if rvar.is_bool():
                     # this is a reification
-                    (lhs, lcons) = normalized_boolexpr(lexpr, expr_dict)
+                    (lhs, lcons) = normalized_boolexpr(lexpr, expr_dict=expr_dict)
                 else:
                     # integer comparison
-                    (lhs, lcons) = get_or_make_var(lexpr, expr_dict)
+                    (lhs, lcons) = get_or_make_var(lexpr, expr_dict=expr_dict)
             else:
-                (lhs, lcons) = normalized_numexpr(lexpr, expr_dict)
+                (lhs, lcons) = normalized_numexpr(lexpr, expr_dict=expr_dict)
 
             newlist.append(Comparison(exprname, lhs, rvar))
             newlist.extend(lcons)
@@ -330,7 +330,7 @@ def get_or_make_var(expr, expr_dict=None):
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
-
+    assert expr_dict is not None
     if expr_dict is None:
         expr_dict = dict()
     if expr in expr_dict:
