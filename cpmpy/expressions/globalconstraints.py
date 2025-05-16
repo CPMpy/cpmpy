@@ -547,7 +547,7 @@ class InDomain(GlobalConstraint):
         """
         expr, arr = self.args
         lb, ub = get_bounds(expr)
-
+        
         defining = []
         #if expr is not a var
         if not isinstance(expr,Expression):

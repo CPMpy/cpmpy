@@ -569,13 +569,6 @@ class Comparison(Expression):
             return repr(self.args[0]) == repr(self.args[1])
         super().__bool__() # default to exception
 
-    def get_repr(self):
-        if self.name == "==" or self.name == "!=":
-            return (self.name, frozenset(get_repr(self.args[0], get_repr(self.args[1]))))
-        else: # order matters, return tuple
-            return (self.name, (get_repr(self.args[0], get_repr(self.args[1]))))
-                                         
-
     # return the value of the expression
     # optional, default: None
     def value(self):
@@ -589,6 +582,12 @@ class Comparison(Expression):
         elif self.name == ">":  return arg_vals[0] > arg_vals[1]
         elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
         return None # default
+    
+    def get_repr(self):
+        if self.name == "==" or self.name == "!=":
+            return (self.name, frozenset(get_repr(self.args[0], get_repr(self.args[1]))))
+        else: # order matters, return tuple
+            return (self.name, (get_repr(self.args[0], get_repr(self.args[1]))))
 
 
 class Operator(Expression):
