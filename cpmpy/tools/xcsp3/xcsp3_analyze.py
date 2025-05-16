@@ -1,8 +1,21 @@
 import argparse
 from pathlib import Path
+import re
 import matplotlib
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+
+def extract_cost(solution_str):
+    """
+    Extract numeric cost from solution string like '<instantiation ... cost="69">'
+    """
+    if isinstance(solution_str, str):
+        match = re.search(r'cost="(\d+)"', solution_str)
+        if match:
+            return float(match.group(1))
+    return np.nan
+
 
 def xcsp3_plot(df, time_limit=None):
     # Get unique solvers
@@ -15,11 +28,17 @@ def xcsp3_plot(df, time_limit=None):
     else:
         status_filter = 'SATISFIABLE'
     df = df[(df['status'] == status_filter) | (df['status'] == 'UNSATISFIABLE')]  # only those that reached the desired status
+
+    # Count how many instances each solver solved (with correct status)
+    solver_counts = df['solver'].value_counts()
+
+    # Sort solvers descending by number of instances solved
+    solvers_sorted = solver_counts.sort_values(ascending=False).index.tolist()
     
     # Create figure
     fig = plt.figure(figsize=(10, 6))
     
-    for solver in solvers:
+    for solver in sorted(solvers): # Sort solver names for consistent ordering
         # Get data for this solver
         solver_data = df[df['solver'] == solver]
         
@@ -50,6 +69,52 @@ def xcsp3_plot(df, time_limit=None):
     # Set x-axis limit if specified
     if time_limit is not None:
         plt.xlim(0, time_limit)
+
+    return fig
+
+def xcsp3_objective_performance_profile(df):
+    # Parse cost from the solution string
+    df = df.copy()
+    df['cost'] = df['solution'].apply(extract_cost)
+
+    # Pivot to get costs per instance per solver
+    pivot = df.pivot_table(index='instance', columns='solver', values='cost')
+
+    # Drop instances not solved by all solvers (for fair comparison)
+    pivot = pivot.dropna(how='all')
+
+    # Compute the best (minimum) cost per instance
+    best_costs = pivot.min(axis=1)
+
+    # Compute performance ratios: solver_cost / best_cost
+    perf_ratios = pivot.divide(best_costs, axis=0)
+
+    # Replace inf or NaN with a large number for safe plotting
+    perf_ratios = perf_ratios.replace([np.inf, np.nan], np.max(perf_ratios.values) * 10)
+
+    # Compute a score for sorting: fraction of instances with ratio ≤ 1.1 (or similar)
+    score_threshold = 1.1
+    solver_scores = (perf_ratios <= score_threshold).mean().sort_values(ascending=False)
+    sorted_solvers = solver_scores.index.tolist()
+
+    # τ range for plotting
+    tau_vals = np.linspace(1, perf_ratios.max().max(), 500)
+
+    # Plotting
+    fig = plt.figure(figsize=(10, 6))
+
+    for solver in sorted_solvers:
+        y_vals = [(perf_ratios[solver] <= tau).mean() for tau in tau_vals]
+        plt.plot(tau_vals, y_vals, label=solver, linewidth=2.5)
+
+    plt.xlabel(r'Objective ratio $\tau$')
+    plt.ylabel('Fraction of instances')
+    year_track_pairs = df[['year', 'track']].drop_duplicates()
+    datasets = ', '.join([f'{row.year}:{row.track}' for _, row in year_track_pairs.iterrows()])
+    plt.title(f'Objective Performance Profile ({datasets})')
+    plt.grid(True)
+    plt.legend()
+    plt.xlim(left=1)
 
     return fig
 
@@ -102,6 +167,7 @@ def main():
     
     # Create performance plot
     fig = xcsp3_plot(merged_df, args.time_limit)
+    # fig = xcsp3_objective_performance_profile(merged_df)
 
     # Save or show plot
     if args.output:

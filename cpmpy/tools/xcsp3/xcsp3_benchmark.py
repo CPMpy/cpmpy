@@ -5,7 +5,7 @@ import os
 import io
 import time
 import lzma
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 from io import StringIO
@@ -53,6 +53,46 @@ class Tee:
         for s in self.streams:
             s.flush()
 
+class PipeWriter:
+    """
+    Stdout wrapper for a multiprocessing pipe.
+    """
+    def __init__(self, conn):
+        self.conn = conn
+    def write(self, data):
+        if data:  # avoid empty writes
+            self.conn.send(data)
+    def flush(self):
+        pass  # no buffering
+
+
+def xcsp3_wrapper(conn, kwargs, verbose):
+    """
+    Wraps a call to xcsp3_cpmpy as to correctly 
+    forward stdout to the multiprocessing pipe (conn).
+    Also sends a last status report though the pipe.
+
+    Status report can be missing when process has been terminated by a SIGTERM.
+    """
+    original_stdout = sys.stdout
+
+    pipe_writer = PipeWriter(conn)
+
+    if not verbose:
+        sys.stdout = pipe_writer # only forward to pipe
+    else:
+        sys.stdout = Tee(original_stdout, pipe_writer) # forward to pipe and console
+
+    try:
+        xcsp3_cpmpy(**kwargs)
+        conn.send({"status": "ok"})
+    except Exception as e: # capture exceptions and report in state
+        tb_str = traceback.format_exc()
+        conn.send({"status": "error", "exception": e, "traceback": tb_str})
+    finally:
+        sys.stdout = original_stdout
+        conn.close()
+
 # exec_args = (filename, metadata, solver, time_limit, mem_limit, output_file, verbose) 
 def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     """
@@ -84,66 +124,60 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     # Start total timing
     total_start = time.time()
 
-    try:
-        # Decompress the XZ file
-        with lzma.open(filename, 'rt', encoding='utf-8') as f:
-            xml_file = io.StringIO(f.read()) # read to memory-mapped file
-                
-        # Capture stdout for output extranction
-        captured_output = StringIO()
-        original_stdout = sys.stdout
-        if not verbose:
-            # prevent xcsp3_cpmpy from printing if not verbose
-            sys.stdout = captured_output
-        else:
-            # print to original stdout and captured_output
-            sys.stdout = Tee(original_stdout, captured_output)
-        
-        try:
-            # Call xcsp3_cpmpy with the solver and limits
-            xcsp3_cpmpy(xml_file, solver=solver, time_limit=time_limit, mem_limit=mem_limit, cores=1)
-            xml_file.close()  # Explicitly close the StringIO object
-                            
-            # Get the output and restore stdout
-            output = captured_output.getvalue()
-            sys.stdout = original_stdout
-            
-            # Parse the output to get status, solution and timings
-            for line in output.split('\n'):
-                if line.startswith('s '):
-                    result['status'] = line[2:].strip()
-                elif line.startswith('v ') and result['solution'] is None:
-                    # only record first line, contains 'type' and 'cost'
-                    result['solution'] = line[2:].strip()
-                elif line.startswith('o '):
-                    result['objective_value'] = int(line[2:].strip())
-                elif line.startswith('c took '):
-                    # Parse timing information
-                    parts = line.split(' seconds to ')
-                    if len(parts) == 2:
-                        time_val = float(parts[0].replace('c took ', ''))
-                        action = parts[1].strip()
-                        if action.startswith('parse'):
-                            result['time_parse'] = time_val
-                        elif action.startswith('convert'):
-                            result['time_model'] = time_val
-                        elif action.startswith('post'):
-                            result['time_post'] = time_val
-                        elif action.startswith('solve'):
-                            result['time_solve'] = time_val
+    # Call xcsp3 in separate process
+    ctx = multiprocessing.get_context("spawn")
+    parent_conn, child_conn = multiprocessing.Pipe() # communication pipe between processes
+    process = ctx.Process(target=xcsp3_wrapper, args=(child_conn, {"benchname":filename, "solver": solver, "time_limit": time_limit, "mem_limit": mem_limit}, verbose))
+    process.start()
+    process.join()
 
-        except Exception as e:
-            raise e
-            
-        finally:
-            # Restore stdout in case of exception
-            if not verbose:
-                sys.stdout = original_stdout
-            captured_output.close()  # Close the captured output StringIO
-        
-    except Exception as e:
-        result['status'] = ExitStatus.unknown.value
-        result['solution'] = type(e).__name__ + " -- " + str(e)  # abuse solution field for error message
+    # Collect output
+    output = []
+    while parent_conn.poll(timeout=1):
+        output.append(parent_conn.recv())
+
+    # Process output
+    status = output[-1] # exit state should be at the end
+    if type(status) == str: # if exit state is missing, process ended due to sigterm
+        # Process exited prematurely due to sigterm
+        status = {"status": "error", "exception": "sigterm"}
+        output = "".join(output)
+    else:
+        output = "".join(output[:-1])
+       
+    # Parse the output to get status, solution and timings
+    for line in output.split('\n'):
+        if line.startswith('s '):
+            result['status'] = line[2:].strip()
+        elif line.startswith('v ') and result['solution'] is None:
+            # only record first line, contains 'type' and 'cost'
+            result['solution'] = line[2:].strip()
+        elif line.startswith('o '):
+            result['objective_value'] = int(line[2:].strip())
+        elif line.startswith('c took '):
+            # Parse timing information
+            parts = line.split(' seconds to ')
+            if len(parts) == 2:
+                time_val = float(parts[0].replace('c took ', ''))
+                action = parts[1].strip()
+                if action.startswith('parse'):
+                    result['time_parse'] = time_val
+                elif action.startswith('convert'):
+                    result['time_model'] = time_val
+                elif action.startswith('post'):
+                    result['time_post'] = time_val
+                elif action.startswith('solve'):
+                    result['time_solve'] = time_val
+
+    # Parse the exit status
+    if status["status"] == "error":
+        # Ignore timeouts
+        if "TimeoutError" in repr(status["exception"]):
+            pass
+        # All other exceptions, put in solution field
+        else:
+            result['status'] = ExitStatus.unknown.value
+            result["solution"] = status["exception"]    
 
     result['time_total'] = time.time() - total_start
 
@@ -230,18 +264,23 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     dataset = XCSP3Dataset(year=year, track=track, download=True)
 
     # Process instances in parallel
-    with ProcessPoolExecutor(max_workers=workers) as executor:
+    with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
-        futures = [executor.submit(submit_wrapped,  # below: args
-                                   filename, metadata, solver, time_limit, mem_limit, output_file, verbose)
+        futures = [executor.submit(execute_instance,  # below: args
+                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose))
                    for filename, metadata in dataset]
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
             try:
-                _ = future.result(timeout=10)  # for cleanliness sake, result is empty
-            except TimeoutError:
-                print(f"Timeout on job {i}: {dataset[i][1]['name']}")  # print the metadata
+                _ = future.result()  # for cleanliness sake, result is empty
+            # except TimeoutError:
+            #     pass
+                # print(f"Timeout on job {i}: {dataset[i][1]['name']}")  # print the metadata
             except Exception as e:
+                print(type(e))
+                # Expected exception -> due to RLIMIT_CPU to terminate hanging instances
+                # if str(e) == "A process in the process pool was terminated abruptly while the future was running or pending.":
+                #     continue
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
     
     return output_file

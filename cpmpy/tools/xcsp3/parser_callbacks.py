@@ -294,7 +294,7 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_all_different_lists(self, lists: list[list[Variable]], excepting: None | list[list[int]]):
         if excepting is None:
-            self.cpm_model += cp.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists])
+            self.cpm_model += xglobals.AllDifferentLists([self.get_cpm_vars(lst) for lst in lists])
         else:
             self.cpm_model += xglobals.AllDifferentListsExceptN([self.get_cpm_vars(lst) for lst in lists], excepting)
 
