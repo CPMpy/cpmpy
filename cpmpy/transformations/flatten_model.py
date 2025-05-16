@@ -344,18 +344,21 @@ def get_or_make_var(expr, expr_dict=None):
 
     if expr.is_bool():
         # normalize expr into a boolexpr LHS, reify LHS == bvar
-        (flatexpr, flatcons) = normalized_boolexpr(expr)
+        (flatexpr, flatcons) = normalized_boolexpr(expr, expr_dict=expr_dict)
 
         if isinstance(flatexpr,_BoolVarImpl):
             # avoids unnecessary bv == bv or bv == ~bv assignments
             return flatexpr,flatcons
         bvar = _BoolVarImpl()
+
+        # save expr in dict
+        expr_dict[expr] = bvar
         return bvar, [flatexpr == bvar] + flatcons
 
     else:
         # normalize expr into a numexpr LHS,
         # then compute bounds and return (newintvar, LHS == newintvar)
-        (flatexpr, flatcons) = normalized_numexpr(expr)
+        (flatexpr, flatcons) = normalized_numexpr(expr, expr_dict=expr_dict)
 
         lb, ub = flatexpr.get_bounds()
         if not is_int(lb) or not is_int(ub):
@@ -363,6 +366,9 @@ def get_or_make_var(expr, expr_dict=None):
                           f" - {ub}({type(ub)}. CPMpy will rewrite this constriants with integer bounds instead.")
             lb, ub = math.floor(lb), math.ceil(ub)
         ivar = _IntVarImpl(lb, ub)
+
+        # save expr in dict
+        expr_dict[expr] = ivar
         return ivar, [flatexpr == ivar] + flatcons
 
 def get_or_make_var_or_list(expr, expr_dict=None):
