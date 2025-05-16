@@ -566,7 +566,7 @@ class Comparison(Expression):
     def __bool__(self):
         # will be called when comparing elements in a container, but always with `==`
         if self.name == "==":
-            return repr(self.args[0]) == repr(self.args[1])
+            return get_repr(self.args[0]) == get_repr(self.args[1])
         super().__bool__() # default to exception
 
     # return the value of the expression
