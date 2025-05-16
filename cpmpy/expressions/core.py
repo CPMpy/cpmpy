@@ -585,9 +585,9 @@ class Comparison(Expression):
     
     def get_repr(self):
         if self.name == "==" or self.name == "!=":
-            return (self.name, frozenset(get_repr(self.args[0], get_repr(self.args[1]))))
+            return (self.name, frozenset((get_repr(self.args[0]), get_repr(self.args[1]))))
         else: # order matters, return tuple
-            return (self.name, (get_repr(self.args[0], get_repr(self.args[1]))))
+            return (self.name, (get_repr(self.args[0]), get_repr(self.args[1])))
 
 
 class Operator(Expression):
