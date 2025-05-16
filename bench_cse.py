@@ -14,6 +14,7 @@ import resource
 import sys
 import multiprocessing as mp
 import signal
+import time
 
 def do_transform(fname, solver):
     signal.signal(signal.SIGALRM, signal_handler)
@@ -25,7 +26,9 @@ def do_transform(fname, solver):
         model = read_xcsp3(StringIO(xml_str))
 
         solver = cp.SolverLookup.get(solver)
+        start = time.time()
         transformed = solver.transform(model.constraints)
+        transform_time = time.time() - start
 
         return  {
             "nb_vars_orig": len(get_variables(model.constraints)),
@@ -33,6 +36,8 @@ def do_transform(fname, solver):
             
             "nb_cons_orig": len(toplevel_list(model.constraints)),
             "nb_cons_trans": len(transformed),
+
+            "transform_time": transform_time
         }
     
     
