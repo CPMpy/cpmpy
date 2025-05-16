@@ -29,7 +29,7 @@ import seaborn as sns
 
 # info for variables
 
-if False:
+if True:
 
     fig, ax = plt.subplots(figsize=(5, 5))
     sns.ecdfplot(
@@ -42,8 +42,8 @@ if False:
 
     ax.set_xlim(0,200)
     ax.set_title("Number of variables after transformation")
+    ax.set_xlabel("Number of instances")
     ax.set_xlabel("Number of variables")
-    ax.set_ylabel("Number of instances")
     plt.show()
 
     fig, ax = plt.subplots(figsize=(5, 5))
@@ -64,7 +64,7 @@ if False:
     
 
 
-if False:
+if True:
 
     fig, ax = plt.subplots(figsize=(5, 5))
 
