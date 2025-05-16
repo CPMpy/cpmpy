@@ -63,7 +63,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
 from ..transformations.reification import reify_rewrite
-from ..exceptions import ChocoBoundsException
+from ..exceptions import ChocoBoundsException, NotSupportedError
 
 
 class CPM_choco(SolverInterface):
@@ -370,7 +370,7 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "short_table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
 
         cpm_cons = no_partial_functions(cpm_cons)
@@ -575,6 +575,21 @@ class CPM_choco(SolverInterface):
                 chc_star = min(np.nanmin(table), *get_bounds(array)[0]) -1
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
+            elif cpm_expr.name == "regular":
+                from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
+                array, transitions, start, accepting = cpm_expr.args
+                for i, (lb, ub) in enumerate(zip(*get_bounds(array))):
+                    if lb < 0 or ub > 65535:
+                        raise NotSupportedError(f"Choco regular only supports variables within domain 0..65535, got {array[i]} with bounds {lb}..{ub}")
+                # convert to Automaton Choco object
+                automaton = FiniteAutomaton()
+                for node, i in cpm_expr.node_map.items(): automaton.add_state()
+                for src, label, dst in transitions:
+                    automaton.add_transition(cpm_expr.node_map[src], cpm_expr.node_map[dst], label)
+                automaton.set_initial_state(cpm_expr.node_map[start])
+                automaton.set_final(*[cpm_expr.node_map[a] for a in accepting])
+                return self.chc_model.regular(self._to_vars(array), automaton)
+            
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
