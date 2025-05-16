@@ -63,7 +63,7 @@ from .normalize import toplevel_list
 from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Operator, BoolVal, cpm_dict
+from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
@@ -84,7 +84,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
         reified: whether the constraint is fully reified
     """
     if expr_dict is None:
-        expr_dict = cpm_dict()
+        expr_dict = dict()
 
     newlist = []
     for cpm_expr in lst_of_expr:
@@ -204,7 +204,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
 
                         # k * y + z == x
                         k = intvar(*get_bounds((x - rhs) // y))
-                        mult_res, side_cons = get_or_make_var(k * y)
+                        mult_res, side_cons = get_or_make_var(k * y, expr_dict=expr_dict)
                         cpm_expr = (mult_res + rhs) == x
                         # |z| < |y|
                         abs_of_z = cp.intvar(*get_bounds(abs(rhs)))
@@ -237,7 +237,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
                         raise NotImplementedError("Cannot linearize division without multiplication")
 
                     if cpm_expr.name != "==":
-                        new_rhs, newcons = get_or_make_var(lhs)
+                        new_rhs, newcons = get_or_make_var(lhs, expr_dict=expr_dict)
                         newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
                         newlist += linearize_constraint(newcons, supported=supported, reified=reified, expr_dict=expr_dict)
                         continue
@@ -399,7 +399,7 @@ def only_positive_bv(lst_of_expr, expr_dict=None):
         Resulting expression is linear if the original expression was linear.
     """
     if expr_dict is None:
-        expr_dict = cpm_dict()
+        expr_dict = dict()
     newlist = []
     for cpm_expr in lst_of_expr:
 

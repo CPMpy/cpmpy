@@ -8,7 +8,7 @@ import warnings  # for deprecation warning
 from .normalize import toplevel_list
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.core import Expression, Comparison, Operator, cpm_dict
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import intvar, cpm_array, NDVarArray
 from ..expressions.utils import is_any_list, eval_comparison
 from ..expressions.python_builtins import all
@@ -34,7 +34,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
     """
     if expr_dict is None:
-        expr_dict = cpm_dict()
+        expr_dict = dict()
 
     if _toplevel is None:
         _toplevel = []

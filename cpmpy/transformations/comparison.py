@@ -16,7 +16,7 @@
 
 import copy
 from .flatten_model import get_or_make_var
-from ..expressions.core import Comparison, Operator, cpm_dict
+from ..expressions.core import Comparison, Operator
 from ..expressions.utils import is_boolexpr
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
@@ -28,7 +28,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), expr_dict=None):
         :param supported:  a (frozen)set of expression names that supports all comparisons in the solver
     """
     if expr_dict is None:
-        expr_dict = cpm_dict()
+        expr_dict = dict()
 
     # shallow copy (could support inplace too this way...)
     newcons = copy.copy(constraints)

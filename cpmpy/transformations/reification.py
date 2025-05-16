@@ -20,7 +20,7 @@
     ==========================  =================================================================
 """
 import copy
-from ..expressions.core import Operator, Comparison, Expression, cpm_dict
+from ..expressions.core import Operator, Comparison, Expression
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import Element
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
@@ -32,7 +32,7 @@ from .negation import recurse_negation
 
 def only_bv_reifies(constraints, expr_dict=None):
     if expr_dict is None:
-        expr_dict = cpm_dict()
+        expr_dict = dict()
 
     newcons = []
     for cpm_expr in constraints:
@@ -72,7 +72,7 @@ def only_implies(constraints, expr_dict=None):
         AFTER :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`only_bv_reifies()`.
     """
     if expr_dict is None:
-        expr_dict = cpm_dict()
+        expr_dict = dict()
 
     newcons = []
     retransform = []
@@ -132,7 +132,7 @@ def reify_rewrite(constraints, supported=frozenset(), expr_dict=None):
                           supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. ``BV -> (LHS == V)``
     """
     if expr_dict is None:
-        expr_dict = cpm_dict()
+        expr_dict = dict()
 
     if not is_any_list(constraints):
         # assume list, so make list

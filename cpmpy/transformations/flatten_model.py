@@ -133,7 +133,7 @@ def flatten_constraint(expr, expr_dict=None):
             RE TODO: we now have custom NotImpl/NotSupported
     """
     if expr_dict is None:
-        expr_dict = cpm_dict()
+        expr_dict = dict()
 
     newlist = []
     # for backwards compatibility reasons, we now consider it a meta-
@@ -286,7 +286,7 @@ def flatten_constraint(expr, expr_dict=None):
     return newlist
 
 
-def flatten_objective(expr, supported=frozenset(["sum", "wsum"])):
+def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), expr_dict=None):
     """
     - Decision variable: Var
     - Linear: 
@@ -295,6 +295,7 @@ def flatten_objective(expr, supported=frozenset(["sum", "wsum"])):
         wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
         ======================                       ========
     """
+
     # lets be very explicit here
     if is_any_list(expr):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead
@@ -306,7 +307,7 @@ def flatten_objective(expr, supported=frozenset(["sum", "wsum"])):
         return (flatexpr, flatcons)
     else:
         # any other numeric expression,
-        var, cons = get_or_make_var(flatexpr)
+        var, cons = get_or_make_var(flatexpr, expr_dict=expr_dict)
         return (var, cons+flatcons)
 
 
@@ -323,12 +324,18 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg) or \
            is_star(arg)
 
-def get_or_make_var(expr):
+def get_or_make_var(expr, expr_dict=None):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
+
+    if expr_dict is None:
+        expr_dict = dict()
+    if expr in expr_dict:
+        return expr_dict[expr], []
+
     if __is_flat_var(expr):
         return (expr, [])
 
@@ -358,20 +365,21 @@ def get_or_make_var(expr):
         ivar = _IntVarImpl(lb, ub)
         return ivar, [flatexpr == ivar] + flatcons
 
-def get_or_make_var_or_list(expr):
+def get_or_make_var_or_list(expr, expr_dict=None):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
         Used to convert arguments of globals
     """
+
     if __is_flat_var_or_list(expr):
         return (expr,[])
     elif is_any_list(expr):
-        flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr])
+        flatvars, flatcons = zip(*[get_or_make_var(arg, expr_dict=expr_dict) for arg in expr])
         return (flatvars, [c for con in flatcons for c in con])
     else:
-        return get_or_make_var(expr)
+        return get_or_make_var(expr, expr_dict=expr_dict)
 
 
-def normalized_boolexpr(expr):
+def normalized_boolexpr(expr, expr_dict=None):
     """
         input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
@@ -407,18 +415,18 @@ def normalized_boolexpr(expr):
         # apply De Morgan's transform for "implies"
         if expr.name == '->':
             # TODO, optimisation if args0 is an 'and'?
-            (lhs,lcons) = get_or_make_var(expr.args[0])
+            (lhs,lcons) = get_or_make_var(expr.args[0], expr_dict=expr_dict)
             # TODO, optimisation if args1 is an 'or'?
-            (rhs,rcons) = get_or_make_var(expr.args[1])
+            (rhs,rcons) = get_or_make_var(expr.args[1], expr_dict=expr_dict)
             return ((~lhs | rhs), lcons+rcons)
         if expr.name == 'not':
-            flatvar, flatcons = get_or_make_var(expr.args[0])
+            flatvar, flatcons = get_or_make_var(expr.args[0], expr_dict=expr_dict)
             return (~flatvar, flatcons)
         if not expr.has_subexpr():
             return (expr, [])
         else:
             # one of the arguments is not flat, flatten all
-            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
+            flatvars, flatcons = zip(*[get_or_make_var(arg, expr_dict=expr_dict) for arg in expr.args])
             newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
 
@@ -437,19 +445,19 @@ def normalized_boolexpr(expr):
                 lexpr, rexpr = rexpr, lexpr
 
             # ensure rhs is var
-            (rvar, rcons) = get_or_make_var(rexpr)
+            (rvar, rcons) = get_or_make_var(rexpr, expr_dict=expr_dict)
 
             # LHS: check if Boolexpr == smth:
             if (exprname == '==' or exprname == '!=') and lexpr.is_bool():
                 # this is a reified constraint, so lhs must be var too to be in normal form
-                (lhs, lcons) = get_or_make_var(lexpr)
+                (lhs, lcons) = get_or_make_var(lexpr, expr_dict=expr_dict)
                 if expr.name == '!=' and rvar.is_bool():
                     # != not needed, negate RHS variable
                     rvar = ~rvar
                     exprname = '=='
             else:
                 # other cases: LHS is numexpr
-                (lhs, lcons) = normalized_numexpr(lexpr)
+                (lhs, lcons) = normalized_numexpr(lexpr, expr_dict=expr_dict)
 
             return (Comparison(exprname, lhs, rvar), lcons+rcons)
 
@@ -462,7 +470,7 @@ def normalized_boolexpr(expr):
             return (expr, [])
         else:
             # recursively flatten all children
-            flatargs, flatcons = zip(*[get_or_make_var_or_list(arg) for arg in expr.args])
+            flatargs, flatcons = zip(*[get_or_make_var_or_list(arg, expr_dict=expr_dict) for arg in expr.args])
 
             # take copy, replace args
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
@@ -494,7 +502,7 @@ def normalized_numexpr(expr, expr_dict=None):
     elif expr.is_bool():
         # unusual case, but its truth-value is a valid numexpr
         # so reify and return the boolvar
-        return get_or_make_var(expr, expr_dict)
+        return get_or_make_var(expr, expr_dict=expr_dict)
 
     elif isinstance(expr, Operator):
         # rewrite -a, const*a and a*const into a weighted sum, so it can be used as objective
