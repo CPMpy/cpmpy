@@ -486,7 +486,7 @@ class CPM_minizinc(SolverInterface):
                      "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
                      "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"}, expr_dict=self.expr_dict)
 
     def add(self, cpm_expr):
         """

@@ -204,6 +204,15 @@ def implies(expr, other):
         return BoolVal(True)
     else:
         return expr.implies(other)
+    
+def get_repr(expr):
+    """ like :func:`~cpmpy.expressions.core.Expression.get_repr`, but also safe to use for non-expressions """
+    if is_any_list(expr):
+        return tuple(get_repr(e) for e in expr)
+    if isinstance(expr, cp.expressions.core.Expression):
+        return expr.get_repr()
+    else:
+        return str(expr)
 
 # Specific stuff for ShortTabel global (should this be in globalconstraints.py instead?)
 STAR = "*" # define constant here
