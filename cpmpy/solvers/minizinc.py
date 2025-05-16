@@ -378,7 +378,7 @@ class CPM_minizinc(SolverInterface):
                 else:
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
-            # display (and reverse-map first) if needed
+            # display if needed
             if display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))

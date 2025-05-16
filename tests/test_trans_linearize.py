@@ -340,8 +340,6 @@ class TestVarsLhs(unittest.TestCase):
 
         cons = a ** 3 == b
         lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
-        for c in lin_cons:
-            print("-",c)
 
         self.assertEqual(str(lin_cons[0]), "((a) * (a)) == (IV0)")
         self.assertEqual(str(lin_cons[1]), "((a) * (IV0)) == (IV1)")

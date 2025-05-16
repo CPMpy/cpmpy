@@ -313,11 +313,6 @@ class TestSolvers(unittest.TestCase):
 
         # check get core, simple
         self.assertFalse(ps2.solve(assumptions=[mayo,~mayo]))
-        print(ps2.get_core())
-        print(set(ps2.get_core()))
-        print([mayo,~mayo])
-        print(set([mayo,~mayo]))
-        print(set(ps2.get_core()) == set([mayo,~mayo]))
         self.assertSetEqual(set(ps2.get_core()), set([mayo,~mayo]))
 
         # check get core, more realistic

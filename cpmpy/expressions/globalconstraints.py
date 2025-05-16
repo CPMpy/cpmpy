@@ -511,8 +511,8 @@ class InDomain(GlobalConstraint):
                they should be enforced toplevel.
         """
         expr, arr = self.args
-        lb, ub = expr.get_bounds()
-
+        lb, ub = get_bounds(expr)
+        
         defining = []
         #if expr is not a var
         if not isinstance(expr,Expression):
