@@ -14,7 +14,7 @@ def xcsp3_plot(df, time_limit=None):
         status_filter = 'OPTIMUM FOUND'
     else:
         status_filter = 'SATISFIABLE'
-    df = df[df['status'] == status_filter]  # only those that reached the desired status
+    df = df[(df['status'] == status_filter) | (df['status'] == 'UNSATISFIABLE')]  # only those that reached the desired status
     
     # Create figure
     fig = plt.figure(figsize=(10, 6))
