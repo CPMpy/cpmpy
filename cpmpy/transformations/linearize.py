@@ -207,8 +207,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
                         mult_res, side_cons = get_or_make_var(k * y, expr_dict=expr_dict)
                         cpm_expr = (mult_res + rhs) == x
                         # |z| < |y|
-                        abs_of_z = cp.intvar(*get_bounds(abs(rhs)))
-                        side_cons.append(abs(rhs) == abs_of_z)
+                        abs_of_z, new_cons = get_or_make_var(abs(rhs), expr_dict=expr_dict)
+                        side_cons += new_cons
                         # TODO: do the following in constructor of abs instead?
                         # we know y is strictly positive or negative due to safening.
                         if lby >= 0:
@@ -256,11 +256,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
                         cpm_expr = eval_comparison(cpm_expr.name, a, mult_res + r)
 
                         # need absolute values of variables later
-                        abs_of_a = intvar(*get_bounds(abs(a)))
-                        abs_of_b = intvar(*get_bounds(abs(b)))
-                        abs_of_rhs = intvar(*get_bounds(abs(rhs)))
-                        abs_of_r = intvar(*get_bounds(abs(r)))
-                        side_cons += [abs(a) == abs_of_a, abs(b) == abs_of_b, abs(rhs) == abs_of_rhs, abs(r) == abs_of_r]
+                        abs_of_a, side_cons_a = get_or_make_var(abs(a), expr_dict=expr_dict)
+                        abs_of_b, side_cons_b = get_or_make_var(abs(b), expr_dict=expr_dict)
+                        abs_of_rhs, side_cons_rhs = get_or_make_var(abs(rhs), expr_dict=expr_dict)
+                        abs_of_r, side_cons_r = get_or_make_var(abs(r), expr_dict=expr_dict)
+                        side_cons += side_cons_a + side_cons_b + side_cons_rhs + side_cons_r
                         # |r| < |b|
                         side_cons.append(abs_of_r < abs_of_b)
 
@@ -276,7 +276,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
 
             elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and "abs" not in supported:
                 if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
-                    newvar = intvar(*get_bounds(lhs))
+                    newvar, newcons = get_or_make_var(lhs, expr_dict=expr_dict)
+                    newlist += newcons
                     newlist += linearize_constraint([lhs == newvar])
                     cpm_expr = eval_comparison(cpm_expr.name, newvar, rhs)
                 else:

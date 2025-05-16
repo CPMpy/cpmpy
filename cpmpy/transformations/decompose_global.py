@@ -113,7 +113,12 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     # global function, replace by a fresh variable and decompose the equality to this
                     assert isinstance(expr, GlobalFunction)
                     lb,ub = expr.get_bounds()
-                    aux = intvar(lb, ub)
+                    
+                    if expr in expr_dict:
+                        aux = expr_dict[expr]
+                    else:
+                        aux = intvar(lb, ub)
+                        expr_dict[expr] = aux
 
                     # NOTE Do we need to decompose here (the expr's args)? As done in the Comparison's section?
 
