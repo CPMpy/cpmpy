@@ -42,6 +42,7 @@
     ==============
 """
 import time
+from typing import Dict
 
 import numpy as np
 
@@ -101,7 +102,7 @@ class CPM_choco(SolverInterface):
         except Exception as e:
             raise e
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
         """
         Constructor of the native solver object
 
@@ -130,6 +131,8 @@ class CPM_choco(SolverInterface):
         self.minimize_obj = None
         self.helper_var = None
         # for solving with assumption variables, TO-CHECK
+
+        self.added_natives = added_natives
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="choco", cpm_model=cpm_model)
@@ -177,13 +180,21 @@ class CPM_choco(SolverInterface):
         self.cpm_status.runtime = end - start
 
         # translate exit status
+        # A) Found a solution
         if sol is not None:
-            if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-            else: # solved, but optimality not proven
+            # COP
+            if self.has_objective():
+                if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                else: # solved, but optimality not proven
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # CSP
+            else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        # B) Found unsat
         elif time_limit is None or self.cpm_status.runtime < time_limit: # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        # C) Timeout
         else:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN  # can happen when timeout is reached...
 
@@ -228,10 +239,13 @@ class CPM_choco(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # create solver object
+        self.chc_solver = self.chc_model.get_solver()
+
+        # set time limit (if given)
         if time_limit is not None:
             self.chc_solver.limit_time(str(time_limit) + "s")
 
-        self.chc_solver = self.chc_model.get_solver()
         start = time.time()
         if self.has_objective():
             sols = self.chc_solver.find_all_optimal_solutions(maximize=not self.minimize_obj,
@@ -245,6 +259,19 @@ class CPM_choco(SolverInterface):
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
+
+        if len(sols): # solutions found
+            if (len(sols) == solution_limit): # matched the set limit (if given)
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif (time_limit is None) or (self.cpm_status.runtime < time_limit): # found all solutions
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else: # reached timeout
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else: # no solutions found
+            if (time_limit is None) or (self.cpm_status.runtime < time_limit): # unsat problem
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            else: # timeout
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
 
         # if no solutions, clear values of variables
         if len(sols) == 0:
@@ -371,7 +398,7 @@ class CPM_choco(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", 'negative_table', "short_table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
+                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence", *self.added_natives.keys()} 
 
         cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported, expr_dict=self.expr_dict) # choco supports any global also (half-) reified
@@ -572,7 +599,7 @@ class CPM_choco(SolverInterface):
                 table = table.astype(float) # nan's require float dtype
                 # Choco requires a wildcard value not present in dom of args,
                 # take value lower than anything else
-                chc_star = min(np.nanmin(table), *get_bounds(array)[0]) -1
+                chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
             elif cpm_expr.name == 'InDomain':
@@ -593,6 +620,8 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args
                 return self.chc_model.global_cardinality(self._to_vars(vars), self.solver_vars(vals), self._to_vars(occ), cpm_expr.closed)
+            elif cpm_expr.name in self.added_natives:
+                return self.added_natives[cpm_expr.name](self, cpm_expr)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 

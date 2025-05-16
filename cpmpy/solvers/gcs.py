@@ -50,6 +50,7 @@
 
         CPM_gcs
 """
+from typing import Dict
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
@@ -99,7 +100,7 @@ class CPM_gcs(SolverInterface):
         except Exception as e:
             raise e
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
         """
         Constructor of the native solver object
 
@@ -303,6 +304,16 @@ class CPM_gcs(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.gcs_result["solve_time"]
 
+        num_sols = self.gcs_result["solutions"]
+        if self.gcs_result["completed"] and num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        elif self.gcs_result["completed"] and num_sols == 0:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else: # maybe unsat, maybe not (maybe a timeout)
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         # clear user vars if no solution found
         if self._solve_return(self.cpm_status, self.objective_value_) is False:
             for var in self.user_vars:
@@ -313,7 +324,7 @@ class CPM_gcs(SolverInterface):
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit, 
                         veripb_args=veripb_args, display_output=display_verifier_output)
 
-        return self.gcs_result["solutions"]
+        return num_sols
 
     def solver_var(self, cpm_var):
         """

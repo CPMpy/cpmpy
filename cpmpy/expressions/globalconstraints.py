@@ -420,7 +420,7 @@ class Table(GlobalConstraint):
     """
     def __init__(self, array, table):
         array = flatlist(array)
-        if isinstance(table, np.ndarray): # Ensure it is a list
+        if isinstance(table, np.ndarray):  # Ensure it is a list
             table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
@@ -448,8 +448,9 @@ class ShortTable(GlobalConstraint):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if not all(is_int(x) or x == STAR for row in table for x in row):
-            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        # TODO: temporarily disabled due to performance implication on large tables
+        # if not all(is_int(x) or x == STAR for row in table for x in row):
+        #     raise TypeError(f"elements in argument `table` should be integer or {STAR}")
         if isinstance(table, np.ndarray): # Ensure it is a list
             table = table.tolist()
         super().__init__("short_table", [array, table])
@@ -471,6 +472,7 @@ class ShortTable(GlobalConstraint):
     
     def get_repr(self):
         return (self.name, (get_repr(self.args[0]), frozenset(tuple(row) for row in self.args[1])))
+
 
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'

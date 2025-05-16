@@ -666,10 +666,10 @@ class Operator(Expression):
                 mul_args = arg_list[0].args
                 if is_num(mul_args[0]):
                     name = 'mul'
-                    arg_list = (-mul_args[0], mul_args[1])
+                    arg_list = [-mul_args[0], mul_args[1]]
                 elif is_num(mul_args[1]):
                     name = 'mul'
-                    arg_list = (mul_args[0], -mul_args[1])
+                    arg_list = [mul_args[0], -mul_args[1]]
 
         super().__init__(name, arg_list)
 

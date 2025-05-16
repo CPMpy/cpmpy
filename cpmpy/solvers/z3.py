@@ -45,6 +45,7 @@
     Module details
     ==============
 """
+from typing import Dict
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -87,7 +88,7 @@ class CPM_z3(SolverInterface):
             raise e
 
 
-    def __init__(self, cpm_model=None, subsolver="sat"):
+    def __init__(self, cpm_model=None, subsolver="sat", added_natives:dict[str, callable]={}):
         """
         Constructor of the native solver object
 
@@ -112,6 +113,9 @@ class CPM_z3(SolverInterface):
             self.z3_solver = z3.Solver()
         if "opt" in subsolver:
             self.z3_solver = z3.Optimize()
+
+        # handle of objective (as returned by solver)
+        self.obj_handle = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
@@ -189,14 +193,30 @@ class CPM_z3(SolverInterface):
 
         # translate exit status
         if my_status == "sat":
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            if isinstance(self.z3_solver, z3.Optimize):
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            if self.has_objective(): # COP
+                # check if optimal solution found and proven, i.e. bounds are equal
+                lower_bound = self.z3_solver.lower(self.obj_handle)
+                upper_bound = self.z3_solver.upper(self.obj_handle)
+                if lower_bound == upper_bound: # found optimal
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                else: # suboptimal / not proven
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else: # CSP
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status == "unsat":
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "unknown":
+            try:
+                model = self.z3_solver.model()
+                if model: # a solution was found, just not the optimal one (or not proven)
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                # can happen when timeout is reached...
+                else:
+                    self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             # can happen when timeout is reached...
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            except z3.Z3Exception as e: # no model has been initialized, not even an empty one
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         else:  # another?
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
@@ -286,9 +306,9 @@ class CPM_z3(SolverInterface):
 
         obj = self._z3_expr(expr)
         if minimize:
-            self.z3_solver.minimize(obj)
+            self.obj_handle = self.z3_solver.minimize(obj)
         else:
-            self.z3_solver.maximize(obj)
+            self.obj_handle = self.z3_solver.maximize(obj)
 
 
     def transform(self, cpm_expr):
