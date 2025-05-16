@@ -575,8 +575,7 @@ def xcsp3_cpmpy(benchname: str,
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 
-    # Configure signal handles
-    # signal.signal(signal.SIGINT, sigterm_handler)
+    # Configure signal handles, has to be here and not in xcsp3_cpmpy() for multiprocessing...
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGABRT, sigterm_handler)
