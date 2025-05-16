@@ -421,7 +421,7 @@ def only_positive_bv(lst_of_expr):
                     new_lhs = copy.copy(lhs)
                     new_lhs.update_args(new_args)
 
-            if new_lhs != lhs:
+            if new_lhs is not lhs:
                 newlist.append(eval_comparison(cpm_expr.name, new_lhs, rhs))
                 newlist += new_cons  # already linear
             else:
