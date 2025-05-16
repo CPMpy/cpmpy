@@ -62,11 +62,20 @@ def sigterm_handler(_signo, _stack_frame):
         Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
     """
     # Report that we haven't found a solution in time
-    #sys.stdout = original_stdout
     print_status(ExitStatus.unknown)
     print_comment("SIGTERM raised.")
     print(flush=True)
     raise SystemExit("SIGTERM received")
+    
+def rlimit_cpu_handler(_signo, _stack_frame):
+    """
+        Handles a SIGXCPU.
+    """
+    # Report that we haven't found a solution in time
+    print_status(ExitStatus.unknown)
+    print_comment("SIGXCPU raised.")
+    print(flush=True)
+    raise TimeoutError("SIGXCPU received")
 
 def mib_as_bytes(mib: int) -> int:
     return mib * 1024 * 1024
@@ -429,12 +438,22 @@ def xcsp3_cpmpy(benchname: str,
             hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
             print_comment(f"Setting memory limit: {soft} -- {hard}")
             resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
+        if time_limit is not None:
+            soft = time_limit + 1
+            hard = time_limit + 2
+            resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
 
         sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
         time_start = time.time()
 
         # ------------------------------ Parse instance ------------------------------ #
+
+        if benchname.endswith(".lzma"):
+            # Decompress the XZ file
+            with lzma.open(benchname, 'rt', encoding='utf-8') as f:
+                xml_file = StringIO(f.read()) # read to memory-mapped file
+                benchname = xml_file
 
         time_parse = time.time()
         parser = _parse_xcsp3(benchname)
@@ -443,7 +462,7 @@ def xcsp3_cpmpy(benchname: str,
 
         if time_limit and time_limit < (time.time() - time_start):
             raise TimeoutError("Time's up after parse")
-
+        
         # ---------------- Convert XCSP3 to CPMpy model with callbacks --------------- #
 
         time_callback = time.time()
@@ -501,7 +520,14 @@ def xcsp3_cpmpy(benchname: str,
             print_comment(f"{time_limit}s left to solve")
         
         time_solve = time.time()
-        is_sat = s.solve(time_limit=time_limit, **solver_args)
+        try:
+            is_sat = s.solve(time_limit=time_limit, **solver_args)
+        except RuntimeError as e:
+            if "Program interrupted by user." in str(e): # Special handling for Exact
+                raise TimeoutError("Exact interrupted due to timeout")
+            else:
+                raise e
+
         time_solve = time.time() - time_solve
         print_comment(f"took {time_solve:.4f} seconds to solve")
 
@@ -554,6 +580,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGABRT, sigterm_handler)
+    signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
 
     # ------------------------------ Argument parsing ------------------------------ #
     parser = argparse.ArgumentParser("CPMpy XCSP3 executable")
@@ -586,11 +613,6 @@ if __name__ == "__main__":
     print_comment(f"Arguments: {args}")
 
     try:
-        if args.benchname.name.endswith(".lzma"):
-            # Decompress the XZ file
-            with lzma.open(args.benchname, 'rt', encoding='utf-8') as f:
-                xml_file = StringIO(f.read()) # read to memory-mapped file
-                args.benchname = xml_file
         xcsp3_cpmpy(**vars(args))
     except Exception as e:
         print_comment(f"{type(e).__name__} -- {e}")
