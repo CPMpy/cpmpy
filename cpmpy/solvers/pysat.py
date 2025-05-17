@@ -51,6 +51,7 @@
     Module details
     ==============
 """
+from typing import Dict
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
@@ -130,7 +131,7 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
         """
         Constructor of the native solver object
 
@@ -220,7 +221,12 @@ class CPM_pysat(SolverInterface):
 
         # translate exit status
         if my_status is True:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status is False:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status is None:

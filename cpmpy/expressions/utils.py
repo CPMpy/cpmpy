@@ -99,9 +99,20 @@ def is_any_list(arg):
 
 
 def flatlist(args):
-    """ recursively flatten arguments into one single list
     """
-    return list(_flatten(args))
+    Flattens an arbitrarily nested list
+    from: https://stackoverflow.com/questions/10823877/what-is-the-fastest-way-to-flatten-arbitrarily-nested-lists-in-python
+    """
+    if not isinstance(args, list):
+        args = list(args)
+    try:
+        for i, x in enumerate(args):
+            while isinstance(x, Iterable) and not isinstance(x, (str, bytes)):  
+                args[i:i+1] = x
+                x = args[i]
+    except IndexError:
+        pass
+    return args
 
 
 def _flatten(args):

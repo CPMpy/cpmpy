@@ -1,0 +1,311 @@
+import argparse
+import csv
+import multiprocessing
+import os
+import io
+import time
+import lzma
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Dict, Any, Optional, Tuple
+from io import StringIO
+import sys
+from datetime import datetime
+import warnings
+from tqdm import tqdm
+import concurrent.futures
+import traceback
+from filelock import FileLock
+
+import cpmpy
+from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
+from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
+from cpmpy.tools.xcsp3.parser_callbacks import CallbacksCPMPy
+from cpmpy.tools.xcsp3.xcsp3_solution import solution_xml
+from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, ExitStatus
+
+class Tee:
+    """
+    A stream-like object that duplicates writes to multiple underlying streams.
+    """
+    def __init__(self, *streams):
+        """
+        Arguments:
+            *streams: Any number of file-like objects that implement a write() method,
+                      such as sys.stdout, sys.stderr, or StringIO.
+        """
+        self.streams = streams
+
+    def write(self, data):
+        """
+        Write data to all underlying streams.
+
+        Args:
+            data (str): The string to write.
+        """
+        for s in self.streams:
+            s.write(data)
+
+    def flush(self):
+        """
+        Flush all underlying streams to ensure all data is written out.
+        """
+        for s in self.streams:
+            s.flush()
+
+class PipeWriter:
+    """
+    Stdout wrapper for a multiprocessing pipe.
+    """
+    def __init__(self, conn):
+        self.conn = conn
+    def write(self, data):
+        if data:  # avoid empty writes
+            self.conn.send(data)
+    def flush(self):
+        pass  # no buffering
+
+
+def xcsp3_wrapper(conn, kwargs, verbose):
+    """
+    Wraps a call to xcsp3_cpmpy as to correctly 
+    forward stdout to the multiprocessing pipe (conn).
+    Also sends a last status report though the pipe.
+
+    Status report can be missing when process has been terminated by a SIGTERM.
+    """
+    original_stdout = sys.stdout
+
+    pipe_writer = PipeWriter(conn)
+
+    if not verbose:
+        sys.stdout = pipe_writer # only forward to pipe
+    else:
+        sys.stdout = Tee(original_stdout, pipe_writer) # forward to pipe and console
+
+    try:
+        xcsp3_cpmpy(**kwargs)
+        conn.send({"status": "ok"})
+    except Exception as e: # capture exceptions and report in state
+        tb_str = traceback.format_exc()
+        conn.send({"status": "error", "exception": e, "traceback": tb_str})
+    finally:
+        sys.stdout = original_stdout
+        conn.close()
+
+# exec_args = (filename, metadata, solver, time_limit, mem_limit, output_file, verbose) 
+def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
+    """
+    Solve a single XCSP3 instance and write results to file immediately.
+    
+    Args is a list of:
+        filename: Path to the XCSP3 instance file
+        metadata: Dictionary containing instance metadata (year, track, name)
+        solver: Name of the solver to use
+        time_limit: Time limit in seconds
+        mem_limit: Memory limit in MB
+        output_file: Path to the output CSV file
+        verbose: Whether to show solver output
+    """
+    warnings.filterwarnings("ignore")
+    
+    filename, metadata, solver, time_limit, mem_limit, output_file, verbose = args
+
+    # Fieldnames for the CSV file
+    fieldnames = ['year', 'track', 'instance', 'solver',
+                  'time_total', 'time_parse', 'time_model', 'time_post', 'time_solve',
+                  'status', 'objective_value', 'solution']
+    result = dict.fromkeys(fieldnames)  # init all fields to None
+    result['year'] = metadata['year']
+    result['track'] = metadata['track']
+    result['instance'] = metadata['name'] 
+    result['solver'] = solver
+
+    # Decompress before timers start
+    if str(filename).endswith(".lzma"):
+        # Decompress the XZ file
+        with lzma.open(filename, 'rt', encoding='utf-8') as f:
+            xml_file = StringIO(f.read()) # read to memory-mapped file
+            filename = xml_file
+            
+    # Start total timing
+    total_start = time.time()
+
+    # Call xcsp3 in separate process
+    ctx = multiprocessing.get_context("spawn")
+    parent_conn, child_conn = multiprocessing.Pipe() # communication pipe between processes
+    process = ctx.Process(target=xcsp3_wrapper, args=(child_conn, {"benchname":filename, "solver": solver, "time_limit": time_limit, "mem_limit": mem_limit}, verbose))
+    process.start()
+    process.join()
+
+    result['time_total'] = time.time() - total_start
+
+    # Collect output
+    output = []
+    while parent_conn.poll(timeout=1):
+        output.append(parent_conn.recv())
+
+    # Process output
+    status = output[-1] # exit state should be at the end
+    if type(status) == str: # if exit state is missing, process ended due to sigterm
+        # Process exited prematurely due to sigterm
+        status = {"status": "error", "exception": "sigterm"}
+        output = "".join(output)
+    else:
+        output = "".join(output[:-1])
+       
+    # Parse the output to get status, solution and timings
+    for line in output.split('\n'):
+        if line.startswith('s '):
+            result['status'] = line[2:].strip()
+        elif line.startswith('v ') and result['solution'] is None:
+            # only record first line, contains 'type' and 'cost'
+            result['solution'] = line[2:].strip()
+        elif line.startswith('o '):
+            result['objective_value'] = int(line[2:].strip())
+        elif line.startswith('c took '):
+            # Parse timing information
+            parts = line.split(' seconds to ')
+            if len(parts) == 2:
+                time_val = float(parts[0].replace('c took ', ''))
+                action = parts[1].strip()
+                if action.startswith('parse'):
+                    result['time_parse'] = time_val
+                elif action.startswith('convert'):
+                    result['time_model'] = time_val
+                elif action.startswith('post'):
+                    result['time_post'] = time_val
+                elif action.startswith('solve'):
+                    result['time_solve'] = time_val
+
+    # Parse the exit status
+    if status["status"] == "error":
+        # Ignore timeouts
+        if "TimeoutError" in repr(status["exception"]):
+            pass
+        # All other exceptions, put in solution field
+        else:
+            result['status'] = ExitStatus.unknown.value
+            result["solution"] = status["exception"]    
+
+    # Use a lock file to prevent concurrent writes
+    lock_file = f"{output_file}.lock"
+    lock = FileLock(lock_file)
+    try:
+        with lock:
+            # Pre-check if file exists to determine if we need to write header
+            write_header = not os.path.exists(output_file)
+
+            with open(output_file, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                if write_header:
+                    writer.writeheader()
+                writer.writerow(result)
+    finally:
+        # Optional: cleanup if the lock file somehow persists
+        if os.path.exists(lock_file):
+            try:
+                os.remove(lock_file)
+            except Exception:
+                pass  # avoid crashing on cleanup
+
+
+def run_with_timeout(func, args, timeout):
+    def wrapper(queue):
+        try:
+            result = func(args)
+            queue.put((True, result))
+        except Exception as e:
+            queue.put((False, traceback.format_exc()))
+
+    queue = multiprocessing.Queue()
+    p = multiprocessing.Process(target=wrapper, args=(queue,))
+    p.start()
+    p.join(timeout)
+
+    if p.is_alive():
+        p.terminate()
+        p.join()
+        raise TimeoutError("Function timed out")
+    
+    success, result = queue.get()
+    if not success:
+        raise RuntimeError(f"Function raised exception:\n{result}")
+    return result
+    
+def submit_wrapped(filename, metadata, solver, time_limit, mem_limit, output_file, verbose):
+    return run_with_timeout(execute_instance, 
+                            (filename, metadata, solver, time_limit, mem_limit, output_file, verbose),
+                            timeout=time_limit*2) # <- change limit as needed, now a very gracious doubling of the time
+
+def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
+                   time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
+                   verbose: bool = False) -> str:
+    """
+    Benchmark a solver on XCSP3 instances.
+    
+    Args:
+        year (int): Competition year (e.g., 2023)
+        track (str): Track type (e.g., COP, CSP, MiniCOP)
+        solver (str): Solver name (e.g., ortools, exact, choco, ...)
+        workers (int): Number of parallel workers
+        time_limit (int): Time limit in seconds per instance
+        mem_limit (int): Memory limit in MB per instance
+        output_dir (str): Output directory for CSV files
+        verbose (bool): Whether to show solver output
+        
+    Returns:
+        str: Path to the output CSV file
+    """
+    # Create output directory
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Get current timestamp in a filename-safe format
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Define output file path with timestamp
+    output_file = str(output_dir / f"xcsp3_{year}_{track}_{solver}_{timestamp}.csv")
+    
+    # Initialize dataset
+    dataset = XCSP3Dataset(year=year, track=track, download=True)
+
+    # Process instances in parallel
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        # Submit all tasks and track their futures
+        futures = [executor.submit(execute_instance,  # below: args
+                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose))
+                   for filename, metadata in dataset]
+        # Process results as they complete
+        for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
+            try:
+                _ = future.result()  # for cleanliness sake, result is empty
+            # except TimeoutError:
+            #     pass
+                # print(f"Timeout on job {i}: {dataset[i][1]['name']}")  # print the metadata
+            except Exception as e:
+                print(type(e))
+                # Expected exception -> due to RLIMIT_CPU to terminate hanging instances
+                # if str(e) == "A process in the process pool was terminated abruptly while the future was running or pending.":
+                #     continue
+                print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
+    
+    return output_file
+
+if __name__ == "__main__":
+    warnings.filterwarnings("ignore")
+
+    parser = argparse.ArgumentParser(description='Benchmark solvers on XCSP3 instances')
+    parser.add_argument('--year', type=int, required=True, help='Competition year (e.g., 2023)')
+    parser.add_argument('--track', type=str, required=True, help='Track type (e.g., COP, CSP, MiniCOP)')
+    parser.add_argument('--solver', type=str, required=True, help='Solver name (e.g., ortools, exact, choco, ...)')
+    parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
+    parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
+    parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
+    parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
+    parser.add_argument('--verbose', action='store_true', help='Show solver output')
+    
+    args = parser.parse_args()
+    
+    output_file = xcsp3_benchmark(**vars(args))
+    print(f"Results added to {output_file}")
