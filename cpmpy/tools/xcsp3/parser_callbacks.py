@@ -51,7 +51,7 @@ class CallbacksCPMPy(Callbacks):
         nbvals = maxi - mini + 1
         if len(values) < nbvals:
             # only do this if there are holes in the domain
-            self.cpm_model += xglobals.InDomain(newvar, values)  # faster decomp, only works in positive context
+            self.cpm_model += cp.InDomain(newvar, values)  # faster decomp, only works in positive context
 
     def load_instance(self, discarded_classes=None):
         return self.cpm_model, self.cpm_variables
@@ -246,7 +246,7 @@ class CallbacksCPMPy(Callbacks):
             if len(values) == 1:
                 self.cpm_model += self.get_cpm_var(x) == values[0]
             else:
-                self.cpm_model += xglobals.InDomain(self.get_cpm_var(x), self.unroll(values))  # faster decomp, only works in positive context
+                self.cpm_model += cp.InDomain(self.get_cpm_var(x), self.unroll(values))  # faster decomp, only works in positive context
         else:
             # negative, so not in domain
             if len(values) == 1:
