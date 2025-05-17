@@ -518,6 +518,14 @@ m = cp.Model(cp.sum(x) <= 5)
 m.solve(solver="minizinc:chuffed")
 ```
 
+You can even use the same model across different solvers to see which one you like best:
+```python
+# m = same model as above
+for solvername in cp.SolverLookup.solvernames() # all solvers (+subsolvers) installed on the system
+    m.solve(solver=solvername)
+    print(m.status())
+```
+
 Note that for solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
 
 ## Model versus solver interface
