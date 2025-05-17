@@ -423,12 +423,6 @@ def xcsp3_cpmpy(benchname: str,
                 intermediate: bool = False,
                 **kwargs,
 ):
-    if str(benchname).endswith(".lzma"):
-        # Decompress the XZ file
-        with lzma.open(benchname, 'rt', encoding='utf-8') as f:
-            xml_file = StringIO(f.read()) # read to memory-mapped file
-            benchname = xml_file
-
     try:
 
         # --------------------------- Global Configuration --------------------------- #
@@ -613,6 +607,12 @@ if __name__ == "__main__":
     print_comment(f"Arguments: {args}")
 
     try:
+        if str(args.benchname).endswith(".lzma"):
+            # Decompress the XZ file
+            with lzma.open(args.benchname, 'rt', encoding='utf-8') as f:
+                xml_file = StringIO(f.read()) # read to memory-mapped file
+                args.benchname = xml_file
+
         xcsp3_cpmpy(**vars(args))
     except Exception as e:
         print_comment(f"{type(e).__name__} -- {e}")
