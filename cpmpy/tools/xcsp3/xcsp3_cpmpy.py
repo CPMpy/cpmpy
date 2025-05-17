@@ -449,7 +449,7 @@ def xcsp3_cpmpy(benchname: str,
 
         # ------------------------------ Parse instance ------------------------------ #
 
-        if benchname.endswith(".lzma"):
+        if str(benchname).endswith(".lzma"):
             # Decompress the XZ file
             with lzma.open(benchname, 'rt', encoding='utf-8') as f:
                 xml_file = StringIO(f.read()) # read to memory-mapped file
