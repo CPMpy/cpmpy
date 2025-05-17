@@ -151,9 +151,19 @@ class CPM_template(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds
 
-        # translate solver exit status to CPMpy exit status
+        # Translate solver exit status to CPMpy exit status
+        # CSP:                         COP:
+        # ├─ sat -> FEASIBLE           ├─ optimal -> OPTIMAL
+        # ├─ unsat -> UNSATISFIABLE    ├─ sub-optimal -> FEASIBLE
+        # └─ timeout -> UNKNOWN        ├─ unsat -> UNSATISFIABLE
+        #                              └─ timeout -> UNKNOWN
         if my_status is True:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status is False:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status is None:
@@ -409,7 +419,7 @@ class CPM_template(SolverInterface):
 
             If the problem is an optimization problem, returns only optimal solutions.
 
-           Arguments:
+            Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
@@ -420,7 +430,7 @@ class CPM_template(SolverInterface):
             Returns: number of solutions found
         """
 
-        # check if objective function
+        # check if objective function (optional if solver doesn't support finding all solutions for COP)
         if self.has_objective():
             raise NotSupportedError("TEMPLATE does not support finding all optimal solutions")
 
@@ -430,7 +440,21 @@ class CPM_template(SolverInterface):
         else:
             callback = display
 
-        self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+        my_status = self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+
+        # new status, translate runtime
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds (of entire solveAll call)
+
+        # Translate solver exit status to CPMpy exit status
+        # CSP & COP:
+        # ├─ all solutions found -> OPTIMAL
+        # ├─ at least 1 found (timeout / solution limit reached) -> FEASIBLE
+        # ├─ 0 solutions found due to timeout -> UNKNOWN
+        # └─ unsat -> UNSATISFIABLE
+
+        # self.cpm_status.exitstatus = ...
+
         # clear user vars if no solution found
         if self.TPL_solver.SolutionCount() == 0:
             for var in self.user_vars:
