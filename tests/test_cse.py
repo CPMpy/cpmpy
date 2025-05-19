@@ -1,9 +1,12 @@
 import unittest
 import cpmpy as cp
 
+from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
+from cpmpy.transformations.linearize import linearize_constraint
+from cpmpy.transformations.reification import only_bv_reifies
 
 
 class TestCSE(unittest.TestCase):
@@ -66,8 +69,6 @@ class TestCSE(unittest.TestCase):
         nested_cons = b == ((cp.max([x,y,z]) + q) <= 10)
         expr_dict = dict()
         decomp = decompose_in_tree([nested_cons], expr_dict=expr_dict)
-        print(decomp)
-        print(expr_dict)
     
         self.assertEqual(len(decomp), 6)
         self.assertEqual(str(decomp[0]), "(b) == ((IV0) + (q) <= 10)")
@@ -78,7 +79,7 @@ class TestCSE(unittest.TestCase):
         self.assertEqual(str(decomp[5]), "(z) <= (IV1)")
 
         # next time we use max([x,y,z]) it should replace the max-constraint with IV0
-        #  ... it seems like we should be able to do more here e.g., cp.max([x,y,z]) != should be replaced with IV0 != 42
+        #  ... it seems like we should be able to do more here e.g., cp.max([x,y,z]) != 42 should be replaced with IV0 != 42
         #  ...      but the current code-flow of decompose_in_tree and .decompose_comparison does not allow this
         nested2 = (q + cp.max([x,y,z]) != 42)
         decomp = decompose_in_tree([nested2], expr_dict=expr_dict)
@@ -86,23 +87,38 @@ class TestCSE(unittest.TestCase):
         self.assertEqual(len(decomp), 1)
         self.assertEqual(str(decomp[0]), "(q) + (IV0) != 42")
 
-        
-
-    def test_safen(self):
-        pass
-
     def test_only_numexpr_equality(self):
-        pass
+        x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
+
+        cons = cp.max([x,y,z]) <= 42
+        expr_dict = dict()
+        eq_cons = only_numexpr_equality([cons], expr_dict=expr_dict)
+        
+        self.assertEqual(len(eq_cons), 2)
+        self.assertEqual(str(eq_cons[0]), "(max(x,y,z)) == (IV0)")
+        self.assertEqual(str(eq_cons[1]), "IV0 <= 42")
+        self.assertEqual(len(expr_dict), 1)
+        
+        # next time we use max([x,y,z]) it should replace it with IV0
+        non_eq_cons = cp.max([x,y,z]) != 1337
+        eq_cons = only_numexpr_equality([non_eq_cons], expr_dict=expr_dict)
+        self.assertEqual(len(eq_cons), 1)
+        self.assertEqual(str(eq_cons[0]), "IV0 != 1337")
+        self.assertEqual(len(expr_dict), 1)
 
     def test_linearize(self):
-        pass
+        x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
+        
+        cons = cp.max(x,y) < z
+        expr_dict = dict()
+        lin_cons = linearize_constraint([cons], supported={"max"}, expr_dict=expr_dict)
+        
+        self.assertEqual(len(lin_cons), 2)
+        self.assertEqual(str(lin_cons[0]), "(max(x,y)) <= (IV0)")
+        self.assertEqual(str(lin_cons[1]), "sum([1, -1] * [z, IV0]) == 1")
+        
+        # next time we use z - 1 it should replace it with IV0
+        # ... not sure how to find a test for this...        
 
-    def test_only_bv_reifies(self):
-        pass
-
-    def test_only_implies(self):
-        pass
-
-    def test_to_cnf(self):
-        pass
+    ### other transformations only use expr_dict as argument to flatten_constraint internally, not sure how to easily test them
 
