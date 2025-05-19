@@ -431,3 +431,78 @@ class CPM_cplex(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+            """
+                Compute all solutions and optionally display the solutions.
+
+                This is the generic implementation, solvers can overwrite this with
+                a more efficient native implementation
+
+                Arguments:
+                    display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                            default/None: nothing displayed
+                    time_limit: stop after this many seconds (default: None)
+                    solution_limit: stop after this many solutions (default: None)
+                    call_from_model: whether the method is called from a CPMpy Model instance or not
+                    any other keyword argument
+
+                Returns: number of solutions found
+            """
+
+            if time_limit is not None:
+                self.cplex_model.set_time_limit(time_limit)
+
+            if solution_limit is None:
+                raise Exception(
+                    "CPLEX does not support searching for all solutions. If you really need all solutions, "
+                    "try setting solution limit to a large number")
+
+            # Ask for multiple solutions
+            self.cplex_model.context.cplex_parameters.mip.limits.populate = solution_limit
+            self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4  # (optional) max effort for finding solutions
+
+            solutions_pool = self.cplex_model.populate_solution_pool()
+
+            optimal_val = None
+            solution_count = len(solutions_pool)
+            opt_sol_count = 0
+
+            # clear user vars if no solution found
+            if solution_count == 0:
+                self.objective_value_ = None
+                for var in self.user_vars:
+                    var._value = None
+
+            for i in range(solution_count):
+                # Specify which solution to query
+                solution = solutions_pool[i]
+                sol_obj_val = solution.get_objective_value()
+                if optimal_val is None:
+                    optimal_val = sol_obj_val
+                if optimal_val is not None:
+                    # sub-optimal solutions
+                    if sol_obj_val != optimal_val:
+                        break
+                opt_sol_count += 1
+
+                # Translate solution to variables
+                for cpm_var in self.user_vars:
+                    solver_val = solution.get_value(self.solver_var(cpm_var))
+                    if cpm_var.is_bool():
+                        cpm_var._value = solver_val >= 0.5
+                    else:
+                        cpm_var._value = int(solver_val)
+
+                # Translate objective
+                if self.has_objective():
+                    self.objective_value_ = sol_obj_val
+
+                if display is not None:
+                    if isinstance(display, Expression):
+                        print(argval(display))
+                    elif isinstance(display, list):
+                        print(argvals(display))
+                    else:
+                        display()  # callback
+
+            return opt_sol_count
