@@ -556,35 +556,6 @@ class Regular(GlobalConstraint):
                 return False
         return curr_node in accepting
 
-
-# syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
-# same semantic as CPLEX IfThenElse constraint
-# https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
-class IfThenElse(GlobalConstraint):
-    def __init__(self, condition, if_true, if_false):
-        if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
-            raise TypeError("only boolean expression allowed in IfThenElse")
-        super().__init__("ite", [condition, if_true, if_false])
-
-    def value(self):
-        condition, if_true, if_false = self.args
-        try:
-            if argval(condition):
-                return argval(if_true)
-            else:
-                return argval(if_false)
-        except IncompleteFunctionError:
-            return False
-
-    def decompose(self):
-        condition, if_true, if_false = self.args
-        return [condition.implies(if_true), (~condition).implies(if_false)], []
-
-    def __repr__(self):
-        condition, if_true, if_false = self.args
-        return "If {} Then {} Else {}".format(condition, if_true, if_false)
-
-
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
 # https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
