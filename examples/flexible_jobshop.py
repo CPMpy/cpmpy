@@ -66,10 +66,17 @@ else:
     print("No solution found.")
 
 
+def compare_solvers(model):
+    """
+    Compare the runtime of all installed solvers on the given model.
+    """
+    print("Solving with all installed solvers...")
+    for solvername in cp.SolverLookup.solvernames():
+        try:
+            model.solve(solver=solvername, time_limit=10)  # max 10 seconds
+            print(f"{solvername}: {model.status()}")
+        except Exception as e:
+            print(f"{solvername}: Not run -- {str(e)}")
+
 # --- bonus: compare the runtime of all installed solvers ---
-for solvername in cp.SolverLookup.solvernames():
-    try:
-        model.solve(solver=solvername, time_limit=10)  # max 10 seconds
-        print(f"{solvername}: {model.status()}")
-    except Exception as e:
-        print(f"{solvername}: Not run -- {str(e)}")
+# compare_solvers(model)
