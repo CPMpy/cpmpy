@@ -484,24 +484,27 @@ class Regular(GlobalConstraint):
 
     The automaton is defined by a list of transitions, a starting node and a list of accepting nodes.
     The transitions are represented as a list of tuples, where each tuple is of the form (id1, value, id2).
-    An id is an integer representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
-    The starting node is an integer representing the starting state of the automaton.
-    The accepting nodes are a list of integers representing the accepting states of the automaton.
+    An id is an integer or string representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
+    The starting node is an integer or string representing the starting state of the automaton.
+    The accepting nodes are a list of integers or strings representing the accepting states of the automaton.
 
     Example: an automaton that accepts the language 0*10* (exactly 1 variable taking value 1) is defined as:
         cp.Regular(array = cp.intvar(0,1, shape=4),
-                   transitions = [(0,0,0), (0,1,1), (1,0,2), (2,0,2)],
-                   start = 0,
-                   accepting = [2])
+                   transitions = [("A",0,"A"), ("A",1,"B"), ("B",0,"C"), ("C",0,"C")],
+                   start = "A",
+                   accepting = ["C"])
     """
     def __init__(self, array, transitions, start, accepting):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
         
+        if not is_any_list(transitions):
+            raise TypeError("The second argument of a regular constraint should be a list of transitions")
         _node_type = type(transitions[0][0])
-        if not all(isinstance(t, tuple) and len(t) == 3 and isinstance(t[0], _node_type) and isinstance(t[1], int) and isinstance(t[2],_node_type) for t in transitions):
-            raise TypeError("The second argument of a regular constraint should be a collection of transitions (node, int, node)")
+        for s,v,e in transitions:
+            if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
+                raise TypeError(f"The second argument of a regular constraint should be a list of transitions ({_node_type}, int, {_node_type})")
         if not isinstance(start, _node_type):
             raise TypeError("The third argument of a regular constraint should be a node id")
         if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
@@ -535,7 +538,7 @@ class Regular(GlobalConstraint):
         state_vars = intvar(0, sink, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        defining = [Table([arr[0], state_vars[0]], [t[1:] for t in transitions if t[0] == id_start])]        
+        defining = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
         # define the rest of the automaton using transition table
         defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
         
