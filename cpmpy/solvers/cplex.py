@@ -174,7 +174,12 @@ class CPM_cplex(SolverInterface):
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         elif "optimal" in cplex_status:
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif cplex_status == "JobFailed":
             self.cpm_status.exitstatus = ExitStatus.ERROR
         elif "aborted" in cplex_status:
