@@ -336,9 +336,11 @@ class CPM_z3(SolverInterface):
 
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
+            cpm_con = self.expr_dict.get(cpm_con, cpm_con) # we might have alrady seen this constraint before (as a subexpression)
             # translate each expression tree, then post straight away
             z3_con = self._z3_expr(cpm_con)
             self.z3_solver.add(z3_con)
+            self.expr_dict[cpm_con] = BoolVal(True) # constraint is now always true, no need to post it again
 
         return self
     __add__ = add  # avoid redirect in superclass

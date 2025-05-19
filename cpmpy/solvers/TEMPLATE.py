@@ -53,7 +53,7 @@ import pkg_resources
 from pkg_resources import VersionConflict
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables
@@ -329,6 +329,7 @@ class CPM_template(SolverInterface):
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
+            cpm_expr = self.expr_dict.get(cpm_expr, cpm_expr) # we might have alrady seen this constraint before (as a subexpression)
 
             if isinstance(cpm_expr, _BoolVarImpl):
                 # base case, just var or ~var
@@ -396,6 +397,8 @@ class CPM_template(SolverInterface):
                 self.TPL_solver.add_alldifferent(self.solver_vars(cpm_expr.args))
             else:
                 raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_expr)
+
+            self.expr_dict[cpm_expr] = BoolVal(True) # constraint is now always true, no need to post it again
 
         return self
     __add__ = add  # avoid redirect in superclass

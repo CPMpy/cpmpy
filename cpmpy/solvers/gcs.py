@@ -475,7 +475,8 @@ class CPM_gcs(SolverInterface):
         get_variables(cpm_cons, collect=self.user_vars)
 
         for con in self.transform(cpm_cons):
-            cpm_expr = con
+            cpm_expr = self.expr_dict.get(con, con) # we might have alrady seen this constraint before (as a subexpression)
+
             if isinstance(cpm_expr, _BoolVarImpl):
                 # base case, just var or ~var
                 self.gcs.post_or([self.solver_var(cpm_expr)])
@@ -660,6 +661,7 @@ class CPM_gcs(SolverInterface):
                 # Hopefully we don't end up here.
                 raise NotImplementedError(cpm_expr)
 
+            self.expr_dict[cpm_expr] = BoolVal(True) # constraint is now always true, no need to post it again
         return self
     __add__ = add  # avoid redirect in superclass
 

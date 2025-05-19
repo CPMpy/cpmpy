@@ -366,6 +366,7 @@ class CPM_gurobi(SolverInterface):
 
       # transform and post the constraints
       for cpm_expr in self.transform(cpm_expr_orig):
+        cpm_expr = self.expr_dict.get(cpm_expr, cpm_expr) # we might have alrady seen this constraint before (as a subexpression)
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
@@ -456,6 +457,8 @@ class CPM_gurobi(SolverInterface):
 
         else:
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+        
+        self.expr_dict[cpm_expr] = BoolVal(True) # constraint is now always true, no need to post it again
 
       return self
     __add__ = add  # avoid redirect in superclass
