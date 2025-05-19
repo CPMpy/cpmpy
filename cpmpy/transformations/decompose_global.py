@@ -1,5 +1,5 @@
 """
-    Decompose any global constraint not supported by the solver.
+    Decompose global constraints not supported by the solver.
 """
 
 import copy
@@ -17,21 +17,21 @@ from .flatten_model import flatten_constraint, normalized_numexpr
 
 def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _toplevel=None, nested=False):
     """
-        Decomposes any global constraint not supported by the solver
-        Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions,
-            if nested is True, new constraints will have been added to the `_toplevel` list too
-
-        - supported: a set of supported global constraints or global functions
-        - supported_reified: a set of supported reified global constraints (globals with Boolean return type only)
-        - toplevel: a list of constraints that should be added toplevel, carried as pass by reference to recursive calls
-
+        Decomposes any global constraint not supported by the solver.
+        Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions.
+            
+        :param supported: a set of supported global constraints or global functions
+        :param supported_reified: a set of supported reified global constraints (globals with Boolean return type only)
+        :param _toplevel: a list of constraints that should be added toplevel, carried as pass by reference to recursive calls
+        :param nested: if True, new constraints will have been added to the `_toplevel` list too
+        
         Special care taken for unsupported global constraints in reified contexts and for numeric global constraints
-            in a comparison.
+        in a comparison.
 
         Supported numerical global functions remain in the expression tree as is. They can be rewritten using
-            `cpmpy.transformations.reification.reify_rewrite`
-            The following `bv -> NumExpr <comp> Var/Const` can be rewritten as  [bv -> IV0 <comp> Var/Const, NumExpr == IV0].
-            So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
+        :func:`cpmpy.transformations.reification.reify_rewrite`
+        The following ``bv -> NumExpr <comp> Var/Const`` can be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
+        So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
     """
     if _toplevel is None:
         _toplevel = []
@@ -188,6 +188,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
 # old way of doing decompositions post-flatten
 # will be removed in any future version!
 def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
+    """
+    .. deprecated:: 0.9.16
+          Please use :func:`decompose_in_tree()` instead.
+    """
     warnings.warn("Deprecated, use `decompose_in_tree()` instead, will be removed in stable version", DeprecationWarning)
     """
         DEPRECATED!!! USE `decompose_in_tree()` instead!
@@ -272,6 +276,10 @@ def decompose_global(lst_of_expr, supported=set(), supported_reif=set()):
     return newlist
 
 def do_decompose(cpm_expr):
+    """
+    .. deprecated:: 0.9.13
+          Please use :func:`decompose_in_tree()` instead.
+    """
     warnings.warn("Deprecated, never meant to be used outside this transformation; will be removed in stable version",
                   DeprecationWarning)
     """

@@ -4,8 +4,11 @@ import cpmpy
 from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.expressions.globalconstraints import *
 from cpmpy.expressions.globalfunctions import *
+from cpmpy.expressions.core import Comparison
 
 import pytest
+
+from utils import skip_on_missing_pblib
 
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
@@ -30,10 +33,10 @@ SAT_SOLVERS = {"pysat", "pysdd"}
 
 EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "z3": {"Inverse"},
-                  "choco": {"Inverse"},
-                  "ortools":{"Inverse"},
-                  "exact": {"Inverse"},
+                  "z3": {},
+                  "choco": {},
+                  "ortools":{},
+                  "exact": {},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
                   "gcs": {}
                   }
@@ -272,6 +275,7 @@ def verify(cons):
 
 
 @pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
+@skip_on_missing_pblib(skip_on_exception_only=True)
 def test_bool_constraints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
@@ -286,6 +290,7 @@ def test_bool_constraints(solver, constraint):
 
 
 @pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(comp_constraints)),  ids=str)
+@skip_on_missing_pblib(skip_on_exception_only=True)
 def test_comparison_constraints(solver, constraint):
     """
         Tests comparison constraint by posting it to the solver and checking the value after solve.
@@ -300,6 +305,7 @@ def test_comparison_constraints(solver, constraint):
 
 
 @pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(reify_imply_exprs)),  ids=str)
+@skip_on_missing_pblib(skip_on_exception_only=True)
 def test_reify_imply_constraints(solver, constraint):
     """
         Tests boolean expression by posting it to solver and checking the value after solve.

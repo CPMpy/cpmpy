@@ -1,31 +1,22 @@
 name: Github Tests
-
 on: [push] # Can also put pull_request here, but then we dont run it when directly pushing to master
-
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 pytest pytest-xdist requests pandas
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install python-sat
-          pip install z3-solver
-          pip install exact
-          pip install pysdd
-          pip install pychoco
+          pip install ".[test, z3, choco, exact, pysat, pysdd, choco, minizinc]"
+          pip install pypblib  # dependency of pysat for PB constraints
+          pip install pytest-xdist
           sudo snap install minizinc --classic
-          pip install minizinc
       - name: Test with pytest
         run: |
           python -m pytest -n 4 tests/
-
