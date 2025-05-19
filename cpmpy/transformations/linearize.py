@@ -397,7 +397,7 @@ def only_positive_bv(lst_of_expr, expr_dict=None):
 
         Resulting expression is linear if the original expression was linear.
     """
-    assert expr_dict is not None
+
     newlist = []
     for cpm_expr in lst_of_expr:
 
