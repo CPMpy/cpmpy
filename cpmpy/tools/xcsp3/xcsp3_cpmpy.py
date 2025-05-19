@@ -77,6 +77,13 @@ def rlimit_cpu_handler(_signo, _stack_frame):
     print(flush=True)
     raise TimeoutError("SIGXCPU received")
 
+def init_signal_handlers():
+    signal.signal(signal.SIGINT, sigterm_handler)
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGINT, sigterm_handler)
+    signal.signal(signal.SIGABRT, sigterm_handler)
+    signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
+
 def mib_as_bytes(mib: int) -> int:
     return mib * 1024 * 1024
 
@@ -579,11 +586,7 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 
     # Configure signal handles
-    # signal.signal(signal.SIGINT, sigterm_handler)
-    signal.signal(signal.SIGTERM, sigterm_handler)
-    signal.signal(signal.SIGINT, sigterm_handler)
-    signal.signal(signal.SIGABRT, sigterm_handler)
-    signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
+    init_signal_handlers()
 
     # ------------------------------ Argument parsing ------------------------------ #
     parser = argparse.ArgumentParser("CPMpy XCSP3 executable")

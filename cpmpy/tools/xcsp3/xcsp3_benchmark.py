@@ -23,7 +23,7 @@ from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 from cpmpy.tools.xcsp3.parser_callbacks import CallbacksCPMPy
 from cpmpy.tools.xcsp3.xcsp3_solution import solution_xml
-from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, ExitStatus
+from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, init_signal_handlers, ExitStatus
 
 class Tee:
     """
@@ -85,6 +85,7 @@ def xcsp3_wrapper(conn, kwargs, verbose):
         sys.stdout = Tee(original_stdout, pipe_writer) # forward to pipe and console
 
     try:
+        init_signal_handlers() # configure OS signal handlers
         xcsp3_cpmpy(**kwargs)
         conn.send({"status": "ok"})
     except Exception as e: # capture exceptions and report in state
