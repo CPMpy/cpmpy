@@ -481,6 +481,18 @@ class Regular(GlobalConstraint):
     Regular-constraint (or Automaton-constraint)
     Takes as input a sequence of variables and a automaton representation using a transition table.
     The constraint is satisfied if the sequence of variables corresponds to an accepting path in the automaton.
+
+    The automaton is defined by a list of transitions, a starting node and a list of accepting nodes.
+    The transitions are represented as a list of tuples, where each tuple is of the form (id1, value, id2).
+    An id is an integer representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
+    The starting node is an integer representing the starting state of the automaton.
+    The accepting nodes are a list of integers representing the accepting states of the automaton.
+
+    Example: an automaton that accepts the language 0*10* (exactly 1 variable taking value 1) is defined as:
+        cp.Regular(array = cp.intvar(0,1, shape=4),
+                   transitions = [(0,0,0), (0,1,1), (1,0,2), (2,0,2)],
+                   start = 0,
+                   accepting = [2])
     """
     def __init__(self, array, transitions, start, accepting):
         array = flatlist(array)
