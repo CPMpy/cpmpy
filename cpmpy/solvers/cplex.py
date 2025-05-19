@@ -333,7 +333,7 @@ class CPM_cplex(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -429,4 +429,5 @@ class CPM_cplex(SolverInterface):
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
       return self
+    __add__ = add  # avoid redirect in superclass
 
