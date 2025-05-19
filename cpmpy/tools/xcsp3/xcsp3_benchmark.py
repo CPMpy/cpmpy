@@ -223,34 +223,6 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
                 pass  # avoid crashing on cleanup
 
 
-def run_with_timeout(func, args, timeout):
-    def wrapper(queue):
-        try:
-            result = func(args)
-            queue.put((True, result))
-        except Exception as e:
-            queue.put((False, traceback.format_exc()))
-
-    queue = multiprocessing.Queue()
-    p = multiprocessing.Process(target=wrapper, args=(queue,))
-    p.start()
-    p.join(timeout)
-
-    if p.is_alive():
-        p.terminate()
-        p.join()
-        raise TimeoutError("Function timed out")
-    
-    success, result = queue.get()
-    if not success:
-        raise RuntimeError(f"Function raised exception:\n{result}")
-    return result
-    
-def submit_wrapped(filename, metadata, solver, time_limit, mem_limit, output_file, verbose):
-    return run_with_timeout(execute_instance, 
-                            (filename, metadata, solver, time_limit, mem_limit, output_file, verbose),
-                            timeout=time_limit*2) # <- change limit as needed, now a very gracious doubling of the time
-
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
                    verbose: bool = False) -> str:
@@ -293,14 +265,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
             try:
                 _ = future.result()  # for cleanliness sake, result is empty
-            # except TimeoutError:
-            #     pass
-                # print(f"Timeout on job {i}: {dataset[i][1]['name']}")  # print the metadata
             except Exception as e:
-                print(type(e))
-                # Expected exception -> due to RLIMIT_CPU to terminate hanging instances
-                # if str(e) == "A process in the process pool was terminated abruptly while the future was running or pending.":
-                #     continue
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
     
     return output_file
