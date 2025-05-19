@@ -11,7 +11,7 @@ from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.python_builtins import all as cpm_all
 
-def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=frozenset(), expr_dict=None):
+def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=frozenset()):
     """
         A partial function is a function whose output is not defined for all possible inputs.
 
