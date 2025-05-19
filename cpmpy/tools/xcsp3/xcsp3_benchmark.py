@@ -3,6 +3,7 @@ import csv
 import multiprocessing
 import os
 import io
+import signal
 import time
 import lzma
 from concurrent.futures import ThreadPoolExecutor
@@ -129,7 +130,18 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     parent_conn, child_conn = multiprocessing.Pipe() # communication pipe between processes
     process = ctx.Process(target=xcsp3_wrapper, args=(child_conn, {"benchname":filename, "solver": solver, "time_limit": time_limit, "mem_limit": mem_limit}, verbose))
     process.start()
-    process.join()
+    process.join(timeout=time_limit)
+
+    # Replicate competition convention on how jobs get terminated
+    if process.is_alive():
+        # Send sigterm to let process know it reached its time limit
+        os.kill(process.pid, signal.SIGTERM)
+        # 1 second grace period
+        process.join(timeout=1)
+        # Kill if still alive
+        if process.is_alive():
+            os.kill(process.pid, signal.SIGKILL)
+            process.join()
 
     # Collect output
     output = []

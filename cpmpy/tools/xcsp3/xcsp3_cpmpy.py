@@ -423,6 +423,13 @@ def xcsp3_cpmpy(benchname: str,
                 intermediate: bool = False,
                 **kwargs,
 ):
+
+    # Configure signal handlers  
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGINT, sigterm_handler)
+    signal.signal(signal.SIGABRT, sigterm_handler)
+    signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
+
     try:
 
         # --------------------------- Global Configuration --------------------------- #
@@ -438,10 +445,12 @@ def xcsp3_cpmpy(benchname: str,
             hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
             print_comment(f"Setting memory limit: {soft} -- {hard}")
             resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
-        if time_limit is not None:
-            soft = time_limit + 1
-            hard = time_limit + 2
-            resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
+        # TODO should the executable even interrupt itself -> just wait for external signal
+        #      let the executable use all the time it can get
+        # if time_limit is not None:
+        #     soft = time_limit + 1
+        #     hard = time_limit + 2
+        #     resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
 
         sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
