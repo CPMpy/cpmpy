@@ -329,7 +329,7 @@ def get_or_make_var(expr, expr_dict=None):
         the equivalent of: (var, normalize(expr) == var)
     """
 
-    if expr is not None and expr in expr_dict:
+    if expr_dict is not None and expr in expr_dict:
         return expr_dict[expr], []
 
     if __is_flat_var(expr):
@@ -348,7 +348,8 @@ def get_or_make_var(expr, expr_dict=None):
         bvar = _BoolVarImpl()
 
         # save expr in dict
-        expr_dict[expr] = bvar
+        if expr_dict is not None:
+            expr_dict[expr] = bvar
         return bvar, [flatexpr == bvar] + flatcons
 
     else:
