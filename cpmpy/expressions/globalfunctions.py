@@ -71,7 +71,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, get_repr, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, get_bounds, implies
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, get_bounds, implies
 
 
 class GlobalFunction(Expression):

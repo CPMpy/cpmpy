@@ -170,7 +170,8 @@ class Expression(object):
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self):
-        return hash(self.__repr__())
+        return hash(repr(self))
+
 
     def has_subexpr(self):
         """ Does it contains nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
