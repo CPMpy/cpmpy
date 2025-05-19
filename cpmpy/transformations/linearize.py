@@ -83,8 +83,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
             Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
         reified: whether the constraint is fully reified
     """
-    if expr_dict is None:
-        expr_dict = dict()
 
     newlist = []
     for cpm_expr in lst_of_expr:

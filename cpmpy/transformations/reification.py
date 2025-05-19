@@ -31,8 +31,6 @@ from .negation import recurse_negation
 
 
 def only_bv_reifies(constraints, expr_dict=None):
-    if expr_dict is None:
-        expr_dict = dict()
 
     newcons = []
     for cpm_expr in constraints:
@@ -71,8 +69,6 @@ def only_implies(constraints, expr_dict=None):
         Assumes all constraints are in 'flat normal form' and all reifications have a variable in lhs. Hence, only apply
         AFTER :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`only_bv_reifies()`.
     """
-    if expr_dict is None:
-        expr_dict = dict()
 
     newcons = []
     retransform = []
@@ -131,10 +127,7 @@ def reify_rewrite(constraints, supported=frozenset(), expr_dict=None):
         :param supported: a (frozen)set of expression names that support reification in the solver, including
                           supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. ``BV -> (LHS == V)``
     """
-    assert expr_dict is not None
-    if expr_dict is None:
-        expr_dict = dict()
-
+    
     if not is_any_list(constraints):
         # assume list, so make list
         constraints = [constraints]

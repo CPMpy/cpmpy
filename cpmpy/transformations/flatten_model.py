@@ -132,8 +132,6 @@ def flatten_constraint(expr, expr_dict=None):
             TODO, what built-in python error is best?
             RE TODO: we now have custom NotImpl/NotSupported
     """
-    if expr_dict is None:
-        expr_dict = dict()
 
     newlist = []
     # for backwards compatibility reasons, we now consider it a meta-
@@ -330,10 +328,8 @@ def get_or_make_var(expr, expr_dict=None):
         Determines whether this is a Boolean or Integer variable and returns
         the equivalent of: (var, normalize(expr) == var)
     """
-    assert expr_dict is not None
-    if expr_dict is None:
-        expr_dict = dict()
-    if expr in expr_dict:
+
+    if expr is not None and expr in expr_dict:
         return expr_dict[expr], []
 
     if __is_flat_var(expr):
@@ -368,7 +364,8 @@ def get_or_make_var(expr, expr_dict=None):
         ivar = _IntVarImpl(lb, ub)
 
         # save expr in dict
-        expr_dict[expr] = ivar
+        if expr_dict is not None:
+            expr_dict[expr] = ivar
         return ivar, [flatexpr == ivar] + flatcons
 
 def get_or_make_var_or_list(expr, expr_dict=None):

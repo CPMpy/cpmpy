@@ -38,8 +38,6 @@ def to_cnf(constraints, expr_dict=None):
             constraints:    list[Expression] or Operator
             supported:      (frozen)set of global constraint names that do not need to be decomposed
     """
-    if expr_dict is None:
-        expr_dict = dict()
     fnf = flatten_constraint(constraints, expr_dict=expr_dict)
     fnf = only_implies(fnf, expr_dict=expr_dict)
     return flat2cnf(fnf)
