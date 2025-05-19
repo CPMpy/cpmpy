@@ -458,12 +458,6 @@ def xcsp3_cpmpy(benchname: str,
 
         # ------------------------------ Parse instance ------------------------------ #
 
-        if benchname.endswith(".lzma"):
-            # Decompress the XZ file
-            with lzma.open(benchname, 'rt', encoding='utf-8') as f:
-                xml_file = StringIO(f.read()) # read to memory-mapped file
-                benchname = xml_file
-
         time_parse = time.time()
         parser = _parse_xcsp3(benchname)
         time_parse = time.time() - time_parse
@@ -622,6 +616,12 @@ if __name__ == "__main__":
     print_comment(f"Arguments: {args}")
 
     try:
+        if str(args.benchname).endswith(".lzma"):
+            # Decompress the XZ file
+            with lzma.open(args.benchname, 'rt', encoding='utf-8') as f:
+                xml_file = StringIO(f.read()) # read to memory-mapped file
+                args.benchname = xml_file
+
         xcsp3_cpmpy(**vars(args))
     except Exception as e:
         print_comment(f"{type(e).__name__} -- {e}")

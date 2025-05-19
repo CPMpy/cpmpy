@@ -121,6 +121,13 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     result['track'] = metadata['track']
     result['instance'] = metadata['name'] 
     result['solver'] = solver
+
+    # Decompress before timers start
+    if str(filename).endswith(".lzma"):
+        # Decompress the XZ file
+        with lzma.open(filename, 'rt', encoding='utf-8') as f:
+            xml_file = StringIO(f.read()) # read to memory-mapped file
+            filename = xml_file
             
     # Start total timing
     total_start = time.time()
@@ -142,6 +149,8 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         if process.is_alive():
             os.kill(process.pid, signal.SIGKILL)
             process.join()
+
+    result['time_total'] = time.time() - total_start
 
     # Collect output
     output = []
@@ -190,8 +199,6 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
         else:
             result['status'] = ExitStatus.unknown.value
             result["solution"] = status["exception"]    
-
-    result['time_total'] = time.time() - total_start
 
     # Use a lock file to prevent concurrent writes
     lock_file = f"{output_file}.lock"

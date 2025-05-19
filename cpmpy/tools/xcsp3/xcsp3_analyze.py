@@ -27,7 +27,7 @@ def xcsp3_plot(df, time_limit=None):
         status_filter = 'OPTIMUM FOUND'
     else:
         status_filter = 'SATISFIABLE'
-    df = df[df['status'] == status_filter]  # only those that reached the desired status
+    df = df[(df['status'] == status_filter) | (df['status'] == 'UNSATISFIABLE')]  # only those that reached the desired status
 
     # Count how many instances each solver solved (with correct status)
     solver_counts = df['solver'].value_counts()
@@ -122,7 +122,8 @@ def xcsp3_stats(df):
 
     for phase in ['parse', 'model', 'post']:
         slowest_idx = df[f'time_{phase}'].idxmax()
-        print(f"Slowest {phase}: {df.loc[slowest_idx, f'time_{phase}']}s ({df.loc[slowest_idx, 'instance']}, {df.loc[slowest_idx, 'solver']})")
+        if slowest_idx is not None and not pd.isna(slowest_idx):
+            print(f"Slowest {phase}: {df.loc[slowest_idx, f'time_{phase}']}s ({df.loc[slowest_idx, 'instance']}, {df.loc[slowest_idx, 'solver']})")
 
     for solver in df['solver'].unique():
         solver_total = df[df['solver'] == solver]['time_total'].sum()
