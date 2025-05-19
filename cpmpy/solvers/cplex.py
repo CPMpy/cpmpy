@@ -361,7 +361,7 @@ class CPM_cplex(SolverInterface):
                 self.cplex_model.add_constraint(cplexlhs >= cplexrhs)
             elif cpm_expr.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
-                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum')):
+                        or (isinstance(lhs, Operator) and (lhs.name in {'sum', 'wsum', 'sub'})):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     cplexlhs = self._make_numexpr(lhs)
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
@@ -393,7 +393,7 @@ class CPM_cplex(SolverInterface):
                 cond, trigger_val = self.solver_var(cond), 1
 
             lhs, rhs = sub_expr.args
-            if isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum":
+            if isinstance(lhs, _NumVarImpl) or (lhs.name in {'sum', 'wsum', 'sub'}):
                 lin_expr = self._make_numexpr(lhs)
             else:
                 raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
