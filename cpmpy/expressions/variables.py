@@ -321,7 +321,6 @@ class _NumVarImpl(Expression):
     # for sets/dicts. Because names are unique, so is the str repr
     def __hash__(self):
         return hash(self.name)
-    
 
 
 class _IntVarImpl(_NumVarImpl):
@@ -421,7 +420,6 @@ class NegBoolView(_BoolVarImpl):
 
     def __invert__(self):
         return self._bv
-    
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest

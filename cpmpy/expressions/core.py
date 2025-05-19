@@ -576,7 +576,6 @@ class Comparison(Expression):
         elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
         return None # default
     
-
 class Operator(Expression):
     """
     All kinds of mathematical and logical operators on expressions
@@ -665,7 +664,6 @@ class Operator(Expression):
         """
         return Operator.allowed[self.name][1]
     
-
     def __repr__(self):
         printname = self.name
         if printname in Operator.printmap:

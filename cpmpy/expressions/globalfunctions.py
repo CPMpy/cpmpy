@@ -185,7 +185,6 @@ class Maximum(GlobalFunction):
         """
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
-    
 
 class Abs(GlobalFunction):
     """
@@ -221,6 +220,8 @@ class Abs(GlobalFunction):
             return [eval_comparison(cpm_op, newarg, cpm_rhs)], \
                     [is_pos == (arg >= 0), is_pos.implies(arg == newarg), (~is_pos).implies(-arg == newarg)]
 
+    
+    
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
@@ -231,7 +232,7 @@ class Abs(GlobalFunction):
         if ub <= 0:
             return -ub, -lb
         return 0, max(-lb, ub)
-    
+
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
@@ -411,7 +412,6 @@ class NValue(GlobalFunction):
         Returns the bounds of the (numerical) global constraint
         """
         return 1, len(self.args)
-    
 
 
 class NValueExcept(GlobalFunction):

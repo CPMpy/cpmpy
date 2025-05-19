@@ -198,7 +198,6 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(argvals(self.args))) == len(self.args)
     
-
 class AllDifferentExceptN(GlobalConstraint):
     """
         All arguments except those equal to a value in n have a distinct value.
@@ -217,7 +216,6 @@ class AllDifferentExceptN(GlobalConstraint):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == len(vals)
     
-
 
 class AllDifferentExcept0(AllDifferentExceptN):
     """
@@ -426,7 +424,6 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
     
-
 class ShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
@@ -457,7 +454,6 @@ class ShortTable(GlobalConstraint):
                 return True
         return False
     
-
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
@@ -553,7 +549,6 @@ class InDomain(GlobalConstraint):
         return "{} in {}".format(self.args[0], self.args[1])
     
 
-
 class Xor(GlobalConstraint):
     """
         The :class:`Xor` exclusive-or constraint
@@ -584,7 +579,7 @@ class Xor(GlobalConstraint):
         if len(self.args) == 2:
             return "{} xor {}".format(*self.args)
         return "xor({})".format(self.args)
-    
+
 
 class Cumulative(GlobalConstraint):
     """
@@ -744,6 +739,7 @@ class NoOverlap(GlobalConstraint):
                 return False
         return True
 
+
 class GlobalCardinalityCount(GlobalConstraint):
     """
     The number of occurrences of each value `vals[i]` in the list of variables `vars`
@@ -767,6 +763,7 @@ class GlobalCardinalityCount(GlobalConstraint):
     def value(self):
         decomposed, _ = self.decompose()
         return cp.all(decomposed).value()
+
 
 class Increasing(GlobalConstraint):
     """
