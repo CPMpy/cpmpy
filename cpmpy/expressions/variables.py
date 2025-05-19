@@ -322,8 +322,6 @@ class _NumVarImpl(Expression):
     def __hash__(self):
         return hash(self.name)
     
-    def get_repr(self):
-        return self.name
 
 
 class _IntVarImpl(_NumVarImpl):
@@ -424,8 +422,6 @@ class NegBoolView(_BoolVarImpl):
     def __invert__(self):
         return self._bv
     
-    def get_repr(self):
-        return "~" + self._bv.get_repr()
 
 
 # subclass numericexpression for operators (first), ndarray for all the rest

@@ -198,8 +198,6 @@ class AllDifferent(GlobalConstraint):
     def value(self):
         return len(set(argvals(self.args))) == len(self.args)
     
-    def get_repr(self):
-        return (self.name, frozenset(get_repr(a) for a in self.args))
 
 class AllDifferentExceptN(GlobalConstraint):
     """
@@ -219,8 +217,6 @@ class AllDifferentExceptN(GlobalConstraint):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == len(vals)
     
-    def get_repr(self):
-        return (self.name, (frozenset(get_repr(a) for a in self.args[0]), get_repr(self.args[1])))
 
 
 class AllDifferentExcept0(AllDifferentExceptN):
@@ -256,9 +252,6 @@ class AllEqual(GlobalConstraint):
 
     def value(self):
         return len(set(argvals(self.args))) == 1
-    
-    def get_repr(self):
-        return (self.name, frozenset(get_repr(a) for a in self.args))
 
 
 class AllEqualExceptN(GlobalConstraint):
@@ -279,9 +272,6 @@ class AllEqualExceptN(GlobalConstraint):
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == 1 or len(set(vals)) == 0
-    
-    def get_repr(self):
-        return (self.name, (frozenset(get_repr(a) for a in self.args[0]), get_repr(self.args[1])))
 
 
 def circuit(args):
@@ -436,8 +426,6 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
     
-    def get_repr(self):
-        return (self.name, (get_repr(self.args[0]), frozenset(tuple(row) for row in self.args[1])))
 
 class ShortTable(GlobalConstraint):
     """
@@ -469,8 +457,6 @@ class ShortTable(GlobalConstraint):
                 return True
         return False
     
-    def get_repr(self):
-        return (self.name, (get_repr(self.args[0]), frozenset(tuple(row) for row in self.args[1])))
 
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
@@ -492,8 +478,6 @@ class NegativeTable(GlobalConstraint):
         tabval = argvals(tab)
         return arrval not in tabval
 
-    def get_repr(self):
-        return (self.name, (get_repr(self.args[0]), get_repr(self.args[1])))
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
@@ -568,8 +552,6 @@ class InDomain(GlobalConstraint):
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
     
-    def get_repr(self):
-        return (self.name, (get_repr(self.args[0]), frozenset(self.args[1])))
 
 
 class Xor(GlobalConstraint):
@@ -603,9 +585,6 @@ class Xor(GlobalConstraint):
             return "{} xor {}".format(*self.args)
         return "xor({})".format(self.args)
     
-    def get_repr(self):
-        return (self.name, frozenset(get_repr(a) for a in self.args))
-
 
 class Cumulative(GlobalConstraint):
     """
@@ -687,10 +666,6 @@ class Cumulative(GlobalConstraint):
                 return False
 
         return True
-    
-    def get_repr(self):
-        task_info = frozenset(get_repr([s,d,e,h]) for s,d,e,h in zip(*self.args[:-1]))
-        return (self.name, (task_info, get_repr(self.args[-1])))
 
 
 class Precedence(GlobalConstraint):
@@ -768,11 +743,6 @@ class NoOverlap(GlobalConstraint):
             if e1 > s2 and e2 > s1:
                 return False
         return True
-    
-    def get_repr(self):
-        task_info = frozenset(get_repr([s,d,e]) for s,d,e in zip(*self.args))
-        return (self.name, task_info)
-
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
@@ -797,11 +767,6 @@ class GlobalCardinalityCount(GlobalConstraint):
     def value(self):
         decomposed, _ = self.decompose()
         return cp.all(decomposed).value()
-
-    def get_repr(self):
-        repr_vars = frozenset(get_repr(a) for a in self.args[0])
-        repr_vals, repr_occ = get_repr(self.args[1]), get_repr(self.args[2])
-        return (self.name, (repr_vars, repr_vals, repr_occ))
 
 class Increasing(GlobalConstraint):
     """

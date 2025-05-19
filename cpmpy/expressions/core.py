@@ -90,7 +90,7 @@ from types import GeneratorType
 import numpy as np
 import cpmpy as cp
 
-from .utils import get_repr, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
+from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -148,13 +148,6 @@ class Expression(object):
         self.desc = txt
         self._override_print = override_print
         self._full_print = full_print
-
-    def get_repr(self):
-        """
-            Return a hashable representation of the expression
-            Can be used to check if two expressions are semantically equivalent
-        """
-        return (self.name, get_repr(self.args))
 
     def __str__(self):
         if not hasattr(self, "desc") or self._override_print is False:
@@ -566,7 +559,7 @@ class Comparison(Expression):
     def __bool__(self):
         # will be called when comparing elements in a container, but always with `==`
         if self.name == "==":
-            return get_repr(self.args[0]) == get_repr(self.args[1])
+            return str(self.args[0]) == str(self.args[1])
         super().__bool__() # default to exception
 
     # return the value of the expression
@@ -583,12 +576,6 @@ class Comparison(Expression):
         elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
         return None # default
     
-    def get_repr(self):
-        if self.name == "==" or self.name == "!=":
-            return (self.name, frozenset((get_repr(self.args[0]), get_repr(self.args[1]))))
-        else: # order matters, return tuple
-            return (self.name, (get_repr(self.args[0]), get_repr(self.args[1])))
-
 
 class Operator(Expression):
     """
@@ -678,16 +665,6 @@ class Operator(Expression):
         """
         return Operator.allowed[self.name][1]
     
-    def get_repr(self):
-        is_commutative = self.name in {"sum", "mul", "and", "or"}
-        if is_commutative:
-            return (self.name, frozenset(get_repr(arg) for arg in self.args))
-        elif self.name == "wsum":
-            return (self.name, frozenset((w, get_repr(a)) for w,a in zip(*self.args)))
-        elif self.name == "not" or self.name == "-":
-            return (self.name, get_repr(self.args[0]))
-        else: # order matters, return tuple
-            return (self.name, tuple(get_repr(arg) for arg in self.args))
 
     def __repr__(self):
         printname = self.name

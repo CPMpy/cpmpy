@@ -148,9 +148,6 @@ class Minimum(GlobalFunction):
         bnds = [get_bounds(x) for x in self.args]
         return min(lb for lb, ub in bnds), min(ub for lb, ub in bnds)
 
-    def get_repr(self):
-        return (self.name, frozenset(get_repr(a) for a in self.args))
-
 
 class Maximum(GlobalFunction):
     """
@@ -189,8 +186,6 @@ class Maximum(GlobalFunction):
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
     
-    def get_repr(self):
-        return (self.name, frozenset(get_repr(a) for a in self.args))
 
 class Abs(GlobalFunction):
     """
@@ -237,9 +232,6 @@ class Abs(GlobalFunction):
             return -ub, -lb
         return 0, max(-lb, ub)
     
-    def get_repr(self):
-        return (self.name, get_repr(self.args[0]))
-
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
@@ -344,10 +336,6 @@ class Count(GlobalFunction):
         """
         arr, val = self.args
         return 0, len(arr)
-    
-    def get_repr(self):
-        repr_arr = frozenset(get_repr(a) for a in self.args[0])
-        return (self.name, (repr_arr, get_repr(self.args[1])))
 
 
 
@@ -377,11 +365,6 @@ class Among(GlobalFunction):
     def get_bounds(self):
         return 0, len(self.args[0])
     
-    def get_repr(self):
-        repr_arr = frozenset(get_repr(a) for a in self.args[0])
-        repr_vals = frozenset(get_repr(a) for a in self.args[1])
-        return (self.name, (repr_arr, repr_vals))
-
 
 class NValue(GlobalFunction):
 
@@ -429,8 +412,6 @@ class NValue(GlobalFunction):
         """
         return 1, len(self.args)
     
-    def get_repr(self):
-        return (self.name, frozenset(get_repr(a) for a in self.args))
 
 
 class NValueExcept(GlobalFunction):
@@ -487,7 +468,3 @@ class NValueExcept(GlobalFunction):
         Returns the bounds of the (numerical) global constraint
         """
         return 0, len(self.args)
-
-    def get_repr(self):
-        repr_arr = frozenset(get_repr(a) for a in self.args[0])
-        return (self.name, (repr_arr, get_repr(self.args[1])))
