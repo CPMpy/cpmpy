@@ -217,8 +217,6 @@ class SolverInterface(object):
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
-            con = self.expr_dict.get(con, con) # we might have alrady seen this constraint before (as a subexpression)
-
             raise NotImplementedError("solver add(): abstract function, overwrite")
 
         return self

@@ -413,9 +413,7 @@ class CPM_ortools(SolverInterface):
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
-            con = self.expr_dict.get(con, con) # we might have alrady seen this constraint before (as a subexpression)
             self._post_constraint(con)
-            self.expr_dict[con] = BoolVal(True) # constraint is now always true, no need to post it again
 
         return self
     __add__ = add  # avoid redirect in superclass

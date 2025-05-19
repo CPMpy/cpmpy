@@ -327,7 +327,6 @@ class CPM_pysat(SolverInterface):
 
       # transform and post the constraints
       for cpm_expr in self.transform(cpm_expr_orig):
-        cpm_expr = self.expr_dict.get(cpm_expr, cpm_expr) # we might have alrady seen this constraint before (as a subexpression)
 
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
@@ -400,8 +399,6 @@ class CPM_pysat(SolverInterface):
 
         else:
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
-
-        self.expr_dict[cpm_expr] = BoolVal(True) # constraint is now always true, no need to post it again
 
       return self
     __add__ = add  # avoid redirect in superclass

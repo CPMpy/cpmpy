@@ -333,7 +333,7 @@ class CPM_cpo(SolverInterface):
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}), expr_dict=self.expr_dict)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
         # count is only supported with a constant to be counted, so we decompose
         supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
                      "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'no_overlap'}
@@ -365,11 +365,9 @@ class CPM_cpo(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
 
         for cpm_con in self.transform(cpm_expr):
-            cpm_con = self.expr_dict.get(cpm_con, cpm_con) # we might have alrady seen this constraint before (as a subexpression)
             # translate each expression tree, then post straight away
             cpo_con = self._cpo_expr(cpm_con)
             self.cpo_model.add(cpo_con)
-            self.expr_dict[cpm_con] = BoolVal(True) # constraint is now always true, no need to post it again
         return self
     __add__ = add  # avoid redirect in superclass
 

@@ -328,7 +328,7 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"}, expr_dict=self.expr_dict)  # linearize expects safe exprs
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"})  # linearize expects safe exprs
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported, expr_dict=self.expr_dict)
         cpm_cons = flatten_constraint(cpm_cons, expr_dict=self.expr_dict)  # flat normal form
@@ -366,7 +366,6 @@ class CPM_gurobi(SolverInterface):
 
       # transform and post the constraints
       for cpm_expr in self.transform(cpm_expr_orig):
-        cpm_expr = self.expr_dict.get(cpm_expr, cpm_expr) # we might have alrady seen this constraint before (as a subexpression)
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
@@ -458,8 +457,6 @@ class CPM_gurobi(SolverInterface):
         else:
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
         
-        self.expr_dict[cpm_expr] = BoolVal(True) # constraint is now always true, no need to post it again
-
       return self
     __add__ = add  # avoid redirect in superclass
 

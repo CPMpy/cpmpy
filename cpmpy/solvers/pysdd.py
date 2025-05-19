@@ -308,14 +308,11 @@ class CPM_pysdd(SolverInterface):
         # transform and post the constraints
         # XXX the order in the for loop will matter on runtime efficiency...
         for cpm_con in self.transform(cpm_expr):
-            cpm_con = self.expr_dict.get(cpm_con, cpm_con) # we might have alrady seen this constraint before (as a subexpression)
 
             # replace root by conjunction of itself and the con expression
             self.pysdd_root = self.pysdd_manager.conjoin(self.pysdd_root,
                                                 self._pysdd_expr(cpm_con))
             
-            self.expr_dict[cpm_con] = BoolVal(True) # constraint is now always true, no need to post it again
-
         return self
     __add__ = add  # avoid redirect in superclass
 

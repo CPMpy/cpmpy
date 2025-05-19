@@ -406,11 +406,9 @@ class CPM_choco(SolverInterface):
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
-            con = self.expr_dict.get(con, con) # we might have alrady seen this constraint before (as a subexpression)
             c = self._get_constraint(con)
             if c is not None: # Reification constraints are not posted
                 c.post()
-            self.expr_dict[con] = BoolVal(True) # constraint is now always true, no need to post it again
             
         return self
     __add__ = add  # avoid redirect in superclass
