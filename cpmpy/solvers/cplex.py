@@ -102,6 +102,7 @@ class CPM_cplex(SolverInterface):
                 return True
             except Exception as e:
                 warnings.warn(f"Problem encountered with CPLEX installation: {e}")
+                return False
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
