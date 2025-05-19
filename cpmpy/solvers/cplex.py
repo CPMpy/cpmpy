@@ -4,7 +4,7 @@
 ## cplex.py
 ##
 """
-    Interface to the python 'docplex.mp' package
+    Interface to CPLEX Optimizer using the python 'docplex.mp' package
 
     Requires that the 'docplex' python package is installed:
 
@@ -50,6 +50,13 @@ from ..transformations.safening import no_partial_functions
 class CPM_cplex(SolverInterface):
     """
     Interface to the CPLEX solver.
+
+    Creates the following attributes (see parent constructor for more):
+    - cplex_model: object, CPLEX model object
+
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, 
+    calls a function on the ``cplex_model`` object.
+
     Requires that the 'docplex' python package is installed:
     $ pip install docplex
 
@@ -62,8 +69,6 @@ class CPM_cplex(SolverInterface):
     https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
     Academic license:
     https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
-    Creates the following attributes (see parent constructor for more):
-    - cplex_model: object, CPLEX model object
     """
 
     _domp = None  # Static attribute to hold the docplex.cp module
@@ -134,8 +139,8 @@ class CPM_cplex(SolverInterface):
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
+            - nb_threads:  how many threads to use during solve (int, optional)
             - kwargs:      any keyword argument, sets parameters of solver object
-            - nb_threads - how many threads to use during solve.
 
             Examples of supported arguments include:
                 - context (optional) – context to use during solve
@@ -152,14 +157,16 @@ class CPM_cplex(SolverInterface):
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-        # set nb of threads
-        self.cplex_model.context.cplex_parameters.threads = nb_threads
 
         if time_limit is not None and not np.isinf(time_limit):
             self.cplex_model.set_time_limit(time_limit)
 
+        # set nb of threads
+        self.cplex_model.context.cplex_parameters.threads = nb_threads
+
         cplex_objective = self.cplex_model.get_objective_expr()
         self.cplex_model.solve(**kwargs)
+        
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.cplex_model.solve_details.time
@@ -185,7 +192,7 @@ class CPM_cplex(SolverInterface):
         elif "aborted" in cplex_status:
             self.cpm_status.exitstatus = ExitStatus.NOT_RUN
         else:  # another? This can happen when error during solve. Error message will be in the status.
-            raise NotImplementedError(cplex_status)  # if a new status type was introduced, please report on GitHub
+            raise NotImplementedError(f"Translation of cplex status {cplex_status} to CPMpy status not implemented")  # if a new status type was introduced, please report on GitHub
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
@@ -211,7 +218,9 @@ class CPM_cplex(SolverInterface):
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+
         return has_sol
+
 
     def solver_var(self, cpm_var):
         """
@@ -245,9 +254,10 @@ class CPM_cplex(SolverInterface):
             Post the given expression to the solver as objective to minimize/maximize
 
             'objective()' can be called multiple times, only the last one is stored
-
-            (technical side note: any constraints created during conversion of the objective
-                are premanently posted to the solver)
+            
+            .. note::
+                technical side note: any constraints created during conversion of the objective
+                are premanently posted to the solver
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = (flatten_objective(expr))
