@@ -1,4 +1,5 @@
 import argparse
+import ast
 from pathlib import Path
 import re
 import matplotlib
@@ -72,10 +73,36 @@ def xcsp3_plot(df, time_limit=None):
 
     return fig
 
+def get_cost(row):
+    """
+    Get the achieved objective value from the provided row.
+    If intermediate solutions are available, get the best found (not neccesarily proven optimal).
+    """
+    intermediate = row['intermediate']
+
+    # Try to parse string representations safely
+    if isinstance(intermediate, str):
+        try:
+            intermediate = ast.literal_eval(intermediate)
+        except (ValueError, SyntaxError):
+            intermediate = None
+
+    # If it's a valid list of tuples, return the last objective
+    if isinstance(intermediate, list) and len(intermediate) > 0:
+        try:
+            return intermediate[-1][1]
+        except (IndexError, TypeError):
+            pass
+
+    # Fallback to extracting from solution
+    return extract_cost(row['solution'])
+
 def xcsp3_objective_performance_profile(df):
     # Parse cost from the solution string
     df = df.copy()
-    df['cost'] = df['solution'].apply(extract_cost)
+    # print(df["intermediate"])
+    df['cost'] = df.apply(get_cost, axis=1)
+    # df['cost'] = df['solution'].apply(extract_cost)
 
     # Pivot to get costs per instance per solver
     pivot = df.pivot_table(index='instance', columns='solver', values='cost')
