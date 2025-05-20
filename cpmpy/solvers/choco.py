@@ -409,7 +409,7 @@ class CPM_choco(SolverInterface):
             c = self._get_constraint(con)
             if c is not None: # Reification constraints are not posted
                 c.post()
-            
+
         return self
     __add__ = add  # avoid redirect in superclass
 
