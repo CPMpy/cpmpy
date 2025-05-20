@@ -62,7 +62,10 @@ class PipeWriter:
         self.conn = conn
     def write(self, data):
         if data:  # avoid empty writes
-            self.conn.send(data)
+            try:
+                self.conn.send(data)
+            except:
+                pass
     def flush(self):
         pass  # no buffering
 
@@ -273,7 +276,9 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
             try:
-                _ = future.result()  # for cleanliness sake, result is empty
+                _ = future.result(timeout=time_limit+10)  # for cleanliness sake, result is empty
+            except TimeoutError:
+                pass
             except Exception as e:
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
     
