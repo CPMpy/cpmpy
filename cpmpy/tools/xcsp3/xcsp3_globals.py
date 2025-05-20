@@ -397,9 +397,6 @@ class ShortTable(GlobalConstraint):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        # TODO: temporarily disabled due to performance implication on large tables
-        # if not all(is_int(x) or x == STAR for row in table for x in row):
-        #     raise TypeError(f"elements in argument `table` should be integer or {STAR}")
         if isinstance(table, np.ndarray): # Ensure it is a list
             table = table.tolist()
         super().__init__("short_table", [array, table])
@@ -416,35 +413,6 @@ class ShortTable(GlobalConstraint):
             cons.append(row_selected[i].implies(subexpr))
 
         return [any(row_selected)]+cons,[]
-
-    def value(self):
-        arr, tab = self.args
-        tab = np.array(tab)
-        arrval = np.array(argvals(arr))
-        for row in tab:
-            num_row = row[row != STAR].astype(int)
-            num_vals = arrval[row != STAR].astype(int)
-            if (num_row == num_vals).all():
-                return True
-        return False
-
-
-class ShortTable(GlobalConstraint):
-    """
-        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
-        no restrictions for the corresponding variable in that tuple.
-    """
-    def __init__(self, array, table):
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if isinstance(table, np.ndarray): # Ensure it is a list
-            table = table.tolist()
-        super().__init__("short_table", [array, table])
-
-    def decompose(self):
-        arr, tab = self.args
-        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
 
     def value(self):
         arr, tab = self.args
