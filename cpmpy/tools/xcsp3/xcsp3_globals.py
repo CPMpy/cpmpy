@@ -10,9 +10,9 @@ Currently, version 3.1 is supported.
 import numpy as np
 from cpmpy import cpm_array, intvar, boolvar
 from cpmpy.exceptions import CPMpyException
-from cpmpy.expressions.core import Expression
+from cpmpy.expressions.core import Expression, Operator
 from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain
-from cpmpy.expressions.utils import is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
+from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
     get_bounds, eval_comparison
 from cpmpy.expressions.variables import _IntVarImpl
 
@@ -363,14 +363,13 @@ class Table(GlobalConstraint):
         row_selected = boolvar(shape=len(tab))
         if len(tab) == 1:
             return [all(t == a for (t, a) in zip(tab[0], arr))], []
+        
+        cons = []
+        for i, row in enumerate(tab):
+            subexpr = Operator("and", [x == v for x,v in zip(arr, row)])
+            cons.append(Operator("->", [row_selected[i], subexpr]))
 
-        # Decomposition wil fail in negated setting
-        constraining = [any(row_selected)]
-
-        for (row, rs) in zip(tab, row_selected):
-            constraining += [rs.implies(all([t == a for (t, a) in zip(row, arr)]))]
-
-        return constraining, []
+        return [Operator("or", row_selected)]+cons,[]
 
     def value(self):
         arr, tab = self.args
@@ -387,6 +386,46 @@ class Table(GlobalConstraint):
             arr, tab = self.args  # the table 'tab' can only hold constants, never a nested expression
             self._has_subexpr = any(a.has_subexpr() for a in arr)
         return self._has_subexpr
+
+class ShortTable(GlobalConstraint):
+    """
+        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
+        no restrictions for the corresponding variable in that tuple.
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
+        # TODO: temporarily disabled due to performance implication on large tables
+        # if not all(is_int(x) or x == STAR for row in table for x in row):
+        #     raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
+        super().__init__("short_table", [array, table])
+
+    def decompose(self):
+        from cpmpy.expressions.python_builtins import any, all
+
+        arr, tab = self.args
+        row_selected = boolvar(shape=(len(tab),))
+
+        cons = []
+        for i, row in enumerate(tab):
+            subexpr = Operator("and", [ai == ri for ai, ri in zip(arr, row) if ri != STAR])
+            cons.append(row_selected[i].implies(subexpr))
+
+        return [any(row_selected)]+cons,[]
+
+    def value(self):
+        arr, tab = self.args
+        tab = np.array(tab)
+        arrval = np.array(argvals(arr))
+        for row in tab:
+            num_row = row[row != STAR].astype(int)
+            num_vals = arrval[row != STAR].astype(int)
+            if (num_row == num_vals).all():
+                return True
+        return False
 
 
 class NegativeShortTable(GlobalConstraint):
