@@ -433,9 +433,8 @@ class ShortTable(GlobalConstraint):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        # TODO: temporarily disabled due to performance implication on large tables
-        # if not all(is_int(x) or x == STAR for row in table for x in row):
-        #     raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        if not all(is_int(x) or x == STAR for row in table for x in row):
+            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
         if isinstance(table, np.ndarray): # Ensure it is a list
             table = table.tolist()
         super().__init__("short_table", [array, table])
