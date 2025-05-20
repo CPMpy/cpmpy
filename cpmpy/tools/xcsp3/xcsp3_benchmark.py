@@ -136,7 +136,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
     # Call xcsp3 in separate process
     ctx = multiprocessing.get_context("spawn")
     parent_conn, child_conn = multiprocessing.Pipe() # communication pipe between processes
-    process = ctx.Process(target=xcsp3_wrapper, args=(child_conn, {"benchname":filename, "solver": solver, "time_limit": time_limit, "mem_limit": mem_limit, "intermediate": intermediate}, verbose))
+    process = ctx.Process(target=xcsp3_wrapper, args=(child_conn, {"benchname":filename, "solver": solver, "time_limit": time_limit, "mem_limit": mem_limit, "intermediate": intermediate, "time_buffer": 1}, verbose))
     process.start()
     process.join(timeout=time_limit)
 

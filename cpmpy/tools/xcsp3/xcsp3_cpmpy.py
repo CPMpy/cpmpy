@@ -558,7 +558,7 @@ def xcsp3_cpmpy(benchname: str,
         
         if time_limit:
             # give solver only the remaining time
-            time_limit = time_limit - (time.time() - time_start)
+            time_limit = time_limit - (time.time() - time_start) - time_buffer
             print_comment(f"{time_limit}s left to solve")
         
         time_solve = time.time()
