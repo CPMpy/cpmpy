@@ -408,7 +408,7 @@ class Table(GlobalConstraint):
     """
     def __init__(self, array, table):
         array = flatlist(array)
-        if isinstance(table, np.ndarray):  # Ensure it is a list
+        if isinstance(table, np.ndarray): # Ensure it is a list
             table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
@@ -453,7 +453,6 @@ class ShortTable(GlobalConstraint):
             if (num_row == num_vals).all():
                 return True
         return False
-
 
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
