@@ -480,7 +480,6 @@ class CPM_exact(SolverInterface):
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
-
             # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
             # numexpr `comp` bvar|const
             if isinstance(cpm_expr, Comparison):
@@ -552,7 +551,6 @@ class CPM_exact(SolverInterface):
                 raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
             
         return self
-    
     __add__ = add  # avoid redirect in superclass
 
     def get_core(self):
