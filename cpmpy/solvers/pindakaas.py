@@ -42,7 +42,7 @@ class CPM_pindakaas(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
 
-    - ``pkd_solver``: the `pindakaas` solver or formula object
+    - ``pdk_solver``: the `pindakaas` solver or formula object
     """
 
     # TODO add link to docs Documentation of the solver's own Python API: ...
@@ -81,8 +81,8 @@ class CPM_pindakaas(SolverInterface):
 
         try:
             # Set subsolver or use Cnf if None
-            self.pkd_solver = (
                 pdk.Cnf()
+            self.pdk_solver = (
                 if subsolver is None
                 else CPM_pindakaas.subsolvers.get[subsolver]
             )
@@ -96,7 +96,7 @@ class CPM_pindakaas(SolverInterface):
 
     @property
     def native_model(self):
-        self.pkd_solver
+        self.pdk_solver
 
     def solve(self, time_limit=None, assumptions=None):
         # TODO assumptions undocumented/unsupported in solver_interface?
@@ -115,10 +115,10 @@ class CPM_pindakaas(SolverInterface):
         t = time.time()
 
         # If no subsolver selected, use Cadical as default Cnf solver
-        if isinstance(self.pkd_solver, pdk.Cnf):
-            self.pkd_solver = pdk.solver.Cadical(self.pkd_solver)
+        if isinstance(self.pdk_solver, pdk.Cnf):
+            self.pdk_solver = pdk.solver.Cadical(self.pdk_solver)
 
-        my_status = self.pkd_solver.solve(
+        my_status = self.pdk_solver.solve(
             time_limit=time_limit,
             assumptions=[] if assumptions is None else self.solver_vars(assumptions),
             # TODO make assumptions default None
@@ -148,7 +148,7 @@ class CPM_pindakaas(SolverInterface):
             for cpm_var in self.user_vars:
                 if cpm_var.name in self._varmap:
                     lit = self.solver_var(cpm_var)
-                    cpm_var._value = self.pkd_solver.value(lit)
+                    cpm_var._value = self.pdk_solver.value(lit)
                     if cpm_var._value is None:
                         cpm_var._value = True  # dummy value
                 else:  # if pindakaas does not know the literal, it will error
@@ -166,7 +166,7 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
             # insert if new
             if cpm_var.name not in self._varmap:
-                self._varmap[cpm_var.name] = self.pkd_solver.add_variable()
+                self._varmap[cpm_var.name] = self.pdk_solver.add_variable()
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):
             raise NotSupportedError(
@@ -227,13 +227,13 @@ class CPM_pindakaas(SolverInterface):
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                self.pkd_solver.add_clause(conditions)
+                self.pdk_solver.add_clause(conditions)
 
         elif isinstance(cpm_expr, _BoolVarImpl):  # (implied) literal
-            self.pkd_solver.add_clause(conditions + [self.solver_var(cpm_expr)])
+            self.pdk_solver.add_clause(conditions + [self.solver_var(cpm_expr)])
 
         elif cpm_expr.name == "or":  # (implied) clause
-            self.pkd_solver.add_clause(conditions + self.solver_vars(cpm_expr.args))
+            self.pdk_solver.add_clause(conditions + self.solver_vars(cpm_expr.args))
 
         elif cpm_expr.name == "->":  # implication
             a0, a1 = cpm_expr.args
@@ -263,7 +263,7 @@ class CPM_pindakaas(SolverInterface):
             else:
                 raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
 
-            self.pkd_solver.add_linear(
+            self.pdk_solver.add_linear(
                 self.solver_vars(literals),
                 coefficients=coefficients,
                 comparator=comparator,
