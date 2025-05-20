@@ -245,7 +245,6 @@ class AllEqual(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-
         # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
         return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
 
@@ -383,7 +382,6 @@ class Inverse(GlobalConstraint):
         for i,x in enumerate(fwd):
             if is_num(x) and not 0 <= x < len(rev): 
                 return [cp.BoolVal(False)], [] # can never satisfy the Inverse constraint
-
            
             lb, ub = get_bounds(x)
             if lb >= 0 and ub < len(rev): # safe, index is within bounds
