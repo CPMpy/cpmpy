@@ -922,10 +922,11 @@ class TestSupportedSolvers:
             pass # not all solvers support time/solution limits
 
         # making the problem unsat
-        m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
-        num_sols = m.solveAll(solver=solver, solution_limit=limit)
-        assert num_sols == 0
-        assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
+        if solver != "pysdd": # constraint not supported by pysdd
+            m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
+            num_sols = m.solveAll(solver=solver, solution_limit=limit)
+            assert num_sols == 0
+            assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
     def test_hidden_user_vars(self, solver):
