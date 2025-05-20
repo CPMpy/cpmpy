@@ -54,7 +54,7 @@ def xcsp3_plot(df, time_limit=None):
         y = [0] + list(range(1, len(solver_data) + 1))
         
         # Plot the performance curve
-        plt.plot(x, y, label=solver, linewidth=2.5)
+        plt.plot(x, y, label=f"{solver} ({len(solver_data)})", linewidth=2.5)
     
     # Set plot properties
     plt.xlabel('Time (seconds)')
