@@ -116,7 +116,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
                   'time_total', 'time_parse', 'time_model', 'time_post', 'time_solve',
-                  'status', 'objective_value', 'solution']
+                  'status', 'objective_value', 'solution', 'intermediate']
     result = dict.fromkeys(fieldnames)  # init all fields to None
     result['year'] = metadata['year']
     result['track'] = metadata['track']
@@ -167,6 +167,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
     else:
         output = "".join(output[:-1])
        
+    sol_time = None
     # Parse the output to get status, solution and timings
     for line in output.split('\n'):
         if line.startswith('s '):
@@ -175,7 +176,15 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
             # only record first line, contains 'type' and 'cost'
             result['solution'] = line[2:].strip()
         elif line.startswith('o '):
-            result['objective_value'] = int(line[2:].strip())
+            obj = int(line[2:].strip())
+            if result['intermediate'] is None:
+                result['intermediate'] = []
+            result['intermediate'] += [(sol_time, obj)]
+            result['objective_value'] = obj
+            obj = None
+        elif line.startswith('c Solution'):
+            parts = line.split(', time = ')
+            sol_time = float(parts[-1].replace('s', '').rstrip())
         elif line.startswith('c took '):
             # Parse timing information
             parts = line.split(' seconds to ')
