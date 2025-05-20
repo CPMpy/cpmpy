@@ -63,10 +63,10 @@ from .normalize import toplevel_list
 from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Operator, BoolVal
+from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
+from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
@@ -535,8 +535,16 @@ def only_positive_bv_wsum_const(cpm_expr):
 
 
 def canonical_comparison(lst_of_expr):
+    """
+        Canonicalize a comparison expression.
+        Transforms linear expressions, or a reification thereof into canonical form by:
+            - moving all variables to the left-hand side
+            - moving constants to the right-hand side
 
-    lst_of_expr = toplevel_list(lst_of_expr)               # ensure it is a list
+        Expects the input constraints to be flat. Only apply after applying :func:`flatten_constraint`
+    """
+
+    lst_of_expr = toplevel_list(lst_of_expr) # ensure it is a list
 
     newlist = []
     for cpm_expr in lst_of_expr:
@@ -554,7 +562,8 @@ def canonical_comparison(lst_of_expr):
 
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            if isinstance(lhs, Comparison) and cpm_expr.name == "==":  # reification of comparison
+            if isinstance(lhs, Comparison) and (is_bool(rhs) or isinstance(rhs, Expression) and rhs.is_bool()):
+                assert cpm_expr.name == "==", "Expected a reification of a comparison here, but got {}".format(cpm_expr.name)
                 lhs = canonical_comparison(lhs)[0]
             elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
                 # Bring all vars from rhs to lhs
@@ -582,8 +591,7 @@ def canonical_comparison(lst_of_expr):
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
                     lhs = lhs + lhs2
                 else:
-                    raise ValueError(
-                        f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
+                    raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
 
                 assert not is_num(lhs), "lhs cannot be an integer at this point!"
 
@@ -610,7 +618,7 @@ def canonical_comparison(lst_of_expr):
                     else:
                         raise ValueError(f"lhs should be sum or wsum, but got {lhs}")
                 else:
-                    assert isinstance(lhs, _NumVarImpl)
+                    assert isinstance(lhs, _NumVarImpl), f"Expected variable here, but got {lhs} in expression {cpm_expr}"
                     lhs = Operator("sum", [lhs])
 
             newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
