@@ -20,6 +20,7 @@ from io import StringIO
 import lzma
 import json
 import warnings
+import psutil
 
 
 # sys.path.insert(1, os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
@@ -64,7 +65,6 @@ def sigterm_handler(_signo, _stack_frame):
     # Report that we haven't found a solution in time
     print_status(ExitStatus.unknown)
     print_comment("SIGTERM raised.")
-    print(flush=True)
     sys.exit(0)
     
 def rlimit_cpu_handler(_signo, _stack_frame):
@@ -489,7 +489,11 @@ def xcsp3_cpmpy(benchname: str,
 
         sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
-        time_start = time.time()
+        # Get the current process
+        p = psutil.Process()
+
+        # Get the start time as a timestamp
+        time_start = p.create_time()
 
         # ------------------------------ Parse instance ------------------------------ #
 
