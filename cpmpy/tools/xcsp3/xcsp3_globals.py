@@ -8,6 +8,7 @@ Currently, version 3.1 is supported.
 """
 
 import numpy as np
+import cpmpy as cp
 from cpmpy import cpm_array, intvar, boolvar
 from cpmpy.exceptions import CPMpyException
 from cpmpy.expressions.core import Expression, Operator
@@ -427,6 +428,34 @@ class ShortTable(GlobalConstraint):
                 return True
         return False
 
+
+class ShortTable(GlobalConstraint):
+    """
+        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
+        no restrictions for the corresponding variable in that tuple.
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
+        super().__init__("short_table", [array, table])
+
+    def decompose(self):
+        arr, tab = self.args
+        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        tab = np.array(tab)
+        arrval = np.array(argvals(arr))
+        for row in tab:
+            num_row = row[row != STAR].astype(int)
+            num_vals = arrval[row != STAR].astype(int)
+            if (num_row == num_vals).all():
+                return True
+        return False
 
 class NegativeShortTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
