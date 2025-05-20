@@ -131,7 +131,7 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
-    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 

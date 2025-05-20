@@ -109,7 +109,7 @@ class CPM_cpo(SolverInterface):
             except:
                 return False
 
-    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 

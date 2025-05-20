@@ -102,7 +102,7 @@ class CPM_exact(SolverInterface):
             raise e
 
 
-    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}, **kwargs):
+    def __init__(self, cpm_model=None, subsolver=None, **kwargs):
         """
         Constructor of the native solver object
 
