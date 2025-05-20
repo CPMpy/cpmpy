@@ -167,13 +167,9 @@ class CPM_pindakaas(SolverInterface):
             if cpm_var.name not in self._varmap:
                 self._varmap[cpm_var.name] = self.pdk_solver.add_variable()
             return self._varmap[cpm_var.name]
-        elif isinstance(cpm_var, _IntVarImpl):
-            raise NotSupportedError(
-                f"{self.name}: integer variable {cpm_var} of type {type(cpm_var)} not supported"
-            )
         else:
             raise NotImplementedError(
-                f"{self.name}: unexpected variable {cpm_var} of type {type(cpm_var)} not"
+                f"{self.name}: unexpected variable {cpm_var} of type {type(cpm_var)} not supported"
             )
 
     def transform(self, cpm_expr):
