@@ -269,8 +269,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
 
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
-                   verbose: bool = False, intermediate: bool = False,
-                   instance=None) -> str:
+                   verbose: bool = False, intermediate: bool = False) -> str:
     """
     Benchmark a solver on XCSP3 instances.
     
@@ -305,7 +304,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
         # Submit all tasks and track their futures
         futures = [executor.submit(execute_instance,  # below: args
                                    (filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate))
-                   for filename, metadata in dataset if instance is None or metadata['name'] == instance]
+                   for filename, metadata in dataset]
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
             try:
@@ -330,7 +329,6 @@ if __name__ == "__main__":
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
-    parser.add_argument('--instance', type=str, default=None, help='Instance name to solve')
     
     args = parser.parse_args()
     
