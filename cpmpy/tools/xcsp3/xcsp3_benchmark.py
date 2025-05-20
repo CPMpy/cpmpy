@@ -193,47 +193,53 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
     while parent_conn.poll(timeout=1):
         output.append(parent_conn.recv())
 
-    # Process output
-    status = output[-1] # exit state should be at the end
-    if type(status) == str: # if exit state is missing, process ended due to sigterm
-        # Process exited prematurely due to sigterm
-        status = {"status": "error", "exception": "sigterm"}
-        output = "".join(output)
-    else:
-        output = "".join(output[:-1])
        
-    sol_time = None
+    sol_time = None # For annotation intermediate solutions (when they were received)
+    
+    # Default status if nothing returned by subprocess
+    # -> process exited prematurely due to sigterm
+    status = {"status": "error", "exception": "sigterm"}
+
     # Parse the output to get status, solution and timings
-    for line in output.split('\n'):
-        if line.startswith('s '):
-            result['status'] = line[2:].strip()
-        elif line.startswith('v ') and result['solution'] is None:
-            # only record first line, contains 'type' and 'cost'
-            result['solution'] = line[2:].strip()
-        elif line.startswith('o '):
-            obj = int(line[2:].strip())
-            if result['intermediate'] is None:
-                result['intermediate'] = []
-            result['intermediate'] += [(sol_time, obj)]
-            result['objective_value'] = obj
-            obj = None
-        elif line.startswith('c Solution'):
-            parts = line.split(', time = ')
-            sol_time = float(parts[-1].replace('s', '').rstrip())
-        elif line.startswith('c took '):
-            # Parse timing information
-            parts = line.split(' seconds to ')
-            if len(parts) == 2:
-                time_val = float(parts[0].replace('c took ', ''))
-                action = parts[1].strip()
-                if action.startswith('parse'):
-                    result['time_parse'] = time_val
-                elif action.startswith('convert'):
-                    result['time_model'] = time_val
-                elif action.startswith('post'):
-                    result['time_post'] = time_val
-                elif action.startswith('solve'):
-                    result['time_solve'] = time_val
+    while parent_conn.poll(timeout=1):
+        line = parent_conn.recv()
+
+        # Received a print statement from the subprocess
+        if isinstance(line, str):
+            if line.startswith('s '):
+                result['status'] = line[2:].strip()
+            elif line.startswith('v ') and result['solution'] is None:
+                # only record first line, contains 'type' and 'cost'
+                result['solution'] = line[2:].strip()
+            elif line.startswith('o '):
+                obj = int(line[2:].strip())
+                if result['intermediate'] is None:
+                    result['intermediate'] = []
+                result['intermediate'] += [(sol_time, obj)]
+                result['objective_value'] = obj
+                obj = None
+            elif line.startswith('c Solution'):
+                parts = line.split(', time = ')
+                # Get solution time from comment for intermediate solution -> used for annotating 'o ...' lines
+                sol_time = float(parts[-1].replace('s', '').rstrip())
+            elif line.startswith('c took '):
+                # Parse timing information
+                parts = line.split(' seconds to ')
+                if len(parts) == 2:
+                    time_val = float(parts[0].replace('c took ', ''))
+                    action = parts[1].strip()
+                    if action.startswith('parse'):
+                        result['time_parse'] = time_val
+                    elif action.startswith('convert'):
+                        result['time_model'] = time_val
+                    elif action.startswith('post'):
+                        result['time_post'] = time_val
+                    elif action.startswith('solve'):
+                        result['time_solve'] = time_val
+        
+        # Received a new status from the subprocess
+        elif isinstance(line, dict):
+            status = line
 
     # Parse the exit status
     if status["status"] == "error":
