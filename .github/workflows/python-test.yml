@@ -17,7 +17,6 @@ jobs:
           pip install pypblib  # dependency of pysat for PB constraints
           pip install pytest-xdist
           sudo snap install minizinc --classic
-
       - name: Test with pytest
         run: |
           python -m pytest -n 4 tests/
