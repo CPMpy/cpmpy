@@ -99,7 +99,6 @@ class CPM_pindakaas(SolverInterface):
         self.pdk_solver
 
     def solve(self, time_limit=None, assumptions=None):
-        # TODO assumptions undocumented/unsupported in solver_interface?
         if self.unsatisfiable:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             return self._solve_return(self.cpm_status)
