@@ -456,6 +456,7 @@ class CPM_gurobi(SolverInterface):
 
         else:
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+
       return self
     __add__ = add  # avoid redirect in superclass
 
