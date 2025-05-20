@@ -476,7 +476,6 @@ class CPM_gcs(SolverInterface):
 
         for con in self.transform(cpm_cons):
             cpm_expr = con
-
             if isinstance(cpm_expr, _BoolVarImpl):
                 # base case, just var or ~var
                 self.gcs.post_or([self.solver_var(cpm_expr)])
