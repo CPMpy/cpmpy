@@ -198,7 +198,7 @@ class AllDifferent(GlobalConstraint):
 
     def value(self):
         return len(set(argvals(self.args))) == len(self.args)
-    
+
 class AllDifferentExceptN(GlobalConstraint):
     """
         All arguments except those equal to a value in n have a distinct value.
@@ -216,7 +216,7 @@ class AllDifferentExceptN(GlobalConstraint):
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
         return len(set(vals)) == len(vals)
-    
+
 
 class AllDifferentExcept0(AllDifferentExceptN):
     """
@@ -424,7 +424,7 @@ class Table(GlobalConstraint):
         arr, tab = self.args
         arrval = argvals(arr)
         return arrval in tab
-    
+
 class ShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
@@ -454,7 +454,7 @@ class ShortTable(GlobalConstraint):
             if (num_row == num_vals).all():
                 return True
         return False
-    
+
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
@@ -628,7 +628,7 @@ class InDomain(GlobalConstraint):
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
-    
+
 
 class Xor(GlobalConstraint):
     """

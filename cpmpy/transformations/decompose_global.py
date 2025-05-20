@@ -33,7 +33,6 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         The following ``bv -> NumExpr <comp> Var/Const`` can be rewritten as  ``[bv -> IV0 <comp> Var/Const, NumExpr == IV0]``.
         So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
     """
-
     if _toplevel is None:
         _toplevel = []
 

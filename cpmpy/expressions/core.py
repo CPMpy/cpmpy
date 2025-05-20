@@ -170,7 +170,7 @@ class Expression(object):
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self):
-        return hash((self.name, tuple(hash(arg) for arg in flatlist(self.args))))
+        return hash(self.__repr__())
 
     def has_subexpr(self):
         """ Does it contains nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
@@ -559,7 +559,7 @@ class Comparison(Expression):
     def __bool__(self):
         # will be called when comparing elements in a container, but always with `==`
         if self.name == "==":
-            return str(self.args[0]) == str(self.args[1])
+            return repr(self.args[0]) == repr(self.args[1])
         super().__bool__() # default to exception
 
     # return the value of the expression
@@ -575,7 +575,8 @@ class Comparison(Expression):
         elif self.name == ">":  return arg_vals[0] > arg_vals[1]
         elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
         return None # default
-    
+
+
 class Operator(Expression):
     """
     All kinds of mathematical and logical operators on expressions
@@ -663,7 +664,7 @@ class Operator(Expression):
         """ is it a Boolean (return type) Operator?
         """
         return Operator.allowed[self.name][1]
-    
+
     def __repr__(self):
         printname = self.name
         if printname in Operator.printmap:

@@ -104,6 +104,7 @@ def flatten_model(orig_model):
     """
         Receives model, returns new model where every constraint is in 'flat normal form'
     """
+
     # the top-level constraints
     basecons = flatten_constraint(orig_model.constraints)
 
@@ -293,7 +294,6 @@ def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), expr_dict=None
         wsum([Const],[Var])                          (CPMpy class 'Operator', name 'wsum')
         ======================                       ========
     """
-
     # lets be very explicit here
     if is_any_list(expr):
         # one source of errors is sum(v) where v is a matrix, use v.sum() instead

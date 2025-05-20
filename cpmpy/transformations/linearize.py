@@ -70,7 +70,6 @@ from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
-
 def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, expr_dict=None):
     """
     Transforms all constraints to a linear form.
@@ -389,7 +388,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
 
     return newlist
 
-
 def only_positive_bv(lst_of_expr, expr_dict=None):
     """
         Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
@@ -397,7 +395,6 @@ def only_positive_bv(lst_of_expr, expr_dict=None):
 
         Resulting expression is linear if the original expression was linear.
     """
-
     newlist = []
     for cpm_expr in lst_of_expr:
 

@@ -53,7 +53,7 @@ import pkg_resources
 from pkg_resources import VersionConflict
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import BoolVal, Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables

@@ -220,8 +220,8 @@ class Abs(GlobalFunction):
             return [eval_comparison(cpm_op, newarg, cpm_rhs)], \
                     [is_pos == (arg >= 0), is_pos.implies(arg == newarg), (~is_pos).implies(-arg == newarg)]
 
-    
-    
+
+
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
@@ -365,7 +365,7 @@ class Among(GlobalFunction):
 
     def get_bounds(self):
         return 0, len(self.args[0])
-    
+
 
 class NValue(GlobalFunction):
 
