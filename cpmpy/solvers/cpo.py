@@ -368,6 +368,7 @@ class CPM_cpo(SolverInterface):
             # translate each expression tree, then post straight away
             cpo_con = self._cpo_expr(cpm_con)
             self.cpo_model.add(cpo_con)
+
         return self
     __add__ = add  # avoid redirect in superclass
 
