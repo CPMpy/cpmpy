@@ -1,3 +1,4 @@
+import importlib
 import unittest
 import tempfile
 import pytest
@@ -15,6 +16,11 @@ from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
+
+from utils import skip_on_missing_pblib
+
+pysat_available = CPM_pysat.supported()
+pblib_available = importlib.util.find_spec("pypblib") is not None
 
 class TestSolvers(unittest.TestCase):
 
@@ -144,7 +150,7 @@ class TestSolvers(unittest.TestCase):
         s = CPM_ortools(m)
         s.ort_solver.parameters.enumerate_all_solutions=True
         cpm_status = s.solve(solution_callback=cb)
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
         self.assertEqual(cb.solcount, 6)
 
 
@@ -171,7 +177,7 @@ class TestSolvers(unittest.TestCase):
         s = CPM_ortools(m)
         s.ort_solver.parameters.enumerate_all_solutions=True
         cpm_status = s.solve(solution_callback=cb)
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
         self.assertEqual(cb.solcount, 6)
 
 
@@ -181,7 +187,7 @@ class TestSolvers(unittest.TestCase):
         cpm_status = s.solve(solution_callback=cb)
         self.assertEqual(s.objective_value(), 5.0)
 
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
 
 
         # manually enumerating solutions
@@ -308,14 +314,14 @@ class TestSolvers(unittest.TestCase):
 
         # check get core, simple
         self.assertFalse(ps2.solve(assumptions=[mayo,~mayo]))
-        self.assertEqual(ps2.get_core(), [mayo,~mayo])
+        self.assertSetEqual(set(ps2.get_core()), set([mayo,~mayo]))
 
         # check get core, more realistic
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
-        self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
+        self.assertSetEqual(set(ps2.get_core()), set([mayo,inds[6],inds[9]]))
 
-    @pytest.mark.skipif(not CPM_pysat.supported(),
-                        reason="PySAT not installed")
+    @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
+    @skip_on_missing_pblib()
     def test_pysat_card(self):
         b = cp.boolvar()
         x = cp.boolvar(shape=5)
@@ -485,7 +491,7 @@ class TestSolvers(unittest.TestCase):
 
 
         def _trixor_callback():
-            assert bv[0]+bv[1]+bv[2] >= 1
+            assert (bv[0]+bv[1]+bv[2]).value() >= 1
 
         m = cp.Model([bv[0] | bv[1] | bv[2]])
         s = cp.SolverLookup.get("exact", m)
@@ -513,7 +519,7 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(exact.solve())
 
         with open(proof_file+".proof", "r") as f:
-            self.assertEquals(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
+            self.assertEqual(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
@@ -936,4 +942,5 @@ class TestSupportedSolvers:
         m = cp.Model([cp.AllDifferentExceptN([x], 1)])
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
-        assert s.solveAll() == 4     # check if still correct number of solutions, even though empty model
+        solution_limit = 5 if solver == "gurobi" else None
+        assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model

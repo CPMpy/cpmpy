@@ -21,12 +21,17 @@
     Installation
     ============
 
-    Requires that the 'python-sat' package is installed. If you want to also solve
-    pseudo-Boolean constraints, you should also install its optional dependency 'pblib', as follows:
+    Requires that the 'python-sat' package is installed:
 
     .. code-block:: console
 
-        $ pip install python-sat[pblib]
+        $ pip install pysat
+
+    If you want to also solve pseudo-Boolean constraints, you should also install its optional dependency 'pypblib', as follows:
+
+    .. code-block:: console
+
+        $ pip install pypblib
 
     See detailed installation instructions at:
     https://pysathq.github.io/installation
@@ -82,8 +87,6 @@ class CPM_pysat(SolverInterface):
 
     """
 
-    IMPORT_PYSAT_PBLIB_ERROR = ImportError("PySAT was installed without optional dependency `pblib`, which is required to encode (weighted) sums. To install PySAT with recommended optional dependencies, run `pip install cpmpy[pysat]`.")
-
     @staticmethod
     def supported():
         # try to import the package
@@ -93,6 +96,19 @@ class CPM_pysat(SolverInterface):
             # while we need the 'python-sat' package, some more checks:
             from pysat.formula import IDPool
             from pysat.solvers import Solver
+
+            from pysat import card
+            CPM_pysat._card = card  # native
+
+            # try to import pypblib and avoid ever re-import by setting `_pb`
+            if not hasattr(CPM_pysat, ("_pb")):
+                try:
+                    from pysat import pb  # require pypblib
+                    """The `pysat.pb` module if its dependency `pypblib` installed, `None` if we have not checked it yet, or `False` if we checked and it is *not* installed"""
+                    CPM_pysat._pb = pb
+                except (ModuleNotFoundError, NameError):  # pysat returns the wrong error type (latter i/o former)
+                    CPM_pysat._pb = None  # not installed, avoid reimporting
+
             return True
         except ModuleNotFoundError:
             return False
@@ -141,15 +157,6 @@ class CPM_pysat(SolverInterface):
             subsolver = "glucose4" # something recent...
         elif subsolver.startswith('pysat:'):
             subsolver = subsolver[6:] # strip 'pysat:'
-
-        # try to import the pblib module once
-        try:
-            from pysat import card, pb
-            self._card = card
-            self._pb = pb
-        except NameError:
-            self._card = None
-            self._pb = None
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
@@ -446,8 +453,6 @@ class CPM_pysat(SolverInterface):
 
     def _pysat_cardinality(self, cpm_expr, reified=False):
         """ Convert CPMpy comparison of `sum` (over Boolean variables) into PySAT list of clauses """
-        if self._card is None:
-            raise self.IMPORT_PYSAT_PBLIB_ERROR
 
         # unpack and transform to PySAT argument
         lhs, rhs = cpm_expr.args
@@ -473,9 +478,9 @@ class CPM_pysat(SolverInterface):
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
 
     def _pysat_pseudoboolean(self, cpm_expr):
-        """ Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses """
+        """Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses."""
         if self._pb is None:
-            raise self.IMPORT_PYSAT_PBLIB_ERROR
+            raise ImportError("The model contains a PB constraint, for which PySAT needs an additional dependency (PBLib). To install it, run `pip install pypblib`.")
 
         if cpm_expr.args[0].name != "wsum":
             raise NotSupportedError(
@@ -486,6 +491,7 @@ class CPM_pysat(SolverInterface):
         lhs, rhs = cpm_expr.args
         lits = self.solver_vars(lhs.args[1])
         pysat_args = {"weights": lhs.args[0], "lits": lits, "bound": rhs, "vpool":self.pysat_vpool }
+
 
         if cpm_expr.name == "<=":
             return self._pb.PBEnc.atmost(**pysat_args).clauses

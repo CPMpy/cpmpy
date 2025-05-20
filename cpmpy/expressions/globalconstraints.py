@@ -108,6 +108,7 @@
         Table
         ShortTable
         NegativeTable
+        Regular
         IfThenElse
         InDomain
         Xor
@@ -374,9 +375,24 @@ class Inverse(GlobalConstraint):
         super().__init__("inverse", [fwd, rev])
 
     def decompose(self):
+
         fwd, rev = self.args
         rev = cpm_array(rev)
-        return [cp.all(rev[x] == i for i, x in enumerate(fwd))], []
+
+        constraining, defining = [], []
+        for i,x in enumerate(fwd):
+            if is_num(x) and not 0 <= x < len(rev): 
+                return [cp.BoolVal(False)], [] # can never satisfy the Inverse constraint
+           
+            lb, ub = get_bounds(x)
+            if lb >= 0 and ub < len(rev): # safe, index is within bounds
+                constraining.append(rev[x] == i)
+            else: # partial! need safening here
+                is_defined, total_expr, toplevel = cp.transformations.safening._safen_range(rev[x], (0, len(rev)-1), 1)
+                constraining += [is_defined, total_expr == i]
+                defining += toplevel
+        
+        return constraining, defining
 
     def value(self):
         fwd = argvals(self.args[0])
@@ -458,7 +474,87 @@ class NegativeTable(GlobalConstraint):
         arrval = argvals(arr)
         tabval = argvals(tab)
         return arrval not in tabval
+    
 
+class Regular(GlobalConstraint):
+    """
+    Regular-constraint (or Automaton-constraint)
+    Takes as input a sequence of variables and a automaton representation using a transition table.
+    The constraint is satisfied if the sequence of variables corresponds to an accepting path in the automaton.
+
+    The automaton is defined by a list of transitions, a starting node and a list of accepting nodes.
+    The transitions are represented as a list of tuples, where each tuple is of the form (id1, value, id2).
+    An id is an integer or string representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
+    The starting node is an integer or string representing the starting state of the automaton.
+    The accepting nodes are a list of integers or strings representing the accepting states of the automaton.
+
+    Example: an automaton that accepts the language 0*10* (exactly 1 variable taking value 1) is defined as:
+        cp.Regular(array = cp.intvar(0,1, shape=4),
+                   transitions = [("A",0,"A"), ("A",1,"B"), ("B",0,"C"), ("C",0,"C")],
+                   start = "A",
+                   accepting = ["C"])
+    """
+    def __init__(self, array, transitions, start, accepting):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
+        
+        if not is_any_list(transitions):
+            raise TypeError("The second argument of a regular constraint should be a list of transitions")
+        _node_type = type(transitions[0][0])
+        for s,v,e in transitions:
+            if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
+                raise TypeError(f"The second argument of a regular constraint should be a list of transitions ({_node_type}, int, {_node_type})")
+        if not isinstance(start, _node_type):
+            raise TypeError("The third argument of a regular constraint should be a node id")
+        if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
+            raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
+        super().__init__("regular", [array, transitions, start, list(accepting)])
+
+        self.nodes = set()
+        self.trans_dict = {}
+        for s, v, e in transitions:
+            self.nodes.update([s,e])
+            self.trans_dict[(s, v)] = e
+        self.nodes = sorted(self.nodes)
+        # normalize node_ids to be 0..n-1, allows for smaller domains
+        self.node_map = {n: i for i, n in enumerate(self.nodes)}
+
+    def decompose(self):
+        # Decompose to transition table using Table constraints
+        
+        arr, transitions, start, accepting = self.args
+        lbs, ubs = get_bounds(arr)
+        lb, ub = min(lbs), max(ubs)
+        
+        transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+
+        # add a sink node for transitions that are not defined
+        sink = len(self.nodes)
+        transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
+        transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
+
+        # keep track of current state when traversing the array
+        state_vars = intvar(0, sink, shape=len(arr))
+        id_start = self.node_map[start]
+        # optimization: we know the entry node of the automaton, results in smaller table
+        defining = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
+        # define the rest of the automaton using transition table
+        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
+        
+        # constraint is satisfied iff last state is accepting
+        return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+
+    def value(self):
+        arr, transitions, start, accepting = self.args
+        arrval = [argval(a) for a in arr]
+        curr_node = start
+        for v in arrval:
+            if (curr_node, v) in self.trans_dict:
+                curr_node = self.trans_dict[curr_node, v]
+            else:
+                return False
+        return curr_node in accepting
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
@@ -511,11 +607,11 @@ class InDomain(GlobalConstraint):
                they should be enforced toplevel.
         """
         expr, arr = self.args
-        lb, ub = expr.get_bounds()
-
+        lb, ub = get_bounds(expr)
+        
         defining = []
         #if expr is not a var
-        if not isinstance(expr,_IntVarImpl):
+        if not isinstance(expr,Expression):
             aux = intvar(lb, ub)
             defining.append(aux == expr)
             expr = aux
@@ -868,6 +964,9 @@ class LexLess(GlobalConstraint):
         """
         X, Y = cpm_array(self.args)
 
+        if len(X) == 0 == len(Y):
+            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
+
         bvar = boolvar(shape=(len(X) + 1))
 
         # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
@@ -913,6 +1012,9 @@ class LexLessEq(GlobalConstraint):
         subsequent positions.
         """
         X, Y = cpm_array(self.args)
+
+        if len(X) == 0 == len(Y):
+            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
 
         bvar = boolvar(shape=(len(X) + 1))
         defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
