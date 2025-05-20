@@ -297,7 +297,7 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertEqual(iv.value(),1)
-        cons = cp.InDomain(min(iv_arr), vals)
+        cons = cp.InDomain(cp.min(iv_arr), vals)
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         iv2 = cp.intvar(-8, 8)
@@ -305,25 +305,25 @@ class TestGlobal(unittest.TestCase):
         cons = [cp.InDomain(iv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertIn(iv.value(), vals)
+        self.assertIn(iv.value(), argvals(vals))
         vals = [1, 5, 8, -4]
         bv = cp.boolvar()
         cons = [cp.InDomain(bv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertIn(bv.value(), vals)
+        self.assertIn(bv.value(), set(vals))
         vals = [iv2, 5, 8, -4]
         bv = cp.boolvar()
         cons = [cp.InDomain(bv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertIn(bv.value(), vals)
+        self.assertIn(bv.value(), argvals(vals))
         vals = [bv & bv, 5, 8, -4]
         bv = cp.boolvar()
         cons = [cp.InDomain(bv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertIn(bv.value(), vals)
+        self.assertIn(bv.value(), argvals(vals))
 
     def test_lex_lesseq(self):
         from cpmpy import BoolVal

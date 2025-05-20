@@ -28,8 +28,6 @@ Internal utilities for expression handling.
         eval_comparison
         get_bounds     
 """
-import copy
-
 
 import cpmpy as cp
 import numpy as np
