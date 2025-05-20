@@ -308,11 +308,9 @@ class CPM_pysdd(SolverInterface):
         # transform and post the constraints
         # XXX the order in the for loop will matter on runtime efficiency...
         for cpm_con in self.transform(cpm_expr):
-
             # replace root by conjunction of itself and the con expression
             self.pysdd_root = self.pysdd_manager.conjoin(self.pysdd_root,
                                                 self._pysdd_expr(cpm_con))
-            
         return self
     __add__ = add  # avoid redirect in superclass
 
