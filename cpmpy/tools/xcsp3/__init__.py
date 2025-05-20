@@ -51,8 +51,28 @@ def read_xcsp3(path: os.PathLike) -> cp.Model:
     Returns:
         The XCSP3 instance loaded as a CPMpy model.
     """
+    # Decompress on the fly if still in .lzma format
+    if str(path).endswith(".lzma"):
+        path = decompress_lzma(path)
+
+    # Parse and create CPMpy model
     parser = _parse_xcsp3(path)
     model = _load_xcsp3(parser)
     return model
-    
+
+def decompress_lzma(path: os.PathLike) -> StringIO:
+    """
+    Decompresses a .lzma file.
+
+    Arguments:
+        path: Location of .lzma file
+
+    Returns:
+        Memory-mapped decompressed file
+    """
+    # Decompress the XZ file
+    with lzma.open(path, 'rt', encoding='utf-8') as f:
+        return StringIO(f.read()) # read to memory-mapped file
+        
+
     
