@@ -83,7 +83,7 @@ def only_implies(constraints):
             else:
                 newcons.append(cpm_expr)
 
-        # Comparisons: transform bV == BE
+        # Comparisons: transform BV == BE
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
             # a0 is a boolvar, because of previous transformation only_bv_reifies.
             a0,a1 = cpm_expr.args
@@ -96,8 +96,14 @@ def only_implies(constraints):
                 # then it is actually an integer expression, keep
                 newcons.append(cpm_expr)
             else:
-                # BVar1 == BE0 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                retransform.extend(( (~a0).implies(recurse_negation(a1)), a0.implies(a1) ))
+                # BVar1 == BE0 :: BVar1 -> BE0, ~BVar1 -> ~BE0 
+                newcons.append(a0.implies(a1))
+                neg_a1 = recurse_negation(a1)
+                if neg_a1.has_subexpr():
+                    # requires retransform
+                    retransform.append((~a0).implies(neg_a1))
+                else:
+                    newcons.append((~a0).implies(neg_a1))
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
