@@ -471,7 +471,16 @@ class CPM_cpo(SolverInterface):
                 total_usage = []
                 cons = []
                 for s, d, e, h in zip(start, dur, end, height):
-                    cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s, d, e, h])
+                    bounds_d = get_bounds(d)
+                    # Special case for tasks with duration 0
+                    # -> cpo immediately returns UNSAT if done through tasks
+                    if bounds_d[1] == bounds_d[0] == 0:
+                        cpo_s, cpo_e = self.solver_vars([s, e])
+                        cons += [cpo_s == cpo_e] # enforce 0 duration
+                        # no restrictions on height due to zero duration and thus no contribution to capacity
+                        continue
+                    # Normal setting
+                    cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s, d, e, h])                   
                     task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
                     task_height = dom.pulse(task, get_bounds(h))
                     cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
