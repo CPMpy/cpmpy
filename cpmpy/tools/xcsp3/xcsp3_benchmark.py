@@ -96,7 +96,7 @@ def xcsp3_wrapper(conn, kwargs, verbose):
         conn.close()
 
 # exec_args = (filename, metadata, solver, time_limit, mem_limit, output_file, verbose) 
-def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
+def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> None:
     """
     Solve a single XCSP3 instance and write results to file immediately.
     
@@ -111,7 +111,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
     """
     warnings.filterwarnings("ignore")
     
-    filename, metadata, solver, time_limit, mem_limit, output_file, verbose = args
+    filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate = args
 
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
@@ -132,11 +132,11 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
             
     # Start total timing
     total_start = time.time()
-
+    
     # Call xcsp3 in separate process
     ctx = multiprocessing.get_context("spawn")
     parent_conn, child_conn = multiprocessing.Pipe() # communication pipe between processes
-    process = ctx.Process(target=xcsp3_wrapper, args=(child_conn, {"benchname":filename, "solver": solver, "time_limit": time_limit, "mem_limit": mem_limit}, verbose))
+    process = ctx.Process(target=xcsp3_wrapper, args=(child_conn, {"benchname":filename, "solver": solver, "time_limit": time_limit, "mem_limit": mem_limit, "intermediate": intermediate}, verbose))
     process.start()
     process.join(timeout=time_limit)
 
@@ -225,7 +225,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool]) -> None:
 
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
-                   verbose: bool = False) -> str:
+                   verbose: bool = False, intermediate: bool = False) -> str:
     """
     Benchmark a solver on XCSP3 instances.
     
@@ -259,7 +259,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
         futures = [executor.submit(execute_instance,  # below: args
-                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose))
+                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate))
                    for filename, metadata in dataset]
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
@@ -282,6 +282,7 @@ if __name__ == "__main__":
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
+    parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
     
     args = parser.parse_args()
     
