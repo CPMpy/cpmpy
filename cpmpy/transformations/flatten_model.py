@@ -120,7 +120,11 @@ def flatten_model(orig_model):
             return cp.Model(*basecons, maximize=newobj)
 
 
-def flatten_constraint(expr):
+POSITIVE = 1
+NEGATIVE = 2
+MIXED = 3
+
+def flatten_constraint(expr, context=MIXED):
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
@@ -204,12 +208,8 @@ def flatten_constraint(expr):
                 newlist.extend(lcons)
                 newlist.extend(rcons)
                 continue
-
-
-
-            # if none of the above cases + continue matched:
-            # a normalizable boolexpr
-            (con, flatcons) = normalized_boolexpr(expr)
+            
+            (con, flatcons) = normalized_boolexpr(expr, context=context)
             newlist.append(con)
             newlist.extend(flatcons)
 
@@ -322,7 +322,7 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg) or \
            is_star(arg)
 
-def get_or_make_var(expr):
+def get_or_make_var(expr, context=MIXED):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
@@ -342,7 +342,10 @@ def get_or_make_var(expr):
             # avoids unnecessary bv == bv or bv == ~bv assignments
             return flatexpr,flatcons
         bvar = _BoolVarImpl()
-        return bvar, [flatexpr == bvar] + flatcons
+        if context == POSITIVE:
+            return bvar, [bvar.implies(flatexpr)] + flatcons
+        else:
+            return bvar, [flatexpr == bvar] + flatcons
 
     else:
         # normalize expr into a numexpr LHS,
@@ -370,7 +373,7 @@ def get_or_make_var_or_list(expr):
         return get_or_make_var(expr)
 
 
-def normalized_boolexpr(expr):
+def normalized_boolexpr(expr, context=MIXED):
     """
         input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
@@ -408,7 +411,7 @@ def normalized_boolexpr(expr):
             # TODO, optimisation if args0 is an 'and'?
             (lhs,lcons) = get_or_make_var(expr.args[0])
             # TODO, optimisation if args1 is an 'or'?
-            (rhs,rcons) = get_or_make_var(expr.args[1])
+            (rhs,rcons) = get_or_make_var(expr.args[1], context=max(context, POSITIVE))
             return ((~lhs | rhs), lcons+rcons)
         if expr.name == 'not':
             flatvar, flatcons = get_or_make_var(expr.args[0])
@@ -417,7 +420,11 @@ def normalized_boolexpr(expr):
             return (expr, [])
         else:
             # one of the arguments is not flat, flatten all
-            flatvars, flatcons = zip(*[get_or_make_var(arg) for arg in expr.args])
+            if expr.name in {"and", "or"}:
+                context = max(context, POSITIVE)
+            else:
+                context = MIXED
+            flatvars, flatcons = zip(*[get_or_make_var(arg, context=context) for arg in expr.args])
             newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
 
