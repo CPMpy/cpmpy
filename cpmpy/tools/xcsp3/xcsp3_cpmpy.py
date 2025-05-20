@@ -413,7 +413,7 @@ def solver_arguments(solver: str,
     elif solver == "gurobi":
         return gurobi_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, intermediate=intermediate, opt=opt, **kwargs)
     elif solver == "cpo":
-        return cpo_arguments(cores=cores, seed=seed, **kwargs)
+        return cpo_arguments(model=model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
     else:
         print_comment(f"setting parameters of {solver} is not (yet) supported")
         return dict()
