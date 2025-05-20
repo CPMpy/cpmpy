@@ -1,13 +1,60 @@
-import os, io, sys
-from pathlib import Path
-import lzma
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## __init__.py
+##
+"""
+    Set of utilities for working with XCSP3-formatted CP models.
 
+
+    =================
+    List of functions
+    =================
+
+    .. autosummary::
+        :nosignatures:
+
+        read_xcsp3
+
+    ========================
+    List of helper functions
+    ========================
+
+    .. autosummary::
+        :nosignatures:
+
+        _parse_xcsp3
+        _load_xcsp3
+
+    ==================
+    List of submodules
+    ==================
+
+    .. autosummary::
+        :nosignatures:
+
+        parser_callbacks
+        xcsp3_analyze
+        xcsp3_benchmark
+        xcsp3_cpmpy
+        xcsp3_dataset
+        xcsp3_globals
+        xcsp3_natives
+        xcsp3_solution
+"""
+from io import StringIO
+import lzma
+import os
 import cpmpy as cp
+
+# Prevent pycsp3 from complaining on exit + breaking docs
+import sys
+sys.argv = ["-nocompile"]
 
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 from .parser_callbacks import CallbacksCPMPy
+from .xcsp3_dataset import XCSP3Dataset
 
-# from . import xcsp3_dataset
 
 def _parse_xcsp3(path: os.PathLike) -> ParserXCSP3:
     """
@@ -43,10 +90,10 @@ def _load_xcsp3(parser: ParserXCSP3) -> cp.Model:
 
 def read_xcsp3(path: os.PathLike) -> cp.Model:
     """
-    Reads in an XCSP3 instance (.xml) and returns its matching CPMpy model.
+    Reads in an XCSP3 instance (.xml or .xml.lzma) and returns its matching CPMpy model.
 
     Arguments:
-        path: location of the XCSP3 instance to read (expects a .xml file).
+        path: location of the XCSP3 instance to read (expects a .xml or .xml.lzma file).
 
     Returns:
         The XCSP3 instance loaded as a CPMpy model.

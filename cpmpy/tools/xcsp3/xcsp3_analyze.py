@@ -1,3 +1,29 @@
+"""
+Collection of visualisation tools for processing the result of a `xcsp3_benchmark` run.
+
+Best used though its CLI, a command-line tool to visualize and analyze solver performance 
+based on CSV output files.
+
+E.g. to compare the results of multiple solvers:
+
+.. code-block:: console
+
+    python xcsp3_analyze.py <results_dir>
+
+Positional Arguments
+--------------------
+files : str
+    One or more CSV files (or a single directory) containing performance data to analyze.
+
+Optional Arguments
+------------------
+--time_limit : float, optional
+    Maximum time limit (in seconds) to display on the x-axis of the plot.
+
+--output, -o : str, optional
+    Path to save the generated plot image (e.g., "output.png"). If not provided, the plot will be displayed interactively.
+"""
+
 import argparse
 import ast
 from pathlib import Path
@@ -7,7 +33,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-def extract_cost(solution_str):
+def _extract_cost(solution_str):
     """
     Extract numeric cost from solution string like '<instantiation ... cost="69">'
     """
@@ -95,7 +121,7 @@ def get_cost(row):
             pass
 
     # Fallback to extracting from solution
-    return extract_cost(row['solution'])
+    return _extract_cost(row['solution'])
 
 def xcsp3_objective_performance_profile(df):
     # Parse cost from the solution string

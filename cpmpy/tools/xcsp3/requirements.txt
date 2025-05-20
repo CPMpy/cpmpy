@@ -2,4 +2,4 @@ pycsp3
 requests
 tqdm
 matplotlib
-stopit
+psutil

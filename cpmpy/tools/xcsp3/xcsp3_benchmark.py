@@ -1,28 +1,60 @@
-import argparse
+"""
+Benchmark Solvers on XCSP3 Instances.
+
+A command-line tool for benchmarking constraint solvers on XCSP3 competition instances.
+Supports parallel execution, time/memory limits, and solver configuration.
+
+Required Arguments
+------------------
+--year : int
+    The competition year (e.g., 2023).
+
+--track : str
+    The competition track (e.g., "CSP", "COP", "MiniCOP").
+
+--solver : str
+    The name of the solver to benchmark (e.g., "ortools", "exact", "choco").
+
+Optional Arguments
+------------------
+--workers : int, default=4
+    Number of parallel workers to use.
+
+--time-limit : int, default=300
+    Time limit in seconds per instance.
+
+--mem-limit : int, default=8192
+    Memory limit in megabytes per instance.
+
+--output-dir : str, default='results'
+    Directory where result CSV files will be saved.
+
+--verbose
+    If set, display full xcsp3 output during execution.
+
+--intermediate
+    If set, report intermediate solutions (if supported by the solver).
+"""
+
 import csv
-import multiprocessing
 import os
-import io
 import signal
 import time
 import lzma
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
-from io import StringIO
 import sys
-from datetime import datetime
+import argparse
 import warnings
-from tqdm import tqdm
-import concurrent.futures
 import traceback
+import multiprocessing
+from tqdm import tqdm
+from pathlib import Path
+from typing import Optional, Tuple
+from io import StringIO
+from datetime import datetime
 from filelock import FileLock
+from concurrent.futures import ThreadPoolExecutor
 
-import cpmpy
 from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
-from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
-from cpmpy.tools.xcsp3.parser_callbacks import CallbacksCPMPy
-from cpmpy.tools.xcsp3.xcsp3_solution import solution_xml
 from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, init_signal_handlers, ExitStatus
 
 class Tee:

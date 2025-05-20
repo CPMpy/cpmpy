@@ -1,28 +1,63 @@
 """
 PyTorch-style Dataset for XCSP3 competition instances.
+
+Simply create a dataset instance (configured for the targeted competition year/track) and start iterating over its contents:
+
+.. code-block:: python
+
+    from cpmpy.tools.xcsp3 import XCSP3Dataset, read_xcsp3
+
+    for filename, metadata in XCSP3Dataset(year=2024, track="COP", download=True): # auto download dataset and iterate over its instances
+        # Do whatever you want here, e.g. reading to a CPMpy model and solving it:
+        model = read_xcsp3(filename)
+        model.solve()
+        print(model.status())
+
+The `metadata` contains usefull information about the current problem instance.
+
+Since the dataset is PyTorch compatible, it can be used with a DataLoader:
+
+.. code-block:: python
+
+    from cpmpy.tools.xcsp3 import XCSP3Dataset, read_xcsp3
+
+    # Initialize the dataset
+    dataset = XCSP3Dataset(year=2024, track="COP", download=True)
+
+    from torch.utils.data import DataLoader
+
+    # Wrap dataset in a DataLoader
+    data_loader = DataLoader(dataset, batch_size=10, shuffle=False)
+
+    # Iterate over the dataset
+    for batch in data_loader:
+        # Your code here
 """
 
-import os
 import pathlib
-from typing import List, Tuple, Dict, Any
+from typing import Tuple, Any
 import xml.etree.ElementTree as ET
 from urllib.request import urlretrieve
 from urllib.error import HTTPError, URLError
 import zipfile
-import lzma
 
 class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
+
+    """
+    XCSP3 Dataset in a PyTorch compatible format.
+    
+    Arguments:
+        root (str): Root directory containing the XCSP3 instances (if 'download', instances will be downloaded to this location)
+        year (int): Competition year (2022, 2023 or 2024)
+        track (str, optional): Filter instances by track type (e.g., "COP", "CSP", "MiniCOP")
+        transform (callable, optional): Optional transform to be applied on the instance data
+        target_transform (callable, optional): Optional transform to be applied on the file path
+        download (bool): If True, downloads the dataset from the internet and puts it in `root` directory
+    """
+    
     def __init__(self, root: str = ".", year: int = 2023, track: str = None, transform=None, target_transform=None, download: bool = False):
         """
         Initialize the XCSP3 Dataset.
-        
-        Args:
-            root (str): Root directory containing the XCSP3 instances
-            year (int): Competition year (2022 or 2023)
-            track (str, optional): Filter instances by track type (e.g., "COP", "CSP", "MiniCOP")
-            transform (callable, optional): Optional transform to be applied on the instance data
-            target_transform (callable, optional): Optional transform to be applied on the file path
-            download (bool): If True, downloads the dataset from the internet and puts it in root directory
         """
         self.root = pathlib.Path(root)
         self.year = year

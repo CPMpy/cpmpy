@@ -4,7 +4,7 @@ Additional global constraints which are not (yet) part of the standard CPMpy col
 This file contains all the missing global constraints in order to support XCSP3-core, 
 which is a restricted scope of the complete XCSP3 specification (as used for the competitions).
 
-Currently, version 3.1 is supported.
+Currently, version 3.2 is supported.
 """
 
 import numpy as np

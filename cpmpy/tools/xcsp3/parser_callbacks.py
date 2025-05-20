@@ -1,4 +1,7 @@
-import copy
+"""
+Collection of callbacks for the PyCSP3 parser
+"""
+
 from functools import reduce
 
 from pycsp3.parser.callbacks import Callbacks
@@ -15,8 +18,7 @@ from pycsp3.tools.utilities import _Star
 import cpmpy as cp
 from cpmpy.tools.xcsp3 import xcsp3_globals as xglobals
 from cpmpy import cpm_array
-from cpmpy.expressions.core import Operator
-from cpmpy.expressions.utils import is_any_list, get_bounds, is_boolexpr
+from cpmpy.expressions.utils import get_bounds, is_boolexpr
 
 
 class CallbacksCPMPy(Callbacks):  

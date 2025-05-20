@@ -1,48 +1,80 @@
 """
     CLI script for the XCSP3 competition.
+
+    A command-line interface for solving XCSP3 constraint satisfaction problems using CPMpy.
+
+    Example usage:
+
+    .. code-block:: console
+
+        python xcsp3_cpmpy <xcsp3_instance.xml>
+
+
+    Required Arguments
+    ------------------
+    benchname : str
+        Path to the XCSP3 XML file to solve.
+
+    Optional XCSP3 Arguments
+    ------------------------
+    -s, --seed : int, optional
+        Random seed (between 0 and 4294967295) for reproducibility.
+    -l, --time-limit : int, optional
+        CPU time limit in seconds. The process will be killed if this limit is exceeded.
+    -m, --mem-limit : int, optional
+        Memory usage limit in MiB (1 MiB = 1024 * 1024 bytes).
+    -t, --tmpdir : str, optional
+        Directory where temporary read/write operations are allowed.
+    -c, --cores : int, optional
+        Number of processing units to use (logical cores or processors).
+
+    Required CPMpy Argument
+    -----------------------
+    --solver : str
+        The name of the CPMpy solver to use. Can be in the format "solver" or "solver:subsolver".
+
+    Optional CPMpy Arguments
+    ------------------------
+    --time-buffer : int, optional
+        Time in seconds reserved before hitting the time limit, used for solver cleanup and solution printing.
+    --intermediate : bool, optional
+        If specified, intermediate solutions will be printed (if supported by the solver).
 """
+
 from __future__ import annotations
+
 import argparse
-from contextlib import contextmanager
+import lzma
+import warnings
+import psutil
 import signal
 import time
 import sys, os
 import random
 import resource
-from enum import Enum
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional
 import pathlib
-from dataclasses import dataclass
-# import psutil
+from pathlib import Path
+from enum import Enum
+from typing import Optional
 from io import StringIO 
-import lzma
-import json
-import warnings
-import psutil
 
+from contextlib import contextmanager
 
-# sys.path.insert(1, os.path.join(pathlib.Path(__file__).parent.resolve(), "..", ".."))
 
 # CPMpy
 import cpmpy as cp
-from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3 import _parse_xcsp3, _load_xcsp3
+from cpmpy.tools.xcsp3 import xcsp3_natives
 
 # PyCSP3
-from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 from xml.etree.ElementTree import ParseError
 
 # Utils
 import os, pathlib
 sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve()))
-from xcsp3_solution import solution_xml
-from parser_callbacks import CallbacksCPMPy
-# from xcsp3.perf_timer import PerfContext, TimerContext
+from cpmpy.tools.xcsp3.xcsp3_solution import solution_xml
 
-import xcsp3_natives
 
 # Configuration
 SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc", "gurobi"]

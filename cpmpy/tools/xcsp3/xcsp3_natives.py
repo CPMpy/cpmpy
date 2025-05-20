@@ -1,3 +1,7 @@
+"""
+A collection of XCSP3 solver-native global constraints.
+"""
+
 import cpmpy as cp
 import numpy as np
 

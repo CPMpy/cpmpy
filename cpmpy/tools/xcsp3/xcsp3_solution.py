@@ -1,9 +1,23 @@
+"""
+Collection of tools for handeling solutions in XCSP3 format. 
+"""
+
 import xml.etree.cElementTree as ET
-import cpmpy as cp
 
 def solution_xml(model, useless_style="*", boolean_style="int"):
     """
         Formats a solution according to the XCSP3 specification.
+
+        Arguments:
+            model: CPMpy model for which to format its solution (should be solved first)
+            useless_style: How to process unused decision variables (with value `None`). 
+                           If "*", variable is included in reporting with value "*". 
+                           If "drop", variable is excluded from reporting.
+            boolean_style: Print style for boolean constants.
+                           "int" results in 0/1, "bool" results in False/True.
+
+        Returns:
+            XML-formatted model solution according to XCSP3 specification.
     """
 
     # CSP
