@@ -187,12 +187,6 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
             process.join()
 
     result['time_total'] = time.time() - total_start
-
-    # Collect output
-    output = []
-    while parent_conn.poll(timeout=1):
-        output.append(parent_conn.recv())
-
        
     sol_time = None # For annotation intermediate solutions (when they were received)
     
@@ -210,7 +204,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
                 result['status'] = line[2:].strip()
             elif line.startswith('v ') and result['solution'] is None:
                 # only record first line, contains 'type' and 'cost'
-                result['solution'] = line[2:].strip()
+                result['solution'] = line.split("\n")[0][2:].strip()
             elif line.startswith('o '):
                 obj = int(line[2:].strip())
                 if result['intermediate'] is None:
@@ -240,6 +234,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
         # Received a new status from the subprocess
         elif isinstance(line, dict):
             status = line
+
+        else:
+            raise()
 
     # Parse the exit status
     if status["status"] == "error":
