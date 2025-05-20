@@ -23,6 +23,7 @@ List of classes
 """
 import inspect
 import time
+from datetime import timedelta
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
@@ -80,9 +81,10 @@ class CPM_pindakaas(SolverInterface):
         import pindakaas as pdk
 
         try:
-            # Set subsolver or use Cnf if None
-                pdk.Cnf()
+            # Set subsolver or use CNF if None
             self.pdk_solver = (
+                # pdk.CNF()
+                pdk.solver.CaDiCaL()
                 if subsolver is None
                 else CPM_pindakaas.subsolvers.get[subsolver]
             )
@@ -113,48 +115,52 @@ class CPM_pindakaas(SolverInterface):
 
         t = time.time()
 
-        # If no subsolver selected, use Cadical as default Cnf solver
-        if isinstance(self.pdk_solver, pdk.Cnf):
-            self.pdk_solver = pdk.solver.Cadical(self.pdk_solver)
+        # If no subsolver selected, use CaDiCaL as default CNF solver
+        if isinstance(self.pdk_solver, pdk.CNF):
+            assert False
+            cadical = pdk.solver.CaDiCaL()
+            for c in self.pdk_solver:
+                cadical += c
+            self.pdk_solver = cadical
 
-        my_status = self.pdk_solver.solve(
-            time_limit=time_limit,
-            assumptions=[] if assumptions is None else self.solver_vars(assumptions),
-            # TODO make assumptions default None
-        )
+        time_limit = None if time_limit is None else timedelta(seconds=time_limit)
+        assumptions = [] if assumptions is None else self.solver_vars(assumptions)
 
-        self.cpm_status.runtime = time.time() - t
+        with self.pdk_solver.solve(
+            time_limit=time_limit, assumptions=assumptions
+        ) as result:
+            self.cpm_status.runtime = time.time() - t
 
-        # translate exit status
-        if my_status is True:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif my_status is False:
-            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif my_status is None:
-            # can happen when timeout is reached
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        else:  # another?
-            raise NotImplementedError(
-                my_status
-            )  # a new status type was introduced, please report on github
+            # translate pindakaas result status to cpmpy status
+            match result.status:
+                case pdk.solver.Status.SATISFIED:
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                case pdk.solver.Status.UNSATISFIABLE:
+                    self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+                case pdk.solver.Status.UNKNOWN:
+                    self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+                case _:
+                    raise NotImplementedError(
+                        f"Pindakaas returned an unkown type of result status: {result}"
+                    )
 
-        # # True/False depending on self.cpm_status
-        has_sol = self._solve_return(self.cpm_status)
+            # # True/False depending on self.cpm_status
+            has_sol = self._solve_return(self.cpm_status)
 
-        # translate solution values (of user specified variables only)
-        if has_sol:
-            # fill in variable values
-            for cpm_var in self.user_vars:
-                if cpm_var.name in self._varmap:
-                    lit = self.solver_var(cpm_var)
-                    cpm_var._value = self.pdk_solver.value(lit)
-                    if cpm_var._value is None:
-                        cpm_var._value = True  # dummy value
-                else:  # if pindakaas does not know the literal, it will error
+            # translate solution values (of user specified variables only)
+            if has_sol:
+                # fill in variable values
+                for cpm_var in self.user_vars:
+                    if cpm_var.name in self._varmap:
+                        lit = self.solver_var(cpm_var)
+                        cpm_var._value = result.value(lit)
+                        if cpm_var._value is None:
+                            cpm_var._value = True  # dummy value
+                    else:  # if pindakaas does not know the literal, it will error
+                        cpm_var._value = None
+            else:  # clear values of variables
+                for cpm_var in self.user_vars:
                     cpm_var._value = None
-        else:  # clear values of variables
-            for cpm_var in self.user_vars:
-                cpm_var._value = None
 
         return has_sol
 
@@ -165,7 +171,7 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
             # insert if new
             if cpm_var.name not in self._varmap:
-                self._varmap[cpm_var.name] = self.pdk_solver.add_variable()
+                (self._varmap[cpm_var.name],) = self.pdk_solver.new_vars(1)
             return self._varmap[cpm_var.name]
         else:
             raise NotImplementedError(
@@ -235,35 +241,33 @@ class CPM_pindakaas(SolverInterface):
             self._add(a1, conditions=conditions + [~self.solver_var(a0)])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
-            literals = None
-            coefficients = None
-            comparator = None
-            k = None
-
             lhs, k = cpm_expr.args
-            if lhs.name == "sum":
-                literals = lhs.args
-            elif lhs.name == "wsum":
-                coefficients, literals = lhs.args
-            else:
-                raise ValueError(
-                    f"Trying to encode non (Boolean) linear constraint: {cpm_expr}"
-                )
-            if cpm_expr.name == "<=":
-                comparator = pdk.Comparator.LessEq
-            elif cpm_expr.name == ">=":
-                comparator = pdk.Comparator.GreaterEq
-            elif cpm_expr.name == "==":
-                comparator = pdk.Comparator.Equal
-            else:
-                raise ValueError(f"Unsupported comparator: {cpm_expr.name}")
+            match lhs.name:
+                case "sum":
+                    literals = lhs.args
+                    coefficients = [1] * len(literals)
+                case "wsum":
+                    coefficients, literals = lhs.args
+                case _:
+                    raise ValueError(
+                        f"Trying to encode non (Boolean) linear constraint: {cpm_expr}"
+                    )
 
-            self.pdk_solver.add_linear(
-                self.solver_vars(literals),
-                coefficients=coefficients,
-                comparator=comparator,
-                k=k,
-                conditions=conditions,
+            lhs = sum(
+                (l * c for c, l in zip(coefficients, self.solver_vars(literals))),
+                pdk.BoolLinExp(),  # TODO check upstream if this can be avoided; needed for type coercion
             )
+
+            match cpm_expr.name:
+                case "<=":
+                    self.pdk_solver += lhs <= k
+                case ">=":
+                    self.pdk_solver += lhs >= k
+                case "==":
+                    self.pdk_solver += lhs == k
+                case _:
+                    raise ValueError(
+                        f"Unsupported comparator for constraint: {cpm_expr}"
+                    )
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
