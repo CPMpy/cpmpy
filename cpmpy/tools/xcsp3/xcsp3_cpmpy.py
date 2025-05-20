@@ -349,8 +349,10 @@ def gurobi_arguments(model: cp.Model,
 
     return res
 
-def cpo_arguments(cores: Optional[int] = None,
+def cpo_arguments(model: cp.Model,
+                  cores: Optional[int] = None,
                   seed: Optional[int] = None,
+                  intermediate: bool = False,
                   **kwargs):
     # Documentation: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
     res = dict()
@@ -358,6 +360,32 @@ def cpo_arguments(cores: Optional[int] = None,
         res |= { "Workers": cores }
     if seed is not None:
         res |= { "RandomSeed": seed }
+
+    if intermediate and model.has_objective():
+        from docplex.cp.solver.solver_listener import CpoSolverListener
+
+        class CpoSolutionCallback(CpoSolverListener):
+
+            def __init__(self):
+                super().__init__()
+                self.__start_time = time.time()
+                self.__solution_count = 1
+
+            def result_found(self, solver, sres):
+                current_time = time.time()
+                obj = sres.get_objective_value()
+                if obj is not None:
+                    print_comment('Solution %i, time = %0.2fs' % 
+                                (self.__solution_count, current_time - self.__start_time))
+                    print_objective(obj)
+                    self.__solution_count += 1
+
+            def solution_count(self):
+                """Returns the number of solutions found."""
+                return self.__solution_count
+
+        # Register the callback
+        res |= { "solution_callback": CpoSolutionCallback }
 
     return res
 
