@@ -21,7 +21,7 @@ List of classes
     CPM_pindakaas
 
 """
-import inspect
+import importlib
 import time
 from datetime import timedelta
 
@@ -48,26 +48,14 @@ class CPM_pindakaas(SolverInterface):
 
     # TODO add link to docs Documentation of the solver's own Python API: ...
 
+
+
     @staticmethod
     def supported():
-        try:
-            import pindakaas as pdk
+        return importlib.util.find_spec("pindakaas") is not None
 
-            # check subsolvers via `solver.*` modules
-            CPM_pindakaas.subsolvers = dict(
-                (name.lower(), solver)
-                for name, solver in inspect.getmembers(pdk.solver, inspect.isclass)
-            )
-            return True
-        except ModuleNotFoundError:
-            return False
+    def __init__(self, cpm_model=None):
 
-    @staticmethod
-    def solvernames():
-        if CPM_pindakaas.supported():
-            return list(CPM_pindakaas.subsolvers)
-
-    def __init__(self, cpm_model=None, subsolver=None):
         name = "pindakaas"
         if not self.supported():
             raise ImportError(
@@ -80,19 +68,7 @@ class CPM_pindakaas(SolverInterface):
 
         import pindakaas as pdk
 
-        try:
-            # Set subsolver or use CNF if None
-            self.pdk_solver = (
-                # pdk.CNF()
-                pdk.solver.CaDiCaL()
-                if subsolver is None
-                else CPM_pindakaas.subsolvers.get[subsolver]
-            )
-        except KeyError:
-            raise ValueError(
-                f"Expected subsolver to be `None` or one of {CPM_pindakaas.subsolvers()}, but was {subsolver}"
-            )
-
+        self.pdk_solver = pdk.solver.CaDiCaL()
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         super().__init__(name=name, cpm_model=cpm_model)
 
@@ -111,18 +87,7 @@ class CPM_pindakaas(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        import pindakaas as pdk
-
         t = time.time()
-
-        # If no subsolver selected, use CaDiCaL as default CNF solver
-        if isinstance(self.pdk_solver, pdk.CNF):
-            assert False
-            cadical = pdk.solver.CaDiCaL()
-            for c in self.pdk_solver:
-                cadical += c
-            self.pdk_solver = cadical
-
         time_limit = None if time_limit is None else timedelta(seconds=time_limit)
         assumptions = None if assumptions is None else self.solver_vars(assumptions)
 
@@ -132,6 +97,8 @@ class CPM_pindakaas(SolverInterface):
             self.cpm_status.runtime = time.time() - t
 
             # translate pindakaas result status to cpmpy status
+            import pindakaas as pdk
+
             match result.status:
                 case pdk.solver.Status.SATISFIED:
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
@@ -223,8 +190,6 @@ class CPM_pindakaas(SolverInterface):
 
     def _add(self, cpm_expr, conditions=[]):
         """Add for a single, transformed expression, implied by conditions (mostly for internal use)"""
-        import pindakaas as pdk
-
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
