@@ -45,6 +45,7 @@ setup(
         "exact": ["exact>=2.1.0"],
         "minizinc": ["minizinc"],
         "pysat": ["python-sat"],
+        "pindakaas": ["pindakaas @ git+https://github.com/hbierlee/pindakaas.git@feature/cpmpy#subdirectory=crates/pyndakaas"],
         "gurobi": ["gurobipy"],
         "pysdd": ["pysdd"],
         "gcs": ["gcspy"],
