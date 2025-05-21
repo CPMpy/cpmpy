@@ -11,7 +11,7 @@ from cpmpy.expressions.globalconstraints import DirectConstraint
 
 class OrtNoOverlap2D(DirectConstraint):
     def __init__(self, arguments):
-        self.args = arguments
+        self._args = arguments
 
     def callSolver(self, CPMpy_solver, Native_solver):
         start_x, dur_x, end_x, start_y, dur_y, end_y = CPMpy_solver.solver_vars(self.args)
@@ -21,7 +21,7 @@ class OrtNoOverlap2D(DirectConstraint):
 
 class OrtSubcircuit(DirectConstraint):
     def __init__(self, arguments):
-        self.args = arguments
+        self._args = arguments
 
     def callSolver(self, CPMpy_solver, Native_solver):
         N = len(self.args)
@@ -36,7 +36,7 @@ class OrtSubcircuit(DirectConstraint):
 
 class OrtSubcircuitWithStart(DirectConstraint):
     def __init__(self, arguments, start_index:int=0):
-        self.args = arguments
+        self._args = arguments
         self.start_index = start_index
 
     def callSolver(self, CPMpy_solver, Native_solver):
@@ -55,7 +55,7 @@ class OrtSubcircuitWithStart(DirectConstraint):
 
 class ChocoSubcircuit(DirectConstraint):
     def __init__(self, arguments):
-        self.args = arguments
+        self._args = arguments
 
     def callSolver(self, CPMpy_solver, Native_solver):
         # Successor variables
@@ -68,7 +68,7 @@ class ChocoSubcircuit(DirectConstraint):
 
 class MinizincSubcircuit(DirectConstraint):
     def __init__(self, arguments):
-        self.args = arguments
+        self._args = arguments
 
     def callSolver(self, CPMpy_solver, Native_solver):
         # minizinc is offset 1, which can be problematic here...
