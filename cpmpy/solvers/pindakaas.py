@@ -42,7 +42,7 @@ from datetime import timedelta
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
-from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
+from ..expressions.variables import NegBoolView, _BoolVarImpl
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
@@ -73,7 +73,7 @@ class CPM_pindakaas(SolverInterface):
 
     def __init__(self, cpm_model=None):
         """
-        Initalize Pindakaas interface
+        Initialize Pindakaas interface.
 
         - `pdk_solver`: The pindakaas back-end which will encode and post constraints for the SAT solver
         - `unsatisfiable`: If a constraint is found to be unsatisfiable during the encoding phase, this flag is set to `True` to prevent further encoding efforts
