@@ -529,6 +529,34 @@ class TestGlobal(unittest.TestCase):
                 except (NotImplementedError, NotSupportedError):
                     pass
 
+    def test_regular(self):
+        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
+        x = cp.intvar(0, 1, shape=7)
+
+        transitions = [("a", 0, "a"), ("a", 1, "b"), ("b", 1, "c"), ("c", 0, "d"), ("d", 0, "d"), ("d", 1, "e"),
+                       ("e", 0, "e")]
+        start = "a"
+        ends = ["e"]
+
+        true_sols = set()
+        false_sols = set()
+
+        solutions = [(0,0,0,1,1,0,1), (0,0,1,1,0,0,1), (0,0,1,1,0,1,0), (0,1,1,0,0,0,1), (0,1,1,0,0,1,0),
+                     (0,1,1,0,1,0,0), (1,1,0,0,0,0,1), (1,1,0,0,0,1,0), (1,1,0,0,1,0,0), (1,1,0,1,0,0,0)]
+
+        true_model = cp.Model(cp.Regular(x, transitions, start, ends))
+        false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
+
+        num_true = true_model.solveAll(display=lambda : true_sols.add(tuple(argvals(x))))
+        num_false = false_model.solveAll(display=lambda : false_sols.add(tuple(argvals(x))))
+
+        self.assertEqual(num_true, len(solutions))
+        self.assertSetEqual(true_sols, set(solutions))
+
+        self.assertEqual(num_true + num_false, 2**7)
+        self.assertEqual(len(true_sols & false_sols), 0) # no solutions can be in both
+
+
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
         constraints = [cp.Minimum(iv) + 9 == 8]
