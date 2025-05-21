@@ -96,10 +96,25 @@ def only_implies(constraints):
                 # then it is actually an integer expression, keep
                 newcons.append(cpm_expr)
             else:
-                # BVar1 == BE0 :: BVar1 -> BE0, ~BVar1 -> ~BE0 
-                newcons.append(a0.implies(a1))
+                # BVar1 == BE0 :: BVar1 -> BE0, ~BVar1 -> ~BE0
+                # assume that if a0 == a1 was fine, that a0 -> a1 is too
+                # EXCEPT, optimize a0 -> a1_0 & ... & a1_n :: a0 -> a1_0 & ... & a0 -> a1_n
+                if a1.name == 'and':
+                    # optimize
+                    for suba in a1.args:
+                        newcons.append(a0.implies(suba))
+                elif a1.has_subexpr():
+                    # requires retransform
+                    retransform.append(a0.implies(a1))
+                else:
+                    newcons.append(a0.implies(a1))
+
                 neg_a1 = recurse_negation(a1)
-                if neg_a1.has_subexpr():
+                if neg_a1.name == 'and':
+                    # optimize
+                    for suba in neg_a1.args:
+                        newcons.append((~a0).implies(suba))
+                elif neg_a1.has_subexpr():
                     # requires retransform
                     retransform.append((~a0).implies(neg_a1))
                 else:
