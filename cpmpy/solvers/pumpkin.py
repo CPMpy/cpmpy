@@ -341,16 +341,16 @@ class CPM_pumpkin(SolverInterface):
         else:
             raise ValueError(f"Cannot convert CPMpy expression {cpm_expr} to a predicate")
 
-        var = self._ivars(lhs)
+        var = self.to_pum_ivar(lhs)
         return Predicate(var, comp, rhs)
 
 
-    def _ivars(self, cpm_var):
+    def to_pum_ivar(self, cpm_var):
         """
             Helper function to convert (boolean) variables and constants to Pumpkin integer expressions
         """
         if is_any_list(cpm_var):
-            return [self._ivars(v) for v in cpm_var]
+            return [self.to_pum_ivar(v) for v in cpm_var]
         elif isinstance(cpm_var, _BoolVarImpl):
             return self.pum_solver.boolean_as_integer(self.solver_var(cpm_var))
         elif is_num(cpm_var):
@@ -421,20 +421,20 @@ class CPM_pumpkin(SolverInterface):
                 if "sum" in lhs.name or lhs.name == "sub":
                     return [constraints.Equals(self._sum_args(lhs), rhs)]
                
-                pum_rhs = self._ivars(rhs) # other operators require IntExpression
+                pum_rhs = self.to_pum_ivar(rhs) # other operators require IntExpression
                 if lhs.name == "div":
-                    return [constraints.Division(*self._ivars(lhs.args), pum_rhs)]
+                    return [constraints.Division(*self.to_pum_ivar(lhs.args), pum_rhs)]
                 elif lhs.name == "mul":
-                    return [constraints.Times(*self._ivars(lhs.args), pum_rhs)]
+                    return [constraints.Times(*self.to_pum_ivar(lhs.args), pum_rhs)]
                 elif lhs.name == "abs":
                     return [constraints.Absolute(self.solver_var(lhs), pum_rhs)]
                 elif lhs.name == "min":
-                    return [constraints.Minimum(self._ivars(lhs.args), pum_rhs)]
+                    return [constraints.Minimum(self.to_pum_ivar(lhs.args), pum_rhs)]
                 elif lhs.name == "max":
-                    return [constraints.Maximum(self._ivars(lhs.args), pum_rhs)]
+                    return [constraints.Maximum(self.to_pum_ivar(lhs.args), pum_rhs)]
                 elif lhs.name == "element":
                     arr, idx = lhs.args
-                    return [constraints.Element(self._ivars(idx), self._ivars(arr), pum_rhs)]
+                    return [constraints.Element(self.to_pum_ivar(idx), self.to_pum_ivar(arr), pum_rhs)]
                 else:
                     raise NotImplementedError("Unknown lhs of comparison", cpm_expr)
 
