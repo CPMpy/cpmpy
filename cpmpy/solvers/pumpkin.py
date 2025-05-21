@@ -2,6 +2,8 @@
 import warnings
 import re
 
+from os.path import join
+
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -57,10 +59,7 @@ class CPM_pumpkin(SolverInterface):
     Interface to Pumpkin's API
 
     Creates the following attributes (see parent constructor for more):
-
     - ``pum_solver``: the pumpkin.Model() object
-    Creates the following attributes (see parent constructor for more):
-    - tpl_model: object, Pumpkin's model object
     """
 
     @staticmethod
@@ -96,7 +95,7 @@ class CPM_pumpkin(SolverInterface):
         self.objective_is_min = True
 
         # initialise everything else and post the constraints/objective
-        super().__init__(name="Pumpkin", cpm_model=cpm_model)
+        super().__init__(name="pumpkin", cpm_model=cpm_model)
 
     @property
     def native_model(self):
@@ -106,13 +105,15 @@ class CPM_pumpkin(SolverInterface):
         return self.pum_solver
 
 
-    def solve(self, time_limit=None, proof=None, assumptions=None):
+    def solve(self, time_limit=None, prove=False, proof_name="proof.drcp", proof_location=".", assumptions=None):
         """
             Call the Pumpkin solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
-            - proof:       path to a proof file
+            - prove: whether to produce a DRCP proof (.lits file and .drcp proof file).
+            - proof_name: name for the the proof files.
+            - proof_location: location for the proof files (default to current working directory).
             - assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
@@ -126,18 +127,21 @@ class CPM_pumpkin(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        if time_limit is not None:
+            raise ValueError("Time limits are currently not supported by Pumpkin")
+
         # parse and dispatch the arguments
         kwargs = dict()
 
         if self.has_objective():
             assert assumptions is None, "Optimization under assumptions is not supported"
             solve_func = self.pum_solver.optimise
-            kwargs.update(proof=proof,
+            kwargs.update(proof=join(proof_location, proof_name) if prove else None,
                           objective=self.solver_var(self._objective),
                           direction=Direction.Minimise if self.objective_is_min else Direction.Maximise)
 
         elif assumptions is not None:
-            assert proof is None, "Proof-logging under assumptions is not supported"
+            assert not prove, "Proof-logging under assumptions is not supported"
             pum_assumptions = [self.to_predicate(a) for a in assumptions]
             self.assump_map = dict(zip(pum_assumptions, assumptions))
             solve_func = self.pum_solver.satisfy_under_assumptions
@@ -145,7 +149,7 @@ class CPM_pumpkin(SolverInterface):
 
         else:
             solve_func = self.pum_solver.satisfy
-            kwargs.update(proof=proof)
+            kwargs.update(proof=join(proof_location, proof_name) if prove else None)
 
         self._pum_core = None
         
@@ -172,7 +176,7 @@ class CPM_pumpkin(SolverInterface):
 
         elif assumptions is not None: # check result under assumptions
             if isinstance(result, SatisfactionUnderAssumptionsResult.Satisfiable):
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             elif isinstance(result, SatisfactionUnderAssumptionsResult.Unsatisfiable):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
                 self._pum_core = [] # empty core, no required assumptions to prove UNSAT
@@ -186,7 +190,7 @@ class CPM_pumpkin(SolverInterface):
 
         else: # satisfaction result without assumptions
             if isinstance(result, SatisfactionResult.Satisfiable):
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             elif isinstance(result, SatisfactionResult.Unsatisfiable):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             elif isinstance(result, SatisfactionResult.Unknown):
@@ -198,7 +202,6 @@ class CPM_pumpkin(SolverInterface):
         has_sol = self._solve_return(self.cpm_status)
         if has_sol:
             solution = result._0
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
 
             # fill in variable values
             for cpm_var in self.user_vars:
@@ -291,7 +294,7 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"alldifferent", "cumulative", 
                      "min", "max", "element"}
-        cpm_cons = decompose_in_tree(cpm_cons, supported=supported) # TODO: Pumpkin supports half-reified globals
+        cpm_cons = decompose_in_tree(cpm_cons, supported=supported)
         # safening after decompose here, need to safen toplevel elements too
         #   which come from decomposition of other global constraints...
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"})
@@ -497,21 +500,14 @@ class CPM_pumpkin(SolverInterface):
         # add new user vars to the set
         get_variables(cpm_expr_orig, collect=self.user_vars)
 
-        # transform and post the constraints
-        for orig_expr in toplevel_list(cpm_expr_orig, merge_and=True):
-            for cpm_expr in self.transform(orig_expr):
-                if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
-                    bv, subexpr = cpm_expr.args
-                    for cons in self._get_constraint(subexpr):
-                        if isinstance(cons, constraints.Clause):    
-                            raise ValueError("_get_constraint should not return clauses")
-                        self.pum_solver.add_implication(cons, self.solver_var(bv))
-                else:
-                    solver_constraints = self._get_constraint(cpm_expr)
-                    for cons in solver_constraints:
-                        if isinstance(cons, constraints.Clause):
-                            raise ValueError("_get_constraint should not return clauses")
-                        self.pum_solver.add_constraint(cons)
+        for cpm_expr in self.transform(cpm_expr_orig):
+            if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
+                bv, subexpr = cpm_expr.args
+                for pum_cons in self._get_constraint(subexpr):
+                    self.pum_solver.add_implication(pum_cons, self.solver_var(bv))
+            else:
+                for pum_cons in self._get_constraint(cpm_expr):
+                    self.pum_solver.add_constraint(pum_cons)
 
         return self
     __add__ = add # avoid redirect in superclass
