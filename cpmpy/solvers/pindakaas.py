@@ -253,10 +253,7 @@ class CPM_pindakaas(SolverInterface):
                         f"Trying to encode non (Boolean) linear constraint: {cpm_expr}"
                     )
 
-            lhs = sum(
-                (l * c for c, l in zip(coefficients, self.solver_vars(literals))),
-                pdk.BoolLinExp(),  # TODO check upstream if this can be avoided; needed for type coercion
-            )
+            lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
             match cpm_expr.name:
                 case "<=":
