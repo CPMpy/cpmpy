@@ -557,19 +557,19 @@ def xcsp3_cpmpy(benchname: str,
         # time_limit is generic for all, done later
 
         # Additional XCSP3-specific native transformations
-        added_natives = {
-            "ortools": {
-                "no_overlap2d": xcsp3_natives.ort_nooverlap2d,
-                "subcircuit": xcsp3_natives.ort_subcircuit,
-                "subcircuitwithstart": xcsp3_natives.ort_subcircuitwithstart,
-            },
-            "choco": {
-                "subcircuit": xcsp3_natives.choco_subcircuit,
-            },
-            "minizinc": {
-                "subcircuit": xcsp3_natives.minizinc_subcircuit,
-            },
-        }
+        # added_natives = {
+        #     "ortools": {
+        #         "no_overlap2d": xcsp3_natives.ort_nooverlap2d,
+        #         "subcircuit": xcsp3_natives.ort_subcircuit,
+        #         "subcircuitwithstart": xcsp3_natives.ort_subcircuitwithstart,
+        #     },
+        #     "choco": {
+        #         "subcircuit": xcsp3_natives.choco_subcircuit,
+        #     },
+        #     "minizinc": {
+        #         "subcircuit": xcsp3_natives.minizinc_subcircuit,
+        #     },
+        # }
 
         # Post model to solver
         time_post = time.time()
