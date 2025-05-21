@@ -1,15 +1,27 @@
 # /usr/bin/env python
 """
-Interface to Pindakaas (`pindakaas`) API.
+Interface to the Pindakaas solver's Python API.
 
-Requires that the `pindakaas` library python package is installed:
+Pindakaas is an open-source Rust library for encoding propositional and pseudo-Boolean constraints to SAT, with support for incremental solving and assumptions.
 
-    $ pip install pindakaas
+Always use :func:`cp.SolverLookup.get("pindakaas") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
-`pindakaas` is a library to transform pseudo-Boolean and integer constraints into conjunctive normal form.
-See https://github.com/pindakaashq/pindakaas.
+============
+Installation
+============
 
-This solver can be used if the model only has PB constraints.
+Requires that the 'pindakaas' optional dependency is installed:
+
+.. code-block:: console
+
+    $ pip install cpmpy[pindakaas]
+
+Detailed installation instructions available at:
+
+- https://pypi.org/project/pindakaas/
+- https://github.com/pindakaashq/pindakaas
+
+The rest of this documentation is for advanced users.
 
 ===============
 List of classes
@@ -20,6 +32,9 @@ List of classes
 
     CPM_pindakaas
 
+==============
+Module details
+==============
 """
 import importlib
 import time
@@ -44,22 +59,29 @@ class CPM_pindakaas(SolverInterface):
     Creates the following attributes (see parent constructor for more):
 
     - ``pdk_solver``: the `pindakaas` solver or formula object
+
+    Documentation of the solver's own Python API:
+
+    - https://pypi.org/project/pindakaas/
+    - https://github.com/pindakaashq/pindakaas
+
     """
-
-    # TODO add link to docs Documentation of the solver's own Python API: ...
-
-
 
     @staticmethod
     def supported():
         return importlib.util.find_spec("pindakaas") is not None
 
     def __init__(self, cpm_model=None):
+        """
+        Initalize Pindakaas interface
 
+        - `pdk_solver`: The pindakaas back-end which will encode and post constraints for the SAT solver
+        - `unsatisfiable`: If a constraint is found to be unsatisfiable during the encoding phase, this flag is set to `True` to prevent further encoding efforts
+        """
         name = "pindakaas"
         if not self.supported():
             raise ImportError(
-                f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use this solver interface"
+                f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install cpmpy[pindakaas]`) package to use this solver interface"
             )
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError(
@@ -77,6 +99,12 @@ class CPM_pindakaas(SolverInterface):
         self.pdk_solver
 
     def solve(self, time_limit=None, assumptions=None):
+        """
+        Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
+
+        :param time_limit: optional, time limit in seconds
+        :param assumptions: optional, a list of assumptions (Boolean variables which should hold for this solve call)
+        """
         if self.unsatisfiable:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
             return self._solve_return(self.cpm_status)
@@ -87,10 +115,10 @@ class CPM_pindakaas(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        t = time.time()
         time_limit = None if time_limit is None else timedelta(seconds=time_limit)
         assumptions = None if assumptions is None else self.solver_vars(assumptions)
 
+        t = time.time()
         with self.pdk_solver.solve(
             time_limit=time_limit, assumptions=assumptions
         ) as result:
@@ -146,17 +174,6 @@ class CPM_pindakaas(SolverInterface):
             )
 
     def transform(self, cpm_expr):
-        """
-            Transform arbitrary CPMpy expressions to constraints the `pindakaas` solver supports.
-
-            Implemented through chaining multiple solver-independent **transformation functions** from
-            the `cpmpy/transformations/` directory.
-
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
-
-        :return: list of Expression
-        """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons)
         cpm_cons = simplify_boolean(cpm_cons)
@@ -189,7 +206,7 @@ class CPM_pindakaas(SolverInterface):
     __add__ = add
 
     def _add(self, cpm_expr, conditions=[]):
-        """Add for a single, transformed expression, implied by conditions (mostly for internal use)"""
+        """Add for a single, *transformed* expression, implied by conditions."""
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
