@@ -50,7 +50,6 @@
 
         CPM_gcs
 """
-from typing import Dict
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException

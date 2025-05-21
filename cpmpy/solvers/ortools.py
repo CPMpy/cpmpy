@@ -44,7 +44,6 @@
     ==============
 """
 import sys
-from typing import Dict  # for stdout checking
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus

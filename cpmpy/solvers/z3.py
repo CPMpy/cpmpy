@@ -45,7 +45,6 @@
     Module details
     ==============
 """
-from typing import Dict
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError

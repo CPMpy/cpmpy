@@ -54,7 +54,6 @@
     ==============
 """
 import re
-from typing import Dict
 import warnings
 import sys
 import os

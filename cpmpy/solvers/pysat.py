@@ -51,7 +51,6 @@
     Module details
     ==============
 """
-from typing import Dict
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
