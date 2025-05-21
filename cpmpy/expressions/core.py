@@ -430,6 +430,10 @@ class Expression(object):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", [self])
 
+    def __bool__(self):
+        raise ValueError(f"__bool__ should not be called on a CPMPy expression {self} as it will always return True\n"
+                         "Do not use an expression as argument in an `if` statement and use cpmpy.any, cpmpy.max instead of python builtins\n"
+                         "If you think this is an error, please report on github")
 
 class BoolVal(Expression):
     """
@@ -551,6 +555,12 @@ class Comparison(Expression):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+    
+    def __bool__(self):
+        # will be called when comparing elements in a container, but always with `==`
+        if self.name == "==":
+            return repr(self.args[0]) == repr(self.args[1])
+        super().__bool__() # default to exception
 
     # return the value of the expression
     # optional, default: None
@@ -643,10 +653,10 @@ class Operator(Expression):
                 mul_args = arg_list[0].args
                 if is_num(mul_args[0]):
                     name = 'mul'
-                    arg_list = [-mul_args[0], mul_args[1]]
+                    arg_list = (-mul_args[0], mul_args[1])
                 elif is_num(mul_args[1]):
                     name = 'mul'
-                    arg_list = [mul_args[0], -mul_args[1]]
+                    arg_list = (mul_args[0], -mul_args[1])
 
         super().__init__(name, arg_list)
 

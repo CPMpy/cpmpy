@@ -54,7 +54,6 @@
     ==============
 """
 import re
-from typing import Dict
 import warnings
 import sys
 import os
@@ -65,6 +64,7 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, argvals, argval
@@ -156,7 +156,7 @@ class CPM_minizinc(SolverInterface):
     # variable names must have this pattern
     mzn_name_pattern = re.compile('^[A-Za-z][A-Za-z0-9_]*$')
 
-    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 
@@ -193,8 +193,6 @@ class CPM_minizinc(SolverInterface):
         # Prepare solve statement, so it can be overwritten on demand
         self.mzn_txt_solve = "solve satisfy;"
         self.mzn_result = None
-
-        self.added_natives = added_natives
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
@@ -374,19 +372,17 @@ class CPM_minizinc(SolverInterface):
             if mzn_result.solution is None:
                 break
 
-            # display (and reverse-map first) if needed
+             # fill in variable values
+            mznsol = mzn_result.solution
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                if hasattr(mznsol, sol_var):
+                    cpm_var._value = getattr(mznsol, sol_var)
+                else:
+                    raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
+
+            # display if needed
             if display is not None:
-                mznsol = mzn_result.solution
-
-                # fill in variable values
-                for cpm_var in self.user_vars:
-                    sol_var = self.solver_var(cpm_var)
-                    if hasattr(mznsol, sol_var):
-                        cpm_var._value = getattr(mznsol, sol_var)
-                    else:
-                        print("Warning, no value for ", sol_var)
-
-                # and the actual displaying
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
@@ -400,7 +396,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars])
+            self += cpm_any([v != v.value() for v in self.user_vars])
 
         if solution_count == 0:
             # clear user vars if no solution found
@@ -499,7 +495,7 @@ class CPM_minizinc(SolverInterface):
                      "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
                      "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
-                     "lex_chain_lesseq", "among", *self.added_natives.keys()}
+                     "lex_chain_lesseq", "among"}
         return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
 
     def add(self, cpm_expr):
@@ -717,9 +713,6 @@ class CPM_minizinc(SolverInterface):
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
         
-        elif expr.name in self.added_natives:
-                return self.added_natives[expr.name](self, expr)
-
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
         elif isinstance(expr, DirectConstraint):

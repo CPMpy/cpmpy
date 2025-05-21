@@ -48,8 +48,8 @@ import os
 import cpmpy as cp
 
 # Prevent pycsp3 from complaining on exit + breaking docs
-import sys
-sys.argv = ["-nocompile"]
+# import sys
+# sys.argv = ["-nocompile"]
 
 from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 from .parser_callbacks import CallbacksCPMPy

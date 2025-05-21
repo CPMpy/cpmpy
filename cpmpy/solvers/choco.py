@@ -42,7 +42,6 @@
     ==============
 """
 import time
-from typing import Dict
 
 import numpy as np
 
@@ -64,7 +63,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
 from ..transformations.reification import reify_rewrite
-from ..exceptions import ChocoBoundsException
+from ..exceptions import ChocoBoundsException, NotSupportedError
 
 
 class CPM_choco(SolverInterface):
@@ -102,7 +101,7 @@ class CPM_choco(SolverInterface):
         except Exception as e:
             raise e
 
-    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 
@@ -131,8 +130,6 @@ class CPM_choco(SolverInterface):
         self.minimize_obj = None
         self.helper_var = None
         # for solving with assumption variables, TO-CHECK
-
-        self.added_natives = added_natives
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="choco", cpm_model=cpm_model)
@@ -397,8 +394,8 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "short_table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence", *self.added_natives.keys()} 
+                     "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
 
         cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
@@ -602,6 +599,21 @@ class CPM_choco(SolverInterface):
                 chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
+            elif cpm_expr.name == "regular":
+                from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
+                array, transitions, start, accepting = cpm_expr.args
+                for i, (lb, ub) in enumerate(zip(*get_bounds(array))):
+                    if lb < 0 or ub > 65535:
+                        raise NotSupportedError(f"Choco regular only supports variables within domain 0..65535, got {array[i]} with bounds {lb}..{ub}")
+                # convert to Automaton Choco object
+                automaton = FiniteAutomaton()
+                for node, i in cpm_expr.node_map.items(): automaton.add_state()
+                for src, label, dst in transitions:
+                    automaton.add_transition(cpm_expr.node_map[src], cpm_expr.node_map[dst], label)
+                automaton.set_initial_state(cpm_expr.node_map[start])
+                automaton.set_final(*[cpm_expr.node_map[a] for a in accepting])
+                return self.chc_model.regular(self._to_vars(array), automaton)
+            
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
@@ -620,8 +632,6 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == "gcc":
                 vars, vals, occ = cpm_expr.args
                 return self.chc_model.global_cardinality(self._to_vars(vars), self.solver_vars(vals), self._to_vars(occ), cpm_expr.closed)
-            elif cpm_expr.name in self.added_natives:
-                return self.added_natives[cpm_expr.name](self, cpm_expr)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 

@@ -50,7 +50,6 @@
 
         CPM_gcs
 """
-from typing import Dict
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
@@ -100,7 +99,7 @@ class CPM_gcs(SolverInterface):
         except Exception as e:
             raise e
 
-    def __init__(self, cpm_model=None, subsolver=None, added_natives:dict[str, callable]={}):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 

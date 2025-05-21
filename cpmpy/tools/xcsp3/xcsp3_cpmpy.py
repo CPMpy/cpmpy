@@ -575,10 +575,10 @@ def xcsp3_cpmpy(benchname: str,
         time_post = time.time()
         # with prepend_print():  # catch prints and prepend 'c' to each line (still needed?)
         if solver == "exact": # Exact2 takes its options at creation time
-            s = cp.SolverLookup.get(solver, model, **solver_args, added_natives=added_natives.get(solver, {}))
+            s = cp.SolverLookup.get(solver, model, **solver_args)
             solver_args = dict()  # no more solver args needed
         else:
-            s = cp.SolverLookup.get(solver, model, added_natives=added_natives.get(solver, {}))
+            s = cp.SolverLookup.get(solver, model)
         time_post = time.time() - time_post
         print_comment(f"took {time_post:.4f} seconds to post model to {solver}")
 
