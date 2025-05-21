@@ -83,7 +83,7 @@ def only_implies(constraints):
             else:
                 newcons.append(cpm_expr)
 
-        # Comparisons: transform bV == BE
+        # Comparisons: transform BV == BE
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
             # a0 is a boolvar, because of previous transformation only_bv_reifies.
             a0,a1 = cpm_expr.args
@@ -96,8 +96,27 @@ def only_implies(constraints):
                 # then it is actually an integer expression, keep
                 newcons.append(cpm_expr)
             else:
-                # BVar1 == BE0 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                retransform.extend(( (~a0).implies(recurse_negation(a1)), a0.implies(a1) ))
+                # BVar1 == BE0 :: BVar1 -> BE0, ~BVar1 -> ~BE0
+                # assume that if a0 == a1 was fine, that a0 -> a1 is too
+                # EXCEPT, optimisation a0 -> a1_0 & ... & a1_n :: a0 -> a1_0 & ... & a0 -> a1_n
+                if a1.name == 'and':
+                    # optimisation without going through retransform
+                    newcons.extend(a0.implies(a1_i) for a1_i in a1.args)
+                elif a1.has_subexpr():
+                    # requires retransform
+                    retransform.append(a0.implies(a1))
+                else:
+                    newcons.append(a0.implies(a1))
+
+                neg_a1 = recurse_negation(a1)
+                if neg_a1.name == 'and':
+                    # optimisation without going through retransform
+                    newcons.extend((~a0).implies(na1_i) for na1_i in neg_a1.args)
+                elif neg_a1.has_subexpr():
+                    # requires retransform
+                    retransform.append((~a0).implies(neg_a1))
+                else:
+                    newcons.append((~a0).implies(neg_a1))
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
