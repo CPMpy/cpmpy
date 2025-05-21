@@ -124,7 +124,7 @@ class CPM_pindakaas(SolverInterface):
             self.pdk_solver = cadical
 
         time_limit = None if time_limit is None else timedelta(seconds=time_limit)
-        assumptions = [] if assumptions is None else self.solver_vars(assumptions)
+        assumptions = None if assumptions is None else self.solver_vars(assumptions)
 
         with self.pdk_solver.solve(
             time_limit=time_limit, assumptions=assumptions
