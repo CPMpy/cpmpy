@@ -229,8 +229,7 @@ class SubCircuitWithStart(GlobalConstraint):
             raise CPMpyException("SubCircuitWithStart constraint must be given a minimum of 2 variables for field 'args' as stops to route between.")
 
         # Create the object
-        super().__init__("subcircuitwithstart", flatargs)
-        self.start_index = start_index
+        super().__init__("subcircuitwithstart", flatargs + [start_index])
 
     def decompose(self):
         """
@@ -239,11 +238,11 @@ class SubCircuitWithStart(GlobalConstraint):
             enforcing the start_index to be part of the subcircuit.
         """
         # Get the arguments
-        start_index = self.start_index
-        succ = cpm_array(self.args) # Successor variables
+        start_index = self.args[-1]
+        succ = cpm_array(self.args[:-1]) # Successor variables
 
         constraining = []
-        constraining += [SubCircuit(self.args)] # The successor variables should form a subcircuit.
+        constraining += [SubCircuit(succ[:-1])] # The successor variables should form a subcircuit.
         constraining += [succ[start_index] != start_index] # The start_index should be inside the subcircuit.
 
         defining = []
@@ -251,8 +250,8 @@ class SubCircuitWithStart(GlobalConstraint):
         return constraining, defining
 
     def value(self):
-        start_index = self.start_index
-        succ = [argval(a) for a in self.args] # Successor variables
+        start_index = self.args[-1]
+        succ = [argval(a) for a in self.args[:-1]] # Successor variables
 
         # Check if we have a valid subcircuit and that the start_index is part of it.
         return SubCircuit(succ).value() and (succ[start_index] != start_index)
