@@ -135,7 +135,7 @@ class CPM_cpo(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds 
-                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, 
+                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `CpoSolutionCounter`. If you want to count all solutions, 
                                                                                                         don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
                 kwargs:                         any keyword argument, sets parameters of solver object
 
@@ -247,6 +247,8 @@ class CPM_cpo(SolverInterface):
 
         docp = self.get_docp()
         solution_count = 0
+
+        # TODO: convert to use 'start_search' and solution callback handlers
         start = time.time()
         while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
 
@@ -517,6 +519,7 @@ class CPM_cpo(SolverInterface):
                     if bounds_d[1] == bounds_d[0] == 0:
                         cpo_s, cpo_e = self.solver_vars([s, e])
                         cons += [cpo_s == cpo_e] # enforce 0 duration
+                        # no restrictions on height due to zero duration and thus no contribution to capacity
                         continue
                     # Normal setting
                     cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s, d, e, h])                   
