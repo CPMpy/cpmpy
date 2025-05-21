@@ -241,7 +241,8 @@ class CPM_pindakaas(SolverInterface):
             self._add(a1, conditions=conditions + [~self.solver_var(a0)])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
-            lhs, k = cpm_expr.args
+            # lhs is a sum/wsum, right hand side a constant int
+            lhs, rhs = cpm_expr.args
             match lhs.name:
                 case "sum":
                     literals = lhs.args
@@ -257,14 +258,16 @@ class CPM_pindakaas(SolverInterface):
 
             match cpm_expr.name:
                 case "<=":
-                    self.pdk_solver += lhs <= k
+                    con = lhs <= rhs
                 case ">=":
-                    self.pdk_solver += lhs >= k
+                    con = lhs >= rhs
                 case "==":
-                    self.pdk_solver += lhs == k
+                    con = lhs == rhs
                 case _:
                     raise ValueError(
                         f"Unsupported comparator for constraint: {cpm_expr}"
                     )
+
+            self.pdk_solver.add_encoding(con, conditions=conditions)
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
