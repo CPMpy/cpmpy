@@ -129,12 +129,14 @@ class CPM_cpo(SolverInterface):
         self.cpo_model = docp.model.CpoModel()
         super().__init__(name="cpo", cpm_model=cpm_model)
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, solution_callback=None, **kwargs):
         """
             Call the CP Optimizer solver
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds 
+                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `CpoSolutionCounter`. If you want to count all solutions, 
+                                                                                                        don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
                 kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -154,6 +156,7 @@ class CPM_cpo(SolverInterface):
             All solver parameters are documented here: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
 
         """
+        docp = self.get_docp()
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -165,7 +168,16 @@ class CPM_cpo(SolverInterface):
         # set time limit
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
-        self.cpo_result = self.cpo_model.solve(TimeLimit=time_limit, **kwargs)
+        
+        # create solver object
+        self.cpo_solver = docp.solver.solver.CpoSolver(
+            self.cpo_model,
+            TimeLimit=time_limit, 
+            **kwargs, 
+            listeners=[solution_callback] if solution_callback is not None else None
+        )
+
+        self.cpo_result = self.cpo_solver.solve()
 
         # new status, translate runtime
         self.cpo_status = self.cpo_result.get_solve_status()
@@ -235,6 +247,8 @@ class CPM_cpo(SolverInterface):
 
         docp = self.get_docp()
         solution_count = 0
+
+        # TODO: convert to use 'start_search' and solution callback handlers
         start = time.time()
         while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
 
@@ -551,3 +565,132 @@ class CPM_cpo(SolverInterface):
                 return dom.count_different(self._cpo_expr(cpm_con.args))
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
+
+
+# solvers are optional, so this file should be interpretable
+# even if cpo is not installed...
+try:
+    from docplex.cp.solver.solver_listener import CpoSolverListener
+    import time
+
+    class CpoSolutionCounter(CpoSolverListener):
+        """
+        Native CP Optimizer callback for solution counting.
+
+        It is based on cpo's built-in `CpoSolverListener`.
+
+        use with CPM_cpo as follows:
+
+        .. code-block:: python
+            
+            cb = CpoSolutionCounter()
+            s.solve(solution_callback=cb)
+
+        then retrieve the solution count with ``cb.solution_count()``
+
+        Arguments:
+            verbose (bool, default: False): whether to print info on every solution found 
+    """
+
+        def __init__(self, verbose=False):
+            super().__init__()
+            self.__solution_count = 0
+            self.__verbose = verbose
+            if self.__verbose:
+                self.__start_time = time.time()
+
+        def result_found(self, solver, sres):
+            """Called on each new solution."""
+            if self.__verbose:
+                current_time = time.time()
+                obj = sres.get_objective_value()
+                print('Solution %i, time = %0.2f s, objective = %i' %
+                      (self.__solution_count, current_time - self.__start_time, obj))
+            self.__solution_count += 1
+
+        def solution_count(self):
+            """Returns the number of solutions found."""
+            return self.__solution_count
+
+    class CpoSolutionPrinter(CpoSolutionCounter):
+        """
+            Native CP Optimizer callback for solution printing.
+
+            Subclasses :class:`CpoSolutionCounter`, see those docs too.
+
+            Use with :class:`CPM_cpo` as follows:
+
+            .. code-block:: python
+
+                cb = CpoSolutionPrinter(s, display=vars)
+                s.solve(solution_callback=cb)
+
+            For multiple variables (single or NDVarArray), use:
+            ``cb = CpoSolutionPrinter(s, display=[v, x, z])``.
+
+            For a custom print function, use for example:
+            
+            .. code-block:: python
+
+                def myprint():
+                    print(f"x0={x[0].value()}, x1={x[1].value()}")
+                
+                cb = CpoSolutionPrinter(s, printer=myprint)
+
+            Optionally retrieve the solution count with ``cb.solution_count()``.
+
+            Arguments:
+                verbose (bool, default = False): whether to print info on every solution found 
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                            default/None: nothing displayed
+                solution_limit (default = None): stop after this many solutions 
+        """
+        def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+            super().__init__(verbose)
+            self._solution_limit = solution_limit
+            # we only need the cpmpy->solver varmap from the solver
+            self._varmap = solver._varmap
+            # identify which variables to populate with their values
+            self._cpm_vars = []
+            self._display = display
+            if isinstance(display, (list,Expression)):
+                self._cpm_vars = get_variables(display)
+            elif callable(display):
+                # might use any, so populate all (user) variables with their values
+                self._cpm_vars = solver.user_vars
+
+        def result_found(self, solver, sres):
+            """Called on each new solution."""
+            if len(self._cpm_vars):
+                # populate values before printing
+                for cpm_var in self._cpm_vars:
+                    # it might be an NDVarArray
+                    if hasattr(cpm_var, "flat"):
+                        for cpm_subvar in cpm_var.flat:
+                            sol_var = self._varmap[cpm_subvar]
+                            if isinstance(cpm_var,_BoolVarImpl):
+                                sol_var = sol_var.children[0]
+                                cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
+                            else:
+                                cpm_var._value = sres.get_var_solution(sol_var).get_value()
+                    elif isinstance(cpm_var, _BoolVarImpl):
+                        sol_var = self._varmap[cpm_subvar].children[0]
+                        cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
+                    else:
+                        sol_var = self._varmap[cpm_subvar]
+                        cpm_var._value = sres.get_var_solution(sol_var).get_value()
+
+                if isinstance(self._display, Expression):
+                    print(argval(self._display))
+                elif isinstance(self._display, list):
+                    # explicit list of expressions to display
+                    print(argvals(self._display))
+                else: # callable
+                    self._display()
+
+            # check for count limit
+            if self.solution_count() == self._solution_limit:
+                self.end_solve()
+
+except ImportError:
+    pass  # Ok, no cpo installed...
