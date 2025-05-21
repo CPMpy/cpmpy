@@ -71,7 +71,7 @@ class CPM_pindakaas(SolverInterface):
     def supported():
         return importlib.util.find_spec("pindakaas") is not None
 
-    def __init__(self, cpm_model=None):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Initialize Pindakaas interface.
 
@@ -90,6 +90,9 @@ class CPM_pindakaas(SolverInterface):
 
         import pindakaas as pdk
 
+        assert (
+            subsolver is None
+        ), "Pindakaas does not support any subsolvers for the moment"
         self.pdk_solver = pdk.solver.CaDiCaL()
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         super().__init__(name=name, cpm_model=cpm_model)
