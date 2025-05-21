@@ -198,7 +198,7 @@ def flatten_constraint(expr, expr_dict=None):
                 else:
                     # make LHS normalized 'Boolexpr', RHS must be a var
                     lhs,lcons = normalized_boolexpr(expr.args[0], expr_dict=expr_dict)
-                    rhs,rcons = get_or_make_var(expr.args[1], expr_dict)
+                    rhs,rcons = get_or_make_var(expr.args[1], expr_dict=expr_dict)
 
                 newlist.append(Operator(expr.name, (lhs,rhs)))
                 newlist.extend(lcons)
@@ -274,7 +274,7 @@ def flatten_constraint(expr, expr_dict=None):
             """
     - Global constraint: global([Var]*)          (CPMpy class 'GlobalConstraint')
             """
-            (con, flatcons) = normalized_boolexpr(expr, expr_dict)
+            (con, flatcons) = normalized_boolexpr(expr, expr_dict=expr_dict)
             newlist.append(con)
             newlist.extend(flatcons)
 
@@ -329,14 +329,14 @@ def get_or_make_var(expr, expr_dict=None):
         the equivalent of: (var, normalize(expr) == var)
     """
 
-    if expr_dict is not None and expr in expr_dict:
-        return expr_dict[expr], []
-
     if __is_flat_var(expr):
         return (expr, [])
 
     if is_any_list(expr):
         raise Exception(f"Expected single variable, not a list for: {expr}")
+
+    if expr_dict is not None and expr in expr_dict:
+        return expr_dict[expr], []
 
     if expr.is_bool():
         # normalize expr into a boolexpr LHS, reify LHS == bvar
