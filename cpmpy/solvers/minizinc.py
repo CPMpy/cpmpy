@@ -509,11 +509,9 @@ class CPM_minizinc(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
-            cpm_con = self.expr_dict.get(cpm_con, cpm_con) # we might have alrady seen this constraint before (as a subexpression)
             # Get text expression, add to the solver
             mzn_str = f"constraint {self._convert_expression(cpm_con)};\n"
             self.mzn_model.add_string(mzn_str)
-            self.expr_dict[cpm_con] = BoolVal(True) # constraint is now always true, no need to post it again
 
         return self
     __add__ = add  # avoid redirect in superclass
