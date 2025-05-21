@@ -338,7 +338,7 @@ class CPM_cpo(SolverInterface):
         supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
                      "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'no_overlap'}
         supported_reified = {"alldifferent", 'table', 'indomain', "negative_table"} # global functions by default here
-        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified, expr_dict=self.expr_dict)
+        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified, csemap=self._csemap)
         # no flattening required
         return cpm_cons
 

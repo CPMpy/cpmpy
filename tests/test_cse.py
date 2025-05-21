@@ -22,29 +22,29 @@ class TestCSE(unittest.TestCase):
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
        
         nested_alldiff = cp.AllDifferent(x,y+y,z)      
-        expr_dict = dict()
+        csemap = dict()
 
-        flat_cons = flatten_constraint(nested_alldiff, expr_dict=expr_dict)
+        flat_cons = flatten_constraint(nested_alldiff, csemap=csemap)
 
         self.assertEqual(len(flat_cons), 2)
         fc = flat_cons[0]
         self.assertEqual(str(fc), "alldifferent(x,IV0,z)")
-        self.assertEqual(len(expr_dict), 1)
+        self.assertEqual(len(csemap), 1)
 
-        self.assertEqual(str(next(iter(expr_dict.keys()))), "(y) + (y)")
-        self.assertEqual(str(expr_dict[y + y]), "IV0")
+        self.assertEqual(str(next(iter(csemap.keys()))), "(y) + (y)")
+        self.assertEqual(str(csemap[y + y]), "IV0")
 
         # next time we use y + y, it should replace it IV0
         nested_cons2 = (y + y) % 3 == 0
-        flat_cons = flatten_constraint(nested_cons2, expr_dict=expr_dict)
+        flat_cons = flatten_constraint(nested_cons2, csemap=csemap)
         self.assertEqual(len(flat_cons), 1)
         self.assertEqual(str(flat_cons[0]), "(IV0) mod 3 == 0")
-        self.assertEqual(len(expr_dict), 1)
+        self.assertEqual(len(csemap), 1)
         
 
         # should also work for Boolean variables (introduce reification)
         nested_cons = (x + y + z <= 10) | (cp.AllDifferent(x,y,z))
-        flat_cons = flatten_constraint(nested_cons, expr_dict=expr_dict)
+        flat_cons = flatten_constraint(nested_cons, csemap=csemap)
         
         self.assertEqual(len(flat_cons), 3)
         
@@ -54,7 +54,7 @@ class TestCSE(unittest.TestCase):
         
         # next time we use x + y + z <= 10, it should replace it with BV0
         nested_cons2 = ((x + y + z <= 10) ^ cp.boolvar(name="a"))
-        flat_cons = flatten_constraint(nested_cons2, expr_dict=expr_dict)
+        flat_cons = flatten_constraint(nested_cons2, csemap=csemap)
 
         self.assertEqual(len(flat_cons), 1)
         self.assertEqual(str(flat_cons[0]), "BV0 xor a")
@@ -67,8 +67,8 @@ class TestCSE(unittest.TestCase):
 
         b = cp.boolvar(name="b")
         nested_cons = b == ((cp.max([x,y,z]) + q) <= 10)
-        expr_dict = dict()
-        decomp = decompose_in_tree([nested_cons], expr_dict=expr_dict)
+        csemap = dict()
+        decomp = decompose_in_tree([nested_cons], csemap=csemap)
     
         self.assertEqual(len(decomp), 6)
         self.assertEqual(str(decomp[0]), "(b) == ((IV0) + (q) <= 10)")
@@ -82,7 +82,7 @@ class TestCSE(unittest.TestCase):
         #  ... it seems like we should be able to do more here e.g., cp.max([x,y,z]) != 42 should be replaced with IV0 != 42
         #  ...      but the current code-flow of decompose_in_tree and .decompose_comparison does not allow this
         nested2 = (q + cp.max([x,y,z]) != 42)
-        decomp = decompose_in_tree([nested2], expr_dict=expr_dict)
+        decomp = decompose_in_tree([nested2], csemap=csemap)
 
         self.assertEqual(len(decomp), 1)
         self.assertEqual(str(decomp[0]), "(q) + (IV0) != 42")
@@ -91,27 +91,27 @@ class TestCSE(unittest.TestCase):
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
 
         cons = cp.max([x,y,z]) <= 42
-        expr_dict = dict()
-        eq_cons = only_numexpr_equality([cons], expr_dict=expr_dict)
+        csemap = dict()
+        eq_cons = only_numexpr_equality([cons], csemap=csemap)
         
         self.assertEqual(len(eq_cons), 2)
         self.assertEqual(str(eq_cons[0]), "(max(x,y,z)) == (IV0)")
         self.assertEqual(str(eq_cons[1]), "IV0 <= 42")
-        self.assertEqual(len(expr_dict), 1)
+        self.assertEqual(len(csemap), 1)
         
         # next time we use max([x,y,z]) it should replace it with IV0
         non_eq_cons = cp.max([x,y,z]) != 1337
-        eq_cons = only_numexpr_equality([non_eq_cons], expr_dict=expr_dict)
+        eq_cons = only_numexpr_equality([non_eq_cons], csemap=csemap)
         self.assertEqual(len(eq_cons), 1)
         self.assertEqual(str(eq_cons[0]), "IV0 != 1337")
-        self.assertEqual(len(expr_dict), 1)
+        self.assertEqual(len(csemap), 1)
 
     def test_linearize(self):
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
         
         cons = cp.max(x,y) < z
-        expr_dict = dict()
-        lin_cons = linearize_constraint([cons], supported={"max"}, expr_dict=expr_dict)
+        csemap = dict()
+        lin_cons = linearize_constraint([cons], supported={"max"}, csemap=csemap)
         
         self.assertEqual(len(lin_cons), 2)
         self.assertEqual(str(lin_cons[0]), "(max(x,y)) <= (IV0)")
@@ -120,5 +120,5 @@ class TestCSE(unittest.TestCase):
         # next time we use z - 1 it should replace it with IV0
         # ... not sure how to find a test for this...        
 
-    ### other transformations only use expr_dict as argument to flatten_constraint internally, not sure how to easily test them
+    ### other transformations only use csemap as argument to flatten_constraint internally, not sure how to easily test them
 

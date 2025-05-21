@@ -357,7 +357,7 @@ class CPM_gcs(SolverInterface):
         self += flat_cons # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
-        (obj, obj_cons) = get_or_make_var(flat_obj, expr_dict=self.expr_dict)
+        (obj, obj_cons) = get_or_make_var(flat_obj, csemap=self._csemap)
         self += obj_cons
 
         self.objective_var = obj
@@ -396,18 +396,18 @@ class CPM_gcs(SolverInterface):
             'circuit', 
             'xor'}
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported, expr_dict=self.expr_dict)
-        cpm_cons = flatten_constraint(cpm_cons, expr_dict=self.expr_dict)  # flat normal form
+        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints
         # but no reification for linear not equals and not half reification for linear equality. 
         # Maybe a future transformation (or future work on the GCS solver).
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']), expr_dict=self.expr_dict)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), expr_dict=self.expr_dict)  # supports >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']), csemap=self._csemap)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
 
         # NB: GCS supports a small number of simple expressions as the reifying term
         # e.g. (x > 3) -> constraint could in principle be supported in the future.
-        cpm_cons = only_bv_reifies(cpm_cons, expr_dict=self.expr_dict)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         str_rep = ""
         for c in cpm_cons:
             str_rep += str(c) + '\n'
