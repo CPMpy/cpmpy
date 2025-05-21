@@ -565,9 +565,10 @@ def xcsp3_cpmpy(benchname: str,
         }
 
         # Loop through all constraints and replace with native if supported
-        for i, constraint in enumerate(model.constraints):
-            if constraint.name in added_natives[solver]:
-                model.constraints[i] = added_natives[solver][constraint.name](constraint.args)
+        if solver in added_natives:
+            for i, constraint in enumerate(model.constraints):
+                if constraint.name in added_natives[solver]:
+                    model.constraints[i] = added_natives[solver][constraint.name](constraint.args)
 
 
         # ------------------------ Post CPMpy model to solver ------------------------ #
