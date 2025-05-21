@@ -28,7 +28,6 @@ Internal utilities for expression handling.
         eval_comparison
         get_bounds     
 """
-import copy
 
 import cpmpy as cp
 import numpy as np
@@ -97,7 +96,6 @@ def is_any_list(arg):
     """
     return isinstance(arg, (list, tuple, np.ndarray))
 
-
 def flatlist(args):
     """ recursively flatten arguments into one single list
     """
@@ -124,7 +122,7 @@ def all_pairs(args):
 
 def argval(a):
     """ returns .value() of Expression, otherwise the variable itself
-        
+
         We check with hasattr instead of isinstance to avoid circular dependency
     """
     if hasattr(a, "value"):
@@ -201,7 +199,7 @@ def implies(expr, other):
     elif is_true_cst(expr):
         return other
     elif is_false_cst(expr):
-        return BoolVal(True)
+        return cp.BoolVal(True)
     else:
         return expr.implies(other)
 
@@ -212,5 +210,3 @@ def is_star(arg):
         Check if arg is star as used in the ShortTable global constraint
     """
     return isinstance(arg, type(STAR)) and arg == STAR
-
-

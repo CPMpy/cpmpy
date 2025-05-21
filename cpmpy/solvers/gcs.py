@@ -303,6 +303,16 @@ class CPM_gcs(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.gcs_result["solve_time"]
 
+        num_sols = self.gcs_result["solutions"]
+        if self.gcs_result["completed"] and num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        elif self.gcs_result["completed"] and num_sols == 0:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else: # maybe unsat, maybe not (maybe a timeout)
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         # clear user vars if no solution found
         if self._solve_return(self.cpm_status, self.objective_value_) is False:
             for var in self.user_vars:
@@ -313,7 +323,7 @@ class CPM_gcs(SolverInterface):
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit, 
                         veripb_args=veripb_args, display_output=display_verifier_output)
 
-        return self.gcs_result["solutions"]
+        return num_sols
 
     def solver_var(self, cpm_var):
         """
@@ -481,7 +491,9 @@ class CPM_gcs(SolverInterface):
                 self.gcs.post_or([self.solver_var(cpm_expr)])
             elif isinstance(cpm_expr, BoolVal):
                 if not cpm_expr:
-                    self.gcs.post_or([])
+                    # bit a hack, empty clause does not work (issue #73 on gcs github)
+                    a = boolvar()
+                    self.gcs.post_and(self.solver_vars([a,~a]))
             elif isinstance(cpm_expr, Operator) or \
                 (cpm_expr.name == '==' and isinstance(cpm_expr.args[0], _BoolVarImpl) \
                 and not isinstance(cpm_expr.args[1], _NumVarImpl)): 
