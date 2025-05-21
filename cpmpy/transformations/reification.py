@@ -98,11 +98,10 @@ def only_implies(constraints):
             else:
                 # BVar1 == BE0 :: BVar1 -> BE0, ~BVar1 -> ~BE0
                 # assume that if a0 == a1 was fine, that a0 -> a1 is too
-                # EXCEPT, optimize a0 -> a1_0 & ... & a1_n :: a0 -> a1_0 & ... & a0 -> a1_n
+                # EXCEPT, optimisation a0 -> a1_0 & ... & a1_n :: a0 -> a1_0 & ... & a0 -> a1_n
                 if a1.name == 'and':
-                    # optimize
-                    for suba in a1.args:
-                        newcons.append(a0.implies(suba))
+                    # optimisation without going through retransform
+                    newcons.extend(a0.implies(a1_i) for a1_i in a1.args)
                 elif a1.has_subexpr():
                     # requires retransform
                     retransform.append(a0.implies(a1))
@@ -111,9 +110,8 @@ def only_implies(constraints):
 
                 neg_a1 = recurse_negation(a1)
                 if neg_a1.name == 'and':
-                    # optimize
-                    for suba in neg_a1.args:
-                        newcons.append((~a0).implies(suba))
+                    # optimisation without going through retransform
+                    newcons.extend((~a0).implies(na1_i) for na1_i in neg_a1.args)
                 elif neg_a1.has_subexpr():
                     # requires retransform
                     retransform.append((~a0).implies(neg_a1))
