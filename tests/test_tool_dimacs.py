@@ -33,7 +33,7 @@ class CNFTool(unittest.TestCase):
     def test_empty_formula(self):
         model = self.dimacs_to_model("p cnf 0 0")
         self.assertTrue(model.solve())
-        self.assertEqual(model.status().exitstatus, ExitStatus.OPTIMAL)
+        self.assertEqual(model.status().exitstatus, ExitStatus.FEASIBLE)
 
     def test_empty_clauses(self):
         model = self.dimacs_to_model("p cnf 0 2\n0\n0")

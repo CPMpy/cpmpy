@@ -64,6 +64,7 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, argvals, argval
@@ -304,7 +305,7 @@ class CPM_minizinc(SolverInterface):
 
         return has_sol
 
-    def _post_solve(self, mzn_result):
+    def _post_solve(self, mzn_result, solve_all:bool=False):
         """ shared by solve() and solveAll() """
         import minizinc
 
@@ -327,7 +328,10 @@ class CPM_minizinc(SolverInterface):
         if mzn_status == minizinc.result.Status.SATISFIED:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.ALL_SOLUTIONS:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if solve_all:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.OPTIMAL_SOLUTION:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif mzn_status == minizinc.result.Status.UNSATISFIABLE:
@@ -368,19 +372,17 @@ class CPM_minizinc(SolverInterface):
             if mzn_result.solution is None:
                 break
 
-            # display (and reverse-map first) if needed
+             # fill in variable values
+            mznsol = mzn_result.solution
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                if hasattr(mznsol, sol_var):
+                    cpm_var._value = getattr(mznsol, sol_var)
+                else:
+                    raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
+
+            # display if needed
             if display is not None:
-                mznsol = mzn_result.solution
-
-                # fill in variable values
-                for cpm_var in self.user_vars:
-                    sol_var = self.solver_var(cpm_var)
-                    if hasattr(mznsol, sol_var):
-                        cpm_var._value = getattr(mznsol, sol_var)
-                    else:
-                        print("Warning, no value for ", sol_var)
-
-                # and the actual displaying
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
@@ -394,7 +396,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars])
+            self += cpm_any([v != v.value() for v in self.user_vars])
 
         if solution_count == 0:
             # clear user vars if no solution found
@@ -403,7 +405,14 @@ class CPM_minizinc(SolverInterface):
                 var._value = None
 
         # status handling
-        self._post_solve(mzn_result)
+        self._post_solve(mzn_result, solve_all=True)
+
+        if solution_count: # found at least one solution
+            if solution_count == solution_limit: # matched solution limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # elif mzn_result.solution is None: <- is implicit since nothing needs to update
+                # last iteration didn't find a solution
+                # nothing needs to update since _post_solve already set state correctly (state from the second-last iteration)
 
         return solution_count
 
