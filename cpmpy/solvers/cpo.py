@@ -42,6 +42,7 @@
         CPM_cpo
 """
 
+import shutil
 import time
 import warnings
 
@@ -248,6 +249,7 @@ class CPM_cpo(SolverInterface):
         solution_count = 0
 
         # TODO: convert to use 'start_search' and solution callback handlers
+        start = time.time()
         while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
 
             # display if needed
@@ -282,7 +284,26 @@ class CPM_cpo(SolverInterface):
                 solvars.append(sol_var)
                 vals.append(cpm_value)
             self.cpo_model.add(docp.modeler.forbidden_assignments(solvars, [vals]))
-            
+
+            if time_limit is not None: # update remaining time
+                time_limit -= self.status().runtime
+        end = time.time()
+
+        # update solver status
+        self.cpm_status.runtime = end - start
+        if solution_count:
+            if solution_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        # else: <- is implicit since nothing needs to update
+        #     if self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+        #         self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        #     elif self.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+        #         self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         return solution_count
 
     def solver_var(self, cpm_var):
@@ -492,7 +513,16 @@ class CPM_cpo(SolverInterface):
                 total_usage = []
                 cons = []
                 for s, d, e, h in zip(start, dur, end, height):
-                    cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s, d, e, h])
+                    bounds_d = get_bounds(d)
+                    # Special case for tasks with duration 0
+                    # -> cpo immediately returns UNSAT if done through tasks
+                    if bounds_d[1] == bounds_d[0] == 0:
+                        cpo_s, cpo_e = self.solver_vars([s, e])
+                        cons += [cpo_s == cpo_e] # enforce 0 duration
+                        # no restrictions on height due to zero duration and thus no contribution to capacity
+                        continue
+                    # Normal setting
+                    cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s, d, e, h])                   
                     task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
                     task_height = dom.pulse(task, get_bounds(h))
                     cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
