@@ -546,6 +546,28 @@ def xcsp3_cpmpy(benchname: str,
         
         if time_limit and time_limit < (time.time() - time_start):
             raise TimeoutError("Time's up after callback")
+        
+        # ------------ Replace solver supported constraints with natives ------------- #
+
+        # Additional XCSP3-specific native constraints
+        added_natives = {
+            "ortools": {
+                "no_overlap2d": xcsp3_natives.OrtNoOverlap2D,
+                "subcircuit": xcsp3_natives.OrtNoOverlap2D,
+                "subcircuitwithstart": lambda args: xcsp3_natives.OrtSubcircuitWithStart(args[:-1], args[-1]),
+            },
+            "choco": {
+                "subcircuit": xcsp3_natives.ChocoSubcircuit,
+            },
+            "minizinc": {
+                "subcircuit": xcsp3_natives.MinizincSubcircuit,
+            },
+        }
+
+        # Loop through all constraints and replace with native if supported
+        for i, constraint in enumerate(model.constraints):
+            if constraint.name in added_natives[solver]:
+                model.constraints[i] = added_natives[solver][constraint.name](constraint.args)
 
 
         # ------------------------ Post CPMpy model to solver ------------------------ #
@@ -556,20 +578,7 @@ def xcsp3_cpmpy(benchname: str,
                                        **kwargs)
         # time_limit is generic for all, done later
 
-        # Additional XCSP3-specific native transformations
-        added_natives = {
-            "ortools": {
-                "no_overlap2d": xcsp3_natives.ort_nooverlap2d,
-                "subcircuit": xcsp3_natives.ort_subcircuit,
-                "subcircuitwithstart": xcsp3_natives.ort_subcircuitwithstart,
-            },
-            "choco": {
-                "subcircuit": xcsp3_natives.choco_subcircuit,
-            },
-            "minizinc": {
-                "subcircuit": xcsp3_natives.minizinc_subcircuit,
-            },
-        }
+        
 
         # Post model to solver
         time_post = time.time()

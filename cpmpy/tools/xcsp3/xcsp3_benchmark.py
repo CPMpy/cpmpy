@@ -204,7 +204,10 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
                 result['status'] = line[2:].strip()
             elif line.startswith('v ') and result['solution'] is None:
                 # only record first line, contains 'type' and 'cost'
-                result['solution'] = line.split("\n")[0][2:].strip()
+                solution = line.split("\n")[0][2:].strip()
+                result['solution'] = str(solution)
+                if "cost" in solution:
+                    result['objective_value'] = solution.split('cost="')[-1][:-2]
             elif line.startswith('o '):
                 obj = int(line[2:].strip())
                 if result['intermediate'] is None:
@@ -244,7 +247,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
         if "TimeoutError" in repr(status["exception"]):
             pass
         # All other exceptions, put in solution field
-        else:
+        elif result['solution'] is None:
             result['status'] = ExitStatus.unknown.value
             result["solution"] = status["exception"]    
 
