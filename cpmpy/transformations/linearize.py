@@ -274,8 +274,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, e
             elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and "abs" not in supported:
                 if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
                     newvar, newcons = get_or_make_var(lhs, expr_dict=expr_dict)
-                    newlist += newcons
-                    newlist += linearize_constraint([lhs == newvar])
+                    newlist += linearize_constraint(newcons, supported=supported, reified=reified, expr_dict=expr_dict)
                     cpm_expr = eval_comparison(cpm_expr.name, newvar, rhs)
                 else:
                     x = lhs.args[0]
