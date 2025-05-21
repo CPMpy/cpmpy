@@ -134,7 +134,7 @@ class CPM_cpo(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds 
-                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, 
+                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `CpoSolutionCounter`. If you want to count all solutions, 
                                                                                                         don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
                 kwargs:                         any keyword argument, sets parameters of solver object
 
