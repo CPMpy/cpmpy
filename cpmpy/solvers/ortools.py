@@ -396,7 +396,7 @@ class CPM_ortools(SolverInterface):
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # everything that can create
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap, rewrite_bool_eq=False)  # everything that can create
                                              # reified expr must go before this
         
         return cpm_cons
