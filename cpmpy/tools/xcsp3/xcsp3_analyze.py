@@ -48,6 +48,8 @@ def xcsp3_plot(df, time_limit=None):
     # Get unique solvers
     solvers = df['solver'].unique()
 
+    total_instances = df['instance'].nunique()
+
     # Determine the status to plot (Opt if at least one opt, otherwise sat)
     statuses = df['status'].unique()
     if 'OPTIMUM FOUND' in statuses:
@@ -65,7 +67,7 @@ def xcsp3_plot(df, time_limit=None):
     # Create figure
     fig = plt.figure(figsize=(10, 6))
     
-    for solver in sorted(solvers): # Sort solver names for consistent ordering
+    for solver in solvers_sorted:  # Use sorted solvers by count
         # Get data for this solver
         solver_data = df[df['solver'] == solver]
         
@@ -82,17 +84,26 @@ def xcsp3_plot(df, time_limit=None):
         
         # Plot the performance curve
         plt.plot(x, y, label=f"{solver} ({len(solver_data)})", linewidth=2.5)
-    
+
+    # Add horizontal dotted line for total number of instances
+    plt.axhline(y=total_instances, color='gray', linestyle='--', linewidth=1.5, label=f'Total ({total_instances})')
+
     # Set plot properties
     plt.xlabel('Time (seconds)')
     plt.ylabel(f'Number of instances returning \'{status_filter}\'')
-    # Get unique year-track combinations
     year_track_pairs = df[['year', 'track']].drop_duplicates()
     datasets = ', '.join([f'{row.year}:{row.track}' for _, row in year_track_pairs.iterrows()])
     plt.title(f'Performance Plot ({datasets})')
     plt.grid(True)
     plt.legend()
-    
+
+    # Move 'Total' to the top of the legend
+    handles, labels = plt.gca().get_legend_handles_labels()
+    # Sort so that 'Total' is first, others remain in order
+    sorted_handles_labels = sorted(zip(handles, labels), key=lambda x: 0 if x[1].startswith("Total") else 1)
+    handles, labels = zip(*sorted_handles_labels)
+    plt.legend(handles, labels)
+        
     # Set x-axis limit if specified
     if time_limit is not None:
         plt.xlim(0, time_limit)
