@@ -32,6 +32,7 @@ import matplotlib
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 def _extract_cost(solution_str):
     """
@@ -60,14 +61,17 @@ def xcsp3_plot(df, time_limit=None):
 
     # Count how many instances each solver solved (with correct status)
     solver_counts = df['solver'].value_counts()
+    solvers_sorted_by_perf = solver_counts.sort_values(ascending=False).index.tolist()
 
-    # Sort solvers descending by number of instances solved
-    solvers_sorted = solver_counts.sort_values(ascending=False).index.tolist()
+    # Assign colors by alphabetical order of solvers
+    solvers_sorted_alpha = sorted(solvers)
+    cmap = cm.get_cmap('tab10', len(solvers_sorted_alpha))
+    solver_to_color = {solver: cmap(i) for i, solver in enumerate(solvers_sorted_alpha)}
     
     # Create figure
     fig = plt.figure(figsize=(10, 6))
     
-    for solver in solvers_sorted:  # Use sorted solvers by count
+    for solver in solvers_sorted_alpha:  # Use sorted solvers by count
         # Get data for this solver
         solver_data = df[df['solver'] == solver]
         
@@ -83,7 +87,7 @@ def xcsp3_plot(df, time_limit=None):
         y = [0] + list(range(1, len(solver_data) + 1))
         
         # Plot the performance curve
-        plt.plot(x, y, label=f"{solver} ({len(solver_data)})", linewidth=2.5)
+        plt.plot(x, y, label=f"{solver} ({len(solver_data)})", linewidth=2.5, color=solver_to_color[solver])
 
     # Add horizontal dotted line for total number of instances
     plt.axhline(y=total_instances, color='gray', linestyle='--', linewidth=1.5, label=f'Total ({total_instances})')
