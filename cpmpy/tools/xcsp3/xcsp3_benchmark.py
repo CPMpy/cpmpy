@@ -110,6 +110,8 @@ def xcsp3_wrapper(conn, kwargs, verbose):
 
     Status report can be missing when process has been terminated by a SIGTERM.
     """
+    warnings.filterwarnings("ignore")
+    
     original_stdout = sys.stdout
 
     pipe_writer = PipeWriter(conn)
