@@ -491,14 +491,14 @@ class CPM_exact(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"}) # linearize expects safe exprs
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent', 'abs'})) # Abs and Alldiff have a specialized MIP decomp
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","mul"}))  # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
+        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent', 'abs'}), csemap=self._csemap) # Abs and Alldiff have a specialized MIP decomp
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","mul"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
 
         return cpm_cons
 
