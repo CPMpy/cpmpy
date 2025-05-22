@@ -39,6 +39,7 @@ Optional Arguments
 import csv
 import os
 import signal
+import subprocess
 import time
 import lzma
 import sys
@@ -131,7 +132,7 @@ def xcsp3_wrapper(conn, kwargs, verbose):
         conn.close()
 
 # exec_args = (filename, metadata, solver, time_limit, mem_limit, output_file, verbose) 
-def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> None:
+def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool, str]) -> None:
     """
     Solve a single XCSP3 instance and write results to file immediately.
     
@@ -146,12 +147,12 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
     """
     warnings.filterwarnings("ignore")
     
-    filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate = args
+    filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate, checker_path = args
 
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
                   'time_total', 'time_parse', 'time_model', 'time_post', 'time_solve',
-                  'status', 'objective_value', 'solution', 'intermediate']
+                  'status', 'objective_value', 'solution', 'intermediate', 'checker_result']
     result = dict.fromkeys(fieldnames)  # init all fields to None
     result['year'] = metadata['year']
     result['track'] = metadata['track']
@@ -159,6 +160,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
     result['solver'] = solver
 
     # Decompress before timers start
+    file_path = filename
     if str(filename).endswith(".lzma"):
         # Decompress the XZ file
         with lzma.open(filename, 'rt', encoding='utf-8') as f:
@@ -195,6 +197,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
     status = {"status": "error", "exception": "sigterm"}
 
     # Parse the output to get status, solution and timings
+    complete_solution = None
     while parent_conn.poll(timeout=1):
         line = parent_conn.recv()
 
@@ -206,6 +209,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
                 # only record first line, contains 'type' and 'cost'
                 solution = line.split("\n")[0][2:].strip()
                 result['solution'] = str(solution)
+                complete_solution = line
                 if "cost" in solution:
                     result['objective_value'] = solution.split('cost="')[-1][:-2]
             elif line.startswith('o '):
@@ -251,6 +255,20 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
             result['status'] = ExitStatus.unknown.value
             result["solution"] = status["exception"]    
 
+    if checker_path is not None and complete_solution is not None:
+        checker_output, checker_time = run_solution_checker(
+            JAR=checker_path,
+            instance_location=file_path,
+            out_file="'" + complete_solution.replace("\n\r", " ").replace("\n", " ").replace("v   ", "").replace("v ", "")+ "'",
+            verbose=verbose,
+            cpm_time=result.get('time_solve', 0)  # or total solve time you have
+        )
+
+        if checker_output is not None:
+            result['checker_result'] = checker_output
+        else:
+            result['checker_result'] = None
+
     # Use a lock file to prevent concurrent writes
     lock_file = f"{output_file}.lock"
     lock = FileLock(lock_file)
@@ -273,9 +291,28 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool]) -> 
                 pass  # avoid crashing on cleanup
 
 
+def run_solution_checker(JAR, instance_location, out_file, verbose, cpm_time):
+
+    start = time.time()
+    command = ["java", "-jar", JAR, "'" + str(instance_location) + "'" + " " + str(out_file)]
+    command = " ".join(command)
+    test_res_str = subprocess.run(command, capture_output=True, text=True, shell=True)
+    checker_time = time.time() - start
+
+    if verbose:
+        for line in test_res_str.stdout.split("\n"):
+            print("c " + line)
+        print(f"c cpmpy time: {cpm_time}")
+        print(f"c validation time: {checker_time}")
+        print(f"c elapsed time: {cpm_time + checker_time}")
+    
+    return test_res_str.stdout.split("\n")[-2], checker_time
+
+
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
-                   verbose: bool = False, intermediate: bool = False) -> str:
+                   verbose: bool = False, intermediate: bool = False,
+                   checker_path: Optional[str] = None) -> str:
     """
     Benchmark a solver on XCSP3 instances.
     
@@ -309,12 +346,12 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
         futures = [executor.submit(execute_instance,  # below: args
-                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate))
+                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate, checker_path))
                    for filename, metadata in dataset]
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
             try:
-                _ = future.result(timeout=time_limit+10)  # for cleanliness sake, result is empty
+                _ = future.result()  # for cleanliness sake, result is empty
             except TimeoutError:
                 pass
             except Exception as e:
@@ -335,6 +372,8 @@ if __name__ == "__main__":
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
+    parser.add_argument('--checker-path', type=str, default='xcsp3-solutionChecker-2.5.jar',
+                    help='Path to the XCSP3 solution checker JAR file')
     
     args = parser.parse_args()
     
