@@ -679,5 +679,28 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(expr.args[1], 5) # should always put the constant on the right
 
 
+            # also with Boolean constants
+
+            expr = eval_comparison(comp, x, True)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            expr = eval_comparison(comp, True, x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            # now, also check with numpy
+            expr = eval_comparison(comp, x, np.bool_(True))
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            expr = eval_comparison(comp, np.bool_(True), x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
 if __name__ == '__main__':
     unittest.main()
