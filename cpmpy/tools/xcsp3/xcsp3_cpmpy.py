@@ -63,6 +63,7 @@ from contextlib import contextmanager
 
 # CPMpy
 import cpmpy as cp
+from cpmpy.solvers.ortools import CPM_ortools
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3 import _parse_xcsp3, _load_xcsp3
 from cpmpy.tools.xcsp3 import xcsp3_natives
@@ -261,12 +262,22 @@ def supported_solver(solver:Optional[str]):
 # ---------------------------------------------------------------------------- #
 
 def ortools_arguments(model: cp.Model,
+                      optimize: bool,
                       cores: Optional[int] = None,
                       seed: Optional[int] = None,
                       intermediate: bool = False,
                       **kwargs):
     # https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
     res = dict()
+
+    # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+    res |= {
+        "interleave_search": True,
+        "use_rins_lns": False,
+    }
+    if optimize:
+        res |= { "num_violation_ls": 1 }
+
     if cores is not None:
         res |= { "num_search_workers": cores }
     if seed is not None: 
@@ -303,7 +314,15 @@ def ortools_arguments(model: cp.Model,
         # Register the callback
         res |= { "solution_callback": OrtSolutionCallback() }
 
-    return res
+    def internal_options(solver: CPM_ortools):
+        # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+        solver.ort_solver.parameters.subsolvers.extend(["default_lp", "max_lp", "quick_restart"])
+        if not optimize:
+            solver.ort_solver.parameters.subsolvers.append("core_or_no_lp")
+        if len(solver.ort_model.proto.search_strategy) != 0:
+            solver.ort_solver.parameters.subsolvers.append("fixed")
+
+    return res, internal_options
 
 def exact_arguments(seed: Optional[int] = None, **kwargs):
     # Documentation: https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp?ref_type=heads
@@ -311,11 +330,11 @@ def exact_arguments(seed: Optional[int] = None, **kwargs):
     if seed is not None: 
         res |= { "seed": seed }
 
-    return res
+    return res, None
 
 def choco_arguments(): 
     # Documentation: https://github.com/chocoteam/pychoco/blob/master/pychoco/solver.py
-    return {}
+    return {}, None
 
 def z3_arguments(model: cp.Model,
                  cores: int = 1,
@@ -339,7 +358,7 @@ def z3_arguments(model: cp.Model,
         if mem_limit is not None:
             res |= { "max_memory": bytes_as_mb(mem_limit) }
 
-    return res
+    return res, None
 
 def minizinc_arguments(solver: str,
                        cores: Optional[int] = None,
@@ -359,7 +378,7 @@ def minizinc_arguments(solver: str,
         # - https://www.minizinc.org/doc-2.5.5/en/lib-chuffed.html
         # - https://github.com/chuffed/chuffed/blob/develop/chuffed/core/options.h
     
-    return res
+    return res, None
 
 def gurobi_arguments(model: cp.Model,
                      cores: Optional[int] = None,
@@ -379,7 +398,7 @@ def gurobi_arguments(model: cp.Model,
     if intermediate and model.has_objective():
         res |= { "solution_callback": Callback(model).callback }
 
-    return res
+    return res, None
 
 def cpo_arguments(model: cp.Model,
                   cores: Optional[int] = None,
@@ -419,7 +438,7 @@ def cpo_arguments(model: cp.Model,
         # Register the callback
         res |= { "solution_callback": CpoSolutionCallback }
 
-    return res
+    return res, None
 
 
 def solver_arguments(solver: str, 
@@ -429,11 +448,11 @@ def solver_arguments(solver: str,
                      cores: int = 1,
                      mem_limit: Optional[int] = None,
                      **kwargs):
-    opt = model.objective_ is not None
+    opt = model.has_objective()
     sat = not opt
 
     if solver == "ortools":
-        return ortools_arguments(model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
+        return ortools_arguments(model, opt, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
     elif solver == "exact":
         return exact_arguments(seed=seed, **kwargs)
     elif solver == "choco":
@@ -573,7 +592,7 @@ def xcsp3_cpmpy(benchname: str,
 
         # ------------------------ Post CPMpy model to solver ------------------------ #
 
-        solver_args = solver_arguments(solver, model=model, seed=seed,
+        solver_args, internal_options = solver_arguments(solver, model=model, seed=seed,
                                        intermediate=intermediate,
                                        cores=cores, mem_limit=mib_as_bytes(mem_limit) if mem_limit is not None else None,
                                        **kwargs)
@@ -605,6 +624,7 @@ def xcsp3_cpmpy(benchname: str,
         
         time_solve = time.time()
         try:
+            internal_options(s) # Set more internal solver options (need access to native solver object)
             is_sat = s.solve(time_limit=time_limit, **solver_args)
         except RuntimeError as e:
             if "Program interrupted by user." in str(e): # Special handling for Exact
