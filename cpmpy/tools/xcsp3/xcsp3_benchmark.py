@@ -374,7 +374,7 @@ if __name__ == "__main__":
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
-    parser.add_argument('--checker-path', type=str, default='xcsp3-solutionChecker-2.5.jar',
+    parser.add_argument('--checker-path', type=str, default=None,
                     help='Path to the XCSP3 solution checker JAR file')
     
     args = parser.parse_args()
