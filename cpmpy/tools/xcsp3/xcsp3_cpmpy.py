@@ -262,7 +262,6 @@ def supported_solver(solver:Optional[str]):
 # ---------------------------------------------------------------------------- #
 
 def ortools_arguments(model: cp.Model,
-                      optimize: bool,
                       cores: Optional[int] = None,
                       seed: Optional[int] = None,
                       intermediate: bool = False,
@@ -275,7 +274,7 @@ def ortools_arguments(model: cp.Model,
         "interleave_search": True,
         "use_rins_lns": False,
     }
-    if optimize:
+    if not model.has_objective():
         res |= { "num_violation_ls": 1 }
 
     if cores is not None:
@@ -317,7 +316,7 @@ def ortools_arguments(model: cp.Model,
     def internal_options(solver: CPM_ortools):
         # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
         solver.ort_solver.parameters.subsolvers.extend(["default_lp", "max_lp", "quick_restart"])
-        if not optimize:
+        if not model.has_objective():
             solver.ort_solver.parameters.subsolvers.append("core_or_no_lp")
         if len(solver.ort_model.proto.search_strategy) != 0:
             solver.ort_solver.parameters.subsolvers.append("fixed")
@@ -452,7 +451,7 @@ def solver_arguments(solver: str,
     sat = not opt
 
     if solver == "ortools":
-        return ortools_arguments(model, opt, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
+        return ortools_arguments(model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
     elif solver == "exact":
         return exact_arguments(seed=seed, **kwargs)
     elif solver == "choco":
