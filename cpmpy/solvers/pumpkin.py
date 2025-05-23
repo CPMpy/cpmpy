@@ -4,6 +4,8 @@ import re
 
 from os.path import join
 
+import numpy as np
+
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -292,7 +294,7 @@ class CPM_pumpkin(SolverInterface):
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"alldifferent", "cumulative", 
+        supported = {"alldifferent", "cumulative", "table", "negative_table", "InDomain"
                      "min", "max", "element"}
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported)
         # safening after decompose here, need to safen toplevel elements too
@@ -463,8 +465,26 @@ class CPM_pumpkin(SolverInterface):
 
                 return [constraints.Cumulative(self.solver_vars(start),dur, demand, cap)] + \
                         [self._get_constraint(c)[0] for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)])]
+            
+            elif cpm_expr.name == "table":
+                arr, table = cpm_expr.args
+                return [constraints.Table(self.solver_vars(arr), 
+                                          np.array(table).tolist())] # ensure Python list
+            
+            elif cpm_expr.name == "negative_table":
+                arr, table = cpm_expr.args
+                return [constraints.NegativeTable(self.solver_vars(arr), 
+                                                  np.array(table).tolist())] # ensure Python list
+            
+            elif cpm_expr.name == "InDomain":
+                val, domain = cpm_expr.args
+                return [constraints.Table([self.solver_vars(val)], 
+                                          np.array(domain).tolist())] # ensure Python list
+            
+            
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}")
+                
 
         elif isinstance(cpm_expr, BoolVal): # unlikely base case
             a = boolvar() # dummy variable
