@@ -624,7 +624,8 @@ def xcsp3_cpmpy(benchname: str,
         
         time_solve = time.time()
         try:
-            internal_options(s) # Set more internal solver options (need access to native solver object)
+            if internal_options is not None:
+                internal_options(s) # Set more internal solver options (need access to native solver object)
             is_sat = s.solve(time_limit=time_limit, **solver_args)
         except RuntimeError as e:
             if "Program interrupted by user." in str(e): # Special handling for Exact
