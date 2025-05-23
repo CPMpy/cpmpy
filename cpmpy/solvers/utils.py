@@ -108,7 +108,7 @@ class SolverLookup():
             if CPM_slv.supported():
                 names.append(basename)
                 if hasattr(CPM_slv, "solvernames"):
-                    subnames = CPM_slv.solvernames()
+                    subnames = CPM_slv.solvernames(installed=True)
                     for subn in subnames:
                         names.append(basename+":"+subn)
         return names
