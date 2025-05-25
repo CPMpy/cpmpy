@@ -12,7 +12,7 @@ import cpmpy as cp
 from cpmpy import cpm_array, intvar, boolvar
 from cpmpy.exceptions import CPMpyException
 from cpmpy.expressions.core import Expression, Operator
-from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain
+from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, MapDomain
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
     get_bounds, eval_comparison
 from cpmpy.expressions.variables import _IntVarImpl
@@ -405,7 +405,8 @@ class ShortTable(GlobalConstraint):
             return [x == v for (x, v) in zip(arr, tab[0]) if v != STAR], []
         
         row_selected = boolvar(shape=(len(tab),))
-        cons = [Operator("or", row_selected)]
+        cons = [cp.any(row_selected)]
+        cons.extend(MapDomain(x) for x in arr)
         for i, row in enumerate(tab):
             # lets already flatten it a bit
             cons += [Operator("->", [row_selected[i], x == v]) for x,v in zip(arr, row) if v != STAR]
