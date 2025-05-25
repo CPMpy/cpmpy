@@ -85,6 +85,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 decomposed, _ = expr.decompose(is_supported=is_supported, csemap=csemap)
                 if len(decomposed) > 0:
                     newlist.extend(decomposed)
+                if is_supported:
+                    newlist.append(expr)
                 continue
 
             if is_supported:
