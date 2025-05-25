@@ -77,6 +77,15 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 is_supported = (expr.name in supported_reified)
             else:
                 is_supported = (expr.name in supported)
+            
+            # special case: MapDomain
+            if expr.name == "MapDomain":
+                assert nested is False, "MapDomain cannot be nested"
+                # populate csemap, return decomposition if not supported
+                decomposed, _ = expr.decompose(is_supported=is_supported, csemap=csemap)
+                if len(decomposed) > 0:
+                    newlist.extend(decomposed)
+                continue
 
             if is_supported:
                 # If no nested expressions, don't recurse the arguments

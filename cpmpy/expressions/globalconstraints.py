@@ -638,32 +638,41 @@ class MapDomain(GlobalConstraint):
         after declaring this constraint, just
         use 'ivar == v' and it will be replaced by the correct Boolean ?in flatten()?.
 
+        Note: the `decompose()` takes an optional `csemap` and `is_supported` argument!
+
         TODO: what with solvers (e.g. SMT) that do not need flatten?
         (they also don't need us to do CSE, so might be fine?)
 
-        Note: the `decompose()` takes a `csemap` argument!
+        TODO: multiple (e.g. by global constraints) MapDomain's can be declared
+        for the same integer variable...
     """
     def __init__(self, ivar):
-        super().__init__("MapDomain", [ivar])
+        super().__init__("mapdomain", [ivar])
 
-    def decompose(self, csemap=None):
+    def decompose(self, is_supported=False, csemap=None):
         """
+            is_supported: if True, only the CSE map is filled
+                (yes, ortools declares a global for this, called... MapDomain )
             csemap: if given, will populate the csemap with the Boolean variables
         """
         ivar = self.args[0]
         lb, ub = get_bounds(ivar)
 
         bvs = cp.boolvar(shape=ub+1-lb)
+        all_in_csemap = True
         if csemap is not None:
             for i,v in enumerate(range(lb, ub+1)):
                 expr = (ivar == v)
                 if expr in csemap:
                     bvs[i] = csemap[expr]  # overwrite with pre-created one
                 else:
+                    all_in_csemap = False
                     csemap[expr] = bvs[i]
 
+        if is_supported or all_in_csemap:
+            return [], []
+
         # ILP friendly decomposition
-        # TODO: very awkward if somebody will reify this... should we forbid that?
         # TODO: if the 'ivar' is eliminated from the model, no need for 2nd constraint...
         return [cp.sum(bvs) == 1,
                 ivar == cp.sum(bvs[i]*v for i,v in enumerate(range(lb, ub+1)))], []
