@@ -629,6 +629,51 @@ class InDomain(GlobalConstraint):
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
 
+class MapDomain(GlobalConstraint):
+    """
+        Maps an integer decision variable to an array of Boolean variables,
+        one for each value in the domain, e.g. |ub+1 - lb| Boolean variables.
+
+        No Boolean variables are returned or accessible;
+        after declaring this constraint, just
+        use 'ivar == v' and it will be replaced by the correct Boolean ?in flatten()?.
+
+        TODO: what with solvers (e.g. SMT) that do not need flatten?
+        (they also don't need us to do CSE, so might be fine?)
+
+        Note: the `decompose()` takes a `csemap` argument!
+    """
+    def __init__(self, ivar):
+        super().__init__("MapDomain", [ivar])
+
+    def decompose(self, csemap=None):
+        """
+            csemap: if given, will populate the csemap with the Boolean variables
+        """
+        ivar = self.args[0]
+        lb, ub = get_bounds(ivar)
+
+        bvs = cp.boolvar(shape=ub+1-lb)
+        if csemap is not None:
+            for i,v in enumerate(range(lb, ub+1)):
+                expr = (ivar == v)
+                if expr in csemap:
+                    bvs[i] = csemap[expr]  # overwrite with pre-created one
+                else:
+                    csemap[expr] = bvs[i]
+
+        # ILP friendly decomposition
+        # TODO: very awkward if somebody will reify this... should we forbid that?
+        # TODO: if the 'ivar' is eliminated from the model, no need for 2nd constraint...
+        return [cp.sum(bvs) == 1,
+                ivar == cp.sum(bvs[i]*v for i,v in enumerate(range(lb, ub+1)))], []
+
+    def value(self):
+        # not much to say...
+        return True
+
+    def __repr__(self):
+        return f"MapDomain({self.args[0]})"
 
 class Xor(GlobalConstraint):
     """
