@@ -280,10 +280,9 @@ class Inverse(GlobalConstraint):
         super().__init__(name, [fwd, rev])
 
     def decompose(self):
-        from cpmpy.expressions.python_builtins import all
         fwd, rev = self.args
         rev = cpm_array(rev)
-        return [all(rev[x] == i for i, x in enumerate(fwd))], []
+        return [cp.all(rev[x] == i for i, x in enumerate(fwd))], []
 
     def value(self):
         fwd = argvals(self.args[0])
@@ -307,10 +306,10 @@ class InverseOne(GlobalConstraint):
         super().__init__("inverseOne", [arr])
 
     def decompose(self):
-        from cpmpy.expressions.python_builtins import all
         arr = self.args[0]
         arr = cpm_array(arr)
-        return [all(arr[x] == i for i, x in enumerate(arr))], []
+        return [MapDomain(x) for x in arr] +\
+               [cp.all(arr[x] == i for i, x in enumerate(arr))], []
 
     def value(self):
         valsx = argvals(self.args[0])
@@ -337,7 +336,9 @@ class Channel(GlobalConstraint):
 
     def decompose(self):
         arr, v = self.args
-        return [(arr[i] == 1) == (v == i) for i in range(len(arr))] + [v >= 0, v < len(arr)], []
+        # TODO... this is not ILP friendly!, but we have MapDomain now...
+        return [MapDomain(v)] +\
+               [(arr[i] == 1) == (v == i) for i in range(len(arr))] + [v >= 0, v < len(arr)], []
 
     def value(self):
         arr, v = self.args
@@ -364,6 +365,7 @@ class Table(GlobalConstraint):
         
         row_selected = boolvar(shape=len(tab))
         cons = [Operator("or", row_selected)]
+        cons.extend(MapDomain(x) for x in arr)
         for i, row in enumerate(tab):
             # lets already flatten it a bit
             cons += [Operator("->", [row_selected[i], x == v]) for x,v in zip(arr, row)]
@@ -435,7 +437,8 @@ class NegativeShortTable(GlobalConstraint):
 
     def decompose(self):
         arr, tab = self.args
-        return [Operator("or", [x != v for x,v in zip(arr, row) if v != "*"]) for row in tab], []
+        return [MapDomain(x) for x in arr] +\
+               [Operator("or", [x != v for x,v in zip(arr, row) if v != "*"]) for row in tab], []
 
     def value(self):
         arr, tab = self.args
