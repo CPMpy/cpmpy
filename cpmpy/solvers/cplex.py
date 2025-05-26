@@ -158,7 +158,10 @@ class CPM_cplex(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # set time limit
         if time_limit is not None and not np.isinf(time_limit):
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.cplex_model.set_time_limit(time_limit)
 
         # set nb of threads
