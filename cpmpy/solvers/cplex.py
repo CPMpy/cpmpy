@@ -511,7 +511,7 @@ class CPM_cplex(SolverInterface):
 
         cplex_status = self.cplex_model.solve_details.status
         if opt_sol_count:
-            if opt_sol_count == solution_limit:
+            if opt_sol_count >= solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
             else:
                 if cplex_status == "Unknown": # reached time limit
