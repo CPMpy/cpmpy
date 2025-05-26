@@ -889,23 +889,27 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
-            bvs = cp.boolvar(shape=3)
-            m = cp.Model([cp.any(bvs) <= 2])
+            
+        if solver == 'cplex':
+            pytest.skip("skip for cplex, cplex throws an error if you add just BoolVal(True) to a model..")
+        
+        bvs = cp.boolvar(shape=3)
+        m = cp.Model([cp.any(bvs) <= 2])
 
-            # reset value for vars
-            bvs.clear()
-            assert m.solve(solver=solver)
-            for v in bvs:
-                assert v.value() is not None
-            #test solve_all
-            sols = set()
-            solution_limit = 20 if solver == 'gurobi' else None
-            #test number of solutions is valid
-            assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
-            #test number of solutions is valid, no display
-            assert m.solveAll(solver=solver, solution_limit=solution_limit) == 8
-            #test unique sols, should be same number
-            assert len(sols) == 8
+        # reset value for vars
+        bvs.clear()
+        assert m.solve(solver=solver)
+        for v in bvs:
+            assert v.value() is not None
+        #test solve_all
+        sols = set()
+        solution_limit = 20 if solver == 'gurobi' else None
+        #test number of solutions is valid
+        assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
+        #test number of solutions is valid, no display
+        assert m.solveAll(solver=solver, solution_limit=solution_limit) == 8
+        #test unique sols, should be same number
+        assert len(sols) == 8
 
 
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
