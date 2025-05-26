@@ -449,7 +449,10 @@ class CPM_cplex(SolverInterface):
             Returns: number of solutions found
         """
 
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.cplex_model.set_time_limit(time_limit)
 
         if solution_limit is None:
