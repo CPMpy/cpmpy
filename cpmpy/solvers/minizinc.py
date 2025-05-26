@@ -305,7 +305,7 @@ class CPM_minizinc(SolverInterface):
 
         return has_sol
 
-    def _post_solve(self, mzn_result):
+    def _post_solve(self, mzn_result, solve_all:bool=False):
         """ shared by solve() and solveAll() """
         import minizinc
 
@@ -328,7 +328,10 @@ class CPM_minizinc(SolverInterface):
         if mzn_status == minizinc.result.Status.SATISFIED:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.ALL_SOLUTIONS:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if solve_all:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.OPTIMAL_SOLUTION:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif mzn_status == minizinc.result.Status.UNSATISFIABLE:
@@ -402,7 +405,14 @@ class CPM_minizinc(SolverInterface):
                 var._value = None
 
         # status handling
-        self._post_solve(mzn_result)
+        self._post_solve(mzn_result, solve_all=True)
+
+        if solution_count: # found at least one solution
+            if solution_count == solution_limit: # matched solution limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # elif mzn_result.solution is None: <- is implicit since nothing needs to update
+                # last iteration didn't find a solution
+                # nothing needs to update since _post_solve already set state correctly (state from the second-last iteration)
 
         return solution_count
 
@@ -486,7 +496,7 @@ class CPM_minizinc(SolverInterface):
                      "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
                      "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"}, csemap=self._csemap)
 
     def add(self, cpm_expr):
         """

@@ -303,6 +303,16 @@ class CPM_gcs(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.gcs_result["solve_time"]
 
+        num_sols = self.gcs_result["solutions"]
+        if self.gcs_result["completed"] and num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        elif self.gcs_result["completed"] and num_sols == 0:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else: # maybe unsat, maybe not (maybe a timeout)
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         # clear user vars if no solution found
         if self._solve_return(self.cpm_status, self.objective_value_) is False:
             for var in self.user_vars:
@@ -313,7 +323,7 @@ class CPM_gcs(SolverInterface):
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit, 
                         veripb_args=veripb_args, display_output=display_verifier_output)
 
-        return self.gcs_result["solutions"]
+        return num_sols
 
     def solver_var(self, cpm_var):
         """
@@ -357,7 +367,7 @@ class CPM_gcs(SolverInterface):
         self += flat_cons # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
-        (obj, obj_cons) = get_or_make_var(flat_obj)
+        (obj, obj_cons) = get_or_make_var(flat_obj, csemap=self._csemap)
         self += obj_cons
 
         self.objective_var = obj
@@ -396,18 +406,18 @@ class CPM_gcs(SolverInterface):
             'circuit', 
             'xor'}
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints
         # but no reification for linear not equals and not half reification for linear equality. 
         # Maybe a future transformation (or future work on the GCS solver).
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']))
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']), csemap=self._csemap)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
 
         # NB: GCS supports a small number of simple expressions as the reifying term
-        # e.g. (x > 3) -> constraint could in principle be supported in future. 
-        cpm_cons = only_bv_reifies(cpm_cons)
+        # e.g. (x > 3) -> constraint could in principle be supported in the future.
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         str_rep = ""
         for c in cpm_cons:
             str_rep += str(c) + '\n'

@@ -113,6 +113,9 @@ class CPM_z3(SolverInterface):
         if "opt" in subsolver:
             self.z3_solver = z3.Optimize()
 
+        # handle of objective (as returned by solver)
+        self.obj_handle = None
+
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
 
@@ -189,14 +192,30 @@ class CPM_z3(SolverInterface):
 
         # translate exit status
         if my_status == "sat":
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            if isinstance(self.z3_solver, z3.Optimize):
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            if self.has_objective(): # COP
+                # check if optimal solution found and proven, i.e. bounds are equal
+                lower_bound = self.z3_solver.lower(self.obj_handle)
+                upper_bound = self.z3_solver.upper(self.obj_handle)
+                if lower_bound == upper_bound: # found optimal
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                else: # suboptimal / not proven
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else: # CSP
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status == "unsat":
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "unknown":
+            try:
+                model = self.z3_solver.model()
+                if model: # a solution was found, just not the optimal one (or not proven)
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                # can happen when timeout is reached...
+                else:
+                    self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             # can happen when timeout is reached...
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            except z3.Z3Exception as e: # no model has been initialized, not even an empty one
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         else:  # another?
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
 
@@ -286,9 +305,9 @@ class CPM_z3(SolverInterface):
 
         obj = self._z3_expr(expr)
         if minimize:
-            self.z3_solver.minimize(obj)
+            self.obj_handle = self.z3_solver.minimize(obj)
         else:
-            self.z3_solver.maximize(obj)
+            self.obj_handle = self.z3_solver.maximize(obj)
 
 
     def transform(self, cpm_expr):
@@ -309,7 +328,7 @@ class CPM_z3(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod"})
         supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported)
+        cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap)
         return cpm_cons
 
     def add(self, cpm_expr):
