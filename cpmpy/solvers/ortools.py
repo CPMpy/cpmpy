@@ -389,7 +389,7 @@ class CPM_ortools(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap", "regular"} #, "mapdomain"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap", "regular", "mapdomain"}
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap, context=POSITIVE)  # flat normal form
@@ -589,7 +589,7 @@ class CPM_ortools(SolverInterface):
                 lb, ub = get_bounds(ivar)
                 bvs = [self._csemap[ivar == v] for v in range(lb, ub+1)]
                 self.add(sum(bvs) == 1)  # not covered by AddMapDomain...
-                return self.ort_model.AddMapDomain(self.solver_var(ivar), self.solver_vars(bvs), offset=lb)
+                return self.ort_model.add_map_domain(self.solver_var(ivar), self.solver_vars(bvs), offset=lb)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
                                           f"If you reach this, please report on github.")
