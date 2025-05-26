@@ -15,6 +15,7 @@ from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
+from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
@@ -664,6 +665,57 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(s.solve())
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
+    def test_cplex(self):
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0, 10, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        m += sum(bv) == len(bv)
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertFalse(s.solve())
+
+        m = cp.Model(~(iv[0] != iv[1]))
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue(s.solve())
+
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
+    def test_cplex_solveAll(self):
+        iv = cp.intvar(0,5, shape=3)
+        m = cp.Model(cp.AllDifferent(iv))
+        s = cp.SolverLookup.get("cplex", m)
+        sol_count = s.solveAll(solution_limit=10)
+        self.assertTrue(sol_count >= 10)
+        self.assertEqual(s.status().exitstatus, ExitStatus.FEASIBLE)
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
+    def test_cplex_objective(self):
+        iv = cp.intvar(0,10, shape=2)
+        m = cp.Model(iv >= 1, iv <= 5, maximize=sum(iv))
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue( s.solve() )
+        self.assertEqual( s.objective_value(), 10)
+
+        m = cp.Model(iv >= 1, iv <= 5, minimize=sum(iv))
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue( s.solve() )
+        self.assertEqual(s.objective_value(), 2)
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
