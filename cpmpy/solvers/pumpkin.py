@@ -36,11 +36,11 @@ import time
     Installation
     ===============
 
-    The `pumpkin_py` python package is currently not available on PyPI.
+    The `pumpkin_solver_py` python package is currently not available on PyPI.
     It can be installed from source using the following steps:
      1. clone the repository from github: https://github.com/consol-lab/pumpkin
      2. install the "maturin" package to build the python bindings: $ pip install maturin
-     3. build and install the package: $ maturin develop
+     3. build and install the package: $ cd Pumpkin/pumpkin_solver_py && maturin develop
 
     ===============
     List of classes
@@ -68,7 +68,7 @@ class CPM_pumpkin(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import pumpkin_py as gp
+            import pumpkin_solver_py as gp
             return True
         except ImportError:
             return False
@@ -83,9 +83,9 @@ class CPM_pumpkin(SolverInterface):
         - subsolver: None, not used
         """
         if not self.supported():
-            raise Exception("CPM_Pumpkin: Install the python package 'pumpkin_py'")
+            raise Exception("CPM_Pumpkin: Install the python package 'pumpkin_solver_py'")
 
-        from pumpkin_py import Model
+        from pumpkin_solver_py import Model
 
         assert subsolver is None 
 
@@ -122,18 +122,17 @@ class CPM_pumpkin(SolverInterface):
         """
 
         # Again, I don't know why this is necessary, but the PyO3 modules seem to be a bit wonky.
-        from pumpkin_py import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
-        from pumpkin_py import SatisfactionResult, SatisfactionUnderAssumptionsResult
-        from pumpkin_py.optimisation import OptimisationResult, Direction
+        from pumpkin_solver_py import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
+        from pumpkin_solver_py import SatisfactionResult, SatisfactionUnderAssumptionsResult
+        from pumpkin_solver_py.optimisation import OptimisationResult, Direction
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        if time_limit is not None:
-            raise ValueError("Time limits are currently not supported by Pumpkin")
-
         # parse and dispatch the arguments
-        kwargs = dict()
+        if time_limit is not None and time_limit < 0:
+            raise ValueError("Time limit cannot be negative, but got {time_limit}")
+        kwargs = dict(timeout=time_limit)
 
         if self.has_objective():
             assert assumptions is None, "Optimization under assumptions is not supported"
@@ -313,7 +312,7 @@ class CPM_pumpkin(SolverInterface):
         """
             Convert a CPMpy expression to a Pumpkin predicate (comparison with constant)
         """
-        from pumpkin_py import Comparator, Predicate
+        from pumpkin_solver_py import Comparator, Predicate
 
         if isinstance(cpm_expr, _BoolVarImpl):
             if isinstance(cpm_expr, NegBoolView):
@@ -400,7 +399,7 @@ class CPM_pumpkin(SolverInterface):
             :param cpm_expr: CPMpy expression
             :type cpm_expr: Expression
         """
-        from pumpkin_py import constraints
+        from pumpkin_solver_py import constraints
 
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
@@ -515,7 +514,7 @@ class CPM_pumpkin(SolverInterface):
 
         :return: self
         """
-        from pumpkin_py import constraints
+        from pumpkin_solver_py import constraints
 
         # add new user vars to the set
         get_variables(cpm_expr_orig, collect=self.user_vars)
