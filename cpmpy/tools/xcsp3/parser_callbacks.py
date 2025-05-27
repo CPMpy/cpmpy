@@ -510,11 +510,19 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable,
                            condition: Condition):
+        
+        # this can be optimized by indexing into the matrix directly
         mtrx = cp.cpm_array([self.get_cpm_vars(lst) for lst in matrix])
+        dim1, dim2 = mtrx.shape
+
         cpm_i, cpm_j = self.get_cpm_vars([i, j])
         cpm_rhs = self.get_cpm_var(condition.right_operand())
+        # ensure i,j are within bounds, we can do this as it is a toplevel constraint
+        self.cpm_model += [cpm_i >= 0, cpm_i < dim1, cpm_j >= 0, cpm_j < dim2]
 
-        self.cpm_model += self.eval_cpm_comp(mtrx[cpm_i, cpm_j], condition.operator, cpm_rhs)
+        # flatten matrix and lookup with weighed sum
+        self.cpm_model += self.eval_cpm_comp(xglobals.Element(mtrx, dim1 * cpm_i + cpm_j), condition.operator, cpm_rhs)
+
 
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
 
