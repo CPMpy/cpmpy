@@ -467,12 +467,12 @@ class CPM_pumpkin(SolverInterface):
             
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args
-                return [constraints.Table([self.to_pum_ivar(arr)], 
+                return [constraints.Table(self.to_pum_ivar(arr), 
                                           np.array(table).tolist())] # ensure Python list
             
             elif cpm_expr.name == "negative_table":
                 arr, table = cpm_expr.args
-                return [constraints.NegativeTable([self.to_pum_ivar(arr)], 
+                return [constraints.NegativeTable(self.to_pum_ivar(arr), 
                                                   np.array(table).tolist())] # ensure Python list
             
             elif cpm_expr.name == "InDomain":
