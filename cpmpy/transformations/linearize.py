@@ -366,17 +366,20 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
             lb, ub = min(lbs), max(ubs)
             n_vals = (ub-lb) + 1
 
-            x = boolvar(shape=(len(cpm_expr.args), n_vals))
+            for val in range(lb, ub+1):
+                newlist.append(cp.sum([a == val for a in cpm_expr.args]) <= 1)
 
-            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
-            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
+            # x = boolvar(shape=(len(cpm_expr.args), n_vals))
 
-            # link Boolean matrix and integer variable
-            for arg, row in zip(cpm_expr.args, x):
-                if is_num(arg): # constant, fix directly
-                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
-                else: # ensure result is canonical
-                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
+            # newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
+            # newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
+
+            # # link Boolean matrix and integer variable
+            # for arg, row in zip(cpm_expr.args, x):
+            #     if is_num(arg): # constant, fix directly
+            #         newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
+            #     else: # ensure result is canonical
+            #         newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
 
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
