@@ -843,6 +843,17 @@ class Element(GlobalFunction):
             cons += [eval_comparison(cpm_op, expr, cpm_rhs)]
 
         return cons, defn  # no auxiliary variables
+    
+
+    def decompose_numerical(self):
+        """
+            Return a numerical expression to replace the array loopup with in the expression tree
+        """
+        arr, idx = self.args
+        lb, ub = get_bounds(idx)
+        expr = cp.sum(arr[i]*(idx == i) for i in range(lb, ub+1))
+        return expr, [MapDomain(idx)]
+
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])

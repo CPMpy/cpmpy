@@ -10,7 +10,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import intvar, cpm_array, NDVarArray
-from ..expressions.utils import is_any_list, eval_comparison
+from ..expressions.utils import is_any_list, eval_comparison, is_num
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
@@ -120,6 +120,17 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 else:
                     # global function, replace by a fresh variable and decompose the equality to this
                     assert isinstance(expr, GlobalFunction)
+
+                    # we can do something special for Element
+                    if expr.name == "element" and all(is_num(a) for a in expr.args[0]):
+                        # it's an array with constants
+                        encoding, otherdef = expr.decompose_numerical()
+                        assert encoding.is_bool() is False, "we should get a numerical expression here (wsum over bools)"
+                        newlist.append(encoding)
+                        _toplevel.extend(otherdef)
+                        continue
+
+                    # else, do the usual thing
                     lb,ub = expr.get_bounds()
                     
                     if csemap is not None and expr in csemap:
