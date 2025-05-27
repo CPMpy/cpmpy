@@ -658,7 +658,7 @@ class MapDomain(GlobalConstraint):
         ivar = self.args[0]
         lb, ub = get_bounds(ivar)
 
-        bvs = cp.boolvar(shape=(ub+1-lb,))
+        bvs = cp.boolvar(shape=(ub+1-lb,), name=f"B#{ivar.name}")
         all_in_csemap = True
         if csemap is not None:
             for i,v in enumerate(range(lb, ub+1)):

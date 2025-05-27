@@ -828,7 +828,7 @@ class Element(GlobalFunction):
         # Find where the array indices and the bounds of `idx` intersect
         lb, ub = get_bounds(idx)
         new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
-        cons=[]
+        cons, defn = [],[]
 
         classic = False
         if classic:
@@ -838,11 +838,11 @@ class Element(GlobalFunction):
             cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
         else:
             # ILP friendly decomposition, from Gleb's paper
-            cons += [MapDomain(idx)]
+            defn += [MapDomain(idx)]
             expr = cp.sum(arr[i]*(idx == i) for i in range(lb, ub+1))
             cons += [eval_comparison(cpm_op, expr, cpm_rhs)]
 
-        return cons, []  # no auxiliary variables
+        return cons, defn  # no auxiliary variables
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
