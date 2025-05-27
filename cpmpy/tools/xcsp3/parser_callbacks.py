@@ -18,7 +18,7 @@ from pycsp3.tools.utilities import _Star
 import cpmpy as cp
 from cpmpy.tools.xcsp3 import xcsp3_globals as xglobals
 from cpmpy import cpm_array
-from cpmpy.expressions.utils import get_bounds, is_boolexpr
+from cpmpy.expressions.utils import flatlist, get_bounds, is_boolexpr
 
 
 class CallbacksCPMPy(Callbacks):  
@@ -521,7 +521,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += [cpm_i >= 0, cpm_i < dim1, cpm_j >= 0, cpm_j < dim2]
 
         # flatten matrix and lookup with weighed sum
-        self.cpm_model += self.eval_cpm_comp(xglobals.Element(mtrx, dim1 * cpm_i + cpm_j), condition.operator, cpm_rhs)
+        self.cpm_model += self.eval_cpm_comp(xglobals.Element(flatlist(mtrx), dim1 * cpm_i + cpm_j), condition.operator, cpm_rhs)
 
 
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
