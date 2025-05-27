@@ -365,10 +365,16 @@ class Table(GlobalConstraint):
         
         row_selected = boolvar(shape=len(tab))
         cons = [Operator("or", row_selected)]
-        cons.extend(MapDomain(x) for x in arr)
-        for i, row in enumerate(tab):
-            # lets already flatten it a bit
-            cons += [Operator("->", [row_selected[i], x == v]) for x,v in zip(arr, row)]
+        classic = False
+        if classic:
+            cons.extend(MapDomain(x) for x in arr)
+            for i, row in enumerate(tab):
+                # lets already flatten it a bit
+                cons += [Operator("->", [row_selected[i], x == v]) for x,v in zip(arr, row)]
+        else:
+            # ILP friendly decomposition, from Gleb's paper
+            nptab = np.array(tab)
+            cons += [x == row_selected*nptab[:,i] for i,x in enumerate(arr)]
 
         return cons,[]
 
