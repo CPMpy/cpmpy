@@ -785,6 +785,75 @@ class IfThenElseNum(GlobalFunction):
         else:
             return argval(y)
 
+class Element(GlobalFunction):
+    """
+        XCSP3 copy for doing Gleb-style ILP friendly decomposition
+    """
+
+    def __init__(self, arr, idx):
+        if is_boolexpr(idx):
+            raise TypeError("index cannot be a boolean expression: {}".format(idx))
+        if is_any_list(idx):
+            raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
+        super().__init__("element", [arr, idx])
+
+    def __getitem__(self, index):
+        raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
+
+    def value(self):
+        arr, idx = self.args
+        idxval = argval(idx)
+        if idxval is not None:
+            if idxval >= 0 and idxval < len(arr):
+                return argval(arr[idxval])
+            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
+                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
+        return None # default
+
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
+            When used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
+            it is a constraint, and that one can be decomposed.
+
+            Returns two lists of constraints:
+
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
+
+        """
+        arr, idx = self.args
+
+        # Find where the array indices and the bounds of `idx` intersect
+        lb, ub = get_bounds(idx)
+        new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
+        cons=[]
+
+        classic = False
+        if classic:
+            # For every `i` in that intersection, post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
+            for i in range(new_lb, new_ub+1):
+                cons.append(implies(idx == i, eval_comparison(cpm_op, arr[i], cpm_rhs)))
+            cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
+        else:
+            # ILP friendly decomposition, from Gleb's paper
+            cons += [MapDomain(idx)]
+            expr = cp.sum(arr[i]*(idx == i) for i in range(lb, ub+1))
+            cons += [eval_comparison(cpm_op, expr, cpm_rhs)]
+
+        return cons, []  # no auxiliary variables
+
+    def __repr__(self):
+        return "{}[{}]".format(self.args[0], self.args[1])
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        arr, idx = self.args
+        bnds = [get_bounds(x) for x in arr]
+        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
 # helper function
 def is_transition(arg):
