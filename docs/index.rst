@@ -75,6 +75,11 @@ Supported solvers
      - pip
      - Yes
      - Knowledge compiler, only Boolean variables (CPMpy transformation incomplete)
+   * - :doc:`Pumpkin <api/solvers/pumpkin>`
+     - CP (LGC)
+     - local install (maturin)
+     - Yes
+     - Supports proof-logging, no assumptions when optimizing or proof-logging
 
 Different solvers excel at different problems. `Try multiple! <modeling.html#selecting-a-solver>`_
 
