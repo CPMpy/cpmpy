@@ -1,4 +1,40 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## pumpkin.py
+##
+"""
+    Interface to Pumpkin's API
+
+    Pumpkin is a combinatorial optimisation solver developed by the ConSol Lab at TU Delft. 
+    It is based on the (lazy clause generation) constraint programming paradigm.
+    (see https://github.com/consol-lab/pumpkin)
+
+    Always use :func:`cp.SolverLookup.get("pumpkin") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ===============
+    Installation
+    ===============
+
+    The `pumpkin_solver_py` python package is currently not available on PyPI.
+    It can be installed from source using the following steps:
+     1. clone the repository from github: https://github.com/consol-lab/pumpkin
+     2. install the "maturin" package to build the python bindings: $ pip install maturin
+     3. build and install the package: :code:`cd pumpkin/pumpkin-solver-py && maturin develop`
+
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        CPM_pumpkin
+
+    ==============
+    Module details
+    ==============
+"""
 import warnings
 import re
 
@@ -23,38 +59,6 @@ from ..transformations.safening import no_partial_functions
 
 import time
 
-"""
-    Interface to Pumpkin's API
-
-    Pumpkin is a combinatorial optimisation solver developed by the ConSol Lab at TU Delft. 
-    It is based on the (lazy clause generation) constraint programming paradigm.
-    (see https://github.com/consol-lab/pumpkin)
-
-    Always use :func:`cp.SolverLookup.get("pumpkin") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
-
-    ===============
-    Installation
-    ===============
-
-    The `pumpkin_solver_py` python package is currently not available on PyPI.
-    It can be installed from source using the following steps:
-     1. clone the repository from github: https://github.com/consol-lab/pumpkin
-     2. install the "maturin" package to build the python bindings: $ pip install maturin
-     3. build and install the package: $ cd Pumpkin/pumpkin_solver_py && maturin develop
-
-    ===============
-    List of classes
-    ===============
-
-    .. autosummary::
-        :nosignatures:
-
-        CPM_pumpkin
-
-    ==============
-    Module details
-    ==============
-"""
 
 class CPM_pumpkin(SolverInterface):
     """
