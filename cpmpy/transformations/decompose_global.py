@@ -64,8 +64,27 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 continue
 
             if any(isinstance(a,GlobalFunction) for a in expr.args):
+                # XXX This is where GlobalFunctions get turned into Comparisons...
+                newargs = [a for a in expr.args]  # copy
+                modified = False
+                for i, a in enumerate(newargs):
+                    # we can do something special for Element
+                    if a.name == "element" and "element" not in supported and all(is_num(t) for t in a.args[0]):
+                        # it's an array with constants
+                        encoding, otherdef = a.decompose_numerical()
+                        assert encoding.is_bool() is False, "we should get a numerical expression here (wsum over bools)"
+                        newargs[i] = encoding
+                        # call decompose here so that the MapDomain is populated in the csemap
+                        _toplevel.extend(decompose_in_tree(otherdef, supported, supported_reified, _toplevel, nested=False, csemap=csemap))
+                        modified = True
+                        continue
+                if modified:
+                    # copy of entire expr with the new args
+                    expr = Operator(expr.name, newargs)
+
                 expr, base_con = normalized_numexpr(expr, csemap=csemap)
                 _toplevel.extend(base_con)  # should be added toplevel
+
             # recurse into arguments, recreate through constructor (we know it stores no other state)
             args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
             newlist.append(Operator(expr.name, args))
