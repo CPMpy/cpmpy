@@ -52,7 +52,6 @@ import copy
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
-
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
 
 
@@ -64,7 +63,7 @@ from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, MapDomain
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 
@@ -361,13 +360,28 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
             if reified is True:
                 raise ValueError("Linear decomposition of AllDifferent does not work reified. "
                                  "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
+            
+            # Create Boolvars and seed CSE map
+            newlist.extend(decompose_in_tree([MapDomain(a) for a in cpm_expr.args], csemap=csemap))
 
             lbs, ubs = get_bounds(cpm_expr.args)
             lb, ub = min(lbs), max(ubs)
-            n_vals = (ub-lb) + 1
 
             for val in range(lb, ub+1):
-                newlist.append(cp.sum([a == val for a in cpm_expr.args]) <= 1)
+                bvs = []
+                cons = []
+                for a in cpm_expr.args:
+                    bv, con = get_or_make_var(a == val, csemap=csemap)
+                    bvs.append(bv)
+                    if len(con) > 0:
+                        cons.append(con)
+                # each value can be taken at most once (not necessarily exactly once)
+                newlist.append(cp.sum(bvs) <= 1)
+                if len(cons) > 0:
+                    newlist += linearize_constraint(cons, supported=supported, reified=reified, csemap=csemap)
+            # XXX TODO It can be very tricky to get the get/make var and linearize correct...
+            # I think we should have AllDiff just use this decomp by default... or have
+            # another way to overwrite the decomp before the 'decompose_in_tree' call...
 
             # x = boolvar(shape=(len(cpm_expr.args), n_vals))
 
