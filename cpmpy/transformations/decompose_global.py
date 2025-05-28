@@ -67,17 +67,20 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 # XXX This is where GlobalFunctions get turned into Comparisons...
                 newargs = [a for a in expr.args]  # copy
                 modified = False
-                for i, a in enumerate(newargs):
+                for i, a in enumerate(expr.args):
                     # we can do something special for Element
-                    if a.name == "element" and "element" not in supported and all(is_num(t) for t in a.args[0]):
-                        # it's an array with constants
+                    if (a.name == "element" and "element" not in supported and all(is_num(t) for t in a.args[0])) or \
+                       (a.name == "count" and "count" not in supported):
+                        # it's an element with constants or a count
                         encoding, otherdef = a.decompose_numerical()
                         assert encoding.is_bool() is False, "we should get a numerical expression here (wsum over bools)"
                         newargs[i] = encoding
                         # call decompose here so that the MapDomain is populated in the csemap
-                        _toplevel.extend(decompose_in_tree(otherdef, supported, supported_reified, _toplevel, nested=False, csemap=csemap))
+                        xtratoplevel = []
+                        newotherdef = decompose_in_tree(otherdef, supported, supported_reified, xtratoplevel, nested=False, csemap=csemap)
+                        _toplevel.extend(xtratoplevel)
+                        _toplevel.extend(newotherdef)
                         modified = True
-                        continue
                 if modified:
                     # copy of entire expr with the new args
                     expr = Operator(expr.name, newargs)
@@ -101,11 +104,12 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
             if expr.name == "mapdomain":
                 assert nested is False, "'mapdomain' cannot be nested"
                 # populate csemap, return decomposition if not supported
-                decomposed, _ = expr.decompose(is_supported=is_supported, csemap=csemap)
-                if len(decomposed) > 0:
-                    newlist.extend(decomposed)
-                if is_supported:
-                    newlist.append(expr)
+                decomposed, all_in_csemap = expr.decompose(is_supported=is_supported, csemap=csemap)
+                if not all_in_csemap:
+                    if is_supported:
+                        newlist.append(expr)
+                    else:
+                        newlist.extend(decomposed)
                 continue
 
             if is_supported:

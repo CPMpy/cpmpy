@@ -718,14 +718,16 @@ class MapDomain(GlobalConstraint):
                 else:
                     all_in_csemap = False
                     csemap[expr] = bvs[i]
-
-        if is_supported or all_in_csemap:
-            return [], []
+        
+        if is_supported:
+            # TRICKY HACK to use 2nd argument as all_in_csemap...
+            return [], all_in_csemap
 
         # ILP friendly decomposition
         # TODO: if the 'ivar' is eliminated from the model, no need for 2nd constraint...
+        # TRICKY HACK to use 2nd argument as all_in_csemap...
         return [cp.sum(bvs) == 1,
-                ivar == cp.sum(bvs[i]*v for i,v in enumerate(range(lb, ub+1)))], []
+                ivar == cp.sum(bvs[i]*v for i,v in enumerate(range(lb, ub+1)))], all_in_csemap
 
     def value(self):
         # not much to say...

@@ -21,6 +21,7 @@ task = cp.intvar(0, n_tasks-1, shape=n_workers, name="task")
 
 # Each worker works on a different task
 model += cp.AllDifferent(task)
+model += cp.sum(cp.Count(task, 0), cp.Count(task, 2)) <= 3  # to test count
 
 # Objective: maximize sum of values
 obj = cp.intvar(np.min(value), np.sum(value), name="obj")
