@@ -10,7 +10,7 @@ Currently, version 3.2 is supported.
 import numpy as np
 import cpmpy as cp
 from cpmpy import cpm_array, intvar, boolvar
-from cpmpy.exceptions import CPMpyException
+from cpmpy.exceptions import CPMpyException, IncompleteFunctionError
 from cpmpy.expressions.core import Expression, Operator
 from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, MapDomain
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
@@ -374,7 +374,7 @@ class Table(GlobalConstraint):
         else:
             # ILP friendly decomposition, from Gleb's paper
             nptab = np.array(tab)
-            cons += [x == row_selected*nptab[:,i] for i,x in enumerate(arr)]
+            cons += [x == cp.sum(row_selected*nptab[:,i]) for i,x in enumerate(arr)]
 
         return cons,[]
 
@@ -834,7 +834,7 @@ class Element(GlobalFunction):
         if classic:
             # For every `i` in that intersection, post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
             for i in range(new_lb, new_ub+1):
-                cons.append(implies(idx == i, eval_comparison(cpm_op, arr[i], cpm_rhs)))
+                cons.append((idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)))
             cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
         else:
             # ILP friendly decomposition, from Gleb's paper
@@ -851,7 +851,7 @@ class Element(GlobalFunction):
         """
         arr, idx = self.args
         lb, ub = get_bounds(idx)
-        expr = cp.sum(arr[i]*(idx == i) for i in range(lb, ub+1))
+        expr = cp.sum(arr[i]*(idx == i) for i in range(lb, ub+1)) # <- not missing in CSE since MapDomain done later?
         return expr, [MapDomain(idx)]
 
 
