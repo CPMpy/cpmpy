@@ -42,10 +42,9 @@ CONSTRAINTS = [
         Comparison(cmp, x, 2),
         Comparison(cmp, x, 5),
         Comparison(cmp, Operator("sum", [[x, y, z]]), 4),
-        # Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 11), TODO or tools gives too moany sols
-        # Comparison(cmp, Operator("wsum", [[2, 3, 5, 4], [x, y, z, c]]), 16),  # TODO same
+        Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 12),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), -10),
-        Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),
+        Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),   # where ub(lhs)<rhs
         Comparison(
             cmp, Operator("wsum", [[2, 3], [x, p]]), 5
         ),  # mix int and bool terms
