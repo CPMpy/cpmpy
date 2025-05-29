@@ -200,12 +200,19 @@ def _decide_encoding(x, cmp=None, encoding="auto"):
 class IntVarEnc(ABC):
     """Abstract base class for integer variable encodings."""
 
-    def __init__(self, x, xs):
-        """Create encoding of integer variable `x`."""
+    def __init__(self, x, n, name):
+        """Create encoding of integer variable `x` with `n` Boolean variables named by `name`."""
         if _dom_size(x) == 0:
             raise EMPTY_DOMAIN_ERROR
+
         self._x = x  # the encoded integer variable
-        self._xs = xs  # its encoding variables
+
+        if n == 0:
+            # `shape=(0,)` raises exception
+            self._xs = cp.cpm_array([])
+        else:
+            # `x`'s encoding variables
+            self._xs = boolvar(shape=(n,), name=name)
 
     def vars(self):
         """Return the Boolean variables in the encoding."""
@@ -271,16 +278,8 @@ class IntVarEncDirect(IntVarEnc):
 
     def __init__(self, x):
         """Create direct encoding of integer variable `x`."""
-        name = f"EncDir({x.name}"
-        dom_size = _dom_size(x)
-        if dom_size == 0:
-            raise EMPTY_DOMAIN_ERROR
-        elif dom_size == 1:
-            # TODO we would like to use a boolval(true) here rather than a literal, but this causes problems in linearize
-            xs = cp.cpm_array([boolvar(name=name)])
-        else:
-            xs = boolvar(shape=dom_size, name=name)
-        super().__init__(x, xs)
+        # Requires |dom(x)| Boolean equality variables
+        super().__init__(x, _dom_size(x), f"EncDir({x.name})")
 
     def encode_domain_constraint(self):
         """
@@ -327,18 +326,7 @@ class IntVarEncOrder(IntVarEnc):
 
     def __init__(self, x):
         """Create order encoding of integer variable `x`."""
-        name = f"EncOrd({x.name}"
-        dom_size = _dom_size(x)
-        if dom_size == 0:
-            raise EMPTY_DOMAIN_ERROR
-        elif dom_size == 1:
-            xs = cp.cpm_array([])
-        elif dom_size == 2:
-            xs = cp.cpm_array([boolvar(name=name)])
-        else:
-            # note that the order encoding requires one less variable than the direct encoding
-            xs = boolvar(shape=dom_size - 1, name=name)
-        super().__init__(x, xs)
+        super().__init__(x, _dom_size(x) - 1, f"EncOrd({x.name})")
 
     def encode_domain_constraint(self):
         """Return order encoding domain constraint (i.e. encoding variables are sorted in descending order e.g. `111000`)."""
@@ -394,18 +382,8 @@ class IntVarEncLog(IntVarEnc):
 
     def __init__(self, x):
         """Create binary encoding of integer variable `x`."""
-        dom_size = _dom_size(x)
-        if dom_size == 0:
-            raise EMPTY_DOMAIN_ERROR
-
-        bits = math.ceil(math.log2(dom_size))
-        if bits == 0:
-            xs = cp.cpm_array([])
-        elif bits == 1:
-            xs = cp.cpm_array([boolvar(name=f"EncBin({x.name})")])
-        else:
-            xs = boolvar(shape=bits, name=f"EncBin({x.name})")
-        super().__init__(x, xs)
+        bits = math.ceil(math.log2(_dom_size(x)))
+        super().__init__(x, bits, f"EncBin({x.name})")
 
     def encode_domain_constraint(self):
         """Return binary encoding domain constraint (i.e. upper bound is respected with `self._x<=self._x.ub`. The lower bound is automatically enforced by offset binary which maps `000.. = self._x.lb`)."""
