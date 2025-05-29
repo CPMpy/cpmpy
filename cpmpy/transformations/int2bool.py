@@ -394,14 +394,13 @@ class IntVarEncLog(IntVarEnc):
         """Return offset binary representation of `d` as Booleans in order of increasing signicance (e.g. `4` return `001`)."""
         # more efficient implementation probably not necessary
         i = self._offset(d)
-        if (
-            i == 0
-        ):  # otherwise the bitstring will formatted to '0' (which is inconsistent with empty encodings of constants)
+        if i == 0:
+            # otherwise the bitstring will formatted to '0' (which is inconsistent with empty encodings of constants)
             return []
         else:
-            return (
-                True if bit == "1" else False for bit in reversed("{0:b}".format(i))
-            )
+            # generate bitstring from least to most significant bit
+            bitstring = reversed("{0:b}".format(i))
+            return (True if bit == "1" else False for bit in bitstring)
 
     def eq(self, d):
         """Returns a list of literals which in conjunction enforced x==d."""
