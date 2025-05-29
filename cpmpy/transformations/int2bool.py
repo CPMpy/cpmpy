@@ -159,12 +159,12 @@ def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None, check_bounds=T
             terms += new_terms  # add new terms
             rhs -= k  # subtract constant from both sides
 
-    # unzip does not work for 0 length iterables
     if len(terms) == 0:
+        # the unzip trick does not allow default for 0 length iterables
         lhs = 0
     else:
         # term tuples to two separate lists
-        pb_weights, pb_literals = _unzip(terms)
+        pb_weights, pb_literals = zip(*terms)
 
         # Revert back to `sum` if we happen to have constructed one
         if all(w == 1 for w in pb_weights):
@@ -435,10 +435,6 @@ class IntVarEncLog(IntVarEnc):
 
     def encode_term(self, w=1):
         return [(w * (2**i), b) for i, b in enumerate(self._xs)], w * self._x.lb
-
-
-def _unzip(iterable):
-    return zip(*iterable)
 
 
 def _dom_size(x):
