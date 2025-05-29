@@ -391,7 +391,7 @@ class IntVarEncLog(IntVarEnc):
         return self.encode_comparison("<=", self._x.ub, check_bounds=False)
 
     def _bitstring(self, d):
-        """Return offset binary representation of `d` as Booleans in order of increasing signicance (e.g. `4` return `001`)."""
+        """Return offset binary representation of `d` as Booleans in order of increasing significance (e.g. `4` returns `001`)."""
         # more efficient implementation probably not necessary
         i = self._offset(d)
         if i == 0:
