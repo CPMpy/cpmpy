@@ -4,8 +4,8 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.core import Comparison, Operator, BoolVal
 from cpmpy.expressions.utils import argvals
-from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.model import Model
+from cpmpy import SolverLookup
 
 from cpmpy.transformations.int2bool import int2bool
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl, intvar, boolvar
@@ -20,6 +20,16 @@ p = boolvar(name="p")
 q = boolvar(name="q")
 
 c = intvar(2, 2, name="c")
+
+SOLVERS = [
+    "pysat",
+    # "pysdd"
+]
+SOLVERS = [
+    (name, solver)
+    for name, solver in SolverLookup.base_solvers()
+    if name in SOLVERS and solver.supported()
+]
 
 CONSTRAINTS = [
     # BoolVal(True),  # TODO or tools problem
@@ -44,7 +54,9 @@ CONSTRAINTS = [
         Comparison(cmp, Operator("sum", [[x, y, z]]), 4),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 12),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), -10),
-        Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),   # where ub(lhs)<rhs
+        Comparison(
+            cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100
+        ),  # where ub(lhs)<rhs
         Comparison(
             cmp, Operator("wsum", [[2, 3], [x, p]]), 5
         ),  # mix int and bool terms
@@ -87,14 +99,19 @@ class TestTransInt2Bool:
     import importlib
     import itertools
 
+    def idfn(val):
+        if isinstance(val, tuple):
+            # solver name, class tuple
+            return val[0]
+        else:
+            return f"{val}"
+
     @pytest.mark.parametrize(
-        ("constraint", "encoding"), itertools.product(CONSTRAINTS, ENCODINGS), ids=str
+        ("solver", "constraint", "encoding"),
+        itertools.product(SOLVERS, CONSTRAINTS, ENCODINGS),
+        ids=idfn,
     )
-    @pytest.mark.skipif(
-        not (CPM_pysat.supported() and importlib.util.find_spec("pypblib")),
-        reason="PySAT+pblib not supported",
-    )
-    def test_transforms(self, constraint, encoding, setup):
+    def test_transforms(self, solver, constraint, encoding, setup):
         user_vars = set(get_variables(constraint))
         ivarmap = dict()
         flat = int2bool(
@@ -104,27 +121,30 @@ class TestTransInt2Bool:
         cons_sols = []
         flat_sols = []
 
+        # "Trusted" solver (not using int2bool)
         Model(constraint).solveAll(
             solver="ortools",
             display=lambda: cons_sols.append(tuple(argvals(user_vars))),
         )
         cons_sols = sorted(cons_sols)
-        pysat = CPM_pysat(encoding=encoding)
+        name, solver_class = solver
+        solver = solver_class()
+        solver.encoding = encoding
         for c in flat:
-            pysat.add(c)
+            solver.add(c)
 
         # unfortunately, some tricky edge cases where trivial constraints remove their variables by using the above `add` method
         # this only happens in this test set-up
         # to fix this, we add user variables which may have been removed!
-        pysat.user_vars |= user_vars
+        solver.user_vars |= user_vars
 
-        pysat.ivarmap = ivarmap
-        pysat.solveAll(display=lambda: flat_sols.append(tuple(argvals(user_vars))))
+        solver.ivarmap = ivarmap
+        solver.solveAll(display=lambda: flat_sols.append(tuple(argvals(user_vars))))
         flat_sols = sorted(flat_sols)
 
         def show_int_var(x):
             bnd = x.get_bounds()
-            enc = pysat.ivarmap.get(x.name, None)
+            enc = solver.ivarmap.get(x.name, None)
             return f"{x} in {bnd[0]}..{bnd[1]} = {enc if enc is None else enc._xs}"
 
         assert (
