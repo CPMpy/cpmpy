@@ -189,7 +189,7 @@ def _decide_encoding(x, cmp=None, encoding="auto"):
     if encoding != "auto":
         return encoding
     elif _dom_size(x) >= 100:
-        # even slightly large domain sizes suit the binary encoding, as the PB encoding is not expected to be optimized for integer variables!
+        # This heuristic is chosen to be small to favour the binary encoding. This is because the PB encoding (e.g. generalized totalizer, ...) of a direct/order encoded PB constraints is quite inefficient unless the AMO/IC side-constraint is taken into account (which is not the case for pysat/pblib/pysdd).
         return "binary"
     elif cmp in (None, "==", "!="):
         return "direct"  # equalities suit the direct encoding
