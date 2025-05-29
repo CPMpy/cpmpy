@@ -154,9 +154,8 @@ def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None, check_bounds=T
                 ivarmap, x, _decide_encoding(x, cmp, encoding)
             )
             domain_constraints += x_cons
-            new_terms, k = x_enc.encode_term(
-                w
-            )  # the value of the integer variable as a PB expression `(b_1*c_1) + ... + k`
+            # Encode the value of the integer variable as PB expression `(b_1*c_1) + ... + k`
+            new_terms, k = x_enc.encode_term(w)
             terms += new_terms  # add new terms
             rhs -= k  # subtract constant from both sides
 
