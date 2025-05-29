@@ -133,7 +133,7 @@ class CPM_pysat(SolverInterface):
                 names.append(name)
         return names
 
-    def __init__(self, cpm_model=None, subsolver=None, encoding="auto"):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 
@@ -145,7 +145,6 @@ class CPM_pysat(SolverInterface):
         Arguments:
             cpm_model (Model(), a CPMpy Model(), optional):
             subsolver (str, name of the pysat solver, e.g. glucose4):  see .solvernames() to get the list of available solver(names)
-            encoding (str, "auto", "direct", "order", "binary") used to represent integer variables with Boolean vairalbes
         """
         if not self.supported():
             raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
@@ -166,7 +165,7 @@ class CPM_pysat(SolverInterface):
         self.pysat_vpool = IDPool()
         self.pysat_solver = Solver(use_timer=True, name=subsolver)
         self.ivarmap = dict()  # for the integer to boolean encoders
-        self.encoding = encoding
+        self.encoding = "auto"
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
