@@ -48,7 +48,7 @@ def _encode_expr(ivarmap, expr, encoding):
         constraints, domain_constraints = _encode_expr(ivarmap, consequent, encoding)
         return (
             [p.implies(constraint) for constraint in constraints],
-            domain_constraints + [p == p],  # keep `p` in model
+            domain_constraints,
         )
     elif isinstance(expr, Comparison):
         lhs, rhs = expr.args
