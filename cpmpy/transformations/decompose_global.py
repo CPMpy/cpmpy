@@ -69,8 +69,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 modified = False
                 for i, a in enumerate(expr.args):
                     # we can do something special for Element
-                    if (a.name == "element" and "element" not in supported and all(is_num(t) for t in a.args[0])) or \
-                       (a.name == "count" and "count" not in supported):
+                    if hasattr(a, "name") and (
+                            (a.name == "element" and "element" not in supported and all(is_num(t) for t in a.args[0])) or \
+                            (a.name == "count" and "count" not in supported)
+                        ):
                         # it's an element with constants or a count
                         encoding, otherdef = a.decompose_numerical()
                         assert encoding.is_bool() is False, "we should get a numerical expression here (wsum over bools)"
