@@ -210,7 +210,11 @@ def inverse_optimize(values, weights, capacity, x_d, foil_idx):
         if sum(d_star * x_d) >= sum(d_star * x_0.value()):
             return d_star
         else:
-            master_model += [sum(d * x_d) >= sum(d * x_0.value())]
+            # Convert boolean arrays to integer arrays
+            x_d_int = x_d.astype(int)
+            x_0_val_int = x_0.value().astype(int)
+            # Add constraint using integer coefficients
+            master_model += [sum(d * x_d_int) >= sum(d * x_0_val_int)]
         i += 1
 
     raise ValueError("Master model is UNSAT!")
