@@ -644,31 +644,129 @@ class Regular(GlobalConstraint):
         # normalize node_ids to be 0..n-1, allows for smaller domains
         self.node_map = {n: i for i, n in enumerate(self.nodes)}
 
+        self.mapping = {} # for classic decomp
+
+
     def decompose(self):
-        # Decompose to transition table using Table constraints
-        
-        arr, transitions, start, accepting = self.args
-        lbs, ubs = get_bounds(arr)
-        lb, ub = min(lbs), max(ubs)
-        
-        transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+            
+        version = "mip"
 
-        # add a sink node for transitions that are not defined
-        # --> not necessary for comp, because positive context
-        # sink = len(self.nodes)
-        # transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
-        # transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
-
-        # keep track of current state when traversing the array
-        state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
-        id_start = self.node_map[start]
-        # optimization: we know the entry node of the automaton, results in smaller table
-        defining = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
-        # define the rest of the automaton using transition table
-        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
+        if version == "classic":
+            arr, transitions, start, ends = self.args
+            # get the range of possible transition value
+            lb = min([x.lb for x in arr])
+            ub = max([x.ub for x in arr])
+            # Table decomposition with aux variables for the states
+            nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))  # get all nodes used
+            # normalization of the id of the node (from 0 to n-1)
+            num_mapping = dict(zip(nodes, range(len(nodes))))  # map node to integer ids for the nodes
+            num_transitions = [[num_mapping[n_in], v, num_mapping[n_out]] for n_in, v, n_out in
+                            transitions]  # apply mapping to transition
+            # compute missing transition with an additionnal never-accepting sink node (dummy default node)
+            id_dummy = len(nodes)  # default node id
+            transition_dummy = [[num_mapping[n], v, id_dummy] for n in nodes for v in range(lb, ub + 1) if
+                                (n, v) not in self.mapping] + [[id_dummy, v, id_dummy] for v in range(lb, ub + 1)]
+            num_transitions = num_transitions + transition_dummy
+            # auxiliary variable representing the sequence of state node in the path
+            aux_vars = intvar(0, id_dummy, shape=len(arr))
+            id_start = num_mapping[start]
+            # optimization for first level (only one node, allows to deal with smaller table on first layer)
+            tab_first = [t[1:] for t in num_transitions if t[0] == id_start]
+            id_ends = [num_mapping[e] for e in ends]
+            # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-Automaton
+            defining = [Table([arr[0], aux_vars[0]], tab_first)] + \
+                                                    [Table([aux_vars[i - 1], arr[i], aux_vars[i]], num_transitions) for i
+                                                    in range(1, len(arr))]
+            # constraining constraint: end of the path in accepting node
+            constraining = [InDomain(aux_vars[-1], id_ends)]
+            return constraining, defining
         
-        # constraint is satisfied iff last state is accepting
-        return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+        elif version == "ignace":
+            # Decompose to transition table using Table constraints
+            arr, transitions, start, accepting = self.args
+            lbs, ubs = get_bounds(arr)
+            lb, ub = min(lbs), max(ubs)
+            
+            transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+
+            # add a sink node for transitions that are not defined
+            # --> not necessary for comp, because positive context
+            # sink = len(self.nodes)
+            # transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
+            # transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
+
+            # keep track of current state when traversing the array
+            state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
+            id_start = self.node_map[start]
+            # optimization: we know the entry node of the automaton, results in smaller table
+            defining = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
+            # define the rest of the automaton using transition table
+            defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
+            
+            # constraint is satisfied iff last state is accepting
+            return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+        
+        elif version == "mip":
+            """
+            Deterministic Finite Automata (DFA) MIP decomposition based on Côté et al. (2007): 
+              "Modeling the Regular Constraint with Integer Programming"
+            """
+            arr, transitions, start, ends = self.args
+
+            # get number of possible states
+            nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))  # get all nodes used
+            Q = len(nodes)
+            # get number of layers
+            I = len(arr)
+            # get possible transition values
+            D = list(set([t[1] for t in transitions]))
+            J = len(D)
+
+            # collect possible transitions
+            Tin = [list() for _ in range(Q)]
+            Tout = [list() for _ in range(Q)]
+            for trans in transitions:
+                Tin[nodes.index(trans[2])].append( (D.index(trans[1]), nodes.index(trans[0])) )
+                Tout[nodes.index(trans[0])].append( (D.index(trans[1]), nodes.index(trans[2])) )
+
+            # get special start / end states
+            E = [nodes.index(e) for e in ends]
+            S = nodes.index(start)
+
+            defining = []
+            constraining = []
+
+            # auxiliary decision variables
+            s = cp.boolvar(shape=(I, J, Q))     # flow variable
+            sf = cp.boolvar(shape=(len(ends),)) # flow leaving states of last layer
+
+            # 1 unit of flow entering the graph
+            for q in range(Q):
+                if q == S:
+                    defining.append( cp.sum(s[0, j, S] for j,_ in Tout[S]) == 1 )
+                else:
+                    defining.append( cp.sum(s[0, j, q] for j in range(J)) == 0 )
+            # incoming = outgoing
+            for i in range(1, I):
+                for q in range(Q):
+                    defining.append( cp.sum([s[i-1, j, q_] for j,q_ in Tin[q]]) == cp.sum([s[i, j, q] for j,_ in Tout[q]]) )
+            # collect total flow exiting graph
+            for q in range(Q):
+                if q in E:
+                    defining.append( cp.sum([s[-1, j, q_] for j,q_ in Tin[q]]) == sf[E.index(q)] )
+                else:
+                    defining.append( cp.sum([s[-1, j, q_] for j,q_ in Tin[q]]) == 0)
+            # 1 unit of flow exiting the graph
+            defining.append( cp.sum(sf) == 1 )
+
+            # channeling with 'arr'
+            defining.extend([MapDomain(a) for a in arr])
+            for i in range(I):
+                for j in range(J):
+                    constraining.append( (arr[i] == D[j]) == ( cp.sum(s[i,j,:]) ) )
+
+            return constraining + defining, []
+
 
     def value(self):
         arr, transitions, start, accepting = self.args
