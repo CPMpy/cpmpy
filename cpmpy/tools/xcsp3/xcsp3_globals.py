@@ -375,6 +375,7 @@ class Table(GlobalConstraint):
             # ILP friendly decomposition, from Gleb's paper
             nptab = np.array(tab)
             cons += [x == cp.sum(row_selected*nptab[:,i]) for i,x in enumerate(arr)]
+            cons += [ cp.sum(row_selected) == 1 ]
 
         return cons,[]
 
