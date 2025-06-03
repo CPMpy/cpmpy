@@ -272,7 +272,7 @@ class CallbacksCPMPy(Callbacks):
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
-                self.cpm_model += cp.Table(cpm_vars, tuples)
+                self.cpm_model += xglobals.Table(cpm_vars, tuples)
             else:
                 self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
 
@@ -691,7 +691,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, balance, arcs, capacities, weights, condition)
 
     def ctr_instantiation(self, lst: list[Variable], values: list[int]):
-        self.cpm_model += cp.Table(self.get_cpm_vars(lst), [values])
+        self.cpm_model += xglobals.Table(self.get_cpm_vars(lst), [values])
 
     def ctr_clause(self, pos: list[Variable], neg: list[Variable]):  # not in XCSP3-core
         self._unimplemented(pos, neg)
