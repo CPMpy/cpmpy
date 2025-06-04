@@ -589,7 +589,7 @@ class CPM_ortools(SolverInterface):
                 # extract boolvars from csemap
                 lb, ub = get_bounds(ivar)
                 bvs = [self._csemap[ivar == v] for v in range(lb, ub+1)]
-                self.add(sum(bvs) == 1, internal=True): # not covered by AddMapDomain...
+                self.add(sum(bvs) == 1, internal=True) # not covered by AddMapDomain...
                 return self.ort_model.add_map_domain(self.solver_var(ivar), self.solver_vars(bvs), offset=lb)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
