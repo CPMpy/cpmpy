@@ -572,7 +572,10 @@ class CPM_ortools(SolverInterface):
                 N = len(x)
                 arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
-                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                channeling = [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                for expr in channeling:
+                    for con in self.transform(expr):
+                        self._post_constraint(con)
                 # post the global constraint
                 # when posting arcs on diagonal (i==j), it would do subcircuit
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
@@ -588,7 +591,8 @@ class CPM_ortools(SolverInterface):
                 # extract boolvars from csemap
                 lb, ub = get_bounds(ivar)
                 bvs = [self._csemap[ivar == v] for v in range(lb, ub+1)]
-                self.add(sum(bvs) == 1)  # not covered by AddMapDomain...
+                for con in self.transform(sum(bvs) == 1): # not covered by AddMapDomain...
+                    self._post_constraint(con)
                 return self.ort_model.add_map_domain(self.solver_var(ivar), self.solver_vars(bvs), offset=lb)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
