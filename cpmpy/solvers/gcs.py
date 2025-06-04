@@ -364,11 +364,11 @@ class CPM_gcs(SolverInterface):
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
+        self.add(flat_cons, internal=True) # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
         (obj, obj_cons) = get_or_make_var(flat_obj, csemap=self._csemap)
-        self += obj_cons
+        self.add(obj_cons, internal=True)
 
         self.objective_var = obj
 

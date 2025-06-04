@@ -300,7 +300,7 @@ class CPM_z3(SolverInterface):
 
         if isinstance(expr, GlobalFunction): # not supported by Z3
             obj_var = intvar(*expr.get_bounds())
-            self += expr == obj_var
+            self.add(expr == obj_var, internal=True)
             expr = obj_var
 
         obj = self._z3_expr(expr)
@@ -331,7 +331,7 @@ class CPM_z3(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr, internal:bool=False):
         """
             Z3 supports nested expressions so translate expression tree and post to solver API directly
 
@@ -351,7 +351,8 @@ class CPM_z3(SolverInterface):
         """
         # all variables are user variables, handled in `solver_var()`
         # unless their constraint gets simplified away, so lets collect them anyway
-        get_variables(cpm_expr, collect=self.user_vars)
+        if not internal:
+            get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
