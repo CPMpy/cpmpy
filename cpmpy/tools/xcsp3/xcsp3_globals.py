@@ -364,15 +364,17 @@ class Table(GlobalConstraint):
             return [x == v for x,v in zip(arr, tab[0])], []
         
         row_selected = boolvar(shape=len(tab))
-        cons = [Operator("or", row_selected)]
+        
         classic = False
         if classic:
+            cons = [Operator("or", row_selected)]
             cons.extend(MapDomain(x) for x in arr)
             for i, row in enumerate(tab):
                 # lets already flatten it a bit
                 cons += [Operator("->", [row_selected[i], x == v]) for x,v in zip(arr, row)]
         else:
             # ILP friendly decomposition, from Gleb's paper
+            cons = []
             nptab = np.array(tab)
             cons += [x == cp.sum(row_selected*nptab[:,i]) for i,x in enumerate(arr)]
             cons += [ cp.sum(row_selected) == 1 ]
