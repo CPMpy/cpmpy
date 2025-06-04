@@ -423,10 +423,10 @@ class CPM_exact(SolverInterface):
         self.objective_is_min_ = minimize
 
         # make objective function non-nested and with positive BoolVars only
+        self.user_vars.update(get_variables(expr))  # add objvars to vars
         (flat_obj, flat_cons) = flatten_objective(expr)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
-        self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
-        self += flat_cons  # add potentially created constraints
+        self.add(flat_cons, internal=True) # add potentially created constraints
 
         # make objective function or variable and post
         xct_cfvars,xct_rhs = self._make_numexpr(flat_obj,0)
@@ -517,7 +517,7 @@ class CPM_exact(SolverInterface):
     def is_multiplication(cpm_expr): # helper function
         return isinstance(cpm_expr, Operator) and cpm_expr.name == 'mul'
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig, internal:bool=False):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -537,7 +537,8 @@ class CPM_exact(SolverInterface):
         """
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        if not internal:
+            get_variables(cpm_expr_orig, collect=self.user_vars)
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):

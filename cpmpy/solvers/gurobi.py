@@ -270,10 +270,10 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
 
         # make objective function non-nested
+        get_variables(expr, collect=self.user_vars)  # add potentially created variables
         (flat_obj, flat_cons) = flatten_objective(expr)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
-        self += flat_cons
+        self.add(flat_cons, internal=True)
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -344,7 +344,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig, internal:bool=False):
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -365,7 +365,8 @@ class CPM_gurobi(SolverInterface):
       from gurobipy import GRB
 
       # add new user vars to the set
-      get_variables(cpm_expr_orig, collect=self.user_vars)
+      if not internal:
+        get_variables(cpm_expr_orig, collect=self.user_vars)
 
       # transform and post the constraints
       for cpm_expr in self.transform(cpm_expr_orig):
