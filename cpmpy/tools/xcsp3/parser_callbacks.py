@@ -477,7 +477,7 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable],
                         occurs: list[int] | list[Variable] | list[range], closed: bool):
-        self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
+        self.cpm_model += xglobals.GlobalCardinalityCount(self.get_cpm_exprs(lst),
                                                     self.get_cpm_exprs(values),
                                                     self.get_cpm_exprs(occurs),
                                                     closed=closed)
