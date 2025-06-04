@@ -597,7 +597,7 @@ class CallbacksCPMPy(Callbacks):
             cpm_ends.append(cp.intvar(*get_bounds(expr)))
 
         if condition.operator == TypeConditionOperator.LE:
-            self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
+            self.cpm_model += xglobals.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
                                             self.get_cpm_var(condition.right_operand()))
         else:
             # post decomposition directly

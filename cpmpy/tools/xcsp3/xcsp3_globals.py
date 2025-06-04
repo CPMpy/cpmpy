@@ -965,6 +965,117 @@ class Element(GlobalFunction):
         bnds = [get_bounds(x) for x in arr]
         return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
+
+class Cumulative(GlobalConstraint):
+    """
+        Global cumulative constraint. Used for resource aware scheduling.
+        Ensures that the capacity of the resource is never exceeded.
+        Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
+        Supports both varying demand across tasks or equal demand for all jobs.
+    """
+    def __init__(self, start, duration, end, demand, capacity):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(duration), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        duration = flatlist(duration)
+        end = flatlist(end)
+        assert len(start) == len(duration) == len(end), "Start, duration and end should have equal length"
+        n_jobs = len(start)
+
+        for lb in get_bounds(duration)[0]:
+            if lb < 0:
+                raise TypeError("Durations should be non-negative")
+
+        if is_any_list(demand):
+            demand = flatlist(demand)
+            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
+        else: # constant demand
+            demand = [demand] * n_jobs
+
+        super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
+
+    def decompose(self):
+        """
+            Decomposition from:
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+
+            Heuristically switches between time-resource and task-resource decomposition depending on the relative size of the time horizon and the number of tasks.
+            If 
+                n = number of tasks
+                t = size of time horizon
+            then    
+                time-resource decomposition scales with n*t 
+                task-resource decomposition scales with 3n(n-1)
+            thus
+                switch when t > 3*n
+        """
+
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity = arr_args
+
+        num_tasks = len(demand) # number of tasks
+        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
+        time_horizon =  ub - lb
+
+        cons = []
+
+        if time_horizon > 3 * num_tasks:
+            version = "task"
+        else:
+            version = "time"
+
+        if version == "time":
+            # set duration of tasks
+            for t in range(len(start)):
+                cons += [start[t] + duration[t] == end[t]]
+
+            # demand doesn't exceed capacity
+            for t in range(lb,ub+1):
+                demand_at_t = 0
+                for job in range(len(start)):
+                    if is_num(demand):
+                        demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
+                    else:
+                        demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
+
+                cons += [demand_at_t <= capacity]
+                
+        elif version == "task":
+
+            # set duration of tasks
+            for t in range(num_tasks):
+                cons += [start[t] + duration[t] == end[t]]
+
+            for j in range(num_tasks):
+                cons += [capacity >= demand[j] + cp.sum([(start[i] <= start[j]) & (start[j] < start[i] + duration[i]) for i in range(num_tasks) if i != j])]
+
+        return cons, []
+
+    def value(self):
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
+                   else argval(arg) for arg in self.args]
+
+        if any(a is None for a in arg_vals):
+            return None
+
+        # start, dur, end are np arrays
+        start, dur, end, demand, capacity = arg_vals
+        # start and end seperated by duration
+        if not (start + dur == end).all():
+            return False
+
+        # demand doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        for t in range(lb, ub+1):
+            if capacity < sum(demand * ((start <= t) & (t < end))):
+                return False
+
+        return True
+
+
 # helper function
 def is_transition(arg):
     """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
