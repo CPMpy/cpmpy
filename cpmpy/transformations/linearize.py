@@ -362,7 +362,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                                  "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
             
             # Create Boolvars and seed CSE map
-            newlist.extend(decompose_in_tree([MapDomain(a) for a in cpm_expr.args], csemap=csemap))
+            exprs = decompose_in_tree([MapDomain(a) for a in cpm_expr.args], csemap=csemap)
+            newlist.extend(linearize_constraint(exprs, supported=supported, reified=reified, csemap=csemap))
 
             lbs, ubs = get_bounds(cpm_expr.args)
             lb, ub = min(lbs), max(ubs)
