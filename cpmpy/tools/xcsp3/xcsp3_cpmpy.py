@@ -704,7 +704,7 @@ if __name__ == "__main__":
     # The underlying solver which should be used (can also be "solver:subsolver")
     parser.add_argument("--solver", required=True, type=str)
     # How much time before SIGTERM should we halt solver (for the final post-processing steps and solution printing)
-    parser.add_argument("--time-buffer", required=False, type=int, default=0)
+    parser.add_argument("--time-buffer", required=False, type=int, default=1)
     # If intermediate solutions should be printed (if the solver supports it)
     parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
 
