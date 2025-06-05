@@ -15,8 +15,8 @@ The CPMpy modelling system will compete in the following tracks, using the follo
 | **cpmpy_z3** | yes | yes | yes | no |
 | **cpmpy_gurobi** | yes | yes | yes | yes |
 | **cpmpy_cpo** | yes | yes | yes | yes |
-| **cpmpy_mnz_gecode** | yes | yes | yes | yes | no |
-| **cpmpy_mnz_chuffed** | yes | yes | yes | yes | no |
+| **cpmpy_mnz_gecode** | yes | yes | yes | no |
+| **cpmpy_mnz_chuffed** | yes | yes | yes | no |
 
 
 ## Setup
