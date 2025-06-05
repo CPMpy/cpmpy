@@ -333,7 +333,7 @@ class Count(GlobalFunction):
         """
         arr, val = self.args
         expr = cp.sum(ai == val for ai in arr)
-        return expr, [cp.expressions.globalconstraints.MapDomain(ai) for ai in arr]
+        return expr, []# [cp.expressions.globalconstraints.MapDomain(ai) for ai in arr] <- somehow breaks the constraint in the setting "count(..., ...) not in [...]""
 
 
     def value(self):
