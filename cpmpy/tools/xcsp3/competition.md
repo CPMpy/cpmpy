@@ -22,7 +22,7 @@ The CPMpy modelling system will compete in the following tracks, using the follo
 
 ## Setup
 
-Since the competition will be run on a cluster of Rocky Linux 9.5 servers, the installation steps have been talored to that particular OS (but for version 9.6). Our submission is not inherently dependant on any particular OS, but some dependencies might be missing on a clean install (which are for example included in a standard Ubuntu install).
+Since the competition will be run on a cluster of Rocky Linux 9.5 servers, the installation steps have been talored to that particular OS (but for version 9.6, unsure if there will be any difference). Our submission is not inherently dependant on any particular OS, but some dependencies might be missing on a clean install (which are for example included in a standard Ubuntu install).
 
 ### Dependencies
 
