@@ -27,7 +27,7 @@ class OrtSubcircuit(DirectConstraint):
         N = len(self.args[0])
         arcvars = cp.boolvar(shape=(N,N))
         # post channeling constraints from int to bool
-        CPMpy_solver += [b == (self.args[0][i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+        CPMpy_solver.add([b == (self.args[0][i] == j) for (i,j),b in np.ndenumerate(arcvars)], internal=True)
         # post the global constraint
         #   posting arcs on diagonal (i==j) allows for subcircuits
         ort_arcs = [(i,j, CPMpy_solver.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars)] # Allows for empty subcircuits
@@ -42,7 +42,7 @@ class OrtSubcircuitWithStart(DirectConstraint):
         N = len(self.args[0])
         arcvars = cp.boolvar(shape=(N,N))
         # post channeling constraints from int to bool
-        CPMpy_solver += [b == (self.args[0][i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+        CPMpy_solver.add([b == (self.args[0][i] == j) for (i,j),b in np.ndenumerate(arcvars)], internal=True)
         # post the global constraint
         # posting arcs on diagonal (i==j) allows for subcircuits
         ort_arcs = [(i,j,CPMpy_solver.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if not ((i == j) and (i == self.args[1]))] # The start index cannot self loop and thus must be part of the subcircuit.
