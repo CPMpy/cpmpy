@@ -1099,7 +1099,7 @@ class GlobalCardinalityCount(GlobalConstraint):
         variant = "boolean"
 
         if variant == "classic":
-            constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
+            constraints = [cp.Count(vars, i) == v for i, v in zip(vals, occ)]
             if self.closed:
                 constraints += [InDomain(v, vals) for v in vars]
 
