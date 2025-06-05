@@ -201,10 +201,11 @@ class AllDifferent(GlobalConstraint):
             # switch to ILP friendly decomposition
             cons = []
             lbs, ubs = get_bounds(self.args)
+            M = [cp.MapDomain(var) for var in self.args if isinstance(var, Expression)]
             for val in range(min(lbs), max(ubs)+1):
                 # each value can be taken at most once (not necessarily exactly once)
                 cons.append(cp.sum(x == val for x in self.args) <= 1)
-            return cons, [MapDomain(x) for x in self.args]
+            return cons, M
 
     def value(self):
         return len(set(argvals(self.args))) == len(self.args)
