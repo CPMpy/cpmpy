@@ -671,7 +671,8 @@ class InDomain(GlobalConstraint):
         else:
             # XXX do we properly capture that x!=v with b:=x==v should be ~b?
             # Can't do MapDomain, would need to check if `expr` is a variable...
-            return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+            # TODO is this even efficient when there are many gaps? (similar to NotInDomain)
+            return [expr != val for val in range(lb, ub + 1) if val not in arr] + [expr >= min(arr), expr <= max(arr)], defining
 
 
     def value(self):
