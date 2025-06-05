@@ -280,7 +280,7 @@ class AllEqual(GlobalConstraint):
             lbs, ubs = get_bounds(self.args)
             for val in range(min(lbs), max(ubs)+1):
                 # each value can be taken at most once (not necessarily exactly once)
-                cons.append((x1 == val) == (x2 == val) for x1,x2 in all_pairs(self.args))
+                cons.extend((x1 == val) == (x2 == val) for x1,x2 in all_pairs(self.args))
             return cons, [MapDomain(x) for x in self.args]
 
     def value(self):
