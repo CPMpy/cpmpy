@@ -119,12 +119,18 @@ def flatten_model(orig_model):
         else:
             return cp.Model(*basecons, maximize=newobj)
 
+# constants to determine Boolean context
+POSITIVE = 1
+NEGATIVE = 2
+MIXED = 3
 
-def flatten_constraint(expr, csemap=None):
+
+def flatten_constraint(expr, context=MIXED, csemap=None):
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
-        
+        context: the context of the given expression, can be POSITIVE, NEGATIVE or MIXED
+            default is MIXED, just to be safe if we forget to specify
         output: see definition of 'flat normal form' above.
 
         it will return 'Exception' if something is not supported
@@ -164,7 +170,7 @@ def flatten_constraint(expr, csemap=None):
                         if isinstance(a, Operator) and a.name == '->':
                             newargs[i:i+1] = [~a.args[0],a.args[1]]
                     # there could be nested implications
-                    newlist.extend(flatten_constraint(Operator('or', newargs), csemap=csemap))
+                    newlist.extend(flatten_constraint(Operator('or', newargs), csemap=csemap, context=context))
                     continue
                 # conjunctions in disjunctions could be split out by applying distributivity,
                 # but this would explode the number of constraints in favour of having less auxiliary variables.
@@ -175,30 +181,30 @@ def flatten_constraint(expr, csemap=None):
                 if expr.args[1].name == 'and':
                     a1s = expr.args[1].args
                     a0 = expr.args[0]
-                    newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s], csemap=csemap))
+                    newlist.extend(flatten_constraint([a0.implies(a1) for a1 in a1s], csemap=csemap, context=context))
                     continue
                 # 2) if lhs is 'or' then or([a01..a0n])->a1 :: ~a1->and([~a01..~a0n] and split
                 elif expr.args[0].name == 'or':
                     a0s = expr.args[0].args
                     a1 = expr.args[1]
-                    newlist.extend(flatten_constraint([(~a1).implies(~a0) for a0 in a0s], csemap=csemap))
+                    newlist.extend(flatten_constraint([(~a1).implies(~a0) for a0 in a0s], csemap=csemap, context=context))
                     continue
                 # 2b) if lhs is ->, like 'or': a01->a02->a1 :: (~a01|a02)->a1 :: ~a1->a01,~a1->~a02
                 elif expr.args[0].name == '->':
                     a01,a02 = expr.args[0].args
                     a1 = expr.args[1]
-                    newlist.extend(flatten_constraint([(~a1).implies(a01), (~a1).implies(~a02)], csemap=csemap))
+                    newlist.extend(flatten_constraint([(~a1).implies(a01), (~a1).implies(~a02)], csemap=csemap, context=context))
                     continue
 
                 # ->, allows a boolexpr on one side
                 elif isinstance(expr.args[0], _BoolVarImpl):
                     # LHS is var, ensure RHS is normalized 'Boolexpr'
                     lhs,lcons = expr.args[0], ()
-                    rhs,rcons = normalized_boolexpr(expr.args[1], csemap=csemap)
+                    rhs,rcons = normalized_boolexpr(expr.args[1], csemap=csemap, context=max(POSITIVE, context))
                 else:
                     # make LHS normalized 'Boolexpr', RHS must be a var
-                    lhs,lcons = normalized_boolexpr(expr.args[0], csemap=csemap)
-                    rhs,rcons = get_or_make_var(expr.args[1], csemap=csemap)
+                    lhs,lcons = normalized_boolexpr(expr.args[0], csemap=csemap, context=max(NEGATIVE, context))
+                    rhs,rcons = get_or_make_var(expr.args[1], csemap=csemap, context=max(POSITIVE, context))
 
                 newlist.append(Operator(expr.name, (lhs,rhs)))
                 newlist.extend(lcons)
@@ -209,7 +215,7 @@ def flatten_constraint(expr, csemap=None):
 
             # if none of the above cases + continue matched:
             # a normalizable boolexpr
-            (con, flatcons) = normalized_boolexpr(expr, csemap=csemap)
+            (con, flatcons) = normalized_boolexpr(expr, csemap=csemap, context=context)
             newlist.append(con)
             newlist.extend(flatcons)
 
@@ -259,10 +265,10 @@ def flatten_constraint(expr, csemap=None):
             if exprname == '==' and lexpr.is_bool():
                 if rvar.is_bool():
                     # this is a reification
-                    (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap)
+                    (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap, context=MIXED)
                 else:
                     # integer comparison
-                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap, context=MIXED)
             else:
                 (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap)
 
@@ -274,7 +280,7 @@ def flatten_constraint(expr, csemap=None):
             """
     - Global constraint: global([Var]*)          (CPMpy class 'GlobalConstraint')
             """
-            (con, flatcons) = normalized_boolexpr(expr, csemap=csemap)
+            (con, flatcons) = normalized_boolexpr(expr, csemap=csemap, context=context)
             newlist.append(con)
             newlist.extend(flatcons)
 
@@ -322,7 +328,7 @@ def __is_flat_var_or_list(arg):
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg) or \
            is_star(arg)
 
-def get_or_make_var(expr, csemap=None):
+def get_or_make_var(expr, csemap=None, context=MIXED):
     """
         Must return a variable, and list of flat normal constraints
         Determines whether this is a Boolean or Integer variable and returns
@@ -335,12 +341,17 @@ def get_or_make_var(expr, csemap=None):
     if is_any_list(expr):
         raise Exception(f"Expected single variable, not a list for: {expr}")
 
-    if csemap is not None and expr in csemap:
-        return csemap[expr], []
-
     if expr.is_bool():
+
+        if csemap is not None and (expr, context) in csemap:
+            return csemap[(expr, context)], []
+        if csemap is not None and (expr, MIXED) in csemap: # if we have it already in mixed context anyway, we can also use that
+            return csemap[(expr, MIXED)], []
+        if csemap is not None and expr in csemap: # maybe it was put in by decompos_in_tree already? (unlikely)
+            return csemap[expr], []
+
         # normalize expr into a boolexpr LHS, reify LHS == bvar
-        (flatexpr, flatcons) = normalized_boolexpr(expr, csemap=csemap)
+        (flatexpr, flatcons) = normalized_boolexpr(expr, csemap=csemap, context=context)
 
         if isinstance(flatexpr,_BoolVarImpl):
             # avoids unnecessary bv == bv or bv == ~bv assignments
@@ -349,10 +360,18 @@ def get_or_make_var(expr, csemap=None):
 
         # save expr in dict
         if csemap is not None:
-            csemap[expr] = bvar
-        return bvar, [flatexpr == bvar] + flatcons
+            csemap[(expr, context)] = bvar
+
+        if context == POSITIVE:
+            return bvar, [bvar.implies(flatexpr)] + flatcons
+        else:
+            return bvar, [flatexpr == bvar] + flatcons
 
     else:
+        
+        if csemap is not None and expr in csemap: # numexpr is saved without context
+            return csemap[expr], []
+
         # normalize expr into a numexpr LHS,
         # then compute bounds and return (newintvar, LHS == newintvar)
         (flatexpr, flatcons) = normalized_numexpr(expr, csemap=csemap)
@@ -366,7 +385,7 @@ def get_or_make_var(expr, csemap=None):
 
         # save expr in dict
         if csemap is not None:
-            csemap[expr] = ivar
+            csemap[(expr, context)] = ivar
         return ivar, [flatexpr == ivar] + flatcons
 
 def get_or_make_var_or_list(expr, csemap=None):
@@ -383,7 +402,7 @@ def get_or_make_var_or_list(expr, csemap=None):
         return get_or_make_var(expr, csemap=csemap)
 
 
-def normalized_boolexpr(expr, csemap=None):
+def normalized_boolexpr(expr, csemap=None, context=MIXED):
     """
         input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
@@ -421,7 +440,7 @@ def normalized_boolexpr(expr, csemap=None):
             # TODO, optimisation if args0 is an 'and'?
             (lhs,lcons) = get_or_make_var(expr.args[0], csemap=csemap)
             # TODO, optimisation if args1 is an 'or'?
-            (rhs,rcons) = get_or_make_var(expr.args[1], csemap=csemap)
+            (rhs,rcons) = get_or_make_var(expr.args[1], csemap=csemap, context=max(POSITIVE, context))
             return ((~lhs | rhs), lcons+rcons)
         if expr.name == 'not':
             flatvar, flatcons = get_or_make_var(expr.args[0], csemap=csemap)
@@ -429,8 +448,9 @@ def normalized_boolexpr(expr, csemap=None):
         if not expr.has_subexpr():
             return (expr, [])
         else:
+            assert expr.name in {"and", "or"}, f"Unexpected `Operator`: {expr.name}"
             # one of the arguments is not flat, flatten all
-            flatvars, flatcons = zip(*[get_or_make_var(arg, csemap=csemap) for arg in expr.args])
+            flatvars, flatcons = zip(*[get_or_make_var(arg, csemap=csemap, context=max(POSITIVE,context)) for arg in expr.args])
             newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
 

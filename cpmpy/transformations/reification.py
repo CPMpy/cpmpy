@@ -52,7 +52,7 @@ def only_bv_reifies(constraints, csemap=None):
             newcons.append(cpm_expr)
     return newcons
 
-def only_implies(constraints, csemap=None):
+def only_implies(constraints, csemap=None, rewrite_bool_eq=True):
     """
         Transforms all reifications to ``BV -> BE`` form
 
@@ -75,7 +75,7 @@ def only_implies(constraints, csemap=None):
         # Operators: check BE -> BV
         if cpm_expr.name == '->' and cpm_expr.args[1].name == '==':
             a0,a1 = cpm_expr.args
-            if a1.args[0].is_bool() and a1.args[1].is_bool():
+            if rewrite_bool_eq and a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                 #                   :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                 #                   :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)

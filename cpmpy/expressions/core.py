@@ -829,7 +829,7 @@ def _wsum_should(arg):
      all substractions are transformed into less readable wsums)
     """
     return isinstance(arg, Operator) and \
-           (arg.name == 'wsum' or \
+           (arg.name == 'sum' or arg.name == 'wsum' or \
             (arg.name == 'mul' and len(arg.args) == 2 and \
              any(is_num(a) for a in arg.args)
             ) )

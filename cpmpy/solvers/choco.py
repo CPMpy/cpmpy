@@ -346,7 +346,7 @@ class CPM_choco(SolverInterface):
 
         # make objective function non-nested
         obj_var = intvar(*get_bounds(expr))
-        self += obj_var == expr
+        self.add(obj_var == expr, internal=True)
 
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
@@ -406,7 +406,7 @@ class CPM_choco(SolverInterface):
 
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr, internal:bool=False):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -425,7 +425,8 @@ class CPM_choco(SolverInterface):
         :return: self
         """
         # add new user vars to the set
-        get_variables(cpm_expr, collect=self.user_vars)
+        if not internal:
+            get_variables(cpm_expr, collect=self.user_vars)
         # ensure all vars are known to solver
 
         # transform and post the constraints
@@ -596,7 +597,7 @@ class CPM_choco(SolverInterface):
                 table = table.astype(float) # nan's require float dtype
                 # Choco requires a wildcard value not present in dom of args,
                 # take value lower than anything else
-                chc_star = min(np.nanmin(table), *get_bounds(array)[0]) -1
+                chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
             elif cpm_expr.name == "regular":
