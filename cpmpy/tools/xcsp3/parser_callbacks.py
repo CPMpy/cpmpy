@@ -596,16 +596,16 @@ class CallbacksCPMPy(Callbacks):
             expr = s + d
             cpm_ends.append(cp.intvar(*get_bounds(expr)))
 
-        # if condition.operator == TypeConditionOperator.LE:
-        self.cpm_model += xglobals.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
-                                        self.get_cpm_var(condition.right_operand()))
-        # else:
-        #     # post decomposition directly
-        #     # be smart and chose task or time decomposition #TODO you did task decomp in both cases
-        #     if max(get_bounds(cpm_ends)[1]) >= 100:
-        #         self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
-        #     else:
-        #         self._cumulative_time_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
+        if condition.operator == TypeConditionOperator.LE:
+            self.cpm_model += xglobals.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
+                                            self.get_cpm_var(condition.right_operand()))
+        else:
+            # post decomposition directly
+            # be smart and chose task or time decomposition #TODO you did task decomp in both cases
+            if max(get_bounds(cpm_ends)[1]) >= 100:
+                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
+            else:
+                self._cumulative_time_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
 
     def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, condition: Condition):
         cpm_demands = cp.cpm_array(cpm_demands)
