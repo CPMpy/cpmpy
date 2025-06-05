@@ -4,20 +4,19 @@ This document contains the installation and usage instructions for the CPMpy sub
 
 ## Submission
 
-This submission is the basis for multiple submissions with different solver backends. CPMpy is a modelling system which can translate to many different solvers, five of which have been chosen for the XCSP3 competition. The data files and install instructions are shared (some solvers have additional installation steps). From the executable's point of view, the major difference between the submissions is the actual command used to run the executable, where the correct solver must be set. These commands are listed later on. Internally, different solver-tailored backends will be used, where the COP and CSP models get transformed as to satisfy the modelling capabilities of the selected solver target.
+This submission is the basis for multiple submissions with different solver backends. CPMpy is a modelling system which can translate to many different solvers, seven of which have been chosen for the XCSP3 competition. The data files and install instructions are shared (some solvers have additional installation steps). From the executable's point of view, the major difference between the submissions is the actual command used to run the executable, where the correct solver must be set. These commands are listed later on. Internally, different solver-tailored backends will be used, where the COP and CSP models get transformed as to satisfy the modelling capabilities of the selected solver target.
 
 The CPMpy modelling system will compete in the following tracks, using the following solver backends:
 
-| CPMpy_backend | CSP sequential | COP sequential (3') | COP sequential (30') |
-| - | - | - | - |
-| **cpmpy_ortools** | yes | yes | yes |
-| **cpmpy_exact** | yes | yes | yes |
-| **cpmpy_z3** | yes | yes | yes |
-| **cpmpy_gurobi** | yes | yes | yes |
-| **cpmpy_cpo** | yes | yes | yes |
-
-<!-- | **cpmpy_mnz_gecode** | yes | yes | no | yes | yes |
-| **cpmpy_mnz_chuffed** | yes | yes | no | yes | yes | -->
+| CPMpy_backend | CSP sequential | COP sequential (3') | COP sequential (30') | COP parallel |
+| - | - | - | - | - |
+| **cpmpy_ortools** | yes | yes | yes | yes |
+| **cpmpy_exact** | yes | yes | yes | no |
+| **cpmpy_z3** | yes | yes | yes | no |
+| **cpmpy_gurobi** | yes | yes | yes | yes |
+| **cpmpy_cpo** | yes | yes | yes | yes |
+| **cpmpy_mnz_gecode** | yes | yes | yes | yes | no |
+| **cpmpy_mnz_chuffed** | yes | yes | yes | yes | no |
 
 
 ## Setup
@@ -212,8 +211,8 @@ The same executable supports multiple solver backends and is used for all of the
 - `cpmpy_z3`
 - `cpmpy_gurobi`
 - `cpmpy_cpo`
-<!-- - `cpmpy_mnz_chuffed`
-- `cpmpy_mnz_gecode` -->
+- `cpmpy_mnz_chuffed`
+- `cpmpy_mnz_gecode`
 
 The commands are as follows:
 
@@ -224,6 +223,6 @@ The commands are as follows:
 | **cpmpy_z3** | python ./cpmpy/tools/xcsp3/xcsp3_cpmpy.py BENCHNAME --intermediate --cores=NBCORES --solver=z3 --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 | **cpmpy_gurobi** | python ./cpmpy/tools/xcsp3/xcsp3_cpmpy.py BENCHNAME --intermediate --cores=NBCORES --solver=gurobi --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 | **cpmpy_cpo** | python ./cpmpy/tools/xcsp3/xcsp3_cpmpy.py BENCHNAME --intermediate --cores=NBCORES --solver=cpo --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-<!-- | **cpmpy_mnz_chuffed** | python ./cpmpy/tools/xcsp3/xcsp3_cpmpy.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
-| **cpmpy_mnz_gecode** | python ./cpmpy/tools/xcsp3/xcsp3_cpmpy.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc --subsolver=gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED |  -->
+| **cpmpy_mnz_chuffed** | python ./cpmpy/tools/xcsp3/xcsp3_cpmpy.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc:chuffed --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
+| **cpmpy_mnz_gecode** | python ./cpmpy/tools/xcsp3/xcsp3_cpmpy.py BENCHNAME --intermediate --cores=NBCORES --solver=minizinc:gecode --mem-limit=MEMLIMIT --time-limit=TIMELIMIT --seed=RANDOMSEED | 
 
