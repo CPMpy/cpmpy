@@ -8,13 +8,13 @@ This submission is the basis for multiple submissions with different solver back
 
 The CPMpy modelling system will compete in the following tracks, using the following solver backends:
 
-| CPMpy_backend | CSP sequential | COP sequential (30') |
-| - | - | - |
-| **cpmpy_ortools** | yes | yes |
-| **cpmpy_exact** | yes | yes |
-| **cpmpy_z3** | yes | yes |
-| **cpmpy_gurobi** | yes | yes |
-| **cpmpy_cpo** | yes | yes |
+| CPMpy_backend | CSP sequential | COP sequential (3') | COP sequential (30') |
+| - | - | - | - |
+| **cpmpy_ortools** | yes | yes | yes |
+| **cpmpy_exact** | yes | yes | yes |
+| **cpmpy_z3** | yes | yes | yes |
+| **cpmpy_gurobi** | yes | yes | yes |
+| **cpmpy_cpo** | yes | yes | yes |
 
 <!-- | **cpmpy_mnz_gecode** | yes | yes | no | yes | yes |
 | **cpmpy_mnz_chuffed** | yes | yes | no | yes | yes | -->
