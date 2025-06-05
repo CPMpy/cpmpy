@@ -134,7 +134,7 @@ def xcsp3_wrapper(conn, kwargs, verbose):
         conn.close()
 
 # exec_args = (filename, metadata, solver, time_limit, mem_limit, output_file, verbose) 
-def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool, str]) -> None:
+def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool, str]) -> None:
     """
     Solve a single XCSP3 instance and write results to file immediately.
     
@@ -149,7 +149,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool, str]
     """
     warnings.filterwarnings("ignore")
     
-    filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate, checker_path = args
+    filename, metadata, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path = args
 
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
@@ -175,7 +175,19 @@ def execute_instance(args: Tuple[str, dict, str, int, int, str, bool, bool, str]
     # Call xcsp3 in separate process
     ctx = multiprocessing.get_context("spawn")
     parent_conn, child_conn = multiprocessing.Pipe() # communication pipe between processes
-    process = ctx.Process(target=xcsp3_wrapper, args=(child_conn, {"benchname":filename, "solver": solver, "time_limit": time_limit, "mem_limit": mem_limit, "intermediate": intermediate, "time_buffer": 1}, verbose))
+    process = ctx.Process(target=xcsp3_wrapper, args=(
+                                                    child_conn, 
+                                                      {
+                                                          "benchname": filename, 
+                                                          "solver": solver, 
+                                                          "time_limit": time_limit, 
+                                                          "mem_limit": mem_limit, 
+                                                          "intermediate": intermediate, 
+                                                          "force_mem_limit": True,
+                                                          "time_buffer": 1,
+                                                          "cores": cores,
+                                                        }, 
+                                                    verbose))
     process.start()
     process.join(timeout=time_limit)
 
@@ -312,7 +324,8 @@ def run_solution_checker(JAR, instance_location, out_file, verbose, cpm_time):
 
 
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
-                   time_limit: int = 300, mem_limit: Optional[int] = 4096, output_dir: str = 'results',
+                   time_limit: int = 300, mem_limit: Optional[int] = 4096, cores: int=1,
+                   output_dir: str = 'results',
                    verbose: bool = False, intermediate: bool = False,
                    checker_path: Optional[str] = None) -> str:
     """
@@ -348,16 +361,18 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
         futures = [executor.submit(execute_instance,  # below: args
-                                   (filename, metadata, solver, time_limit, mem_limit, output_file, verbose, intermediate, checker_path))
+                                   (filename, metadata, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
                    for filename, metadata in dataset]
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
             try:
-                _ = future.result()  # for cleanliness sake, result is empty
+                _ = future.result(timeout=time_limit+60)  # for cleanliness sake, result is empty
             except TimeoutError:
                 pass
             except Exception as e:
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
+
+        raise()
     
     return output_file
 
@@ -371,6 +386,7 @@ if __name__ == "__main__":
     parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
     parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
+    parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign tp a single instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')

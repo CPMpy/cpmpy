@@ -117,6 +117,13 @@ def init_signal_handlers():
     signal.signal(signal.SIGABRT, sigterm_handler)
     signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
 
+def set_memory_limit(mem_limit):
+    if mem_limit is not None:
+        soft = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_SOFT), mib_as_bytes(MEMORY_BUFFER_SOFT))
+        hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
+        print_comment(f"Setting memory limit: {soft} -- {hard}")
+        resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
+
 def mib_as_bytes(mib: int) -> int:
     return mib * 1024 * 1024
 
@@ -506,6 +513,7 @@ def xcsp3_cpmpy(benchname: str,
                 solver: str = None,
                 time_buffer: int = 0,
                 intermediate: bool = False,
+                force_mem_limit: bool = False,
                 **kwargs,
 ):
 
@@ -525,11 +533,8 @@ def xcsp3_cpmpy(benchname: str,
 
         if seed is not None:
             random.seed(seed)
-        if mem_limit is not None:
-            soft = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_SOFT), mib_as_bytes(MEMORY_BUFFER_SOFT))
-            hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
-            print_comment(f"Setting memory limit: {soft} -- {hard}")
-            resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
+        if mem_limit is not None and force_mem_limit:
+            set_memory_limit(mem_limit)
         # TODO should the executable even interrupt itself -> just wait for external signal
         #      let the executable use all the time it can get
         # if time_limit is not None:
@@ -707,6 +712,8 @@ if __name__ == "__main__":
     parser.add_argument("--time-buffer", required=False, type=int, default=1)
     # If intermediate solutions should be printed (if the solver supports it)
     parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
+    # If memory limit gets exceeded, force quit the instance
+    parser.add_argument("--force-mem-limit", action=argparse.BooleanOptionalAction)
 
     # Process cli arguments 
     args = parser.parse_args()
