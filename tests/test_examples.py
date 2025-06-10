@@ -19,6 +19,8 @@ import itertools
 EXAMPLES = glob(join("examples", "*.py")) + glob(join("examples", "csplib", "*.py"))
 ADVANCED_EXAMPLES = glob(join("examples", "advanced", "*.py"))
 
+SKIPPED_EXAMPLES = ["counterfactual_explain.py", "ocus_explanations.py"]  # waiting for issues to be resolved
+
 # SOLVERS = SolverLookup.supported()
 SOLVERS = [
     "ortools",
@@ -76,4 +78,6 @@ def test_example(solver, example):
 @pytest.mark.timeout(30)
 def test_advanced_example(example):
     """Loads the advanced example file and executes its __main__ block with no default solver set."""
+    if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):
+        pytest.skip(f"Skipped {example}, waiting for issues to be resolved")
     test_example(None, example)

@@ -208,7 +208,8 @@ def explain_one_step_ocus(hard, soft_lit, cost, remaining_sol_to_explain, solver
             print("\n\t hs =", hs, S)
 
         # SAT check and computation of model
-        if not SAT.solve(assumptions=list(S)):
+        # TODO: fix needing to cast to list
+        if not SAT.solve(assumptions=S):
             if verbose > 1:
                 print("\n\t ===> OCUS =", S)
 
