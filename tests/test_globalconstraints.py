@@ -6,10 +6,13 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError
-from cpmpy.expressions.utils import STAR
+from cpmpy.expressions.utils import STAR, argvals
 from cpmpy.solvers import CPM_minizinc
 
+from utils import skip_on_missing_pblib
 
+
+@skip_on_missing_pblib(skip_on_exception_only=True)
 class TestGlobal(unittest.TestCase):
     def test_alldifferent(self):
         """Test all different constraint with a set of
@@ -294,7 +297,7 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertEqual(iv.value(),1)
-        cons = cp.InDomain(min(iv_arr), vals)
+        cons = cp.InDomain(cp.min(iv_arr), vals)
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         iv2 = cp.intvar(-8, 8)
@@ -302,25 +305,25 @@ class TestGlobal(unittest.TestCase):
         cons = [cp.InDomain(iv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertIn(iv.value(), vals)
+        self.assertIn(iv.value(), argvals(vals))
         vals = [1, 5, 8, -4]
         bv = cp.boolvar()
         cons = [cp.InDomain(bv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertIn(bv.value(), vals)
+        self.assertIn(bv.value(), set(vals))
         vals = [iv2, 5, 8, -4]
         bv = cp.boolvar()
         cons = [cp.InDomain(bv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertIn(bv.value(), vals)
+        self.assertIn(bv.value(), argvals(vals))
         vals = [bv & bv, 5, 8, -4]
         bv = cp.boolvar()
         cons = [cp.InDomain(bv, vals)]
         model = cp.Model(cons)
         self.assertTrue(model.solve())
-        self.assertIn(bv.value(), vals)
+        self.assertIn(bv.value(), argvals(vals))
 
     def test_lex_lesseq(self):
         from cpmpy import BoolVal
@@ -525,6 +528,34 @@ class TestGlobal(unittest.TestCase):
                     self.assertTrue(cp.Model(cp.Table([iv], [[0]])).solve(solver=s))
                 except (NotImplementedError, NotSupportedError):
                     pass
+
+    def test_regular(self):
+        # test based on the example from XCSP3 specifications https://arxiv.org/pdf/1611.03398
+        x = cp.intvar(0, 1, shape=7)
+
+        transitions = [("a", 0, "a"), ("a", 1, "b"), ("b", 1, "c"), ("c", 0, "d"), ("d", 0, "d"), ("d", 1, "e"),
+                       ("e", 0, "e")]
+        start = "a"
+        ends = ["e"]
+
+        true_sols = set()
+        false_sols = set()
+
+        solutions = [(0,0,0,1,1,0,1), (0,0,1,1,0,0,1), (0,0,1,1,0,1,0), (0,1,1,0,0,0,1), (0,1,1,0,0,1,0),
+                     (0,1,1,0,1,0,0), (1,1,0,0,0,0,1), (1,1,0,0,0,1,0), (1,1,0,0,1,0,0), (1,1,0,1,0,0,0)]
+
+        true_model = cp.Model(cp.Regular(x, transitions, start, ends))
+        false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
+
+        num_true = true_model.solveAll(display=lambda : true_sols.add(tuple(argvals(x))))
+        num_false = false_model.solveAll(display=lambda : false_sols.add(tuple(argvals(x))))
+
+        self.assertEqual(num_true, len(solutions))
+        self.assertSetEqual(true_sols, set(solutions))
+
+        self.assertEqual(num_true + num_false, 2**7)
+        self.assertEqual(len(true_sols & false_sols), 0) # no solutions can be in both
+
 
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)

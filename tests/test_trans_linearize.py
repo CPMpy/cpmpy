@@ -196,7 +196,7 @@ class TestTransLinearize(unittest.TestCase):
 
 
         lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
-        self.assertEqual(str(lin_mod), '[IV8 <= 0, sum([2, -1] * [IV9, IV10]) == 0, sum([1, -1] * [IV8, IV11]) == 0, sum([1, 1, -1] * [IV10, IV8, x]) == 0]')
+        self.assertEqual(str(lin_mod), '[IV7 <= 0, sum([2, -1] * [IV8, IV9]) == 0, sum([1, 1, -1] * [IV9, IV7, x]) == 0]')
         self.assertTrue(cp.Model(lin_mod).solve())
         self.assertIn(x.value(), {2, 4}) # can never be < 0
 
@@ -294,6 +294,10 @@ class TestConstRhs(unittest.TestCase):
 
 class TestVarsLhs(unittest.TestCase):
 
+    def setUp(self): # reset counters
+        _IntVarImpl.counter = 0
+        _BoolVarImpl.counter = 0
+
     def test_trivial_unsat_sum(self):
         a,b,c = [cp.intvar(0,10,name=n) for n in "abc"]
         rhs = 5
@@ -337,9 +341,9 @@ class TestVarsLhs(unittest.TestCase):
         cons = a ** 3 == b
         lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
 
-        self.assertEqual(lin_cons[0], "((a) * (a)) == (IV0)")
-        self.assertEqual(lin_cons[1], "((a) * (IV0)) == (IV1)")
-        self.assertEqual(lin_cons[2], "sum([1, -1] * [IV1, b]) == 0")
+        self.assertEqual(str(lin_cons[0]), "((a) * (a)) == (IV0)")
+        self.assertEqual(str(lin_cons[1]), "((a) * (IV0)) == (IV1)")
+        self.assertEqual(str(lin_cons[2]), "sum([1, -1] * [IV1, b]) == 0")
 
         # this is not supported
         cons = a ** b == 3
