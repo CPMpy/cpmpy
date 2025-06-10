@@ -8,7 +8,6 @@ Will only run solver tests on solvers that are installed
 """
 from glob import glob
 from os.path import join
-from os import getcwd
 import sys
 
 import runpy
@@ -17,12 +16,8 @@ from cpmpy import SolverLookup
 from cpmpy.exceptions import NotSupportedError, TransformationNotImplementedError
 import itertools
 
-prefix = '.' if 'y' in getcwd()[-2:] else '..'
-
-EXAMPLES = glob(join(prefix, "examples", "*.py")) + \
-           glob(join(prefix, "examples", "csplib", "*.py"))
-
-ADVANCED_EXAMPLES = glob(join(prefix, "examples", "advanced", "*.py"))
+EXAMPLES = glob(join("examples", "*.py")) + glob(join("examples", "csplib", "*.py"))
+ADVANCED_EXAMPLES = glob(join("examples", "advanced", "*.py"))
 
 # SOLVERS = SolverLookup.supported()
 SOLVERS = [
@@ -50,13 +45,14 @@ def test_example(solver, example):
 
     base_solvers = SolverLookup.base_solvers
     try:
-        solver_class = SolverLookup.lookup(solver)
-        if not solver_class.supported():
-            # check this here, as unsupported solvers can fail the example for various reasons
-            return pytest.skip(reason=f"solver {solver} not supported")
+        if solver:
+            solver_class = SolverLookup.lookup(solver)
+            if not solver_class.supported():
+                # check this here, as unsupported solvers can fail the example for various reasons
+                return pytest.skip(reason=f"solver {solver} not supported")
+            # Overwrite SolverLookup.base_solvers to set the target solver first, making it the default
+            SolverLookup.base_solvers = lambda: sorted(base_solvers(), key=lambda s: s[0] == solver, reverse=True)
 
-        # Overwrite SolverLookup.base_solvers to set the target solver first, making it the default
-        SolverLookup.base_solvers = lambda: sorted(base_solvers(), key=lambda s: s[0] == solver, reverse=True)
         sys.argv = [example]  # avoid pytest arguments being passed the executed module
         runpy.run_path(example, run_name="__main__")  # many examples won't do anything `__name__ != "__main__"`
     except (NotSupportedError, TransformationNotImplementedError) as e:
@@ -80,11 +76,4 @@ def test_example(solver, example):
 @pytest.mark.timeout(30)
 def test_advanced_example(example):
     """Loads the advanced example file and executes its __main__ block with no default solver set."""
-    try:
-        sys.argv = [example]
-        runpy.run_path(example, run_name="__main__")
-    except Exception as e:
-        if "CPM_exact".lower() in str(e).lower():
-            pytest.skip(reason=f"Skipped, example uses Exact but is not installed, raised: {e}")
-        else:
-            raise e
+    test_example(None, example)
