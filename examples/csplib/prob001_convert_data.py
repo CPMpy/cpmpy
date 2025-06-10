@@ -146,8 +146,6 @@ if __name__ == "__main__":
     print(f"File {fname} does not exist. No data to convert.")
   else:
     problems = list(parse_data(fname))
-    # outstring = pprint.pformat(problems, indent=4, sort_dicts=False)
-    # outstring = outstring.replace("'",'"')
 
     with open(out, "w") as outfile:
       json.dump(problems, outfile, cls=CompactJSONEncoder, indent=4)
