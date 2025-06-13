@@ -301,7 +301,8 @@ class CPM_z3(SolverInterface):
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
-        if isinstance(expr, GlobalFunction): # not supported by Z3
+        # if isinstance(expr, GlobalFunction): 
+        if isinstance(expr, Expression) and expr.has_subexpr(): # not supported by Z3
             obj_var = intvar(*expr.get_bounds())
             self.add(expr == obj_var, internal=True)
             expr = obj_var
