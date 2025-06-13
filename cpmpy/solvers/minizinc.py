@@ -715,8 +715,11 @@ class CPM_minizinc(SolverInterface):
         
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
+        # elif isinstance(expr, DirectConstraint):
+        #     return "{}({})".format(expr.name, ",".join(args_str))
+
         elif isinstance(expr, DirectConstraint):
-            return "{}({})".format(expr.name, ",".join(args_str))
+            return expr.callSolver(self, self.mzn_model)
 
         print_map = {"allequal": "all_equal", "xor": "xorall"}
         if expr.name in print_map:
