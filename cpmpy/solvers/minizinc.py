@@ -712,7 +712,7 @@ class CPM_minizinc(SolverInterface):
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
-
+        
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
         elif isinstance(expr, DirectConstraint):
