@@ -4,6 +4,7 @@ A collection of XCSP3 solver-native global constraints.
 
 import numpy as np
 import cpmpy as cp
+from cpmpy import cpm_array
 from cpmpy.expressions.globalconstraints import DirectConstraint
 
 
@@ -72,5 +73,18 @@ class MinizincSubcircuit(DirectConstraint):
     def callSolver(self, CPMpy_solver, Native_solver):
         # minizinc is offset 1, which can be problematic here...
         args_str = ["{}+1".format(CPMpy_solver._convert_expression(e)) for e in self.args[0]]
+        return "{}([{}])".format("subcircuit", ",".join(args_str))
+
+class MinizincSubcircuitWithStart(DirectConstraint):
+    def __init__(self, arguments):
+        super().__init__("minizincsubcircuitwithstart", arguments)
+
+    def callSolver(self, CPMpy_solver, Native_solver):
+        # minizinc is offset 1, which can be problematic here...
+        start_index = self.args[0][-1]
+        succ = cpm_array(self.args[0][:-1]) # Successor variables
+
+        CPMpy_solver += (succ[start_index] != start_index)
+        args_str = ["{}+1".format(CPMpy_solver._convert_expression(e)) for e in succ]
         return "{}([{}])".format("subcircuit", ",".join(args_str))
         
