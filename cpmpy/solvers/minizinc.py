@@ -467,7 +467,7 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        # get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
+        get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
 
         # make objective function or variable and post
         obj = self._convert_expression(expr)

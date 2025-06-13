@@ -345,6 +345,8 @@ class CPM_cpo(SolverInterface):
             
                 technical side note: any constraints created during conversion of the objective are permanently posted to the solver
         """
+        get_variables(expr, collect=self.user_vars)
+        
         dom = self.get_docp().modeler
         if self.has_objective():
             self.cpo_model.remove(self.cpo_model.get_objective_expression())

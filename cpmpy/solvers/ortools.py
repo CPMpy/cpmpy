@@ -327,8 +327,8 @@ class CPM_ortools(SolverInterface):
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
+        get_variables(expr, collect=self.user_vars)  # add objvars to vars <- XCSP3 needs also unused vars to be posted, added to user vars
         self.add(flat_cons, internal=True)  # add potentially created constraints
-        get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)

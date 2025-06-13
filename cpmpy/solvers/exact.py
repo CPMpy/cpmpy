@@ -423,7 +423,7 @@ class CPM_exact(SolverInterface):
         self.objective_is_min_ = minimize
 
         # make objective function non-nested and with positive BoolVars only
-        self.user_vars.update(get_variables(expr))  # add objvars to vars
+        get_variables(expr, collect=self.user_vars) # add objvars to vars
         (flat_obj, flat_cons) = flatten_objective(expr)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         self.add(flat_cons, internal=True) # add potentially created constraints

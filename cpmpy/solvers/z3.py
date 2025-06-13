@@ -294,6 +294,8 @@ class CPM_z3(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
+        get_variables(expr, collect=self.user_vars)
+
         import z3
         # objective can be a nested expression for z3
         if not isinstance(self.z3_solver, z3.Optimize):
