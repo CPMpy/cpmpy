@@ -216,6 +216,11 @@ class CPM_exact(SolverInterface):
         self.cpm_status.runtime = end - start
 
         self.objective_value_ = None
+        
+        self._fillVars()
+        if self.has_objective():
+            self.objective_value_ = self.objective_.value()
+
         # translate exit status
         #   see 'toOptimum' documentation:
         #   https://gitlab.com/nonfiction-software/exact/-/blob/main/src/interface/IntProg.cpp#L877
@@ -235,19 +240,13 @@ class CPM_exact(SolverInterface):
         elif my_status == "INCONSISTENT": # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "TIMEOUT": # found timeout
-            if self.xct_solver.hasSolution(): # found a (sub-)optimal solution
+            if self.objective_value_ is not None: # found a (sub-)optimal solution
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else: # no solution found
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
         
-        self._fillVars()
-        if self.has_objective():
-            if self.objective_is_min_:
-                self.objective_value_ = obj_val
-            else: # maximize, so actually negative value
-                self.objective_value_ = -obj_val
         
         # True/False depending on self.cpm_status
         return self._solve_return(self.cpm_status)
