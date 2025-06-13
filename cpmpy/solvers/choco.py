@@ -619,14 +619,8 @@ class CPM_choco(SolverInterface):
                 expr, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.member(expr, table)
             elif cpm_expr.name == "cumulative":
-                start, dur, end, demand, cap = cpm_expr.args
-                # start, end, demand and cap should be var
-                start, end, demand, cap = self._to_vars([start, end, demand, cap])
-                # duration can be var or int
-                dur = self.solver_vars(dur)
-                # Create task variables. Choco can create them only one by one
-                tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
-                return self.chc_model.cumulative(tasks, demand, cap)
+                start, dur, end, demand, cap = self._to_vars(cpm_expr.args)
+                return self.chc_model.cumulative_vars(start, dur, end, demand, cap)
             elif cpm_expr.name == "precedence":
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":
