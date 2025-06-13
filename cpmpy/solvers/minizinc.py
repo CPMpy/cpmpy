@@ -437,13 +437,13 @@ class CPM_minizinc(SolverInterface):
         if cpm_var not in self._varmap:
             # clean the varname
             varname = cpm_var.name
-            mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
+            mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '').replace('#', '_')
 
             # test if the name is a valid minizinc identifier
             if not self.mzn_name_pattern.search(mzn_var):
                 raise MinizincNameException("Minizinc only accept names with alphabetic characters, "
                                             "digits and underscores. "
-                                "First character must be an alphabetic character")
+                                f"First character must be an alphabetic character: {mzn_var}")
             if mzn_var in self.keywords:
                 raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
 
@@ -467,7 +467,7 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        # get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
+        get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
 
         # make objective function or variable and post
         obj = self._convert_expression(expr)
@@ -712,11 +712,14 @@ class CPM_minizinc(SolverInterface):
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
-
+        
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
+        # elif isinstance(expr, DirectConstraint):
+        #     return "{}({})".format(expr.name, ",".join(args_str))
+
         elif isinstance(expr, DirectConstraint):
-            return "{}({})".format(expr.name, ",".join(args_str))
+            return expr.callSolver(self, self.mzn_model)
 
         print_map = {"allequal": "all_equal", "xor": "xorall"}
         if expr.name in print_map:

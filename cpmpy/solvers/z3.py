@@ -45,6 +45,7 @@
     Module details
     ==============
 """
+import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -293,15 +294,17 @@ class CPM_z3(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
+        get_variables(expr, collect=self.user_vars)
+
         import z3
         # objective can be a nested expression for z3
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
-        if isinstance(expr, GlobalFunction): # not supported by Z3
-            obj_var = intvar(*expr.get_bounds())
-            self += expr == obj_var
-            expr = obj_var
+        # if isinstance(expr, GlobalFunction): # not supported by Z3
+        obj_var = intvar(*expr.get_bounds())
+        self.add(expr == obj_var, internal=True)
+        expr = obj_var
 
         obj = self._z3_expr(expr)
         if minimize:
@@ -327,11 +330,11 @@ class CPM_z3(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod"})
-        supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
+        supported = {"alldifferent", "xor", "ite", "mapdomain", "table"}  # z3 accepts these reified too, TODO mapdomain is a hack to prevent posting it
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr, internal:bool=False):
         """
             Z3 supports nested expressions so translate expression tree and post to solver API directly
 
@@ -351,13 +354,15 @@ class CPM_z3(SolverInterface):
         """
         # all variables are user variables, handled in `solver_var()`
         # unless their constraint gets simplified away, so lets collect them anyway
-        get_variables(cpm_expr, collect=self.user_vars)
+        if not internal:
+            get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
         for cpm_con in self.transform(cpm_expr):
             # translate each expression tree, then post straight away
             z3_con = self._z3_expr(cpm_con)
-            self.z3_solver.add(z3_con)
+            if z3_con is not None:
+                self.z3_solver.add(z3_con)
 
         return self
     __add__ = add  # avoid redirect in superclass
@@ -496,6 +501,26 @@ class CPM_z3(SolverInterface):
             elif cpm_con.name == 'ite':
                 return z3.If(self._z3_expr(cpm_con.args[0]), self._z3_expr(cpm_con.args[1]),
                              self._z3_expr(cpm_con.args[2]))
+            elif cpm_con.name == "mapdomain":
+                # Hack: dummy native as to prevent posting MapDomain to Z3
+                return None
+            elif cpm_con.name == "table":
+                # Hack: dummy native at to have unique Z3 decomposition for table (even if result of decomposition of another constraint)
+                arr, tab = cpm_con.args
+                if len(tab) == 1:
+                    self.add([x == v for x,v in zip(arr, tab[0])], internal=True)
+                    return None
+
+                row_selected = cp.boolvar(shape=len(tab))
+                
+                cons = [Operator("or", row_selected)]
+                for i, row in enumerate(tab):
+                    # lets already flatten it a bit
+                    cons += [Operator("->", [row_selected[i], x == v]) for x,v in zip(arr, row)]
+                self.add(cons, internal=True)
+                return None
+
+
 
             raise ValueError(f"Global constraint {cpm_con} should be decomposed already, please report on github.")
 
