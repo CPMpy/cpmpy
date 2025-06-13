@@ -242,7 +242,7 @@ class SubCircuitWithStart(GlobalConstraint):
         succ = cpm_array(self.args[:-1]) # Successor variables
 
         constraining = []
-        constraining += [SubCircuit(succ[:-1])] # The successor variables should form a subcircuit.
+        constraining += [SubCircuit(succ)] # The successor variables should form a subcircuit.
         constraining += [succ[start_index] != start_index] # The start_index should be inside the subcircuit.
 
         defining = []
