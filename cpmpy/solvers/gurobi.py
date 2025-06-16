@@ -486,6 +486,23 @@ class CPM_gurobi(SolverInterface):
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
         return self
 
+    def solution_hint(self, cpm_vars, vals):
+        """
+        Gurobi supports warmstarting the solver with a (in)feasible solution.
+        The provided value will be affect branching heurstics during solving, making it more likley the final solution will contain the provided assignment.
+        To learn more about solution hinting in gurobi, see:
+        https://docs.gurobi.com/projects/optimizer/en/current/reference/attributes/variable.html#varhintval
+        Optionally, you can also set the relative priority of the hint, using:
+        `solver.solver_var(cpm_var).setAttr("VarHintPri", <priority>)`
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        for cpm_var, val in zip(cpm_vars, vals):
+            self.solver_var(cpm_var).setAttr("VarHintVal", val)
+
+        # disable update, model will be updated when solve() is called
+        # self.grb_model.update()
+
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
