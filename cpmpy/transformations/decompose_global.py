@@ -147,7 +147,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     assert isinstance(expr, GlobalFunction)
 
                     # we can do something special for Element
-                    if expr.name == "element" and all(is_num(a) for a in expr.args[0]):
+                    if (expr.name == "element" and all(is_num(a) for a in expr.args[0])) or (expr.name == "count"):
                         # it's an array with constants
                         encoding, otherdef = expr.decompose_numerical()
                         assert encoding.is_bool() is False, "we should get a numerical expression here (wsum over bools)"
