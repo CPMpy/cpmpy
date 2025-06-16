@@ -9,7 +9,7 @@ import pytest
 
 @pytest.mark.parametrize(
         "solver",
-        [name for name, solver in SolverLookup.base_solvers() if solver.supported() if name == "gurobi"]
+        [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
 )
 class TestSolutionHinting:
 
@@ -24,9 +24,11 @@ class TestSolutionHinting:
             slv.solution_hint([], [])
         except NotSupportedError:
             pytest.skip(f"{solver} does not support solution hinting")
+            return
         
         if solver == "gurobi":
             pytest.skip("Gurobi supports solution hinting, but simple models are solved too fast to see the effect")
+            return
         
         if solver == "ortools":
             args = {"cp_model_presolve": False} # hints are not taken into account in presolve
