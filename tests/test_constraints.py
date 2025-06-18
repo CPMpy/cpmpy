@@ -186,7 +186,7 @@ def global_constraints(solver):
     for name, cls in classes:
         if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
             continue
-
+        
         if name == "Xor":
             expr = cls(BOOL_ARGS)
         elif name == "Inverse":
@@ -210,6 +210,10 @@ def global_constraints(solver):
             demand = [4, 5, 7]
             cap = 10
             expr = Cumulative(s, dur, e, demand, cap)
+            yield expr
+            expr = Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
+            yield expr
+            continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
