@@ -116,6 +116,16 @@ def init_signal_handlers():
     signal.signal(signal.SIGABRT, sigterm_handler)
     signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
 
+def set_memory_limit(mem_limit, verbose:bool=False):
+    """
+    Set memory limit (Virtual Memory Size). 
+    """
+    if mem_limit is not None:
+        soft = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_SOFT), mib_as_bytes(MEMORY_BUFFER_SOFT))
+        hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
+        if verbose:
+            print_comment(f"Setting memory limit: {soft} -- {hard}")
+        resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
 def mib_as_bytes(mib: int) -> int:
     return mib * 1024 * 1024
 
@@ -508,16 +518,12 @@ def xcsp3_cpmpy(benchname: str,
         if seed is not None:
             random.seed(seed)
         if mem_limit is not None:
-            soft = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_SOFT), mib_as_bytes(MEMORY_BUFFER_SOFT))
-            hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
-            print_comment(f"Setting memory limit: {soft} -- {hard}")
-            resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
-        # TODO should the executable even interrupt itself -> just wait for external signal
-        #      let the executable use all the time it can get
-        # if time_limit is not None:
-        #     soft = time_limit + 1
-        #     hard = time_limit + 2
-        #     resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
+            set_memory_limit(mem_limit, verbose=verbose)
+
+        # Set time limit (if provided)
+        if time_limit is not None:
+            set_time_limit(int(time_limit - wall_time(p) + time.process_time()), verbose=verbose) # set remaining process time != wall time
+   
 
         sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
