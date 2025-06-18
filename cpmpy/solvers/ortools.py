@@ -556,7 +556,10 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting], 
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
             elif cpm_expr.name == "cumulative":
-                start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
+                start, dur, end, demand, cap = cpm_expr.args
+                if end[0] is None:
+                    end = cpm_expr.get_end_vars()
+                start, dur, end, demand, cap = self.solver_vars([start, dur, end, demand, cap])
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "no_overlap":
