@@ -1,4 +1,5 @@
 """
+    Transforms partial functions into total functions.
 """
 
 from copy import copy
@@ -44,9 +45,10 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         argument must equal the original argument so the two are coupled again. If `is_defined` is false, the new
         argument remains decoupled (can take any value, as will the function's output).
 
-        WARNING! Under the relational semantics, ``b <-> ~(partial==5)`` and ``b <-> (partial!=5)`` mean
-        different things! The second is ``b <-> (is_defined & (total!=5))`` the first is
-        ``b <-> (~is_defined | (total!=5))``.
+        .. warning::
+            Under the relational semantics, ``b <-> ~(partial==5)`` and ``b <-> (partial!=5)`` mean
+            different things! The second is ``b <-> (is_defined & (total!=5))`` the first is
+            ``b <-> (~is_defined | (total!=5))``.
 
 
         A clever observation of the implementation below is that for the above 3 expressions, the 'safe'

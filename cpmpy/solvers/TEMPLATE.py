@@ -1,16 +1,51 @@
 #!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## TEMPLATE.py
+##
 """
-    Template file for a new solver interface
+    Interface to TEMPLATE's API
 
-    Replace <TEMPLATE> by the solver's name, and implement the missing pieces
-    The functions are ordered in a way that could be convenient to 
-    start from the top and continue in that order
+    .. note::
+        [GUIDELINE] Replace <TEMPLATE> by the solver's name, and implement the missing pieces
+        The functions are ordered in a way that could be convenient to 
+        start from the top and continue in that order.
 
-    After you are done filling in the template, remove all comments starting with [GUIDELINE]
+    .. note::
+        After you are done filling in the template, remove all comments starting with [GUIDELINE]
 
-    WARNING: do not include the python package at the top of the file,
-    as CPMpy should also work without this solver installed.
-    To ensure that, include it inside supported() and other functions that need it...
+    .. warning::
+        [GUIDELINE] do not include the python package at the top of the file,
+        as CPMpy should also work without this solver installed.
+        To ensure that, include it inside supported() and other functions that need it...
+
+    <some information on the solver>
+
+    Always use :func:`cp.SolverLookup.get("TEMPLATE") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'TEMPLATEpy' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install TEMPLATEpy
+
+    See detailed installation instructions at:
+    <URL to detailed solver installation instructions, if any>
+
+    The rest of this documentation is for advanced users.
+
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        CPM_template
 """
 
 from typing import Optional
@@ -29,36 +64,15 @@ from ..transformations.flatten_model import flatten_constraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies
 
-"""
-    Interface to TEMPLATE's API
-
-    <some information on the solver>
-
-    Documentation of the solver's own Python API:
-    <URL to docs or source code>
-
-    ===============
-    List of classes
-    ===============
-
-    .. autosummary::
-        :nosignatures:
-
-        CPM_template
-"""
-
 class CPM_template(SolverInterface):
     """
     Interface to TEMPLATE's API
 
-    Requires that the 'TEMPLATEpy' python package is installed:
-    $ pip install TEMPLATEpy
-
-    See detailed installation instructions at:
-    <URL to detailed solver installation instructions, if any>
-
     Creates the following attributes (see parent constructor for more):
     - tpl_model: object, TEMPLATE's model object
+
+    Documentation of the solver's own Python API:
+    <URL to docs or source code>
     """
 
     @staticmethod
@@ -110,7 +124,7 @@ class CPM_template(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
-        #           internally, the constructor relies on __add__ which uses the above solver native object(s)
+        #           internally, the constructor relies on `add()` which uses the above solver native object(s)
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
@@ -147,9 +161,19 @@ class CPM_template(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds
 
-        # translate solver exit status to CPMpy exit status
+        # Translate solver exit status to CPMpy exit status
+        # CSP:                         COP:
+        # ├─ sat -> FEASIBLE           ├─ optimal -> OPTIMAL
+        # ├─ unsat -> UNSATISFIABLE    ├─ sub-optimal -> FEASIBLE
+        # └─ timeout -> UNKNOWN        ├─ unsat -> UNSATISFIABLE
+        #                              └─ timeout -> UNKNOWN
         if my_status is True:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status is False:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status is None:
@@ -250,7 +274,7 @@ class CPM_template(SolverInterface):
 
         # [GUIDELINE] not all solver interfaces have a native "numerical expression" object.
         #       in that case, this function may be removed and a case-by-case analysis of the numerical expression
-        #           used in the constraint at hand is required in __add__
+        #           used in the constraint at hand is required in `add()`
         #       For an example of such solver interface, check out solvers/choco.py or solvers/exact.py
 
         if is_num(cpm_expr):
@@ -275,7 +299,7 @@ class CPM_template(SolverInterface):
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    # `__add__()` first calls `transform()`
+    # `add()` first calls `transform()`
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -301,7 +325,7 @@ class CPM_template(SolverInterface):
         # ...
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -394,6 +418,7 @@ class CPM_template(SolverInterface):
                 raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_expr)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
@@ -404,7 +429,7 @@ class CPM_template(SolverInterface):
 
             If the problem is an optimization problem, returns only optimal solutions.
 
-           Arguments:
+            Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
@@ -415,7 +440,7 @@ class CPM_template(SolverInterface):
             Returns: number of solutions found
         """
 
-        # check if objective function
+        # check if objective function (optional if solver doesn't support finding all solutions for COP)
         if self.has_objective():
             raise NotSupportedError("TEMPLATE does not support finding all optimal solutions")
 
@@ -425,7 +450,21 @@ class CPM_template(SolverInterface):
         else:
             callback = display
 
-        self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+        my_status = self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+
+        # new status, translate runtime
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds (of entire solveAll call)
+
+        # Translate solver exit status to CPMpy exit status
+        # CSP & COP:
+        # ├─ all solutions found -> OPTIMAL
+        # ├─ at least 1 found (timeout / solution limit reached) -> FEASIBLE
+        # ├─ 0 solutions found due to timeout -> UNKNOWN
+        # └─ unsat -> UNSATISFIABLE
+
+        # self.cpm_status.exitstatus = ...
+
         # clear user vars if no solution found
         if self.TPL_solver.SolutionCount() == 0:
             for var in self.user_vars:

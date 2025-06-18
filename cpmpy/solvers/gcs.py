@@ -4,7 +4,18 @@
 ## gcs.py
 ##
 """
-    Interface to the Glasgow Constraint Solver's API for the cpmpy library.
+    Interface to the Glasgow Constraint Solver's API for the CPMpy library.
+
+    See:
+    https://github.com/ciaranm/glasgow-constraint-solver
+
+    The key feature of this CP solver is the ability to produce proof logs.
+
+    Always use :func:`cp.SolverLookup.get("gcs") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
 
     Requires that the 'gcspy' python package is installed:
 
@@ -12,10 +23,23 @@
 
         $ pip install gcspy
 
-    The key feature of this solver is the ability to produce proof logs.
+    Source installation instructions:
 
-    See:
-    https://github.com/ciaranm/glasgow-constraint-solver
+    - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
+    - (on Debian-based systems, see https://apt.llvm.org for easy installation)
+    - If necessary ``export CXX=<your up to date C++ compiler (e.g. clang++-15)>``
+    - Ensure you have Boost installed
+    - ``git clone https://github.com/ciaranm/glasgow-constraint-solver.git``
+    - ``cd glasgow-constraint-solver/python``
+    - ``pip install .``
+
+    .. note::
+        If for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
+
+    For the verifier functionality, the 'veripb' tool is also required.
+    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb. 
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -54,23 +78,6 @@ class CPM_gcs(SolverInterface):
     """
     Interface to Glasgow Constraint Solver's API.
 
-    Requires that the 'gcspy' python package is installed: $ pip install gcspy
-
-    Current installation instructions:
-
-    - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
-    - (on Debian-based systems, see https://apt.llvm.org for easy installation)
-    - If necessary `export CXX=<your up to date C++ compiler (e.g. clang++-15)>`
-    - Ensure you have Boost installed
-    - `git clone https://github.com/ciaranm/glasgow-constraint-solver.git`
-    - `cd glasgow-constraint-solver/python`
-    - `pip install .`
-
-    NB: if for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
-
-    For the verifier functionality, the 'veripb' tool is also required.
-    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions. 
-
     Creates the following attributes (see parent constructor for more):
 
     - ``gcs`` : the gcspy solver object
@@ -79,6 +86,9 @@ class CPM_gcs(SolverInterface):
     - ``proof_name`` : name of the last proof (means <proof_name>.opb and <proof_name>.pbp will be present at the proof location)
     - ``veripb_return_code`` : return code from the last VeriPB check.
     - ``proof_check_timeout`` : whether the last VeriPB check timed out.
+
+    Documentation of the solver's own Python API is sparse, but example usage can be found at:
+    https://github.com/ciaranm/glasgow-constraint-solver/blob/main/python/python_test.py
     """
 
     @staticmethod
@@ -165,6 +175,10 @@ class CPM_gcs(SolverInterface):
             self.proof_name = proof_name
         self.proof_location = proof_location
      
+        # set time limit
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
+                 
         # call the solver, with parameters    
         self.gcs_result = self.gcs.solve(
             all_solutions=self.has_objective(), 
@@ -212,6 +226,12 @@ class CPM_gcs(SolverInterface):
 
         # Verify proof, if requested
         if verify:
+
+            # set time limit
+            if verify_time_limit is not None:
+                if verify_time_limit <= 0:
+                    raise ValueError("Time limit for verifying must be positive")
+
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit,
                         veripb_args=veripb_args, display_output=display_verifier_output)
             
@@ -296,6 +316,16 @@ class CPM_gcs(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.gcs_result["solve_time"]
 
+        num_sols = self.gcs_result["solutions"]
+        if self.gcs_result["completed"] and num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        elif self.gcs_result["completed"] and num_sols == 0:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else: # maybe unsat, maybe not (maybe a timeout)
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         # clear user vars if no solution found
         if self._solve_return(self.cpm_status, self.objective_value_) is False:
             for var in self.user_vars:
@@ -306,7 +336,7 @@ class CPM_gcs(SolverInterface):
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit, 
                         veripb_args=veripb_args, display_output=display_verifier_output)
 
-        return self.gcs_result["solutions"]
+        return num_sols
 
     def solver_var(self, cpm_var):
         """
@@ -350,7 +380,7 @@ class CPM_gcs(SolverInterface):
         self += flat_cons # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
-        (obj, obj_cons) = get_or_make_var(flat_obj)
+        (obj, obj_cons) = get_or_make_var(flat_obj, csemap=self._csemap)
         self += obj_cons
 
         self.objective_var = obj
@@ -389,18 +419,18 @@ class CPM_gcs(SolverInterface):
             'circuit', 
             'xor'}
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints
         # but no reification for linear not equals and not half reification for linear equality. 
         # Maybe a future transformation (or future work on the GCS solver).
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']))
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']), csemap=self._csemap)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
 
         # NB: GCS supports a small number of simple expressions as the reifying term
-        # e.g. (x > 3) -> constraint could in principle be supported in future. 
-        cpm_cons = only_bv_reifies(cpm_cons)
+        # e.g. (x > 3) -> constraint could in principle be supported in the future.
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         str_rep = ""
         for c in cpm_cons:
             str_rep += str(c) + '\n'
@@ -454,7 +484,7 @@ class CPM_gcs(SolverInterface):
 
         return self.veripb_return_code
     
-    def __add__(self, cpm_cons):
+    def add(self, cpm_cons):
         """
         Post a (list of) CPMpy constraints(=expressions) to the solver
         Note that we don't store the constraints in a cpm_model,
@@ -474,7 +504,9 @@ class CPM_gcs(SolverInterface):
                 self.gcs.post_or([self.solver_var(cpm_expr)])
             elif isinstance(cpm_expr, BoolVal):
                 if not cpm_expr:
-                    self.gcs.post_or([])
+                    # bit a hack, empty clause does not work (issue #73 on gcs github)
+                    a = boolvar()
+                    self.gcs.post_and(self.solver_vars([a,~a]))
             elif isinstance(cpm_expr, Operator) or \
                 (cpm_expr.name == '==' and isinstance(cpm_expr.args[0], _BoolVarImpl) \
                 and not isinstance(cpm_expr.args[1], _NumVarImpl)): 
@@ -652,6 +684,7 @@ class CPM_gcs(SolverInterface):
                 raise NotImplementedError(cpm_expr)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
 
         

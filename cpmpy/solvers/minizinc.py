@@ -4,17 +4,7 @@
 ## minizinc.py
 ##
 """
-    Interface to MiniZinc's Python API
-
-    Requires that the 'minizinc' python package is installed:
-
-    .. code-block:: console
-
-        $ pip install minizinc
-
-    as well as the Minizinc bundled binary packages, downloadable from:
-    https://github.com/MiniZinc/MiniZincIDE/releases
-
+    Interface to MiniZinc's Python API.
 
     MiniZinc is a free and open-source constraint modeling language.
     MiniZinc is used to model constraint satisfaction and optimization problems in
@@ -23,10 +13,32 @@
     language that is understood by a wide range of solvers.
     https://www.minizinc.org
 
-    Documentation of the solver's own Python API:
-    https://minizinc-python.readthedocs.io/
+    The MiniZinc interface is text-based: CPMpy writes a textfile and passes it to the minizinc Python package.
 
-    CPMpy can translate CPMpy models to the (text-based) MiniZinc language.
+    Always use :func:`cp.SolverLookup.get("minizinc") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'minizinc' python package is installed:
+
+    .. code-block:: console
+
+        $ pip install minizinc
+
+    as well as the MiniZinc bundled binary packages, downloadable from:
+    https://www.minizinc.org/software.html
+
+    See detailed installation instructions at:
+    https://minizinc-python.readthedocs.io/en/latest/getting_started.html
+
+    Note for **Jupyter notebook** users: MiniZinc uses AsyncIO, so using it in a Jupyter notebook gives
+    you the following error: ``RuntimeError: asyncio.run() cannot be called from a running event loop``
+    You can overcome this by ``pip install nest_asyncio``
+    and adding in the top cell ``import nest_asyncio; nest_asyncio.apply()``
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -57,6 +69,7 @@ import pkg_resources
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, argvals, argval
@@ -70,21 +83,6 @@ class CPM_minizinc(SolverInterface):
     """
     Interface to MiniZinc's Python API
 
-    Requires that the 'minizinc' python package is installed:
-    $ pip install minizinc
-    
-    as well as the MiniZinc bundled binary packages, downloadable from:
-    https://www.minizinc.org/software.html
-
-    See detailed installation instructions at:
-    https://minizinc-python.readthedocs.io/en/latest/getting_started.html
-
-    Note for Jupyter users: MiniZinc uses AsyncIO, so using it in a jupyter notebook gives
-    you the following error: RuntimeError: asyncio.run() cannot be called from a running event loop
-    You can overcome this by `pip install nest_asyncio`
-    and adding in the top cell `import nest_asyncio; nest_asyncio.apply()`
-
-
     Creates the following attributes (see parent constructor for more):
 
     - ``mzn_model``: object, the minizinc.Model instance
@@ -93,6 +91,9 @@ class CPM_minizinc(SolverInterface):
     - ``mzn_result``: object, containing solve results
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
+
+    Documentation of the solver's own Python API:
+    https://minizinc-python.readthedocs.io/
     """
 
     required_version = (2, 8, 2)
@@ -310,6 +311,9 @@ class CPM_minizinc(SolverInterface):
             Does not store the ``minizinc.Instance()`` or ``minizinc.Result()``
         """
 
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
+
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
@@ -361,7 +365,7 @@ class CPM_minizinc(SolverInterface):
 
         return has_sol
 
-    def _post_solve(self, mzn_result):
+    def _post_solve(self, mzn_result, solve_all:bool=False):
         """ shared by solve() and solveAll() """
         import minizinc
 
@@ -384,7 +388,10 @@ class CPM_minizinc(SolverInterface):
         if mzn_status == minizinc.result.Status.SATISFIED:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.ALL_SOLUTIONS:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if solve_all:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.OPTIMAL_SOLUTION:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif mzn_status == minizinc.result.Status.UNSATISFIABLE:
@@ -410,6 +417,10 @@ class CPM_minizinc(SolverInterface):
 
     async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """ Special 'async' function because mzn.solutions() is async """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+        
         # make mzn_inst
         (kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         kwargs['all_solutions'] = True
@@ -421,19 +432,17 @@ class CPM_minizinc(SolverInterface):
             if mzn_result.solution is None:
                 break
 
-            # display (and reverse-map first) if needed
+             # fill in variable values
+            mznsol = mzn_result.solution
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                if hasattr(mznsol, sol_var):
+                    cpm_var._value = getattr(mznsol, sol_var)
+                else:
+                    raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
+
+            # display if needed
             if display is not None:
-                mznsol = mzn_result.solution
-
-                # fill in variable values
-                for cpm_var in self.user_vars:
-                    sol_var = self.solver_var(cpm_var)
-                    if hasattr(mznsol, sol_var):
-                        cpm_var._value = getattr(mznsol, sol_var)
-                    else:
-                        print("Warning, no value for ", sol_var)
-
-                # and the actual displaying
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
@@ -447,7 +456,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars])
+            self += cpm_any([v != v.value() for v in self.user_vars])
 
         if solution_count == 0:
             # clear user vars if no solution found
@@ -456,7 +465,14 @@ class CPM_minizinc(SolverInterface):
                 var._value = None
 
         # status handling
-        self._post_solve(mzn_result)
+        self._post_solve(mzn_result, solve_all=True)
+
+        if solution_count: # found at least one solution
+            if solution_count == solution_limit: # matched solution limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # elif mzn_result.solution is None: <- is implicit since nothing needs to update
+                # last iteration didn't find a solution
+                # nothing needs to update since _post_solve already set state correctly (state from the second-last iteration)
 
         return solution_count
 
@@ -540,9 +556,9 @@ class CPM_minizinc(SolverInterface):
                      "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
                      "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"}, csemap=self._csemap)
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
 
@@ -568,6 +584,7 @@ class CPM_minizinc(SolverInterface):
             self.mzn_model.add_string(mzn_str)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _convert_expression(self, expr) -> str:
         """
@@ -790,6 +807,11 @@ class CPM_minizinc(SolverInterface):
             raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
 
         import asyncio
+
+        # set time limit
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
 
         # HAD TO DEFINE OUR OWN ASYNC HANDLER
         coroutine = self._solveAll(display=display, time_limit=time_limit,

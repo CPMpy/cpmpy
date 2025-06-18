@@ -436,7 +436,12 @@ if hassol:
 else:
     print("No solution found.")
 ```
-
+The status of solve-call can be the following:
+1. `ExitStatus.OPTIMAL`: The solver found a solution to an optimisation problem and proved its optimality.
+2. `ExitStatus.FEASIBLE`: The solver found a solution to a satisfaction problem, or a feasible solution to an optimization problem but did not prove optimality
+3. `ExitStatus.UNSATIFIABLE`: The solver proved the input problem is unsatisfiable.
+4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, nor proved the problem is unsatisfiable. Can happen when a time-limit is reached.
+5. `ExitStatus.NOT_RUN`: The solver is not run yet (default when initializing a solver)
 
 ## Finding all solutions
 
@@ -450,6 +455,13 @@ m = cp.Model(x[0] > x[1])
 n = m.solveAll()
 print("Nr of solutions:", n)  # Nr of solutions: 6
 ```
+
+The status of solveAll-call can be the following:
+1. `ExitStatus.OPTIMAL`: The solver found all possible solutions to a problem and proved there to be none remaining.
+2. `ExitStatus.FEASIBLE`: The solver found a subset of all solutions, or found all solutions but did not prove there to be none remaining.
+3. `ExitStatus.UNSATIFIABLE`: The solver proved the input problem is unsatisfiable.
+4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, nor proved the problem is unsatisfiable. Can happen when a time-limit is reached.
+5. `ExitStatus.NOT_RUN`: The solver is not run yet (default when initializing a solver)
 
 When using `solveAll()`, a solver will use an optimized native implementation behind the scenes when that exists. Otherwise it will be emulated with an iterative approach, resulting in a performance impact.
 
