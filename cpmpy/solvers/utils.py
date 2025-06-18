@@ -180,7 +180,11 @@ class SolverLookup():
             version = CPM_slv.version() if installed and hasattr(CPM_slv, 'version') else None
             
             # Collect main solver status
-            result.append((basename, installed, version))
+            result.append({
+                    "name": basename,
+                    "status": installed, 
+                    "version": version,
+                })
             
             # Handle subsolvers if applicable
             if installed and hasattr(CPM_slv, 'solvernames'):
