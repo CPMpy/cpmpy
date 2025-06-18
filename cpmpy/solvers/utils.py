@@ -166,13 +166,13 @@ class SolverLookup():
     @classmethod
     def status(cls):
         """
-        Returns the status of all solvers supported by CPMpy as a list of tuples.
+        Returns the status of all solvers supported by CPMpy as a list of dicts.
 
-        Each tuple consists of:
+        Each dict consists of:
 
-        - solver name: <base_solver> or <base_solver>:<subsolver>
-        - install status
-        - version of solver's Python library
+        - "name": <base_solver> or <base_solver>:<subsolver>
+        - "status": install status (True/False)
+        - "version": version of solver's Python library (or one of its subsolvers if applicable)
         """
         result = []
         for (basename, CPM_slv) in cls.base_solvers():
@@ -188,7 +188,11 @@ class SolverLookup():
                 installed_subnames = CPM_slv.solvernames(installed=True)
                 for subn in subnames:
                     is_installed = subn in installed_subnames
-                    subsolver_status = (basename + ":" + subn, is_installed, CPM_slv.solverversion(subn) if installed else None)  # No version information for subsolvers in this example
+                    subsolver_status = {
+                        "name": basename + ":" + subn, 
+                        "status": is_installed, 
+                        "version": CPM_slv.solverversion(subn) if installed else None,
+                    }
                     result.append(subsolver_status)  # Append subsolver status
         return result
 
@@ -201,14 +205,15 @@ class SolverLookup():
         """
         
         # Get the status information using the status() method
-        solver_status = cls.status()
+        solver_statuses = cls.status()
 
         # Print the header
         print(f"{'Solver':<25} {'Installed':<10} {'Version':<15}")
         print("-" * 50)
 
         # Iterate over the solver status
-        for basename, installed, version in solver_status:
+        for solver_status in solver_statuses:
+            basename, installed, version = solver_status["name"], solver_status["status"], solver_status["version"]
 
             # If this is a subsolver (indicated by a ':' in the name), indent the output
             if ':' in basename:
