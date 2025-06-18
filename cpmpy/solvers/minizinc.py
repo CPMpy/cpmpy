@@ -196,7 +196,7 @@ class CPM_minizinc(SolverInterface):
             raise ValueError(f"Subsolver '{subsolver}' not found in the list of available solvers.")
 
     @staticmethod
-    def version(subsolver=None) -> Optional[str]:
+    def version() -> Optional[str]:
         """
         Returns the installed version of the solver's Python API.
         """
