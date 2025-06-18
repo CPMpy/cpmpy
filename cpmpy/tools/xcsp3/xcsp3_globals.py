@@ -358,17 +358,18 @@ class Table(GlobalConstraint):
         """
             This decomposition is only valid in a non-reified setting.
         """
+        from cpmpy.expressions.python_builtins import any, all
         arr, tab = self.args
-        if len(tab) == 1:
-            return [x == v for x,v in zip(arr, tab[0])], []
-        
         row_selected = boolvar(shape=len(tab))
-        cons = [Operator("or", row_selected)]
+        if len(tab) == 1:
+            return [all(t == a for (t, a) in zip(tab[0], arr))], []
+        
+        cons = []
         for i, row in enumerate(tab):
-            # lets already flatten it a bit
-            cons += [Operator("->", [row_selected[i], x == v]) for x,v in zip(arr, row)]
+            subexpr = Operator("and", [x == v for x,v in zip(arr, row)])
+            cons.append(Operator("->", [row_selected[i], subexpr]))
 
-        return cons,[]
+        return [Operator("or", row_selected)]+cons,[]
 
     def value(self):
         arr, tab = self.args
@@ -400,17 +401,17 @@ class ShortTable(GlobalConstraint):
         super().__init__("short_table", [array, table])
 
     def decompose(self):
-        arr, tab = self.args
-        if len(tab) == 1:
-            return [x == v for (x, v) in zip(arr, tab[0]) if v != STAR], []
-        
-        row_selected = boolvar(shape=(len(tab),))
-        cons = [Operator("or", row_selected)]
-        for i, row in enumerate(tab):
-            # lets already flatten it a bit
-            cons += [Operator("->", [row_selected[i], x == v]) for x,v in zip(arr, row) if v != STAR]
+        from cpmpy.expressions.python_builtins import any, all
 
-        return cons,[]
+        arr, tab = self.args
+        row_selected = boolvar(shape=(len(tab),))
+
+        cons = []
+        for i, row in enumerate(tab):
+            subexpr = Operator("and", [ai == ri for ai, ri in zip(arr, row) if ri != STAR])
+            cons.append(row_selected[i].implies(subexpr))
+
+        return [any(row_selected)]+cons,[]
 
     def value(self):
         arr, tab = self.args
@@ -433,8 +434,10 @@ class NegativeShortTable(GlobalConstraint):
         super().__init__("negative_shorttable", [array, table])
 
     def decompose(self):
+        from cpmpy.expressions.python_builtins import all as cpm_all
+        from cpmpy.expressions.python_builtins import any as cpm_any
         arr, tab = self.args
-        return [Operator("or", [x != v for x,v in zip(arr, row) if v != "*"]) for row in tab], []
+        return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row) if ri != "*") for row in tab)], []
 
     def value(self):
         arr, tab = self.args
