@@ -590,6 +590,21 @@ class CPM_minizinc(SolverInterface):
                 str_X += ",".join(map(str, row)) + " |"  # rows
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)
+        
+        elif expr.name == "cumulative":
+            start, dur, end, demand, capacity = expr.args
+
+            global_str = "cumulative({},{},{},{})"
+            if end[0] is None:
+                format_str = global_str
+            else:
+                durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
+                format_str = "forall(" + durstr + " ++ [" + global_str + "])"
+
+            return format_str.format(self._convert_expression(start), 
+                                     self._convert_expression(dur), 
+                                     self._convert_expression(demand), 
+                                     self._convert_expression(capacity))
 
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
@@ -664,14 +679,6 @@ class CPM_minizinc(SolverInterface):
         elif expr.name.endswith('circuit'):  # circuit, subcircuit
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
-
-        elif expr.name == "cumulative":
-            start, dur, end, _, _ = expr.args
-
-            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
-            format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
-
-            return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
 
         elif expr.name == "precedence":
             return "value_precede_chain({},{})".format(args_str[1], args_str[0])
