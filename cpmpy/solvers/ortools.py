@@ -5,21 +5,30 @@
 ##
 """
     Interface to OR-Tools' CP-SAT Python API. 
+
+    Google OR-Tools is open source software for combinatorial optimization, which seeks
+    to find the best solution to a problem out of a very large set of possible solutions.
+    The OR-Tools CP-SAT solver is an award-winning constraint programming solver
+    that uses SAT (satisfiability) methods and lazy-clause generation 
+    (see https://developers.google.com/optimization).
+
+    Always use :func:`cp.SolverLookup.get("ortools") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
     
     The 'ortools' python package is bundled by default with CPMpy.
-    It can be installed through `pip`:
+    It can also be installed separately through `pip`:
 
     .. code-block:: console
     
         $ pip install ortools
 
-    Google OR-Tools is open source software for combinatorial optimization, which seeks
-    to find the best solution to a problem out of a very large set of possible solutions.
-    The OR-Tools CP-SAT solver is an award-winning constraint programming solver
-    that uses SAT (satisfiability) methods and lazy-clause generation.
+    Detailed installation instructions available at:
+    https://developers.google.com/optimization/install
 
-    Documentation of the solver's own Python API:
-    https://developers.google.com/optimization/reference/python/sat/python/cp_model
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -41,9 +50,9 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, eval_comparison, flatlist, argval, argvals, get_bounds
+from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -55,13 +64,7 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to the Python 'ortools' CP-SAT API
-
-    Requires that the 'ortools' python package is installed:
-    $ pip install ortools
-
-    See detailed installation instructions at:
-    https://developers.google.com/optimization/install
+    Interface to OR-Tools' CP-SAT Python API. 
 
     Creates the following attributes (see parent constructor for more):
 
@@ -69,6 +72,9 @@ class CPM_ortools(SolverInterface):
     - ``ort_solver``: the ortools cp_model.CpSolver() instance used in solve()
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``ort_model`` object.
+
+    Documentation of the solver's own Python API:
+    https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
     @staticmethod
@@ -168,8 +174,10 @@ class CPM_ortools(SolverInterface):
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        # set time limit?
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:
@@ -206,7 +214,17 @@ class CPM_ortools(SolverInterface):
         if self.ort_status == ort.FEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.ort_status == ort.OPTIMAL:
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                # for .solveAll(), if all solutions found status is OPTIMAL
+                if kwargs.get("enumerate_all_solutions", False):
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                # regular .solve()
+                else:
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.ort_status == ort.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif self.ort_status == ort.MODEL_INVALID:
@@ -371,18 +389,18 @@ class CPM_ortools(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap", "regular"}
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # everything that can create
+        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # everything that can create
                                              # reified expr must go before this
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -408,11 +426,12 @@ class CPM_ortools(SolverInterface):
             self._post_constraint(con)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     # TODO: 'reifiable' is an artefact from the early days
     # only 3 constraints support it (and,or,sum),
     # we can just add reified support for those and not need `reifiable` or returning the constraint
-    # then we can remove _post_constraint and have its code inside the for loop of __add__
+    # then we can remove _post_constraint and have its code inside the for loop of `add()`
     # like for other solvers
     def _post_constraint(self, cpm_expr, reifiable=False):
         """
@@ -480,14 +499,20 @@ class CPM_ortools(SolverInterface):
                 elif lhs.name == 'div':
                     return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'element':
-                    # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                    return self.ort_model.AddElement(self.solver_var(lhs.args[1]),
-                                                     self.solver_vars(lhs.args[0]), ortrhs)
+                    arr, idx = lhs.args
+                    if is_int(idx): # OR-Tools does not handle all constant integer cases
+                        idx = intvar(idx,idx)
+                    # OR-Tools has slight different in argument order
+                    return self.ort_model.AddElement(
+                        self.solver_var(idx),
+                        self.solver_vars(arr),
+                        ortrhs
+                    )
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     x,y = lhs.args
                     if get_bounds(y)[0] <= 0: # not supported, but result of modulo is agnositic to sign of second arg
-                        y, link = get_or_make_var(-lhs.args[1])
+                        y, link = get_or_make_var(-lhs.args[1], csemap=self._csemap)
                         self += link
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars([x,y]))
                 elif lhs.name == 'pow':
@@ -501,7 +526,7 @@ class CPM_ortools(SolverInterface):
                         b, n = lhs.args
                         new_lhs = 1
                         for exp in range(n):
-                            new_lhs, new_cons = get_or_make_var(b * new_lhs)
+                            new_lhs, new_cons = get_or_make_var(b * new_lhs, csemap=self._csemap)
                             self += new_cons
                         return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
 
@@ -525,6 +550,11 @@ class CPM_ortools(SolverInterface):
                 array, table = cpm_expr.args
                 array = self.solver_vars(array)
                 return self.ort_model.AddForbiddenAssignments(array, table)
+            elif cpm_expr.name == "regular":
+                array, transitions, start, accepting = cpm_expr.args
+                array = self.solver_vars(array)
+                return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting], 
+                                                   [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]

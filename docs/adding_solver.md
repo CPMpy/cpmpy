@@ -17,6 +17,8 @@ Implementing the template consists of the following parts:
 
 For your new solver to appear in CPMpy's [API documentation](./api/solvers.rst), add a `.rst` file in ``/docs/api/solvers`` (copy one of the other solvers' file and make the necessary changes) and add your solver to the *"List of submodules"* and the *"List of classes"* in the file ``/cpmpy/solvers/__init__.py``.
 
+To ease the installation process of your solver, be sure to add it to CPMpy's `setup.py`. Simply add an entry to `solver_dependencies`, mapping the cpmpy-native name for your solver (the same one used when calling `model.solve(solver=<SOLVER_NAME>)`) to the name of your pip-installable Python package and all its required dependencies.
+
 ## Transformations and posting constraints
 
 CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed (throught `transform()`) and then posted to the solver.

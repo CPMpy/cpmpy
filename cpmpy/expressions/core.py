@@ -24,8 +24,8 @@
     `x >= y`             `Comparison(">=", x, y)`         
     ===================  ==========================
 
-    Mathematical Operators
-    ----------------------
+    Arithmetic Operators
+    --------------------
     ===========================  ===============================================
     Python Operator              CPMpy Object                                  
     ===========================  ===============================================
@@ -35,9 +35,9 @@
     `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
     `x - y`                      `Operator("sum", [x, -y])`                    
     `x * y`                      `Operator("mul", [x, y])`                     
-    `x / y`                      `Operator("div", [x, y])`                     
-    `x % y`                      `Operator("mod", [x, y])`                     
-    `x ** y`                     `Operator("pow", [x, y])`  
+    `x // y`                     `Operator("div", [x, y])` (integer division)
+    `x % y`                      `Operator("mod", [x, y])` (modulo)                    
+    `x ** y`                     `Operator("pow", [x, y])` (power)  
     ===========================  ===============================================                   
 
     
@@ -430,6 +430,10 @@ class Expression(object):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", [self])
 
+    def __bool__(self):
+        raise ValueError(f"__bool__ should not be called on a CPMPy expression {self} as it will always return True\n"
+                         "Do not use an expression as argument in an `if` statement and use cpmpy.any, cpmpy.max instead of python builtins\n"
+                         "If you think this is an error, please report on github")
 
 class BoolVal(Expression):
     """
@@ -437,7 +441,7 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg):
-        assert is_true_cst(arg) or is_false_cst(arg)
+        assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
@@ -551,6 +555,12 @@ class Comparison(Expression):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+    
+    def __bool__(self):
+        # will be called when comparing elements in a container, but always with `==`
+        if self.name == "==":
+            return repr(self.args[0]) == repr(self.args[1])
+        super().__bool__() # default to exception
 
     # return the value of the expression
     # optional, default: None

@@ -15,8 +15,23 @@ def get_version(rel_path):
     else:
         raise RuntimeError("Unable to find version string.")
 
-with open("README.md", "r") as readme_file:
+with open("README.md", "r", encoding="utf8") as readme_file:
     long_description = readme_file.read()
+
+
+solver_dependencies = {
+    "ortools": ["ortools"],
+    "z3": ["z3-solver"],
+    "choco": ["pychoco>=0.2.1"],
+    "exact": ["exact>=2.1.0"],
+    "minizinc": ["minizinc"],
+    "pysat": ["python-sat"],
+    "gurobi": ["gurobipy"],
+    "pysdd": ["pysdd"],
+    "gcs": ["gcspy"],
+    "cpo": ["docplex"],
+}
+solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
 setup(
     name='cpmpy',
@@ -34,21 +49,11 @@ setup(
     install_requires=[
         'ortools>=9.9',
         'numpy>=1.5',
+        'setuptools',
     ],
-    #extra dependency, only needed if minizinc is to be used.
     extras_require={
-        "FULL":  ["minizinc"],
         # Solvers
-        "ortools": ["ortools"],
-        "z3": ["z3-solver"],
-        "choco": ["pychoco>=0.2.1"],
-        "exact": ["exact>=2.1.0"],
-        "minizinc": ["minizinc"],
-        "pysat": ["python-sat[pblib]"],
-        "gurobi": ["gurobipy"],
-        "pysdd": ["pysdd"],
-        "gcs": ["gcspy"],
-        "cpo": ["docplex"],
+        **solver_dependencies,
         # Tools
         # "xcsp3": ["pycsp3"], <- for when xcsp3 is merged
         # Other

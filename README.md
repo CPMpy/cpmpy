@@ -35,7 +35,7 @@ Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research 
 
 ### 🔩 Solvers
 
-CPMpy can translate to a wide variaty of constraint solving paradigms, including both commercial and open-source solvers.
+CPMpy can translate to a wide variety of constraint solving paradigms, including both commercial and open-source solvers.
 
 * **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, MiniZinc+solvers
 * **ILP Solvers**: Gurobi (license required)

@@ -4,7 +4,15 @@
 ## gurobi.py
 ##
 """
-    Interface to the python 'gurobi' package
+    Interface to Gurobi Optimizer's Python API.
+
+    Gurobi Optimizer is a highly efficient commercial solver for Integer Linear Programming (and more).
+
+    Always use :func:`cp.SolverLookup.get("gurobi") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
 
     Requires that the 'gurobipy' python package is installed:
 
@@ -12,12 +20,13 @@
 
         $ pip install gurobipy
     
-    
-    In contrast to other solvers in this package, Gurobi is not free to use and requires an active licence
+    Gurobi Optimizer requires an active licence (for example a free academic license)
     You can read more about available licences at https://www.gurobi.com/downloads/
 
-    Documentation of the solver's own Python API:
-    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
+    See detailed installation instructions at:
+    https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -43,7 +52,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions
@@ -57,19 +66,16 @@ except ImportError:
 
 class CPM_gurobi(SolverInterface):
     """
-    Interface to Gurobi's API
-
-    Requires that the 'gurobipy' python package is installed:
-    $ pip install gurobipy
-
-    See detailed installation instructions at:
-    https://support.gurobi.com/hc/en-us/articles/360044290292-How-do-I-install-Gurobi-for-Python-
+    Interface to Gurobi's Python API
 
     Creates the following attributes (see parent constructor for more):
     
     - ``grb_model``: object, TEMPLATE's model object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
+    
+    Documentation of the solver's own Python API:
+    https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
 
     @staticmethod
@@ -96,8 +102,7 @@ class CPM_gurobi(SolverInterface):
             global GRB_ENV
             if GRB_ENV is None:
                 # initialise the native gurobi model object
-                GRB_ENV = gp.Env()
-                GRB_ENV.setParam("OutputFlag", 0)
+                GRB_ENV = gp.Env(params={"OutputFlag": 0})
                 GRB_ENV.start()
             return True
         except Exception as e:
@@ -122,7 +127,7 @@ class CPM_gurobi(SolverInterface):
         self.grb_model = gp.Model(env=GRB_ENV)
 
         # initialise everything else and post the constraints/objective
-        # it is sufficient to implement __add__() and minimize/maximize() below
+        # it is sufficient to implement add() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
 
     @property
@@ -155,8 +160,11 @@ class CPM_gurobi(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-
+        
+        # set time limit
         if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
             self.grb_model.setParam("TimeLimit", time_limit)
 
         # call the solver, with parameters
@@ -173,10 +181,13 @@ class CPM_gurobi(SolverInterface):
         self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
-        if grb_status == GRB.OPTIMAL and not self.has_objective():
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif grb_status == GRB.OPTIMAL and self.has_objective():
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        if grb_status == GRB.OPTIMAL:
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif grb_status == GRB.TIME_LIMIT:
@@ -259,9 +270,10 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
 
         # make objective function non-nested
-        (flat_obj, flat_cons) = (flatten_objective(expr))
+        (flat_obj, flat_cons) = flatten_objective(expr)
+        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
+        get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
         self += flat_cons
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -321,18 +333,18 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"})  # linearize expects safe exprs
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow"}))  # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -449,6 +461,7 @@ class CPM_gurobi(SolverInterface):
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
 
       return self
+    __add__ = add  # avoid redirect in superclass
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
@@ -467,6 +480,7 @@ class CPM_gurobi(SolverInterface):
 
             Returns: number of solutions found
         """
+        from gurobipy import GRB
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
@@ -526,5 +540,16 @@ class CPM_gurobi(SolverInterface):
 
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
+
+        if opt_sol_count:
+            if opt_sol_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
+            else:
+                grb_status = self.grb_model.Status
+                if grb_status == GRB.TIME_LIMIT: # reached time limit
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                else: # found all solutions   
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        # if unsat or timout with no solution, .solve() will have already set the state accordingly (so nothing to update)
 
         return opt_sol_count

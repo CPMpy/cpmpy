@@ -1,4 +1,7 @@
+import importlib
+import inspect
 import unittest
+import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
@@ -6,6 +9,7 @@ from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
@@ -13,6 +17,11 @@ from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
+
+from utils import skip_on_missing_pblib
+
+pysat_available = CPM_pysat.supported()
+pblib_available = importlib.util.find_spec("pypblib") is not None
 
 class TestSolvers(unittest.TestCase):
 
@@ -142,7 +151,7 @@ class TestSolvers(unittest.TestCase):
         s = CPM_ortools(m)
         s.ort_solver.parameters.enumerate_all_solutions=True
         cpm_status = s.solve(solution_callback=cb)
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
         self.assertEqual(cb.solcount, 6)
 
 
@@ -169,7 +178,7 @@ class TestSolvers(unittest.TestCase):
         s = CPM_ortools(m)
         s.ort_solver.parameters.enumerate_all_solutions=True
         cpm_status = s.solve(solution_callback=cb)
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
         self.assertEqual(cb.solcount, 6)
 
 
@@ -179,7 +188,7 @@ class TestSolvers(unittest.TestCase):
         cpm_status = s.solve(solution_callback=cb)
         self.assertEqual(s.objective_value(), 5.0)
 
-        self.assertGreater(x[0], x[1])
+        self.assertGreater(x[0].value(), x[1].value())
 
 
         # manually enumerating solutions
@@ -306,14 +315,14 @@ class TestSolvers(unittest.TestCase):
 
         # check get core, simple
         self.assertFalse(ps2.solve(assumptions=[mayo,~mayo]))
-        self.assertEqual(ps2.get_core(), [mayo,~mayo])
+        self.assertSetEqual(set(ps2.get_core()), set([mayo,~mayo]))
 
         # check get core, more realistic
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
-        self.assertEqual(ps2.get_core(), [mayo,inds[6],inds[9]])
+        self.assertSetEqual(set(ps2.get_core()), set([mayo,inds[6],inds[9]]))
 
-    @pytest.mark.skipif(not CPM_pysat.supported(),
-                        reason="PySAT not installed")
+    @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
+    @skip_on_missing_pblib()
     def test_pysat_card(self):
         b = cp.boolvar()
         x = cp.boolvar(shape=5)
@@ -483,12 +492,35 @@ class TestSolvers(unittest.TestCase):
 
 
         def _trixor_callback():
-            assert bv[0]+bv[1]+bv[2] >= 1
+            assert (bv[0]+bv[1]+bv[2]).value() >= 1
 
         m = cp.Model([bv[0] | bv[1] | bv[2]])
         s = cp.SolverLookup.get("exact", m)
         self.assertEqual(s.solveAll(display=_trixor_callback),7)
 
+    @pytest.mark.skipif(not CPM_exact.supported(), 
+                        reason="Exact not installed")
+    def test_parameters_to_exact(self):
+    
+        # php with 5 pigeons, 4 holes
+        p,h = 40,39
+        x = cp.boolvar(shape=(p,h))
+        m = cp.Model(x.sum(axis=1) >= 1, x.sum(axis=0) <= 1)
+
+        # this should raise a warning
+        with self.assertWarns(UserWarning):
+            self.assertFalse(m.solve(solver="exact", verbosity=10))
+        
+        # can we indeed set a parameter? Try with prooflogging
+        proof_file = tempfile.NamedTemporaryFile(delete=False).name
+        
+        # taken from https://gitlab.com/nonfiction-software/exact/-/blob/main/python_examples/proof_logging.py
+        options = {"proof-log": proof_file, "proof-assumptions":"0"}
+        exact = cp.SolverLookup.get("exact",m, **options)
+        self.assertFalse(exact.solve())
+
+        with open(proof_file+".proof", "r") as f:
+            self.assertEqual(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
 
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
@@ -670,6 +702,20 @@ class TestSupportedSolvers:
         s.solve()
         assert [int(a) for a in v.value()] == [0, 1, 0]
 
+    def test_time_limit(self, solver):
+        if solver == "pysdd": # pysdd does not support time limit
+            return
+        
+        x = cp.boolvar(shape=3)
+        m = cp.Model(x[0] | x[1] | x[2])
+        assert m.solve(solver=solver, time_limit=1)
+
+        try:
+            m.solve(solver=solver, time_limit=-1)
+            assert False
+        except ValueError:
+            pass
+
     def test_installed_solvers_solveAll(self, solver):
         # basic model
         v = cp.boolvar(3)
@@ -760,6 +806,36 @@ class TestSupportedSolvers:
         assert x.value()
         assert y.value() + z.value() == 1
 
+
+    def test_incremental_assumptions(self, solver):
+        x, y, z = cp.boolvar(shape=3, name=["x","y","z"])
+        s = cp.SolverLookup.get(solver)
+        if "assumptions" not in inspect.signature((s.solve)).parameters:
+            return # solver does not support solving under assumptions
+        
+        if solver == "pysdd":
+            return # not implemented in pysdd
+        
+        s += x | y
+        assert s.solve(assumptions=[x])
+        assert x.value()
+        assert (s.solve(assumptions=[~x]))
+        assert not (x.value())
+        assert (y.value())
+
+        s += ~x | z
+        assert s.solve(assumptions=[x,~y])
+        assert z.value()
+
+        s += y | ~z
+        assert not s.solve(assumptions=[~x, ~y])
+
+        core = s.get_core()
+        assert ~y in set([~x,~y])
+        assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat
+
+        assert s.solve(assumptions=[])
+
     def test_vars_not_removed(self, solver):
             bvs = cp.boolvar(shape=3)
             m = cp.Model([cp.any(bvs) <= 2])
@@ -804,3 +880,99 @@ class TestSupportedSolvers:
             assert dv * yv + rv == xv
             assert (Operator('div', [xv, yv])).value() == dv
             assert (Operator('mod', [xv, yv])).value() == rv
+
+
+    def test_status(self, solver):
+
+        bv = cp.boolvar(shape=3, name="bv")
+        m = cp.Model(cp.any(bv))
+
+        assert m.status().exitstatus == ExitStatus.NOT_RUN
+        assert m.solve(solver=solver)
+        assert m.status().exitstatus == ExitStatus.FEASIBLE
+
+        try: # now try optimization, not supported for all solvers
+            m.maximize(cp.sum(bv))
+            assert m.solve(solver=solver)
+            assert m.status().exitstatus == ExitStatus.OPTIMAL
+        except NotSupportedError:
+            return
+
+        # now making a tricky problem to solve
+        np.random.seed(0)
+        start = cp.intvar(0,100, shape=50)
+        dur = np.random.randint(1,5, size=50)
+        end = cp.intvar(0,100, shape=50)
+        demand  = np.random.randint(10,15, size=50)
+
+        m += cp.Cumulative(start, dur, end,demand, 30)
+        m.minimize(cp.max(end))
+        m.solve(solver=solver, time_limit=1)
+        # normally, should not be able to solve within 1s...
+        assert m.status().exitstatus == ExitStatus.FEASIBLE or m.status().exitstatus == ExitStatus.UNKNOWN
+
+        # now trivally unsat
+        m += cp.sum(bv) <= 0
+        m.solve(solver=solver)
+        assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
+
+
+
+    def test_status_solveall(self, solver):
+
+        bv = cp.boolvar(shape=3, name="bv")
+        m = cp.Model(cp.any(bv))
+
+        limit = None
+        if solver == "gurobi": limit = 100000
+
+        num_sols = m.solveAll(solver=solver, solution_limit=limit)
+        assert num_sols == 7
+        assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
+
+
+
+        # adding a bunch of variables to increase nb of sols
+        try:
+            x = cp.boolvar(shape=32, name="x")
+            m = cp.Model(cp.any(x))
+            num_sols = m.solveAll(solver=solver, time_limit=1, solution_limit=limit)
+            assert m.status().exitstatus == ExitStatus.FEASIBLE
+
+            num_sols = m.solveAll(solver=solver, solution_limit=10)
+            assert num_sols == 10
+            assert m.status().exitstatus == ExitStatus.FEASIBLE
+
+            # edge-case: nb of solutions is exactly the sol limit
+            m = cp.Model(cp.any(bv))
+            num_sols = m.solveAll(solver=solver, solution_limit=7)
+            assert num_sols ==  7
+            assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE) # which of the two?
+
+        except NotImplementedError:
+            pass # not all solvers support time/solution limits
+
+        # making the problem unsat
+        if solver != "pysdd": # constraint not supported by pysdd
+            m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
+            num_sols = m.solveAll(solver=solver, solution_limit=limit)
+            assert num_sols == 0
+            assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
+
+
+    def test_hidden_user_vars(self, solver):
+        """
+        Tests whether decision variables which are part of a constraint that never gets posted to the underlying solver
+        still get correctly captured and posted.
+        """
+        if solver == 'pysdd' or solver == 'pysat':  # pysat and pysdd don't support integer decision variables
+            return
+        
+        x = cp.intvar(1, 4, shape=1)
+        # Dubious constraint which enforces nothing, gets decomposed to empty list
+        # -> resulting CP model is empty
+        m = cp.Model([cp.AllDifferentExceptN([x], 1)])
+        s = cp.SolverLookup().get(solver, m)
+        assert len(s.user_vars) == 1 # check if var captured as a user_var
+        solution_limit = 5 if solver == "gurobi" else None
+        assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
