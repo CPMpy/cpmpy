@@ -157,6 +157,11 @@ def eval_comparison(str_op, lhs, rhs):
 
         Especially useful in decomposition and transformation functions that already involve a comparison.
     """
+    if isinstance(lhs, (np.integer, np.bool_)):
+        lhs = int(lhs)
+    if isinstance(rhs, (np.integer, np.bool_)):
+        rhs = int(rhs)
+
     if str_op == '==':
         return lhs == rhs
     elif str_op == '!=':
