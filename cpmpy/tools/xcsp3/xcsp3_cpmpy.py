@@ -664,34 +664,40 @@ if __name__ == "__main__":
     init_signal_handlers()
 
     # ------------------------------ Argument parsing ------------------------------ #
+
     parser = argparse.ArgumentParser("CPMpy XCSP3 executable")
     
     ## XCSP3 required arguments:
     # BENCHNAME: Name of the XCSP3 XML file with path and extension
-    parser.add_argument("benchname", type=dir_path) 
+    parser.add_argument("benchname", type=dir_path, help="XCSP3 XML file to parse, with full path and extension.") 
     # RANDOMSEED: Seed between 0 and 4294967295
-    parser.add_argument("-s", "--seed", required=False, type=int, default=None)
+    parser.add_argument("-s", "--seed", required=False, type=int, default=None, help="Random seed (integer between 0 and 4294967295).")
     # TIMELIMIT: Total CPU time in seconds (before it gets killed)
-    parser.add_argument("-l", "--time-limit", required=False, type=int, default=None) # TIMELIMIT
+    parser.add_argument("-l", "--time-limit", required=False, type=int, default=None, help="Time limit in seconds.") # TIMELIMIT
     # MEMLIMIT: Total amount of memory in MiB (mebibyte = 1024 * 1024 bytes)
-    parser.add_argument("-m", "--mem-limit", required=False, type=int, default=None)
+    parser.add_argument("-m", "--mem-limit", required=False, type=int, default=None, help="Memory limit in MiB (1 MiB = 1024 x 1024 bytes). Gets passed on to the solver (if supported) but is not enforced on the Python/CPMpy side.")
     # TMPDIR: Only location where temporary read/write is allowed
-    parser.add_argument("-t","--tmpdir", required=False, type=dir_path)
+    parser.add_argument("-t","--tmpdir", required=False, type=dir_path, help="Directory for temporary read/write operations.")
     # NBCORE: Number of processing units (can by any of the following: a processor / a processor core / logical processor (hyper-threading))
-    parser.add_argument("-c", "--cores", required=False, type=int, default=None)
+    parser.add_argument("-c", "--cores", required=False, type=int, default=None, help="Number of processing units to use (e.g., cores or logical processors).")
     # DIR: not needed, e.g. we just import files
 
     ## CPMpy optional arguments:
     # The underlying solver which should be used (can also be "solver:subsolver")
-    parser.add_argument("--solver", required=False, type=str, default="ortools")
+    parser.add_argument("--solver", required=False, type=str, default="ortools", help="Underlying CPMpy solver to use (can be 'solver:subsolver').")
     # How much time before SIGTERM should we halt solver (for the final post-processing steps and solution printing)
-    parser.add_argument("--time-buffer", required=False, type=int, default=0) # buffer to give subsolver time to return and do some post-processing
+    parser.add_argument("--time-buffer", required=False, type=int, default=0, help="Time buffer (in seconds) to reserve before SIGTERM for cleanup/postprocessing.") # buffer to give subsolver time to return and do some post-processing
     # If intermediate solutions should be printed (if the solver supports it)
-    parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--intermediate", action=argparse.BooleanOptionalAction, help="Whether to print intermediate solutions (if supported by the solver).")
+
+    ## Executable optional arguments
+    parser.add_argument("--verbose", action=argparse.BooleanOptionalAction, help="Enable verbose output for debugging or detailed logs.")
+    
 
     # Process cli arguments 
     args = parser.parse_args()
-    print_comment(f"Arguments: {args}")
+    if args.verbose:
+        print_comment(f"Arguments: {args}")
 
     try:
         if str(args.benchname).endswith(".lzma"):
