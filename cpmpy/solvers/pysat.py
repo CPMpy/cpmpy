@@ -125,7 +125,7 @@ class CPM_pysat(SolverInterface):
             Returns solvers supported by PySAT on your system
         """
         if CPM_pysat.supported():
-            from pysat.solvers import SolverNames, Solver
+            from pysat.solvers import SolverNames
             names = []
             for name, attr in vars(SolverNames).items():
                 # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
