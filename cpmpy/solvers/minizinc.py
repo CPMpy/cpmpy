@@ -605,6 +605,17 @@ class CPM_minizinc(SolverInterface):
                                      self._convert_expression(dur), 
                                      self._convert_expression(demand), 
                                      self._convert_expression(capacity))
+        
+        elif expr.name == "no_overlap":
+            start, dur, end = expr.args
+            global_str = "disjunctive({},{})"
+            if end[0] is None:
+                format_str = global_str
+            else:
+                durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
+                format_str = "forall(" + durstr + " ++ [" + global_str + "])"
+            
+            return format_str.format(self._convert_expression(start), self._convert_expression(dur))
 
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
@@ -682,12 +693,6 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "precedence":
             return "value_precede_chain({},{})".format(args_str[1], args_str[0])
-
-        elif expr.name == "no_overlap":
-            start, dur, end = expr.args
-            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
-            format_str = "forall(" + durstr + " ++ [disjunctive({},{})])"
-            return format_str.format(args_str[0], args_str[1])
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args

@@ -513,41 +513,27 @@ class CPM_cpo(SolverInterface):
                 total_usage = []
                 cons = []
                 for s, d, e, h in zip(start, dur, end, height):
-                    bounds_d = get_bounds(d)
-                    # Special case for tasks with duration 0
-                    # -> cpo immediately returns UNSAT if done through tasks
-                    if bounds_d[1] == bounds_d[0] == 0:
-                        if e is None: # nothing to enforce
-                            continue
-                        cpo_s, cpo_e = self.solver_vars([s, e])
-                        cons += [cpo_s == cpo_e] # enforce 0 duration
-                        # no restrictions on height due to zero duration and thus no contribution to capacity
+                    task, task_cons = self._make_task(s, d, e)
+                    cons += task_cons
+                    if task is None: # can happen with 0 duration tasks
                         continue
-                    # Normal setting
-                    if e is None: # no end provided by user
-                        cpo_s, cpo_d, cpo_h = self.solver_vars([s, d, h])
-                        task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d))
-                        cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
-                    else:
-                        cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s, d, e, h])                
-                        task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
-                        cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
-                    
-                    task_height = dom.pulse(task, get_bounds(h))
-                    cons += [cpo_h == dom.height_at_start(task, task_height)]
-                    total_usage.append(task_height)
+                    else:                
+                        task_height = dom.pulse(task, get_bounds(h))
+                        cons += [self.solver_var(h) == dom.height_at_start(task, task_height)]
+                        total_usage.append(task_height)
                 cons += [dom.sum(total_usage) <= self.solver_var(capacity)]
                 return cons
             elif cpm_con.name == "no_overlap":
                 start, dur, end  = cpm_con.args
-                docp = self.get_docp()
                 cons = []
                 tasks = []
                 for s, d, e in zip(start, dur, end):
-                    cpo_s, cpo_d, cpo_e = self.solver_vars([s, d, e])
-                    task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
-                    tasks.append(task)
-                    cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
+                    task, task_cons = self._make_task(s, d, e)
+                    cons += task_cons
+                    if task is None: # can happen with 0 duration tasks
+                        continue
+                    else:
+                        tasks.append(task)
                 return cons + [dom.no_overlap(tasks)]
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
@@ -573,6 +559,30 @@ class CPM_cpo(SolverInterface):
                 return dom.count_different(self._cpo_expr(cpm_con.args))
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
+
+    def _make_task(self, start, dur, end):
+        """
+            Helper function to create task objects and additional constraints enforcing task-relation
+        """
+        dom = self.get_docp().modeler
+        docp = self.get_docp()
+
+        dur_bounds = get_bounds(dur)
+        if dur_bounds[1] == dur_bounds[0] == 0:
+            if end is None: # nothing to enforce
+                return None, []
+            cpo_s, cpo_e = self.solver_vars([start, end])
+            return None, [cpo_s == cpo_e] # no task, just enforce 0 duration
+            
+        # Normal setting
+        if end is None: # no end provided by user
+            cpo_s, cpo_d = self.solver_vars([start, dur])
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur))
+            return task, [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
+        else:
+            cpo_s, cpo_d, cpo_e = self.solver_vars([start, dur, end])                
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end))
+            return task, [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
 
 
 # solvers are optional, so this file should be interpretable

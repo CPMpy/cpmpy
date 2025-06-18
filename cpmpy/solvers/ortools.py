@@ -563,7 +563,10 @@ class CPM_ortools(SolverInterface):
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "no_overlap":
-                start, dur, end = self.solver_vars(cpm_expr.args)
+                start, dur, end = cpm_expr.args
+                if end[0] is None:
+                    end = cpm_expr.get_end_vars()
+                start, dur, end = self.solver_vars([start, dur, end])
                 intervals = [self.ort_model.NewIntervalVar(s,d,e, f"interval_{s}-{d}-{d}") for s,d,e in zip(start,dur,end)]
                 return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":

@@ -1,0 +1,2 @@
+year,track,instance,solver,time_total,time_parse,time_model,time_post,time_solve,status,objective_value,solution,intermediate
+2024,CSP,Takuzu-030_c24.xml,ortools,4.669029474258423,0.0466,0.3875,3.5615,,,,,

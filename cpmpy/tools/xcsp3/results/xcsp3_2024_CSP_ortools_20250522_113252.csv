@@ -1,0 +1,3 @@
+year,track,instance,solver,time_total,time_parse,time_model,time_post,time_solve,status,objective_value,solution,intermediate
+2024,CSP,AverageAvoiding-20_c24.xml,ortools,0.9732275009155273,0.0172,0.2753,,,UNKNOWN,,normalized_numexpr() got an unexpected keyword argument 'context',
+2024,CSP,AverageAvoiding-25_c24.xml,ortools,1.2447218894958496,0.0311,0.508,,,UNKNOWN,,normalized_numexpr() got an unexpected keyword argument 'context',
