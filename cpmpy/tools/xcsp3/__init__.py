@@ -47,16 +47,15 @@ import lzma
 import os
 import cpmpy as cp
 
-# Prevent pycsp3 from complaining on exit + breaking docs
-# import sys
-# sys.argv = ["-nocompile"]
+# Special case for optional cpmpy dependencies
+from typing import TYPE_CHECKING
 
-from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
-from .parser_callbacks import CallbacksCPMPy
-from .xcsp3_dataset import XCSP3Dataset
+if TYPE_CHECKING:
+    from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 
+from .xcsp3_dataset import XCSP3Dataset # for easier importing
 
-def _parse_xcsp3(path: os.PathLike) -> ParserXCSP3:
+def _parse_xcsp3(path: os.PathLike) -> "ParserXCSP3":
     """
     Parses an XCSP3 instance file (.xml) and returns a `ParserXCSP3` instance.
     
@@ -66,10 +65,16 @@ def _parse_xcsp3(path: os.PathLike) -> ParserXCSP3:
     Returns:
         A parser object.
     """
+    try:
+        from pycsp3.parser.xparser import ParserXCSP3
+    except ImportError as e:
+        raise ImportError("The 'pycsp3' package is required to parse XCSP3 files. "
+                          "Please install it with `pip install pycsp3`.") from e
+    
     parser = ParserXCSP3(path)
     return parser
 
-def _load_xcsp3(parser: ParserXCSP3) -> cp.Model:
+def _load_xcsp3(parser: "ParserXCSP3") -> cp.Model:
     """
     Takes in a `ParserXCSP3` instance and loads its captured model as a CPMpy model.
 
@@ -79,6 +84,8 @@ def _load_xcsp3(parser: ParserXCSP3) -> cp.Model:
     Returns:
         The XCSP3 instance loaded as a CPMpy model.
     """
+    from .parser_callbacks import CallbacksCPMPy
+    from pycsp3.parser.xparser import CallbackerXCSP3
     callbacks = CallbacksCPMPy()
     callbacks.force_exit = True
     callbacker = CallbackerXCSP3(parser, callbacks)
