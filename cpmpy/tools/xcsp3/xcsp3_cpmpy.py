@@ -682,7 +682,7 @@ if __name__ == "__main__":
 
     ## CPMpy optional arguments:
     # The underlying solver which should be used (can also be "solver:subsolver")
-    parser.add_argument("--solver", required=True, type=str)
+    parser.add_argument("--solver", required=False, type=str, default="ortools")
     # How much time before SIGTERM should we halt solver (for the final post-processing steps and solution printing)
     parser.add_argument("--time-buffer", required=False, type=int, default=None)
     # If intermediate solutions should be printed (if the solver supports it)
