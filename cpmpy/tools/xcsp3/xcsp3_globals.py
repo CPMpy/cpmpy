@@ -10,7 +10,7 @@ Currently, version 3.2 is supported.
 import numpy as np
 import cpmpy as cp
 from cpmpy import cpm_array, intvar, boolvar
-from cpmpy.exceptions import CPMpyException
+from cpmpy.exceptions import CPMpyException, IncompleteFunctionError
 from cpmpy.expressions.core import Expression, Operator
 from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
@@ -777,6 +777,206 @@ class IfThenElseNum(GlobalFunction):
         else:
             return argval(y)
 
+class Element(GlobalFunction):
+    """
+        XCSP3 copy for doing Gleb-style ILP friendly decomposition
+    """
+
+    def __init__(self, arr, idx):
+        if is_boolexpr(idx):
+            raise TypeError("index cannot be a boolean expression: {}".format(idx))
+        if is_any_list(idx):
+            raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
+        super().__init__("element", [arr, idx])
+
+    def __getitem__(self, index):
+        raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
+
+    def value(self):
+        arr, idx = self.args
+        idxval = argval(idx)
+        if idxval is not None:
+            if idxval >= 0 and idxval < len(arr):
+                return argval(arr[idxval])
+            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
+                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
+        return None # default
+
+    def decompose_comparison(self, cpm_op, cpm_rhs):
+        """
+            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
+            When used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
+            it is a constraint, and that one can be decomposed.
+
+            Returns two lists of constraints:
+
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
+
+        """
+        arr, idx = self.args
+
+        # Find where the array indices and the bounds of `idx` intersect
+        lb, ub = get_bounds(idx)
+        new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
+        cons, defn = [],[]
+       
+        # For every `i` in that intersection, post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
+        for i in range(new_lb, new_ub+1):
+            cons.append((idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)))
+        cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
+
+        return cons, defn  # no auxiliary variables
+    
+    def __repr__(self):
+        return "{}[{}]".format(self.args[0], self.args[1])
+
+    def get_bounds(self):
+        """
+        Returns the bounds of the (numerical) global constraint
+        """
+        arr, idx = self.args
+        bnds = [get_bounds(x) for x in arr]
+        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
+
+
+class Cumulative(GlobalConstraint):
+    """
+        Global cumulative constraint. Used for resource aware scheduling.
+        Ensures that the capacity of the resource is never exceeded.
+        Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
+        Supports both varying demand across tasks or equal demand for all jobs.
+    """
+    def __init__(self, start, duration, end, demand, capacity):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(duration), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        duration = flatlist(duration)
+        end = flatlist(end)
+        assert len(start) == len(duration) == len(end), "Start, duration and end should have equal length"
+        n_jobs = len(start)
+
+        for lb in get_bounds(duration)[0]:
+            if lb < 0:
+                raise TypeError("Durations should be non-negative")
+
+        if is_any_list(demand):
+            demand = flatlist(demand)
+            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
+        else: # constant demand
+            demand = [demand] * n_jobs
+
+        super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
+
+    def decompose(self):
+        """
+            Decomposition from:
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+
+            Heuristically switches between time-resource and task-resource decomposition depending on the relative size of the time horizon and the number of tasks.
+            If 
+                n = number of tasks
+                t = size of time horizon
+            then    
+                time-resource decomposition scales with n*t 
+                task-resource decomposition scales with 3n(n-1)
+            thus
+                switch when t > 3*n
+        """
+
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity = arr_args
+
+        num_tasks = len(demand) # number of tasks
+        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
+        time_horizon =  ub - lb
+
+        cons = []
+
+        if time_horizon > 3 * num_tasks:
+            version = "task"
+        else:
+            version = "time"
+
+        if version == "time":
+            # set duration of tasks
+            for t in range(len(start)):
+                cons += [start[t] + duration[t] == end[t]]
+
+            # demand doesn't exceed capacity
+            for t in range(lb,ub+1):
+                demand_at_t = 0
+                for job in range(len(start)):
+                    if is_num(demand):
+                        demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
+                    else:
+                        demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
+
+                cons += [demand_at_t <= capacity]
+                
+        elif version == "task":
+
+            # set duration of tasks
+            for t in range(num_tasks):
+                cons += [start[t] + duration[t] == end[t]]
+
+            for j in range(num_tasks):
+                cons += [capacity >= demand[j] + cp.sum([(start[i] <= start[j]) & (start[j] < start[i] + duration[i]) for i in range(num_tasks) if i != j])]
+
+        return cons, []
+
+    def value(self):
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
+                   else argval(arg) for arg in self.args]
+
+        if any(a is None for a in arg_vals):
+            return None
+
+        # start, dur, end are np arrays
+        start, dur, end, demand, capacity = arg_vals
+        # start and end seperated by duration
+        if not (start + dur == end).all():
+            return False
+
+        # demand doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        for t in range(lb, ub+1):
+            if capacity < sum(demand * ((start <= t) & (t < end))):
+                return False
+
+        return True
+
+
+class GlobalCardinalityCount(GlobalConstraint):
+    """
+    The number of occurrences of each value `vals[i]` in the list of variables `vars`
+    must be equal to `occ[i]`.
+    """
+
+    def __init__(self, vars, vals, occ, closed=False):
+        flatargs = flatlist([vars, vals, occ])
+        if any(is_boolexpr(arg) for arg in flatargs):
+            raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
+        super().__init__("gcc", [vars,vals,occ])
+        self.closed = closed
+
+    def decompose(self):
+        vars, vals, occ = self.args
+
+
+        constraints = [cp.Count(vars, i) == v for i, v in zip(vals, occ)]
+        if self.closed:
+            constraints += [InDomain(v, vals) for v in vars]
+
+        return constraints, []
+
+    def value(self):
+        decomposed, _ = self.decompose()
+        return cp.all(decomposed).value()
 
 # helper function
 def is_transition(arg):
