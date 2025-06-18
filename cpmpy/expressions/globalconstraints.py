@@ -808,7 +808,10 @@ class NoOverlap(GlobalConstraint):
     NoOverlap constraint, enforcing that the intervals defined by start, duration and end do not overlap.
     """
 
-    def __init__(self, start, dur, end):
+    def __init__(self, start, dur, end=None):
+        if end is None:
+            end = [None] * len(start)
+
         assert is_any_list(start), "start should be a list"
         assert is_any_list(dur), "duration should be a list"
         assert is_any_list(end), "end should be a list"
@@ -823,13 +826,27 @@ class NoOverlap(GlobalConstraint):
 
     def decompose(self):
         start, dur, end = self.args
-        cons = [s + d == e for s,d,e in zip(start, dur, end)]
-        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
+        cons = []
+        if end[0] is not None:
+            cons += [s + d == e for s,d,e in zip(start, dur, end)]
+        
+        for (s1, e1), (s2, e2) in all_pairs(zip(start, [s+d for s,d in zip(start, dur)])):
             cons += [(e1 <= s2) | (e2 <= s1)]
         return cons, []
+    
+    def get_end_vars(self):
+        if self.args[2][0] is None:
+            self.args[2] = [intvar(lb, ub) for lb, ub in zip(*get_bounds([s+d for s,d in zip(self.args[0], self.args[1])]))]
+        return self.args[2]
 
     def value(self):
-        start, dur, end = argvals(self.args)
+        start, dur, end = self.args
+        start, dur = argvals([start, dur])
+        if end[0] is None:
+            end = [s+d for s,d in zip(start, dur)]
+        else:
+            end = argvals(end)
+
         if any(s + d != e for s,d,e in zip(start, dur, end)):
             return False
         for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
