@@ -4,6 +4,7 @@ A collection of XCSP3 solver-native global constraints.
 
 import numpy as np
 import cpmpy as cp
+from cpmpy import cpm_array
 from cpmpy.expressions.globalconstraints import DirectConstraint
 
 
@@ -27,7 +28,7 @@ class OrtSubcircuit(DirectConstraint):
         N = len(self.args[0])
         arcvars = cp.boolvar(shape=(N,N))
         # post channeling constraints from int to bool
-        CPMpy_solver += [b == (self.args[0][i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+        CPMpy_solver.add([b == (self.args[0][i] == j) for (i,j),b in np.ndenumerate(arcvars)])
         # post the global constraint
         #   posting arcs on diagonal (i==j) allows for subcircuits
         ort_arcs = [(i,j, CPMpy_solver.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars)] # Allows for empty subcircuits
@@ -42,7 +43,7 @@ class OrtSubcircuitWithStart(DirectConstraint):
         N = len(self.args[0])
         arcvars = cp.boolvar(shape=(N,N))
         # post channeling constraints from int to bool
-        CPMpy_solver += [b == (self.args[0][i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+        CPMpy_solver.add([b == (self.args[0][i] == j) for (i,j),b in np.ndenumerate(arcvars)])
         # post the global constraint
         # posting arcs on diagonal (i==j) allows for subcircuits
         ort_arcs = [(i,j,CPMpy_solver.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if not ((i == j) and (i == self.args[1]))] # The start index cannot self loop and thus must be part of the subcircuit.
@@ -72,5 +73,18 @@ class MinizincSubcircuit(DirectConstraint):
     def callSolver(self, CPMpy_solver, Native_solver):
         # minizinc is offset 1, which can be problematic here...
         args_str = ["{}+1".format(CPMpy_solver._convert_expression(e)) for e in self.args[0]]
+        return "{}([{}])".format("subcircuit", ",".join(args_str))
+
+class MinizincSubcircuitWithStart(DirectConstraint):
+    def __init__(self, arguments):
+        super().__init__("minizincsubcircuitwithstart", arguments)
+
+    def callSolver(self, CPMpy_solver, Native_solver):
+        # minizinc is offset 1, which can be problematic here...
+        start_index = self.args[0][-1]
+        succ = cpm_array(self.args[0][:-1]) # Successor variables
+
+        CPMpy_solver += (succ[start_index] != start_index)
+        args_str = ["{}+1".format(CPMpy_solver._convert_expression(e)) for e in succ]
         return "{}([{}])".format("subcircuit", ",".join(args_str))
         

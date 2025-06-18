@@ -561,6 +561,7 @@ def xcsp3_cpmpy(benchname: str,
             },
             "minizinc": {
                 "subcircuit": xcsp3_natives.MinizincSubcircuit,
+                "subcircuitwithstart": xcsp3_natives.MinizincSubcircuitWithStart,
             },
         }
 
