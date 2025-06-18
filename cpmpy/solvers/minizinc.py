@@ -59,9 +59,7 @@ import warnings
 import sys
 import os
 import json
-import platform
 from datetime import timedelta  # for mzn's timeout
-from pathlib import Path
 
 import numpy as np
 import pkg_resources

@@ -89,7 +89,6 @@ class CPM_z3(SolverInterface):
         except Exception as e:
             raise e
         
-
     @classmethod
     def version(cls) -> Optional[str]:
         """
