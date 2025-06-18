@@ -138,9 +138,10 @@ class CPM_minizinc(SolverInterface):
             
             # Collect solver names
             all_solvers, all_versions = [], []
-            output = driver._run(["--solvers-json"])
+            output = driver._run(["--solvers-json"]) # get json-structured solver overview
             solvers = json.loads(output.stdout)        
             for solver_dict in solvers:
+                # get subsolver metadata
                 tag = solver_dict["id"].split(".")[-1]
                 version = solver_dict["version"]
                 if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
@@ -157,7 +158,7 @@ class CPM_minizinc(SolverInterface):
             Returns solvers supported by MiniZinc (on your system)
 
             Arguments:
-                installed (boolean): whether to filter the solvernames to those installed on your system
+                installed (boolean): whether to filter the solvernames to those installed on your system (default True)
 
             Returns:
                 list of solver names
@@ -166,7 +167,7 @@ class CPM_minizinc(SolverInterface):
                 WARNING, some of the returned solver names (when ``installed=False``) may not actually 
                 be installed on your system (namely cplex, gurobi, scip, xpress).
                 The following are bundled with minizinc: chuffed, coin-bc, gecode.
-                Use ``installed=True`` if you only want the names actually installed solvers.
+                Use ``installed=True`` (the default) if you only want the names of the actually installed solvers.
         """
 
         all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
@@ -181,7 +182,7 @@ class CPM_minizinc(SolverInterface):
             """
             Test which solver executables are available by retrieving version information
             """
-            valid_indices = [i for i, version in enumerate(all_versions) if version != "<unknown version>"]
+            valid_indices = [i for i, version in enumerate(all_versions) if version != "<unknown version>"] # check if version is available (required by minizinc)
             installed_solvers = [all_solvers[i] for i in valid_indices]
 
             return set(installed_solvers)
@@ -190,7 +191,7 @@ class CPM_minizinc(SolverInterface):
     def solverversion(subsolver:str):
         all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
         try:
-            solver_index = all_solvers.index(subsolver)
+            solver_index = all_solvers.index(subsolver) # find requested subsolver
             return all_versions[solver_index]
         except ValueError:
             raise ValueError(f"Subsolver '{subsolver}' not found in the list of available solvers.")

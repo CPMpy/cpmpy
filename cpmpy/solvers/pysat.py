@@ -140,6 +140,10 @@ class CPM_pysat(SolverInterface):
         
     @staticmethod
     def solverversion(subsolver:str):
+        """
+            Pysat does not provide accessible subsolver version numbers.
+        """
+        # Could try to extract them from solver name, but even then the minor revision numbers are missing
         return None
     
     @staticmethod
