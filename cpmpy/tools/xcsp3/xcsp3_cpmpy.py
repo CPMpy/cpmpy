@@ -110,6 +110,9 @@ def rlimit_cpu_handler(_signo, _stack_frame):
     sys.exit(0)
 
 def init_signal_handlers():
+    """
+    Configure signal handlers
+    """
     signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
@@ -126,6 +129,23 @@ def set_memory_limit(mem_limit, verbose:bool=False):
         if verbose:
             print_comment(f"Setting memory limit: {soft} -- {hard}")
         resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
+
+def set_time_limit(time_limit, verbose:bool=False):
+    """
+    Set time limit (CPU time in seconds).
+    """
+    if time_limit is not None:
+        soft = time_limit
+        hard = resource.RLIM_INFINITY
+        if verbose:
+            print_comment(f"Setting time limit: {soft} -- {hard}")
+        resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
+    else:
+        resource.setrlimit(resource.RLIMIT_CPU, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+
+def wall_time(p: psutil.Process):
+    return time.time() - p.create_time()
+
 def mib_as_bytes(mib: int) -> int:
     return mib * 1024 * 1024
 
@@ -439,7 +459,7 @@ def solver_arguments(solver: str,
                      cores: int = 1,
                      mem_limit: Optional[int] = None,
                      **kwargs):
-    opt = model.objective_ is not None
+    opt = model.has_objective()
     sat = not opt
 
     if solver == "ortools":
@@ -490,33 +510,36 @@ def prepend_print():
 
  
 # Run the instance; exceptions are caught and printed but also re-raised
-def xcsp3_cpmpy(benchname: str,
-                seed: Optional[int] = None,
-                time_limit: Optional[int] = None,
-                mem_limit: Optional[int] = None,  # MiB: 1024 * 1024 bytes
-                cores: int = 1,
-                solver: str = None,
-                time_buffer: int = 0,
-                intermediate: bool = False,
-                **kwargs,
+def xcsp3_cpmpy(
+        benchname: str,
+        seed: Optional[int] = None,
+        time_limit: Optional[int] = None,
+        mem_limit: Optional[int] = None,  # MiB: 1024 * 1024 bytes
+        cores: int = 1,
+        solver: str = None,
+        time_buffer: int = 0,
+        intermediate: bool = False,
+        verbose: bool = False,
+        **kwargs,
 ):
-
-    # Configure signal handlers  
-    signal.signal(signal.SIGTERM, sigterm_handler)
-    signal.signal(signal.SIGINT, sigterm_handler)
-    signal.signal(signal.SIGABRT, sigterm_handler)
-    signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
 
     try:
 
         # --------------------------- Global Configuration --------------------------- #
 
+        # Get the current process
+        p = psutil.Process()
+
+        # pychoco currently does not support setting the mem_limit
         if solver == "choco" and mem_limit is not None:
             warnings.warn("'mem_limit' is currently not supported with choco, issues with GraalVM")
             mem_limit = None
 
+        # Set random seed (if provided)
         if seed is not None:
             random.seed(seed)
+
+        # Set memory limit (if provided)
         if mem_limit is not None:
             set_memory_limit(mem_limit, verbose=verbose)
 
@@ -524,33 +547,27 @@ def xcsp3_cpmpy(benchname: str,
         if time_limit is not None:
             set_time_limit(int(time_limit - wall_time(p) + time.process_time()), verbose=verbose) # set remaining process time != wall time
    
-
         sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
 
-        # Get the current process
-        p = psutil.Process()
-
-        # Get the start time as a timestamp
-        time_start = p.create_time()
-
+        
         # ------------------------------ Parse instance ------------------------------ #
 
         time_parse = time.time()
         parser = _parse_xcsp3(benchname)
         time_parse = time.time() - time_parse
-        print_comment(f"took {time_parse:.4f} seconds to parse XCSP3 model [{benchname}]")
+        if verbose: print_comment(f"took {time_parse:.4f} seconds to parse XCSP3 model [{benchname}]")
 
-        if time_limit and time_limit < (time.time() - time_start):
+        if time_limit and time_limit < wall_time(p):
             raise TimeoutError("Time's up after parse")
-        
+                
         # ---------------- Convert XCSP3 to CPMpy model with callbacks --------------- #
 
         time_callback = time.time()
         model = _load_xcsp3(parser)
         time_callback = time.time() - time_callback
-        print_comment(f"took {time_callback:.4f} seconds to convert to CPMpy model")
+        if verbose: print_comment(f"took {time_callback:.4f} seconds to convert to CPMpy model")
         
-        if time_limit and time_limit < (time.time() - time_start):
+        if time_limit and time_limit < wall_time(p):
             raise TimeoutError("Time's up after callback")
         
         # ------------ Replace solver supported constraints with natives ------------- #
@@ -577,7 +594,6 @@ def xcsp3_cpmpy(benchname: str,
                 if constraint.name in added_natives[solver]:
                     model.constraints[i] = added_natives[solver][constraint.name](constraint.args)
 
-
         # ------------------------ Post CPMpy model to solver ------------------------ #
 
         solver_args = solver_arguments(solver, model=model, seed=seed,
@@ -586,29 +602,31 @@ def xcsp3_cpmpy(benchname: str,
                                        **kwargs)
         # time_limit is generic for all, done later
 
-        
-
         # Post model to solver
         time_post = time.time()
-        # with prepend_print():  # catch prints and prepend 'c' to each line (still needed?)
+
         if solver == "exact": # Exact2 takes its options at creation time
             s = cp.SolverLookup.get(solver, model, **solver_args)
             solver_args = dict()  # no more solver args needed
         else:
             s = cp.SolverLookup.get(solver, model)
         time_post = time.time() - time_post
-        print_comment(f"took {time_post:.4f} seconds to post model to {solver}")
+        if verbose: print_comment(f"took {time_post:.4f} seconds to post model to {solver}")
 
-        if time_limit and time_limit < (time.time() - time_start):
+        if time_limit and time_limit < wall_time(p):
             raise TimeoutError("Time's up after post")
 
+        
 
         # ------------------------------- Solve model ------------------------------- #
         
         if time_limit:
             # give solver only the remaining time
-            time_limit = time_limit - (time.time() - time_start) - time_buffer
-            print_comment(f"{time_limit}s left to solve")
+            time_limit = time_limit - wall_time(p) - time_buffer
+            # disable signal-based time limit and let the solver handle it (solvers don't play well with difference between cpu and wall time)
+            set_time_limit(None)
+            
+            if verbose: print_comment(f"{time_limit}s left to solve")
         
         time_solve = time.time()
         try:
@@ -620,7 +638,7 @@ def xcsp3_cpmpy(benchname: str,
                 raise e
 
         time_solve = time.time() - time_solve
-        print_comment(f"took {time_solve:.4f} seconds to solve")
+        if verbose: print_comment(f"took {time_solve:.4f} seconds to solve")
 
         # ------------------------------- Print result ------------------------------- #
 
