@@ -188,7 +188,16 @@ class CPM_minizinc(SolverInterface):
             return set(installed_solvers)
         
     @staticmethod
-    def solverversion(subsolver:str):
+    def solverversion(subsolver:str) -> Optional[str]:
+        """
+        Returns the version of the requested subsolver.
+
+        Arguments:
+            subsolver (str): name of the subsolver
+
+        Returns:
+            Version number of the subsolver if installed, else None 
+        """
         all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
         try:
             solver_index = all_solvers.index(subsolver) # find requested subsolver
