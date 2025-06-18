@@ -184,42 +184,6 @@ def get_subsolver(solver: str, model: cp.Model, subsolver: Optional[str] = None)
     return subsolver
 
 
-class Capturing(list):
-    def __enter__(self):
-        self._stdout = sys.stdout
-        sys.stdout = self._stringio = StringIO()
-        return self
-    def __exit__(self, *args):
-        self.extend(self._stringio.getvalue().splitlines())
-        del self._stringio    # free up some memory
-        sys.stdout = self._stdout
-
-class Callback:
-
-    def __init__(self, model:cp.Model):
-        self.__start_time = time.time()
-        self.__solution_count = 0
-        self.model = model
-
-    def callback(self, *args, **kwargs):
-        current_time = time.time()
-        model, state = args
-
-        # Callback codes: https://www.gurobi.com/documentation/current/refman/cb_codes.html#sec:CallbackCodes
-        
-        from gurobipy import GurobiError, GRB
-        # if state == GRB.Callback.MESSAGE: # verbose logging
-        #     print_comment("log message: " + str(model.cbGet(GRB.Callback.MSG_STRING)))
-        if state == GRB.Callback.MIP: # callback from the MIP solver
-            if model.cbGet(GRB.Callback.MIP_SOLCNT) > self.__solution_count: # do we have a new solution?
-
-                obj = int(model.cbGet(GRB.Callback.MIP_OBJBST))
-                print_comment('Solution %i, time = %0.2fs' % 
-                            (self.__solution_count, current_time - self.__start_time))
-                print_objective(obj)
-                self.__solution_count = model.cbGet(GRB.Callback.MIP_SOLCNT)
-
-
 # ---------------------------------------------------------------------------- #
 #                            XCSP3 Output formatting                           #
 # ---------------------------------------------------------------------------- #
@@ -237,7 +201,7 @@ def comment_line_start() -> str:
     return 'c' + chr(32)
 
 class ExitStatus(Enum):
-    unsupported:str = "UNSUPPORTED" # instance contains a unsupported feature (e.g. a unsupported global constraint)
+    unsupported:str = "UNSUPPORTED" # instance contains an unsupported feature (e.g. a unsupported global constraint)
     sat:str = "SATISFIABLE" # CSP : found a solution | COP : found a solution but couldn't prove optimality
     optimal:str = "OPTIMUM" + chr(32) + "FOUND" # optimal COP solution found
     unsat:str = "UNSATISFIABLE" # instance is unsatisfiable
@@ -256,6 +220,7 @@ def print_objective(objective: int) -> None:
 def print_comment(comment: str) -> None:
     print(comment_line_start() + comment.rstrip('\n'), end="\r\n", flush=True)
 
+
 # ---------------------------------------------------------------------------- #
 #                          CLI argument type checkers                          #
 # ---------------------------------------------------------------------------- #
@@ -265,7 +230,6 @@ def dir_path(path):
         return Path(path)
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
-
 
 def is_supported_solver(solver:Optional[str]):
     if (solver is not None) and (solver not in SUPPORTED_SOLVERS):
@@ -407,7 +371,32 @@ def gurobi_arguments(model: cp.Model,
         res |= { "MemLimit": bytes_as_gb(remaining_memory(mem_limit)) }
 
     if intermediate and model.has_objective():
-        res |= { "solution_callback": Callback(model).callback }
+
+        class GurobiSolutionCallback:
+            def __init__(self, model:cp.Model):
+                self.__start_time = time.time()
+                self.__solution_count = 0
+                self.model = model
+
+            def callback(self, *args, **kwargs):
+                current_time = time.time()
+                model, state = args
+
+                # Callback codes: https://www.gurobi.com/documentation/current/refman/cb_codes.html#sec:CallbackCodes
+                
+                from gurobipy import GRB
+                # if state == GRB.Callback.MESSAGE: # verbose logging
+                #     print_comment("log message: " + str(model.cbGet(GRB.Callback.MSG_STRING)))
+                if state == GRB.Callback.MIP: # callback from the MIP solver
+                    if model.cbGet(GRB.Callback.MIP_SOLCNT) > self.__solution_count: # do we have a new solution?
+
+                        obj = int(model.cbGet(GRB.Callback.MIP_OBJBST))
+                        print_comment('Solution %i, time = %0.2fs' % 
+                                    (self.__solution_count, current_time - self.__start_time))
+                        print_objective(obj)
+                        self.__solution_count = model.cbGet(GRB.Callback.MIP_SOLCNT)
+
+        res |= { "solution_callback": GurobiSolutionCallback(model).callback }
 
     return res
 
@@ -548,7 +537,6 @@ def xcsp3_cpmpy(
             set_time_limit(int(time_limit - wall_time(p) + time.process_time()), verbose=verbose) # set remaining process time != wall time
    
         sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
-
         
         # ------------------------------ Parse instance ------------------------------ #
 
@@ -616,8 +604,6 @@ def xcsp3_cpmpy(
         if time_limit and time_limit < wall_time(p):
             raise TimeoutError("Time's up after post")
 
-        
-
         # ------------------------------- Solve model ------------------------------- #
         
         if time_limit:
@@ -653,6 +639,9 @@ def xcsp3_cpmpy(
         else:
             print_comment("Solver did not find any solution within the time/memory limit")
             print_status(ExitStatus.unknown)
+
+        # ------------------------------------- - ------------------------------------ #
+
         
     except MemoryError as e:
         print_comment(f"MemoryError raised. Reached limit of {mem_limit} MiB")
@@ -683,9 +672,6 @@ def xcsp3_cpmpy(
 
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
-
-    # Configure signal handles
-    init_signal_handlers()
 
     # ------------------------------ Argument parsing ------------------------------ #
 
@@ -724,6 +710,9 @@ if __name__ == "__main__":
         print_comment(f"Arguments: {args}")
 
     try:
+        # Configure signal handles
+        init_signal_handlers()
+
         if str(args.benchname).endswith(".lzma"):
             # Decompress the XZ file
             with lzma.open(args.benchname, 'rt', encoding='utf-8') as f:
