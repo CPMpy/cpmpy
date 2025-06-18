@@ -704,7 +704,7 @@ if __name__ == "__main__":
     # TIMELIMIT: Total CPU time in seconds (before it gets killed)
     parser.add_argument("-l", "--time-limit", required=False, type=int, default=None, help="Time limit in seconds.") # TIMELIMIT
     # MEMLIMIT: Total amount of memory in MiB (mebibyte = 1024 * 1024 bytes)
-    parser.add_argument("-m", "--mem-limit", required=False, type=int, default=None, help="Memory limit in MiB (1 MiB = 1024 x 1024 bytes). Gets passed on to the solver (if supported) but is not enforced on the Python/CPMpy side.")
+    parser.add_argument("-m", "--mem-limit", required=False, type=int, default=None, help="Memory limit in MiB (1 MiB = 1024 x 1024 bytes). Gets passed on to the solver (if supported) and is also enforced on the Python/CPMpy side. Measured as Virtual Memory Size")
     # TMPDIR: Only location where temporary read/write is allowed
     parser.add_argument("-t","--tmpdir", required=False, type=dir_path, help="Directory for temporary read/write operations.")
     # NBCORE: Number of processing units (can by any of the following: a processor / a processor core / logical processor (hyper-threading))
