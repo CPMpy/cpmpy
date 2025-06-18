@@ -261,6 +261,15 @@ def ortools_arguments(model: cp.Model,
                       **kwargs):
     # https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
     res = dict()
+
+    # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+    res |= {
+        "interleave_search": True,
+        "use_rins_lns": False,
+    }
+    if not model.has_objective():
+        res |= { "num_violation_ls": 1 }
+
     if cores is not None:
         res |= { "num_search_workers": cores }
     if seed is not None: 
@@ -297,7 +306,15 @@ def ortools_arguments(model: cp.Model,
         # Register the callback
         res |= { "solution_callback": OrtSolutionCallback() }
 
-    return res
+    def internal_options(solver: CPM_ortools):
+        # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+        solver.ort_solver.parameters.subsolvers.extend(["default_lp", "max_lp", "quick_restart"])
+        if not model.has_objective():
+            solver.ort_solver.parameters.subsolvers.append("core_or_no_lp")
+        if len(solver.ort_model.proto.search_strategy) != 0:
+            solver.ort_solver.parameters.subsolvers.append("fixed")
+
+    return res, internal_options
 
 def exact_arguments(seed: Optional[int] = None, **kwargs):
     # Documentation: https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp?ref_type=heads
@@ -305,11 +322,11 @@ def exact_arguments(seed: Optional[int] = None, **kwargs):
     if seed is not None: 
         res |= { "seed": seed }
 
-    return res
+    return res, None
 
 def choco_arguments(): 
     # Documentation: https://github.com/chocoteam/pychoco/blob/master/pychoco/solver.py
-    return {}
+    return {}, None
 
 def z3_arguments(model: cp.Model,
                  cores: int = 1,
@@ -333,7 +350,7 @@ def z3_arguments(model: cp.Model,
         if mem_limit is not None:
             res |= { "max_memory": bytes_as_mb(mem_limit) }
 
-    return res
+    return res, None
 
 def minizinc_arguments(solver: str,
                        cores: Optional[int] = None,
@@ -353,7 +370,7 @@ def minizinc_arguments(solver: str,
         # - https://www.minizinc.org/doc-2.5.5/en/lib-chuffed.html
         # - https://github.com/chuffed/chuffed/blob/develop/chuffed/core/options.h
     
-    return res
+    return res, None
 
 def gurobi_arguments(model: cp.Model,
                      cores: Optional[int] = None,
@@ -398,7 +415,7 @@ def gurobi_arguments(model: cp.Model,
 
         res |= { "solution_callback": GurobiSolutionCallback(model).callback }
 
-    return res
+    return res, None
 
 def cpo_arguments(model: cp.Model,
                   cores: Optional[int] = None,
@@ -438,7 +455,7 @@ def cpo_arguments(model: cp.Model,
         # Register the callback
         res |= { "solution_callback": CpoSolutionCallback }
 
-    return res
+    return res, None
 
 
 def solver_arguments(solver: str, 
@@ -584,7 +601,7 @@ def xcsp3_cpmpy(
 
         # ------------------------ Post CPMpy model to solver ------------------------ #
 
-        solver_args = solver_arguments(solver, model=model, seed=seed,
+        solver_args, internal_options = solver_arguments(solver, model=model, seed=seed,
                                        intermediate=intermediate,
                                        cores=cores, mem_limit=mib_as_bytes(mem_limit) if mem_limit is not None else None,
                                        **kwargs)
@@ -616,6 +633,8 @@ def xcsp3_cpmpy(
         
         time_solve = time.time()
         try:
+            if internal_options is not None:
+                internal_options(s) # Set more internal solver options (need access to native solver object)
             is_sat = s.solve(time_limit=time_limit, **solver_args)
         except RuntimeError as e:
             if "Program interrupted by user." in str(e): # Special handling for Exact
