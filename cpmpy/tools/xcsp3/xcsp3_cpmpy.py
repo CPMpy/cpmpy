@@ -1,5 +1,5 @@
 """
-    CLI script for the XCSP3 competition.
+    CLI script for running XCSP3 instances.
 
     A command-line interface for solving XCSP3 constraint satisfaction problems using CPMpy.
 

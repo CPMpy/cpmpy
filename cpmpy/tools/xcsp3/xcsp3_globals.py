@@ -461,22 +461,28 @@ class MDD(GlobalConstraint):
     ending in one. Each edge layer corresponds to a variables and each path corresponds to a solution
     The values of the variables in 'array' correspond to a path in the mdd formed by the transitions in 'transitions'.
     Root node is the first node used as a start in the first transition (i.e. transitions[0][0])
-    spec:
-        - array: an array of CPMpy expressions (integer variable, global functions,...)
-        - transitions: an array of tuples (nodeID, int, nodeID) where nodeID is some unique identifiers for the nodes
-        (int or str are fine)
+
+    Arguments:
+        array: an array of CPMpy expressions (integer variable, global functions,...)
+        transitions: an array of tuples (nodeID, int, nodeID) where nodeID is some unique identifiers for the nodes
+            (int or str are fine)
+    
     Example:
         The following transitions depict a 3 layer MDD, starting at 'r' and ending in 't'
         ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
         ("n4", 0, "t"), ("n5", 1, "t")
         Its graphical representation is:
+
+        .. code-block:: text
+            
                   r
-              0/ |1  \2     X
+              0/ |1  \\2     X
             n1   n2   n3
             2| /2    /O     Y
              n4     n5
               0\   /1       Z
                  t
+        
         It has 3 paths, corresponding to 3 solution for (X,Y,Z): (0,2,0), (1,2,0) and (2,0,1)
     """
 
@@ -602,11 +608,15 @@ class Regular(GlobalConstraint):
     The starting node is an integer or string representing the starting state of the automaton.
     The accepting nodes are a list of integers or strings representing the accepting states of the automaton.
 
-    Example: an automaton that accepts the language 0*10* (exactly 1 variable taking value 1) is defined as:
-        cp.Regular(array = cp.intvar(0,1, shape=4),
-                   transitions = [("A",0,"A"), ("A",1,"B"), ("B",0,"C"), ("C",0,"C")],
-                   start = "A",
-                   accepting = ["C"])
+    Example: 
+        an automaton that accepts the language 0*10* (exactly 1 variable taking value 1) is defined as:
+
+        .. code-block:: python
+
+            cp.Regular(array = cp.intvar(0,1, shape=4),
+                    transitions = [("A",0,"A"), ("A",1,"B"), ("B",0,"C"), ("C",0,"C")],
+                    start = "A",
+                    accepting = ["C"])
     """
     def __init__(self, array, transitions, start, accepting):
         array = flatlist(array)

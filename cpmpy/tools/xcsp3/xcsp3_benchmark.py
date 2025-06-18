@@ -1,5 +1,5 @@
 """
-Benchmark Solvers on XCSP3 Instances.
+Benchmark solvers on XCSP3 Instances by replicating the XCSP3 competition.
 
 A command-line tool for benchmarking constraint solvers on XCSP3 competition instances.
 Supports parallel execution, time/memory limits, and solver configuration.
