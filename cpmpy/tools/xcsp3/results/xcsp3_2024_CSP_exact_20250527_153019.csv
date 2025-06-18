@@ -1,2 +1,0 @@
-year,track,instance,solver,time_total,time_parse,time_model,time_post,time_solve,status,objective_value,solution,intermediate,checker_result
-2024,CSP,Fillomino-5-0_c24.xml,exact,62.70538330078125,0.0612,0.2098,57.7655,3.7692,SATISFIABLE,,"<instantiation type=""solution"">",,

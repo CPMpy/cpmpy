@@ -1,9 +1,0 @@
-year,track,instance,solver,time_total,time_parse,time_model,time_post,time_solve,status,objective_value,solution,intermediate
-2024,CSP,AverageAvoiding-20_c24.xml,ortools,0.9548358917236328,0.0163,0.2507,0.1153,,,,,
-2024,CSP,AverageAvoiding-25_c24.xml,ortools,1.4006166458129883,0.0315,0.507,0.239,,,,,
-2024,CSP,AverageAvoiding-30_c24.xml,ortools,2.085334539413452,0.0528,0.9211,0.4571,,,,,
-2024,CSP,AverageAvoiding-35_c24.xml,ortools,3.0483720302581787,0.1134,1.4326,0.7894,,,,,
-2024,CSP,AverageAvoiding-40_c24.xml,ortools,4.229047536849976,0.152,2.2155,1.0973,,,,,
-2024,CSP,AverageAvoiding-45_c24.xml,ortools,5.816161870956421,0.2038,3.093,1.6727,,,,,
-2024,CSP,AverageAvoiding-50_c24.xml,ortools,7.694201231002808,0.2752,4.3791,2.1233,,,,,
-2024,CSP,AverageAvoiding-55_c24.xml,ortools,10.02436900138855,0.3542,5.7513,2.8616,,,,,
