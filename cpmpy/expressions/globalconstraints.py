@@ -669,10 +669,16 @@ class Cumulative(GlobalConstraint):
         Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs.
     """
-    def __init__(self, start, duration, end, demand, capacity):
+    def __init__(self, start, duration, end=None, demand=None, capacity=None):
+        if end is None:
+            end = [None] * len(start)
+        
         assert is_any_list(start), "start should be a list"
         assert is_any_list(duration), "duration should be a list"
         assert is_any_list(end), "end should be a list"
+        
+        assert demand is not None, "demand should be provided but was None"
+        assert capacity is not None, "capacity should be provided but was None"
 
         start = flatlist(start)
         duration = flatlist(duration)
@@ -692,6 +698,12 @@ class Cumulative(GlobalConstraint):
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
+    def get_end_vars(self):
+        if self.args[2][0] is None:
+            self.args[2] = [intvar(lb, ub) for lb, ub in zip(*get_bounds([s+d for s,d in zip(self.args[0], self.args[1])]))]
+        return self.args[2]
+
+
     def decompose(self):
         """
             Time-resource decomposition from:
@@ -704,38 +716,43 @@ class Cumulative(GlobalConstraint):
 
         cons = []
 
-        # set duration of tasks
-        for t in range(len(start)):
-            cons += [start[t] + duration[t] == end[t]]
+        # set duration of tasks, only if end is user-provided
+        if end[0] is not None:
+            for t in range(len(start)):
+                cons += [start[t] + duration[t] == end[t]]
 
         # demand doesn't exceed capacity
-        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
+        lbs, ubs = get_bounds(start)
+        lb, ub = min(lbs), max(ubs)
         for t in range(lb,ub+1):
             demand_at_t = 0
             for job in range(len(start)):
-                if is_num(demand):
-                    demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
-                else:
-                    demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
+                demand_at_t += demand[job] * ((start[job] <= t) & (start[job] + duration[job] > t))
 
             cons += [demand_at_t <= capacity]
 
         return cons, []
 
     def value(self):
-        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
-                   else argval(arg) for arg in self.args]
 
+        start, dur, end, demand, capacity = self.args
+
+        start, dur, demand = [np.array(argvals(lst)) for lst in (start, dur, demand)]
+        if end[0] is None:
+            end  = start + dur
+        else:
+            end = np.array(argvals(end))
+        capacity = argval(capacity)
+
+        arg_vals = [start, dur, end, demand, capacity] # start, dur, end are np arrays
         if any(a is None for a in arg_vals):
             return None
 
-        # start, dur, end are np arrays
-        start, dur, end, demand, capacity = arg_vals
         # start and end seperated by duration
         if not (start + dur == end).all():
             return False
 
-        # demand doesn't exceed capacity
+        # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
         for t in range(lb, ub+1):
             if capacity < sum(demand * ((start <= t) & (t < end))):
