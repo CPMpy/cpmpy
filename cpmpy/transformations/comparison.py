@@ -38,7 +38,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
             if not isinstance(cond, _BoolVarImpl): # expr -> bv
                 res = only_numexpr_equality([cond], supported, csemap=csemap)
                 if len(res) == 1 and cond is not res[0]: # changed, but no new cons due to CSE
-                    newcons[i] = res[0]
+                    newcons[i] = res[0].implies(subexpr)
                 if len(res) > 1:
                     newcons[i] = res[1].implies(subexpr)
                     newcons.insert(i, res[0])
@@ -46,7 +46,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
             elif not isinstance(subexpr, _BoolVarImpl):  # bv -> expr
                 res = only_numexpr_equality([subexpr], supported, csemap=csemap)
                 if len(res) == 1 and subexpr is not res[0]: # changed, but no new cons due to CSE
-                    newcons[i] = res[0]
+                    newcons[i] = cond.implies(res[0])
                 if len(res) > 1:
                     newcons[i] = cond.implies(res[1])
                     newcons.insert(i, res[0]) # can still be changted because of CSE
@@ -62,7 +62,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                 if not isinstance(lhs, _BoolVarImpl):  # expr == bv
                     res = only_numexpr_equality([lhs], supported, csemap=csemap)
                     if len(res) == 1 and lhs is not res[0]: # changed, but no new cons due to CSE
-                        newcons[i] = res[0]
+                        newcons[i] = res[0] == rhs
                     if len(res) > 1:
                         newcons[i] = res[1] == rhs
                         newcons.insert(i, res[0])
@@ -70,7 +70,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                 elif not isinstance(rhs, _BoolVarImpl):  # bv == expr
                     res = only_numexpr_equality([rhs], supported, csemap=csemap)
                     if len(res) == 1 and rhs is not res[0]: # changed, but no new cons due to CSE
-                        newcons[i] = res[0]
+                        newcons[i] = lhs == res[0]
                     if len(res) > 1:
                         newcons[i] = lhs == res[1]
                         newcons.insert(i, res[0])
