@@ -565,16 +565,22 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self):
-        arg_vals = argvals(self.args)
+        # ensure all values are Python native
+        # https://github.com/CPMpy/cpmpy/pull/413#discussion_r1333264363 --> more efficient than iterating?? 
+        arg_vals = np.array(argvals(self.args)).tolist()
 
         if any(a is None for a in arg_vals): return None
-        if   self.name == "==": return arg_vals[0] == arg_vals[1]
-        elif self.name == "!=": return arg_vals[0] != arg_vals[1]
-        elif self.name == "<":  return arg_vals[0] < arg_vals[1]
-        elif self.name == "<=": return arg_vals[0] <= arg_vals[1]
-        elif self.name == ">":  return arg_vals[0] > arg_vals[1]
-        elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
-        return None # default
+        val = None
+        if   self.name == "==": val = arg_vals[0] == arg_vals[1]
+        elif self.name == "!=": val = arg_vals[0] != arg_vals[1]
+        elif self.name == "<":  val = arg_vals[0] < arg_vals[1]
+        elif self.name == "<=": val = arg_vals[0] <= arg_vals[1]
+        elif self.name == ">":  val = arg_vals[0] > arg_vals[1]
+        elif self.name == ">=": val = arg_vals[0] >= arg_vals[1]
+
+        if val is None:
+            return val
+        return bool(val)
 
 
 class Operator(Expression):
@@ -699,6 +705,9 @@ class Operator(Expression):
         else:
             arg_vals = argvals(self.args)
 
+        # ensure all values are Python native
+        # https://github.com/CPMpy/cpmpy/pull/413#discussion_r1333264363 --> more efficient than iterating?? 
+        arg_vals = np.array(arg_vals).tolist()
 
         if any(a is None for a in arg_vals): return None
         # non-boolean
