@@ -120,7 +120,7 @@ class Minimum(GlobalFunction):
         super().__init__("min", flatlist(arg_list))
 
     def value(self):
-        argvals = [argval(a) for a in self.args]
+        argvals = np.array([argval(a) for a in self.args]).tolist()
         if any(val is None for val in argvals):
             return None
         else:
@@ -158,7 +158,7 @@ class Maximum(GlobalFunction):
         super().__init__("max", flatlist(arg_list))
 
     def value(self):
-        argvals = [argval(a) for a in self.args]
+        argvals = np.array([argval(a) for a in self.args]).tolist()
         if any(val is None for val in argvals):
             return None
         else:
@@ -195,7 +195,7 @@ class Abs(GlobalFunction):
         super().__init__("abs", [expr])
 
     def value(self):
-        return abs(argval(self.args[0]))
+        return int(abs(argval(self.args[0])))
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
@@ -268,7 +268,11 @@ class Element(GlobalFunction):
         idxval = argval(idx)
         if idxval is not None:
             if idxval >= 0 and idxval < len(arr):
-                return argval(arr[idxval])
+                val = argval(arr[idxval])
+                if isinstance(val, np.generic):
+                    return val.item()
+                return val
+            
             raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
                                           + "\n Use argval(expr) to get the value of expr with relational semantics.")
         return None # default
@@ -329,7 +333,7 @@ class Count(GlobalFunction):
     def value(self):
         arr, val = self.args
         val = argval(val)
-        return sum([argval(a) == val for a in arr])
+        return int(sum([argval(a) == val for a in arr]))
 
     def get_bounds(self):
         """
