@@ -128,15 +128,17 @@ def argval(a):
     if hasattr(a, "value"):
         try:
             val = a.value()
-            if isinstance(val, np.generic):
-                return val.item() # ensure it is a Python native value
-            return val
         except IncompleteFunctionError as e:
             if a.is_bool():
                 return False
             else:
                 raise e
-    return a
+    else:
+        val = a
+
+    if isinstance(val, np.generic):
+        return val.item() # ensure it is a Python native value
+    return val
 
 
 def argvals(arr):
