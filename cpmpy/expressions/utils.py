@@ -127,7 +127,10 @@ def argval(a):
     """
     if hasattr(a, "value"):
         try:
-            return a.value()
+            val = a.value()
+            if isinstance(val, np.generic):
+                return val.item() # ensure it is a Python native value
+            return val
         except IncompleteFunctionError as e:
             if a.is_bool():
                 return False
