@@ -49,7 +49,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                     newcons[i] = cond.implies(res[0])
                 if len(res) > 1:
                     newcons[i] = cond.implies(res[1])
-                    newcons.insert(i, res[0]) # can still be changted because of CSE
+                    newcons.insert(i, res[0]) 
             else: #bv -> bv
                 pass
 
