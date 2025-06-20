@@ -399,7 +399,7 @@ class Inverse(GlobalConstraint):
         rev = argvals(self.args[1])
         # args are fine, now evaluate actual inverse cons
         try:
-            return bool(all(rev[x] == i for i, x in enumerate(fwd)))
+            return all(rev[x] == i for i, x in enumerate(fwd))
         except IndexError: # partiality of Element constraint
             return False
 
@@ -575,9 +575,9 @@ class IfThenElse(GlobalConstraint):
         condition, if_true, if_false = self.args
         try:
             if argval(condition):
-                return bool(argval(if_true))
+                return argval(if_true)
             else:
-                return bool(argval(if_false))
+                return argval(if_false)
         except IncompleteFunctionError:
             return False
 
@@ -654,7 +654,7 @@ class Xor(GlobalConstraint):
         return decomp, []
 
     def value(self):
-        return bool(sum(argvals(self.args)) % 2 == 1)
+        return sum(argvals(self.args)) % 2 == 1
 
     def __repr__(self):
         if len(self.args) == 2:
@@ -842,19 +842,8 @@ class GlobalCardinalityCount(GlobalConstraint):
         return constraints, []
 
     def value(self):
-        vars, vals, occ = argvals(self.args)
-        if self.closed and set(vars) - set(vals):
-            return False # some variables take a value outside vals
-        
-        cnts = {val: 0 for val in vals}
-        for val in argvals(vars):
-            if val in cnts:
-                cnts[val] += 1
-            elif self.closed:
-                return False # variable takes a value outside vals
-            
-        return all(cnts[val] == occ for val, occ in zip(vals, occ))
-
+        decomposed, _ = self.decompose()
+        return cp.all(decomposed).value()
 
 
 class Increasing(GlobalConstraint):
@@ -876,7 +865,7 @@ class Increasing(GlobalConstraint):
 
     def value(self):
         args = argvals(self.args)
-        return bool(all(args[i] <= args[i+1] for i in range(len(args)-1)))
+        return all(args[i] <= args[i+1] for i in range(len(args)-1))
 
 
 class Decreasing(GlobalConstraint):
@@ -898,7 +887,7 @@ class Decreasing(GlobalConstraint):
 
     def value(self):
         args = argvals(self.args)
-        return bool(all(args[i] >= args[i+1] for i in range(len(args)-1)))
+        return all(args[i] >= args[i+1] for i in range(len(args)-1))
 
 
 class IncreasingStrict(GlobalConstraint):
@@ -920,7 +909,7 @@ class IncreasingStrict(GlobalConstraint):
 
     def value(self):
         args = argvals(self.args)
-        return bool(all(args[i] < args[i+1] for i in range(len(args)-1)))
+        return all(args[i] < args[i+1] for i in range(len(args)-1))
 
 
 class DecreasingStrict(GlobalConstraint):
@@ -942,7 +931,7 @@ class DecreasingStrict(GlobalConstraint):
 
     def value(self):
         args = argvals(self.args)
-        return bool(all(args[i] > args[i+1] for i in range(len(args)-1)))
+        return all(args[i] > args[i+1] for i in range(len(args)-1))
 
 
 class LexLess(GlobalConstraint):
@@ -991,7 +980,7 @@ class LexLess(GlobalConstraint):
 
     def value(self):
         X, Y = argvals(self.args)
-        return bool(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))))
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X)))
 
 
 class LexLessEq(GlobalConstraint):
@@ -1036,7 +1025,7 @@ class LexLessEq(GlobalConstraint):
 
     def value(self):
         X, Y = argvals(self.args)
-        return bool(any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X))))
+        return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X)))
 
 
 class LexChainLess(GlobalConstraint):
@@ -1056,7 +1045,7 @@ class LexChainLess(GlobalConstraint):
 
     def value(self):
         X = argvals(self.args)
-        return bool(all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:])))
+        return all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class LexChainLessEq(GlobalConstraint):
@@ -1076,7 +1065,7 @@ class LexChainLessEq(GlobalConstraint):
 
     def value(self):
         X = argvals(self.args)
-        return bool(all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:])))
+        return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class DirectConstraint(Expression):
