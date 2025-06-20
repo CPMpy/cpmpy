@@ -589,6 +589,24 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type((a ** b).value()))
         self.assertEqual(int, type((a % b).value()))
 
+        # test comparisons
+        a,b = x[0,[0,1]]
+        self.assertEqual(bool, type((a < b).value()))
+        self.assertEqual(bool, type((a <= b).value()))
+        self.assertEqual(bool, type((a > b).value()))
+        self.assertEqual(bool, type((a >= b).value()))
+        self.assertEqual(bool, type((a == b).value()))
+        self.assertEqual(bool, type((a != b).value()))
+
+        # alsl comparisons with numpy values
+        a,b = x[0,0], np.int64(42)
+        self.assertEqual(bool, type((a < b).value()))
+        self.assertEqual(bool, type((a <= b).value()))
+        self.assertEqual(bool, type((a > b).value()))
+        self.assertEqual(bool, type((a >= b).value()))
+        self.assertEqual(bool, type((a == b).value()))
+        self.assertEqual(bool, type((a != b).value()))
+
 class TestBuildIns(unittest.TestCase):
 
     def setUp(self):
