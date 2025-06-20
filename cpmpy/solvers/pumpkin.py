@@ -299,16 +299,16 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"alldifferent", "cumulative", "table", "negative_table", "InDomain"
                      "min", "max", "element"}
-        cpm_cons = decompose_in_tree(cpm_cons, supported=supported)
+        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, csemap=self._csemap)
         # safening after decompose here, need to safen toplevel elements too
         #   which come from decomposition of other global constraints...
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"})
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         supported_halfreif = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max"}
-        cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif) # reified element not supported yet (TODO?)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif, csemap=self._csemap) # reified element not supported yet (TODO?)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]),csemap=self._csemap)  # supports >, <, !=
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons
 
@@ -385,7 +385,7 @@ class CPM_pumpkin(SolverInterface):
                 if cpm_var.is_bool(): # have convert to integer
                     pum_var = self.pum_solver.boolean_as_integer(pum_var)
                 args.append(pum_var.scaled(-w if negate else w))
-        elif isinstance(Operator, expr) and expr.name == "sub":
+        elif isinstance(expr, Operator) and expr.name == "sub":
             x, y = self.solver_vars(expr.args)
             if expr.args[0].is_bool():
                 x = self.pum_solver.boolean_as_integer(x)
@@ -412,9 +412,7 @@ class CPM_pumpkin(SolverInterface):
 
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == "or": 
-                # bit of a hack: clauses cannot be tagged in the proof, use sum instead
-                summed_args = Operator("sum", cpm_expr.args)
-                return [constraints.LessThanOrEquals(self._sum_args(summed_args, negate=True), -1)]
+                return [constraints.Clause(self.solver_vars(cpm_expr.args))]
 
             raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
 
@@ -422,7 +420,13 @@ class CPM_pumpkin(SolverInterface):
             lhs, rhs = cpm_expr.args
             assert isinstance(lhs, Expression), f"Expected a CPMpy expression on lhs but got {lhs} of type {type(lhs)}"
 
+            if isinstance(lhs, _NumVarImpl) or \
+                    (isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1):
+                pred = self.to_predicate(cpm_expr)
+                return [constraints.Clause([self.pum_solver.predicate_as_boolean(pred)])]
+
             if cpm_expr.name == "==":
+                
                 if "sum" in lhs.name or lhs.name == "sub":
                     return [constraints.Equals(self._sum_args(lhs), rhs)]
                
