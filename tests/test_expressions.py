@@ -567,7 +567,12 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type(cp.sum(x).value()))
         self.assertEqual(int, type(cp.sum([1,2,3] * x[0]).value()))
         self.assertEqual(float, type(cp.sum([0.1,0.2,0.3] * x[0]).value()))
+        
+        # also numpy should be converted to Python native when callig value()
         self.assertEqual(int, type(cp.sum(np.array([1, 2, 3]) * x[0]).value()))
+        self.assertEqual(float, type(cp.sum(np.array([0.1,0.2,0.3]) * x[0]).value()))
+        
+        # test binary operators
         a,b = x[0,[0,1]]
         self.assertEqual(int, type((-a).value()))
         self.assertEqual(int, type((a - b).value()))
@@ -576,6 +581,13 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type((a ** b).value()))
         self.assertEqual(int, type((a % b).value()))
 
+        # test binary operators with numpy constants
+        a,b = x[0,0], np.int64(42)
+        self.assertEqual(int, type((a - b).value()))
+        self.assertEqual(int, type((a * b).value()))
+        self.assertEqual(int, type((a // b).value()))
+        self.assertEqual(int, type((a ** b).value()))
+        self.assertEqual(int, type((a % b).value()))
 
 class TestBuildIns(unittest.TestCase):
 
