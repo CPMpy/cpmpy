@@ -43,7 +43,7 @@
     Module details
     ==============
 """
-import sys
+import sys  # for stdout checking
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
