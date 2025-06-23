@@ -577,7 +577,7 @@ class CPM_cpo(SolverInterface):
         # Normal setting
         if end is None: # no end provided by user
             cpo_s, cpo_d = self.solver_vars([start, dur])
-            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur))
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur))
             return task, [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
         else:
             cpo_s, cpo_d, cpo_e = self.solver_vars([start, dur, end])                
