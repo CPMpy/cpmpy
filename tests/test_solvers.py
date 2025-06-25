@@ -321,6 +321,15 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertSetEqual(set(ps2.get_core()), set([mayo,inds[6],inds[9]]))
 
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
+    def test_pysat_subsolver(self):
+        pysat = CPM_pysat(subsolver="pysat:cadical195")
+        x, y = cp.boolvar(shape=2)
+        pysat += x | y
+        pysat += ~x | ~y
+        assert pysat.solve()
+
     @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
     @skip_on_missing_pblib()
     def test_pysat_card(self):
