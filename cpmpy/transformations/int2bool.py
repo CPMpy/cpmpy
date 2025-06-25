@@ -377,7 +377,7 @@ class IntVarEncLog(IntVarEnc):
     """
     Log (or "binary") encoding of an integer variable.
 
-    Uses a Boolean 'bit' variable to represent `x` using the unsigned binary representation offset by its lower bound (e.g. for `x in 5..8`, the assignment `00` maps to `x=5`, and `11` to `x=8`). In other words, it is `k`-offset binary encoding where `k=x.lb`
+    Uses a Boolean 'bit' variable to represent `x` using the unsigned binary representation offset by its lower bound (e.g. for `x in 5..8`, the assignment `00` maps to `x=5`, and `11` to `x=8`). In other words, it is `k`-offset binary encoding where `k=x.lb`.
     """
 
     def __init__(self, x):
@@ -390,8 +390,10 @@ class IntVarEncLog(IntVarEnc):
         # encode directly to avoid bounds check for this seemingly tautological constraint
         return self.encode_comparison("<=", self._x.ub, check_bounds=False)
 
-    def _bitstring(self, d):
-        """Return offset binary representation of `d` as Booleans in order of increasing significance (e.g. `4` returns `001`)."""
+    def _to_little_endian_offset_binary(self, d):
+        """Return offset binary representation of `d` as Booleans in order of increasing significance ("little-endian").
+        
+        For more details on offset binary, see the docstring of this class. Note that if e.g. the offset (equal to `self.x.lb`) is 0, then for `d=4` we return `001`. If the offset (i.e. `self.x.lb`) is 1, then it returns `11`, representing 3 in binary, as binary value of 3 + offset of 1 = 4. Note that in this second case, one less bit is returned as we require only 2."""
         # more efficient implementation probably not necessary
         i = self._offset(d)
         if i == 0:
@@ -410,7 +412,7 @@ class IntVarEncLog(IntVarEnc):
             # x_i = bit_i for every bit in the representation
             return [
                 x if bit else (~x)
-                for bit, x in itertools.zip_longest(self._bitstring(d), self._xs)
+                for bit, x in itertools.zip_longest(self._to_little_endian_offset_binary(d), self._xs)
             ]
         else:  # don't use try IndexError since negative values wrap
             return [BoolVal(False)]
