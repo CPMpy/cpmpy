@@ -164,9 +164,9 @@ class SolverLookup():
     
 
     @classmethod
-    def status(cls):
+    def version(cls):
         """
-        Returns the status of all solvers supported by CPMpy as a list of dicts.
+        Returns an overview of all solvers supported by CPMpy as a list of dicts.
 
         Each dict consists of:
 
@@ -202,10 +202,10 @@ class SolverLookup():
 
 
     @classmethod
-    def print_status(cls):
+    def print_version(cls):
         """
-        Prints a tabulated status report of the different solvers,
-        i.e. whether they are installed on the system and if so which version.
+        Prints a tabulated report on the different solvers supported by CPMpy,
+        i.e. whether they are installed on the current system and if so which version.
         """
         
         # Get the status information using the status() method
