@@ -48,7 +48,13 @@ for filename, metadata in XCSP3Dataset(year=2024, track="COP", download=True): #
 
 ## Solving single instance
 
-To parse, load and solve a single XCSP3 instance, we provide the `xcsp3_cpmpy` CLI.
+To parse, load and solve a single XCSP3 instance, we provide the `xcsp3_cpmpy` CLI. It has additional dependencies which are not part of the base cpmpy install (and currently might not be supported on all platforms, linux has been validated). To install the additional dependencies:
+
+```console
+pip install -R tools/xcsp3/requirements.txt
+``` 
+
+To use the CLI:
 
 ```python
 python xcsp3_cpmpy.py <benchname> --solver <solver> [-s SEED] [-l TIME_LIMIT] [-m MEM_LIMIT] [-t TMPDIR] [-c CORES] [--time-buffer TIME_BUFFER] [--intermediate]
@@ -58,7 +64,13 @@ python xcsp3_cpmpy.py <benchname> --solver <solver> [-s SEED] [-l TIME_LIMIT] [-
 
 ## Benchmarking
 
-For benchmarking CPMpy / a backend solver on XCSP3, we provide a CLI to run against a complete competition dataset.
+For benchmarking CPMpy / a backend solver on XCSP3, we provide a CLI to run against a complete competition dataset. Similarly as above, additional dependencies need to be installed:
+
+```console
+pip install -R tools/xcsp3/requirements.txt
+``` 
+
+To use the benchmarking CLI:
 
 ```python
 python xcsp3_benchmark.py --year <YEAR> --track <TRACK> --solver <SOLVER> [--workers WORKERS] [--time-limit TIME_LIMIT] [--mem-limit MEM_LIMIT] [--output-dir OUTPUT_DIR] [--verbose] [--intermediate]
