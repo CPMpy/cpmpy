@@ -5,6 +5,32 @@ This file contains all the missing global constraints in order to support XCSP3-
 which is a restricted scope of the complete XCSP3 specification (as used for the competitions).
 
 Currently, version 3.2 is supported.
+
+
+===============
+List of classes
+===============
+
+.. autosummary::
+    :nosignatures:
+
+    AllDifferentLists
+    AllDifferentListsExceptN
+    SubCircuit
+    SubCircuitWithStart
+    SafeOnlyInverse
+    InverseOne
+    Channel
+    NonReifiedTable
+    ShortTable
+    NegativeShortTable
+    MDD
+    Regular
+    NotInDomain
+    NoOverlap2d
+    IfThenElseNum
+    Element
+    Cumulative
 """
 
 import numpy as np
