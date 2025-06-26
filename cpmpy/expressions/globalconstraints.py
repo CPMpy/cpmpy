@@ -194,7 +194,18 @@ class AllDifferent(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
+        if False:
+            return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
+        else:
+            # DO NOT COMMIT IN MAINLINE yet
+            # switch to ILP friendly decomposition
+            cons = []
+            lbs, ubs = get_bounds(self.args)
+            M = [cp.MapDomain(var) for var in self.args if isinstance(var, Expression)]
+            for val in range(min(lbs), max(ubs)+1):
+                # each value can be taken at most once (not necessarily exactly once)
+                cons.append(cp.sum(x == val for x in self.args) <= 1)
+            return cons, M
 
     def value(self):
         return len(set(argvals(self.args))) == len(self.args)
@@ -210,8 +221,20 @@ class AllDifferentExceptN(GlobalConstraint):
         super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
-        return [(var1 == var2).implies(cp.any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        if False:
+            # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
+            return [(var1 == var2).implies(cp.any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        else:
+            # DO NOT COMMIT IN MAINLINE yet
+            # switch to ILP friendly decomposition
+            cons = []
+            arr, n = self.args
+            lbs, ubs = get_bounds(arr)
+            for val in range(min(lbs), max(ubs)+1):
+                if val != n:
+                    # each value can be taken at most once (not necessarily exactly once)
+                    cons.append(cp.sum(x == val for x in arr) <= 1)
+            return cons, [MapDomain(x) for x in arr]
 
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
@@ -246,8 +269,19 @@ class AllEqual(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
-        return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
+        # Not sure we need the Boolean version here...
+        if False:
+            # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
+            return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
+        else:
+            # DO NOT COMMIT IN MAINLINE yet
+            # switch to ILP friendly decomposition
+            cons = []
+            lbs, ubs = get_bounds(self.args)
+            for val in range(min(lbs), max(ubs)+1):
+                # each value can be taken at most once (not necessarily exactly once)
+                cons.extend((x1 == val) == (x2 == val) for x1,x2 in all_pairs(self.args))
+            return cons, [MapDomain(x) for x in self.args]
 
     def value(self):
         return len(set(argvals(self.args))) == 1
@@ -265,8 +299,21 @@ class AllEqualExceptN(GlobalConstraint):
         super().__init__("allequal_except_n", [flatarr, n])
 
     def decompose(self):
-        return [(cp.any(var1 == a for a in self.args[1]) | (var1 == var2) | cp.any(var2 == a for a in self.args[1]))
-                for var1, var2 in all_pairs(self.args[0])], []
+        # Not sure we need the Boolean version here...
+        if False:
+            return [(cp.any(var1 == a for a in self.args[1]) | (var1 == var2) | cp.any(var2 == a for a in self.args[1]))
+                    for var1, var2 in all_pairs(self.args[0])], []
+        else:
+            # DO NOT COMMIT IN MAINLINE yet
+            # switch to ILP friendly decomposition
+            cons = []
+            arr, n = self.args
+            lbs, ubs = get_bounds(arr)
+            for val in range(min(lbs), max(ubs)+1):
+                if val != n:
+                    # each value can be taken at most once (not necessarily exactly once)
+                    cons.append((x1 == val) == (x2 == val) for x1,x2 in all_pairs(arr))
+            return cons, [MapDomain(x) for x in arr]
 
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
@@ -303,6 +350,7 @@ class Circuit(GlobalConstraint):
                 MiniZinc has slightly different one:
                 https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
         """
+        # XXX Right, so for ILP solvers, we would ideally do lazy subcircuit elimination (otherwise MTZ)...
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0,n-1, shape=n)
@@ -386,6 +434,7 @@ class Inverse(GlobalConstraint):
            
             lb, ub = get_bounds(x)
             if lb >= 0 and ub < len(rev): # safe, index is within bounds
+                # XXX Both rev and x are variables... is there an ILP friendly decomp?
                 constraining.append(rev[x] == i)
             else: # partial! need safening here
                 is_defined, total_expr, toplevel = cp.transformations.safening._safen_range(rev[x], (0, len(rev)-1), 1)
@@ -620,7 +669,10 @@ class InDomain(GlobalConstraint):
         if expressions:
             return [cp.any(expr == a for a in arr)], defining
         else:
-            return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+            # XXX do we properly capture that x!=v with b:=x==v should be ~b?
+            # Can't do MapDomain, would need to check if `expr` is a variable...
+            # TODO is this even efficient when there are many gaps? (similar to NotInDomain)
+            return [expr != val for val in range(lb, ub + 1) if val not in arr] + [expr >= min(arr), expr <= max(arr)], defining
 
 
     def value(self):
@@ -629,6 +681,62 @@ class InDomain(GlobalConstraint):
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
 
+class MapDomain(GlobalConstraint):
+    """
+        Maps an integer decision variable to an array of Boolean variables,
+        one for each value in the domain, e.g. |ub+1 - lb| Boolean variables.
+
+        No Boolean variables are returned or accessible;
+        after declaring this constraint, just
+        use 'ivar == v' and it will be replaced by the correct Boolean ?in flatten()?.
+
+        Note: the `decompose()` takes an optional `csemap` and `is_supported` argument!
+
+        TODO: what with solvers (e.g. SMT) that do not need flatten?
+        (they also don't need us to do CSE, so might be fine?)
+
+        TODO: multiple (e.g. by global constraints) MapDomain's can be declared
+        for the same integer variable...
+    """
+    def __init__(self, ivar):
+        super().__init__("mapdomain", [ivar])
+
+    def decompose(self, is_supported=False, csemap=None):
+        """
+            is_supported: if True, only the CSE map is filled
+                (yes, ortools declares a global for this, called... MapDomain )
+            csemap: if given, will populate the csemap with the Boolean variables
+        """
+        ivar = self.args[0]
+        lb, ub = get_bounds(ivar)
+
+        bvs = cp.boolvar(shape=(ub+1-lb,), name=f"B#{ivar.name}")
+        all_in_csemap = True
+        if csemap is not None:
+            for i,v in enumerate(range(lb, ub+1)):
+                expr = (ivar == v)
+                if expr in csemap:
+                    bvs[i] = csemap[expr]  # overwrite with pre-created one
+                else:
+                    all_in_csemap = False
+                    csemap[expr] = bvs[i]
+        
+        if is_supported:
+            # TRICKY HACK to use 2nd argument as all_in_csemap...
+            return [], all_in_csemap
+
+        # ILP friendly decomposition
+        # TODO: if the 'ivar' is eliminated from the model, no need for 2nd constraint...
+        # TRICKY HACK to use 2nd argument as all_in_csemap...
+        return [cp.sum(bvs) == 1,
+                cp.sum(bvs[i]*v for i,v in enumerate(range(lb, ub+1))) == ivar], all_in_csemap
+
+    def value(self):
+        # not much to say...
+        return True
+
+    def __repr__(self):
+        return f"MapDomain({self.args[0]})"
 
 class Xor(GlobalConstraint):
     """
@@ -648,6 +756,7 @@ class Xor(GlobalConstraint):
 
     def decompose(self):
         # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
+        # and ILP friendly...
         decomp = [sum(self.args[:2]) == 1]
         if len(self.args) > 2:
             decomp = Xor([decomp,self.args[2:]]).decompose()[0]

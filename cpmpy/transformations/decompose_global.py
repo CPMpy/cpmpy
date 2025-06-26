@@ -10,7 +10,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import intvar, cpm_array, NDVarArray
-from ..expressions.utils import is_any_list, eval_comparison
+from ..expressions.utils import is_any_list, eval_comparison, is_num
 from ..expressions.python_builtins import all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
@@ -64,8 +64,32 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 continue
 
             if any(isinstance(a,GlobalFunction) for a in expr.args):
+                # XXX This is where GlobalFunctions get turned into Comparisons...
+                newargs = [a for a in expr.args]  # copy
+                modified = False
+                for i, a in enumerate(expr.args):
+                    # we can do something special for Element
+                    if hasattr(a, "name") and (
+                            (a.name == "element" and "element" not in supported and all(is_num(t) for t in a.args[0])) or \
+                            (a.name == "count" and "count" not in supported)
+                        ):
+                        # it's an element with constants or a count
+                        encoding, otherdef = a.decompose_numerical()
+                        assert encoding.is_bool() is False, "we should get a numerical expression here (wsum over bools)"
+                        newargs[i] = encoding
+                        # call decompose here so that the MapDomain is populated in the csemap
+                        xtratoplevel = []
+                        newotherdef = decompose_in_tree(otherdef, supported, supported_reified, xtratoplevel, nested=False, csemap=csemap)
+                        _toplevel.extend(xtratoplevel)
+                        _toplevel.extend(newotherdef)
+                        modified = True
+                if modified:
+                    # copy of entire expr with the new args
+                    expr = Operator(expr.name, newargs)
+
                 expr, base_con = normalized_numexpr(expr, csemap=csemap)
                 _toplevel.extend(base_con)  # should be added toplevel
+
             # recurse into arguments, recreate through constructor (we know it stores no other state)
             args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
             newlist.append(Operator(expr.name, args))
@@ -77,6 +101,18 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 is_supported = (expr.name in supported_reified)
             else:
                 is_supported = (expr.name in supported)
+            
+            # special case: MapDomain
+            if expr.name == "mapdomain":
+                assert nested is False, "'mapdomain' cannot be nested"
+                # populate csemap, return decomposition if not supported
+                decomposed, all_in_csemap = expr.decompose(is_supported=is_supported, csemap=csemap)
+                if not all_in_csemap:
+                    if is_supported:
+                        newlist.append(expr)
+                    else:
+                        newlist.extend(decomposed)
+                continue
 
             if is_supported:
                 # If no nested expressions, don't recurse the arguments
@@ -109,6 +145,17 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 else:
                     # global function, replace by a fresh variable and decompose the equality to this
                     assert isinstance(expr, GlobalFunction)
+
+                    # we can do something special for Element
+                    if (expr.name == "element" and all(is_num(a) for a in expr.args[0])) or (expr.name == "count"):
+                        # it's an array with constants
+                        encoding, otherdef = expr.decompose_numerical()
+                        assert encoding.is_bool() is False, "we should get a numerical expression here (wsum over bools)"
+                        newlist.append(encoding)
+                        _toplevel.extend(otherdef)
+                        continue
+
+                    # else, do the usual thing
                     lb,ub = expr.get_bounds()
                     
                     if csemap is not None and expr in csemap:

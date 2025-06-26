@@ -52,7 +52,6 @@ import copy
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
-
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
 
 
@@ -64,7 +63,7 @@ from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, MapDomain
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 
@@ -361,22 +360,41 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
             if reified is True:
                 raise ValueError("Linear decomposition of AllDifferent does not work reified. "
                                  "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
+            
+            # Create Boolvars and seed CSE map
+            exprs = decompose_in_tree([MapDomain(a) for a in cpm_expr.args], csemap=csemap)
+            newlist.extend(linearize_constraint(exprs, supported=supported, reified=reified, csemap=csemap))
 
             lbs, ubs = get_bounds(cpm_expr.args)
             lb, ub = min(lbs), max(ubs)
-            n_vals = (ub-lb) + 1
 
-            x = boolvar(shape=(len(cpm_expr.args), n_vals))
+            for val in range(lb, ub+1):
+                bvs = []
+                cons = []
+                for a in cpm_expr.args:
+                    bv, con = get_or_make_var(a == val, csemap=csemap)
+                    bvs.append(bv)
+                    if len(con) > 0:
+                        cons.append(con)
+                # each value can be taken at most once (not necessarily exactly once)
+                newlist.append(cp.sum(bvs) <= 1)
+                if len(cons) > 0:
+                    newlist += linearize_constraint(cons, supported=supported, reified=reified, csemap=csemap)
+            # XXX TODO It can be very tricky to get the get/make var and linearize correct...
+            # I think we should have AllDiff just use this decomp by default... or have
+            # another way to overwrite the decomp before the 'decompose_in_tree' call...
 
-            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
-            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
+            # x = boolvar(shape=(len(cpm_expr.args), n_vals))
 
-            # link Boolean matrix and integer variable
-            for arg, row in zip(cpm_expr.args, x):
-                if is_num(arg): # constant, fix directly
-                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
-                else: # ensure result is canonical
-                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
+            # newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
+            # newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
+
+            # # link Boolean matrix and integer variable
+            # for arg, row in zip(cpm_expr.args, x):
+            #     if is_num(arg): # constant, fix directly
+            #         newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
+            #     else: # ensure result is canonical
+            #         newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
 
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)

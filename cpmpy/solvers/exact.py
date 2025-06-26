@@ -216,6 +216,11 @@ class CPM_exact(SolverInterface):
         self.cpm_status.runtime = end - start
 
         self.objective_value_ = None
+        
+        self._fillVars()
+        if self.has_objective():
+            self.objective_value_ = self.objective_.value()
+
         # translate exit status
         #   see 'toOptimum' documentation:
         #   https://gitlab.com/nonfiction-software/exact/-/blob/main/src/interface/IntProg.cpp#L877
@@ -235,19 +240,13 @@ class CPM_exact(SolverInterface):
         elif my_status == "INCONSISTENT": # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "TIMEOUT": # found timeout
-            if self.xct_solver.hasSolution(): # found a (sub-)optimal solution
+            if self.objective_value_ is not None: # found a (sub-)optimal solution
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else: # no solution found
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
         
-        self._fillVars()
-        if self.has_objective():
-            if self.objective_is_min_:
-                self.objective_value_ = obj_val
-            else: # maximize, so actually negative value
-                self.objective_value_ = -obj_val
         
         # True/False depending on self.cpm_status
         return self._solve_return(self.cpm_status)
@@ -423,10 +422,10 @@ class CPM_exact(SolverInterface):
         self.objective_is_min_ = minimize
 
         # make objective function non-nested and with positive BoolVars only
+        get_variables(expr, collect=self.user_vars) # add objvars to vars
         (flat_obj, flat_cons) = flatten_objective(expr)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
-        self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
-        self += flat_cons  # add potentially created constraints
+        self.add(flat_cons, internal=True) # add potentially created constraints
 
         # make objective function or variable and post
         xct_cfvars,xct_rhs = self._make_numexpr(flat_obj,0)
@@ -517,7 +516,7 @@ class CPM_exact(SolverInterface):
     def is_multiplication(cpm_expr): # helper function
         return isinstance(cpm_expr, Operator) and cpm_expr.name == 'mul'
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig, internal:bool=False):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -537,7 +536,8 @@ class CPM_exact(SolverInterface):
         """
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        if not internal:
+            get_variables(cpm_expr_orig, collect=self.user_vars)
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
@@ -552,7 +552,7 @@ class CPM_exact(SolverInterface):
                         assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} " \
                                                                       f"only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
-                            rhs = intvar(rhs, rhs)
+                            rhs = cp.intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
                                                                                   "rewritten by linearize"

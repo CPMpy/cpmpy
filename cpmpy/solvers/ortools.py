@@ -43,7 +43,7 @@
     Module details
     ==============
 """
-import sys  # for stdout checking
+import sys
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -55,7 +55,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import POSITIVE, flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
@@ -327,8 +327,8 @@ class CPM_ortools(SolverInterface):
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons  # add potentially created constraints
-        get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
+        get_variables(expr, collect=self.user_vars)  # add objvars to vars <- XCSP3 needs also unused vars to be posted, added to user vars
+        self.add(flat_cons, internal=True)  # add potentially created constraints
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -389,18 +389,19 @@ class CPM_ortools(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap", "regular"}
+        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap", "regular", "mapdomain"}
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap, context=POSITIVE)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # everything that can create
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap, rewrite_bool_eq=False)  # everything that can create
                                              # reified expr must go before this
+        
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr, internal:bool=False):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -419,7 +420,8 @@ class CPM_ortools(SolverInterface):
             :return: self
         """
         # add new user vars to the set
-        get_variables(cpm_expr, collect=self.user_vars)
+        if not internal:
+            get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
         for con in self.transform(cpm_expr):
@@ -513,7 +515,7 @@ class CPM_ortools(SolverInterface):
                     x,y = lhs.args
                     if get_bounds(y)[0] <= 0: # not supported, but result of modulo is agnositic to sign of second arg
                         y, link = get_or_make_var(-lhs.args[1], csemap=self._csemap)
-                        self += link
+                        self.add(link, internal=True)
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars([x,y]))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
@@ -527,7 +529,7 @@ class CPM_ortools(SolverInterface):
                         new_lhs = 1
                         for exp in range(n):
                             new_lhs, new_cons = get_or_make_var(b * new_lhs, csemap=self._csemap)
-                            self += new_cons
+                            self.add(new_cons, internal=True)
                         return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
 
 
@@ -571,7 +573,7 @@ class CPM_ortools(SolverInterface):
                 N = len(x)
                 arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
-                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                self.add([b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)], internal=True)
                 # post the global constraint
                 # when posting arcs on diagonal (i==j), it would do subcircuit
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
@@ -582,6 +584,13 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddInverse(fwd, rev)
             elif cpm_expr.name == 'xor':
                 return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
+            elif cpm_expr.name == 'mapdomain':
+                ivar = cpm_expr.args[0]
+                # extract boolvars from csemap
+                lb, ub = get_bounds(ivar)
+                bvs = [self._csemap[ivar == v] for v in range(lb, ub+1)]
+                self.add(sum(bvs) == 1, internal=True) # not covered by AddMapDomain...
+                return self.ort_model.add_map_domain(self.solver_var(ivar), self.solver_vars(bvs), offset=lb)
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
                                           f"If you reach this, please report on github.")

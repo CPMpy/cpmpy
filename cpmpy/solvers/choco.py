@@ -346,7 +346,7 @@ class CPM_choco(SolverInterface):
 
         # make objective function non-nested
         obj_var = intvar(*get_bounds(expr))
-        self += obj_var == expr
+        self.add(obj_var == expr, internal=True)
 
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
@@ -406,7 +406,7 @@ class CPM_choco(SolverInterface):
 
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr, internal:bool=False):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -425,7 +425,8 @@ class CPM_choco(SolverInterface):
         :return: self
         """
         # add new user vars to the set
-        get_variables(cpm_expr, collect=self.user_vars)
+        if not internal:
+            get_variables(cpm_expr, collect=self.user_vars)
         # ensure all vars are known to solver
 
         # transform and post the constraints

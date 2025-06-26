@@ -326,6 +326,16 @@ class Count(GlobalFunction):
         arr, val = self.args
         return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)], []
 
+    def decompose_numerical(self):
+        """
+            Return a numerical expression to replace the array loopup with in the expression tree
+            XXX DOES NOT work automatically, needs hacking into decompose_global.py
+        """
+        arr, val = self.args
+        expr = cp.sum(ai == val for ai in arr)
+        return expr, []# [cp.expressions.globalconstraints.MapDomain(ai) for ai in arr] <- somehow breaks the constraint in the setting "count(..., ...) not in [...]""
+
+
     def value(self):
         arr, val = self.args
         val = argval(val)

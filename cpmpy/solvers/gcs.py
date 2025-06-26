@@ -364,11 +364,11 @@ class CPM_gcs(SolverInterface):
         """
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
+        self.add(flat_cons, internal=True) # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
         (obj, obj_cons) = get_or_make_var(flat_obj, csemap=self._csemap)
-        self += obj_cons
+        self.add(obj_cons, internal=True)
 
         self.objective_var = obj
 
@@ -471,7 +471,7 @@ class CPM_gcs(SolverInterface):
 
         return self.veripb_return_code
     
-    def add(self, cpm_cons):
+    def add(self, cpm_cons, internal:bool=False):
         """
         Post a (list of) CPMpy constraints(=expressions) to the solver
         Note that we don't store the constraints in a cpm_model,
@@ -482,7 +482,8 @@ class CPM_gcs(SolverInterface):
         """
         # add new user vars to the set
                 # add new user vars to the set
-        get_variables(cpm_cons, collect=self.user_vars)
+        if not internal:
+            get_variables(cpm_cons, collect=self.user_vars)
 
         for con in self.transform(cpm_cons):
             cpm_expr = con
@@ -551,10 +552,10 @@ class CPM_gcs(SolverInterface):
                             # lt == x < y
                             # gt == x > y
                             lt_bool, gt_bool = boolvar(shape=2)
-                            self += (lhs < rhs) == lt_bool
-                            self += (lhs > rhs) == gt_bool
+                            self.add( (lhs < rhs) == lt_bool, internal=True )
+                            self.add( (lhs > rhs) == gt_bool, internal=True )
                             if fully_reify:
-                                self += (~bool_lhs).implies(lhs == rhs)
+                                self.add( (~bool_lhs).implies(lhs == rhs), internal=True )
                             self.gcs.post_or_reif(self.solver_vars([lt_bool, gt_bool]), reif_var, False)
                         else:
                             raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}' {}".format)
@@ -665,7 +666,7 @@ class CPM_gcs(SolverInterface):
             elif isinstance(cpm_expr, GlobalConstraint):
                 # GCS also has SmartTable, Regular Language Membership, Knapsack constraints
                 # which could be added in future. 
-                self += cpm_expr.decompose()  # assumes a decomposition exists...
+                self.add(cpm_expr.decompose(), internal=True)  # assumes a decomposition exists...
             else:
                 # Hopefully we don't end up here.
                 raise NotImplementedError(cpm_expr)
