@@ -111,13 +111,13 @@ def xcsp3_wrapper(conn, kwargs, verbose):
 
     Status report can be missing when process has been terminated by a SIGTERM.
     """
-    warnings.filterwarnings("ignore")
     
     original_stdout = sys.stdout
 
     pipe_writer = PipeWriter(conn)
 
     if not verbose:
+        warnings.filterwarnings("ignore")
         sys.stdout = pipe_writer # only forward to pipe
     else:
         sys.stdout = Tee(original_stdout, pipe_writer) # forward to pipe and console
@@ -147,7 +147,6 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
         output_file: Path to the output CSV file
         verbose: Whether to show solver output
     """
-    warnings.filterwarnings("ignore")
     
     filename, metadata, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path = args
 
@@ -377,7 +376,6 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     return output_file
 
 if __name__ == "__main__":
-    warnings.filterwarnings("ignore")
 
     parser = argparse.ArgumentParser(description='Benchmark solvers on XCSP3 instances')
     parser.add_argument('--year', type=int, required=True, help='Competition year (e.g., 2023)')
@@ -393,7 +391,11 @@ if __name__ == "__main__":
     parser.add_argument('--checker-path', type=str, default=None,
                     help='Path to the XCSP3 solution checker JAR file')
     
+    
     args = parser.parse_args()
+
+    if not args.verbose:
+        warnings.filterwarnings("ignore")
     
     output_file = xcsp3_benchmark(**vars(args))
     print(f"Results added to {output_file}")

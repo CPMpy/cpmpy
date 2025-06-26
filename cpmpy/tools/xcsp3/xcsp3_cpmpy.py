@@ -51,7 +51,11 @@ import signal
 import time
 import sys, os
 import random
-import resource
+
+
+if sys.platform != "win32":
+    import resource
+    
 import pathlib
 from pathlib import Path
 from enum import Enum
@@ -66,6 +70,7 @@ import cpmpy as cp
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3 import _parse_xcsp3, _load_xcsp3
 from cpmpy.tools.xcsp3 import xcsp3_globals
+from cpmpy.solvers.ortools import CPM_ortools
 
 # PyCSP3
 from xml.etree.ElementTree import ParseError
@@ -117,7 +122,10 @@ def init_signal_handlers():
     signal.signal(signal.SIGTERM, sigterm_handler)
     signal.signal(signal.SIGINT, sigterm_handler)
     signal.signal(signal.SIGABRT, sigterm_handler)
-    signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
+    if sys.platform != "win32":
+        signal.signal(signal.SIGXCPU, rlimit_cpu_handler)
+    else:
+        warnings.warn("Windows does not support setting SIGXCPU signal")
 
 def set_memory_limit(mem_limit, verbose:bool=False):
     """
@@ -128,20 +136,26 @@ def set_memory_limit(mem_limit, verbose:bool=False):
         hard = max(mib_as_bytes(mem_limit) - mib_as_bytes(MEMORY_BUFFER_HARD), mib_as_bytes(MEMORY_BUFFER_HARD))
         if verbose:
             print_comment(f"Setting memory limit: {soft} -- {hard}")
-        resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
+        if sys.platform != "win32":
+            resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
+        else:
+            warnings.warn("Memory limits using `resource` are not supported on Windows. Skipping hard limit.")
 
 def set_time_limit(time_limit, verbose:bool=False):
     """
     Set time limit (CPU time in seconds).
     """
     if time_limit is not None:
-        soft = time_limit
-        hard = resource.RLIM_INFINITY
-        if verbose:
-            print_comment(f"Setting time limit: {soft} -- {hard}")
-        resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
-    else:
-        resource.setrlimit(resource.RLIMIT_CPU, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+        if sys.platform != "win32":
+            soft = time_limit
+            hard = resource.RLIM_INFINITY
+            if verbose:
+                print_comment(f"Setting time limit: {soft} -- {hard}")
+                resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
+            else:
+                resource.setrlimit(resource.RLIMIT_CPU, (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+        else:
+            warnings.warn("CPU time limits using `resource` are not supported on Windows. Skipping hard limit.")
 
 def wall_time(p: psutil.Process):
     return time.time() - p.create_time()
@@ -528,6 +542,8 @@ def xcsp3_cpmpy(
         verbose: bool = False,
         **kwargs,
 ):
+    if not verbose:
+        warnings.filterwarnings("ignore")
 
     try:
 
@@ -690,7 +706,7 @@ def xcsp3_cpmpy(
 
 
 if __name__ == "__main__":
-    warnings.filterwarnings("ignore")
+    
 
     # ------------------------------ Argument parsing ------------------------------ #
 

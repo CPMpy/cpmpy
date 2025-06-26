@@ -4,4 +4,4 @@ tqdm
 matplotlib
 psutil
 filelock
-readline
+gnureadline
