@@ -65,7 +65,7 @@ from contextlib import contextmanager
 import cpmpy as cp
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3 import _parse_xcsp3, _load_xcsp3
-from cpmpy.tools.xcsp3 import xcsp3_natives
+from cpmpy.tools.xcsp3 import xcsp3_globals
 
 # PyCSP3
 from xml.etree.ElementTree import ParseError
@@ -580,16 +580,16 @@ def xcsp3_cpmpy(
         # Additional XCSP3-specific native constraints
         added_natives = {
             "ortools": {
-                "no_overlap2d": xcsp3_natives.OrtNoOverlap2D,
-                "subcircuit": xcsp3_natives.OrtNoOverlap2D,
-                "subcircuitwithstart": lambda args: xcsp3_natives.OrtSubcircuitWithStart(args[:-1], args[-1]),
+                "no_overlap2d": xcsp3_globals.OrtNoOverlap2D,
+                "subcircuit": xcsp3_globals.OrtNoOverlap2D,
+                "subcircuitwithstart": lambda args: xcsp3_globals.OrtSubcircuitWithStart(args[:-1], args[-1]),
             },
             "choco": {
-                "subcircuit": xcsp3_natives.ChocoSubcircuit,
+                "subcircuit": xcsp3_globals.ChocoSubcircuit,
             },
             "minizinc": {
-                "subcircuit": xcsp3_natives.MinizincSubcircuit,
-                "subcircuitwithstart": xcsp3_natives.MinizincSubcircuitWithStart,
+                "subcircuit": xcsp3_globals.MinizincSubcircuit,
+                "subcircuitwithstart": xcsp3_globals.MinizincSubcircuitWithStart,
             },
         }
 
