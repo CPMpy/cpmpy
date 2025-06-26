@@ -56,7 +56,7 @@ class SolverInterface(object):
         """
         Returns the installed version of the solver's Python API.
         """
-        return None
+        raise NotImplementedError("Implementation of 'version' is missing in solver interface. This should be fixed. If encountered, please report on GitHub.")
 
     def __init__(self, name="dummy", cpm_model=None, subsolver=None):
         """
