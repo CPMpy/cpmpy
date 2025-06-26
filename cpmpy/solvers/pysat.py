@@ -56,17 +56,16 @@ from threading import Timer
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
-from ..transformations.linearize import canonical_comparison, only_positive_coefficients
-from ..expressions.utils import is_int, flatlist
-from ..transformations.comparison import only_numexpr_equality
+from ..transformations.linearize import only_positive_coefficients
+from ..expressions.utils import flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
-from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
+from ..transformations.reification import only_implies, only_bv_reifies
 from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
 
 
@@ -365,19 +364,14 @@ class CPM_pysat(SolverInterface):
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
-            self._add_expr(cpm_expr)
+            self._add_transformed_expr(cpm_expr)
 
         return self
 
-    __add__ = add  # avoid redirect in superclass
-
-    def _add_clauses(self, clauses):
-        self.pysat_solver.append_formula(clauses)
-
-    def _add_expr(self, cpm_expr):
-        """ Add expression to solver _without_ transformation."""
+    def _add_transformed_expr(self, cpm_expr):
+        """ Add expression to solver _without_ transforming."""
         if cpm_expr.name == 'or':
-            self._add_clauses([self.solver_vars(cpm_expr.args)])
+            self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 
         elif cpm_expr.name == '->':  # BV -> BE only thanks to only_bv_reifies
             a0,a1 = cpm_expr.args
@@ -385,11 +379,11 @@ class CPM_pysat(SolverInterface):
             if isinstance(a1, _BoolVarImpl):
                 # BoolVar() -> BoolVar()
                 args = [~a0, a1]
-                self._add_clauses([self.solver_vars(args)])
+                self.pysat_solver.add_clause(self.solver_vars(args))
             elif isinstance(a1, Operator) and a1.name == 'or':
                 # BoolVar() -> or(...)
                 args = [~a0]+a1.args
-                self._add_clauses([self.solver_vars(args)])
+                self.pysat_solver.add_clause(self.solver_vars(args))
             elif isinstance(a1, Comparison) and a1.args[0].name == "sum":  # implied sum comparison (a0->sum(bvs)<>val)
                 # implied sum comparison (a0->sum(bvs)<>val)
                 # convert sum to cnf
@@ -397,23 +391,21 @@ class CPM_pysat(SolverInterface):
                 # implication of conjunction is conjunction of individual implications
                 antecedent = [self.solver_var(~a0)]
                 cnf = [antecedent+c for c in cnf]
-                self._add_clauses(cnf)
+                self.pysat_solver.append_formula(cnf)
             elif isinstance(a1, Comparison) and a1.args[0].name == "wsum":  # implied pseudo-boolean comparison (a0->wsum(ws,bvs)<>val)
                 # implied sum comparison (a0->wsum([w,bvs])<>val or a0->(w*bv<>val))
                 cnf = self._pysat_pseudoboolean(a1)
                 # implication of conjunction is conjunction of individual implications
                 antecedent = [self.solver_var(~a0)]
-                self._add_clauses([antecedent+c for c in cnf])
+                self.pysat_solver.append_formula([antecedent+c for c in cnf])
             else:
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
 
         elif isinstance(cpm_expr, Comparison): # root-level comparisons have been linearized
-            if cpm_expr.name == "==" and isinstance(cpm_expr.args[0], _BoolVarImpl) and isinstance(cpm_expr.args[1], _BoolVarImpl) and cpm_expr.args[0] == cpm_expr.args[1]:
-                return  # `p == p` (added to keep `p` in the model)
-            elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
-                self._add_clauses(self._pysat_cardinality(cpm_expr))
+            if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
+                self.pysat_solver.append_formula(self._pysat_cardinality(cpm_expr))
             elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "wsum":
-                self._add_clauses(self._pysat_pseudoboolean(cpm_expr))
+                self.pysat_solver.append_formula(self._pysat_pseudoboolean(cpm_expr))
             else:
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
 
@@ -424,11 +416,11 @@ class CPM_pysat(SolverInterface):
                 if cpm_expr.args[0].name == "sum":
                     # convert to clauses and post
                     clauses = self._pysat_cardinality(cpm_expr)
-                    self._add_clauses(clauses)
+                    self.pysat_solver.append_formula(clauses)
                 elif cpm_expr.args[0].name == "wsum":
                     # convert to clauses and post
                     clauses = self._pysat_pseudoboolean(cpm_expr)
-                    self._add_clauses(clauses)
+                    self.pysat_solver.append_formula(clauses)
                 else:
                     raise NotImplementedError(f"Operator constraint {cpm_expr} not supported by CPM_pysat")
             else:
@@ -437,11 +429,11 @@ class CPM_pysat(SolverInterface):
         elif isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                self._add_clauses([[]])  # empty clause
+                self.pysat_solver.add_clause([])
 
         elif isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var
-            self._add_clauses([[self.solver_var(cpm_expr)]])
+            self.pysat_solver.add_clause([self.solver_var(cpm_expr)])
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
@@ -449,6 +441,9 @@ class CPM_pysat(SolverInterface):
 
         else:
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
+
+
+    __add__ = add  # avoid redirect in superclass
 
     def solution_hint(self, cpm_vars, vals):
         """
