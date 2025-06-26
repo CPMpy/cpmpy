@@ -11,6 +11,14 @@ What is included:
 
 Only the XCSP3-Core specification version 3.2 is currently supported.
 
+## Installation
+
+The XCSP3 tooling has some additional dependencies on top of the base CPMpy. Install them using:
+
+```console
+pip install cpmpy[xcsp3]
+```
+
 ## Utilities
 
 We provide a basic utility for parsing and loading a XCSP3 `.xml` or compressed `.xml.lzma` file into a CPMpy model:
@@ -48,13 +56,9 @@ for filename, metadata in XCSP3Dataset(year=2024, track="COP", download=True): #
 
 ## Solving single instance
 
-To parse, load and solve a single XCSP3 instance, we provide the `xcsp3_cpmpy` CLI. It has additional dependencies which are not part of the base cpmpy install (and currently might not be supported on all platforms, linux has been validated). To install the additional dependencies:
+To parse, load and solve a single XCSP3 instance, we provide the `xcsp3_cpmpy` CLI.
 
-```console
-pip install -R tools/xcsp3/requirements.txt
-``` 
-
-To use the CLI:
+To use the single-instance CLI:
 
 ```python
 python xcsp3_cpmpy.py <benchname> --solver <solver> [-s SEED] [-l TIME_LIMIT] [-m MEM_LIMIT] [-t TMPDIR] [-c CORES] [--time-buffer TIME_BUFFER] [--intermediate]
@@ -64,11 +68,7 @@ python xcsp3_cpmpy.py <benchname> --solver <solver> [-s SEED] [-l TIME_LIMIT] [-
 
 ## Benchmarking
 
-For benchmarking CPMpy / a backend solver on XCSP3, we provide a CLI to run against a complete competition dataset. Similarly as above, additional dependencies need to be installed:
-
-```console
-pip install -R tools/xcsp3/requirements.txt
-``` 
+For benchmarking CPMpy / a backend solver on XCSP3, we provide a CLI to run against a complete competition dataset.
 
 To use the benchmarking CLI:
 
