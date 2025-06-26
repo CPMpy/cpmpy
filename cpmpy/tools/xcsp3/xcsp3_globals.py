@@ -282,7 +282,7 @@ class SubCircuitWithStart(GlobalConstraint):
         # Check if we have a valid subcircuit and that the start_index is part of it.
         return SubCircuit(succ).value() and (succ[start_index] != start_index)
 
-class Inverse(GlobalConstraint):
+class SafeOnlyInverse(GlobalConstraint):
     """
        Inverse (aka channeling / assignment) constraint. 'fwd' and
        'rev' represent inverse functions; that is,
@@ -372,8 +372,11 @@ class Channel(GlobalConstraint):
         return sum(argvals(x) for x in arr) == 1 and 0 <= argval(v) < len(arr) and arr[argval(v)] == 1
 
 
-class Table(GlobalConstraint):
-    """The values of the variables in 'array' correspond to a row in 'table'
+class NonReifiedTable(GlobalConstraint):
+    """
+    The values of the variables in 'array' correspond to a row in 'table'.
+    This global represents the non-reified version, meaning that it does not support occuring reified when decomposing.
+    Look at :class:`globalconstraints.Table <cpmpy.expressions.globalconstraints.Table` for a formulation that does support reification.
     """
 
     def __init__(self, array, table):
@@ -415,7 +418,7 @@ class Table(GlobalConstraint):
             self._has_subexpr = any(a.has_subexpr() for a in arr)
         return self._has_subexpr
 
-class ShortTable(GlobalConstraint):
+class RowSelectingShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
         no restrictions for the corresponding variable in that tuple.
