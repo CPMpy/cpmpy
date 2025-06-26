@@ -907,36 +907,10 @@ class DynamicCumulative(GlobalConstraint):
         return True
 
 
-class GlobalCardinalityCount(GlobalConstraint):
-    """
-    The number of occurrences of each value `vals[i]` in the list of variables `vars`
-    must be equal to `occ[i]`.
-    """
-
-    def __init__(self, vars, vals, occ, closed=False):
-        flatargs = flatlist([vars, vals, occ])
-        if any(is_boolexpr(arg) for arg in flatargs):
-            raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
-        super().__init__("gcc", [vars,vals,occ])
-        self.closed = closed
-
-    def decompose(self):
-        vars, vals, occ = self.args
-
-
-        constraints = [cp.Count(vars, i) == v for i, v in zip(vals, occ)]
-        if self.closed:
-            constraints += [InDomain(v, vals) for v in vars]
-
-        return constraints, []
-
-    def value(self):
-        decomposed, _ = self.decompose()
-        return cp.all(decomposed).value()
-
 # helper function
 def is_transition(arg):
     """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
     a transition value and an ending node"""
     return len(arg) == 3 and \
         isinstance(arg[0], (int, str)) and is_int(arg[1]) and isinstance(arg[2], (int, str))
+
