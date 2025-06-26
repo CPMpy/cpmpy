@@ -266,6 +266,9 @@ class Inverse(GlobalConstraint):
             The asymmetric version (where len(fwd) < len(rev)) is defined as:
                 fwd[i] == x   =>   rev[x] == i
 
+        The included decomposition only covers the "safe" variant, meaning that the expressions in fwd are assumed to have a domain within [0, len(rev)[.
+        To also handle the "unsafe" variant, have a look at :class:`globalconstraints.Inverse <cpmpy.expressions.globalconstraints.Inverse>`.
+
     """
     def __init__(self, fwd, rev):
         flatargs = flatlist([fwd, rev])
@@ -390,6 +393,8 @@ class ShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
         no restrictions for the corresponding variable in that tuple.
+        This global skips typechecks on the table and has a different decomposition than the standard 
+        :class:`globalconstraints.ShortTable <cpmpy.expressions.globalconstraints.ShortTable>`.
     """
     def __init__(self, array, table):
         array = flatlist(array)
@@ -400,6 +405,10 @@ class ShortTable(GlobalConstraint):
         super().__init__("short_table", [array, table])
 
     def decompose(self):
+        """
+        Alternative decomposition, similar to `element` from Gleb's paper: "Improved Linearization of Constraint
+        Programming Models"
+        """
         from cpmpy.expressions.python_builtins import any, all
 
         arr, tab = self.args
@@ -787,74 +796,11 @@ class IfThenElseNum(GlobalFunction):
         else:
             return argval(y)
 
-class Element(GlobalFunction):
+
+class DynamicCumulative(GlobalConstraint):
     """
-        XCSP3 copy for doing Gleb-style ILP friendly decomposition
-    """
-
-    def __init__(self, arr, idx):
-        if is_boolexpr(idx):
-            raise TypeError("index cannot be a boolean expression: {}".format(idx))
-        if is_any_list(idx):
-            raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
-        super().__init__("element", [arr, idx])
-
-    def __getitem__(self, index):
-        raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
-
-    def value(self):
-        arr, idx = self.args
-        idxval = argval(idx)
-        if idxval is not None:
-            if idxval >= 0 and idxval < len(arr):
-                return argval(arr[idxval])
-            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
-                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
-        return None # default
-
-    def decompose_comparison(self, cpm_op, cpm_rhs):
-        """
-            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
-            When used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
-            it is a constraint, and that one can be decomposed.
-
-            Returns two lists of constraints:
-
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
-
-        """
-        arr, idx = self.args
-
-        # Find where the array indices and the bounds of `idx` intersect
-        lb, ub = get_bounds(idx)
-        new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
-        cons, defn = [],[]
-       
-        # For every `i` in that intersection, post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
-        for i in range(new_lb, new_ub+1):
-            cons.append((idx == i).implies(eval_comparison(cpm_op, arr[i], cpm_rhs)))
-        cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
-
-        return cons, defn  # no auxiliary variables
-    
-    def __repr__(self):
-        return "{}[{}]".format(self.args[0], self.args[1])
-
-    def get_bounds(self):
-        """
-        Returns the bounds of the (numerical) global constraint
-        """
-        arr, idx = self.args
-        bnds = [get_bounds(x) for x in arr]
-        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
-
-
-class Cumulative(GlobalConstraint):
-    """
-        Global cumulative constraint. Used for resource aware scheduling.
-        Ensures that the capacity of the resource is never exceeded.
+        Global cumulative constraint. Used for resource aware scheduling. Ensures that the capacity of the resource is never exceeded.
+        When decomposed, dynamically switches between time-resource and task-resource decompositions depending on size of domains.
         Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs.
     """
@@ -879,7 +825,7 @@ class Cumulative(GlobalConstraint):
         else: # constant demand
             demand = [demand] * n_jobs
 
-        super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
+        super(DynamicCumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
     def decompose(self):
         """
