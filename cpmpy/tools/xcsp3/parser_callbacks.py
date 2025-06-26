@@ -265,13 +265,13 @@ class CallbacksCPMPy(Callbacks):
             cpm_vars = self.vars_from_node(scope)
             exttuples = [tuple([strwildcard(x) for x in tup]) for tup in tuples]
             if positive:
-                self.cpm_model += xglobals.ShortTable(cpm_vars, exttuples)
+                self.cpm_model += xglobals.RowSelectingShortTable(cpm_vars, exttuples)
             else:
                 self.cpm_model += xglobals.NegativeShortTable(cpm_vars, exttuples)
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
-                self.cpm_model += xglobals.Table(cpm_vars, tuples)
+                self.cpm_model += xglobals.NonReifiedTable(cpm_vars, tuples)
             else:
                 self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
 
@@ -498,7 +498,7 @@ class CallbacksCPMPy(Callbacks):
 
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable],
                         occurs: list[int] | list[Variable] | list[range], closed: bool):
-        self.cpm_model += xglobals.GlobalCardinalityCount(self.get_cpm_exprs(lst),
+        self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
                                                     self.get_cpm_exprs(values),
                                                     self.get_cpm_exprs(occurs),
                                                     closed=closed)
@@ -527,7 +527,7 @@ class CallbacksCPMPy(Callbacks):
         cpm_lst = self.get_cpm_vars(lst)
         cpm_index = self.get_cpm_var(i)
         cpm_rhs = self.get_cpm_var(condition.right_operand())
-        self.cpm_model += self.eval_cpm_comp(xglobals.Element(cpm_lst, cpm_index), condition.operator, cpm_rhs)
+        self.cpm_model += self.eval_cpm_comp(cp.Element(cpm_lst, cpm_index), condition.operator, cpm_rhs)
 
     def ctr_element_matrix(self, matrix: list[list[Variable]] | list[list[int]], i: Variable, j: Variable,
                            condition: Condition):
@@ -542,7 +542,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += [cpm_i >= 0, cpm_i < dim1, cpm_j >= 0, cpm_j < dim2]
 
         # flatten matrix and lookup with weighed sum
-        self.cpm_model += self.eval_cpm_comp(xglobals.Element(flatlist(mtrx), dim1 * cpm_i + cpm_j), condition.operator, cpm_rhs)
+        self.cpm_model += self.eval_cpm_comp(cp.Element(flatlist(mtrx), dim1 * cpm_i + cpm_j), condition.operator, cpm_rhs)
 
 
     def ctr_channel(self, lst1: list[Variable], lst2: None | list[Variable]):
@@ -558,7 +558,7 @@ class CallbacksCPMPy(Callbacks):
             #     cpm_vars2 = cpm_vars2[0:len(cpm_vars1)]
             # elif len(cpm_vars1) > len(cpm_vars2):
             #     cpm_vars1 = cpm_vars1[0:len(cpm_vars2)]
-            self.cpm_model += xglobals.Inverse(cpm_vars1, cpm_vars2)
+            self.cpm_model += xglobals.SafeOnlyInverse(cpm_vars1, cpm_vars2)
 
     def ctr_channel_value(self, lst: list[Variable], value: Variable):
         self.cpm_model += xglobals.Channel(self.get_cpm_vars(lst), self.get_cpm_var(value))
@@ -618,7 +618,7 @@ class CallbacksCPMPy(Callbacks):
             cpm_ends.append(cp.intvar(*get_bounds(expr)))
 
         if condition.operator == TypeConditionOperator.LE:
-            self.cpm_model += xglobals.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
+            self.cpm_model += xglobals.DynamicCumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
                                             self.get_cpm_var(condition.right_operand()))
         else:
             # post decomposition directly
@@ -712,7 +712,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, balance, arcs, capacities, weights, condition)
 
     def ctr_instantiation(self, lst: list[Variable], values: list[int]):
-        self.cpm_model += xglobals.Table(self.get_cpm_vars(lst), [values])
+        self.cpm_model += xglobals.NonReifiedTable(self.get_cpm_vars(lst), [values])
 
     def ctr_clause(self, pos: list[Variable], neg: list[Variable]):  # not in XCSP3-core
         self._unimplemented(pos, neg)
