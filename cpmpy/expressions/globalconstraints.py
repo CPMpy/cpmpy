@@ -210,8 +210,14 @@ class AllDifferentExceptN(GlobalConstraint):
         super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
-        return [(var1 == var2).implies(cp.any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        cons = []
+        arr, n = self.args
+        for x,y in all_pairs(arr):
+            cond = x == y
+            if is_bool(cond):
+                cond = cp.BoolVal(cond)
+            cons.append(cond.implies(cp.any(x == a for a in n))) # equivalent to (var1 in n) | (var2 in n) | (var1 != var2)
+        return cons, []
 
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
@@ -583,6 +589,8 @@ class IfThenElse(GlobalConstraint):
 
     def decompose(self):
         condition, if_true, if_false = self.args
+        if is_bool(condition):
+            condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
         return [condition.implies(if_true), (~condition).implies(if_false)], []
 
     def __repr__(self):
