@@ -229,7 +229,6 @@ class AllDifferentExcept0(AllDifferentExceptN):
         All nonzero arguments have a distinct value
     """
     def __init__(self, *arr):
-        flatarr = flatlist(arr)
         super().__init__(arr, 0)
 
 
