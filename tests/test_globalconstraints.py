@@ -1368,6 +1368,13 @@ class TestTypeChecks(unittest.TestCase):
                 except (NotImplementedError, NotSupportedError):
                     pass
 
+    def test_issue_699(self):
+        x,y = cp.intvar(0,10, shape=2, name=tuple("xy"))
+        self.assertTrue(cp.Model(cp.AllDifferentExcept0([x,0,y,0]).decompose()).solve())
+        self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], 3).decompose()).solve())
+        self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], [3,0]).decompose()).solve())
+
+
     def test_element_index_dom_mismatched(self):
         """
             Check transform of `[0,1,2][x in -1..1] == y in 1..5`
