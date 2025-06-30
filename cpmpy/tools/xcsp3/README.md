@@ -9,7 +9,7 @@ What is included:
 - cli for benchmarking CPMpy across a large collection of XCSP3 instances
 - cli for processing and visualizing benchmark results
 
-Only the XCSP3-Core specification version 3.2 is currently supported.
+The XCSP3-Core specification version 3.2 is currently supported.
 
 ## Installation
 
