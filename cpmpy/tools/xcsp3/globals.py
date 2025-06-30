@@ -22,7 +22,7 @@ List of classes
     InverseOne
     Channel
     NonReifiedTable
-    ShortTable
+    RowSelectingShortTable
     NegativeShortTable
     MDD
     Regular
