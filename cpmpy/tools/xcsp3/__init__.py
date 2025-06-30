@@ -39,7 +39,6 @@
         xcsp3_cpmpy
         dataset
         globals
-        xcsp3_solution
 """
 from io import StringIO
 import lzma
