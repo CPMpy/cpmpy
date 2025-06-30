@@ -1,5 +1,5 @@
 """
-Collection of visualisation tools for processing the result of a `xcsp3_benchmark` run.
+Collection of visualisation tools for processing the result of a `benchmark.py` run.
 
 Best used though its CLI, a command-line tool to visualize and analyze solver performance 
 based on CSV output files.
@@ -8,7 +8,7 @@ E.g. to compare the results of multiple solvers:
 
 .. code-block:: console
 
-    python xcsp3_analyze.py <results_dir>
+    python analyze.py <results_dir>
 
 Positional Arguments
 --------------------

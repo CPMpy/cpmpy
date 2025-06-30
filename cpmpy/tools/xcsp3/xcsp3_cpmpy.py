@@ -7,7 +7,7 @@
 
     .. code-block:: console
 
-        python xcsp3_cpmpy <xcsp3_instance.xml>
+        python xcsp3_cpmpy.py <xcsp3_instance.xml>
 
 
     Required Arguments
@@ -69,7 +69,7 @@ from contextlib import contextmanager
 import cpmpy as cp
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3 import _parse_xcsp3, _load_xcsp3
-from cpmpy.tools.xcsp3 import xcsp3_globals
+from cpmpy.tools.xcsp3 import globals
 from cpmpy.solvers.ortools import CPM_ortools
 
 # PyCSP3
@@ -596,16 +596,16 @@ def xcsp3_cpmpy(
         # Additional XCSP3-specific native constraints
         added_natives = {
             "ortools": {
-                "no_overlap2d": xcsp3_globals.OrtNoOverlap2D,
-                "subcircuit": xcsp3_globals.OrtNoOverlap2D,
-                "subcircuitwithstart": lambda args: xcsp3_globals.OrtSubcircuitWithStart(args[:-1], args[-1]),
+                "no_overlap2d": globals.OrtNoOverlap2D,
+                "subcircuit": globals.OrtNoOverlap2D,
+                "subcircuitwithstart": lambda args: globals.OrtSubcircuitWithStart(args[:-1], args[-1]),
             },
             "choco": {
-                "subcircuit": xcsp3_globals.ChocoSubcircuit,
+                "subcircuit": globals.ChocoSubcircuit,
             },
             "minizinc": {
-                "subcircuit": xcsp3_globals.MinizincSubcircuit,
-                "subcircuitwithstart": xcsp3_globals.MinizincSubcircuitWithStart,
+                "subcircuit": globals.MinizincSubcircuit,
+                "subcircuitwithstart": globals.MinizincSubcircuitWithStart,
             },
         }
 

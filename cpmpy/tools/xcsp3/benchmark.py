@@ -55,7 +55,7 @@ from datetime import datetime
 from filelock import FileLock
 from concurrent.futures import ThreadPoolExecutor
 
-from cpmpy.tools.xcsp3.xcsp3_dataset import XCSP3Dataset
+from cpmpy.tools.xcsp3.dataset import XCSP3Dataset
 from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, init_signal_handlers, ExitStatus
 
 class Tee:

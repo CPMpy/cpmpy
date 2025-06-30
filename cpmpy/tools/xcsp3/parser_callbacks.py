@@ -16,7 +16,7 @@ from pycsp3.parser.xentries import XVar
 from pycsp3.tools.utilities import _Star
 
 import cpmpy as cp
-from cpmpy.tools.xcsp3 import xcsp3_globals as xglobals
+from cpmpy.tools.xcsp3 import globals as xglobals
 from cpmpy import cpm_array
 from cpmpy.expressions.utils import flatlist, get_bounds, is_boolexpr
 

@@ -53,7 +53,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
 
-from .xcsp3_dataset import XCSP3Dataset # for easier importing
+from .dataset import XCSP3Dataset # for easier importing
 
 def _parse_xcsp3(path: os.PathLike) -> "ParserXCSP3":
     """
