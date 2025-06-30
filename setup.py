@@ -60,6 +60,11 @@ setup(
         "test": ["pytest"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
     },
+    entry_points={
+        'console_scripts': [
+            'cpmpy = cpmpy.cli:main',
+        ],
+    },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.8",
