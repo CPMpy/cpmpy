@@ -44,7 +44,9 @@
 
 import shutil
 import time
+from typing import Optional
 import warnings
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from .. import DirectConstraint
@@ -108,6 +110,16 @@ class CPM_cpo(SolverInterface):
                 return True
             except:
                 return False
+            
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('docplex').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """

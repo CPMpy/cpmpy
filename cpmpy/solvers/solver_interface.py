@@ -19,6 +19,7 @@
         ExitStatus
 
 """
+from typing import Optional
 import warnings
 import time
 from enum import Enum
@@ -49,6 +50,13 @@ class SolverInterface(object):
                 [bool]: Solver support by current system setup.
         """
         return False
+    
+    @classmethod
+    def version(cls) -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        raise NotImplementedError("Implementation of 'version' is missing in solver interface. This should be fixed. If encountered, please report on GitHub.")
 
     def __init__(self, name="dummy", cpm_model=None, subsolver=None):
         """
