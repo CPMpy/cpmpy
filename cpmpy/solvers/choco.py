@@ -52,7 +52,7 @@ from pkg_resources import VersionConflict
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalconstraints import Cumulative, DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
@@ -395,7 +395,7 @@ class CPM_choco(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
+                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence", "no_overlap"}
 
         cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap) # choco supports any global also (half-) reified
@@ -621,12 +621,21 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = cpm_expr.args
                 # start, end, demand and cap should be var
-                start, end, demand, cap = self._to_vars([start, end, demand, cap])
+                if end[0] is None:
+                    start, demand, cap = self._to_vars([start, demand, cap])
+                else:
+                    start, end, demand, cap = self._to_vars([start, end, demand, cap])
                 # duration can be var or int
                 dur = self.solver_vars(dur)
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
+    
                 return self.chc_model.cumulative(tasks, demand, cap)
+            elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
+                start, dur, end = cpm_expr.args
+                if end[0] is None:
+                    end = None
+                return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))                
             elif cpm_expr.name == "precedence":
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":
