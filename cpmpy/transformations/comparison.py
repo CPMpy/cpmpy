@@ -96,7 +96,6 @@ def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap=None):
     :param csemap: the cse map to use
     :return: the rewritten comparison and the defining constraint
     """
-    print(f"Rewriting {cpm_expr}")
     if not isinstance(cpm_expr, Comparison):
         return cpm_expr, []
 
