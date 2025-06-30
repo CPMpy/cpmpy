@@ -171,7 +171,7 @@ class SolverLookup():
         Each dict consists of:
 
         - "name": <base_solver> or <base_solver>:<subsolver>
-        - "status": install status (True/False)
+        - "installed": install status (True/False)
         - "version": version of solver's Python library (or one of its subsolvers if applicable)
         """
         result = []
@@ -182,7 +182,7 @@ class SolverLookup():
             # Collect main solver status
             result.append({
                     "name": basename,
-                    "status": installed, 
+                    "installed": installed, 
                     "version": version,
                 })
             
@@ -194,7 +194,7 @@ class SolverLookup():
                     is_installed = subn in installed_subnames
                     subsolver_status = {
                         "name": basename + ":" + subn, 
-                        "status": is_installed, 
+                        "installed": is_installed, 
                         "version": CPM_slv.solverversion(subn) if installed else None,
                     }
                     result.append(subsolver_status)  # Append subsolver status
@@ -208,16 +208,16 @@ class SolverLookup():
         i.e. whether they are installed on the current system and if so which version.
         """
         
-        # Get the status information using the status() method
-        solver_statuses = cls.status()
+        # Get the solver information using the version() method
+        solver_versions = cls.version()
 
         # Print the header
         print(f"{'Solver':<25} {'Installed':<10} {'Version':<15}")
         print("-" * 50)
 
-        # Iterate over the solver status
-        for solver_status in solver_statuses:
-            basename, installed, version = solver_status["name"], solver_status["status"], solver_status["version"]
+        # Iterate over the solvers
+        for solver_version in solver_versions:
+            basename, installed, version = solver_version["name"], solver_version["installed"], solver_version["version"]
 
             # If this is a subsolver (indicated by a ':' in the name), indent the output
             if ':' in basename:
