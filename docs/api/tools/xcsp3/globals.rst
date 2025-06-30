@@ -1,7 +1,7 @@
-Globals (:mod:`cpmpy.tools.xcsp3.xcsp3_globals`)
+Globals (:mod:`cpmpy.tools.xcsp3.globals`)
 =====================================================
 
-.. automodule:: cpmpy.tools.xcsp3.xcsp3_globals
+.. automodule:: cpmpy.tools.xcsp3.globals
     :members:
     :undoc-members:
     :inherited-members:

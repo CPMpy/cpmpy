@@ -34,12 +34,11 @@
         :nosignatures:
 
         parser_callbacks
-        xcsp3_analyze
-        xcsp3_benchmark
+        analyze
+        benchmark
         xcsp3_cpmpy
-        xcsp3_dataset
-        xcsp3_globals
-        xcsp3_natives
+        dataset
+        globals
         xcsp3_solution
 """
 from io import StringIO

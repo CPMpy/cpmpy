@@ -1,7 +1,7 @@
-Dataset (:mod:`cpmpy.tools.xcsp3.xcsp3_dataset`)
+Dataset (:mod:`cpmpy.tools.xcsp3.dataset`)
 =====================================================
 
-.. automodule:: cpmpy.tools.xcsp3.xcsp3_dataset
+.. automodule:: cpmpy.tools.xcsp3.dataset
     :members:
     :undoc-members:
     :inherited-members:

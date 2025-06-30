@@ -29,8 +29,21 @@ List of classes
     NotInDomain
     NoOverlap2d
     IfThenElseNum
-    Element
-    Cumulative
+    DynamicCumulative
+
+=============================
+List of Solver-native classes
+=============================
+
+.. autosummary::
+    :nosignatures:
+
+    OrtNoOverlap2D
+    OrtSubcircuit
+    OrtSubcircuitWithStart
+    ChocoSubcircuit
+    MinizincSubcircuit
+    MinizincSubcircuitWithStart
 """
 
 import numpy as np
@@ -867,6 +880,7 @@ class DynamicCumulative(GlobalConstraint):
             International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
 
             Heuristically switches between time-resource and task-resource decomposition depending on the relative size of the time horizon and the number of tasks.
+            
             If 
                 n = number of tasks
                 t = size of time horizon
@@ -962,6 +976,12 @@ A collection of XCSP3 solver-native global constraints.
 # --------------------------------- OR-Tools --------------------------------- #
 
 class OrtNoOverlap2D(DirectConstraint):
+    """
+    OR-Tools native `NoOverlap2D` global constraint.
+
+    Ensures that all provided rectangles are positioned within a plane whilst not overlapping.
+    The rectangles have their sides aligned with the perpendicular x- and y-axis.
+    """
     def __init__(self, arguments):
         super().__init__("ortnooverlap2d", arguments)
 
@@ -972,6 +992,12 @@ class OrtNoOverlap2D(DirectConstraint):
         return Native_solver.add_no_overlap_2d(intervals_x, intervals_y)
 
 class OrtSubcircuit(DirectConstraint):
+    """
+    OR-Tools native `SubCircuit` global constraint.
+
+    A subcircuit is a Hamiltonian path between a subset of the nodes of a graph.
+    When a node `i` is not part of the circuit, it should self-loop with an arc `i -> i`.
+    """
     def __init__(self, arguments):
         super().__init__("ortsubcircuit", arguments)
 
@@ -987,6 +1013,12 @@ class OrtSubcircuit(DirectConstraint):
         return Native_solver.AddCircuit(ort_arcs)
 
 class OrtSubcircuitWithStart(DirectConstraint):
+    """
+    OR-Tools native `SubCircuitWithStart` global constraint.
+
+    This global is the same as `SubCircuit`, only can a additional `start_index` be provided 
+    which is ensure to be part of the subcircuit.
+    """
     def __init__(self, arguments, start_index:int=0):
         super().__init__("ortsubcircuitwithstart", (arguments, start_index))
 
@@ -1005,6 +1037,12 @@ class OrtSubcircuitWithStart(DirectConstraint):
 # ----------------------------------- Choco ---------------------------------- #
 
 class ChocoSubcircuit(DirectConstraint):
+    """
+    Choco's native `SubCircuit` global constraint.
+
+    A subcircuit is a Hamiltonian path between a subset of the nodes of a graph.
+    When a node `i` is not part of the circuit, it should self-loop with an arc `i -> i`.
+    """
     def __init__(self, arguments):
         super().__init__("chocosubcircuit", arguments)
 
@@ -1018,6 +1056,12 @@ class ChocoSubcircuit(DirectConstraint):
 # --------------------------------- Minizinc --------------------------------- #
 
 class MinizincSubcircuit(DirectConstraint):
+    """
+    Minizinc's native `SubCircuit` global constraint.
+
+    A subcircuit is a Hamiltonian path between a subset of the nodes of a graph.
+    When a node `i` is not part of the circuit, it should self-loop with an arc `i -> i`.
+    """
     def __init__(self, arguments):
         super().__init__("minizincsubcircuit", arguments)
 
@@ -1027,6 +1071,12 @@ class MinizincSubcircuit(DirectConstraint):
         return "{}([{}])".format("subcircuit", ",".join(args_str))
 
 class MinizincSubcircuitWithStart(DirectConstraint):
+    """
+    Minizinc's native `SubCircuitWithStart` global constraint.
+
+    This global is the same as `SubCircuit`, only can a additional `start_index` be provided 
+    which is ensure to be part of the subcircuit.
+    """
     def __init__(self, arguments):
         super().__init__("minizincsubcircuitwithstart", arguments)
 
