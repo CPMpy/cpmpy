@@ -19,7 +19,7 @@ jobs:
           sudo snap install minizinc --classic
           
           # install pumpkin from source
-          git clone https://github.com/consol-lab/pumpkin
+          git clone https://github.com/consol-lab/pumpkin pumpkin
           cd pumpkin/pumpkin_py
           maturin build
           pip install ../target/wheels/*.whl # name can change based on version
