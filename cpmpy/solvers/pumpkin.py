@@ -186,7 +186,7 @@ class CPM_pumpkin(SolverInterface):
             elif isinstance(result, SatisfactionUnderAssumptionsResult.Unsatisfiable):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
                 self._pum_core = [] # empty core, no required assumptions to prove UNSAT
-            elif  isinstance(result, SatisfactionUnderAssumptionsResult.UnsatisfiableUnderAssumptions):
+            elif isinstance(result, SatisfactionUnderAssumptionsResult.UnsatisfiableUnderAssumptions):
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
                 self._pum_core = result._0
             elif isinstance(result, SatisfactionUnderAssumptionsResult.Unknown):
@@ -403,10 +403,8 @@ class CPM_pumpkin(SolverInterface):
 
     def _get_constraint(self, cpm_expr):
         """
-            Get a solver's constraint by a supported CPMpy constraint
-
-            :param cpm_expr: CPMpy expression
-            :type cpm_expr: Expression
+            Convert a CPMpy expression into a Pumpkin constraint
+            Expects a transformed CPMpy expression, but implemented as a separate function so we can support reification in `add()`
         """
         from pumpkin_solver_py import constraints
 
@@ -526,7 +524,6 @@ class CPM_pumpkin(SolverInterface):
 
         :return: self
         """
-        from pumpkin_solver_py import constraints
 
         # add new user vars to the set
         get_variables(cpm_expr_orig, collect=self.user_vars)
