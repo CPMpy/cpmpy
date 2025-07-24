@@ -20,7 +20,7 @@ jobs:
           
           # install pumpkin from source
           git clone https://github.com/consol-lab/pumpkin pumpkin
-          cd pumpkin/pumpkin_solver_py
+          cd pumpkin/pumpkin-solver-py
           maturin build
           pip install ../target/wheels/*.whl # name can change based on version
           cd ../../ # back to cpmpy
