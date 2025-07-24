@@ -411,10 +411,9 @@ class CPM_pumpkin(SolverInterface):
         from pumpkin_solver_py import constraints
 
         if isinstance(cpm_expr, _BoolVarImpl):
-            # base case, just var or ~var
-            forced_sum = Operator("sum", [cpm_expr])
-            return [constraints.Equals(self._sum_args(forced_sum), 1)]
-
+            # base case, just var or ~var, post as clause
+            return [constraints.Clause([self.solver_var(cpm_expr)])]
+            
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == "or": 
                 return [constraints.Clause(self.solver_vars(cpm_expr.args))]
