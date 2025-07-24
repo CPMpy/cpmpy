@@ -472,7 +472,10 @@ class CPM_gurobi(SolverInterface):
         https://docs.gurobi.com/projects/optimizer/en/current/reference/attributes/variable.html#varhintval
 
         Optionally, you can also set the relative priority of the hint, using:
-        `solver.solver_var(cpm_var).setAttr("VarHintPri", <priority>)`
+        
+        .. code-block:: python
+
+            solver.solver_var(cpm_var).setAttr("VarHintPri", <priority>)
 
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
