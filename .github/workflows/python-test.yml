@@ -19,6 +19,7 @@ jobs:
           sudo snap install minizinc --classic
           
           # install pumpkin from source
+          pip install maturin
           git clone https://github.com/consol-lab/pumpkin pumpkin
           cd pumpkin/pumpkin-solver-py
           maturin build
