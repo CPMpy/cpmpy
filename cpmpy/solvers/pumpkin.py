@@ -299,16 +299,14 @@ class CPM_pumpkin(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"alldifferent", "cumulative", "table", "negative_table", "InDomain"
-                     "min", "max", "element"}
+                     "min", "max", "element", "abs"}
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"}) # safen toplevel elements, assume total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported, csemap=self._csemap)
-        # safening after decompose here, need to safen toplevel elements too
-        #   which come from decomposition of other global constraints...
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"})
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         supported_halfreif = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max"}
-        cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif, csemap=self._csemap) # reified element not supported yet (TODO?)
+        cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif, csemap=self._csemap) # reified element not supported yet
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]),csemap=self._csemap)  # supports >, <, !=
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons
@@ -443,7 +441,7 @@ class CPM_pumpkin(SolverInterface):
                 elif lhs.name == "mul":
                     return [constraints.Times(*self.to_pum_ivar(lhs.args), pum_rhs)]
                 elif lhs.name == "abs":
-                    return [constraints.Absolute(self.solver_var(lhs), pum_rhs)]
+                    return [constraints.Absolute(self.to_pum_ivar(lhs.args[0]), pum_rhs)]
                 elif lhs.name == "min":
                     return [constraints.Minimum(self.to_pum_ivar(lhs.args), pum_rhs)]
                 elif lhs.name == "max":
