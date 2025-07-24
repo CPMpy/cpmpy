@@ -466,7 +466,7 @@ class CPM_gurobi(SolverInterface):
     def solution_hint(self, cpm_vars, vals):
         """
         Gurobi supports warmstarting the solver with a (in)feasible solution.
-        The provided value will be affect branching heurstics during solving, making it more likley the final solution will contain the provided assignment.
+        The provided value will affect branching heurstics during solving, making it more likely the final solution will contain the provided assignment.
 
         To learn more about solution hinting in gurobi, see:
         https://docs.gurobi.com/projects/optimizer/en/current/reference/attributes/variable.html#varhintval
