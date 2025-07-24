@@ -95,6 +95,7 @@ class CPM_pumpkin(SolverInterface):
 
         # initialise the native solver object
         self.pum_solver = Model() 
+        self.predicate_map = {} # cache predicates for reuse
 
         # for objective
         self._objective = None
@@ -345,9 +346,15 @@ class CPM_pumpkin(SolverInterface):
             if cpm_expr.name == ">":  comp, rhs = Comparator.GreaterThanOrEqual, rhs + 1
         else:
             raise ValueError(f"Cannot convert CPMpy expression {cpm_expr} to a predicate")
+        
+        # do we already have this predicate? 
+        #  (actually, cse might already catch these...)
+        if (lhs, comp, rhs) not in self.predicate_map:
+            pred = Predicate(self.to_pum_ivar(lhs), comp, rhs)
+            self.predicate_map[(lhs, comp, rhs)] = pred
+        
+        return self.predicate_map[(lhs, comp, rhs)]
 
-        var = self.to_pum_ivar(lhs)
-        return Predicate(var, comp, rhs)
 
 
     def to_pum_ivar(self, cpm_var):
