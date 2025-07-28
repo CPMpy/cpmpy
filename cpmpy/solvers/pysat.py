@@ -129,7 +129,7 @@ class CPM_pysat(SolverInterface):
             names = []
             for name, attr in vars(SolverNames).items():
                 # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
-                if not name.startswith('__') and isinstance(attr, tuple) and not name == 'cryptosat':
+                if not name.startswith('__') and isinstance(attr, tuple) and name != 'cryptosat':
                     if name not in attr:
                         name = attr[-1]
                     names.append(name)  
