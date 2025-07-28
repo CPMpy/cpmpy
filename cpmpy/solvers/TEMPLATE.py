@@ -101,6 +101,44 @@ class CPM_template(SolverInterface):
             return pkg_resources.get_distribution('TEMPLATEpy').version
         except pkg_resources.DistributionNotFound:
             return None
+        
+    # [GUIDELINE] If your solver supports different subsolvers, implement below method to return a list of subsolver names
+    @staticmethod
+    def solvernames(installed:bool=True):
+        """
+            Returns solvers supported by TEMPLATE (on your system).
+
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those installed on your system (default True)
+               
+            Returns:
+                list of solver names
+        """
+        if CPM_template.supported():
+            # Collect solver names
+            if installed:
+                return # [ ... list of the installed subsolver names ... ]
+            else:
+                return # [ ... list of all subsolver names ... ]
+        else:
+            warnings.warn("TEMPLATE is not installed or not supported on this system.")
+            return []
+
+    # [GUIDELINE] If your solver supports different subsolvers, implement below method to return their respective versions
+    @classmethod
+    def solverversion(cls, subsolver:str) -> Optional[str]:
+        """
+        Returns the version of the requested subsolver.
+
+        Arguments:
+            subsolver (str): name of the subsolver
+
+        Returns:
+            Version number of the subsolver if installed, else None 
+        """
+        # return version of requested subsolver (if installed)
+        # if requested subsolver does not exist, raise ValueError
+        pass
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
