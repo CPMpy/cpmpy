@@ -73,10 +73,12 @@ class CPM_pumpkin(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import pumpkin_solver_py as gp
+            import pumpkin_solver_py as psp
             return True
-        except ImportError:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
 
     def __init__(self, cpm_model=None, subsolver=None):
