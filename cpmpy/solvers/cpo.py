@@ -115,10 +115,14 @@ class CPM_cpo(SolverInterface):
     def version() -> Optional[str]:
         """
         Returns the installed version of the solver's Python API.
+
+        For CPO, two version numbers get returned: ``<docplex version>/<solver version>``
         """
         try:
-            return pkg_resources.get_distribution('docplex').version
-        except pkg_resources.DistributionNotFound:
+            import docplex.cp as docp
+            s = docp.solver.solver.CpoSolver(docp.model.CpoModel())
+            return f"{pkg_resources.get_distribution('docplex').version}/{s.get_solver_version()}"
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):

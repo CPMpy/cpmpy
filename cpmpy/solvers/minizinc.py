@@ -222,10 +222,13 @@ class CPM_minizinc(SolverInterface):
     def version() -> Optional[str]:
         """
         Returns the installed version of the solver's Python API.
+
+        For Minizinc, two version numbers get returned: ``<minizinc python API version>/<minizinc driver version>``
         """
         try:
-            return pkg_resources.get_distribution('minizinc').version
-        except pkg_resources.DistributionNotFound:
+            from minizinc import default_driver
+            return f"{pkg_resources.get_distribution('minizinc').version}/{".".join(str(a) for a in default_driver.parsed_version)}"
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
             return None
 
     # variable name can not be any of these keywords
