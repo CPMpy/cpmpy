@@ -50,8 +50,8 @@ class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
         root (str): Root directory containing the XCSP3 instances (if 'download', instances will be downloaded to this location)
         year (int): Competition year (2022, 2023 or 2024)
         track (str, optional): Filter instances by track type (e.g., "COP", "CSP", "MiniCOP")
-        transform (callable, optional): Optional transform to be applied on the instance data
-        target_transform (callable, optional): Optional transform to be applied on the file path
+        transform (callable, optional): Optional transform to be applied on the instance data (the file path of each problem instance)
+        target_transform (callable, optional): Optional transform to be applied on the metadata (the metadata dictionary of each problem instance)
         download (bool): If True, downloads the dataset from the internet and puts it in `root` directory
     """
     
