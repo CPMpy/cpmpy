@@ -120,7 +120,7 @@ class CPM_pumpkin(SolverInterface):
         Call the Pumpkin solver
 
         Arguments:
-            time_limit:  maximum solve time in seconds (float, optional)
+            time_limit (float, optional):  maximum solve time in seconds 
             prove: whether to produce a DRCP proof (.lits file and .drcp proof file).
             proof_name: name for the the proof files.
             proof_location: location for the proof files (default to current working directory).
