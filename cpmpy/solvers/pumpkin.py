@@ -523,10 +523,10 @@ class CPM_pumpkin(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: self
+            :return: self
         """
 
         # add new user vars to the set
@@ -551,7 +551,9 @@ class CPM_pumpkin(SolverInterface):
 
            CPMpy will return only those variables that are False (in the UNSAT core)
 
-           Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+            .. note::
+
+                Note that there is no guarantee that the core is minimal, though this interface does open up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
         """
 
         assert self._pum_core is not None, "Can only get core if the last solve-call was unsatisfiable under assumptions"
