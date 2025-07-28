@@ -248,17 +248,29 @@ class CPM_pumpkin(SolverInterface):
             return self.solver_var(cpm_var._bv).negate()
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.pum_solver.new_boolean_variable(name=str(cpm_var))
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.pum_solver.new_integer_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+        if isinstance(cpm_var, _NumVarImpl):
+            if cpm_var not in self._varmap:
+                if isinstance(cpm_var, _BoolVarImpl):
+                    revar = self.pum_solver.new_boolean_variable(name=str(cpm_var))
+                elif isinstance(cpm_var, _IntVarImpl):
+                    revar = self.pum_solver.new_integer_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
+                else:
+                    raise NotImplementedError("Not a known var {}".format(cpm_var))
+                self._varmap[cpm_var] = revar
 
-        # return from cache
-        return self._varmap[cpm_var]
+            # return from cache
+            return self._varmap[cpm_var]
+        
+        # can also be a scaled variable (multiplication view)
+        elif isinstance(cpm_var, Operator) and cpm_var.name == "mul":
+            const, cpm_var = cpm_var.args
+            if not is_num(const):
+                raise ValueError(f"Cannot create view from non-constant multiplier {const} * {cpm_var}")
+            return self.solver_var(cpm_var).scaled(const)
+        
+        raise ValueError(f"Not a known var {cpm_var}")
+
+
 
     def objective(self, expr, minimize=True):
         """
@@ -335,10 +347,12 @@ class CPM_pumpkin(SolverInterface):
             if isinstance(lhs, Operator): # can be sum with single arg
                 if lhs.name == "sum" and len(lhs.args) == 1:
                     lhs = lhs.args[0]
+                elif lhs.name == "wsum" and len(lhs.args[0]) == 1:
+                    lhs = lhs.args[0][0] * lhs.args[1][0]
+                elif lhs.name == "mul" and is_num(lhs.args[0]):
+                    lhs = lhs.args[0] * lhs.args[1]
                 else:
-                    raise ValueError("Lhs of predicate should be a sum with 1 argument") # TODO: also wsum with 1 arg/mul with const?
-
-            assert isinstance(lhs, _NumVarImpl), "lhs should be variable by now"
+                    raise ValueError(f"Lhs of predicate should be a sum with 1 argument, wsum with 1 arg, or mul with const, but got {lhs}")
 
             if cpm_expr.name == "==": comp = Comparator.Equal
             if cpm_expr.name == "<=": comp = Comparator.LessThanOrEqual
@@ -404,11 +418,26 @@ class CPM_pumpkin(SolverInterface):
         else:
             raise ValueError(f"Unknown expression to convert in sum-arguments: {expr}")
         return args
+    
+    def _is_predicate(self, cpm_expr):
+        """
+            Check if a CPMpy expression can be converted to a Pumpkin predicate
+        """
+        if isinstance(cpm_expr, _NumVarImpl):
+            return True
+        elif isinstance(cpm_expr, Operator):
+            if cpm_expr.name == "sum" and len(cpm_expr.args) == 1:
+                return True
+            if cpm_expr.name == "wsum" and len(cpm_expr.args[0]) == 1:
+                return True
+            if cpm_expr.name == "mul" and is_num(cpm_expr.args[0]):
+                return True
+        return False
 
     def _get_constraint(self, cpm_expr):
         """
             Convert a CPMpy expression into a Pumpkin constraint
-            Expects a transformed CPMpy expression, but implemented as a separate function so we can support reification in `add()`
+            Expects a transformed CPMpy expression, this logic is implemented as a separate function so we can support reification in `add()`
         """
         from pumpkin_solver_py import constraints
 
@@ -426,8 +455,7 @@ class CPM_pumpkin(SolverInterface):
             lhs, rhs = cpm_expr.args
             assert isinstance(lhs, Expression), f"Expected a CPMpy expression on lhs but got {lhs} of type {type(lhs)}"
 
-            if isinstance(lhs, _NumVarImpl) or \
-                    (isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1):
+            if self._is_predicate(lhs):
                 pred = self.to_predicate(cpm_expr)
                 return [constraints.Clause([self.pum_solver.predicate_as_boolean(pred)])]
 
