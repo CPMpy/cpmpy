@@ -20,7 +20,8 @@ ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the 
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
-    "GlobalCardinalityCount", "InDomain", "Inverse", "Table", 'NegativeTable', "ShortTable", "Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
+    "Table", 'NegativeTable', "ShortTable", "Regular",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
@@ -192,6 +193,8 @@ def global_constraints(solver):
             expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
             expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+        elif name == "Regular":
+            expr = Regular(intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
             expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":

@@ -75,6 +75,7 @@ class SolverInterface(object):
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
         self._varmap = dict()  # maps cpmpy variables to native solver variables
+        self._csemap = dict()  # maps cpmpy expressions to solver expressions
 
         # rest uses own API
         if cpm_model is not None:
@@ -251,9 +252,12 @@ class SolverInterface(object):
         if not call_from_model:
             warnings.warn("Adding constraints to solver object to find all solutions, "
                           "solver state will be invalid after this call!")
+            
+        self.cpm_status = SolverStatus(self.name)
 
         solution_count = 0
-        while self.solve(time_limit=time_limit, **kwargs):
+        start = time.time()
+        while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
@@ -270,6 +274,25 @@ class SolverInterface(object):
 
             # add nogood on the user variables
             self += any([v != v.value() for v in self.user_vars if v.value() is not None])
+
+            if time_limit is not None: # update remaining time
+                time_limit -= self.status().runtime
+        end = time.time()
+
+        # update solver status
+        self.cpm_status.runtime = end - start
+        if solution_count:
+            if solution_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        # else: <- is implicit since nothing needs to update
+        #     if self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+        #         self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        #     elif self.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+        #         self.cpm_status.exitstatus = ExitStatus.UNKNOWN
 
         return solution_count
 
