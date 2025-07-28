@@ -19,7 +19,7 @@
     The `pumpkin_solver_py` python package is currently not available on PyPI.
     It can be installed from source using the following steps:
      1. clone the repository from github: https://github.com/consol-lab/pumpkin
-     2. install the "maturin" package to build the python bindings: $ pip install maturin
+     2. install the "maturin" package to build the python bindings: :code:`pip install maturin`
      3. build and install the package: :code:`cd pumpkin/pumpkin-solver-py && maturin develop`
 
     ===============
@@ -65,6 +65,7 @@ class CPM_pumpkin(SolverInterface):
     Interface to Pumpkin's API
 
     Creates the following attributes (see parent constructor for more):
+
     - ``pum_solver``: the pumpkin.Model() object
     """
 
@@ -83,8 +84,8 @@ class CPM_pumpkin(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None, not used
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None, not used
         """
         if not self.supported():
             raise Exception("CPM_Pumpkin: Install the python package 'pumpkin_solver_py'")
@@ -114,16 +115,16 @@ class CPM_pumpkin(SolverInterface):
 
     def solve(self, time_limit=None, prove=False, proof_name="proof.drcp", proof_location=".", assumptions=None):
         """
-            Call the Pumpkin solver
+        Call the Pumpkin solver
 
-            Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - prove: whether to produce a DRCP proof (.lits file and .drcp proof file).
-            - proof_name: name for the the proof files.
-            - proof_location: location for the proof files (default to current working directory).
-            - assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
-                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
-                           get_core() returns a small subset of assumption variables that are unsat together.
+        Arguments:
+            time_limit:  maximum solve time in seconds (float, optional)
+            prove: whether to produce a DRCP proof (.lits file and .drcp proof file).
+            proof_name: name for the the proof files.
+            proof_location: location for the proof files (default to current working directory).
+            assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
+                            For repeated solving, and/or for use with :func:`s.get_core() <cpmpy.solvers.pumpkin.CPM_pumpkin.get_core>`: if the model is UNSAT,
+                            `get_core()` returns a small subset of assumption variables that are unsat together.
         """
 
         # Again, I don't know why this is necessary, but the PyO3 modules seem to be a bit wonky.
@@ -261,8 +262,9 @@ class CPM_pumpkin(SolverInterface):
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored
 
@@ -289,12 +291,12 @@ class CPM_pumpkin(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
@@ -543,7 +545,7 @@ class CPM_pumpkin(SolverInterface):
 
     def get_core(self):
         """
-           For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+           For use with :func:`s.solve(assumptions=[...]) <cpmpy.solvers.pumpkin.CPM_pumpkin.solve>`. Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
            CPMpy will return only those variables that are False (in the UNSAT core)
 
