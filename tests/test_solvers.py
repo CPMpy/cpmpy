@@ -25,6 +25,14 @@ pblib_available = importlib.util.find_spec("pypblib") is not None
 
 class TestSolvers(unittest.TestCase):
 
+    
+    @pytest.mark.skip(reason="upstream bug, waiting on release for https://github.com/google/or-tools/issues/4640")
+    def test_implied_linear(self):
+        x,y,z = cp.intvar(0, 2, shape=3,name="xyz")
+        p = cp.boolvar(name="p")
+        user_vars = (x, y, z, p)
+        test_solve(cp.Model(cp.BoolVal(True)).solveAll(), None, user_vars)
+
     # should move this test elsewhere later
     def test_tsp(self):
         N = 6
@@ -976,3 +984,27 @@ class TestSupportedSolvers:
         assert len(s.user_vars) == 1 # check if var captured as a user_var
         solution_limit = 5 if solver == "gurobi" else None
         assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
+
+    def test_model_no_vars(self, solver):
+
+        if solver == "gurobi":
+            solution_limit = 10
+        else:
+            solution_limit = None
+
+        # empty model
+        num_sols = cp.Model().solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1    
+
+        # model with one True constant
+        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1        
+
+        # model with two True constants
+        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1
+
+        # model with one False constant
+        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 0
+        
