@@ -95,7 +95,6 @@ class CPM_minizinc(SolverInterface):
 
     @staticmethod
     def supported(): 
-        return False
         return CPM_minizinc.installed() and CPM_minizinc.executable_installed() and not CPM_minizinc.outdated()
 
     @staticmethod
