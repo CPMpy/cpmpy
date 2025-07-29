@@ -158,7 +158,7 @@ class CPM_pysat(SolverInterface):
             # default solver
             subsolver = "glucose4" # something recent...
         elif subsolver.startswith('pysat:'):
-            _, subsolver = subsolver.split(":") # strip 'pysat:'
+            subsolver = subsolver[6:] # strip 'pysat:'
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
