@@ -5,8 +5,8 @@ import numpy as np
 from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
-from cpmpy.expressions.core import Operator, Expression
-from cpmpy.expressions.utils import get_bounds, argval
+from cpmpy.expressions.core import Comparison, Operator, Expression
+from cpmpy.expressions.utils import eval_comparison, get_bounds, argval
 
 class TestComparison(unittest.TestCase):
     def test_comps(self):
@@ -567,7 +567,12 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type(cp.sum(x).value()))
         self.assertEqual(int, type(cp.sum([1,2,3] * x[0]).value()))
         self.assertEqual(float, type(cp.sum([0.1,0.2,0.3] * x[0]).value()))
+        
+        # also numpy should be converted to Python native when callig value()
         self.assertEqual(int, type(cp.sum(np.array([1, 2, 3]) * x[0]).value()))
+        self.assertEqual(float, type(cp.sum(np.array([0.1,0.2,0.3]) * x[0]).value()))
+        
+        # test binary operators
         a,b = x[0,[0,1]]
         self.assertEqual(int, type((-a).value()))
         self.assertEqual(int, type((a - b).value()))
@@ -576,6 +581,31 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type((a ** b).value()))
         self.assertEqual(int, type((a % b).value()))
 
+        # test binary operators with numpy constants
+        a,b = x[0,0], np.int64(42)
+        self.assertEqual(int, type((a - b).value()))
+        self.assertEqual(int, type((a * b).value()))
+        self.assertEqual(int, type((a // b).value()))
+        self.assertEqual(int, type((a ** b).value()))
+        self.assertEqual(int, type((a % b).value()))
+
+        # test comparisons
+        a,b = x[0,[0,1]]
+        self.assertEqual(bool, type((a < b).value()))
+        self.assertEqual(bool, type((a <= b).value()))
+        self.assertEqual(bool, type((a > b).value()))
+        self.assertEqual(bool, type((a >= b).value()))
+        self.assertEqual(bool, type((a == b).value()))
+        self.assertEqual(bool, type((a != b).value()))
+
+        # alsl comparisons with numpy values
+        a,b = x[0,0], np.int64(42)
+        self.assertEqual(bool, type((a < b).value()))
+        self.assertEqual(bool, type((a <= b).value()))
+        self.assertEqual(bool, type((a > b).value()))
+        self.assertEqual(bool, type((a >= b).value()))
+        self.assertEqual(bool, type((a == b).value()))
+        self.assertEqual(bool, type((a != b).value()))
 
 class TestBuildIns(unittest.TestCase):
 
@@ -649,6 +679,58 @@ class TestContainer(unittest.TestCase):
         assert d[self.x] == "x"
         assert d[self.y] == "y"
         assert d[self.z] == "z"
+
+        
+class TestUtils(unittest.TestCase):
+
+    def test_eval_comparison(self):
+        x = intvar(0,10, name="x")
+
+        for comp in ["==", "!=", "<", "<=", ">", ">="]:
+            expr = eval_comparison(comp, x, 5)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], 5) # should always put the constant on the right
+
+            expr = eval_comparison(comp, 5, x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], 5) # should always put the constant on the right
+
+            # now, also check with numpy
+            expr = eval_comparison(comp, x, np.int64(5))
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], 5) # should always put the constant on the right
+
+            expr = eval_comparison(comp, np.int64(5), x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], 5) # should always put the constant on the right
+
+
+            # also with Boolean constants
+
+            expr = eval_comparison(comp, x, True)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            expr = eval_comparison(comp, True, x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            # now, also check with numpy
+            expr = eval_comparison(comp, x, np.bool_(True))
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            expr = eval_comparison(comp, np.bool_(True), x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
 
 if __name__ == '__main__':
     unittest.main()

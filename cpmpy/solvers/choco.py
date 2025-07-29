@@ -398,11 +398,11 @@ class CPM_choco(SolverInterface):
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
 
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap) # choco supports any global also (half-) reified
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons, supported = supported | {"sum", "wsum"})  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported = supported | {"sum", "wsum"}, csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # support >, <, !=
 
         return cpm_cons
 

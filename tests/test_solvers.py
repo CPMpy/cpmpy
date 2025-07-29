@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import unittest
 import tempfile
 import pytest
@@ -827,6 +828,36 @@ class TestSupportedSolvers:
         assert s.solve()
         assert x.value()
         assert y.value() + z.value() == 1
+
+
+    def test_incremental_assumptions(self, solver):
+        x, y, z = cp.boolvar(shape=3, name=["x","y","z"])
+        s = cp.SolverLookup.get(solver)
+        if "assumptions" not in inspect.signature((s.solve)).parameters:
+            return # solver does not support solving under assumptions
+        
+        if solver == "pysdd":
+            return # not implemented in pysdd
+        
+        s += x | y
+        assert s.solve(assumptions=[x])
+        assert x.value()
+        assert (s.solve(assumptions=[~x]))
+        assert not (x.value())
+        assert (y.value())
+
+        s += ~x | z
+        assert s.solve(assumptions=[x,~y])
+        assert z.value()
+
+        s += y | ~z
+        assert not s.solve(assumptions=[~x, ~y])
+
+        core = s.get_core()
+        assert ~y in set([~x,~y])
+        assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat
+
+        assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
             bvs = cp.boolvar(shape=3)
