@@ -186,9 +186,7 @@ class CPM_pysdd(SolverInterface):
                 var._value = None
             return 0
 
-
-        # get models or set to empty list if root node is false (preventing `ValueError`)
-        sddmodels = [] if self.pysdd_root.is_false() else [x for x in self.pysdd_root.models()]
+        sddmodels = [x for x in self.pysdd_root.models()]
         if len(sddmodels) != self.pysdd_root.model_count:
             #pysdd doesn't always have correct solution count..
             projected_sols = set()
