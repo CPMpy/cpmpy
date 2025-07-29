@@ -163,8 +163,7 @@ class CPM_gurobi(SolverInterface):
 
         # edge case, empty model, ensure the solver has something to solve
         if not len(self.user_vars):
-            iv = intvar(1,1)
-            self += iv == 1
+            self.add(intvar(1, 1) == 1)
         
         # set time limit
         if time_limit is not None:

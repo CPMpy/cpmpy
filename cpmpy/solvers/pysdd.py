@@ -127,8 +127,7 @@ class CPM_pysdd(SolverInterface):
 
         # edge case, empty model, ensure the solver has something to solve
         if not len(self.user_vars):
-            bv = boolvar()
-            self += bv == 1
+            self.add(boolvar() == True)
 
         has_sol = True
         if self.pysdd_root is not None:
@@ -182,8 +181,7 @@ class CPM_pysdd(SolverInterface):
 
         # edge case, empty model, ensure the solver has something to solve
         if not len(self.user_vars):
-            bv = boolvar()
-            self += bv == 1
+            self.add(boolvar() == True)
 
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
