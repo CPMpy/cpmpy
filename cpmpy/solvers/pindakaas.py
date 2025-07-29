@@ -71,6 +71,15 @@ class CPM_pindakaas(SolverInterface):
     def supported():
         return importlib.util.find_spec("pindakaas") is not None
 
+    @staticmethod
+    def supported():
+        try:
+            import pindakaas
+
+            return True
+        except ModuleNotFoundError:
+            return False
+
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Initialize Pindakaas interface.
