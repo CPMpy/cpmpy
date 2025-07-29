@@ -38,6 +38,7 @@
         z3
         pysat
         pysdd
+        pindakaas
 
     =========================
     List of helper submodules
