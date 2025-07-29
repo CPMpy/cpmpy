@@ -139,17 +139,16 @@ class CPM_pindakaas(SolverInterface):
             # translate pindakaas result status to cpmpy status
             import pindakaas as pdk
 
-            match result.status:
-                case pdk.solver.Status.SATISFIED:
-                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-                case pdk.solver.Status.UNSATISFIABLE:
-                    self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-                case pdk.solver.Status.UNKNOWN:
-                    self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-                case _:
-                    raise NotImplementedError(
-                        f"Pindakaas returned an unkown type of result status: {result}"
-                    )
+            if result.status == pdk.solver.Status.SATISFIED:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif result.status == pdk.solver.Status.UNSATISFIABLE:
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            elif result.status == pdk.solver.Status.UNKNOWN:
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            else:
+                raise NotImplementedError(
+                    f"Pindakaas returned an unkown type of result status: {result}"
+                )
 
             # # True/False depending on self.cpm_status
             has_sol = self._solve_return(self.cpm_status)
@@ -237,30 +236,26 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_expr, Comparison):  # Bool linear
             # lhs is a sum/wsum, right hand side a constant int
             lhs, rhs = cpm_expr.args
-            match lhs.name:
-                case "sum":
-                    literals = lhs.args
-                    coefficients = [1] * len(literals)
-                case "wsum":
-                    coefficients, literals = lhs.args
-                case _:
-                    raise ValueError(
-                        f"Trying to encode non (Boolean) linear constraint: {cpm_expr}"
-                    )
+            if lhs.name == "sum":
+                literals = lhs.args
+                coefficients = [1] * len(literals)
+            elif lhs.name == "wsum":
+                coefficients, literals = lhs.args
+            else:
+                raise ValueError(
+                    f"Trying to encode non (Boolean) linear constraint: {cpm_expr}"
+                )
 
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            match cpm_expr.name:
-                case "<=":
-                    con = lhs <= rhs
-                case ">=":
-                    con = lhs >= rhs
-                case "==":
-                    con = lhs == rhs
-                case _:
-                    raise ValueError(
-                        f"Unsupported comparator for constraint: {cpm_expr}"
-                    )
+            if cpm_expr.name == "<=":
+                con = lhs <= rhs
+            elif cpm_expr.name == ">=":
+                con = lhs >= rhs
+            elif cpm_expr.name == "==":
+                con = lhs == rhs
+            else:
+                raise ValueError(f"Unsupported comparator for constraint: {cpm_expr}")
 
             self.pdk_solver.add_encoding(con, conditions=conditions)
         else:
