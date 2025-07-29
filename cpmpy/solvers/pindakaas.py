@@ -209,15 +209,15 @@ class CPM_pindakaas(SolverInterface):
         # transform and post the constraints
         try:
             for cpm_expr in self.transform(cpm_expr_orig):
-                self._add(cpm_expr)
+                self._add_transformed(cpm_expr)
         except pdk.Unsatisfiable:
             self.unsatisfiable = True
 
         return self
 
-    __add__ = add
+    __add__ = add  # avoid redirect in superclass
 
-    def _add(self, cpm_expr, conditions=[]):
+    def _add_transformed(self, cpm_expr, conditions=[]):
         """Add for a single, *transformed* expression, implied by conditions."""
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
@@ -232,7 +232,7 @@ class CPM_pindakaas(SolverInterface):
 
         elif cpm_expr.name == "->":  # implication
             a0, a1 = cpm_expr.args
-            self._add(a1, conditions=conditions + [~self.solver_var(a0)])
+            self._add_transformed(a1, conditions=conditions + [~self.solver_var(a0)])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
             # lhs is a sum/wsum, right hand side a constant int
