@@ -51,7 +51,7 @@ import cpmpy as cp
 from cpmpy import cpm_array, intvar, boolvar
 from cpmpy.exceptions import CPMpyException
 from cpmpy.expressions.core import Expression, Operator
-from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, DirectConstraint
+from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, DirectConstraint, Table
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
     get_bounds, eval_comparison
 from cpmpy.expressions.variables import _IntVarImpl
@@ -623,8 +623,8 @@ class MDD(GlobalConstraint):
             # optimization for first level (only one node, allows to deal with smaller table on first layer)
             tab_first = [x[1:] for x in transitions_by_level_normalized[0]]
             # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-MDD
-            defining = [Table([arr[0], aux[0]], tab_first)] \
-                   + [Table([aux[i - 1], arr[i], aux[i]], transitions_by_level_normalized[i]) for i in
+            defining = [NonReifiedTable([arr[0], aux[0]], tab_first)] \
+                   + [NonReifiedTable([aux[i - 1], arr[i], aux[i]], transitions_by_level_normalized[i]) for i in
                       range(1, len(arr))]
             # constraining constraint: end of the path in accepting node
             constraining = [aux[-1] == 0]
@@ -719,9 +719,9 @@ class Regular(GlobalConstraint):
         state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        defining = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
+        defining = [NonReifiedTable([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
         # define the rest of the automaton using transition table
-        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
+        defining += [NonReifiedTable([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
         
         # constraint is satisfied iff last state is accepting
         return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
