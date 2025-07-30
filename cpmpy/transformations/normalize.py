@@ -275,7 +275,6 @@ def simplify_boolean(lst_of_expr, num_context=False):
             elif len(args) == 1: # Xor with single argument can be simplified to just its argument
                 newlist.append(args[0])
             elif args is not expr.args: # removed something, or changed due to subexpr
-                # args.append(BoolVal(nr_true_constants % 2 == 1))
                 newexpr = copy.copy(expr)
                 newexpr.update_args(args)
                 newlist.append(newexpr if (nr_true_constants % 2 == 0) else ~newexpr) # negate expression depending on number of 'True' boolean constants
