@@ -39,6 +39,7 @@
         pysat
         pysdd
         pindakaas
+        pumpkin
 
     =========================
     List of helper submodules
@@ -70,3 +71,4 @@ from .choco import CPM_choco
 from .gcs import CPM_gcs
 from .cpo import CPM_cpo
 from .pindakaas import CPM_pindakaas
+from .pumpkin import CPM_pumpkin

@@ -94,7 +94,7 @@ class CPM_minizinc(SolverInterface):
     required_version = (2, 8, 2)
 
     @staticmethod
-    def supported():
+    def supported(): 
         return CPM_minizinc.installed() and CPM_minizinc.executable_installed() and not CPM_minizinc.outdated()
 
     @staticmethod

@@ -50,6 +50,7 @@ EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pindakaas": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {},
+                     "pumpkin": {"pow", "mod"},
                      }
 
 # Variables to use in the rest of the test script
