@@ -1,3 +1,4 @@
+import inspect
 import importlib
 import inspect
 import unittest
@@ -870,8 +871,9 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat':  # don't support div with vars
+        if solver in ("pysdd", "pysat", "pumpkin"):  # don't support div or mod with vars
             return
+        
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
