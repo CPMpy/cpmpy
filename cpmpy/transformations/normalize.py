@@ -12,7 +12,7 @@ from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, Xor
 
 
 def toplevel_list(cpm_expr, merge_and=True):
@@ -225,7 +225,40 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 if is_bool(res): # Result is a Boolean constant
                     newlist.append(int(res) if num_context else BoolVal(res))
                 else: # Result is an expression
-                    newlist.append(res)                    
+                    newlist.append(res)    
+        elif isinstance(expr, Xor):
+            """
+            Special Xor global constraint.
+            Similar logic to Operator 'or', but now with exclusive condition.
+            """
+            found_true_constant = False
+            failed_xor = False
+            while i < len(args):
+                a = args[i]
+                if isinstance(a, _BoolVarImpl):
+                    continue
+                elif is_true_cst(a):
+                    if found_true_constant: # non-exclusive 'True'
+                        failed_xor = True
+                        break
+                    found_true_constant = True
+                elif is_false_cst(a):
+                    if args is expr_args: # will remove this one, need to copy args...
+                        args = args.copy()
+                    args.pop(i)
+                else:
+                    continue
+            if found_true_constant:
+                if failed_xor:
+                    newlist.append(0 if num_context else BoolVal(False)) # failed exclusive condition
+                else:
+                    newlist.append(1 if num_context else BoolVal(True))
+            elif args is not expr.args: # removed something, or changed due to subexpr
+                newexpr = copy.copy(expr)
+                newexpr.update_args(args)
+                newlist.append(newexpr)
+            else: # no changes
+                newlist.append(expr)
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
             newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?
             if any(a1 is not a2 for a1,a2 in zip(expr.args, newargs)):
