@@ -229,34 +229,56 @@ def simplify_boolean(lst_of_expr, num_context=False):
         elif isinstance(expr, Xor):
             """
             Special Xor global constraint.
-            Similar logic to Operator 'or', but now with exclusive condition.
+            Example with 3 inputs:
+                I1	I2	I3	O
+                0	0	0	0
+                0	0	1	1
+                0	1	0	1
+                0	1	1	0
+                1	0	0	1
+                1	0	1	0
+                1	1	0	0
+                1	1	1	1
             """
-            found_true_constant = False
-            failed_xor = False
+            # Simplify nested expression
+            if expr.has_subexpr():
+                expr_args = simplify_boolean(expr.args, num_context=not expr.is_bool())
+            else:
+                expr_args = expr.args
+            # Count number of 'True' boolean constants
+            # + remove all boolean constants from expression
+            nr_true_constants = 0
+            i = 0
+            args = expr_args
             while i < len(args):
                 a = args[i]
                 if isinstance(a, _BoolVarImpl):
+                    i += 1
                     continue
                 elif is_true_cst(a):
-                    if found_true_constant: # non-exclusive 'True'
-                        failed_xor = True
-                        break
-                    found_true_constant = True
+                    nr_true_constants += 1
+                    if args is expr_args: # will remove this one, need to copy args...
+                        args = args.copy()
+                    args.pop(i)
                 elif is_false_cst(a):
                     if args is expr_args: # will remove this one, need to copy args...
                         args = args.copy()
                     args.pop(i)
                 else:
+                    i += 1
                     continue
-            if found_true_constant:
-                if failed_xor:
-                    newlist.append(0 if num_context else BoolVal(False)) # failed exclusive condition
+            if len(args) == 0: # only constant bools
+                if nr_true_constants % 2 == 0:
+                    newlist.append(0 if num_context else BoolVal(False))
                 else:
                     newlist.append(1 if num_context else BoolVal(True))
+            elif len(args) == 1: # Xor with single argument can be simplified to just its argument
+                newlist.append(args[0])
             elif args is not expr.args: # removed something, or changed due to subexpr
+                # args.append(BoolVal(nr_true_constants % 2 == 1))
                 newexpr = copy.copy(expr)
                 newexpr.update_args(args)
-                newlist.append(newexpr)
+                newlist.append(newexpr if (nr_true_constants % 2 == 0) else ~newexpr) # negate expression depending on number of 'True' boolean constants
             else: # no changes
                 newlist.append(expr)
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
