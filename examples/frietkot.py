@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 """
 The 'frietkot' problem; invented by Tias to explain SAT and SAT solving
 http://homepages.vub.ac.be/~tiasguns/frietkot/
