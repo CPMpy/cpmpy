@@ -104,6 +104,7 @@ class CPM_pindakaas(SolverInterface):
         ), "Pindakaas does not support any subsolvers for the moment"
         self.pdk_solver = pdk.solver.CaDiCaL()
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
+        self.core = None  # latest UNSAT core
         super().__init__(name=name, cpm_model=cpm_model)
 
     @property
@@ -128,11 +129,14 @@ class CPM_pindakaas(SolverInterface):
         self.solver_vars(list(self.user_vars))
 
         time_limit = None if time_limit is None else timedelta(seconds=time_limit)
-        assumptions = None if assumptions is None else self.solver_vars(assumptions)
+        solver_assumptions = (
+            None if assumptions is None else self.solver_vars(assumptions)
+        )
 
         t = time.time()
         with self.pdk_solver.solve(
-            time_limit=time_limit, assumptions=assumptions
+            time_limit=time_limit,
+            assumptions=solver_assumptions,
         ) as result:
             self.cpm_status.runtime = time.time() - t
 
@@ -164,9 +168,17 @@ class CPM_pindakaas(SolverInterface):
                             cpm_var._value = True  # dummy value
                     else:  # if pindakaas does not know the literal, it will error
                         cpm_var._value = None
+                self.core = None
             else:  # clear values of variables
                 for cpm_var in self.user_vars:
                     cpm_var._value = None
+                # we have to save the unsat core here, as the result object does not live beyond this solve call
+                if assumptions is not None:
+                    self.core = [
+                        x
+                        for x, s_x in zip(assumptions, solver_assumptions)
+                        if result.failed(s_x)
+                    ]
 
         return has_sol
 
@@ -260,3 +272,10 @@ class CPM_pindakaas(SolverInterface):
             self.pdk_solver.add_encoding(con, conditions=conditions)
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
+
+    def get_core(self):
+        assert (
+            self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE
+            and self.core is not None
+        ), "get_core(): requires a previous solve call with assumption variables and an UNSATISFIABLE result"
+        return self.core
