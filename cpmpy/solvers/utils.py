@@ -162,7 +162,7 @@ class SolverLookup():
             if basename == solvername:
                 # found the right solver
                 return CPM_slv
-        raise ValueError(f"Unknown solver '{name}', chose from {cls.solvernames()}")
+        raise ValueError(f"Unknown solver '{name}', choose from {cls.solvernames()}")
 
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead

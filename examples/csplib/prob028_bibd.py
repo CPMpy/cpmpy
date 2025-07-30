@@ -58,7 +58,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--solution_limit", type=int, default=0, help="Number of solutions to find, find all by default")
+    parser.add_argument("--solution_limit", type=int, default=10, help="Number of solutions to find, find all by default")
 
     args = parser.parse_args()
 
