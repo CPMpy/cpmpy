@@ -682,6 +682,33 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cp.Xor(bv)).solve())
         self.assertTrue(cp.Xor(bv).value())
 
+    def test_xor_with_constants(self):
+
+        bvs = cp.boolvar(shape=3)
+
+        cases = [(bvs.tolist() + [True],              True),
+                 (bvs.tolist() + [True, True],        True),
+                 (bvs.tolist() + [True, True, True],  True),
+                 (bvs.tolist() + [False],             True),
+                 (bvs.tolist() + [False, True],       True),
+                 ([True], False),
+                 ([False], True)
+               ]
+        for arg, res in cases:
+            expr = cp.Xor(arg)
+
+            model = cp.Model(expr)
+            print(model)
+            self.assertEqual(model.solve(), res)
+            if res:
+                self.assertTrue(expr.value())
+
+            d_model = cp.Model(expr.decompose())
+            self.assertEqual(d_model.solve(), res)
+            if res:
+                self.assertTrue(expr.value())
+            
+
     def test_not_xor(self):
         bv = cp.boolvar(5)
         self.assertTrue(cp.Model(~cp.Xor(bv)).solve())
