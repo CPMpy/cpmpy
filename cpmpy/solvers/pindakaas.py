@@ -276,6 +276,9 @@ class CPM_pindakaas(SolverInterface):
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 
     def get_core(self):
+        raise NotSupportedError(
+            "Solver does not support unsat core extraction"
+        )  # TODO awaiting https://github.com/pindakaashq/pindakaas/pull/135
         assert (
             self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE
             and self.core is not None
