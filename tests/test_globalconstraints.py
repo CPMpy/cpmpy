@@ -686,28 +686,30 @@ class TestGlobal(unittest.TestCase):
 
         bvs = cp.boolvar(shape=3)
 
-        cases = [(bvs.tolist() + [True],              True),
-                 (bvs.tolist() + [True, True],        True),
-                 (bvs.tolist() + [True, True, True],  True),
-                 (bvs.tolist() + [False],             True),
-                 (bvs.tolist() + [False, True],       True),
-                 ([True], False),
-                 ([False], True)
-               ]
-        for arg, res in cases:
-            expr = cp.Xor(arg)
+        cases =[bvs.tolist() + [True],
+                bvs.tolist() + [True, True],
+                bvs.tolist() + [True, True, True],
+                bvs.tolist() + [False],
+                bvs.tolist() + [False, True],
+                [True]]
 
+        for args in cases:
+            expr = cp.Xor(args)
             model = cp.Model(expr)
-            print(model)
-            self.assertEqual(model.solve(), res)
-            if res:
-                self.assertTrue(expr.value())
 
-            d_model = cp.Model(expr.decompose())
-            self.assertEqual(d_model.solve(), res)
-            if res:
-                self.assertTrue(expr.value())
-            
+            self.assertTrue(model.solve())
+            self.assertTrue(expr.value())
+
+            # also check with decomposition
+            model = cp.Model(expr.decompose())
+            self.assertTrue(model.solve())
+            self.assertTrue(expr.value())
+
+        # edge case with False constants
+        self.assertFalse(cp.Model(cp.Xor([False, False])).solve())
+        self.assertFalse(cp.Model(cp.Xor([False, False, False])).solve())
+
+
 
     def test_not_xor(self):
         bv = cp.boolvar(5)
