@@ -160,6 +160,10 @@ class CPM_gurobi(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
         
         # set time limit
         if time_limit is not None:
@@ -181,10 +185,13 @@ class CPM_gurobi(SolverInterface):
         self.cpm_status.runtime = self.grb_model.runtime
 
         # translate exit status
-        if grb_status == GRB.OPTIMAL and not self.has_objective():
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif grb_status == GRB.OPTIMAL and self.has_objective():
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        if grb_status == GRB.OPTIMAL:
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif grb_status == GRB.INFEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif grb_status == GRB.TIME_LIMIT:
@@ -330,15 +337,15 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"})  # linearize expects safe exprs
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
+        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow"}))  # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
     def add(self, cpm_expr_orig):
@@ -460,6 +467,26 @@ class CPM_gurobi(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
+    def solution_hint(self, cpm_vars, vals):
+        """
+        Gurobi supports warmstarting the solver with a (in)feasible solution.
+        The provided value will affect branching heurstics during solving, making it more likely the final solution will contain the provided assignment.
+
+        To learn more about solution hinting in gurobi, see:
+        https://docs.gurobi.com/projects/optimizer/en/current/reference/attributes/variable.html#varhintval
+
+        Optionally, you can also set the relative priority of the hint, using:
+        
+        .. code-block:: python
+
+            solver.solver_var(cpm_var).setAttr("VarHintPri", <priority>)
+
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        for cpm_var, val in zip(cpm_vars, vals):
+            self.solver_var(cpm_var).setAttr("VarHintVal", val)
+
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
@@ -477,6 +504,14 @@ class CPM_gurobi(SolverInterface):
 
             Returns: number of solutions found
         """
+        from gurobipy import GRB
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
@@ -536,5 +571,16 @@ class CPM_gurobi(SolverInterface):
 
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
+
+        if opt_sol_count:
+            if opt_sol_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
+            else:
+                grb_status = self.grb_model.Status
+                if grb_status == GRB.TIME_LIMIT: # reached time limit
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+                else: # found all solutions   
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        # if unsat or timout with no solution, .solve() will have already set the state accordingly (so nothing to update)
 
         return opt_sol_count

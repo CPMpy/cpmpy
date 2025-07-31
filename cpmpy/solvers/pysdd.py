@@ -47,7 +47,7 @@ from functools import reduce
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
@@ -125,6 +125,10 @@ class CPM_pysdd(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
+
         has_sol = True
         if self.pysdd_root is not None:
             # if root node is false (empty), no solutions
@@ -135,6 +139,7 @@ class CPM_pysdd(SolverInterface):
 
         # translate exit status
         if has_sol:
+            # Only CSP (does not support COP)
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -174,12 +179,16 @@ class CPM_pysdd(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
+
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
         if solution_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), solution_limit not (yet?) supported")
 
-        if self.pysdd_root is None:
+        if self.pysdd_root is None or self.pysdd_root.is_false():
             # clear user vars if no solution found
             for var in self.user_vars:
                 var._value = None
@@ -197,27 +206,32 @@ class CPM_pysdd(SolverInterface):
                 projected_sols.add(tuple(projectedsol))
         else:
             projected_sols = set(sddmodels)
-        if display is None:
-            # the desired, fast computation
-            return len(projected_sols)
 
+        if projected_sols:
+            if projected_sols == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else:
+                # time limit not (yet) supported -> always all solutions found
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         else:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+
+        # display if needed
+        if display is not None:
             # manually walking over the tree, much slower...
-            solution_count = 0
             for sol in projected_sols:
-                solution_count += 1
                 # fill in variable values
                 for i, cpm_var in enumerate(self.user_vars):
                     cpm_var._value = sol[i]
 
-                # display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
                     print(argvals(display))
                 else:
                     display()  # callback
-            return solution_count
+        
+        return len(projected_sols)
 
     def solver_var(self, cpm_var):
         """
@@ -260,7 +274,7 @@ class CPM_pysdd(SolverInterface):
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}) #keep unsupported xor for error message purposes.
+        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}, csemap=self._csemap) #keep unsupported xor for error message purposes.
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 

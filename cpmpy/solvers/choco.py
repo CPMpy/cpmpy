@@ -63,7 +63,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
 from ..transformations.reification import reify_rewrite
-from ..exceptions import ChocoBoundsException
+from ..exceptions import ChocoBoundsException, NotSupportedError
 
 
 class CPM_choco(SolverInterface):
@@ -177,13 +177,21 @@ class CPM_choco(SolverInterface):
         self.cpm_status.runtime = end - start
 
         # translate exit status
+        # A) Found a solution
         if sol is not None:
-            if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-            else: # solved, but optimality not proven
+            # COP
+            if self.has_objective():
+                if time_limit is None or self.cpm_status.runtime < time_limit: # solved to optimality
+                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                else: # solved, but optimality not proven
+                    self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # CSP
+            else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        # B) Found unsat
         elif time_limit is None or self.cpm_status.runtime < time_limit: # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        # C) Timeout
         else:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN  # can happen when timeout is reached...
 
@@ -228,10 +236,13 @@ class CPM_choco(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # create solver object
+        self.chc_solver = self.chc_model.get_solver()
+
+        # set time limit (if given)
         if time_limit is not None:
             self.chc_solver.limit_time(str(time_limit) + "s")
 
-        self.chc_solver = self.chc_model.get_solver()
         start = time.time()
         if self.has_objective():
             sols = self.chc_solver.find_all_optimal_solutions(maximize=not self.minimize_obj,
@@ -245,6 +256,19 @@ class CPM_choco(SolverInterface):
         # new status, get runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = end - start
+
+        if len(sols): # solutions found
+            if (len(sols) == solution_limit): # matched the set limit (if given)
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif (time_limit is None) or (self.cpm_status.runtime < time_limit): # found all solutions
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else: # reached timeout
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else: # no solutions found
+            if (time_limit is None) or (self.cpm_status.runtime < time_limit): # unsat problem
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            else: # timeout
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
 
         # if no solutions, clear values of variables
         if len(sols) == 0:
@@ -370,15 +394,15 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "short_table", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
 
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported) # choco supports any global also (half-) reified
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap) # choco supports any global also (half-) reified
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons, supported = supported | {"sum", "wsum"})  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # support >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported = supported | {"sum", "wsum"}, csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # support >, <, !=
 
         return cpm_cons
 
@@ -572,9 +596,24 @@ class CPM_choco(SolverInterface):
                 table = table.astype(float) # nan's require float dtype
                 # Choco requires a wildcard value not present in dom of args,
                 # take value lower than anything else
-                chc_star = min(np.nanmin(table), *get_bounds(array)[0]) -1
+                chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
+            elif cpm_expr.name == "regular":
+                from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
+                array, transitions, start, accepting = cpm_expr.args
+                for i, (lb, ub) in enumerate(zip(*get_bounds(array))):
+                    if lb < 0 or ub > 65535:
+                        raise NotSupportedError(f"Choco regular only supports variables within domain 0..65535, got {array[i]} with bounds {lb}..{ub}")
+                # convert to Automaton Choco object
+                automaton = FiniteAutomaton()
+                for node, i in cpm_expr.node_map.items(): automaton.add_state()
+                for src, label, dst in transitions:
+                    automaton.add_transition(cpm_expr.node_map[src], cpm_expr.node_map[dst], label)
+                automaton.set_initial_state(cpm_expr.node_map[start])
+                automaton.set_final(*[cpm_expr.node_map[a] for a in accepting])
+                return self.chc_model.regular(self._to_vars(array), automaton)
+            
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
