@@ -1,5 +1,38 @@
 # Change log
 
+## 0.9.26
+
+### Added
+
+* **New solver**: Pumpkin LCG solver (by the ConSol Lab at TU Delft) [#669](https://github.com/CPMpy/cpmpy/pull/669)
+* **New global** `Regular` [#677](https://github.com/CPMpy/cpmpy/pull/677)
+* Common Subexpression Elimination (CSE) with normalized expressions [#679](https://github.com/CPMpy/cpmpy/pull/679)
+* Solution hinting for Gurobi [#691](https://github.com/CPMpy/cpmpy/pull/691)
+* Solution callback for CP Optimizer [#682](https://github.com/CPMpy/cpmpy/pull/682)
+* Support for canonicalisation of subtraction expressions [#686](https://github.com/CPMpy/cpmpy/pull/686) 
+* Added testset for incremental assumptions
+* Catch beginner mistakes linked to incorrect usage of boolean expression [#660](https://github.com/CPMpy/cpmpy/pull/660)
+
+### Changed
+
+* Updated instructions for adding a new solver with request to add solver to overview table
+* Improve efficiency `only_implies`: avoid retransform if no subexpression [#680](https://github.com/CPMpy/cpmpy/pull/680)
+* Consistent state reporting of `.solve()` across all solvers [#545](https://github.com/CPMpy/cpmpy/pull/545)
+* Improved docs and error messages for `canonical_comparison` [#678](https://github.com/CPMpy/cpmpy/pull/678)
+
+### Fixed
+
+* Missing solution for empty csp when enumerating [#674](https://github.com/CPMpy/cpmpy/pull/674)
+* Use of constants in globals [#700](https://github.com/CPMpy/cpmpy/pull/700)
+* CSE edge-case in `only_numexpr_equality` [#696](https://github.com/CPMpy/cpmpy/pull/696)
+* Choco `shorttable` star symbol data type [#697](https://github.com/CPMpy/cpmpy/pull/697)
+* Ensure python-native expression values to prevent unexpected behaviour with numpy constants [#695](https://github.com/CPMpy/cpmpy/pull/695)
+* Correctly handle numpy integers in `eval_comparison` [#683](https://github.com/CPMpy/cpmpy/pull/683)
+* CP Optimizer fix cumulative with zero-duration task [#681](https://github.com/CPMpy/cpmpy/pull/681)
+* Fix incorrect decomposition of `Inverse` global constraint [#673](https://github.com/CPMpy/cpmpy/pull/673)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.25...v0.9.26
+
 ## 0.9.25
 
 ### Added
