@@ -275,7 +275,10 @@ def simplify_boolean(lst_of_expr, num_context=False):
             elif args is not expr.args: # removed something, or changed due to subexpr
                 newexpr = copy.copy(expr)
                 newexpr.update_args(args)
-                newlist.append(newexpr if (nr_true_constants % 2 == 0) else ~newexpr) # negate expression depending on number of 'True' boolean constants
+                if nr_true_constants % 2 == 1: # uneven number of removals, need to negate
+                    newlist.append(cp.transformations.negation.recurse_negation(newexpr))
+                else:
+                    newlist.append(newexpr)
             else: # no changes
                 newlist.append(expr)
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
