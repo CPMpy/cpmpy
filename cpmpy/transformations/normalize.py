@@ -12,7 +12,7 @@ from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, Xor
 
 
 def toplevel_list(cpm_expr, merge_and=True):
@@ -225,7 +225,62 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 if is_bool(res): # Result is a Boolean constant
                     newlist.append(int(res) if num_context else BoolVal(res))
                 else: # Result is an expression
-                    newlist.append(res)                    
+                    newlist.append(res)    
+        elif isinstance(expr, Xor):
+            """
+            Special Xor global constraint.
+            Example with 3 inputs:
+                I1	I2	I3	O
+                0	0	0	0
+                0	0	1	1
+                0	1	0	1
+                0	1	1	0
+                1	0	0	1
+                1	0	1	0
+                1	1	0	0
+                1	1	1	1
+            """
+            # Simplify nested expression
+            if expr.has_subexpr():
+                expr_args = simplify_boolean(expr.args, num_context=False)
+            else:
+                expr_args = expr.args
+            # Count number of 'True' boolean constants
+            # + remove all boolean constants from expression
+            nr_true_constants = 0
+            i = 0
+            args = expr_args
+            while i < len(args):
+                a = args[i]
+                if isinstance(a, _BoolVarImpl):
+                    i += 1
+                    continue
+                elif is_true_cst(a):
+                    nr_true_constants += 1
+                    if args is expr_args: # will remove this one, need to copy args...
+                        args = args.copy()
+                    args.pop(i)
+                elif is_false_cst(a):
+                    if args is expr_args: # will remove this one, need to copy args...
+                        args = args.copy()
+                    args.pop(i)
+                else:
+                    i += 1
+                    continue
+            if len(args) == 0: # only constant bools
+                expr_is_true = BoolVal(nr_true_constants % 2 == 1)
+                newlist.append(int(expr_is_true) if num_context else expr_is_true)
+            elif len(args) == 1: # Xor with single argument can be simplified to just its argument
+                newlist.append(args[0])
+            elif args is not expr.args: # removed something, or changed due to subexpr
+                newexpr = copy.copy(expr)
+                newexpr.update_args(args)
+                if nr_true_constants % 2 == 1: # uneven number of removals, need to negate
+                    newlist.append(cp.transformations.negation.recurse_negation(newexpr))
+                else:
+                    newlist.append(newexpr)
+            else: # no changes
+                newlist.append(expr)
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
             newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?
             if any(a1 is not a2 for a1,a2 in zip(expr.args, newargs)):

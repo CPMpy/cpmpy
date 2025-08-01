@@ -78,6 +78,22 @@ class TransSimplify(unittest.TestCase):
         self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2],boolval(False))])]')
         expr = 0 == cp.AllDifferent(self.ivs.tolist() + [True])
         self.assertEqual(str(self.transform(expr)), '[not([alldifferent(iv[0],iv[1],iv[2],boolval(True))])]')
+        
+        # Xor global constraint
+        expr = cp.Xor(self.bvs.tolist() + [True])
+        self.assertEqual(str(self.transform(expr)), '[not([xor([bv[0], bv[1], bv[2]])])]')
+        expr = cp.Xor(self.bvs.tolist() + [True, True])
+        self.assertEqual(str(self.transform(expr)), '[xor([bv[0], bv[1], bv[2]])]')
+        expr = cp.Xor(self.bvs.tolist() + [True, True, True])
+        self.assertEqual(str(self.transform(expr)), '[not([xor([bv[0], bv[1], bv[2]])])]')
+        expr = cp.Xor(self.bvs.tolist() + [False])
+        self.assertEqual(str(self.transform(expr)), '[xor([bv[0], bv[1], bv[2]])]')
+        expr = cp.Xor([True])
+        self.assertEqual(str(self.transform(expr)), '[boolval(True)]')
+        expr = cp.Xor([False])
+        self.assertEqual(str(self.transform(expr)), '[boolval(False)]')
+        expr = cp.Xor([True, cp.Xor([False])])
+        self.assertEqual(str(self.transform(expr)), '[boolval(True)]')
 
         # global functions
         expr = cp.max(self.ivs) == 0
