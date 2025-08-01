@@ -116,8 +116,21 @@ def recurse_negation(expr):
 
     # global constraints
     elif hasattr(expr, "decompose"):
+        
+        if expr.name == "xor": # we can negate 1 random arg for xor, ideally Boolean var
+            neg_idx = 0 # default to first arg
+            for i, arg in enumerate(expr.args):
+                if isinstance(arg, _BoolVarImpl):
+                    neg_idx = i
+                    break
+            
+            newargs = push_down_negation(expr.args[:neg_idx] + [~expr.args[neg_idx]] + expr.args[neg_idx+1:], toplevel=False)
+            newexpr = copy.copy(expr)
+            newexpr.update_args(newargs)
+            return newexpr
+        
         newexpr = copy.copy(expr)
-        # args are positive as we will negate the global, still check if no 'not' in its arguments
+        # args are positive as we will negate the global, still check if no 'not' in its arguments        
         newexpr.update_args(push_down_negation(expr.args, toplevel=False))
         return ~newexpr
 
