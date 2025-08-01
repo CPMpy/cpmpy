@@ -242,7 +242,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
             """
             # Simplify nested expression
             if expr.has_subexpr():
-                expr_args = simplify_boolean(expr.args, num_context=not expr.is_bool())
+                expr_args = simplify_boolean(expr.args, num_context=False)
             else:
                 expr_args = expr.args
             # Count number of 'True' boolean constants
