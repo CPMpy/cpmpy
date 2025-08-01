@@ -227,7 +227,7 @@ class CPM_minizinc(SolverInterface):
         """
         try:
             from minizinc import default_driver
-            return f"{pkg_resources.get_distribution('minizinc').version}/{".".join(str(a) for a in default_driver.parsed_version)}"
+            return f"{pkg_resources.get_distribution('minizinc').version}/{'.'.join(str(a) for a in default_driver.parsed_version)}"
         except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
             return None
 
