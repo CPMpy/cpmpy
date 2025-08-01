@@ -634,7 +634,7 @@ class MDD(GlobalConstraint):
             # avoid auxiliary variables
             tab = [[t_a[1], t_b[1]] for t_a in transitions_by_level_normalized[0] for t_b in
                    transitions_by_level_normalized[1] if t_a[2] == t_b[0]]
-            return [Table(arr, tab)], []
+            return [NonReifiedTable(arr, tab)], []
 
         elif len(transitions_by_level_normalized) == 1:
             # decomposition to inDomain, avoid auxiliary variables and tables
