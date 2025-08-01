@@ -54,12 +54,15 @@
     ==============
 """
 import re
+from typing import Optional
 import warnings
 import sys
 import os
+import json
 from datetime import timedelta  # for mzn's timeout
 
 import numpy as np
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
@@ -126,26 +129,91 @@ class CPM_minizinc(SolverInterface):
         else:
             # outdated
             return True
+        
+    @staticmethod
+    def _solver_names_and_version():
+        if CPM_minizinc.supported():
+            import minizinc
+            driver = minizinc.default_driver
+            
+            # Collect solver names
+            all_solvers, all_versions = [], []
+            output = driver._run(["--solvers-json"]) # get json-structured solver overview
+            solvers = json.loads(output.stdout)        
+            for solver_dict in solvers:
+                # get subsolver metadata
+                tag = solver_dict["id"].split(".")[-1]
+                version = solver_dict["version"]
+                if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
+                    all_solvers.append(tag)
+                    all_versions.append(version)
+            return all_solvers, all_versions
+        else:
+            warnings.warn("MiniZinc is not installed or not supported on this system.")
+            return [], []
 
     @staticmethod
-    def solvernames():
+    def solvernames(installed:bool=True):
         """
-            Returns solvers supported by MiniZinc on your system
+            Returns solvers supported by MiniZinc (on your system)
+
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those installed on your system (default True)
+
+            Returns:
+                list of solver names
 
             .. warning::
-                WARNING, some of them may not actually be installed on your system
-                (namely cplex, gurobi, scip, xpress).
-                The following are bundled in the bundle: chuffed, coin-bc, gecode
+                WARNING, some of the returned solver names (when ``installed=False``) may not actually 
+                be installed on your system (namely cplex, gurobi, scip, xpress).
+                The following are bundled with minizinc: chuffed, coin-bc, gecode.
+                Use ``installed=True`` (the default) if you only want the names of the actually installed solvers.
         """
-        import minizinc
-        solver_dict = minizinc.default_driver.available_solvers()
 
-        solver_names = set()
-        for full_name in solver_dict.keys():
-            name = full_name.split(".")[-1]
-            if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
-                solver_names.add(name)
-        return solver_names
+        all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
+
+        if not installed:
+            """
+            Return all solver names, without checking if they're actually available on the system.
+            """
+            return set(all_solvers)
+
+        else:
+            """
+            Test which solver executables are available by retrieving version information
+            """
+            valid_indices = [i for i, version in enumerate(all_versions) if version != "<unknown version>"] # check if version is available (required by minizinc)
+            installed_solvers = [all_solvers[i] for i in valid_indices]
+
+            return set(installed_solvers)
+        
+    @staticmethod
+    def solverversion(subsolver:str) -> Optional[str]:
+        """
+        Returns the version of the requested subsolver.
+
+        Arguments:
+            subsolver (str): name of the subsolver
+
+        Returns:
+            Version number of the subsolver if installed, else None 
+        """
+        all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
+        try:
+            solver_index = all_solvers.index(subsolver) # find requested subsolver
+            return all_versions[solver_index]
+        except ValueError:
+            raise ValueError(f"Subsolver '{subsolver}' not found in the list of available solvers.")
+
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('minizinc').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     # variable name can not be any of these keywords
     keywords = frozenset(['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',

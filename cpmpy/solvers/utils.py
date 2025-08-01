@@ -110,7 +110,7 @@ class SolverLookup():
             if CPM_slv.supported():
                 names.append(basename)
                 if hasattr(CPM_slv, "solvernames"):
-                    subnames = CPM_slv.solvernames()
+                    subnames = CPM_slv.solvernames(installed=True)
                     for subn in subnames:
                         names.append(basename+":"+subn)
         return names
@@ -163,6 +163,71 @@ class SolverLookup():
                 # found the right solver
                 return CPM_slv
         raise ValueError(f"Unknown solver '{name}', chose from {cls.solvernames()}")
+    
+
+    @classmethod
+    def status(cls):
+        """
+        Returns the status of all solvers supported by CPMpy as a list of dicts.
+
+        Each dict consists of:
+
+        - "name": <base_solver> or <base_solver>:<subsolver>
+        - "status": install status (True/False)
+        - "version": version of solver's Python library (or one of its subsolvers if applicable)
+        """
+        result = []
+        for (basename, CPM_slv) in cls.base_solvers():
+            installed = CPM_slv.supported()
+            version = CPM_slv.version() if installed and hasattr(CPM_slv, 'version') else None
+            
+            # Collect main solver status
+            result.append({
+                    "name": basename,
+                    "status": installed, 
+                    "version": version,
+                })
+            
+            # Handle subsolvers if applicable
+            if installed and hasattr(CPM_slv, 'solvernames'):
+                subnames = CPM_slv.solvernames()
+                installed_subnames = CPM_slv.solvernames(installed=True)
+                for subn in subnames:
+                    is_installed = subn in installed_subnames
+                    subsolver_status = {
+                        "name": basename + ":" + subn, 
+                        "status": is_installed, 
+                        "version": CPM_slv.solverversion(subn) if installed else None,
+                    }
+                    result.append(subsolver_status)  # Append subsolver status
+        return result
+
+
+    @classmethod
+    def print_status(cls):
+        """
+        Prints a tabulated status report of the different solvers,
+        i.e. whether they are installed on the system and if so which version.
+        """
+        
+        # Get the status information using the status() method
+        solver_statuses = cls.status()
+
+        # Print the header
+        print(f"{'Solver':<25} {'Installed':<10} {'Version':<15}")
+        print("-" * 50)
+
+        # Iterate over the solver status
+        for solver_status in solver_statuses:
+            basename, installed, version = solver_status["name"], solver_status["status"], solver_status["version"]
+
+            # If this is a subsolver (indicated by a ':' in the name), indent the output
+            if ':' in basename:
+                print(f" ↪ {basename.split(':')[-1]:<22} {'Yes' if installed else 'No':<10} {(version if version else ' '):<15}")  # Subsolver with indentation
+            else:
+                # For main solvers, show version if available
+                version = version if version else "Not found" if installed else "-"
+                print(f"{basename:<25} {'Yes' if installed else 'No':<10} {version:<15}")
 
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead
