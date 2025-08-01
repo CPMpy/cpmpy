@@ -51,7 +51,7 @@ import cpmpy as cp
 from cpmpy import cpm_array, intvar, boolvar
 from cpmpy.exceptions import CPMpyException
 from cpmpy.expressions.core import Expression, Operator
-from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, DirectConstraint, Table
+from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, DirectConstraint
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
     get_bounds, eval_comparison
 from cpmpy.expressions.variables import _IntVarImpl
@@ -111,7 +111,7 @@ class AllDifferentListsExceptN(GlobalConstraint):
         from cpmpy.expressions.python_builtins import all as cpm_all
         constraints = []
         for lst1, lst2 in all_pairs(self.args[0]):
-            constraints += [cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(Table(lst1, self.args[1]))]
+            constraints += [cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(NonReifiedTable(lst1, self.args[1]))]
         return constraints, []
 
     def value(self):
