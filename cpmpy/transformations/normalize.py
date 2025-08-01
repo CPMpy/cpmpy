@@ -268,10 +268,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     i += 1
                     continue
             if len(args) == 0: # only constant bools
-                if nr_true_constants % 2 == 0:
-                    newlist.append(0 if num_context else BoolVal(False))
-                else:
-                    newlist.append(1 if num_context else BoolVal(True))
+                expr_is_true = BoolVal(nr_true_constants % 2 == 1)
+                newlist.append(int(expr_is_true) if num_context else expr_is_true)
             elif len(args) == 1: # Xor with single argument can be simplified to just its argument
                 newlist.append(args[0])
             elif args is not expr.args: # removed something, or changed due to subexpr
