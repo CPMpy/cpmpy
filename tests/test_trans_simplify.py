@@ -81,11 +81,11 @@ class TransSimplify(unittest.TestCase):
         
         # Xor global constraint
         expr = cp.Xor(self.bvs.tolist() + [True])
-        self.assertEqual(str(self.transform(expr)), '[not([xor([bv[0], bv[1], bv[2]])])]')
+        self.assertEqual(str(self.transform(expr)), '[xor([~bv[0], bv[1], bv[2]])]')
         expr = cp.Xor(self.bvs.tolist() + [True, True])
         self.assertEqual(str(self.transform(expr)), '[xor([bv[0], bv[1], bv[2]])]')
         expr = cp.Xor(self.bvs.tolist() + [True, True, True])
-        self.assertEqual(str(self.transform(expr)), '[not([xor([bv[0], bv[1], bv[2]])])]')
+        self.assertEqual(str(self.transform(expr)), '[xor([~bv[0], bv[1], bv[2]])]')
         expr = cp.Xor(self.bvs.tolist() + [False])
         self.assertEqual(str(self.transform(expr)), '[xor([bv[0], bv[1], bv[2]])]')
         expr = cp.Xor([True])
@@ -94,6 +94,12 @@ class TransSimplify(unittest.TestCase):
         self.assertEqual(str(self.transform(expr)), '[boolval(False)]')
         expr = cp.Xor([True, cp.Xor([False])])
         self.assertEqual(str(self.transform(expr)), '[boolval(True)]')
+
+        # IfThenElse global constraint
+        expr = cp.IfThenElse(True, self.bvs[0], self.bvs[1])
+        self.assertEqual(str(self.transform(expr)), '[bv[0]]')
+        expr = cp.IfThenElse(False, self.bvs[0], self.bvs[1])
+        self.assertEqual(str(self.transform(expr)), '[bv[1]]')
 
         # global functions
         expr = cp.max(self.ivs) == 0

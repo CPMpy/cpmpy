@@ -709,6 +709,20 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Model(cp.Xor([False, False])).solve())
         self.assertFalse(cp.Model(cp.Xor([False, False, False])).solve())
 
+    def test_ite_with_constants(self):
+        x,y,z = cp.boolvar(shape=3)
+        expr = cp.IfThenElse(True, y, z)
+        self.assertTrue(cp.Model(expr).solve())
+        self.assertTrue(expr.value())
+        expr = cp.IfThenElse(False, y, z)
+        self.assertTrue(cp.Model(expr).solve())
+
+        expr = cp.IfThenElse(x, y, z)
+        self.assertTrue(cp.Model(~expr).solve())
+        self.assertFalse(expr.value())
+        x,y, z = x.value(), y.value(), z.value()
+        self.assertTrue((x and z) or (not x and y))
+
 
 
     def test_not_xor(self):
