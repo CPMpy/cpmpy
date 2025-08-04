@@ -226,20 +226,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(int(res) if num_context else BoolVal(res))
                 else: # Result is an expression
                     newlist.append(res)    
-        elif isinstance(expr, Xor):
-            """
-            Special Xor global constraint.
-            Example with 3 inputs:
-                I1	I2	I3	O
-                0	0	0	0
-                0	0	1	1
-                0	1	0	1
-                0	1	1	0
-                1	0	0	1
-                1	0	1	0
-                1	1	0	0
-                1	1	1	1
-            """
+
+        elif isinstance(expr, Xor): # special case for xor, we can simplify it
             # Simplify nested expression
             if expr.has_subexpr():
                 expr_args = simplify_boolean(expr.args, num_context=False)
@@ -281,6 +269,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(newexpr)
             else: # no changes
                 newlist.append(expr)
+
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
             newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?
             if any(a1 is not a2 for a1,a2 in zip(expr.args, newargs)):
