@@ -44,7 +44,9 @@
 
 import shutil
 import time
+from typing import Optional
 import warnings
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from .. import DirectConstraint
@@ -108,6 +110,20 @@ class CPM_cpo(SolverInterface):
                 return True
             except:
                 return False
+            
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+
+        For CPO, two version numbers get returned: ``<docplex version>/<solver version>``
+        """
+        try:
+            import docplex.cp as docp
+            s = docp.solver.solver.CpoSolver(docp.model.CpoModel())
+            return f"{pkg_resources.get_distribution('docplex').version}/{s.get_solver_version()}"
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
