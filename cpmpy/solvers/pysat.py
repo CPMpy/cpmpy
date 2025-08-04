@@ -52,6 +52,9 @@
     ==============
 """
 from threading import Timer
+from typing import Optional
+import warnings
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -118,19 +121,49 @@ class CPM_pysat(SolverInterface):
             raise e
 
     @staticmethod
-    def solvernames():
+    def solvernames(**kwargs):
         """
             Returns solvers supported by PySAT on your system
         """
-        from pysat.solvers import SolverNames
-        names = []
-        for name, attr in vars(SolverNames).items():
-            # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
-            if not name.startswith('__') and isinstance(attr, tuple) and not name == 'cryptosat':
-                if name not in attr:
-                    name = attr[-1]
-                names.append(name)
-        return names
+        if CPM_pysat.supported():
+            from pysat.solvers import SolverNames
+            names = []
+            for name, attr in vars(SolverNames).items():
+                # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
+                if not name.startswith('__') and isinstance(attr, tuple) and name != 'cryptosat':
+                    if name not in attr:
+                        name = attr[-1]
+                    names.append(name)  
+            return names
+        else:
+            warnings.warn("PySAT is not installed or not supported on this system.")
+            return []
+        
+    @staticmethod
+    def solverversion(subsolver:str) -> Optional[str]:
+        """
+        Returns the version of the requested subsolver.
+
+        Arguments:
+            subsolver (str): name of the subsolver
+
+        Returns:
+            Version number of the subsolver if installed, else None 
+    
+        Pysat currently does not provide accessible subsolver version numbers.
+        """
+        # Could try to extract them from solver name, but even then the minor revision numbers are missing
+        return None
+    
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('python-sat').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """

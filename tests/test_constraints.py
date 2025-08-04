@@ -48,6 +48,7 @@ EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"mul", "div", "pow", "mod"},  # int2bool but mul, and friends, not linearized
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {},
+                     "pumpkin": {"pow", "mod"},
                      }
 
 # Variables to use in the rest of the test script
