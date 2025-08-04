@@ -633,6 +633,13 @@ class Operator(Expression):
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
+            weights = []
+            for w in arg_list[0]:
+                if is_int(w):
+                    weights.append(int(w)) # bool or int, simplifies things later on
+                else:
+                    weights.append(w) # can be float
+            arg_list = (weights, arg_list[1])
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
