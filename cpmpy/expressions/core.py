@@ -762,6 +762,7 @@ class Operator(Expression):
         elif self.name == 'wsum':
             weights, vars = self.args
             bounds = []
+            lowerbound, upperbound = 0,0
             #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
             for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]):
                 x,y = int(w) * lb, int(w) * ub
