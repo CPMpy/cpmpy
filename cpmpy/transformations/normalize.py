@@ -233,42 +233,30 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 expr_args = simplify_boolean(expr.args, num_context=False)
             else:
                 expr_args = expr.args
-            # Count number of 'True' boolean constants
-            # + remove all boolean constants from expression
-            nr_true_constants = 0
-            i = 0
-            args = expr_args
-            while i < len(args):
-                a = args[i]
-                if isinstance(a, _BoolVarImpl):
-                    i += 1
-                    continue
-                elif is_true_cst(a):
-                    nr_true_constants += 1
-                    if args is expr_args: # will remove this one, need to copy args...
-                        args = args.copy()
-                    args.pop(i)
-                elif is_false_cst(a):
-                    if args is expr_args: # will remove this one, need to copy args...
-                        args = args.copy()
-                    args.pop(i)
-                else:
-                    i += 1
-                    continue
+
+            # slightly less efficient compared to 'and' and 'or' but more readable
+            # unlikely case for XOR anyway
+
+            # remove constants and count true ones
+            non_false_args = [a for a in expr_args if not is_false_cst(a)]
+            args = [a for a in non_false_args if not is_true_cst(a)]
+            num_true_cst = len(non_false_args) - len(args)
+
             if len(args) == 0: # only constant bools
-                expr_is_true = BoolVal(nr_true_constants % 2 == 1)
+                expr_is_true = BoolVal(num_true_cst % 2 == 1)
                 newlist.append(int(expr_is_true) if num_context else expr_is_true)
             elif len(args) == 1: # Xor with single argument can be simplified to just its argument
                 newlist.append(args[0])
             elif args is not expr.args: # removed something, or changed due to subexpr
                 newexpr = copy.copy(expr)
                 newexpr.update_args(args)
-                if nr_true_constants % 2 == 1: # uneven number of removals, need to negate
+                if num_true_cst % 2 == 1: # uneven number of removals, need to negate
                     newlist.append(cp.transformations.negation.recurse_negation(newexpr))
                 else:
                     newlist.append(newexpr)
             else: # no changes
                 newlist.append(expr)
+
 
         elif isinstance(expr, IfThenElse): # IfThenElse global constraint
             if expr.has_subexpr():
