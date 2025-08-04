@@ -12,7 +12,7 @@ from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
-from ..expressions.globalconstraints import GlobalConstraint, Xor
+from ..expressions.globalconstraints import GlobalConstraint, IfThenElse, Xor
 
 
 def toplevel_list(cpm_expr, merge_and=True):
@@ -269,6 +269,24 @@ def simplify_boolean(lst_of_expr, num_context=False):
                     newlist.append(newexpr)
             else: # no changes
                 newlist.append(expr)
+
+        elif isinstance(expr, IfThenElse): # IfThenElse global constraint
+            if expr.has_subexpr():
+                expr_args = simplify_boolean(expr.args, num_context=False)
+            else:
+                expr_args = expr.args
+            
+            cond, if_true, if_false = expr_args
+            if is_true_cst(cond):
+                newlist.append(if_true)
+            elif is_false_cst(cond):
+                newlist.append(if_false)
+            elif expr_args is not expr.args:
+                newexpr = copy.copy(expr)
+                newexpr.update_args(expr_args)
+                newlist.append(newexpr)
+            else:
+                newlist.append(expr) # unchanged
 
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
             newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?

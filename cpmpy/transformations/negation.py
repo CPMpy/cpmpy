@@ -129,6 +129,11 @@ def recurse_negation(expr):
             newexpr.update_args(newargs)
             return newexpr
         
+        elif expr.name == "ite": # negation If-then-else condition
+            cond, if_true, if_false = expr.args
+            neg_cond = recurse_negation(cond)
+            return neg_cond.implies(if_true).implies(if_false)
+        
         newexpr = copy.copy(expr)
         # args are positive as we will negate the global, still check if no 'not' in its arguments        
         newexpr.update_args(push_down_negation(expr.args, toplevel=False))
