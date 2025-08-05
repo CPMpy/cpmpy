@@ -845,7 +845,7 @@ class TestSupportedSolvers:
         if "assumptions" not in inspect.signature((s.solve)).parameters:
             return # solver does not support solving under assumptions
         
-        if solver == ("pysdd", "pindakaas"):
+        if solver in ("pysdd", "pindakaas"):
             return # not implemented in pysdd, pindakaas
         
         s += x | y
@@ -894,7 +894,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver in ("pysdd", "pysat", "pindkaas", "pumpkin"):  # don't support div or mod with vars
+        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin"):  # don't support div or mod with vars
             return
         
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
@@ -999,7 +999,7 @@ class TestSupportedSolvers:
         still get correctly captured and posted.
         """
         if solver in ('pysdd', 'pysat', 'pindakaas'):
-            pytest.skip(reason="pysat and pysdd don't support integer decision variables")
+            pytest.skip(reason=f"{solver} does not support integer decision variables")
         
         x = cp.intvar(1, 4, shape=1)
         # Dubious constraint which enforces nothing, gets decomposed to empty list
