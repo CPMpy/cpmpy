@@ -22,8 +22,7 @@ q = boolvar(name="q")
 c = intvar(2, 2, name="c")
 
 SOLVERS = [
-    "pysat",
-    # "pysdd"
+    "pindakaas",
 ]
 SOLVERS = [
     (name, solver)

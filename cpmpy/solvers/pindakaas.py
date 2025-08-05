@@ -47,8 +47,7 @@ from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
-from ..transformations.int2bool import (_decide_encoding, _encode_int_var,
-                                        int2bool)
+from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import simplify_boolean, toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies
@@ -209,7 +208,9 @@ class CPM_pindakaas(SolverInterface):
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
-                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
+                enc, cons = _encode_int_var(
+                    self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding)
+                )
                 self += cons
             else:
                 enc = self.ivarmap[cpm_var.name]

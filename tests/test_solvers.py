@@ -1010,7 +1010,7 @@ class TestSupportedSolvers:
         Tests whether decision variables which are part of a constraint that never gets posted to the underlying solver
         still get correctly captured and posted.
         """
-        if solver in ('pysdd', 'pysat', 'pindakaas'):
+        if solver == 'pysdd':
             pytest.skip(reason=f"{solver} does not support integer decision variables")
         
         x = cp.intvar(1, 4, shape=1)
