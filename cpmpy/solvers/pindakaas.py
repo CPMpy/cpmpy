@@ -36,6 +36,7 @@ List of classes
 Module details
 ==============
 """
+
 import importlib
 import time
 from datetime import timedelta
@@ -96,9 +97,7 @@ class CPM_pindakaas(SolverInterface):
 
         import pindakaas as pdk
 
-        assert (
-            subsolver is None
-        ), "Pindakaas does not support any subsolvers for the moment"
+        assert subsolver is None, "Pindakaas does not support any subsolvers for the moment"
         self.pdk_solver = pdk.solver.CaDiCaL()
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
@@ -127,9 +126,7 @@ class CPM_pindakaas(SolverInterface):
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
-        solver_assumptions = (
-            None if assumptions is None else self.solver_vars(assumptions)
-        )
+        solver_assumptions = None if assumptions is None else self.solver_vars(assumptions)
 
         t = time.time()
         with self.pdk_solver.solve(
@@ -176,9 +173,7 @@ class CPM_pindakaas(SolverInterface):
                 # we have to save the unsat core here, as the result object does not live beyond this solve call
                 if assumptions is not None:
                     self.core = [
-                        x
-                        for x, s_x in zip(assumptions, solver_assumptions)
-                        if result.failed(s_x)
+                        x for x, s_x in zip(assumptions, solver_assumptions) if result.failed(s_x)
                     ]
 
         return has_sol
@@ -205,9 +200,7 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons)
         cpm_cons = only_implies(cpm_cons)
-        cpm_cons = linearize_constraint(
-            cpm_cons, supported=frozenset({"sum", "wsum", "and", "or"})
-        )
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "and", "or"}))
         return cpm_cons
 
     def add(self, cpm_expr_orig):
@@ -256,9 +249,7 @@ class CPM_pindakaas(SolverInterface):
             elif lhs.name == "wsum":
                 coefficients, literals = lhs.args
             else:
-                raise ValueError(
-                    f"Trying to encode non (Boolean) linear constraint: {cpm_expr}"
-                )
+                raise ValueError(f"Trying to encode non (Boolean) linear constraint: {cpm_expr}")
 
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
@@ -279,8 +270,7 @@ class CPM_pindakaas(SolverInterface):
         raise NotSupportedError(
             "Solver does not support unsat core extraction"
         )  # TODO awaiting https://github.com/pindakaashq/pindakaas/pull/135
-        assert (
-            self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE
-            and self.core is not None
-        ), "get_core(): requires a previous solve call with assumption variables and an UNSATISFIABLE result"
+        assert self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE and self.core is not None, (
+            "get_core(): requires a previous solve call with assumption variables and an UNSATISFIABLE result"
+        )
         return self.core
