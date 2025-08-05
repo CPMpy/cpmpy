@@ -845,8 +845,8 @@ class TestSupportedSolvers:
         if "assumptions" not in inspect.signature((s.solve)).parameters:
             return # solver does not support solving under assumptions
         
-        if solver in ("pysdd", "pindakaas"):
-            return # not implemented in pysdd, pindakaas
+        if solver == "pysdd":
+            return # not implemented in pysdd
         
         s += x | y
         assert s.solve(assumptions=[x])
@@ -861,6 +861,9 @@ class TestSupportedSolvers:
 
         s += y | ~z
         assert not s.solve(assumptions=[~x, ~y])
+
+        if solver == "pindakaas":
+            return # not implemented in pindakaas
 
         core = s.get_core()
         assert ~y in set([~x,~y])
