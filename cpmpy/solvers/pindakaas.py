@@ -43,10 +43,12 @@ from datetime import timedelta
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
-from ..expressions.variables import NegBoolView, _BoolVarImpl
+from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
+from ..transformations.int2bool import (_decide_encoding, _encode_int_var,
+                                        int2bool)
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import simplify_boolean, toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies
@@ -98,6 +100,8 @@ class CPM_pindakaas(SolverInterface):
         import pindakaas as pdk
 
         assert subsolver is None, "Pindakaas does not support any subsolvers for the moment"
+        self.ivarmap = dict()  # for the integer to boolean encoders
+        self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
@@ -123,6 +127,17 @@ class CPM_pindakaas(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
+
+        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
+        user_vars = set()
+        for x in self.user_vars:
+            if isinstance(x, _BoolVarImpl):
+                user_vars.add(x)
+            else:
+                # extends set with encoding variables of `x`
+                user_vars.update(self.ivarmap[x.name].vars())
+
+        self.user_vars = user_vars
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -167,6 +182,11 @@ class CPM_pindakaas(SolverInterface):
                     if cpm_var._value is None:
                         cpm_var._value = True  # dummy value
                 self.core = None
+                # Now assign the user integer variables using their encodings
+                # `ivarmap` also contains auxiliary variable, but they will be assigned 'None' as their encoding variables are assigned `None`
+                for enc in self.ivarmap.values():
+                    enc._x._value = enc.decode()
+
             else:  # clear values of variables
                 for cpm_var in self.user_vars:
                     cpm_var._value = None
@@ -187,10 +207,15 @@ class CPM_pindakaas(SolverInterface):
             if cpm_var.name not in self._varmap:
                 (self._varmap[cpm_var.name],) = self.pdk_solver.new_vars(1)
             return self._varmap[cpm_var.name]
+        elif isinstance(cpm_var, _IntVarImpl):  # intvar
+            if cpm_var.name not in self.ivarmap:
+                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
+                self += cons
+            else:
+                enc = self.ivarmap[cpm_var.name]
+            return self.solver_vars(enc.vars())
         else:
-            raise NotImplementedError(
-                f"{self.name}: unexpected variable {cpm_var} of type {type(cpm_var)} not supported"
-            )
+            raise TypeError
 
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)
@@ -203,6 +228,7 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = linearize_constraint(
             cpm_cons, supported=frozenset({"sum", "wsum", "and", "or"}), csemap=self._csemap
         )
+        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
         return cpm_cons
 
     def add(self, cpm_expr_orig):
@@ -245,7 +271,10 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_expr, Comparison):  # Bool linear
             # lhs is a sum/wsum, right hand side a constant int
             lhs, rhs = cpm_expr.args
-            if lhs.name == "sum":
+            if isinstance(lhs, _BoolVarImpl):
+                literals = [lhs]
+                coefficients = [1]
+            elif lhs.name == "sum":
                 literals = lhs.args
                 coefficients = [1] * len(literals)
             elif lhs.name == "wsum":
