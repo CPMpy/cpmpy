@@ -70,10 +70,6 @@ class CPM_pindakaas(SolverInterface):
 
     @staticmethod
     def supported():
-        return importlib.util.find_spec("pindakaas") is not None
-
-    @staticmethod
-    def supported():
         try:
             import pindakaas
 
