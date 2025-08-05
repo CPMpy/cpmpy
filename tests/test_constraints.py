@@ -29,10 +29,10 @@ NUM_GLOBAL = {
     "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
 }
 
-# Solvers not supporting arithmetic constraints
-SAT_SOLVERS = {"pysat", "pysdd"}
+# Solvers not supporting arithmetic constraints (numeric comparisons)
+SAT_SOLVERS = {"pysdd"}
 
-EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
+EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "z3": {},
                   "choco": {},
@@ -45,7 +45,7 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {},
-                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "pysat": {"mul", "div", "pow", "mod"},  # int2bool but mul, and friends, not linearized
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "exact": {},
                      "pumpkin": {"pow", "mod"},
