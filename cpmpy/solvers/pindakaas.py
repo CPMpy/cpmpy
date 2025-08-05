@@ -163,13 +163,16 @@ class CPM_pindakaas(SolverInterface):
             if has_sol:
                 # fill in variable values
                 for cpm_var in self.user_vars:
-                    if cpm_var.name in self._varmap:
-                        lit = self.solver_var(cpm_var)
-                        cpm_var._value = result.value(lit)
-                        if cpm_var._value is None:
-                            cpm_var._value = True  # dummy value
-                    else:  # if pindakaas does not know the literal, it will error
-                        cpm_var._value = None
+                    # essentially `.solver_var`, but failing if new vars are added
+                    if isinstance(cpm_var, NegBoolView):
+                        lit = ~self._varmap[cpm_var._bv.name]
+                    elif isinstance(cpm_var, _BoolVarImpl):
+                        lit = self._varmap[cpm_var.name]
+                    else:
+                        raise TypeError
+                    cpm_var._value = result.value(lit)
+                    if cpm_var._value is None:
+                        cpm_var._value = True  # dummy value
                 self.core = None
             else:  # clear values of variables
                 for cpm_var in self.user_vars:
