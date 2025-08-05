@@ -129,7 +129,8 @@ class CPM_pindakaas(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        time_limit = None if time_limit is None else timedelta(seconds=time_limit)
+        if time_limit is not None:
+            time_limit = timedelta(seconds=time_limit)
         solver_assumptions = (
             None if assumptions is None else self.solver_vars(assumptions)
         )
