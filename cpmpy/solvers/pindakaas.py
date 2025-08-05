@@ -14,7 +14,7 @@ Requires that the 'pindakaas' optional dependency is installed:
 
 .. code-block:: console
 
-    $ pip install cpmpy[pindakaas]
+    $ pip install pindakaas
 
 Detailed installation instructions available at:
 
@@ -91,7 +91,7 @@ class CPM_pindakaas(SolverInterface):
         name = "pindakaas"
         if not self.supported():
             raise ImportError(
-                f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install cpmpy[pindakaas]`) package to use this solver interface"
+                f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use this solver interface"
             )
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError(
@@ -155,7 +155,7 @@ class CPM_pindakaas(SolverInterface):
                     f"Pindakaas returned an unkown type of result status: {result}"
                 )
 
-            # # True/False depending on self.cpm_status
+            # True/False depending on self.cpm_status
             has_sol = self._solve_return(self.cpm_status)
 
             # translate solution values (of user specified variables only)
@@ -222,7 +222,7 @@ class CPM_pindakaas(SolverInterface):
         # transform and post the constraints
         try:
             for cpm_expr in self.transform(cpm_expr_orig):
-                self._add_transformed(cpm_expr)
+                self._post_constraint(cpm_expr)
         except pdk.Unsatisfiable:
             self.unsatisfiable = True
 
@@ -230,8 +230,8 @@ class CPM_pindakaas(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
-    def _add_transformed(self, cpm_expr, conditions=[]):
-        """Add for a single, *transformed* expression, implied by conditions."""
+    def _post_constraint(self, cpm_expr, conditions=[]):
+        """Add a single, *transformed* constraint, implied by conditions."""
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
@@ -245,7 +245,7 @@ class CPM_pindakaas(SolverInterface):
 
         elif cpm_expr.name == "->":  # implication
             a0, a1 = cpm_expr.args
-            self._add_transformed(a1, conditions=conditions + [~self.solver_var(a0)])
+            self._post_constraint(a1, conditions=conditions + [~self.solver_var(a0)])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
             # lhs is a sum/wsum, right hand side a constant int
