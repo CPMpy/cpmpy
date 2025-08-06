@@ -203,6 +203,7 @@ class CPM_exact(SolverInterface):
 
         # set assumptions
         if assumptions is not None:
+            assumptions = flatlist(assumptions)
             assert all(v.is_bool() for v in assumptions), "Non-Boolean assumptions given to Exact: " + str([v for v in assumptions if not v.is_bool()])
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
             assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
