@@ -90,7 +90,7 @@ from types import GeneratorType
 import numpy as np
 import cpmpy as cp
 
-from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
+from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -633,6 +633,13 @@ class Operator(Expression):
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
+            weights = []
+            for w in arg_list[0]:
+                if is_int(w):
+                    weights.append(int(w)) # bool or int, simplifies things later on
+                else:
+                    weights.append(w) # can be float
+            arg_list = (weights, arg_list[1])
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
@@ -755,13 +762,17 @@ class Operator(Expression):
         elif self.name == 'wsum':
             weights, vars = self.args
             bounds = []
+            lowerbound, upperbound = 0,0
             #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
-            for i, varbounds in enumerate([get_bounds(arg) for arg in vars]):
-                sortbounds = (list(weights[i] * x for x in varbounds))
-                sortbounds.sort()
-                bounds += [sortbounds]
-            lbs, ubs = (zip(*bounds))
-            lowerbound, upperbound = sum(lbs), sum(ubs) #this is builtins sum, not numpy sum
+            for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]):
+                x,y = int(w) * lb, int(w) * ub
+                if x <= y: # x is the lb of this arg
+                    lowerbound += x
+                    upperbound += y
+                else:
+                    lowerbound += y
+                    upperbound += x
+
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
