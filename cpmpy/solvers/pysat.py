@@ -251,7 +251,8 @@ class CPM_pysat(SolverInterface):
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
         else:
-            pysat_assum_vars = self.solver_vars(list(assumptions))
+            assumptions = flatlist(assumptions)
+            pysat_assum_vars = self.solver_vars(assumptions)
             self.assumption_vars = assumptions
 
         # set time limit
