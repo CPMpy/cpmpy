@@ -47,7 +47,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
-from ..expressions.utils import is_num, is_any_list, get_bounds
+from ..expressions.utils import flatlist, is_num, is_any_list, get_bounds
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
 from ..transformations.normalize import toplevel_list
@@ -151,6 +151,7 @@ class CPM_pumpkin(SolverInterface):
 
         elif assumptions is not None:
             assert not prove, "Proof-logging under assumptions is not supported"
+            assumptions = flatlist(assumptions)
             pum_assumptions = [self.to_predicate(a) for a in assumptions]
             self.assump_map = dict(zip(pum_assumptions, assumptions))
             solve_func = self.pum_solver.satisfy_under_assumptions
