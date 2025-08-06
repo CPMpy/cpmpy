@@ -80,7 +80,9 @@ def numexprs(solver):
         names = [(name, arity) for name, arity in names if name not in EXCLUDE_OPERATORS[solver]]
     for name, arity in names:
         if name == "wsum":
-            operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
+            yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
+            yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
+            continue
         elif name == "div" or name == "pow":
             operator_args = [NN_VAR,3]
         elif arity != 0:
