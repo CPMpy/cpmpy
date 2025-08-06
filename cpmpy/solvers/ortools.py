@@ -193,7 +193,7 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:
-            ort_assum_vars = self.solver_vars(list(assumptions))
+            ort_assum_vars = self.solver_vars(flatlist(assumptions))
             # dict mapping ortools vars to CPMpy vars
             self.assumption_dict = {ort_var.Index(): cpm_var for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars)}
             self.ort_model.ClearAssumptions()  # because add just appends
