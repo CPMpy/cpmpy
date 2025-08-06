@@ -23,6 +23,7 @@ c = intvar(2, 2, name="c")
 
 SOLVERS = [
     "pindakaas",
+    "pysat",
 ]
 SOLVERS = [
     (name, solver)

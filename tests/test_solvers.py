@@ -359,11 +359,13 @@ class TestSolvers(unittest.TestCase):
 
         b = cp.boolvar()
         x = cp.boolvar(shape=5)
+        y = cp.intvar(0, 2, shape=3)
         model = cp.Model([
             cp.any((x[0], x[1])),
             cp.any((~x[0], ~x[1])),
             2*x[0] + 3*x[1] + 5*x[2] <= 6,
             b.implies(2*x[0] + 3*x[1] + 5*x[2] <= 6),
+            2*y[0] + 3*y[1] + 5*y[2] <= 6,
             (cp.Xor([x[0], x[1], x[2]])) >= (cp.BoolVal(True))
         ])
 

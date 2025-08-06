@@ -42,6 +42,7 @@ import time
 from datetime import timedelta
 
 from ..exceptions import NotSupportedError
+from ..expressions.utils import eval_comparison
 from ..expressions.core import BoolVal, Comparison
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.decompose_global import decompose_in_tree
@@ -83,7 +84,7 @@ class CPM_pindakaas(SolverInterface):
         """
         Initialize Pindakaas interface.
 
-        - `pdk_solver`: The pindakaas back-end which will encode and post constraints for the SAT solver
+        - `pdk_solver`: The Pindakaas back-end which will encode and post constraints for the SAT solver
         - `unsatisfiable`: If a constraint is found to be unsatisfiable during the encoding phase, this flag is set to `True` to prevent further encoding efforts
         """
         name = "pindakaas"
@@ -92,9 +93,7 @@ class CPM_pindakaas(SolverInterface):
                 f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use this solver interface"
             )
         if cpm_model and cpm_model.objective_ is not None:
-            raise NotSupportedError(
-                f"CPM_{name}: only satisfaction, does not support an objective function"
-            )
+            raise NotSupportedError(f"CPM_{name}: only satisfaction, does not support an objective function")
 
         import pindakaas as pdk
 
@@ -159,9 +158,7 @@ class CPM_pindakaas(SolverInterface):
             elif result.status == pdk.solver.Status.UNKNOWN:
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             else:
-                raise NotImplementedError(
-                    f"Pindakaas returned an unkown type of result status: {result}"
-                )
+                raise NotImplementedError(f"Pindakaas returned an unkown type of result status: {result}")
 
             # True/False depending on self.cpm_status
             has_sol = self._solve_return(self.cpm_status)
@@ -176,10 +173,14 @@ class CPM_pindakaas(SolverInterface):
                     elif isinstance(cpm_var, _BoolVarImpl):
                         lit = self._varmap[cpm_var.name]
                     else:
-                        raise TypeError
-                    cpm_var._value = result.value(lit)
-                    if cpm_var._value is None:
-                        cpm_var._value = True  # dummy value
+                        raise ValueError(
+                            f"Integer variables should have been encoded using `int2bool` transformation, but {cpm_var} is integer, please report on GitHub"
+                        )
+                    value = result.value(lit)
+                    assert value is not None, (
+                        "All user variables should have been assigned, but {cpm_var} (literal {lit}) was not."
+                    )
+                    cpm_var._value = value
                 self.core = None
                 # Now assign the user integer variables using their encodings
                 # `ivarmap` also contains auxiliary variable, but they will be assigned 'None' as their encoding variables are assigned `None`
@@ -191,9 +192,7 @@ class CPM_pindakaas(SolverInterface):
                     cpm_var._value = None
                 # we have to save the unsat core here, as the result object does not live beyond this solve call
                 if assumptions is not None:
-                    self.core = [
-                        x for x, s_x in zip(assumptions, solver_assumptions) if result.failed(s_x)
-                    ]
+                    self.core = [x for x, s_x in zip(assumptions, solver_assumptions) if result.failed(s_x)]
 
         return has_sol
 
@@ -270,6 +269,10 @@ class CPM_pindakaas(SolverInterface):
             self._post_constraint(a1, conditions=conditions + [~self.solver_var(a0)])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
+            assert cpm_expr.name in {"<=", ">=", "=="}, (
+                f"Unsupported comparator {cpm_expr.name} for constraint should have been transformed: {cpm_expr}"
+            )
+
             # lhs is a sum/wsum, right hand side a constant int
             lhs, rhs = cpm_expr.args
             if isinstance(lhs, _BoolVarImpl):
@@ -285,16 +288,7 @@ class CPM_pindakaas(SolverInterface):
 
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            if cpm_expr.name == "<=":
-                con = lhs <= rhs
-            elif cpm_expr.name == ">=":
-                con = lhs >= rhs
-            elif cpm_expr.name == "==":
-                con = lhs == rhs
-            else:
-                raise ValueError(f"Unsupported comparator for constraint: {cpm_expr}")
-
-            self.pdk_solver.add_encoding(con, conditions=conditions)
+            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=conditions)
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 
