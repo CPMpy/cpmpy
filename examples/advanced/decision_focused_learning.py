@@ -51,7 +51,8 @@ class SPOPlus(torch.autograd.Function):
         :param sol_true: The true solution
         :param optimization_problem: The parametric optimization problem
         """
-        sol_spo = torch.tensor(optimization_problem.solve(np.array(2 * y_pred - y_true)))
+        cost_vector = 2 * y_pred - y_true
+        sol_spo = torch.tensor(optimization_problem.solve(cost_vector.detach().cpu().numpy()))
         ctx.save_for_backward(sol_spo, sol_true)
 
         # We can just return a dummy value, rather than the actual training SPO+ loss, without affecting backprop
@@ -104,9 +105,6 @@ if __name__ == "__main__":
     # Use ADAM optimizer
     optimizer = torch.optim.Adam(pred_model.parameters(), lr=lr)
 
-    # Construct the SPO+ surrogate loss
-    spo_plus = SPOPlus()
-
     # Compute ground-truth solutions
     sols = np.array(
         [knapsack_problem.solve(y[i]) for i in range(len(x))]
@@ -132,7 +130,7 @@ if __name__ == "__main__":
             y_pred = pred_model(x)
             loss = 0
             for i in range(len(x)):
-                loss += spo_plus.apply(y_pred[i], y[i], sol[i], knapsack_problem)
+                loss += SPOPlus.apply(y_pred[i], y[i], sol[i], knapsack_problem)
 
             # Backward pass
             optimizer.zero_grad()
@@ -148,7 +146,10 @@ if __name__ == "__main__":
                 for i in range(len(x)):
                     y_pred = pred_model(x[i])
                     sol_pred = knapsack_problem.solve(y_pred.numpy())
-                    total_regret += (np.matmul(sol[i], y[i]) - np.matmul(sol_pred, y[i])) / np.matmul(sol[i], y[i])
+
+                    sol_i = sol[i].detach().cpu().numpy()
+                    y_i = y[i].detach().cpu().numpy()
+                    total_regret += (np.dot(sol_i, y_i) - np.dot(sol_pred, y_i)) / np.dot(sol_i, y_i)
         
         avg_train_regret = total_regret / len(x_train)
         training_regrets.append(avg_train_regret)
@@ -184,6 +185,10 @@ if __name__ == "__main__":
         for i in range(len(x)):
             y_pred = pred_model(x[i])
             sol_pred = knapsack_problem.solve(y_pred.detach().numpy())
-            average_regret += (np.matmul(sol[i], y[i]) - np.matmul(sol_pred, y[i])) / np.matmul(sol[i], y[i])
+
+            sol_i = sol[i].detach().cpu().numpy()
+            y_i = y[i].detach().cpu().numpy()
+            average_regret += (np.dot(sol_i, y_i) - np.dot(sol_pred, y_i)) / np.dot(sol_i, y_i)
+
         average_regret /= len(x)
     print(f"Average test regret: {average_regret}")
