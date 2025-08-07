@@ -50,7 +50,7 @@ import pkg_resources
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
@@ -138,6 +138,10 @@ class CPM_pysdd(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
+
         has_sol = True
         if self.pysdd_root is not None:
             # if root node is false (empty), no solutions
@@ -188,12 +192,16 @@ class CPM_pysdd(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
+
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
         if solution_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), solution_limit not (yet?) supported")
 
-        if self.pysdd_root is None:
+        if self.pysdd_root is None or self.pysdd_root.is_false():
             # clear user vars if no solution found
             for var in self.user_vars:
                 var._value = None

@@ -97,7 +97,7 @@ class CPM_minizinc(SolverInterface):
     required_version = (2, 8, 2)
 
     @staticmethod
-    def supported():
+    def supported(): 
         return CPM_minizinc.installed() and CPM_minizinc.executable_installed() and not CPM_minizinc.outdated()
 
     @staticmethod
@@ -129,10 +129,30 @@ class CPM_minizinc(SolverInterface):
         else:
             # outdated
             return True
-        
+                
+
     @staticmethod
-    def _solver_names_and_version():
-        if CPM_minizinc.supported():
+    def solvernames(installed:bool=True, with_version:bool=False):
+        """
+            Returns solvers supported by MiniZinc (on your system) with optionally their installed version.
+
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those installed on your system (default True)
+                with_version (boolean): whether to additionally return the available version matching with each solvername 
+                                        (if not available on the system, the entry defaults to None)
+
+            Returns:
+                list of solver names if with_version==False, otherwise a tuple of two lists: the solver names and their versions
+
+            .. warning::
+                WARNING, some of the returned solver names (when ``installed=False``) may not actually 
+                be installed on your system (namely cplex, gurobi, scip, xpress).
+                The following are bundled with minizinc: chuffed, coin-bc, gecode.
+                Use ``installed=True`` (the default) if you only want the names of the actually installed solvers.
+        """
+
+        # Collect solver names and versions
+        if CPM_minizinc.supported(): # check if minizinc is installed
             import minizinc
             driver = minizinc.default_driver
             
@@ -145,38 +165,27 @@ class CPM_minizinc(SolverInterface):
                 tag = solver_dict["id"].split(".")[-1]
                 version = solver_dict["version"]
                 if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
-                    all_solvers.append(tag)
-                    all_versions.append(version)
-            return all_solvers, all_versions
+                    if tag not in all_solvers:
+                        all_solvers.append(tag)
+                        if version == '<unknown version>': # if no version info available, default to None
+                            version = None
+                        all_versions.append(version)
         else:
             warnings.warn("MiniZinc is not installed or not supported on this system.")
-            return [], []
-
-    @staticmethod
-    def solvernames(installed:bool=True):
-        """
-            Returns solvers supported by MiniZinc (on your system)
-
-            Arguments:
-                installed (boolean): whether to filter the solvernames to those installed on your system (default True)
-
-            Returns:
-                list of solver names
-
-            .. warning::
-                WARNING, some of the returned solver names (when ``installed=False``) may not actually 
-                be installed on your system (namely cplex, gurobi, scip, xpress).
-                The following are bundled with minizinc: chuffed, coin-bc, gecode.
-                Use ``installed=True`` (the default) if you only want the names of the actually installed solvers.
-        """
-
-        all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
+            if with_version:
+                return ([], [])
+            else:
+                return []
+            
 
         if not installed:
             """
             Return all solver names, without checking if they're actually available on the system.
             """
-            return set(all_solvers)
+            if with_version:
+                return (all_solvers, all_versions)
+            else:
+                return all_solvers
 
         else:
             """
@@ -184,9 +193,13 @@ class CPM_minizinc(SolverInterface):
             """
             valid_indices = [i for i, version in enumerate(all_versions) if version != "<unknown version>"] # check if version is available (required by minizinc)
             installed_solvers = [all_solvers[i] for i in valid_indices]
+            installed_versions = [all_versions[i] for i in valid_indices]
 
-            return set(installed_solvers)
-        
+            if with_version:
+                return (installed_solvers, installed_versions)
+            else:
+                return installed_solvers       
+             
     @staticmethod
     def solverversion(subsolver:str) -> Optional[str]:
         """
@@ -198,7 +211,7 @@ class CPM_minizinc(SolverInterface):
         Returns:
             Version number of the subsolver if installed, else None 
         """
-        all_solvers, all_versions = CPM_minizinc._solver_names_and_version()
+        all_solvers, all_versions = CPM_minizinc.solvernames(installed=False, with_version=True)
         try:
             solver_index = all_solvers.index(subsolver) # find requested subsolver
             return all_versions[solver_index]
@@ -209,10 +222,13 @@ class CPM_minizinc(SolverInterface):
     def version() -> Optional[str]:
         """
         Returns the installed version of the solver's Python API.
+
+        For Minizinc, two version numbers get returned: ``<minizinc python API version>/<minizinc driver version>``
         """
         try:
-            return pkg_resources.get_distribution('minizinc').version
-        except pkg_resources.DistributionNotFound:
+            from minizinc import default_driver
+            return f"{pkg_resources.get_distribution('minizinc').version}/{'.'.join(str(a) for a in default_driver.parsed_version)}"
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
             return None
 
     # variable name can not be any of these keywords

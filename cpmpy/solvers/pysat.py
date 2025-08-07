@@ -51,6 +51,7 @@
     Module details
     ==============
 """
+from threading import Timer
 from typing import Optional
 import warnings
 import pkg_resources
@@ -58,17 +59,17 @@ import pkg_resources
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
-from ..transformations.linearize import canonical_comparison, only_positive_coefficients
-from ..expressions.utils import is_int, flatlist
-from ..transformations.comparison import only_numexpr_equality
+from ..transformations.linearize import only_positive_coefficients
+from ..expressions.utils import flatlist
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
-from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
+from ..transformations.reification import only_implies, only_bv_reifies
+from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
 
 
 class CPM_pysat(SolverInterface):
@@ -129,7 +130,7 @@ class CPM_pysat(SolverInterface):
             names = []
             for name, attr in vars(SolverNames).items():
                 # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
-                if not name.startswith('__') and isinstance(attr, tuple) and not name == 'cryptosat':
+                if not name.startswith('__') and isinstance(attr, tuple) and name != 'cryptosat':
                     if name not in attr:
                         name = attr[-1]
                     names.append(name)  
@@ -195,6 +196,8 @@ class CPM_pysat(SolverInterface):
         # initialise the native solver object
         self.pysat_vpool = IDPool()
         self.pysat_solver = Solver(use_timer=True, name=subsolver)
+        self.ivarmap = dict()  # for the integer to boolean encoders
+        self.encoding = "auto"
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
@@ -222,8 +225,28 @@ class CPM_pysat(SolverInterface):
                             Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        # ensure all Boolean vars are known to solver
+        for x in list(self.user_vars):  # can change during iteration
+            if isinstance(x, _BoolVarImpl):
+                self.solver_vars(x)
+            elif isinstance(x, _IntVarImpl):  # intvar
+                if x.name not in self.ivarmap:
+                    enc, cons = _encode_int_var(self.ivarmap, x, _decide_encoding(x, None, encoding=self.encoding))
+                    self += cons
+                    self.solver_vars(enc.vars())
+            else:
+                raise TypeError
+
+        # the user vars are only the Booleans (e.g. to make solveAll behave consistently)
+        user_vars = set()
+        for x in self.user_vars:
+            if isinstance(x, _BoolVarImpl):
+                user_vars.add(x)
+            else:
+                # extends set with encoding variables of `x`
+                user_vars.update(self.ivarmap[x.name].vars())
+
+        self.user_vars = user_vars
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
@@ -231,13 +254,11 @@ class CPM_pysat(SolverInterface):
             pysat_assum_vars = self.solver_vars(assumptions)
             self.assumption_vars = assumptions
 
-        import time
         # set time limit
         if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             
-            from threading import Timer
             t = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
             t.start()
             my_status = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
@@ -276,13 +297,21 @@ class CPM_pysat(SolverInterface):
             sol = frozenset(self.pysat_solver.get_model())  # to speed up lookup
             # fill in variable values
             for cpm_var in self.user_vars:
-                lit = self.solver_var(cpm_var)
-                if lit in sol:
-                    cpm_var._value = True
-                elif -lit in sol:
-                    cpm_var._value = False
-                else: # not specified, dummy val
-                    cpm_var._value = True
+                if isinstance(cpm_var, _BoolVarImpl):
+                    lit = self.solver_var(cpm_var)
+                    if lit in sol:
+                        cpm_var._value = True
+                    else:  # -lit in sol (=False) or not specified (=False)
+                        cpm_var._value = False
+                elif isinstance(cpm_var, _IntVarImpl):
+                    assert False, "user_vars should only contain Booleans"
+                else:
+                    raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
+
+            # Now assign the user integer variables using their encodings
+            # `ivarmap` also contains auxiliary variable, but they will be assigned 'None' as their encoding variables are assigned `None`
+            for enc in self.ivarmap.values():
+                enc._x._value = enc.decode()
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -305,7 +334,9 @@ class CPM_pysat(SolverInterface):
 
         # special case, negative-bool-view
         # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
+        if isinstance(cpm_var, BoolVal):
+            return cpm_var
+        elif isinstance(cpm_var, NegBoolView):
             # just a view, get actual var identifier, return -id
             return -self.pysat_vpool.id(cpm_var._bv.name)
         elif isinstance(cpm_var, _BoolVarImpl):
@@ -341,11 +372,12 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
     def add(self, cpm_expr_orig):
-      """
+        """
             Eagerly add a constraint to the underlying solver.
 
             Any CPMpy expression given is immediately transformed (through `transform()`)
@@ -359,13 +391,18 @@ class CPM_pysat(SolverInterface):
 
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
+        """
+        # add new user vars to the set
+        get_variables(cpm_expr_orig, collect=self.user_vars)
 
-      """
-      # add new user vars to the set
-      get_variables(cpm_expr_orig, collect=self.user_vars)
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+            self._add_transformed_expr(cpm_expr)
 
-      # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
+        return self
+
+    def _add_transformed_expr(self, cpm_expr):
+        """ Add expression to solver _without_ transforming."""
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))
 
@@ -438,7 +475,7 @@ class CPM_pysat(SolverInterface):
         else:
             raise NotImplementedError(f"CPM_pysat: Non supported constraint {cpm_expr}")
 
-      return self
+
     __add__ = add  # avoid redirect in superclass
 
     def solution_hint(self, cpm_vars, vals):

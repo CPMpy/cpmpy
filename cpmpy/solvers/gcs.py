@@ -195,7 +195,10 @@ class CPM_gcs(SolverInterface):
 
         # translate exit status
         if self.gcs_result['solutions'] != 0:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if self.gcs_result['completed'] and self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif not self.gcs_result['completed']:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:

@@ -173,6 +173,10 @@ class CPM_gurobi(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
         
         # set time limit
         if time_limit is not None:
@@ -476,6 +480,26 @@ class CPM_gurobi(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
+    def solution_hint(self, cpm_vars, vals):
+        """
+        Gurobi supports warmstarting the solver with a (in)feasible solution.
+        The provided value will affect branching heurstics during solving, making it more likely the final solution will contain the provided assignment.
+
+        To learn more about solution hinting in gurobi, see:
+        https://docs.gurobi.com/projects/optimizer/en/current/reference/attributes/variable.html#varhintval
+
+        Optionally, you can also set the relative priority of the hint, using:
+        
+        .. code-block:: python
+
+            solver.solver_var(cpm_var).setAttr("VarHintPri", <priority>)
+
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        for cpm_var, val in zip(cpm_vars, vals):
+            self.solver_var(cpm_var).setAttr("VarHintVal", val)
+
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
@@ -494,6 +518,13 @@ class CPM_gurobi(SolverInterface):
             Returns: number of solutions found
         """
         from gurobipy import GRB
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
