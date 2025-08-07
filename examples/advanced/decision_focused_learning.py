@@ -22,17 +22,6 @@ class KnapsackProblem():
         return self.x.value().astype(int)
 
 
-# Predictive model
-class LinearRegression(nn.Module):
-    def __init__(self):
-        super(LinearRegression, self).__init__()
-        self.linear = nn.Linear(num_feat, num_item)
-
-    def forward(self, x):
-        out = self.linear(x)
-        return out
-
-
 # SPO+ surrogate loss
 class SPOPlus(torch.autograd.Function):
     """
@@ -100,7 +89,7 @@ if __name__ == "__main__":
     knapsack_problem = KnapsackProblem(weights, capacity)
 
     # Initialize linear regressor
-    pred_model = LinearRegression()
+    pred_model = nn.Linear(num_feat, num_item)
 
     # Use ADAM optimizer
     optimizer = torch.optim.Adam(pred_model.parameters(), lr=lr)
