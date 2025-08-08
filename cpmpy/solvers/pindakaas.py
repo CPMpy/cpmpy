@@ -37,9 +37,10 @@ Module details
 ==============
 """
 
-import importlib
 import time
+import pkg_resources
 from datetime import timedelta
+from typing import Optional
 
 from ..exceptions import NotSupportedError
 from ..expressions.utils import eval_comparison
@@ -79,6 +80,14 @@ class CPM_pindakaas(SolverInterface):
             return True
         except ModuleNotFoundError:
             return False
+
+    @staticmethod
+    def version() -> Optional[str]:
+        """Return the installed version of the solver's Python API."""
+        try:
+            return pkg_resources.get_distribution("pindakaas").version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """

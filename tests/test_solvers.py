@@ -1047,3 +1047,5 @@ class TestSupportedSolvers:
         num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
         assert num_sols == 0
         
+    def test_version(self, solver):
+        assert SolverLookup.lookup(solver).version() is not None
