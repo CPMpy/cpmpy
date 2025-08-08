@@ -22,8 +22,8 @@ q = boolvar(name="q")
 c = intvar(2, 2, name="c")
 
 SOLVERS = [
+    "pindakaas",
     "pysat",
-    # "pysdd"
 ]
 SOLVERS = [
     (name, solver) for name, solver in SolverLookup.base_solvers() if name in SOLVERS and solver.supported()
