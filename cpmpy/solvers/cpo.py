@@ -42,7 +42,6 @@
         CPM_cpo
 """
 
-import shutil
 import time
 from typing import Optional
 import warnings
