@@ -43,8 +43,10 @@
     Module details
     ==============
 """
-import sys  # for stdout checking
+import sys
+from typing import Optional  # for stdout checking
 import numpy as np
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -88,6 +90,16 @@ class CPM_ortools(SolverInterface):
             return False
         except Exception as e:
             raise e
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('ortools').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
 
     def __init__(self, cpm_model=None, subsolver=None):

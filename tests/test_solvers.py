@@ -1,3 +1,4 @@
+import inspect
 import importlib
 import inspect
 import unittest
@@ -24,6 +25,14 @@ pysat_available = CPM_pysat.supported()
 pblib_available = importlib.util.find_spec("pypblib") is not None
 
 class TestSolvers(unittest.TestCase):
+
+    
+    @pytest.mark.skip(reason="upstream bug, waiting on release for https://github.com/google/or-tools/issues/4640")
+    def test_implied_linear(self):
+        x,y,z = cp.intvar(0, 2, shape=3,name="xyz")
+        p = cp.boolvar(name="p")
+        user_vars = (x, y, z, p)
+        test_solve(cp.Model(cp.BoolVal(True)).solveAll(), None, user_vars)
 
     # should move this test elsewhere later
     def test_tsp(self):
@@ -320,6 +329,15 @@ class TestSolvers(unittest.TestCase):
         # check get core, more realistic
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertSetEqual(set(ps2.get_core()), set([mayo,inds[6],inds[9]]))
+
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
+    def test_pysat_subsolver(self):
+        pysat = CPM_pysat(subsolver="pysat:cadical195")
+        x, y = cp.boolvar(shape=2)
+        pysat += x | y
+        pysat += ~x | ~y
+        assert pysat.solve()
 
     @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
     @skip_on_missing_pblib()
@@ -862,8 +880,9 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat':  # don't support div with vars
+        if solver in ("pysdd", "pysat", "pumpkin"):  # don't support div or mod with vars
             return
+        
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
@@ -976,3 +995,27 @@ class TestSupportedSolvers:
         assert len(s.user_vars) == 1 # check if var captured as a user_var
         solution_limit = 5 if solver == "gurobi" else None
         assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
+
+    def test_model_no_vars(self, solver):
+
+        if solver == "gurobi":
+            solution_limit = 10
+        else:
+            solution_limit = None
+
+        # empty model
+        num_sols = cp.Model().solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1    
+
+        # model with one True constant
+        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1        
+
+        # model with two True constants
+        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1
+
+        # model with one False constant
+        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 0
+        

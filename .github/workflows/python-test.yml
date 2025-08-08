@@ -17,6 +17,15 @@ jobs:
           pip install pypblib  # dependency of pysat for PB constraints
           pip install pytest-xdist
           sudo snap install minizinc --classic
+          
+          # install pumpkin from source
+          pip install maturin
+          git clone https://github.com/consol-lab/pumpkin pumpkin
+          cd pumpkin/pumpkin-solver-py
+          maturin build
+          pip install ../target/wheels/*.whl # name can change based on version
+          cd ../../ # back to cpmpy
+
       - name: Test with pytest
         run: |
           python -m pytest -n 4 tests/

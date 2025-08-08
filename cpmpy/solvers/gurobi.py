@@ -42,6 +42,9 @@
     ==============
 """
 
+from typing import Optional
+import pkg_resources
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
@@ -108,6 +111,16 @@ class CPM_gurobi(SolverInterface):
         except Exception as e:
             warnings.warn(f"Problem encountered with Gurobi license: {e}")
             return False
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('gurobipy').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -160,6 +173,10 @@ class CPM_gurobi(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
         
         # set time limit
         if time_limit is not None:
@@ -501,6 +518,13 @@ class CPM_gurobi(SolverInterface):
             Returns: number of solutions found
         """
         from gurobipy import GRB
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
 
         if time_limit is not None:
             self.grb_model.setParam("TimeLimit", time_limit)
