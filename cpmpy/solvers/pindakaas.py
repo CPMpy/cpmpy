@@ -63,7 +63,12 @@ class CPM_pindakaas(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
 
-    - ``pdk_solver``: the `pindakaas` solver or formula object
+    - ``pdk_solver``: The Pindakaas solver back-end which encodes and solves models through the SAT sub-solver
+    - ``ivarmap``: a mapping from integer variables to their encoding for `int2bool`
+    - ``encoding``: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary"). Set to "auto" but can be changed in the solver object.
+    - `unsatisfiable`: if a constraint is found to be unsatisfiable during the encoding phase, this flag is set to `True` to prevent further encoding efforts
+    - ``core``: if the problem is unsatisfiable, the unsatisfiable core, else `None`
+
 
     Documentation of the solver's own Python API:
 
@@ -93,8 +98,6 @@ class CPM_pindakaas(SolverInterface):
         """
         Initialize Pindakaas interface.
 
-        - `pdk_solver`: The Pindakaas back-end which will encode and post constraints for the SAT solver
-        - `unsatisfiable`: If a constraint is found to be unsatisfiable during the encoding phase, this flag is set to `True` to prevent further encoding efforts
         """
         name = "pindakaas"
         if not self.supported():
