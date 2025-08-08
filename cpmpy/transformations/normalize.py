@@ -12,7 +12,7 @@ from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
-from ..expressions.globalconstraints import GlobalConstraint, IfThenElse, Xor
+from ..expressions.globalconstraints import GlobalConstraint
 
 
 def toplevel_list(cpm_expr, merge_and=True):
