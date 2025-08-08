@@ -34,6 +34,7 @@ SAT_SOLVERS = {"pysdd"}
 
 EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
                   "pysdd": NUM_GLOBAL | {"Xor"},
+                  "pindakaas": {},
                   "z3": {},
                   "choco": {},
                   "ortools":{},
@@ -47,6 +48,7 @@ EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
 EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"mul", "div", "pow", "mod"},  # int2bool but mul, and friends, not linearized
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "pindakaas": {"mul", "div", "pow", "mod"},
                      "exact": {},
                      "pumpkin": {"pow", "mod"},
                      }
