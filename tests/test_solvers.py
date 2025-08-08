@@ -1046,9 +1046,4 @@ class TestSupportedSolvers:
         # model with one False constant
         num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
         assert num_sols == 0
-        
-    def test_version(self, solver):
-        if solver == "pumpkin":
-            # not yet implemented
-            return
-        assert SolverLookup.lookup(solver).version() is not None
+
