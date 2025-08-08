@@ -10,12 +10,8 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.core import Expression
 
-UNKNOWN_COMPARATOR_ERROR = ValueError(
-    "Comparator is not known or should have been simplified by linearize."
-)
-EMPTY_DOMAIN_ERROR = ValueError(
-    "Attempted to encode variable with empty domain (which is unsat)"
-)
+UNKNOWN_COMPARATOR_ERROR = ValueError("Comparator is not known or should have been simplified by linearize.")
+EMPTY_DOMAIN_ERROR = ValueError("Attempted to encode variable with empty domain (which is unsat)")
 
 
 def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto"):
@@ -74,14 +70,10 @@ def _encode_expr(ivarmap, expr, encoding):
                 weights=lhs.args[0],
             )
         else:
-            raise NotImplementedError(
-                f"int2bool: comparison with lhs {lhs} not (yet?) supported"
-            )
+            raise NotImplementedError(f"int2bool: comparison with lhs {lhs} not (yet?) supported")
 
     else:
-        raise NotImplementedError(
-            f"int2bool: non-comparison {expr} not (yet?) supported"
-        )
+        raise NotImplementedError(f"int2bool: non-comparison {expr} not (yet?) supported")
 
 
 def _encode_int_var(ivarmap, x, encoding):
@@ -150,9 +142,7 @@ def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None, check_bounds=T
         if isinstance(x, _BoolVarImpl):
             terms += [(w, x)]
         else:
-            x_enc, x_cons = _encode_int_var(
-                ivarmap, x, _decide_encoding(x, cmp, encoding)
-            )
+            x_enc, x_cons = _encode_int_var(ivarmap, x, _decide_encoding(x, cmp, encoding))
             domain_constraints += x_cons
             # Encode the value of the integer variable as PB expression `(b_1*c_1) + ... + k`
             new_terms, k = x_enc.encode_term(w)
@@ -392,7 +382,7 @@ class IntVarEncLog(IntVarEnc):
 
     def _to_little_endian_offset_binary(self, d):
         """Return offset binary representation of `d` as Booleans in order of increasing significance ("little-endian").
-        
+
         For more details on offset binary, see the docstring of this class. Note that if e.g. the offset (equal to `self.x.lb`) is 0, then for `d=4` we return `001`. If the offset (i.e. `self.x.lb`) is 1, then it returns `11`, representing 3 in binary, as binary value of 3 + offset of 1 = 4. Note that in this second case, one less bit is returned as we require only 2."""
         # more efficient implementation probably not necessary
         i = self._offset(d)
@@ -428,9 +418,9 @@ class IntVarEncLog(IntVarEnc):
             constraint, domain_constraints = _encode_linear(
                 {self._x.name: self}, [self._x], cmp, d, None, check_bounds=check_bounds
             )
-            assert (
-                domain_constraints == []
-            ), f"{self._x} should have already been encoded, so no domain constraints should be returned"
+            assert domain_constraints == [], (
+                f"{self._x} should have already been encoded, so no domain constraints should be returned"
+            )
             return constraint
         else:
             raise UNKNOWN_COMPARATOR_ERROR
