@@ -173,6 +173,14 @@ class GlobalConstraint(Expression):
         """
         return 0, 1
 
+    def negate(self):
+        """
+        Returns the negation of this global constraint.
+        Defaults to ~self, but subclasses can implement a better version,
+        > Fages, François, and Sylvain Soliman. Reifying global constraints. Diss. INRIA, 2012.
+        """
+        return ~self
+
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
