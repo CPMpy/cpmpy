@@ -52,7 +52,8 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds
+from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds, is_true_cst, \
+    is_false_cst
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -581,7 +582,17 @@ class CPM_ortools(SolverInterface):
                 fwd, rev = self.solver_vars(cpm_expr.args)
                 return self.ort_model.AddInverse(fwd, rev)
             elif cpm_expr.name == 'xor':
-                return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
+                args = cpm_expr.args
+                if any(is_true_cst(a) for a in cpm_expr.args):
+                    # replace with constant variable instead
+                    if not hasattr(self, "_true_var"):
+                        self._true_var = boolvar()
+                        self.add(self._true_var)
+                    args = [a if not is_true_cst(a) else self._true_var for a in cpm_expr.args]
+
+                # remove false constants
+                args = [a for a in args if not is_false_cst(a)]
+                return self.ort_model.AddBoolXOr(self.solver_vars(args))
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
                                           f"If you reach this, please report on github.")
