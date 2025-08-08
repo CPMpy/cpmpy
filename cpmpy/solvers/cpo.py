@@ -37,21 +37,22 @@
     ===============
 
     .. autosummary::
-        :nosignatures:
+       :nosignatures:
 
         CPM_cpo
 """
 
-import shutil
 import time
+from typing import Optional
 import warnings
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -108,6 +109,20 @@ class CPM_cpo(SolverInterface):
                 return True
             except:
                 return False
+            
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+
+        For CPO, two version numbers get returned: ``<docplex version>/<solver version>``
+        """
+        try:
+            import docplex.cp as docp
+            s = docp.solver.solver.CpoSolver(docp.model.CpoModel())
+            return f"{pkg_resources.get_distribution('docplex').version}/{s.get_solver_version()}"
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -158,8 +173,12 @@ class CPM_cpo(SolverInterface):
         """
         docp = self.get_docp()
 
-        # ensure all vars are known to solver
+        # ensure all vars are known to solver        
         self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
 
         # call the solver, with parameters
         if 'LogVerbosity' not in kwargs:
@@ -244,6 +263,13 @@ class CPM_cpo(SolverInterface):
             Returns:
                 int: Number of solutions found.
         """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
 
         docp = self.get_docp()
         solution_count = 0

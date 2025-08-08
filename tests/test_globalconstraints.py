@@ -1312,7 +1312,7 @@ class TestTypeChecks(unittest.TestCase):
         iv = cp.intvar(0,10, shape=3)
         SOLVERNAMES = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()]
         for name in SOLVERNAMES:
-            if name in ("pysat", "pysdd"): continue
+            if name == "pysdd": continue
             self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name))
             # test closed version
             self.assertFalse(cp.Model(cp.GlobalCardinalityCount(iv, [1,4], [0,0], closed=True)).solve(solver=name))
@@ -1333,8 +1333,6 @@ class TestTypeChecks(unittest.TestCase):
         iv = cp.intvar(0,10, shape=3, name="x")
 
         for name, cls in cp.SolverLookup.base_solvers():
-            # The decomposition of this global introduces (as of yet) unsupported integer variables for PySAT
-            if name == "pysat": continue
             if cls.supported() is False:
                 continue
             try:
@@ -1367,6 +1365,13 @@ class TestTypeChecks(unittest.TestCase):
                     self.assertFalse(cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s))
                 except (NotImplementedError, NotSupportedError):
                     pass
+
+    def test_issue_699(self):
+        x,y = cp.intvar(0,10, shape=2, name=tuple("xy"))
+        self.assertTrue(cp.Model(cp.AllDifferentExcept0([x,0,y,0]).decompose()).solve())
+        self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], 3).decompose()).solve())
+        self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], [3,0]).decompose()).solve())
+
 
     def test_element_index_dom_mismatched(self):
         """
