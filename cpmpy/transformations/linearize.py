@@ -59,7 +59,7 @@ from cpmpy.transformations.reification import only_implies, only_bv_reifies
 from .decompose_global import decompose_in_tree
 
 from .flatten_model import flatten_constraint, get_or_make_var
-from .normalize import toplevel_list
+from .normalize import toplevel_list, simplify_boolean
 from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
@@ -297,6 +297,15 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
 
             [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
             lhs, rhs = cpm_expr.args
+
+            if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
+                # very special case, avoid writing as sum of 1 argument
+                new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
+                assert len(new_expr) == 1
+                newlist.append(Operator("or", new_expr))
+                continue
+
+
 
             # check trivially true/false (not allowed by PySAT Card/PB)
             if cpm_expr.name in ('<', '<=', '>', '>=') and is_num(rhs):
