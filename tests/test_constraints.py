@@ -193,7 +193,10 @@ def global_constraints(solver):
             continue
 
         if name == "Xor":
-            expr = cls(BOOL_ARGS)
+            yield Xor(BOOL_ARGS)
+            yield Xor(BOOL_ARGS + [True,False])
+            yield Xor([True])
+            continue
         elif name == "Inverse":
             expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
