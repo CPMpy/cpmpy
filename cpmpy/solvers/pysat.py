@@ -80,6 +80,8 @@ class CPM_pysat(SolverInterface):
 
     - ``pysat_vpool``: a pysat.formula.IDPool for the variable mapping
     - ``pysat_solver``: a pysat.solver.Solver() (default: glucose4)
+    - ``ivarmap``: a mapping from integer variables to their encoding for `int2bool`
+    - ``encoding``: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary"). Set to "auto" but can be changed in the solver object.
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysat_solver`` object.
 
