@@ -227,55 +227,6 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 else: # Result is an expression
                     newlist.append(res)    
 
-        elif isinstance(expr, Xor): # special case for xor, we can simplify it
-            # Simplify nested expression
-            if expr.has_subexpr():
-                expr_args = simplify_boolean(expr.args, num_context=False)
-            else:
-                expr_args = expr.args
-
-            # slightly less efficient compared to 'and' and 'or' but more readable
-            # unlikely case for XOR anyway
-
-            # remove constants and count true ones
-            non_false_args = [a for a in expr_args if not is_false_cst(a)]
-            args = [a for a in non_false_args if not is_true_cst(a)]
-            num_true_cst = len(non_false_args) - len(args)
-
-            if len(args) == 0: # only constant bools
-                expr_is_true = BoolVal(num_true_cst % 2 == 1)
-                newlist.append(int(expr_is_true) if num_context else expr_is_true)
-            elif len(args) == 1: # Xor with single argument can be simplified to just its argument
-                newlist.append(args[0])
-            elif args is not expr.args: # removed something, or changed due to subexpr
-                newexpr = copy.copy(expr)
-                newexpr.update_args(args)
-                if num_true_cst % 2 == 1: # uneven number of removals, need to negate
-                    newlist.append(cp.transformations.negation.recurse_negation(newexpr))
-                else:
-                    newlist.append(newexpr)
-            else: # no changes
-                newlist.append(expr)
-
-
-        elif isinstance(expr, IfThenElse): # IfThenElse global constraint
-            if expr.has_subexpr():
-                expr_args = simplify_boolean(expr.args, num_context=False)
-            else:
-                expr_args = expr.args
-            
-            cond, if_true, if_false = expr_args
-            if is_true_cst(cond):
-                newlist.append(if_true)
-            elif is_false_cst(cond):
-                newlist.append(if_false)
-            elif expr_args is not expr.args:
-                newexpr = copy.copy(expr)
-                newexpr.update_args(expr_args)
-                newlist.append(newexpr)
-            else:
-                newlist.append(expr) # unchanged
-
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
             newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?
             if any(a1 is not a2 for a1,a2 in zip(expr.args, newargs)):
