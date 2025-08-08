@@ -701,7 +701,7 @@ class Xor(GlobalConstraint):
         if new_args is None:# did not find a Boolean variable to negate
         # pick first arg, and push down negation
             new_args = list(self.args)
-            new_args[0] = cp.transformations.negation.recurse_negation([self.args[0]])
+            new_args[0] = cp.transformations.negation.recurse_negation(self.args[0])
 
         return Xor(new_args)
 
