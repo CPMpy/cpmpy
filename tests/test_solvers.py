@@ -10,6 +10,7 @@ from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
@@ -330,6 +331,15 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertSetEqual(set(ps2.get_core()), set([mayo,inds[6],inds[9]]))
 
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
+    def test_pysat_subsolver(self):
+        pysat = CPM_pysat(subsolver="pysat:cadical195")
+        x, y = cp.boolvar(shape=2)
+        pysat += x | y
+        pysat += ~x | ~y
+        assert pysat.solve()
+
     @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
     @skip_on_missing_pblib()
     def test_pysat_card(self):
@@ -341,6 +351,30 @@ class TestSolvers(unittest.TestCase):
         for c in cons:
             self.assertTrue(cp.Model(c).solve("pysat"))
             self.assertTrue(c.value())
+
+    @pytest.mark.skipif(not CPM_pindakaas.supported(),
+                        reason="pindakaas not installed")
+    def test_pindakaas(self):
+        # Construct the model.
+
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+        y = cp.intvar(0, 2, shape=3)
+        model = cp.Model([
+            cp.any((x[0], x[1])),
+            cp.any((~x[0], ~x[1])),
+            2*x[0] + 3*x[1] + 5*x[2] <= 6,
+            b.implies(2*x[0] + 3*x[1] + 5*x[2] <= 6),
+            2*y[0] + 3*y[1] + 5*y[2] <= 6,
+            (cp.Xor([x[0], x[1], x[2]])) >= (cp.BoolVal(True))
+        ])
+
+        # any solver
+        self.assertTrue(model.solve())
+        
+        # direct solver
+        ps = CPM_pindakaas(model)
+        self.assertTrue(ps.solve())
 
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
@@ -839,6 +873,9 @@ class TestSupportedSolvers:
         s += y | ~z
         assert not s.solve(assumptions=[~x, ~y])
 
+        if solver == "pindakaas":
+            return # not implemented in pindakaas
+
         core = s.get_core()
         assert ~y in set([~x,~y])
         assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat
@@ -871,7 +908,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver in ("pysdd", "pysat", "pumpkin"):  # don't support div or mod with vars
+        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin"):  # don't support div or mod with vars
             return
         
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
@@ -975,8 +1012,8 @@ class TestSupportedSolvers:
         Tests whether decision variables which are part of a constraint that never gets posted to the underlying solver
         still get correctly captured and posted.
         """
-        if solver == 'pysdd' or solver == 'pysat':  # pysat and pysdd don't support integer decision variables
-            return
+        if solver == 'pysdd':
+            pytest.skip(reason=f"{solver} does not support integer decision variables")
         
         x = cp.intvar(1, 4, shape=1)
         # Dubious constraint which enforces nothing, gets decomposed to empty list
@@ -1009,4 +1046,6 @@ class TestSupportedSolvers:
         # model with one False constant
         num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
         assert num_sols == 0
-        
+
+    def test_version(self, solver):
+        assert SolverLookup.lookup(solver).version() is not None

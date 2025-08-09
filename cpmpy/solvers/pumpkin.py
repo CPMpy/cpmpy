@@ -37,6 +37,8 @@
 """
 import warnings
 import re
+from typing import Optional
+import pkg_resources
 
 from os.path import join
 
@@ -80,6 +82,19 @@ class CPM_pumpkin(SolverInterface):
         except Exception as e:
             raise e
 
+
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            # there is also a version of the solver itself in the Cargo.toml (/pumpkin-solver/Cargo.toml)
+            # currently not accessible through the python api
+            # dynamic = ["version"] in the pyproject.toml does not seem to get the right value?
+            return pkg_resources.get_distribution('pumpkin-solver-py').version 
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
