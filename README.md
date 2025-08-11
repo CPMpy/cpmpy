@@ -48,7 +48,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 An example that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
 
 ```python
-# Flexible job-shop: a set of jobs must be run, each can be run on any of the machines,
+# Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
 # with different duration and energy consumption. Minimize makespan and total energy consumption
 import cpmpy as cp
 import pandas as pd
