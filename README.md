@@ -24,6 +24,8 @@ For combinatorial problems with Boolean and integer variables. With many high-le
 
 Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research and industry. 
 
+Install simply with `pip install cpmpy`
+
 ### 🔑 Key Features
 
 * **Solver-agnostic**: use and compare CP, ILP, SMT, PB and SAT solvers
