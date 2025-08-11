@@ -37,10 +37,10 @@ Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research 
 
 CPMpy can translate to a wide variety of constraint solving paradigms, including both commercial and open-source solvers.
 
-* **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, MiniZinc+solvers
+* **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, Pumpkin, MiniZinc+solvers
 * **ILP Solvers**: Gurobi (license required)
 * **SMT Solvers**: Z3
-* **PB Solvers**: Exact
+* **PB Solvers**: Exact, Pindakaas
 * **SAT Solvers**: PySAT+solvers, PySDD
 
 ### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling
