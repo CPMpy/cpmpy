@@ -30,7 +30,7 @@ Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research 
 * **ML-friendly**: decision variables are numpy arrays, with vectorized operations and constraints
 * **Incremental solving**: assumption variables, adding constraints and updating objectives
 * **Extensively tested**: large test-suite and [actively fuzz-tested](https://github.com/CPMpy/fuzz-test)
-* **Tools**: for parameter-tuning, debugging and explanation generation
+* **Tools**: for parameter-tuning, debugging, explanation generation and XCSP3 benchmarking
 * **Flexible**: easy to add constraints or solvers, also direct solver access
 
 ### 🔩 Solvers
