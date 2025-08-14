@@ -1,0 +1,370 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## hexaly.py
+##
+"""
+    Interface to Hexaly's API
+
+
+    Hexaly is a local search solver with suppport for  global constraints.
+
+    Always use :func:`cp.SolverLookup.get("hexaly") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'hexaly' python package is installed:
+
+    .. code-block:: console
+
+        $ pip install hexaly -i https://pip.hexaly.com                
+    
+    Hexaly local solver requires an active licence (for example a free academic license)
+    You can read more about available licences at https://www.hexaly.com/
+
+    See detailed installation instructions at:
+    https://www.hexaly.com/docs/last/installation/pythonsetup.html
+
+    The rest of this documentation is for advanced users.
+
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        CPM_hexaly
+"""
+
+from typing import Optional
+import pkg_resources
+
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison
+from ..transformations.get_variables import get_variables
+from ..transformations.normalize import toplevel_list
+from ..transformations.decompose_global import decompose_in_tree
+
+class CPM_hexaly(SolverInterface):
+    """
+    Interface to Hexaly's API
+
+    Creates the following attributes (see parent constructor for more):
+    - hex_model: object, Hexaly's model object
+
+    Documentation of the solver's own Python API:
+    https://www.hexaly.com/docs/last/pythonapi/index.html
+    """
+
+    @staticmethod
+    def supported():
+        # try to import the package
+        try:
+            import hexaly as hex
+            # optionally enforce a specific version
+            return True
+        except ModuleNotFoundError: # if solver's Python package is not installed
+            return False
+        except Exception as e:
+            raise e
+
+    @classmethod
+    def version(cls) -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('hexaly').version
+        except pkg_resources.DistributionNotFound:
+            return None
+
+    def __init__(self, cpm_model=None, subsolver=None):
+        """
+        Constructor of the native solver object
+
+        Arguments:
+        - cpm_model: Model(), a CPMpy Model() (optional)
+        - subsolver: str, name of a subsolver (optional)
+        """
+        if not self.supported():
+            raise Exception("CPM_hexaly: Install the python package 'hexaly' to use this solver interface.")
+
+        from hexaly.optimizer import HexalyOptimizer, HxObjectiveDirection
+
+        assert subsolver is None # unless you support subsolvers, see pysat or minizinc
+
+        # initialise the native solver object
+        self.hex_solver = HexalyOptimizer()
+        self.hex_solver.param.verbosity = 0
+        self.hex_model = self.hex_solver.model
+        self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
+
+        # initialise everything else and post the constraints/objective
+        super().__init__(name="hexaly", cpm_model=cpm_model)
+
+    def solve(self, time_limit=None, **kwargs):
+        """
+            Call the Hexaly solver
+
+            Arguments:
+            - time_limit:  maximum solve time in seconds (float, optional)
+            - kwargs:      any keyword argument, sets parameters of solver object
+
+            Arguments that correspond to solver parameters:
+            - nb_threads: number of threads used to parallelize the search.
+            - iteration_limit: max number of iterations
+            - verbosity: verbosity level
+
+            full list of parameters availble at:
+            https://www.hexaly.com/docs/last/pythonapi/optimizer/hxparam.html
+        """
+
+        from hexaly.optimizer import HxParam, HxState
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        if time_limit is not None:
+            self.hex_solver.param.time_limit = time_limit
+
+        # set solver parameters
+        for arg, val in kwargs.items():
+            setattr(self.hex_solver, arg, val)
+
+        # new status, translate runtime
+        self.hex_model.close() # model must be closed
+        self.hex_solver.solve()
+        self.hex_sol = self.hex_solver.get_solution()
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
+
+        # Translate solver exit status to CPMpy exit status
+        # CSP:                         COP:
+        # ├─ sat -> FEASIBLE           ├─ optimal -> OPTIMAL
+        # ├─ unsat -> UNSATISFIABLE    ├─ sub-optimal -> FEASIBLE
+        # └─ timeout -> UNKNOWN        ├─ unsat -> UNSATISFIABLE
+        #                              └─ timeout -> UNKNOWN
+
+        from hexaly.optimizer import HxSolutionStatus
+        if self.hex_sol.status == HxSolutionStatus.INCONSISTENT:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif self.hex_sol.status == HxSolutionStatus.INFEASIBLE:
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+        elif self.hex_sol.status == HxSolutionStatus.FEASIBLE:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif self.hex_sol.status == HxSolutionStatus.OPTIMAL:
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else:  # another?
+            raise NotImplementedError(self.hex_sol.status)  # a new status type was introduced, please report on github
+
+        # True/False depending on self.cpm_status
+        has_sol = self._solve_return(self.cpm_status)
+
+        # translate solution values (of user specified variables only)
+        self.objective_value_ = None
+        if has_sol:
+            # fill in variable values
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                cpm_var._value = self.hex_sol.get_value(sol_var)
+
+            # translate objective, for optimisation problems only
+            if self.has_objective():
+                self.objective_value_ = self.hex_sol.get_objective_bound()
+
+        else: # clear values of variables
+            for cpm_var in self.user_vars:
+                cpm_var.clear()
+
+        return has_sol
+
+
+    def solver_var(self, cpm_var):
+        """
+            Creates solver variable for cpmpy variable
+            or returns from cache if previously created
+        """
+        if is_num(cpm_var): # shortcut, eases posting constraints
+            return cpm_var
+
+        # special case, negative-bool-view
+        # work directly on var inside the view
+        if isinstance(cpm_var, NegBoolView):
+            return ~self.solver_var(cpm_var._bv)
+
+        # create if it does not exist
+        if cpm_var not in self._varmap:
+            if isinstance(cpm_var, _BoolVarImpl):
+                revar = self.hex_model.bool()
+            elif isinstance(cpm_var, _IntVarImpl):
+                revar = self.hex_model.int(cpm_var.lb, cpm_var.ub)
+            else:
+                raise NotImplementedError("Not a known var {}".format(cpm_var))
+            # set name of variable
+            revar.set_name(str(cpm_var))
+            self._varmap[cpm_var] = revar
+
+        # return from cache
+        return self._varmap[cpm_var]
+
+
+    def objective(self, expr, minimize=True):
+        """
+            Post the given expression to the solver as objective to minimize/maximize
+
+            'objective()' can be called multiple times, only the last one is stored
+
+            (technical side note: any constraints created during conversion of the objective
+
+            are permanently posted to the solver)
+        """
+        from hexaly.optimizer import HxObjectiveDirection
+        # make objective function or variable and post
+        # remove previous objectives
+        self.hex_model.remove_objective(1)
+        hex_obj = self._get_constraint(expr)
+        if minimize:
+            self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
+        else:
+            self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MAXIMIZE)
+
+    def has_objective(self):
+        return self.hex_model.get_nb_objectives() > 1 # first obj is constant dummy obj
+
+
+    # `add()` first calls `transform()`
+    def transform(self, cpm_expr):
+        """
+            Transform arbitrary CPMpy expressions to constraints the solver supports
+
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
+
+            See the 'Adding a new solver' docs on readthedocs for more information.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: list of Expression
+        """
+        # apply transformations
+        cpm_cons = toplevel_list(cpm_expr)
+        # no flattening, so also no safening required
+        cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element"})
+        return cpm_cons
+
+    def _get_constraint(self, cpm_expr):
+
+        # get transformed constraint
+
+        if is_any_list(cpm_expr):
+            return [self._get_constraint(expr) for expr in cpm_expr]
+
+        # constants
+        if isinstance(cpm_expr, BoolVal):
+            return bool(cpm_expr)
+        if is_num(cpm_expr):
+            return cpm_expr
+        # variables
+        if isinstance(cpm_expr, _NumVarImpl):
+            return self.solver_var(cpm_expr)
+
+        if isinstance(cpm_expr, Operator):
+            if cpm_expr.name == "and":
+                return self.hex_model.and_(self._get_constraint(cpm_expr.args))
+            if cpm_expr.name == "or":
+                return self.hex_model.or_(self._get_constraint(cpm_expr.args))
+            if cpm_expr.name == "not":
+                return ~self._get_constraint(cpm_expr.args[0])
+            if cpm_expr.name == "->":
+                cond, subexpr = cpm_expr.args
+                return self._get_constraint(~cond | subexpr) # post as disjunction
+            if cpm_expr.name == "sum":
+                return self.hex_model.sum(self._get_constraint(cpm_expr.args))
+            if cpm_expr.name == "wsum":
+                weights, args = cpm_expr.args
+                return self.hex_model.sum([w * a for w,a in zip(weights, self._get_constraint(args))])
+            if cpm_expr.name == "sub":
+                a,b = self._get_constraint(cpm_expr.args)
+                return a - b
+            if cpm_expr.name == "-":
+                return -self._get_constraint(cpm_expr.args[0])
+            if cpm_expr.name == "mul":
+                a,b = self._get_constraint(cpm_expr.args)
+                return a * b
+            if cpm_expr.name == "div":
+                raise NotImplementedError("hexaly supports division, but result is float, TODO")
+                a, b = self._get_constraint(cpm_expr.args)
+                return a / b # TODO: check what kind of div
+            if cpm_expr.name == "mod":
+                a, b = self._get_constraint(cpm_expr.args)
+                return a % b
+            if cpm_expr.name == "pow":
+                a, b = self._get_constraint(cpm_expr.args)
+                return a ** b
+            raise ValueError(f"Unknown operator {cpm_expr}")
+
+        elif isinstance(cpm_expr, Comparison):
+            x,y = self._get_constraint(cpm_expr.args)
+            return eval_comparison(cpm_expr.name, x,y)
+
+        elif isinstance(cpm_expr, GlobalConstraint):
+            if cpm_expr.name == "alldifferent":
+                hex_arr = self.hex_model.array(self._get_constraint(cpm_expr.args))
+                return self.hex_model.distinct(hex_arr)
+            raise ValueError(f"Global constraint {cpm_expr} is not supported by hexaly")
+
+        elif isinstance(cpm_expr, GlobalFunction):
+            if cpm_expr.name == "nvalues":
+                return self.hex_model.distinct(self._get_constraint(cpm_expr.args))
+            if cpm_expr.name == "element":
+                hex_arr = self.hex_model.array(self._get_constraint(cpm_expr.args[0]))
+                idx = self._get_constraint(cpm_expr.args[1])
+                return self.hex_model.at(hex_arr,idx)
+            if cpm_expr.name == "abs":
+                return self.hex_model.abs(self._get_constraint(cpm_expr.args[0]))
+            if cpm_expr.name == "min":
+                return self.hex_model.min(*self._get_constraint(cpm_expr.args))
+            if cpm_expr.name == "max":
+                return self.hex_model.max(*self._get_constraint(cpm_expr.args))
+            raise ValueError(f"Global function {cpm_expr} is not supported by hexaly")
+
+        raise NotImplementedError(f"Unexpected expression {cpm_expr}")
+
+    def add(self, cpm_expr_orig):
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
+        """
+        # add new user vars to the set
+        get_variables(cpm_expr_orig, collect=self.user_vars)
+
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+            hex_expr = self._get_constraint(cpm_expr)
+            self.hex_model.add_constraint(hex_expr)
+
+        return self
+    __add__ = add  # avoid redirect in superclass
