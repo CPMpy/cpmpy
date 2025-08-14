@@ -231,7 +231,7 @@ class CPM_hexaly(SolverInterface):
         # make objective function or variable and post
         # remove previous objectives
         self.hex_model.remove_objective(1)
-        hex_obj = self._get_constraint(expr)
+        hex_obj = self._hex_expr(expr)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
         else:
@@ -262,12 +262,12 @@ class CPM_hexaly(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element"})
         return cpm_cons
 
-    def _get_constraint(self, cpm_expr):
+    def _hex_expr(self, cpm_expr):
 
         # get transformed constraint
 
         if is_any_list(cpm_expr):
-            return [self._get_constraint(expr) for expr in cpm_expr]
+            return [self._hex_expr(expr) for expr in cpm_expr]
 
         # constants
         if isinstance(cpm_expr, BoolVal):
@@ -280,62 +280,62 @@ class CPM_hexaly(SolverInterface):
 
         if isinstance(cpm_expr, Operator):
             if cpm_expr.name == "and":
-                return self.hex_model.and_(self._get_constraint(cpm_expr.args))
+                return self.hex_model.and_(self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "or":
-                return self.hex_model.or_(self._get_constraint(cpm_expr.args))
+                return self.hex_model.or_(self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "not":
-                return ~self._get_constraint(cpm_expr.args[0])
+                return ~self._hex_expr(cpm_expr.args[0])
             if cpm_expr.name == "->":
                 cond, subexpr = cpm_expr.args
-                return self._get_constraint(~cond | subexpr) # post as disjunction
+                return self._hex_expr(~cond | subexpr) # post as disjunction
             if cpm_expr.name == "sum":
-                return self.hex_model.sum(self._get_constraint(cpm_expr.args))
+                return self.hex_model.sum(self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "wsum":
                 weights, args = cpm_expr.args
-                return self.hex_model.sum([w * a for w,a in zip(weights, self._get_constraint(args))])
+                return self.hex_model.sum([w * a for w,a in zip(weights, self._hex_expr(args))])
             if cpm_expr.name == "sub":
-                a,b = self._get_constraint(cpm_expr.args)
+                a,b = self._hex_expr(cpm_expr.args)
                 return a - b
             if cpm_expr.name == "-":
-                return -self._get_constraint(cpm_expr.args[0])
+                return -self._hex_expr(cpm_expr.args[0])
             if cpm_expr.name == "mul":
-                a,b = self._get_constraint(cpm_expr.args)
+                a,b = self._hex_expr(cpm_expr.args)
                 return a * b
             if cpm_expr.name == "div":
                 raise NotImplementedError("hexaly supports division, but result is float, TODO")
-                a, b = self._get_constraint(cpm_expr.args)
+                a, b = self._hex_expr(cpm_expr.args)
                 return a / b # TODO: check what kind of div
             if cpm_expr.name == "mod":
-                a, b = self._get_constraint(cpm_expr.args)
+                a, b = self._hex_expr(cpm_expr.args)
                 return a % b
             if cpm_expr.name == "pow":
-                a, b = self._get_constraint(cpm_expr.args)
+                a, b = self._hex_expr(cpm_expr.args)
                 return a ** b
             raise ValueError(f"Unknown operator {cpm_expr}")
 
         elif isinstance(cpm_expr, Comparison):
-            x,y = self._get_constraint(cpm_expr.args)
+            x,y = self._hex_expr(cpm_expr.args)
             return eval_comparison(cpm_expr.name, x,y)
 
         elif isinstance(cpm_expr, GlobalConstraint):
             if cpm_expr.name == "alldifferent":
-                hex_arr = self.hex_model.array(self._get_constraint(cpm_expr.args))
+                hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args))
                 return self.hex_model.distinct(hex_arr)
             raise ValueError(f"Global constraint {cpm_expr} is not supported by hexaly")
 
         elif isinstance(cpm_expr, GlobalFunction):
             if cpm_expr.name == "nvalues":
-                return self.hex_model.distinct(self._get_constraint(cpm_expr.args))
+                return self.hex_model.distinct(self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "element":
-                hex_arr = self.hex_model.array(self._get_constraint(cpm_expr.args[0]))
-                idx = self._get_constraint(cpm_expr.args[1])
+                hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args[0]))
+                idx = self._hex_expr(cpm_expr.args[1])
                 return self.hex_model.at(hex_arr,idx)
             if cpm_expr.name == "abs":
-                return self.hex_model.abs(self._get_constraint(cpm_expr.args[0]))
+                return self.hex_model.abs(self._hex_expr(cpm_expr.args[0]))
             if cpm_expr.name == "min":
-                return self.hex_model.min(*self._get_constraint(cpm_expr.args))
+                return self.hex_model.min(*self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "max":
-                return self.hex_model.max(*self._get_constraint(cpm_expr.args))
+                return self.hex_model.max(*self._hex_expr(cpm_expr.args))
             raise ValueError(f"Global function {cpm_expr} is not supported by hexaly")
 
         raise NotImplementedError(f"Unexpected expression {cpm_expr}")
@@ -363,7 +363,7 @@ class CPM_hexaly(SolverInterface):
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
-            hex_expr = self._get_constraint(cpm_expr)
+            hex_expr = self._hex_expr(cpm_expr)
             self.hex_model.add_constraint(hex_expr)
 
         return self
