@@ -187,6 +187,8 @@ class CPM_hexaly(SolverInterface):
             for cpm_var in self.user_vars:
                 cpm_var.clear()
 
+        # now open model again, we might want to add new constraints after
+        self.hex_model.open()
         return has_sol
 
 
