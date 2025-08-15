@@ -181,7 +181,7 @@ class CPM_hexaly(SolverInterface):
 
             # translate objective, for optimisation problems only
             if self.has_objective():
-                self.objective_value_ = self.hex_sol.get_objective_bound()
+                self.objective_value_ = self.hex_sol.get_objective_bound(1)
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -234,7 +234,9 @@ class CPM_hexaly(SolverInterface):
         from hexaly.optimizer import HxObjectiveDirection
         # make objective function or variable and post
         # remove previous objectives
-        self.hex_model.remove_objective(1)
+        if self.has_objective(): # remove prev objective
+            self.hex_model.remove_objective(1)
+        assert self.hex_model.nb_objectives == 1 # only the constant objective should be left now
         hex_obj = self._hex_expr(expr)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
@@ -242,8 +244,7 @@ class CPM_hexaly(SolverInterface):
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MAXIMIZE)
 
     def has_objective(self):
-        return self.hex_model.get_nb_objectives() > 1 # first obj is constant dummy obj
-
+        return self.hex_model.nb_objectives > 1
 
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
