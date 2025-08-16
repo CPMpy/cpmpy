@@ -970,6 +970,8 @@ class TestSupportedSolvers:
 
 
     def test_status_solveall(self, solver):
+        if solver == "hexaly":
+            pytest.skip("hexaly cannot find all solutions, so status is never OPTIMAL")
 
         bv = cp.boolvar(shape=3, name="bv")
         m = cp.Model(cp.any(bv))
