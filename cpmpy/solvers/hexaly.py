@@ -377,3 +377,11 @@ class CPM_hexaly(SolverInterface):
 
         return self
     __add__ = add  # avoid redirect in superclass
+    
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+        # time_limit = 10
+        if time_limit is None:
+            raise ValueError("Hexaly does not support exhausitve search to find all solutions. "
+                             "Set time limit to do a limited search")
+
+        return super(CPM_hexaly, self).solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
