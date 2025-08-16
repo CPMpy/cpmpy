@@ -912,7 +912,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin"):  # don't support div or mod with vars
+        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin", "hexaly"):  # don't support div or mod with vars
             return
         
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
