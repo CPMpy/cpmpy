@@ -1027,30 +1027,36 @@ class TestSupportedSolvers:
         m = cp.Model([cp.AllDifferentExceptN([x], 1)])
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
-        solution_limit = 5 if solver == "gurobi" else None
-        assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
+
+        kwargs = dict()
+        if solver == "hexaly":
+            kwargs['time_limit'] = 2
+        if solver == "gurobi":
+            kwargs['solution_limit'] = 5
+        assert s.solveAll(**kwargs ) == 4   # check if still correct number of solutions, even though empty model
 
     def test_model_no_vars(self, solver):
 
+        kwargs = dict()
         if solver == "gurobi":
-            solution_limit = 10
-        else:
-            solution_limit = None
+            kwargs['solution_limit'] = 10
+        if solver == "hexaly":
+            kwargs['time_limit'] = 2
 
         # empty model
-        num_sols = cp.Model().solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model().solveAll(solver=solver, **kwargs)
         assert num_sols == 1    
 
         # model with one True constant
-        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver,**kwargs)
         assert num_sols == 1        
 
         # model with two True constants
-        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, **kwargs)
         assert num_sols == 1
 
         # model with one False constant
-        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, **kwargs)
         assert num_sols == 0
 
     def test_version(self, solver):
