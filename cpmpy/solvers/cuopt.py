@@ -172,7 +172,8 @@ class CPM_cuopt(SolverInterface):
             # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
             # numexpr `comp` bvar|const
             if isinstance(cpm_expr, Comparison):
-                lhs, rhs = self.solver_vars(cpm_expr.args)
+                lhs, rhs = cpm_expr.args
+                cuopt_rhs = self.solver_var(rhs)
 
                 # Thanks to `only_numexpr_equality()` only supported comparisons should remain
                 if cpm_expr.name == '<=':
@@ -182,11 +183,12 @@ class CPM_cuopt(SolverInterface):
                 elif cpm_expr.name == '==':
                     self.problem.addConstraint(lhs == rhs)
 
-                    # if isinstance(lhs, _NumVarImpl) \
-                    #         or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
-                    #     # a BoundedLinearExpression LHS, special case, like in objective
-                    #     grblhs = self._make_numexpr(lhs)
-                    #     self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs)
+                    if isinstance(lhs, _NumVarImpl) \
+                            or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
+                        # a BoundedLinearExpression LHS, special case, like in objective
+                        cuopt_lhs = self._make_numexpr(lhs)
+                        self.problem.addConstraint()
+                        self.grb_model.addLConstr(cuopt_lhs == cuopt_rhs)
 
                     # elif lhs.name == 'mul':
                     #     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
@@ -262,3 +264,25 @@ class CPM_cuopt(SolverInterface):
 
     __add__ = add
 
+    def _make_numexpr(self, cpm_expr):
+    
+        if is_num(cpm_expr):
+            return cpm_expr
+
+        # decision variables, check in varmap
+        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
+            return self.solver_var(cpm_expr)
+
+        # sum
+        if cpm_expr.name == "sum":
+            return sum(self.solver_vars(cpm_expr.args))
+        if cpm_expr.name == "sub":
+            a,b = self.solver_vars(cpm_expr.args)
+            return a - b
+        # wsum
+        if cpm_expr.name == "wsum":
+            return sum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
+
+        raise NotImplementedError("cuopt: Not a known supported numexpr {}".format(cpm_expr))
+
+        
