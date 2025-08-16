@@ -166,7 +166,7 @@ class CPM_pumpkin(SolverInterface):
 
         elif assumptions is not None:
             assert not prove, "Proof-logging under assumptions is not supported"
-            pum_assumptions = [self.to_predicate(a) for a in assumptions]
+            pum_assumptions = [self.to_predicate(a, tag=None) for a in assumptions]
             self.assump_map = dict(zip(pum_assumptions, assumptions))
             solve_func = self.pum_solver.satisfy_under_assumptions
             kwargs.update(assumptions=pum_assumptions)
@@ -342,7 +342,7 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons
 
-    def to_predicate(self, cpm_expr):
+    def to_predicate(self, cpm_expr, tag=None):
         """
             Convert a CPMpy expression to a Pumpkin predicate (comparison with constant)
         """
@@ -381,28 +381,28 @@ class CPM_pumpkin(SolverInterface):
         # do we already have this predicate? 
         #  (actually, cse might already catch these...)
         if (lhs, comp, rhs) not in self.predicate_map:
-            pred = Predicate(self.to_pum_ivar(lhs), comp, rhs)
+            pred = Predicate(self.to_pum_ivar(lhs, tag=tag), comp, rhs)
             self.predicate_map[(lhs, comp, rhs)] = pred
         
         return self.predicate_map[(lhs, comp, rhs)]
 
 
 
-    def to_pum_ivar(self, cpm_var):
+    def to_pum_ivar(self, cpm_var, tag=None):
         """
             Helper function to convert (boolean) variables and constants to Pumpkin integer expressions
         """
         if is_any_list(cpm_var):
-            return [self.to_pum_ivar(v) for v in cpm_var]
+            return [self.to_pum_ivar(v, tag=tag) for v in cpm_var]
         elif isinstance(cpm_var, _BoolVarImpl):
-            return self.pum_solver.boolean_as_integer(self.solver_var(cpm_var))
+            return self.pum_solver.boolean_as_integer(self.solver_var(cpm_var), tag=tag)
         elif is_num(cpm_var):
             return self.solver_var(intvar(cpm_var, cpm_var))
         else:
             return self.solver_var(cpm_var)
 
 
-    def _sum_args(self, expr, negate=False):
+    def _sum_args(self, expr, negate=False, tag=None):
         """
             Helper function to convert CPMpy sum-like operators into pumpkin-compatible arguments.
             expr is expected to be a `sum`, `wsum` or `sub` operator.
@@ -410,25 +410,26 @@ class CPM_pumpkin(SolverInterface):
             :return: Returns a list of Pumpkin integer expressions
         """
         args = []
+        if tag is None: raise ValueError("Expected tag to be provided but got None")
         if isinstance(expr, Operator) and expr.name == "sum":
             for cpm_var in expr.args:
                 pum_var = self.solver_var(cpm_var)
                 if cpm_var.is_bool(): # have convert to integer
-                    pum_var = self.pum_solver.boolean_as_integer(pum_var)
+                    pum_var = self.pum_solver.boolean_as_integer(pum_var, tag=tag)
                 args.append(pum_var.scaled(-1 if negate else 1))
         elif isinstance(expr, Operator) and expr.name == "wsum":
             for w, cpm_var in zip(*expr.args):
                 if w == 0: continue # exclude
                 pum_var = self.solver_var(cpm_var)
                 if cpm_var.is_bool(): # have convert to integer
-                    pum_var = self.pum_solver.boolean_as_integer(pum_var)
+                    pum_var = self.pum_solver.boolean_as_integer(pum_var, tag=tag)
                 args.append(pum_var.scaled(-w if negate else w))
         elif isinstance(expr, Operator) and expr.name == "sub":
             x, y = self.solver_vars(expr.args)
             if expr.args[0].is_bool():
-                x = self.pum_solver.boolean_as_integer(x)
+                x = self.pum_solver.boolean_as_integer(x, tag=tag)
             if expr.args[1].is_bool():
-                y = self.pum_solver.boolean_as_integer(y)
+                y = self.pum_solver.boolean_as_integer(y, tag=tag)
             args = [x.scaled(-1 if negate else 1), y.scaled(1 if negate else -1)]
         else:
             raise ValueError(f"Unknown expression to convert in sum-arguments: {expr}")
@@ -449,20 +450,21 @@ class CPM_pumpkin(SolverInterface):
                 return True
         return False
 
-    def _get_constraint(self, cpm_expr):
+    def _get_constraint(self, cpm_expr, tag=None):
         """
             Convert a CPMpy expression into a Pumpkin constraint
             Expects a transformed CPMpy expression, this logic is implemented as a separate function so we can support reification in `add()`
         """
         from pumpkin_solver_py import constraints
-
+        if tag is None:
+            tag = self.pum_solver.new_constraint_tag()
         if isinstance(cpm_expr, _BoolVarImpl):
             # base case, just var or ~var, post as clause
-            return [constraints.Clause([self.solver_var(cpm_expr)])]
+            return [constraints.Clause([self.solver_var(cpm_expr)], constraint_tag=tag)]
             
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == "or": 
-                return [constraints.Clause(self.solver_vars(cpm_expr.args))]
+                return [constraints.Clause(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
 
             raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
 
@@ -471,47 +473,49 @@ class CPM_pumpkin(SolverInterface):
             assert isinstance(lhs, Expression), f"Expected a CPMpy expression on lhs but got {lhs} of type {type(lhs)}"
 
             if self._is_predicate(lhs):
-                pred = self.to_predicate(cpm_expr)
-                return [constraints.Clause([self.pum_solver.predicate_as_boolean(pred)])]
+                pred = self.to_predicate(cpm_expr, tag=tag)
+                return [constraints.Clause([self.pum_solver.predicate_as_boolean(pred, tag=tag)], constraint_tag=tag)]
 
             if cpm_expr.name == "==":
                 
                 if "sum" in lhs.name or lhs.name == "sub":
-                    return [constraints.Equals(self._sum_args(lhs), rhs)]
+                    return [constraints.Equals(self._sum_args(lhs, tag=tag), rhs, constraint_tag=tag)]
                
-                pum_rhs = self.to_pum_ivar(rhs) # other operators require IntExpression
+                pum_rhs = self.to_pum_ivar(rhs, tag=tag) # other operators require IntExpression
                 if lhs.name == "div":
-                    return [constraints.Division(*self.to_pum_ivar(lhs.args), pum_rhs)]
+                    return [constraints.Division(*self.to_pum_ivar(lhs.args, tag=tag), pum_rhs, constraint_tag=tag)]
                 elif lhs.name == "mul":
-                    return [constraints.Times(*self.to_pum_ivar(lhs.args), pum_rhs)]
+                    return [constraints.Times(*self.to_pum_ivar(lhs.args, tag=tag), pum_rhs, constraint_tag=tag)]
                 elif lhs.name == "abs":
-                    return [constraints.Absolute(self.to_pum_ivar(lhs.args[0]), pum_rhs)]
+                    return [constraints.Absolute(self.to_pum_ivar(lhs.args[0], tag=tag), pum_rhs, constraint_tag=tag)]
                 elif lhs.name == "min":
-                    return [constraints.Minimum(self.to_pum_ivar(lhs.args), pum_rhs)]
+                    return [constraints.Minimum(self.to_pum_ivar(lhs.args, tag=tag), pum_rhs, constraint_tag=tag)]
                 elif lhs.name == "max":
-                    return [constraints.Maximum(self.to_pum_ivar(lhs.args), pum_rhs)]
+                    return [constraints.Maximum(self.to_pum_ivar(lhs.args, tag=tag), pum_rhs, constraint_tag=tag)]
                 elif lhs.name == "element":
                     arr, idx = lhs.args
-                    return [constraints.Element(self.to_pum_ivar(idx), self.to_pum_ivar(arr), pum_rhs)]
+                    return [constraints.Element(self.to_pum_ivar(idx, tag=tag),
+                                                self.to_pum_ivar(arr, tag=tag),
+                                                pum_rhs, constraint_tag=tag)]
                 else:
                     raise NotImplementedError("Unknown lhs of comparison", cpm_expr)
 
             elif cpm_expr.name == "<=":
-                return [constraints.LessThanOrEquals(self._sum_args(lhs), rhs)]
+                return [constraints.LessThanOrEquals(self._sum_args(lhs, tag=tag), rhs, constraint_tag=tag)]
             elif cpm_expr.name == "<":
-                return [constraints.LessThanOrEquals(self._sum_args(lhs), rhs-1)]
+                return [constraints.LessThanOrEquals(self._sum_args(lhs, tag=tag), rhs-1,constraint_tag=tag)]
             elif cpm_expr.name == ">=":
-                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), -rhs)]
+                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True, tag=tag), -rhs, constraint_tag=tag)]
             elif cpm_expr.name == ">":
-                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True), -rhs-1)]
+                return [constraints.LessThanOrEquals(self._sum_args(lhs, negate=True, tag=tag), -rhs-1, constraint_tag=tag)]
             elif cpm_expr.name == "!=":
-                return [constraints.NotEquals(self._sum_args(lhs), rhs)]
+                return [constraints.NotEquals(self._sum_args(lhs, tag=tag), rhs, constraint_tag=tag)]
 
             raise ValueError("Unknown comparison", cpm_expr)
 
         elif isinstance(cpm_expr, GlobalConstraint):
             if cpm_expr.name == "alldifferent":
-                return [constraints.AllDifferent(self.solver_vars(cpm_expr.args))]
+                return [constraints.AllDifferent(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
             
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = cpm_expr.args
@@ -519,23 +523,32 @@ class CPM_pumpkin(SolverInterface):
                 assert all(is_num(d) for d in demand), "Pumpkin only accepts Cumulative with fixed demand"
                 assert is_num(cap), "Pumpkin only accepts Cumulative with fixed capacity"
 
-                return [constraints.Cumulative(self.solver_vars(start),dur, demand, cap)] + \
-                        [self._get_constraint(c)[0] for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)])]
-            
+                dur_cons = []
+                for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)]):
+                    dur_cons += self._get_constraint(c, tag=tag)
+
+                return [constraints.Cumulative(self.solver_vars(start),dur, demand, cap, constraint_tag=tag)] + dur_cons
+
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args
                 return [constraints.Table(self.to_pum_ivar(arr), 
-                                          np.array(table).tolist())] # ensure Python list
+                                          np.array(table).tolist(), # ensure Python list
+                                          constraint_tag=tag)
+                        ]
             
             elif cpm_expr.name == "negative_table":
                 arr, table = cpm_expr.args
                 return [constraints.NegativeTable(self.to_pum_ivar(arr), 
-                                                  np.array(table).tolist())] # ensure Python list
+                                                  np.array(table).tolist(),# ensure Python list
+                                                  constraint_tag=tag)  
+                        ]
             
             elif cpm_expr.name == "InDomain":
                 val, domain = cpm_expr.args
                 return [constraints.Table([self.to_pum_ivar(val)], 
-                                          np.array(domain).tolist())] # ensure Python list
+                                          np.array(domain).tolist(), # ensure Python list
+                                          constraint_tag=tag)
+                        ] 
             
             
             else:
