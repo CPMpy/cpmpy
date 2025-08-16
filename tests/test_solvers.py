@@ -769,12 +769,12 @@ class TestSupportedSolvers:
                     y | z
                 )
 
-        if solver == "pysdd":
-            assert model.solveAll(solver=solver) == 4
+        if solver in ("gurobi", "hexaly"): # do not support exhaustive search
+            kwargs = dict(time_limit=2) # should be able to find all solutions in this limit
         else:
-            # some solvers do not support searching for all solutions...
-            # TODO: remove solution limit and replace with time limit (atm pysat does not support time limit and gurobi needs any(solution_limit, time_limit)...
-            assert model.solveAll(solver=solver, solution_limit=4) == 4
+            kwargs = dict()
+
+        assert model.solveAll(solver=solver, **kwargs) == 4
 
     def test_objective(self, solver):
         iv = cp.intvar(0, 10, shape=2)
