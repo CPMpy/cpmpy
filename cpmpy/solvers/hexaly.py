@@ -177,7 +177,11 @@ class CPM_hexaly(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
-                cpm_var._value = self.hex_sol.get_value(sol_var)
+                if cpm_var.is_bool():
+                    cpm_var._value = bool(self.hex_sol.get_value(sol_var))
+                else:
+                    cpm_var._value = int(self.hex_sol.get_value(sol_var))
+
 
             # translate objective, for optimisation problems only
             if self.has_objective():
