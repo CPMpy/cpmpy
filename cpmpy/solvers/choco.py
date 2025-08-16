@@ -42,6 +42,7 @@
     ==============
 """
 import time
+from typing import Optional
 
 import numpy as np
 
@@ -100,6 +101,16 @@ class CPM_choco(SolverInterface):
             return False
         except Exception as e:
             raise e
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('pychoco').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -596,7 +607,7 @@ class CPM_choco(SolverInterface):
                 table = table.astype(float) # nan's require float dtype
                 # Choco requires a wildcard value not present in dom of args,
                 # take value lower than anything else
-                chc_star = min(np.nanmin(table), *get_bounds(array)[0]) -1
+                chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
                 chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
             elif cpm_expr.name == "regular":

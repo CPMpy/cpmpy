@@ -45,6 +45,9 @@
     Module details
     ==============
 """
+from typing import Optional
+import pkg_resources
+
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -85,8 +88,17 @@ class CPM_z3(SolverInterface):
             return False
         except Exception as e:
             raise e
-
-
+        
+    @classmethod
+    def version(cls) -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('z3-solver').version
+        except pkg_resources.DistributionNotFound:
+            return None
+        
     def __init__(self, cpm_model=None, subsolver="sat"):
         """
         Constructor of the native solver object
@@ -489,6 +501,8 @@ class CPM_z3(SolverInterface):
                 return z3.Distinct(self._z3_expr(cpm_con.args))
             elif cpm_con.name == 'xor':
                 z3_args = self._z3_expr(cpm_con.args)
+                if len(z3_args) == 1: # just the arg
+                    return z3_args[0]
                 z3_cons = z3.Xor(z3_args[0], z3_args[1])
                 for a in z3_args[2:]:
                     z3_cons = z3.Xor(z3_cons, a)

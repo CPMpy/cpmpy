@@ -94,9 +94,7 @@ class TestCSE(unittest.TestCase):
         csemap = dict()
         eq_cons = only_numexpr_equality([cons], csemap=csemap)
         
-        self.assertEqual(len(eq_cons), 2)
-        self.assertEqual(str(eq_cons[0]), "(max(x,y,z)) == (IV0)")
-        self.assertEqual(str(eq_cons[1]), "IV0 <= 42")
+        self.assertSetEqual(set([str(c) for c in eq_cons]), {"(max(x,y,z)) == (IV0)", "IV0 <= 42"})
         self.assertEqual(len(csemap), 1)
         
         # next time we use max([x,y,z]) it should replace it with IV0

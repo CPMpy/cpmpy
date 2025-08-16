@@ -241,16 +241,17 @@ def element(arg_list):
 
 class Element(GlobalFunction):
     """
-        The 'Element' global constraint enforces that the result equals Arr[Idx]
-        with 'Arr' an array of constants or variables (the first argument)
-        and 'Idx' an integer decision variable, representing the index into the array.
+        The `Element` global constraint enforces that the result equals `Arr[Idx]`
+        with `Arr` an array of constants or variables (the first argument)
+        and `Idx` an integer decision variable, representing the index into the array.
 
-        Solvers implement it as Arr[Idx] == Y, but CPMpy will automatically derive or create
-        an appropriate Y. Hence, you can write expressions like Arr[Idx] + 3 <= Y
+        Solvers implement it as `Arr[Idx] == Y`, but CPMpy will automatically derive or create
+        an appropriate `Y`. Hence, you can write expressions like `Arr[Idx] + 3 <= Y`.
 
         Element is a CPMpy built-in global constraint, so the class implements a few more
-        extra things for convenience (.value() and .__repr__()). It is also an example of
-        a 'numeric' global constraint.
+        extra things for convenience (`.value()` and `.__repr__()`). It is also an example of
+        a 'numeric' global constraint. Consequently, the return expression of the
+        `Element` function is also numeric, even if `Arr` only contains Boolean variables.
     """
 
     def __init__(self, arr, idx):
