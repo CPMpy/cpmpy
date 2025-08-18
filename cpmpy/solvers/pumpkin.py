@@ -381,6 +381,8 @@ class CPM_pumpkin(SolverInterface):
         # do we already have this predicate? 
         #  (actually, cse might already catch these...)
         if (lhs, comp, rhs) not in self.predicate_map:
+            if tag is None:
+                tag = self.pum_solver.new_constraint_tag()
             pred = Predicate(self.to_pum_ivar(lhs, tag=tag), comp, rhs)
             self.predicate_map[(lhs, comp, rhs)] = pred
         
