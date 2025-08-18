@@ -26,7 +26,7 @@ class CPM_cuopt(SolverInterface):
     
     @staticmethod
     def supported():
-        pass
+        return True
 
     @staticmethod
     def installed():
@@ -41,7 +41,7 @@ class CPM_cuopt(SolverInterface):
 
         from cuopt.linear_programming.problem import Problem, CONTINUOUS, MAXIMIZE
         from cuopt.linear_programming.solver_settings import SolverSettings
-
+        
         self.cuopt_model = Problem("CPMpy model")
 
         super().__init__(name="cuopt", cpm_model=cpm_model)
@@ -50,8 +50,11 @@ class CPM_cuopt(SolverInterface):
     def native_model(self):
         return self.cuopt_model
 
-    def solve(self, model, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, **kwargs):
         from cuopt.linear_programming.solver_settings import SolverSettings
+        from cuopt.linear_programming.solution import Solution
+        # from cuopt.linear_programming.solver 
+
 
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -67,22 +70,34 @@ class CPM_cuopt(SolverInterface):
         
         # Configure solver settings
         settings = SolverSettings()
-        settings.set_parameter("time_limit", time_limit)
+        if time_limit is not None:
+            settings.set_parameter("time_limit", time_limit)
 
         # Solve the problem
-        self.problem.solve(settings)
+        self.cuopt_model.solve(settings)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        # self.cpm_status.runtime = self.ort_solver.WallTime()
+        self.cpm_status.runtime = self.cuopt_model.SolveTime
+        cuopt_status = self.cuopt_model.Status.name
 
-
-
-        print(self.problem.Status.name)
+        if cuopt_status == "Optimal":
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif cuopt_status == "FeasibleFound":
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif cuopt_status == "Infeasible":
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif cuopt_status == "NoTermination":
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+        else:
+            raise NotImplementedError(
+                f"Translation of cpuopt status {cuopt_status} to CPMpy status not implemented")  # a new status type was introduced, please report on github
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
-
 
         # translate solution values (of user specified variables only)
         self.objective_value_ = None
@@ -90,16 +105,15 @@ class CPM_cuopt(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 try:
-                    cpm_var._value = self.solver_var(cpm_var).getValue()
+                    cpm_var._value = int(self.solver_var(cpm_var).getValue())
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
                     raise ValueError(f"Var {cpm_var} is unknown to the cuOpt solver, this is unexpected - "
                                      f"please report on github...")
-
             # translate objective
             if self.has_objective():
-                cuopt_obj_val = self.problem.ObjValue
+                cuopt_obj_val = self.cuopt_model.ObjValue
                 if round(cuopt_obj_val) == cuopt_obj_val: # it is an integer?
                     self.objective_value_ = int(cuopt_obj_val)  # ensure it is an integer
                 else: # can happen when using floats as coeff in objective
@@ -115,10 +129,20 @@ class CPM_cuopt(SolverInterface):
     def solver_var(self, cpm_var):
         from cuopt.linear_programming.problem import INTEGER
 
+        if is_num(cpm_var): # shortcut, eases posting constraints
+            return cpm_var
+        
+        # special case, negative-bool-view
+        # work directly on var inside the view
+        if isinstance(cpm_var, NegBoolView):
+            raise Exception("Negative literals should not be part of any equation. "
+                            "See /transformations/linearize for more details")
+
         # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, (_BoolVarImpl, _IntVarImpl)):
-                revar = self.problem.addVariable(lb=cpm_var.lb, ub=cpm_var.ub, vtype=INTEGER, name=str(cpm_var))
+                revar = self.cuopt_model.addVariable(lb=cpm_var.lb, ub=cpm_var.ub, vtype=INTEGER, name=str(cpm_var))
+                # print(revar)
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
@@ -130,17 +154,18 @@ class CPM_cuopt(SolverInterface):
 
         # make objective function non-nested
         (flat_obj, flat_cons) = flatten_objective(expr)
+        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         self += flat_cons  # add potentially created constraints
         get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
         # Set objective
-        self.problem.setObjective(obj, sense=MINIMIZE if minimize else MAXIMIZE)
+        self.cuopt_model.setObjective(obj, sense=MINIMIZE if minimize else MAXIMIZE)
 
         
     def has_objective(self):
-        return self.problem.getObjective() is not None
+        return self.cuopt_model.getObjective() is not None
 
     def transform(self, cpm_expr):
         # apply transformations, then post internally
@@ -150,12 +175,12 @@ class CPM_cuopt(SolverInterface):
         supported = {} # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset([]), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub", "mul"}), csemap=self._csemap)  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -177,18 +202,19 @@ class CPM_cuopt(SolverInterface):
 
                 # Thanks to `only_numexpr_equality()` only supported comparisons should remain
                 if cpm_expr.name == '<=':
-                    self.problem.addConstraint(lhs <= rhs)
+                    self.cuopt_model.addConstraint(self._make_numexpr(lhs) <= rhs)
                 elif cpm_expr.name == '>=':
-                    self.problem.addConstraint(lhs >= rhs)
+                    print(self._make_numexpr(lhs) >= rhs)
+                    self.cuopt_model.addConstraint(self._make_numexpr(lhs) >= rhs)
                 elif cpm_expr.name == '==':
-                    self.problem.addConstraint(lhs == rhs)
+                    self.cuopt_model.addConstraint(self._make_numexpr(lhs) == rhs)
 
-                    if isinstance(lhs, _NumVarImpl) \
-                            or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
-                        # a BoundedLinearExpression LHS, special case, like in objective
-                        cuopt_lhs = self._make_numexpr(lhs)
-                        self.problem.addConstraint()
-                        self.grb_model.addLConstr(cuopt_lhs == cuopt_rhs)
+                    # if isinstance(lhs, _NumVarImpl) \
+                    #         or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
+                    #     # a BoundedLinearExpression LHS, special case, like in objective
+                    #     cuopt_lhs = self._make_numexpr(lhs)
+                    #     self.cuopt_model.addConstraint()
+                    #     self.grb_model.addLConstr(cuopt_lhs == cuopt_rhs)
 
                     # elif lhs.name == 'mul':
                     #     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
@@ -224,38 +250,56 @@ class CPM_cuopt(SolverInterface):
                     raise NotImplementedError(
                     "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
 
-            # elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            #     # Indicator constraints
-            #     # Take form bvar -> sum(x,y,z) >= rvar
-            #     cond, sub_expr = cpm_expr.args
-            #     assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
-            #     assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
-            #     if isinstance(cond, NegBoolView):
-            #         cond, bool_val = self.solver_var(cond._bv), False
-            #     else:
-            #         cond, bool_val = self.solver_var(cond), True
+            elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
 
-            #     lhs, rhs = sub_expr.args
-            #     if isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum":
-            #         lin_expr = self._make_numexpr(lhs)
-            #     else:
-            #         raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
-            #     if sub_expr.name == "<=":
-            #         self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs))
-            #     elif sub_expr.name == ">=":
-            #         self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
-            #     elif sub_expr.name == "==":
-            #         self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
-            #     else:
-            #         raise Exception(f"Unknown linear expression {sub_expr} name")
+                
+                
+                # Indicator constraints
+                # Take form bvar -> sum(x,y,z) >= rvar
+                cond, sub_expr = cpm_expr.args
+
+                assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+                assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
+                # if isinstance(cond, NegBoolView):
+                #     cond, bool_val = self.solver_var(cond._bv), False
+                # else:
+                #     cond, bool_val = self.solver_var(cond), True
+
+                lhs, rhs = sub_expr.args
+                if isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum":
+                    lin_expr = self._make_numexpr(lhs)
+                else:
+                    raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
+                
+                if sub_expr.name == "<=":
+                    lub, llb = get_bounds(lhs)
+                    rub, rlb = get_bounds(rhs)
+                    M = (lub - rlb)
+                    y = cp.boolvar()
+                    # self.cuopt_model.addConstraint(self._make_numexpr(lhs - y*M) <= rhs)
+                    # self.cuopt_model.addConstraint(self._make_numexpr((-1*cond._bv if isinstance(cond, NegBoolView) else cond) + y) <= 1)
+                    self.cuopt_model.addConstraint(lin_expr + self._make_numexpr(- rhs - M + cond*M) <= 0)
+                elif sub_expr.name == ">=":
+                    lub, llb = get_bounds(lhs)
+                    rub, rlb = get_bounds(rhs)
+                    M = (rub - llb)
+                    y = cp.boolvar()
+                    print(" -----> ", self._make_numexpr(rhs - M + cond*M) - lin_expr)
+                    # self.cuopt_model.addConstraint(self._make_numexpr(lhs + y*M) >= rhs)
+                    # self.cuopt_model.addConstraint(self._make_numexpr((-1*cond._bv if isinstance(cond, NegBoolView) else cond) + y) <= 1)
+                    self.cuopt_model.addConstraint( self._make_numexpr(rhs - M + cond*M) - lin_expr <= 0)
+                # elif sub_expr.name == "==":
+                #     self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
+                else:
+                    raise Exception(f"Unknown linear expression {sub_expr} name")
 
             # True or False
             elif isinstance(cpm_expr, BoolVal):
-                self.problem.addConstraint(cpm_expr.args[0])
+                self.cuopt_model.addConstraint(self.solver_var(cp.boolvar()) >= 2)
 
             # a direct constraint, pass to solver
             elif isinstance(cpm_expr, DirectConstraint):
-                cpm_expr.callSolver(self, self.problem)
+                cpm_expr.callSolver(self, self.cuopt_model)
 
             else:
                 raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
@@ -281,7 +325,7 @@ class CPM_cuopt(SolverInterface):
             return a - b
         # wsum
         if cpm_expr.name == "wsum":
-            return sum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
+            return sum(-w * self.solver_var(var._bv) if isinstance(var, NegBoolView) else w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
         raise NotImplementedError("cuopt: Not a known supported numexpr {}".format(cpm_expr))
 
