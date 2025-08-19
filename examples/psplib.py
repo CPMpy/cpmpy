@@ -235,9 +235,12 @@ if __name__ == "__main__":
     table['Task'] = table.index
     
     import plotly.express as px
+    import plotly.io as pio
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
     import numpy as np
+    pio.renderers.default = "browser"
+
 
     fig = make_subplots(rows=len(capacities)+1, cols=1, 
                         subplot_titles=["Task view"] +[f"Resource {r}" for r in capacities.keys()])
@@ -277,4 +280,5 @@ if __name__ == "__main__":
                       line=dict(color='red', dash='dash')),
             row=i, col=1
         )
+
     fig.show()
