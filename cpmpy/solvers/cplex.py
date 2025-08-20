@@ -6,16 +6,36 @@
 """
     Interface to CPLEX Optimizer using the python 'docplex.mp' package
 
-    Requires that the 'docplex' python package is installed:
-
-        $ pip install docplex
-    
     CPLEX, standing as an acronym for ‘Complex Linear Programming Expert’,
     is a high-performance mathematical programming solver specializing in linear programming (LP),
     mixed integer programming (MIP), and quadratic programming (QP).
 
-    Documentation of the solver's own Python API:
-    https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
+    Always use :func:`cp.SolverLookup.get("cplex") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+    
+    Requires that the 'docplex' python package is installed:
+
+    .. code-block:: console
+
+        $ pip install docplex
+
+    Detailed installation instructions available at:
+    https://ibmdecisionoptimization.github.io/docplex-doc/getting_started_python.html
+
+    You will also need to install CPLEX Optimization Studio from IBM's website.
+    There is a free community version available.
+    https://www.ibm.com/products/ilog-cplex-optimization-studio
+    See detailed installation instructions at:
+    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
+    
+    It also requires an active licence.
+    Academic license:
+    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -58,18 +78,8 @@ class CPM_cplex(SolverInterface):
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, 
     calls a function on the ``cplex_model`` object.
 
-    Requires that the 'docplex' python package is installed:
-    $ pip install docplex
-
-    docplex documentation:
-    https://ibmdecisionoptimization.github.io/docplex-doc/
-    You will also need to install CPLEX Optimization Studio from IBM's website.
-    There is a free community version available.
-    https://www.ibm.com/products/ilog-cplex-optimization-studio
-    See detailed installation instructions at:
-    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
-    Academic license:
-    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
+    Documentation of the solver's own Python API:
+    https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
     """
 
     @staticmethod
