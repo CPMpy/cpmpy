@@ -176,7 +176,7 @@ class CPM_cplex(SolverInterface):
             self.add(intvar(1, 1) == 1)
             
         # set time limit
-        if time_limit is not None and not np.isinf(time_limit):
+        if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             self.cplex_model.set_time_limit(time_limit)
