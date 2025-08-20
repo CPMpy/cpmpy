@@ -509,7 +509,7 @@ class CPM_cplex(SolverInterface):
 
         # Ask for multiple solutions
         self.cplex_model.context.cplex_parameters.mip.limits.populate = solution_limit
-        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4  # (optional) max effort for finding solutions
+        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4
 
         solutions_pool = self.cplex_model.populate_solution_pool()
 
