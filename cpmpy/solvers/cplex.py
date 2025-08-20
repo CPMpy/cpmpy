@@ -182,7 +182,6 @@ class CPM_cplex(SolverInterface):
         if nb_threads is not None:
             self.cplex_model.context.cplex_parameters.threads = nb_threads
 
-        cplex_objective = self.cplex_model.get_objective_expr()
         self.cplex_model.solve(**kwargs)
         
         # new status, translate runtime
@@ -227,7 +226,7 @@ class CPM_cplex(SolverInterface):
                     cpm_var._value = round(solver_val)
             # set _objective_value
             if self.has_objective():
-                obj_val = cplex_objective.solution_value
+                obj_val = self.cplex_model.get_objective_expr().solution_value
                 if round(obj_val) == obj_val: # it is an integer?:
                     self.objective_value_ = int(obj_val)
                 else: #  can happen with DirectVar or when using floats as coefficients
