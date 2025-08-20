@@ -184,6 +184,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                     if "mul" not in supported:
                         raise NotImplementedError("Cannot linearize modulo without multiplication")
 
+                    if not is_num(lhs.args[1]):
+                        raise NotImplementedError("Cannot linearize modulo with non-integer modulus")
+                    # only `MOD(b,n) == IV` supported, with n being an integer
+
                     if cpm_expr.name != "==":
                         new_rhs, newcons = get_or_make_var(lhs, csemap=csemap)
                         newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
