@@ -425,9 +425,9 @@ class CPM_cplex(SolverInterface):
             assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
             assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
             if isinstance(cond, NegBoolView):
-                cond, trigger_val = self.solver_var(cond._bv), 0
+                cond, trigger_val = self.solver_var(cond._bv), False
             else:
-                cond, trigger_val = self.solver_var(cond), 1
+                cond, trigger_val = self.solver_var(cond), True
 
             lhs, rhs = sub_expr.args
             if isinstance(lhs, _NumVarImpl) or (lhs.name in {'sum', 'wsum', 'sub'}):
