@@ -30,7 +30,9 @@
     Module details
     ==============
 """
+import warnings
 import numpy as np
+from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -109,6 +111,17 @@ class CPM_cplex(SolverInterface):
                 warnings.warn(f"Problem encountered with CPLEX installation: {e}")
                 return False
 
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            import pkg_resources
+            return pkg_resources.get_distribution('docplex').version
+        except pkg_resources.DistributionNotFound:
+            return None
+
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
@@ -142,14 +155,14 @@ class CPM_cplex(SolverInterface):
             - nb_threads:  how many threads to use during solve (int, optional)
             - kwargs:      any keyword argument, sets parameters of solver object
 
-            Examples of supported arguments include:
+            Supported arguments:
                 - context (optional) – context to use during solve
                 - cplex_parameters (optional) – A set of CPLEX parameters to use
                 - checker (optional) – a string which controls which type of checking is performed. (type checks etc.)
                 - log_output (optional) – if True, solver logs are output to stdout.
                 - clean_before_solve (optional) – default False (iterative solving)
 
-            For a full list of parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
+            For a full description of the parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
             and for cplex parameters: https://www.ibm.com/docs/en/icos/22.1.1?topic=cplex-topical-list-parameters
 
             After solving, all solve details can be accessed through self.cplex_model.solve_details:
