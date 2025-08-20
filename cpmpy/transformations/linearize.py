@@ -181,7 +181,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
 
 
                 elif lhs.name == "mod" and "mod" not in supported:
-                    if "mul" not in supported and not is_num(lhs.args[1]):
+                    if "mul" not in supported:
                         raise NotImplementedError("Cannot linearize modulo without multiplication")
 
                     if cpm_expr.name != "==":
