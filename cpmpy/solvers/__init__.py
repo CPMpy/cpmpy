@@ -40,6 +40,7 @@
         pysdd
         pindakaas
         pumpkin
+        cplex
 
     =========================
     List of helper submodules
