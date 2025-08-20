@@ -443,9 +443,9 @@ def only_positive_bv(lst_of_expr, csemap=None):
             cond, subexpr = cpm_expr.args
             assert isinstance(cond, _BoolVarImpl), f"{cpm_expr} is not a supported linear expression. Apply " \
                                                    f"`linearize_constraint` before calling `only_positive_bv` "
-            if isinstance(cond, _BoolVarImpl): # BV -> Expr
-                subexpr = only_positive_bv([subexpr], csemap=csemap)
-                newlist += [cond.implies(expr) for expr in subexpr]
+            # BV -> Expr
+            subexpr = only_positive_bv([subexpr], csemap=csemap)
+            newlist += [cond.implies(expr) for expr in subexpr]
 
         elif isinstance(cpm_expr, _BoolVarImpl):
             raise ValueError(f"Unreachable: unexpected Boolean literal (`_BoolVarImpl`) in expression {cpm_expr}, perhaps `linearize_constraint` was not called before this `only_positive_bv `call")
