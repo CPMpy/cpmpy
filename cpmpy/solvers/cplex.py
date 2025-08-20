@@ -523,9 +523,8 @@ class CPM_cplex(SolverInterface):
             for var in self.user_vars:
                 var._value = None
 
-        for i in range(solution_count):
-            # Specify which solution to query
-            solution = solutions_pool[i]
+        for solution in solutions_pool:
+
             sol_obj_val = solution.get_objective_value()
             if optimal_val is None:
                 optimal_val = sol_obj_val
