@@ -53,7 +53,7 @@ import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
-from cpmpy.transformations.reification import only_implies, only_bv_reifies
+from cpmpy.transformations.reification import only_implies
 
 
 from .decompose_global import decompose_in_tree
