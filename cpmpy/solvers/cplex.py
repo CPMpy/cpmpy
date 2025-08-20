@@ -171,6 +171,10 @@ class CPM_cplex(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
+            
         # set time limit
         if time_limit is not None and not np.isinf(time_limit):
             if time_limit <= 0:
@@ -464,6 +468,12 @@ class CPM_cplex(SolverInterface):
 
             Returns: number of solutions found
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
 
         # set time limit
         if time_limit is not None:
