@@ -72,15 +72,6 @@ class CPM_cplex(SolverInterface):
     https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
     """
 
-    _domp = None  # Static attribute to hold the docplex.cp module
-
-    @classmethod
-    def get_domp(cls):
-        if cls._domp is None:
-            import docplex.mp as domp  # Import only once
-            cls._domp = domp
-        return cls._domp
-
     @staticmethod
     def supported():
         return CPM_cplex.installed() and CPM_cplex.license_ok()
@@ -89,7 +80,7 @@ class CPM_cplex(SolverInterface):
     def installed():
         # try to import the package
         try:
-            CPM_cplex.get_domp()
+            import docplex.mp as domp
             return True
         except ModuleNotFoundError:
             return False
@@ -102,7 +93,8 @@ class CPM_cplex(SolverInterface):
             return False
         else:
             try:
-                mdl = CPM_cplex.get_domp().Model()
+                from docplex.mp.model import Model
+                mdl = Model()
                 mdl.solve()
                 return True
             except Exception as e:
@@ -133,7 +125,8 @@ class CPM_cplex(SolverInterface):
         elif not self.license_ok():
             raise Exception("CPM_cplex: A problem occured during license check. Make sure your installed the CPLEX Optimization Studio")
 
-        self.cplex_model = CPM_cplex.get_domp().Model()
+        from docplex.mp.model import Model
+        self.cplex_model = Model()
         super().__init__(name="cplex", cpm_model=cpm_model)
 
     @property
