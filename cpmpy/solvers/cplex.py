@@ -404,7 +404,7 @@ class CPM_cplex(SolverInterface):
                     self.cplex_model.add_constraint(a * b == cplexrhs)
 
                 else:
-                    # General constraints
+                    # Global functions
                     if lhs.name == 'min':
                         self.cplex_model.add_constraint(self.cplex_model.min(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'max':
