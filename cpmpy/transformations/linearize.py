@@ -199,7 +199,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                         x, y = lhs.args
                         lby, uby = get_bounds(y)
                         if lby <= 0 <= uby:
-                            raise ValueError("Attempting linerarization of unsafe modulo, safen expression first (cpmpy/transformations/safen.py)")
+                            raise ValueError("Attempting linearization of unsafe modulo, safen expression first (cpmpy/transformations/safen.py)")
 
                         # k * y + z == x
                         k = intvar(*get_bounds((x - rhs) // y))
@@ -248,7 +248,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                         a, b = lhs.args
                         lb, ub = get_bounds(b)
                         if lb <= 0 <= ub:
-                            raise ValueError("Attempting linerarization of unsafe division, safen expression first (cpmpy/transformations/safen.py)")
+                            raise ValueError("Attempting linearization of unsafe division, safen expression first (cpmpy/transformations/safen.py)")
 
                         r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
                         mult_res, side_cons = get_or_make_var(b * rhs, csemap=csemap)
