@@ -595,7 +595,7 @@ def canonical_comparison(lst_of_expr):
                 
                 # 2) add collected variables to lhs
                 if isinstance(lhs, Operator) and lhs.name == "sum":
-                    lhs, rhs = sum([1 * a for a in lhs.args] + lhs2), rhs
+                    lhs = sum([1 * a for a in lhs.args] + lhs2)
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
                     lhs = lhs + lhs2
                 else:
