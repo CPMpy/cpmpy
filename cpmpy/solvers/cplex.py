@@ -457,6 +457,25 @@ class CPM_cplex(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
+    def solution_hint(self, cpm_vars, vals):
+        """
+        CPLEX supports warmstarting the solver with a (in)feasible solution.
+        This is done using MIP starts which provide the solver with a starting point
+        for the branch-and-bound algorithm.
+
+        To learn more about solution hinting in CPLEX, see:
+        https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html#docplex.mp.model.Model.add_mip_start
+
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        # Create a MIP start solution from the provided variables and values
+        mip_start_sol = {}
+        for cpm_var, val in zip(cpm_vars, vals):
+            mip_start_sol[self.solver_var(cpm_var)] = val
+        
+        self.cplex_model.add_mip_start(mip_start_sol)
+
     def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
