@@ -143,7 +143,7 @@ class CPM_cplex(SolverInterface):
         """
         return self.cplex_model
 
-    def solve(self, time_limit=None, nb_threads=1, **kwargs):
+    def solve(self, time_limit=None, nb_threads=None, **kwargs):
         """
             Call the cplex solver
 
@@ -179,7 +179,8 @@ class CPM_cplex(SolverInterface):
             self.cplex_model.set_time_limit(time_limit)
 
         # set nb of threads
-        self.cplex_model.context.cplex_parameters.threads = nb_threads
+        if nb_threads is not None:
+            self.cplex_model.context.cplex_parameters.threads = nb_threads
 
         cplex_objective = self.cplex_model.get_objective_expr()
         self.cplex_model.solve(**kwargs)
