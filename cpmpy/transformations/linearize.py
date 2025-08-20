@@ -66,7 +66,7 @@ from ..exceptions import TransformationNotImplementedError
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
+from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
@@ -169,9 +169,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                 elif lhs.name == "pow" and "pow" not in supported:
                     if "mul" not in supported:
                         raise NotImplementedError("Cannot linearize power without multiplication")
-                    if not is_num(lhs.args[1]):
-                        raise NotImplementedError("Cannot linearize power with non-integer exponent")
-                    # only `POW(b,n) == IV` supported, with n being an integer, post as b*b*...*b (n times) == IV
+                    if not is_int(lhs.args[1]) or lhs.args[1] < 0:
+                        raise NotImplementedError("Cannot linearize power with non-integer or negative exponent")
+                    # only `POW(b,n) == IV` supported, with n being a non-negative integer, post as b*b*...*b (n times) == IV
                     x, n = lhs.args
                     new_lhs = 1
                     for exp in range(n):
