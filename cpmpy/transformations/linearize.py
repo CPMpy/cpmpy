@@ -106,10 +106,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
             elif cpm_expr.name == "or" and cpm_expr.name not in supported:
                 newlist.append(sum(cpm_expr.args) >= 1)
 
-            # xor
-            elif cpm_expr.name == "xor" and len(cpm_expr.args) == 2:
-                newlist.append(sum(cpm_expr.args) == 1)
-
             # reification
             elif cpm_expr.name == "->":
                 # determine direction of implication
