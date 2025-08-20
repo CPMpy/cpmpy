@@ -31,7 +31,6 @@
     ==============
 """
 import warnings
-import numpy as np
 from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -90,7 +89,7 @@ class CPM_cplex(SolverInterface):
     def installed():
         # try to import the package
         try:
-            import docplex.mp as domp
+            CPM_cplex.get_domp()
             return True
         except ModuleNotFoundError:
             return False
@@ -103,8 +102,7 @@ class CPM_cplex(SolverInterface):
             return False
         else:
             try:
-                from docplex.mp.model import Model
-                mdl = Model()
+                mdl = CPM_cplex.get_domp().Model()
                 mdl.solve()
                 return True
             except Exception as e:
@@ -134,9 +132,8 @@ class CPM_cplex(SolverInterface):
             raise Exception("CPM_cplex: Install the python package 'docplex' to use this solver interface.")
         elif not self.license_ok():
             raise Exception("CPM_cplex: A problem occured during license check. Make sure your installed the CPLEX Optimization Studio")
-        import docplex.mp.model as dmm
 
-        self.cplex_model = dmm.Model()
+        self.cplex_model = CPM_cplex.get_domp().Model()
         super().__init__(name="cplex", cpm_model=cpm_model)
 
     @property
