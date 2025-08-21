@@ -48,7 +48,7 @@ class PSPLibDataset(object):  # torch.utils.data.Dataset compatible
         if variant != "rcpsp":
             raise ValueError("Only 'rcpsp' variant is supported for now")
         if family not in self.families[variant]:
-            raise ValueError("Track must be specified, e.g. COP, CSP, MiniCOP, ...")
+            raise ValueError(f"Unknown problem family. Must be any of {','.join(self.families[variant])}")
         # Create root directory if it doesn't exist
         self.root.mkdir(parents=True, exist_ok=True)
         
@@ -215,7 +215,7 @@ def rcpsp_model(job_data, capacities):
 
 
 if __name__ == "__main__":
-    dataset = PSPLibDataset(variant="rcpsp", family="j30", transform=parse_rcpsp, download=True)
+    dataset = PSPLibDataset(variant="rcpsp", family="j60", transform=parse_rcpsp, download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:")
     (table, capacities), metadata = dataset[0]
@@ -239,20 +239,21 @@ if __name__ == "__main__":
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
     import numpy as np
-    pio.renderers.default = "browser"
+    pio.renderers.default = "browser" # ensure plotly opens figure in browser
 
-
-    fig = make_subplots(rows=len(capacities)+1, cols=1, 
-                        subplot_titles=["Task view"] +[f"Resource {r}" for r in capacities.keys()])
+    
 
     # Make the gantt chart
     ghant_fig = px.bar(table, orientation='h',
                        base="Start", x="duration", y="Task", color="Task", text="Task")   
-    fig.add_traces(ghant_fig.data, rows=1, cols=1)
+    ghant_fig.show()
 
-  
+    # Make the resource usage plots (for each resource)
+    fig = make_subplots(rows=len(capacities), cols=1, 
+                        subplot_titles=[f"Resource {r}" for r in capacities.keys()])
+    
     # For each resource
-    for i, (resource, capacity) in enumerate(capacities.items(), 2):
+    for i, (resource, capacity) in enumerate(capacities.items(),1):
         # Create timeline of resource usage with step function
         timeline = np.zeros(int(makespan.value()) + 1)
         
