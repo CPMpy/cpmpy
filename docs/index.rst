@@ -94,7 +94,6 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
   :width: 480
   :alt: Waterfall from model to solvers
 
-(* automated int-to-bool not yet supported )
 
 
 .. toctree::
