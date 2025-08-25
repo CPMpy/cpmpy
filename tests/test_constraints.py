@@ -50,6 +50,7 @@ EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pindakaas": {"mul", "div", "pow", "mod"},
                      "exact": {},
+                     "cplex": {"mul", "div", "mod", "pow"},
                      "pumpkin": {"pow", "mod"},
                      }
 
