@@ -517,7 +517,7 @@ class CPM_cplex(SolverInterface):
 
         # Ask for multiple solutions
         self.cplex_model.context.cplex_parameters.mip.limits.populate = solution_limit
-        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4
+        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4 # (optional) max effort for finding solutions
 
         solutions_pool = self.cplex_model.populate_solution_pool()
 
@@ -564,7 +564,7 @@ class CPM_cplex(SolverInterface):
 
         # Reset pool search mode to default
         self.cplex_model.context.cplex_parameters.mip.limits.populate = 1
-        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 0  # (optional) max effort for finding solutions
+        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 0
 
         cplex_status = self.cplex_model.solve_details.status
         if opt_sol_count:
