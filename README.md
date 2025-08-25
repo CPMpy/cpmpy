@@ -24,23 +24,25 @@ For combinatorial problems with Boolean and integer variables. With many high-le
 
 Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research and industry. 
 
+Install simply with `pip install cpmpy`
+
 ### 🔑 Key Features
 
 * **Solver-agnostic**: use and compare CP, ILP, SMT, PB and SAT solvers
 * **ML-friendly**: decision variables are numpy arrays, with vectorized operations and constraints
 * **Incremental solving**: assumption variables, adding constraints and updating objectives
 * **Extensively tested**: large test-suite and [actively fuzz-tested](https://github.com/CPMpy/fuzz-test)
-* **Tools**: for parameter-tuning, debugging and explanation generation
+* **Tools**: for parameter-tuning, debugging, explanation generation and XCSP3 benchmarking
 * **Flexible**: easy to add constraints or solvers, also direct solver access
 
 ### 🔩 Solvers
 
 CPMpy can translate to a wide variety of constraint solving paradigms, including both commercial and open-source solvers.
 
-* **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, MiniZinc+solvers
+* **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, Pumpkin, MiniZinc+solvers
 * **ILP Solvers**: Gurobi (license required)
 * **SMT Solvers**: Z3
-* **PB Solvers**: Exact
+* **PB Solvers**: Exact, Pindakaas
 * **SAT Solvers**: PySAT+solvers, PySDD
 
 ### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling
@@ -48,7 +50,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 An example that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
 
 ```python
-# Flexible job-shop: a set of jobs must be run, each can be run on any of the machines,
+# Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
 # with different duration and energy consumption. Minimize makespan and total energy consumption
 import cpmpy as cp
 import pandas as pd

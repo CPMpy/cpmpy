@@ -51,8 +51,10 @@ def toplevel_list(cpm_expr, merge_and=True):
 
 def simplify_boolean(lst_of_expr, num_context=False):
     """
-    Removes boolean constants from all CPMpy expressions.
-    Only resulting boolean constant is literal 'false'.
+    Removes boolean constants from all CPMpy expressions, except for constants in global constraints/functions.
+    Solver interfaces are expected to implement special cases of typing for global constraints themselves.
+
+    Only resulting Boolean constant is literal 'false'.
     Boolean constants are promoted to `int` if in a numerical context,
     `ints` are never converted to `bool`.
     
