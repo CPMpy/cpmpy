@@ -519,45 +519,45 @@ class CPM_cplex(SolverInterface):
         solutions_pool = self.cplex_model.populate_solution_pool()
 
         optimal_val = None
-        solution_count = len(solutions_pool)
         opt_sol_count = 0
 
         # clear user vars if no solution found
-        if solution_count == 0:
+        if solutions_pool is None:
             self.objective_value_ = None
             for var in self.user_vars:
                 var._value = None
 
-        for solution in solutions_pool:
+        else:
+            for solution in solutions_pool:
 
-            sol_obj_val = solution.get_objective_value()
-            if optimal_val is None:
-                optimal_val = sol_obj_val
-            if optimal_val is not None:
-                # sub-optimal solutions
-                if sol_obj_val != optimal_val:
-                    break
-            opt_sol_count += 1
+                sol_obj_val = solution.get_objective_value()
+                if optimal_val is None:
+                    optimal_val = sol_obj_val
+                if optimal_val is not None:
+                    # sub-optimal solutions
+                    if sol_obj_val != optimal_val:
+                        break
+                opt_sol_count += 1
 
-            # Translate solution to variables
-            for cpm_var in self.user_vars:
-                solver_val = solution.get_value(self.solver_var(cpm_var))
-                if cpm_var.is_bool():
-                    cpm_var._value = solver_val >= 0.5
-                else:
-                    cpm_var._value = int(solver_val)
+                # Translate solution to variables
+                for cpm_var in self.user_vars:
+                    solver_val = solution.get_value(self.solver_var(cpm_var))
+                    if cpm_var.is_bool():
+                        cpm_var._value = solver_val >= 0.5
+                    else:
+                        cpm_var._value = int(solver_val)
 
-            # Translate objective
-            if self.has_objective():
-                self.objective_value_ = sol_obj_val
+                # Translate objective
+                if self.has_objective():
+                    self.objective_value_ = sol_obj_val
 
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
+                if display is not None:
+                    if isinstance(display, Expression):
+                        print(argval(display))
+                    elif isinstance(display, list):
+                        print(argvals(display))
+                    else:
+                        display()  # callback
 
         # Reset pool search mode to default
         self.cplex_model.context.cplex_parameters.mip.limits.populate = 1
