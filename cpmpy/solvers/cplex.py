@@ -56,7 +56,7 @@ from typing import Optional
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
-from ..expressions.utils import argvals, argval
+from ..expressions.utils import argvals, argval, eval_comparison
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -439,14 +439,8 @@ class CPM_cplex(SolverInterface):
                 lin_expr = self._make_numexpr(lhs)
             else:
                 raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
-            if sub_expr.name == "<=":
-                self.cplex_model.add_indicator(cond, lin_expr <= self.solver_var(rhs), trigger_val)
-            elif sub_expr.name == ">=":
-                self.cplex_model.add_indicator(cond, lin_expr >= self.solver_var(rhs), trigger_val)
-            elif sub_expr.name == "==":
-                self.cplex_model.add_indicator(cond, lin_expr == self.solver_var(rhs), trigger_val)
-            else:
-                raise ValueError(f"Unknown linear expression {sub_expr} name")
+            constraint = eval_comparison(sub_expr.name, lin_expr, self.solver_var(rhs))
+            self.cplex_model.add_indicator(cond, constraint, trigger_val)
 
         # True or False
         elif isinstance(cpm_expr, BoolVal):
