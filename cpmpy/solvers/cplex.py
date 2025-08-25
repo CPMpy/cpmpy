@@ -211,8 +211,8 @@ class CPM_cplex(SolverInterface):
             self.cpm_status.exitstatus = ExitStatus.ERROR
         elif "aborted" in cplex_status:
             self.cpm_status.exitstatus = ExitStatus.NOT_RUN
-        else:  # another? This can happen when error during solve. Error message will be in the status.
-            raise NotImplementedError(f"Translation of cplex status {cplex_status} to CPMpy status not implemented")  # if a new status type was introduced, please report on GitHub
+        else:  # another? This can happen when error during solve.
+            raise NotImplementedError(f"Translation of cplex status {cplex_status} to CPMpy status not implemented")
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
