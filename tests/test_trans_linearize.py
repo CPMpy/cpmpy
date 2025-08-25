@@ -402,8 +402,25 @@ class TestVarsLhs(unittest.TestCase):
                           lambda : linearize_constraint([cons], supported={"sum", "wsum"}),
                           )
 
+        cons = (x % 2) == 1
+        sols = set()
+        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
+
+        lincons = linearize_constraint([cons], supported={"sum", "wsum"})
+        linsols = set()
+        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
+
+        self.assertSetEqual(sols, linsols)
+
+        # check for full support of mod
         same_cons = linearize_constraint([cons], supported={"mod"})
         self.assertEqual(str(same_cons[0]), str(cons))
+
+        # test unsafe modulo
+        z = cp.intvar(0, 10, name="z")
+        cons = (x % z) == 1
+        with self.assertRaises(ValueError):
+            linearize_constraint([cons], supported={"sum", "wsum", "mul"})
 
         # what about half-reified?
         bv = cp.boolvar(name="bv")
