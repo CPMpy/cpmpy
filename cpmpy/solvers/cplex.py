@@ -288,7 +288,7 @@ class CPM_cplex(SolverInterface):
         (flat_obj, flat_cons) = flatten_objective(expr)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
-        self += flat_cons
+        self.add(flat_cons)
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
