@@ -161,7 +161,7 @@ class CPM_cplex(SolverInterface):
             - nb_threads:  how many threads to use during solve (int, optional)
             - kwargs:      any keyword argument, sets parameters of solver object
 
-            Supported arguments:
+            Supported keyword arguments:
                 - context (optional) – context to use during solve
                 - cplex_parameters (optional) – A set of CPLEX parameters to use
                 - checker (optional) – a string which controls which type of checking is performed. (type checks etc.)
@@ -169,7 +169,7 @@ class CPM_cplex(SolverInterface):
                 - clean_before_solve (optional) – default False (iterative solving)
 
             For a full description of the parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
-            and for cplex parameters: https://www.ibm.com/docs/en/icos/22.1.1?topic=cplex-topical-list-parameters
+            and for cplex parameters: https://www.ibm.com/docs/en/icos/22.1.2?topic=cplex-list-parameters
 
             After solving, all solve details can be accessed through self.cplex_model.solve_details:
             https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.sdetails.html#docplex.mp.sdetails.SolveDetails
