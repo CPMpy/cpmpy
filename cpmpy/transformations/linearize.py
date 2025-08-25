@@ -156,7 +156,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                 cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
 
             # linearize unsupported operators
-            elif isinstance(lhs, Operator) and lhs.name not in supported: # TODO: add pow?
+            elif isinstance(lhs, Operator) and lhs.name not in supported:
 
                 if lhs.name == "mul" and is_num(lhs.args[0]):
                     lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
