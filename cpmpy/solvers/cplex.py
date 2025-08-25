@@ -16,11 +16,11 @@
     Installation
     ============
     
-    Requires that the 'docplex' python package is installed:
+    Requires that both the 'docplex' and the 'cplex' python packages are installed:
 
     .. code-block:: console
 
-        $ pip install docplex
+        $ pip install docplex cplex
 
     Detailed installation instructions available at:
     https://ibmdecisionoptimization.github.io/docplex-doc/getting_started_python.html
@@ -91,15 +91,21 @@ class CPM_cplex(SolverInterface):
         # try to import the package
         try:
             import docplex.mp as domp
+        except ModuleNotFoundError as e:
+            warnings.warn(f"CPM_cplex: Could not import docplex: {e}")
+            return False
+        try:
+            import cplex
             return True
-        except ModuleNotFoundError:
+        except ModuleNotFoundError as e:
+            warnings.warn(f"CPM_cplex: Could not import cplex: {e}")
             return False
 
     @staticmethod
     def license_ok():
         if not CPM_cplex.installed():
             warnings.warn(
-                f"License check failed, python package 'docplex' is not installed! Please check 'CPM_cplex.installed()' before attempting to check license.")
+                f"License check failed, python package 'docplex' or 'cplex' is not installed! Please check 'CPM_cplex.installed()' before attempting to check license.")
             return False
         else:
             try:
@@ -131,9 +137,9 @@ class CPM_cplex(SolverInterface):
         - subsolver: None, not used
         """
         if not self.installed():
-            raise Exception("CPM_cplex: Install the python package 'docplex' to use this solver interface.")
+            raise Exception("CPM_cplex: Install the python packages 'docplex' and 'cplex' to use this solver interface.")
         elif not self.license_ok():
-            raise Exception("CPM_cplex: A problem occured during license check. Make sure your installed the CPLEX Optimization Studio")
+            raise Exception("CPM_cplex: A problem occured during license check. Make sure your installed the CPLEX Optimization Studio and that you have an active license.")
 
         from docplex.mp.model import Model
         self.cplex_model = Model()

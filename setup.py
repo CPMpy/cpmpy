@@ -31,7 +31,7 @@ solver_dependencies = {
     "gcs": ["gcspy"],
     "cpo": ["docplex"],
     "pindakaas": ["pindakaas"],
-    "cplex": ["docplex"],
+    "cplex": ["docplex", "cplex"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
