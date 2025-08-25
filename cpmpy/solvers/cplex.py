@@ -438,7 +438,7 @@ class CPM_cplex(SolverInterface):
             if isinstance(lhs, _NumVarImpl) or (lhs.name in {'sum', 'wsum', 'sub'}):
                 lin_expr = self._make_numexpr(lhs)
             else:
-                raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
+                raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
             if sub_expr.name == "<=":
                 self.cplex_model.add_indicator(cond, lin_expr <= self.solver_var(rhs), trigger_val)
             elif sub_expr.name == ">=":
@@ -446,7 +446,7 @@ class CPM_cplex(SolverInterface):
             elif sub_expr.name == "==":
                 self.cplex_model.add_indicator(cond, lin_expr == self.solver_var(rhs), trigger_val)
             else:
-                raise Exception(f"Unknown linear expression {sub_expr} name")
+                raise ValueError(f"Unknown linear expression {sub_expr} name")
 
         # True or False
         elif isinstance(cpm_expr, BoolVal):
