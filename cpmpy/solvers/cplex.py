@@ -250,7 +250,8 @@ class CPM_cplex(SolverInterface):
 
         # special case, negative-bool-view
         if isinstance(cpm_var, NegBoolView):
-            raise Exception("Negative literals should not be part of any equation. "
+            raise ValueError("Negative literals should not be part of any equation. "
+                            "Should have been removed by the only_positive_bv() transformation. "
                             "See /transformations/linearize for more details")
 
         # create if it does not exit
