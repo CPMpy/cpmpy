@@ -473,10 +473,9 @@ class CPM_cplex(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
         # Create a MIP start solution from the provided variables and values
-        mip_start_sol = {}
-        for cpm_var, val in zip(cpm_vars, vals):
-            mip_start_sol[self.solver_var(cpm_var)] = val
-        
+        if len(cpm_vars) != len(vals):
+            raise ValueError("Number of variables and values must match")
+        mip_start_sol = {self.solver_var(cpm_var) : val for cpm_var, val in zip(cpm_vars, vals)}
         self.cplex_model.add_mip_start(mip_start_sol)
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
