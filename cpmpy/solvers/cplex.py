@@ -444,7 +444,11 @@ class CPM_cplex(SolverInterface):
 
         # True or False
         elif isinstance(cpm_expr, BoolVal):
-            self.cplex_model.add_constraint(cpm_expr.args[0])
+            if cpm_expr.args[0]: # just true
+                pass # do nothing
+            else: # just false
+                a = self.cplex_model.binary_var()
+                self.cplex_model.add_constraint(a - a >= 1) # create a constraint that is always false
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
