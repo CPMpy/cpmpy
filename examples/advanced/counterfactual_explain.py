@@ -210,7 +210,6 @@ def inverse_optimize(values, weights, capacity, x_d, foil_idx):
         if sum(d_star * x_d) >= sum(d_star * x_0.value()):
             return d_star
         else:
-            # TODO: fix needing to cast them to int for OR-Tools (Issue #688)
             master_model += [sum(d * x_d) >= sum(d * x_0.value())]
         i += 1
 
