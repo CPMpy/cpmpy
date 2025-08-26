@@ -55,6 +55,11 @@ Supported solvers
      - pip + (aca.) license
      - No
      - 
+   * - :doc:`CPLEX <api/solvers/cplex>`
+     - ILP
+     - pip + local + (aca.) license
+     - No
+     - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - pip >3.10 (Linux, Win)
