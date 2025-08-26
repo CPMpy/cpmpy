@@ -80,6 +80,8 @@ class CPM_pysat(SolverInterface):
 
     - ``pysat_vpool``: a pysat.formula.IDPool for the variable mapping
     - ``pysat_solver``: a pysat.solver.Solver() (default: glucose4)
+    - ``ivarmap``: a mapping from integer variables to their encoding for `int2bool`
+    - ``encoding``: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary"). Set to "auto" but can be changed in the solver object.
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysat_solver`` object.
 
@@ -225,19 +227,10 @@ class CPM_pysat(SolverInterface):
                             Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
-        # ensure all Boolean vars are known to solver
-        for x in list(self.user_vars):  # can change during iteration
-            if isinstance(x, _BoolVarImpl):
-                self.solver_vars(x)
-            elif isinstance(x, _IntVarImpl):  # intvar
-                if x.name not in self.ivarmap:
-                    enc, cons = _encode_int_var(self.ivarmap, x, _decide_encoding(x, None, encoding=self.encoding))
-                    self += cons
-                    self.solver_vars(enc.vars())
-            else:
-                raise TypeError
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
 
-        # the user vars are only the Booleans (e.g. to make solveAll behave consistently)
+        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         user_vars = set()
         for x in self.user_vars:
             if isinstance(x, _BoolVarImpl):
@@ -304,7 +297,7 @@ class CPM_pysat(SolverInterface):
                     else:  # -lit in sol (=False) or not specified (=False)
                         cpm_var._value = False
                 elif isinstance(cpm_var, _IntVarImpl):
-                    assert False, "user_vars should only contain Booleans"
+                    raise TypeError("user_vars should only contain Booleans")
                 else:
                     raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
@@ -341,6 +334,13 @@ class CPM_pysat(SolverInterface):
             return -self.pysat_vpool.id(cpm_var._bv.name)
         elif isinstance(cpm_var, _BoolVarImpl):
             return self.pysat_vpool.id(cpm_var.name)
+        elif isinstance(cpm_var, _IntVarImpl):  # intvar
+            if cpm_var.name not in self.ivarmap:
+                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
+                self += cons
+            else:
+                enc = self.ivarmap[cpm_var.name]
+            return self.solver_vars(enc.vars())
         else:
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
@@ -397,11 +397,11 @@ class CPM_pysat(SolverInterface):
 
         # transform and post the constraints
         for cpm_expr in self.transform(cpm_expr_orig):
-            self._add_transformed_expr(cpm_expr)
+            self._post_constraint(cpm_expr)
 
         return self
 
-    def _add_transformed_expr(self, cpm_expr):
+    def _post_constraint(self, cpm_expr):
         """ Add expression to solver _without_ transforming."""
         if cpm_expr.name == 'or':
             self.pysat_solver.add_clause(self.solver_vars(cpm_expr.args))

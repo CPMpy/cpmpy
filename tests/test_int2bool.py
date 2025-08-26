@@ -22,13 +22,11 @@ q = boolvar(name="q")
 c = intvar(2, 2, name="c")
 
 SOLVERS = [
+    "pindakaas",
     "pysat",
-    # "pysdd"
 ]
 SOLVERS = [
-    (name, solver)
-    for name, solver in SolverLookup.base_solvers()
-    if name in SOLVERS and solver.supported()
+    (name, solver) for name, solver in SolverLookup.base_solvers() if name in SOLVERS and solver.supported()
 ]
 
 CONSTRAINTS = [
@@ -54,12 +52,8 @@ CONSTRAINTS = [
         Comparison(cmp, Operator("sum", [[x, y, z]]), 4),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 12),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), -10),
-        Comparison(
-            cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100
-        ),  # where ub(lhs)<rhs
-        Comparison(
-            cmp, Operator("wsum", [[2, 3], [x, p]]), 5
-        ),  # mix int and bool terms
+        Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),  # where ub(lhs)<rhs
+        Comparison(cmp, Operator("wsum", [[2, 3], [x, p]]), 5),  # mix int and bool terms
         Comparison(
             cmp,
             Operator(
@@ -95,7 +89,6 @@ def setup():
 
 
 class TestTransInt2Bool:
-
     import importlib
     import itertools
 
@@ -114,9 +107,7 @@ class TestTransInt2Bool:
     def test_transforms(self, solver, constraint, encoding, setup):
         user_vars = set(get_variables(constraint))
         ivarmap = dict()
-        flat = int2bool(
-            flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding
-        )
+        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding)
 
         cons_sols = []
         flat_sols = []
@@ -147,9 +138,7 @@ class TestTransInt2Bool:
             enc = solver.ivarmap.get(x.name, None)
             return f"{x} in {bnd[0]}..{bnd[1]} = {enc if enc is None else enc._xs}"
 
-        assert (
-            cons_sols == flat_sols
-        ), f"""Incorrect transformation:
+        assert cons_sols == flat_sols, f"""Incorrect transformation:
          U_VARS: {", ".join(show_int_var(x) for x in user_vars)}
           INPUT: {constraint} (#sols={len(cons_sols)})
          OUTPUT: {flat} (#sols={len(flat_sols)})
