@@ -48,7 +48,14 @@ extensions = [
     'sphinx_automodapi.smart_resolver',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
-    'sphinx.ext.autosectionlabel'
+    'sphinx.ext.autosectionlabel',
+    "sphinx_immaterial",
+    # "sphinx_immaterial.theme_result",
+    # "sphinx_immaterial.kbd_keys",
+    # "sphinx_immaterial.apidoc.format_signatures",
+    # "sphinx_immaterial.apidoc.json.domain",
+    # "sphinx_immaterial.apidoc.python.apigen",
+    # "sphinx_immaterial.graphviz",
 ]
 
 myst_enable_extensions = [
@@ -98,20 +105,96 @@ autodoc_default_flags = ['members', 'special-members']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_book_theme'
+# html_theme = 'sphinx_book_theme'
+html_theme = "sphinx_immaterial"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+html_css_files = [
+    "custom.css"
+]
+
 html_js_files = [
     'custom.js',
 ]
 
+templates_path = ["_templates"]
+
 html_theme_options = {
     "repository_url": "https://github.com/CPMpy/cpmpy",
     "use_repository_button": True,
+    "site_url": "https://cpmpy.readthedocs.io/",
+    "repo_url": "https://github.com/CPMpy/cpmpy",
+    # "edit_uri": "blob/main/docs",
+    "features": [
+        "navigation.expand",
+        # "navigation.tabs",
+        # "navigation.tabs.sticky",
+        # "toc.integrate",
+        "navigation.sections",
+        # "navigation.instant",
+        # "header.autohide",
+        "navigation.top",
+        "navigation.footer",
+        # "navigation.tracking",
+        # "search.highlight",
+        "search.share",
+        "search.suggest",
+        "toc.follow",
+        "toc.sticky",
+        "content.tabs.link",
+        "content.code.copy",
+        "content.action.edit",
+        "content.action.view",
+        "content.tooltips",
+        "announce.dismiss",
+    ],
+    "palette": [
+        {
+            "media": "(prefers-color-scheme)",
+            # "toggle": {
+            #     "icon": "material/brightness-auto",
+            #     "name": "Switch to light mode",
+            # },
+        },
+        {
+            "media": "(prefers-color-scheme: light)",
+            "scheme": "default",
+            "primary": "white",
+            "accent": "light-blue",
+            "toggle": {
+                "icon": "material/lightbulb",
+                "name": "Switch to dark mode",
+            },
+        },
+        {
+            "media": "(prefers-color-scheme: dark)",
+            "scheme": "slate",
+            "primary": "deep-orange",
+            "accent": "lime",
+            "toggle": {
+                "icon": "material/lightbulb-outline",
+                "name": "Switch to system preference",
+            },
+        },
+    ],
+    "toc_title_is_page_title": False,
+
+    "social": [
+        {
+            "icon": "fontawesome/brands/github",
+            "link": "https://github.com/CPMpy/cpmpy",
+            "name": "Source on github.com",
+        },
+        {
+            "icon": "fontawesome/brands/python",
+            "link": "https://pypi.org/project/cpmpy/",
+        },
+    ]
+    
 }
 
 html_title = "CPMpy documentation"
