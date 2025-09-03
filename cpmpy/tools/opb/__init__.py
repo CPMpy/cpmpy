@@ -6,7 +6,7 @@
 """
     Set of utilities for working with OPB-formatted CP models.
 
-    Currently only the restricted OPB PB24 format is supported.
+    Currently only the restricted OPB PB24 format is supported (without WBO).
 
 
     =================
