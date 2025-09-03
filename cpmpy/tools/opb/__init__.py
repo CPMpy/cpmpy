@@ -167,7 +167,7 @@ def read_opb(path: Union[str, os.PathLike]) -> cp.Model:
     reader = (l for l in map(str.strip, f) if l and l[0] != '*')
 
     # CPMpy objects
-    vars = cp.boolvar(shape=nr_vars)
+    vars = cp.boolvar(shape=nr_vars, name="x")
     model = cp.Model()
     
     # Special case for first line -> might contain objective function
