@@ -1,7 +1,8 @@
 import cpmpy as cp
 import numpy as np
+import time
 
-# This cpmpy example solves a sudoku by KNT, which can be found on https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0009KE
+# This CPMpy example solves a sudoku by KNT, which can be found on https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0009KE
 
 SIZE = 9
 
@@ -81,14 +82,6 @@ def connected(idx1, idx2, regions, manhattan_allowance=SIZE-1, checked=None):
                 constraints.append(cp.all([cell_regions[r1, c1] == cell_regions[r, c], new_constraints]))
                 # print(constraints)
             return cp.any(constraints)
-            
-            
-            
-
-# def orthogonally_connected(r1, c1, r2, c2, regions, checked=[]):
-#     constraints = []
-#     constraints.append(is_neighbour(r1, c1, r2, c2))
-#     constraints.append(~is_neighbour(r1, c1, r2, c2).implies())
     
 
 m = cp.Model(
@@ -126,28 +119,42 @@ for i in range(total_cells-1):
     for j in range(i+1, total_cells):
         r2 = j // SIZE
         c2 = j % SIZE
-        if (abs(r1 - r2) + abs(c1 - c2) > SIZE-1): # can never be in the same region
+        if (abs(r1 - r2) + abs(c1 - c2) > SIZE-1): # can never be in the same region because too far apart (redundant constraint but should guide search?)
             m += cell_regions[r1, c1] != cell_regions[r2, c2]
         else:
             m += (cell_regions[r1, c1] == cell_regions[r2, c2]).implies(connected((r1, c1), (r2, c2), cell_regions)) # TODO: make global, i.e. not pairwise connected, but whole region should be connected
-            if (r1 != r2 and c1 != c2): # all different in region not necessary when already handled by row or column
-                m += (cell_regions[r1, c1] == cell_regions[r2, c2]).implies(cell_values[r1, c1] != cell_values[r2, c2]) # TODO: make global, i.e. not pairwise different, but alldifferent for region
         
 
-# Enforce sum for each region
-# The sum together with the all different constraint means be of size: SIZE 
 for r in range(1, SIZE+1):
-    m += cp.sum([cell_values[i, j] * (cell_regions[i, j] == r) for i in range(SIZE) for j in range(SIZE)]) == SIZE*(SIZE+1)//2
+    # Enforce size for each region
+    m += cp.Count(cell_regions, r) == SIZE  # each region must be of size SIZE
     
-# TODO: the all different constraint for the regions should be doable as a global constraint I think..
-    # m += cp.AllDifferent(cell_values[np.where(cell_regions == i+1)])
-    # m += cp.sum(cell_values[np.where(cell_regions == i+1)]) == 45 # considering the all different constraint, this constraint means that all regions must contatin digits 1..9
+    
+# Create unique IDs for each (value, region) pair to enforce all different
+m += cp.AllDifferent([(cell_values[i,j]-1)*SIZE+cell_regions[i,j]-1 for i in range(SIZE) for j in range(SIZE)])
+
+    
+# TODO: Symmetry breaking for the regions?
+# fix top-left and bottom-right region to reduce symmetry
+m += cell_regions[0,0] == 1
+m += cell_regions[SIZE-1, SIZE-1] == SIZE
+# TODO: symmetry breaking for all regions but slow
+# Probably not needed, because we don't really look for multiple solutions anyway
+# flat_regions = cell_regions.flatten()
+# for i in range(1, SIZE*SIZE):
+#     for j in range(i//SIZE+2, SIZE+1):
+#         m += (flat_regions[i] == j).implies(cp.any([flat_regions[k] == j-1 for k in range(i)]))  # ensure that regions are assigned in order
+
+
 
 
 # print("The model is:")
 # print(m)
 print(f"There are {len(m.constraints)} constraints")
+start = time.time()
 sol = m.solve()
+end = time.time()
+print(f"Solved: {sol} in {end-start} seconds")
 print("The solution is:")
 print(cell_values.value())
 print("The regions are:")
