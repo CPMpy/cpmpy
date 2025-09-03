@@ -13,6 +13,7 @@
         maximal_propagate
         tune_solver
         xcsp3
+        opb
 """
 
 from .tune_solver import ParameterTuner, GridSearchTuner
