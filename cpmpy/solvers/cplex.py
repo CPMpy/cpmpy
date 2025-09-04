@@ -121,12 +121,14 @@ class CPM_cplex(SolverInterface):
     def version() -> Optional[str]:
         """
         Returns the installed version of the solver's Python API.
+        
+        Two version numbers get returned: ``<docplex version>/<solver version>``
         """
         try:
             import pkg_resources
-            from docplex.mp.model import Model
-            cplex_model = Model()
-            return f"{pkg_resources.get_distribution('docplex').version}/{cplex_model.get_solver_version()}" 
+            import cplex
+            cpx = cplex.Cplex()
+            return f"{pkg_resources.get_distribution('docplex').version}/{cpx.get_version()}"
         except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
             return None
 
