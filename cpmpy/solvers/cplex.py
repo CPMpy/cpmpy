@@ -156,24 +156,25 @@ class CPM_cplex(SolverInterface):
         """
         return self.cplex_model
 
-    def solve(self, time_limit=None, nb_threads=None, **kwargs):
+    def solve(self, time_limit=None, **kwargs):
         """
             Call the cplex solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
-            - nb_threads:  how many threads to use during solve (int, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+            - kwargs:      any keyword argument, sets parameters of solver object and cplex parameters
 
-            Supported keyword arguments:
-                - context (optional) – context to use during solve
-                - cplex_parameters (optional) – A set of CPLEX parameters to use
-                - checker (optional) – a string which controls which type of checking is performed. (type checks etc.)
-                - log_output (optional) – if True, solver logs are output to stdout.
-                - clean_before_solve (optional) – default False (iterative solving)
+            Supported keyword arguments are all solve parameters and cplex parameters:
+                - solve_parameters:
+                    - context (optional) – context to use during solve
+                    - checker (optional) – a string which controls which type of checking is performed. (type checks etc.)
+                    - log_output (optional) – if True, solver logs are output to stdout.
+                    - clean_before_solve (optional) – default False (iterative solving)
+                - cplex_parameters:
+                    - any cplex parameter, see https://www.ibm.com/docs/en/icos/22.1.2?topic=cplex-list-parameters
+                    - a well-know parameter is the `threads` parameter, used to set the number of threads to use during solve
 
             For a full description of the parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
-            and for cplex parameters: https://www.ibm.com/docs/en/icos/22.1.2?topic=cplex-list-parameters
 
             After solving, all solve details can be accessed through self.cplex_model.solve_details:
             https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.sdetails.html#docplex.mp.sdetails.SolveDetails
@@ -190,12 +191,21 @@ class CPM_cplex(SolverInterface):
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             self.cplex_model.set_time_limit(time_limit)
-
-        # set nb of threads
-        if nb_threads is not None:
-            self.cplex_model.context.cplex_parameters.threads = nb_threads
-
-        self.cplex_model.solve(**kwargs)
+    
+        # Handle special arguments
+        solve_args = ["clean_before_solve", "checker", "log_output"]
+        cplex_params = {}
+        
+        for arg in list(kwargs.keys()):
+            if arg == "context":
+                self.cplex_model.context = kwargs[arg]
+                del kwargs[arg]
+            elif arg not in solve_args:
+                # Set as cplex parameter
+                cplex_params[arg] = kwargs[arg] 
+                del kwargs[arg]
+        
+        self.cplex_model.solve(cplex_parameters=cplex_params, **kwargs)
         
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
