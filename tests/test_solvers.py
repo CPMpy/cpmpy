@@ -981,10 +981,7 @@ class TestSupportedSolvers:
 
         assert s.solve(assumptions=[])
 
-    def test_vars_not_removed(self, solver):
-            
-        if solver == 'cplex':
-            pytest.skip("skip for cplex, cplex throws an error if you add just BoolVal(True) to a model..")
+    def test_vars_not_removed(self, solver):        
         
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
