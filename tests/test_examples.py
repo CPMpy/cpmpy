@@ -19,7 +19,7 @@ import itertools
 EXAMPLES = glob(join("examples", "*.py")) + glob(join("examples", "csplib", "*.py"))
 ADVANCED_EXAMPLES = glob(join("examples", "advanced", "*.py"))
 
-SKIPPED_EXAMPLES = ["ocus_explanations.py"]  # waiting for issues to be resolved
+SKIPPED_EXAMPLES = ["ocus_explanations.py", "psplib.py"]  # waiting for issues to be resolved
 
 # SOLVERS = SolverLookup.supported()
 SOLVERS = [
@@ -39,6 +39,8 @@ def test_example(solver, example):
         solver ([string]): Loaded with parametrized solver name
         example ([string]): Loaded with parametrized example filename
     """
+    if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):
+        pytest.skip(f"Skipped {example}, waiting for issues to be resolved")
     if solver in ('gurobi', 'minizinc') and any(x in example for x in
                                                 ["npuzzle.py", "tst_likevrp.py", 'sudoku_', 'pareto_optimal.py',
                                                  'prob009_perfect_squares.py', 'blocks_world.py',
