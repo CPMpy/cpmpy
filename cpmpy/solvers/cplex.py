@@ -530,7 +530,20 @@ class CPM_cplex(SolverInterface):
         self.cplex_model.context.cplex_parameters.mip.limits.populate = solution_limit
         self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4 # (optional) max effort for finding solutions
 
-        solutions_pool = self.cplex_model.populate_solution_pool()
+        # Handle special arguments (same as in solve())
+        solve_args = ["clean_before_solve", "checker", "log_output"]
+        cplex_params = {}
+        
+        for arg in list(kwargs.keys()):
+            if arg == "context":
+                self.cplex_model.context = kwargs[arg]
+                del kwargs[arg]
+            elif arg not in solve_args:
+                # Set as cplex parameter
+                cplex_params[arg] = kwargs[arg] 
+                del kwargs[arg]
+
+        solutions_pool = self.cplex_model.populate_solution_pool(cplex_parameters=cplex_params, **kwargs)
 
         optimal_val = None
         opt_sol_count = 0
