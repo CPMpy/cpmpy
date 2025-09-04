@@ -150,6 +150,7 @@ class CPM_exact(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
+        
     @property
     def native_model(self):
         """
