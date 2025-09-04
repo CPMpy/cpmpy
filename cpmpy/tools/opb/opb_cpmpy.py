@@ -35,6 +35,10 @@ sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve()))
 
 SUPPORTED_SOLVERS = [name for name,_ in cp.SolverLookup().base_solvers()]
 
+MEMORY_BUFFER_SOFT = 2 # MiB
+MEMORY_BUFFER_HARD = 0 # MiB
+MEMORY_BUFFER_SOLVER = 20 # MB
+
 original_stdout = sys.stdout
 
 
@@ -180,8 +184,6 @@ def solution_opb(model, useless_style="*", boolean_style="int"):
 
     variables = [var for var in model.user_vars if var.name[:2] not in ["IV", "BV", "B#"]] # dirty workaround for all missed aux vars in user vars
     return " ".join([var.name.replace("[","").replace("]","") if var.value() else "-"+var.name.replace("[","").replace("]","") for var in variables])
-
-
 
 
 # ---------------------------------------------------------------------------- #
