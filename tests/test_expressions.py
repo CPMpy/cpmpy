@@ -628,6 +628,40 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
         self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
 
+from cpmpy.transformations.get_variables import get_variables
+class TestNullifyingArguments(unittest.TestCase):
+
+    def setUp(self):
+        self.x = cp.intvar(0,10, name="x")
+        self.b = cp.boolvar(name="b")
+
+    def test_bool(self):
+
+        funcs = ["__and__", "__rand__", "__or__", "__ror__", "__xor__", "__rxor__"]
+
+        for func in funcs:
+            expr = getattr(self.b, func)(True)
+            self.assertListEqual(get_variables(expr), [self.b])
+
+            expr = getattr(self.b, func)(False)
+            self.assertListEqual(get_variables(expr), [self.b])
+
+    def test_num(self):
+        funcs = ["__add__", "__radd__", "__sub__", "__rsub__", "__mul__", "__rmul__",
+                 "__truediv__", "__rtruediv__", "__floordiv__", "__rfloordiv__",
+                 "__mod__", "__rmod__"]
+
+        for func in funcs:
+
+            expr = getattr(self.x, func)(1)
+            self.assertEqual(get_variables(expr), [self.x])
+
+            expr = getattr(self.x, func)(0)
+            self.assertEqual(get_variables(expr), [self.x])
+
+
+
+
 
 class TestContainer(unittest.TestCase):
 
