@@ -374,16 +374,16 @@ class CPM_cplex(SolverInterface):
 
     def add(self, cpm_expr_orig):
       """
-            Eagerly add a constraint to the underlying solver.
+        Eagerly add a constraint to the underlying solver.
 
-            Any CPMpy expression given is immediately transformed (through `transform()`)
-            and then posted to the solver in this function.
+        Any CPMpy expression given is immediately transformed (through `transform()`)
+        and then posted to the solver in this function.
 
-            This can raise 'NotImplementedError' for any constraint not supported after transformation
+        This can raise 'NotImplementedError' for any constraint not supported after transformation
 
-            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-            the user knows and cares about (and will be populated with a value after solve). All other variables
-            are auxiliary variables created by transformations.
+        The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+        the user knows and cares about (and will be populated with a value after solve). All other variables
+        are auxiliary variables created by transformations.
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
