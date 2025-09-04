@@ -124,8 +124,10 @@ class CPM_cplex(SolverInterface):
         """
         try:
             import pkg_resources
-            return pkg_resources.get_distribution('docplex').version
-        except pkg_resources.DistributionNotFound:
+            from docplex.mp.model import Model
+            cplex_model = Model()
+            return f"{pkg_resources.get_distribution('docplex').version}/{cplex_model.get_solver_version()}" 
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
