@@ -19,7 +19,10 @@ import itertools
 EXAMPLES = glob(join("examples", "*.py")) + glob(join("examples", "csplib", "*.py"))
 ADVANCED_EXAMPLES = glob(join("examples", "advanced", "*.py"))
 
-SKIPPED_EXAMPLES = ["ocus_explanations.py", "psplib.py"]  # waiting for issues to be resolved
+SKIPPED_EXAMPLES = [
+                    "ocus_explanations.py", # waiting for issues to be resolved 
+                    "psplib.py" # randomly fails on github due to file creation
+                    ]  
 
 # SOLVERS = SolverLookup.supported()
 SOLVERS = [
