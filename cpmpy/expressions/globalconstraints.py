@@ -681,35 +681,29 @@ class Cumulative(GlobalConstraint):
         Supports both varying demand across tasks or equal demand for all jobs.
     """
     def __init__(self, start, duration, end=None, demand=None, capacity=None):
-        if end is None:
-            end = [None] * len(start)
-        
+                
         assert is_any_list(start), "start should be a list"
         assert is_any_list(duration), "duration should be a list"
-        assert is_any_list(end), "end should be a list"
+        if end is not None:
+            assert is_any_list(end), "end should be a list if it is provided"
         
         assert demand is not None, "demand should be provided but was None"
         assert capacity is not None, "capacity should be provided but was None"
 
         start = flatlist(start)
         duration = flatlist(duration)
-        end = flatlist(end)
-        assert len(start) == len(duration) == len(end), "Start, duration and end should have equal length"
-        n_jobs = len(start)
+        assert len(start) == len(duration), "Start and duration should have equal length"
+        if end is not None:
+            end = flatlist(end)
+            assert len(start) == len(end), "Start and end should have equal length"
 
         if is_any_list(demand):
             demand = flatlist(demand)
-            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
         else: # constant demand
-            demand = [demand] * n_jobs
+            demand = [demand] * len(start)
+        assert len(demand) == len(start), "Demand should be supplied for each task or be single constant"
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
-
-    def get_end_vars(self):
-        if self.args[2][0] is None:
-            self.args[2] = [intvar(lb, ub) for lb, ub in zip(*get_bounds([s+d for s,d in zip(self.args[0], self.args[1])]))]
-        return self.args[2]
-
 
     def decompose(self):
         """
@@ -718,16 +712,16 @@ class Cumulative(GlobalConstraint):
             International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         """
 
-        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
-        start, duration, end, demand, capacity = arr_args
+        start, duration, end, demand, capacity = self.args
 
         cons = [d >= 0 for d in duration] # enforce non-negative durations
         cons += [h >= 0 for h in demand]
 
         # set duration of tasks, only if end is user-provided
-        if end[0] is not None:
-            for t in range(len(start)):
-                cons += [start[t] + duration[t] == end[t]]
+        if end is None:
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
 
         # demand doesn't exceed capacity
         lbs, ubs = get_bounds(start)
@@ -735,7 +729,7 @@ class Cumulative(GlobalConstraint):
         for t in range(lb,ub+1):
             demand_at_t = 0
             for job in range(len(start)):
-                demand_at_t += demand[job] * ((start[job] <= t) & (start[job] + duration[job] > t))
+                demand_at_t += demand[job] * ((start[job] <= t) & (end[job] > t))
 
             cons += [demand_at_t <= capacity]
 
@@ -743,10 +737,17 @@ class Cumulative(GlobalConstraint):
 
     def value(self):
 
-        start, dur, end, demand, capacity = arg_vals = argvals(self.args)
-        if any(a is None for a in arg_vals):
-            return None
+        start, dur, end, demand, capacity = self.args
+        
+        start, dur, demand, capacity = argvals([start, dur, demand, capacity])
+        if end is None:
+            end = [s + d for s,d in zip(start, dur)]
+        else:
+            end = argvals(end)
 
+        if any(a is None for a in flatlist([start, dur, end, demand, capacity])):
+            return None
+                
         if any(d < 0 for d in dur):
             return False
         if any(s + d != e for s,d,e in zip(start, dur, end)):
@@ -760,6 +761,13 @@ class Cumulative(GlobalConstraint):
                 return False
 
         return True
+    
+    def __repr__(self):
+        start, dur, end, demand, capacity = self.args
+        if end is None:
+            return f"Cumulative({start}, {dur}, {demand}, {capacity})"
+        else:
+            return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity})"
 
 
 class Precedence(GlobalConstraint):
@@ -813,44 +821,52 @@ class NoOverlap(GlobalConstraint):
     """
 
     def __init__(self, start, dur, end=None):
-        if end is None:
-            end = [None] * len(start)
-
+       
         assert is_any_list(start), "start should be a list"
         assert is_any_list(dur), "duration should be a list"
-        assert is_any_list(end), "end should be a list"
+        if end is not None:
+            assert is_any_list(end), "end should be a list if it is provided"
 
         start = flatlist(start)
         dur = flatlist(dur)
-        end = flatlist(end)
-        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length " \
-                                                   "in NoOverlap constraint"
-
+        assert len(start) == len(dur), "start and duration should have equal length"
+        if end is not None:
+            end = flatlist(end)
+            assert len(start) == len(end), "start and end should have equal length"
+        
         super().__init__("no_overlap", [start, dur, end])
 
     def decompose(self):
         start, dur, end = self.args
         cons = [d >= 0 for d in dur]
-        cons += [s + d == e for s,d,e in zip(start, dur, end)]
+        
+        if end is None:
+            end = [s+d for s,d in zip(start, dur)]
+        else: # can use the expression directly below
+            cons += [s + d == e for s,d,e in zip(start, dur, end)]
+            
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons += [(e1 <= s2) | (e2 <= s1)]
         return cons, []
-    
-    def get_end_vars(self):
-        if self.args[2][0] is None:
-            self.args[2] = [intvar(lb, ub) for lb, ub in zip(*get_bounds([s+d for s,d in zip(self.args[0], self.args[1])]))]
-        return self.args[2]
 
     def value(self):
         start, dur, end = argvals(self.args)
         if any(d < 0 for d in dur):
             return False
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
+        if end is not None and any(s + d != e for s,d,e in zip(start, dur, end)):
             return False
-        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
-            if e1 > s2 and e2 > s1:
+        for (s1,d1), (s2,d2) in all_pairs(zip(start,dur)):
+            if s1 + d1 > s2 and s2 + d2 > s1:
                 return False
         return True
+    
+    def __repr__(self):
+        start, dur, end = self.args
+        if end is None:
+            return f"NoOverlap({start}, {dur})"
+        else:
+            return f"NoOverlap({start}, {dur}, {end})"
+    
 
 
 class GlobalCardinalityCount(GlobalConstraint):
