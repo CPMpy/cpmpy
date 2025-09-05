@@ -46,7 +46,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("-n_teams", type=int, default=8, help="Number of teams to schedule")
+    parser.add_argument("-n_teams", type=int, default=6, help="Number of teams to schedule")
 
     args = parser.parse_args()
 

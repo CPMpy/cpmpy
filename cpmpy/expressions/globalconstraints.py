@@ -673,6 +673,10 @@ class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
         Ensures that the capacity of the resource is never exceeded.
+        Enforces:
+            duration >= 0
+            demand >= 0
+            start + duration == end
         Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs.
     """
@@ -692,10 +696,6 @@ class Cumulative(GlobalConstraint):
         end = flatlist(end)
         assert len(start) == len(duration) == len(end), "Start, duration and end should have equal length"
         n_jobs = len(start)
-
-        for lb in get_bounds(duration)[0]:
-            if lb < 0:
-                raise TypeError("Durations should be non-negative")
 
         if is_any_list(demand):
             demand = flatlist(demand)
@@ -721,7 +721,8 @@ class Cumulative(GlobalConstraint):
         arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
         start, duration, end, demand, capacity = arr_args
 
-        cons = []
+        cons = [d >= 0 for d in duration] # enforce non-negative durations
+        cons += [h >= 0 for h in demand]
 
         # set duration of tasks, only if end is user-provided
         if end[0] is not None:
@@ -742,25 +743,18 @@ class Cumulative(GlobalConstraint):
 
     def value(self):
 
-        start, dur, end, demand, capacity = self.args
-
-        start, dur, demand = [np.array(argvals(lst)) for lst in (start, dur, demand)]
-        if end[0] is None:
-            end  = start + dur
-        else:
-            end = np.array(argvals(end))
-        capacity = argval(capacity)
-
-        arg_vals = [start, dur, end, demand, capacity] # start, dur, end are np arrays
+        start, dur, end, demand, capacity = arg_vals = argvals(self.args)
         if any(a is None for a in arg_vals):
             return None
 
-        # start and end seperated by duration
-        if not (start + dur == end).all():
+        if any(d < 0 for d in dur):
+            return False
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
             return False
 
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
+        start, end = np.array(start), np.array(end) # eases check below
         for t in range(lb, ub+1):
             if capacity < sum(demand * ((start <= t) & (t < end))):
                 return False
@@ -813,6 +807,9 @@ class Precedence(GlobalConstraint):
 class NoOverlap(GlobalConstraint):
     """
     NoOverlap constraint, enforcing that the intervals defined by start, duration and end do not overlap.
+    Enforces:
+        dur >= 0
+        start + dur == end
     """
 
     def __init__(self, start, dur, end=None):
@@ -833,11 +830,9 @@ class NoOverlap(GlobalConstraint):
 
     def decompose(self):
         start, dur, end = self.args
-        cons = []
-        if end[0] is not None:
-            cons += [s + d == e for s,d,e in zip(start, dur, end)]
-        
-        for (s1, e1), (s2, e2) in all_pairs(zip(start, [s+d for s,d in zip(start, dur)])):
+        cons = [d >= 0 for d in dur]
+        cons += [s + d == e for s,d,e in zip(start, dur, end)]
+        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons += [(e1 <= s2) | (e2 <= s1)]
         return cons, []
     
@@ -847,13 +842,9 @@ class NoOverlap(GlobalConstraint):
         return self.args[2]
 
     def value(self):
-        start, dur, end = self.args
-        start, dur = argvals([start, dur])
-        if end[0] is None:
-            end = [s+d for s,d in zip(start, dur)]
-        else:
-            end = argvals(end)
-
+        start, dur, end = argvals(self.args)
+        if any(d < 0 for d in dur):
+            return False
         if any(s + d != e for s,d,e in zip(start, dur, end)):
             return False
         for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):

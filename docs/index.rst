@@ -80,6 +80,11 @@ Supported solvers
      - local install (maturin)
      - Yes
      - Supports proof-logging, no assumptions when optimizing or proof-logging
+   * - :doc:`Pindakaas <api/solvers/pindakaas>`
+     - Pseudo-Boolean
+     - local install (git + pip > 3.10)
+     - Yes
+     - Supports incremental solving, encodes propositional and pseudo-Boolean constraints to SAT
 
 Different solvers excel at different problems. `Try multiple! <modeling.html#selecting-a-solver>`_
 
@@ -89,7 +94,6 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
   :width: 480
   :alt: Waterfall from model to solvers
 
-(* automated int-to-bool not yet supported )
 
 
 .. toctree::

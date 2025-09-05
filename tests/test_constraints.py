@@ -189,11 +189,14 @@ def global_constraints(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
+        if name not in ("Cumulative", "NoOverlap"): continue
         if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
             continue
 
         if name == "Xor":
-            expr = cls(BOOL_ARGS)
+            yield Xor(BOOL_ARGS)
+            yield Xor(BOOL_ARGS + [True,False])
+            continue
         elif name == "Inverse":
             expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":

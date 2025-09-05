@@ -54,7 +54,8 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds
+from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds, is_true_cst, \
+    is_false_cst
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -568,16 +569,32 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting], 
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
             elif cpm_expr.name == "cumulative":
-                start, dur, _, demand, cap = cpm_expr.args
-                end = cpm_expr.get_end_vars() # will make the end vars if not provided in constructor
-                start, dur, end, demand, cap = self.solver_vars([start, dur, end, demand, cap])
-                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
-                return self.ort_model.AddCumulative(intervals, demand, cap)
+                start, dur, end, demand, cap = cpm_expr.args
+                # ensure duration is non-negative
+                lbs, ubs = get_bounds(dur)
+                if any(ub < 0 for ub in ubs):
+                    return self.add(False)
+                pos_dur = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(dur, zip(lbs,ubs))]
+                self.add([d1 == d2 for d1, d2 in zip(dur, pos_dur) if d1 is not d2])
+                # ensure demand is non-negative
+                lbs, ubs = get_bounds(demand)
+                if any(ub < 0 for ub in ubs):
+                    return self.add(False)
+                pos_demand = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(demand, zip(lbs, ubs))]
+                self.add([d1 == d2 for d1, d2 in zip(demand, pos_demand) if d1 is not d2])
+
+                start, pos_dur, end, pos_demand, cap = self.solver_vars([start, pos_dur, end, pos_demand, cap])
+                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,pos_dur,end)]
+                return self.ort_model.AddCumulative(intervals, pos_demand, cap)
             elif cpm_expr.name == "no_overlap":
-                start, dur, _ = cpm_expr.args
-                end = cpm_expr.get_end_vars() # will make the end vars if not provided in constructor
-                start, dur, end = self.solver_vars([start, dur, end])
-                intervals = [self.ort_model.NewIntervalVar(s,d,e, f"interval_{s}-{d}-{d}") for s,d,e in zip(start,dur,end)]
+                start, dur, end  = cpm_expr.args
+                lbs, ubs = get_bounds(dur)
+                if any(ub < 0 for ub in ubs):
+                    return self.add(False)
+                pos_dur = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(dur, zip(lbs, ubs))]
+                self.add([d1 == d2 for d1, d2 in zip(dur, pos_dur) if d1 is not d2])
+                start, pos_dur, end = self.solver_vars([start, pos_dur, end])
+                intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, pos_dur, end)]
                 return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
@@ -597,7 +614,17 @@ class CPM_ortools(SolverInterface):
                 fwd, rev = self.solver_vars(cpm_expr.args)
                 return self.ort_model.AddInverse(fwd, rev)
             elif cpm_expr.name == 'xor':
-                return self.ort_model.AddBoolXOr(self.solver_vars(cpm_expr.args))
+                args = cpm_expr.args
+                if any(is_true_cst(a) for a in cpm_expr.args):
+                    # replace with constant variable instead
+                    if not hasattr(self, "_true_var"):
+                        self._true_var = boolvar()
+                        self.add(self._true_var)
+                    args = [a if not is_true_cst(a) else self._true_var for a in cpm_expr.args]
+
+                # remove false constants
+                args = [a for a in args if not is_false_cst(a)]
+                return self.ort_model.AddBoolXOr(self.solver_vars(args))
             else:
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! "
                                           f"If you reach this, please report on github.")
@@ -616,7 +643,6 @@ class CPM_ortools(SolverInterface):
 
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-
 
     def solution_hint(self, cpm_vars, vals):
         """
