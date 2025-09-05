@@ -490,7 +490,6 @@ class CPM_cplex(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        # Create a MIP start solution from the provided variables and values
         # Flatten nested lists to handle test cases like solution_hint([a,[b]], [[[False]], True])
         cpm_vars = flatlist(cpm_vars)
         vals = flatlist(vals)
@@ -549,6 +548,11 @@ class CPM_cplex(SolverInterface):
         # Ask for multiple solutions
         self.cplex_model.context.cplex_parameters.mip.limits.populate = solution_limit
         self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4 # (optional) max effort for finding solutions
+        
+        # For optimization problems, ensure we only get optimal solutions
+        if self.has_objective():
+            self.cplex_model.context.cplex_parameters.mip.pool.absgap = 0.0  # Only optimal solutions
+            self.cplex_model.context.cplex_parameters.mip.pool.relgap = 0.0  # Only optimal solutions
 
         # Handle special arguments (same as in solve())
         solve_args = ["clean_before_solve", "checker", "log_output"]
@@ -585,7 +589,7 @@ class CPM_cplex(SolverInterface):
                 if optimal_val is not None:
                     # sub-optimal solutions
                     if sol_obj_val != optimal_val:
-                        break
+                        continue
                 opt_sol_count += 1
 
                 # Translate solution to variables
@@ -611,6 +615,8 @@ class CPM_cplex(SolverInterface):
         # Reset pool search mode to default
         self.cplex_model.context.cplex_parameters.mip.limits.populate = 1
         self.cplex_model.context.cplex_parameters.mip.pool.intensity = 0
+        self.cplex_model.context.cplex_parameters.mip.pool.absgap = 1e-6  # Default value
+        self.cplex_model.context.cplex_parameters.mip.pool.relgap = 1e-4  # Default value
 
         cplex_status = self.cplex_model.solve_details.status
         if opt_sol_count:
