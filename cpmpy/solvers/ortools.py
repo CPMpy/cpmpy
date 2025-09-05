@@ -54,7 +54,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds, is_true_cst, \
+from ..expressions.utils import get_nonneg_args, is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds, is_true_cst, \
     is_false_cst
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
@@ -571,31 +571,34 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = cpm_expr.args
                 # ensure duration is non-negative
-                lbs, ubs = get_bounds(dur)
-                if any(ub < 0 for ub in ubs):
-                    return self.add(False)
-                pos_dur = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(dur, zip(lbs,ubs))]
-                self.add([d1 == d2 for d1, d2 in zip(dur, pos_dur) if d1 is not d2])
+                dur, dur_cons = get_nonneg_args(dur)
+                self.add(dur_cons)
+                
+                if end is None: # need to make the end-variables ourself
+                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
+                    self.add([s + d == e for s,d,e in zip(start, dur, end)])
+                
                 # ensure demand is non-negative
-                lbs, ubs = get_bounds(demand)
-                if any(ub < 0 for ub in ubs):
-                    return self.add(False)
-                pos_demand = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(demand, zip(lbs, ubs))]
-                self.add([d1 == d2 for d1, d2 in zip(demand, pos_demand) if d1 is not d2])
+                demand, demand_cons = get_nonneg_args(demand)
+                self.add(demand_cons)
 
-                start, pos_dur, end, pos_demand, cap = self.solver_vars([start, pos_dur, end, pos_demand, cap])
-                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,pos_dur,end)]
-                return self.ort_model.AddCumulative(intervals, pos_demand, cap)
+                start, dur, end, demand, cap = self.solver_vars([start, dur, end, demand, cap])
+                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
+                                
+                return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "no_overlap":
                 start, dur, end  = cpm_expr.args
-                lbs, ubs = get_bounds(dur)
-                if any(ub < 0 for ub in ubs):
-                    return self.add(False)
-                pos_dur = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(dur, zip(lbs, ubs))]
-                self.add([d1 == d2 for d1, d2 in zip(dur, pos_dur) if d1 is not d2])
-                start, pos_dur, end = self.solver_vars([start, pos_dur, end])
-                intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, pos_dur, end)]
-                return self.ort_model.add_no_overlap(intervals)
+                dur, dur_cons = get_nonneg_args(dur)
+                self.add(dur_cons)
+                
+                if end is None: # need to make the end-variables ourself
+                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
+                    self.add([s + d == e for s,d,e in zip(start, dur, end)])
+                
+                start, dur, end = self.solver_vars([start, dur, end])
+                intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, dur, end)]
+                
+                return self.ort_model.AddNoOverlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars direclty is recommended

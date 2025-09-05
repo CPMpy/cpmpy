@@ -535,6 +535,8 @@ class CPM_cpo(SolverInterface):
                 return dom.forbidden_assignments(arr, table)
             elif cpm_con.name == "cumulative":
                 start, dur, end, height, capacity = cpm_con.args
+                if end is None:
+                    end = [None for _ in range(len(start))] # easier to handle the task-making below
                 docp = self.get_docp()
                 total_usage = []
                 cons = []
@@ -551,6 +553,8 @@ class CPM_cpo(SolverInterface):
                 return cons
             elif cpm_con.name == "no_overlap":
                 start, dur, end  = cpm_con.args
+                if end is None:
+                    end = [None for _ in range(len(start))] # easier to handle the task-making below
                 cons = []
                 tasks = []
                 for s, d, e in zip(start, dur, end):

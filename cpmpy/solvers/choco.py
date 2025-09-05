@@ -632,8 +632,9 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = cpm_expr.args
                 # start, end, demand and cap should be var
-                if end[0] is None:
+                if end is None:
                     start, demand, cap = self._to_vars([start, demand, cap])
+                    end = [None for _ in range(len(start))]
                 else:
                     start, end, demand, cap = self._to_vars([start, end, demand, cap])
                 # duration can be var or int
@@ -644,8 +645,6 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.cumulative(tasks, demand, cap)
             elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
                 start, dur, end = cpm_expr.args
-                if end[0] is None:
-                    end = None
                 return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))                
             elif cpm_expr.name == "precedence":
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])

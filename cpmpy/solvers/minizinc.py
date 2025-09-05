@@ -679,7 +679,7 @@ class CPM_minizinc(SolverInterface):
             start, dur, end, demand, capacity = expr.args
 
             global_str = "cumulative({},{},{},{})"
-            if end[0] is None:
+            if end is None:
                 format_str = global_str
             else:
                 durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
@@ -693,7 +693,7 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "no_overlap":
             start, dur, end = expr.args
             global_str = "disjunctive({},{})"
-            if end[0] is None:
+            if end is None:
                 format_str = global_str
             else:
                 durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
