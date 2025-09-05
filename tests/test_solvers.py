@@ -790,7 +790,7 @@ class TestSolvers(unittest.TestCase):
         m = cp.Model(cp.AllDifferent(iv))
         s = cp.SolverLookup.get("cplex", m)
         sol_count = s.solveAll(solution_limit=10)
-        self.assertTrue(sol_count >= 10)
+        self.assertTrue(sol_count == 10)
         self.assertEqual(s.status().exitstatus, ExitStatus.FEASIBLE)
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
@@ -1075,7 +1075,7 @@ class TestSupportedSolvers:
         if solver in ("gurobi", "cplex"): limit = 100000
 
         num_sols = m.solveAll(solver=solver, solution_limit=limit)
-        assert num_sols >= 7 # at least 7 solutions
+        assert num_sols == 7
         assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
 
 
@@ -1088,7 +1088,7 @@ class TestSupportedSolvers:
             assert m.status().exitstatus == ExitStatus.FEASIBLE
 
             num_sols = m.solveAll(solver=solver, solution_limit=10)
-            assert num_sols >= 10 # at least 10 solutions
+            assert num_sols == 10 
             assert m.status().exitstatus == ExitStatus.FEASIBLE
 
             # edge-case: nb of solutions is exactly the sol limit

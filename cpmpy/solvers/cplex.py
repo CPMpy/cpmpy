@@ -555,7 +555,9 @@ class CPM_cplex(SolverInterface):
                 var._value = None
 
         else:
-            for solution in solutions_pool:
+            for i, solution in enumerate(solutions_pool):
+                if i == solution_limit:
+                    break
 
                 sol_obj_val = solution.get_objective_value()
                 if optimal_val is None:
@@ -592,7 +594,7 @@ class CPM_cplex(SolverInterface):
 
         cplex_status = self.cplex_model.solve_details.status
         if opt_sol_count:
-            if opt_sol_count >= solution_limit:
+            if opt_sol_count == solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
             else:
                 if cplex_status == "Unknown": # reached time limit
