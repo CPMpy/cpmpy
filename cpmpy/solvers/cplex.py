@@ -56,7 +56,7 @@ from typing import Optional
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
-from ..expressions.utils import argvals, argval, eval_comparison
+from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_bool
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -480,6 +480,10 @@ class CPM_cplex(SolverInterface):
         This is done using MIP starts which provide the solver with a starting point
         for the branch-and-bound algorithm.
 
+        The solution hint does NOT need to satisfy all constraints, it should just provide 
+        reasonable default values for the variables. It can decrease solving times substantially, 
+        especially when solving a similar model repeatedly.
+
         To learn more about solution hinting in CPLEX, see:
         https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html#docplex.mp.model.Model.add_mip_start
 
@@ -487,10 +491,26 @@ class CPM_cplex(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
         # Create a MIP start solution from the provided variables and values
+        # Flatten nested lists to handle test cases like solution_hint([a,[b]], [[[False]], True])
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+        
+        # Validate input lengths
         if len(cpm_vars) != len(vals):
-            raise ValueError("Number of variables and values must match")
-        mip_start_sol = {self.solver_var(cpm_var) : val for cpm_var, val in zip(cpm_vars, vals)}
-        self.cplex_model.add_mip_start(mip_start_sol)
+            raise ValueError(f"Number of variables ({len(cpm_vars)}) and values ({len(vals)}) must match")
+        
+        self.cplex_model.clear_mip_starts()
+
+        # Create a MIP start solution using the proper docplex API
+        if len(cpm_vars) > 0:
+            warmstart = self.cplex_model.new_solution()
+            for cpm_var, val in zip(cpm_vars, vals):
+                # Convert boolean values to numeric (True -> 1, False -> 0) for docplex
+                if is_bool(val):
+                    val = int(val)
+                warmstart.add_var_value(self.solver_var(cpm_var), val)
+
+            self.cplex_model.add_mip_start(warmstart)
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
