@@ -569,12 +569,32 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting], 
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
             elif cpm_expr.name == "cumulative":
-                start, dur, end, demand, cap = self.solver_vars(cpm_expr.args)
-                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
-                return self.ort_model.AddCumulative(intervals, demand, cap)
+                start, dur, end, demand, cap = cpm_expr.args
+                # ensure duration is non-negative
+                lbs, ubs = get_bounds(dur)
+                if any(ub < 0 for ub in ubs):
+                    return self.add(False)
+                pos_dur = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(dur, zip(lbs,ubs))]
+                self.add([d1 == d2 for d1, d2 in zip(dur, pos_dur) if d1 is not d2])
+                # ensure demand is non-negative
+                lbs, ubs = get_bounds(demand)
+                if any(ub < 0 for ub in ubs):
+                    return self.add(False)
+                pos_demand = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(demand, zip(lbs, ubs))]
+                self.add([d1 == d2 for d1, d2 in zip(demand, pos_demand) if d1 is not d2])
+
+                start, pos_dur, end, pos_demand, cap = self.solver_vars([start, pos_dur, end, pos_demand, cap])
+                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,pos_dur,end)]
+                return self.ort_model.AddCumulative(intervals, pos_demand, cap)
             elif cpm_expr.name == "no_overlap":
-                start, dur, end = self.solver_vars(cpm_expr.args)
-                intervals = [self.ort_model.NewIntervalVar(s,d,e, f"interval_{s}-{d}-{d}") for s,d,e in zip(start,dur,end)]
+                start, dur, end  = cpm_expr.args
+                lbs, ubs = get_bounds(dur)
+                if any(ub < 0 for ub in ubs):
+                    return self.add(False)
+                pos_dur = [d if lb >= 0 else intvar(0, ub) for d, (lb, ub) in zip(dur, zip(lbs, ubs))]
+                self.add([d1 == d2 for d1, d2 in zip(dur, pos_dur) if d1 is not d2])
+                start, pos_dur, end = self.solver_vars([start, pos_dur, end])
+                intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, pos_dur, end)]
                 return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
@@ -623,7 +643,6 @@ class CPM_ortools(SolverInterface):
 
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-
 
     def solution_hint(self, cpm_vars, vals):
         """

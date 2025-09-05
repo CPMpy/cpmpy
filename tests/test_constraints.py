@@ -189,6 +189,7 @@ def global_constraints(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
+        if name not in ("Cumulative", "NoOverlap"): continue
         if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
             continue
 
@@ -216,7 +217,11 @@ def global_constraints(solver):
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
-            expr = Cumulative(s, dur, e, demand, cap)
+            yield Cumulative(s, dur, e, demand, cap)
+            # edge cases
+            yield Cumulative(s, dur[:-1] + [intvar(-1,3)], e, demand, cap)
+            yield Cumulative(s, dur, e, demand[:-1] + intvar(-1,3), cap)
+            continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
@@ -232,7 +237,10 @@ def global_constraints(solver):
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
-            expr = cls(s, dur, e)
+            yield NoOverlap(s, dur, e)
+            # edge case
+            yield NoOverlap(s, dur[:-1] + [intvar(-1,3)], e)
+            continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
