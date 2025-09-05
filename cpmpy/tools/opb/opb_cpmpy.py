@@ -200,6 +200,210 @@ def dir_path(path):
 #                         Executable & Solver arguments                        #
 # ---------------------------------------------------------------------------- #
 
+def ortools_arguments(model: cp.Model,
+                      cores: Optional[int] = None,
+                      seed: Optional[int] = None,
+                      intermediate: bool = False,
+                      **kwargs):
+    # https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
+    res = dict()
+
+    # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+    res |= {
+        "interleave_search": True,
+        "use_rins_lns": False,
+    }
+    if not model.has_objective():
+        res |= { "num_violation_ls": 1 }
+
+    if cores is not None:
+        res |= { "num_search_workers": cores }
+    if seed is not None: 
+        res |= { "random_seed": seed }
+
+    if intermediate and model.has_objective():
+        # Define custom ORT solution callback, then register it
+        from ortools.sat.python import cp_model as ort
+        class OrtSolutionCallback(ort.CpSolverSolutionCallback):
+            """
+                For intermediate objective printing.
+            """
+
+            def __init__(self):
+                super().__init__()
+                self.__start_time = time.time()
+                self.__solution_count = 1
+
+            def on_solution_callback(self):
+                """Called on each new solution."""
+                
+                current_time = time.time()
+                obj = int(self.ObjectiveValue())
+                print_comment('Solution %i, time = %0.2fs' % 
+                            (self.__solution_count, current_time - self.__start_time))
+                print_objective(obj)
+                self.__solution_count += 1
+            
+
+            def solution_count(self):
+                """Returns the number of solutions found."""
+                return self.__solution_count
+            
+        # Register the callback
+        res |= { "solution_callback": OrtSolutionCallback() }
+
+    def internal_options(solver: CPM_ortools):
+        # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+        solver.ort_solver.parameters.subsolvers.extend(["default_lp", "max_lp", "quick_restart"])
+        if not model.has_objective():
+            solver.ort_solver.parameters.subsolvers.append("core_or_no_lp")
+        if len(solver.ort_model.proto.search_strategy) != 0:
+            solver.ort_solver.parameters.subsolvers.append("fixed")
+
+    return res, internal_options
+
+def exact_arguments(seed: Optional[int] = None, **kwargs):
+    # Documentation: https://gitlab.com/JoD/exact/-/blob/main/src/Options.hpp?ref_type=heads
+    res = dict()
+    if seed is not None: 
+        res |= { "seed": seed }
+
+    return res, None
+
+def choco_arguments(): 
+    # Documentation: https://github.com/chocoteam/pychoco/blob/master/pychoco/solver.py
+    return {}, None
+
+def z3_arguments(model: cp.Model,
+                 cores: int = 1,
+                 seed: Optional[int] = None,
+                 mem_limit: Optional[int] = None,
+                 **kwargs):
+    # Documentation: https://microsoft.github.io/z3guide/programming/Parameters/
+    # -> is outdated, just let it crash and z3 will report the available options
+
+    res = dict()
+    
+    if model.has_objective():
+        # Opt does not seem to support setting random seed or max memory
+        pass
+    else:
+        # Sat parameters
+        if cores is not None:
+            res |= { "threads": cores }  # TODO what with hyperthreadding, when more threads than cores
+        if seed is not None: 
+            res |= { "random_seed": seed }
+        if mem_limit is not None:
+            res |= { "max_memory": bytes_as_mb(mem_limit) }
+
+    return res, None
+
+def minizinc_arguments(solver: str,
+                       cores: Optional[int] = None,
+                       seed: Optional[int] = None,
+                       **kwargs):
+    # Documentation: https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
+    res = dict()
+    if cores is not None:
+        res |= { "processes": cores }
+    if seed is not None: 
+        res |= { "random_seed": seed }
+
+    #if solver.endswith("gecode"):
+        # Documentation: https://www.minizinc.org/doc-2.4.3/en/lib-gecode.html
+    #elif solver.endswith("chuffed"):
+        # Documentation: 
+        # - https://www.minizinc.org/doc-2.5.5/en/lib-chuffed.html
+        # - https://github.com/chuffed/chuffed/blob/develop/chuffed/core/options.h
+    
+    return res, None
+
+def gurobi_arguments(model: cp.Model,
+                     cores: Optional[int] = None,
+                     seed: Optional[int] = None,
+                     mem_limit: Optional[int] = None,
+                     intermediate: bool = False,
+                     **kwargs):
+    # Documentation: https://www.gurobi.com/documentation/9.5/refman/parameters.html#sec:Parameters
+    res = dict()
+    if cores is not None:
+        res |= { "Threads": cores }
+    if seed is not None:
+        res |= { "Seed": seed }
+    if mem_limit is not None:
+        res |= { "MemLimit": bytes_as_gb(remaining_memory(mem_limit)) }
+
+    if intermediate and model.has_objective():
+
+        class GurobiSolutionCallback:
+            def __init__(self, model:cp.Model):
+                self.__start_time = time.time()
+                self.__solution_count = 0
+                self.model = model
+
+            def callback(self, *args, **kwargs):
+                current_time = time.time()
+                model, state = args
+
+                # Callback codes: https://www.gurobi.com/documentation/current/refman/cb_codes.html#sec:CallbackCodes
+                
+                from gurobipy import GRB
+                # if state == GRB.Callback.MESSAGE: # verbose logging
+                #     print_comment("log message: " + str(model.cbGet(GRB.Callback.MSG_STRING)))
+                if state == GRB.Callback.MIP: # callback from the MIP solver
+                    if model.cbGet(GRB.Callback.MIP_SOLCNT) > self.__solution_count: # do we have a new solution?
+
+                        obj = int(model.cbGet(GRB.Callback.MIP_OBJBST))
+                        print_comment('Solution %i, time = %0.2fs' % 
+                                    (self.__solution_count, current_time - self.__start_time))
+                        print_objective(obj)
+                        self.__solution_count = model.cbGet(GRB.Callback.MIP_SOLCNT)
+
+        res |= { "solution_callback": GurobiSolutionCallback(model).callback }
+
+    return res, None
+
+def cpo_arguments(model: cp.Model,
+                  cores: Optional[int] = None,
+                  seed: Optional[int] = None,
+                  intermediate: bool = False,
+                  **kwargs):
+    # Documentation: https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.parameters.py.html#docplex.cp.parameters.CpoParameters
+    res = dict()
+    if cores is not None:
+        res |= { "Workers": cores }
+    if seed is not None:
+        res |= { "RandomSeed": seed }
+
+    if intermediate and model.has_objective():
+        from docplex.cp.solver.solver_listener import CpoSolverListener
+
+        class CpoSolutionCallback(CpoSolverListener):
+
+            def __init__(self):
+                super().__init__()
+                self.__start_time = time.time()
+                self.__solution_count = 1
+
+            def result_found(self, solver, sres):
+                current_time = time.time()
+                obj = sres.get_objective_value()
+                if obj is not None:
+                    print_comment('Solution %i, time = %0.2fs' % 
+                                (self.__solution_count, current_time - self.__start_time))
+                    print_objective(obj)
+                    self.__solution_count += 1
+
+            def solution_count(self):
+                """Returns the number of solutions found."""
+                return self.__solution_count
+
+        # Register the callback
+        res |= { "solution_callback": CpoSolutionCallback }
+
+    return res, None
+
+
 def solver_arguments(solver: str, 
                      model: cp.Model, 
                      seed: Optional[int] = None,
@@ -207,7 +411,26 @@ def solver_arguments(solver: str,
                      cores: int = 1,
                      mem_limit: Optional[int] = None,
                      **kwargs):
-    return dict(), None
+    opt = model.has_objective()
+    sat = not opt
+
+    if solver == "ortools":
+        return ortools_arguments(model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
+    elif solver == "exact":
+        return exact_arguments(seed=seed, **kwargs)
+    elif solver == "choco":
+        return choco_arguments()
+    elif solver == "z3":
+        return z3_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, **kwargs)
+    elif solver.startswith("minizinc"):  # also can have a subsolver
+        return minizinc_arguments(solver, cores=cores, seed=seed, **kwargs)
+    elif solver == "gurobi":
+        return gurobi_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, intermediate=intermediate, opt=opt, **kwargs)
+    elif solver == "cpo":
+        return cpo_arguments(model=model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
+    else:
+        print_comment(f"setting parameters of {solver} is not (yet) supported")
+        return dict()
 
 def opb_cpmpy(
         benchname: str,
