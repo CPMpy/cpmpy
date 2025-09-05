@@ -217,10 +217,9 @@ def global_constraints(solver):
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
-            expr = Cumulative(s, dur, e, demand, cap)
-            yield expr
-            expr = Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
-            yield expr
+            yield cls(s, dur, e, demand, cap)
+            yield cls(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
+            yield cls(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
             continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
@@ -237,10 +236,9 @@ def global_constraints(solver):
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
-            expr = cls(s, dur, e)
-            yield expr
-            expr = cls(s, dur)
-            yield expr
+            yield cls(s, dur, e)
+            yield cls(s, dur)
+            yield cls(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
             continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
