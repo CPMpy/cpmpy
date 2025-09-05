@@ -993,7 +993,7 @@ class TestSupportedSolvers:
             assert v.value() is not None
         #test solve_all
         sols = set()
-        solution_limit = 20 if solver == 'gurobi' else None
+        solution_limit = 20 if solver in ['gurobi', 'cplex'] else None
         #test number of solutions is valid
         assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
         #test number of solutions is valid, no display
