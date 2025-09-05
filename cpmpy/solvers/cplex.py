@@ -492,7 +492,7 @@ class CPM_cplex(SolverInterface):
         mip_start_sol = {self.solver_var(cpm_var) : val for cpm_var, val in zip(cpm_vars, vals)}
         self.cplex_model.add_mip_start(mip_start_sol)
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
