@@ -45,16 +45,16 @@ Supported solvers
      - SAT ALLSAT - OPT -- ?ISAT IOPT?
      - pip
      - 
+   * - :doc:`CP Optimizer <api/solvers/cpo>`
+     - CP
+     - SAT - OPT - PAR -- ?ISAT, IOPT?
+     - pip + local + (aca.) license
+     - 
    * - :doc:`MiniZinc <api/solvers/minizinc>`
      - CP
      - SAT - OPT
      - pip + local install
      - Communicates through textfiles
-   * - :doc:`CP Optimizer <api/solvers/cpo>`
-     - CP
-     - SAT - OPT - PAR -- ?ISAT IOPT?
-     - pip + local + (aca.) license
-     - 
    * - :doc:`Z3 <api/solvers/z3>`
      - SMT
      - SAT ASAT ISAT - OPT IOPT
@@ -90,9 +90,7 @@ Native capability abbreviations:
 
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
     * OPT: Optimisation, IOPT: Incremental optimisation
-    * PAR: Parallel solving
-    * PROOF: Proof logging
-    * KC: Knowledge Compilation
+    * PAR: Parallel solving, PROOF: Proof logging, KC: Knowledge Compilation
 
 Different solvers excel at different problems. `Try multiple! <modeling.html#selecting-a-solver>`_
 
