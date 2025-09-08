@@ -22,69 +22,77 @@ Supported solvers
 
    * - **Solver**
      - **Technology**
+     - **Capabilities**
      - **Installation**
-     - **Assumptions?**
      - **Notes**
    * - :doc:`OR-Tools <api/solvers/ortools>`
-     - CP-SAT
+     - CP (LCG)
+     - SAT ASAT ALLSAT OPT PAR
      - pip
-     - Yes
-     - Assumptions NOT incremental! Every solve starts from scratch
-   * - :doc:`Choco <api/solvers/choco>`
-     - CP
-     - pip
-     - No
+     - The default solver
+   * - :doc:`Pumpkin <api/solvers/pumpkin>`
+     - CP (LCG)
+     - SAT ASAT OPT PROOF -- ?ISAT ALLSAT IOPT PAR?
+     - local install (maturin)
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
+     - SAT OPT PROOF -- ?ALLSAT?
      - pip
-     - No
-     - Supports proof logging
+     -
+   * - :doc:`Choco <api/solvers/choco>`
+     - CP
+     - SAT OPT -- ?ISAT ALLSAT IOPT PAR?
+     - pip
+     - 
    * - :doc:`MiniZinc <api/solvers/minizinc>`
      - CP
+     - SAT OPT
      - pip + local install
-     - No
      - Communicates through textfiles
    * - :doc:`CP Optimizer <api/solvers/cpo>`
      - CP
+     - SAT OPT -- ?ISAT ALLSAT IOPT PAR?
      - pip + local + (aca.) license
-     - No
+     - 
+   * - :doc:`Z3 <api/solvers/z3>`
+     - SMT
+     - SAT ASAT ISAT OPT IOPT -- ?PAR ALLSAT PROOF?
+     - pip
      - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
+     - SAT OPT IOPT PAR -- ?ISAT?
      - pip + (aca.) license
-     - No
      - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
+     - SAT ASAT ISAT OPT IOPT PROOF -- ? ALLSAT?
      - pip >3.10 (Linux, Win)
-     - Yes
      - Manual installation on Mac possible
-   * - :doc:`Z3 <api/solvers/z3>`
-     - SMT
-     - pip
-     - Yes
-     - 
-   * - :doc:`PySAT <api/solvers/pysat>`
-     - SAT
-     - pip
-     - Yes
-     - Only Boolean variables (CPMpy transformation incomplete)
-   * - :doc:`PySDD <api/solvers/pysdd>`
-     - SAT Counter
-     - pip
-     - Yes
-     - Knowledge compiler, only Boolean variables (CPMpy transformation incomplete)
-   * - :doc:`Pumpkin <api/solvers/pumpkin>`
-     - CP (LGC)
-     - local install (maturin)
-     - Yes
-     - Supports proof-logging, no assumptions when optimizing or proof-logging
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
      - Pseudo-Boolean
+     - SAT -- ?ASAT ALLSAT ISAT PROOF?
      - local install (git + pip > 3.10)
-     - Yes
-     - Supports incremental solving, encodes propositional and pseudo-Boolean constraints to SAT
+     - Encodes to SAT
+   * - :doc:`PySAT <api/solvers/pysat>`
+     - SAT
+     - SAT ASAT ISAT -- ?PAR ALLSAT PROOF?
+     - pip
+     - 
+   * - :doc:`PySDD <api/solvers/pysdd>`
+     - SAT Counter
+     - KC SAT ISAT ALLSAT
+     - pip
+     - only Boolean variables (CPMpy transformation incomplete)
+
+Native capability abbreviations:
+
+    * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
+    * OPT: Optimisation, IOPT: Incremental optimisation
+    * PAR: Parallel solving
+    * PROOF: Proof logging
+    * KC: Knowledge Compilation
 
 Different solvers excel at different problems. `Try multiple! <modeling.html#selecting-a-solver>`_
 
