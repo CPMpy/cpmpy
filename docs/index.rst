@@ -27,62 +27,62 @@ Supported solvers
      - **Notes**
    * - :doc:`OR-Tools <api/solvers/ortools>`
      - CP (LCG)
-     - SAT ASAT ALLSAT OPT PAR
+     - SAT ASAT ALLSAT - OPT - PAR
      - pip
      - The default solver
    * - :doc:`Pumpkin <api/solvers/pumpkin>`
      - CP (LCG)
-     - SAT ASAT OPT PROOF -- ?ISAT ALLSAT IOPT PAR?
+     - SAT ASAT ALLSAT - OPT - PROOF -- ?ISAT IOPT?
      - local install (maturin)
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
-     - SAT OPT PROOF -- ?ALLSAT?
+     - SAT ALLSAT - OPT - PROOF -- ?ISAT IOPT?
      - pip
      -
    * - :doc:`Choco <api/solvers/choco>`
      - CP
-     - SAT OPT -- ?ISAT ALLSAT IOPT PAR?
+     - SAT ALLSAT - OPT -- ?ISAT IOPT?
      - pip
      - 
    * - :doc:`MiniZinc <api/solvers/minizinc>`
      - CP
-     - SAT OPT
+     - SAT - OPT
      - pip + local install
      - Communicates through textfiles
    * - :doc:`CP Optimizer <api/solvers/cpo>`
      - CP
-     - SAT OPT -- ?ISAT ALLSAT IOPT PAR?
+     - SAT - OPT - PAR -- ?ISAT IOPT?
      - pip + local + (aca.) license
      - 
    * - :doc:`Z3 <api/solvers/z3>`
      - SMT
-     - SAT ASAT ISAT OPT IOPT -- ?PAR ALLSAT PROOF?
+     - SAT ASAT ISAT - OPT IOPT
      - pip
      - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
-     - SAT OPT IOPT PAR -- ?ISAT?
+     - SAT - OPT IOPT - PAR -- ?ISAT?
      - pip + (aca.) license
      - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
-     - SAT ASAT ISAT OPT IOPT PROOF -- ? ALLSAT?
+     - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
      - Pseudo-Boolean
-     - SAT -- ?ASAT ALLSAT ISAT PROOF?
+     - SAT -- ?ISAT?
      - local install (git + pip > 3.10)
      - Encodes to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
-     - SAT ASAT ISAT -- ?PAR ALLSAT PROOF?
+     - SAT ASAT ISAT
      - pip
      - 
    * - :doc:`PySDD <api/solvers/pysdd>`
      - SAT Counter
-     - KC SAT ISAT ALLSAT
+     - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
 
