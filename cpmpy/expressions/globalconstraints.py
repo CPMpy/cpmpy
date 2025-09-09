@@ -709,9 +709,9 @@ class Cumulative(GlobalConstraint):
 
         if is_any_list(demand):
             demand = flatlist(demand)
+            assert len(demand) == len(start), "Demand should be supplied for each task or be single constant"
         else: # constant demand
             demand = [demand] * len(start)
-        assert len(demand) == len(start), "Demand should be supplied for each task or be single constant"
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
