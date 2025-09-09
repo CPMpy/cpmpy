@@ -725,7 +725,7 @@ class Cumulative(GlobalConstraint):
         start, duration, end, demand, capacity = self.args
 
         cons = [d >= 0 for d in duration] # enforce non-negative durations
-        cons += [h >= 0 for h in demand]
+        cons += [h >= 0 for h in demand] # enforce non-negative demand
 
         # set duration of tasks, only if end is user-provided
         if end is None:
