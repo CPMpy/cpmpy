@@ -53,7 +53,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
+from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
@@ -537,9 +537,10 @@ class CPM_cpo(SolverInterface):
                 start, dur, end, height, capacity = cpm_con.args
                 if end is None:
                     end = [None for _ in range(len(start))] # easier to handle the task-making below
+                height, height_cons = get_nonneg_args(height)
+                cons = self._cpo_expr(height_cons)
                 docp = self.get_docp()
                 total_usage = []
-                cons = []
                 for s, d, e, h in zip(start, dur, end, height):
                     task, task_cons = self._make_task(s, d, e)
                     cons += task_cons
