@@ -597,22 +597,31 @@ class CPM_cpo(SolverInterface):
         dom = self.get_docp().modeler
         docp = self.get_docp()
 
-        dur_bounds = get_bounds(dur)
-        if dur_bounds[1] == dur_bounds[0] == 0:
+        lb, ub = get_bounds(dur)
+        extra_cons = []
+        if lb < 0 and ub < 0: # duration is always negative
+            return None, [False]
+        else:
+            new_dur = intvar(0, ub)
+            extra_cons += [self.solver_var(new_dur) == self.solver_var(dur)]
+            dur = new_dur
+            lb = 0 # update lb for next check below
+
+        if lb == 0 == ub:
             if end is None: # nothing to enforce
                 return None, []
             cpo_s, cpo_e = self.solver_vars([start, end])
-            return None, [cpo_s == cpo_e] # no task, just enforce 0 duration
+            return None, extra_cons + [cpo_s == cpo_e] # no task, just enforce 0 duration
             
         # Normal setting
         if end is None: # no end provided by user
             cpo_s, cpo_d = self.solver_vars([start, dur])
             task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur))
-            return task, [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
+            return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
         else:
             cpo_s, cpo_d, cpo_e = self.solver_vars([start, dur, end])                
             task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end))
-            return task, [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
+            return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
 
 
 # solvers are optional, so this file should be interpretable
