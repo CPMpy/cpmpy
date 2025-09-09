@@ -220,8 +220,8 @@ def global_constraints(solver):
             yield Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
             if solver != "pumpkin": # only supports with fixed durations
                 yield Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
-                if solver != "pysat": # results in unsupported int2bool integer multiplication
-                    yield Cumulative(s.tolist(), dur, e, cp.intvar(-3,3,shape=3), cap)
+                if solver not in ("pysat", "pindakaas"): # results in unsupported int2bool integer multiplication
+                    yield Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
             continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
