@@ -56,7 +56,8 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import Cumulative, DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
+from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR, \
+    get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
@@ -631,6 +632,8 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.member(expr, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = cpm_expr.args
+                # Choco allows negative durations, but this does not match CPMpy spec
+                dur, extra_cons = get_nonneg_args(dur)
                 # start, end, demand and cap should be var
                 if end is None:
                     start, demand, cap = self._to_vars([start, demand, cap])
@@ -641,8 +644,11 @@ class CPM_choco(SolverInterface):
                 dur = self.solver_vars(dur)
                 # Create task variables. Choco can create them only one by one
                 tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
-    
-                return self.chc_model.cumulative(tasks, demand, cap)
+
+                chc_cumulative = self.chc_model.cumulative(tasks, demand, cap)
+                if len(extra_cons): # replace some negative durations, part of constraint
+                    return self.chc_model.and_([chc_cumulative] + [self._get_constraint(c) for c in extra_cons])
+                return chc_cumulative
             elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
                 start, dur, end = cpm_expr.args
                 return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))                
