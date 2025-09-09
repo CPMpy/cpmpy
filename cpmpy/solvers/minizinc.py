@@ -681,6 +681,10 @@ class CPM_minizinc(SolverInterface):
             global_str = "cumulative({},{},{},{})"
             # ensure duration is non-negative
             dur, extra_cons = get_nonneg_args(dur)
+            # ensure demand is non-negative
+            demand, demand_cons = get_nonneg_args(demand)
+            extra_cons += demand_cons
+
             if end is not None:
                 extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
