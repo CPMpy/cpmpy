@@ -672,15 +672,25 @@ class Xor(GlobalConstraint):
 class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
-        Ensures that the capacity of the resource is never exceeded.
-        Enforces:
+        Ensures that the capacity of the resource is never exceeded and enforces:
             duration >= 0
             demand >= 0
             start + duration == end
+
         Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs.
     """
     def __init__(self, start, duration, end=None, demand=None, capacity=None):
+        """
+            Arguments of constructor:
+
+            Arguments:
+                `start`: List of Expression objects representing the start times of the tasks
+                `duration`: List of Expression objects representing the durations of the tasks
+                `end`: optional, list of Expression objects representing the end times of the tasks
+                `demand`: List of Expression objects or single Expression to indicate constant demand for all tasks
+                `capacity`: Expression object representing the capacity of the resource
+        """
                 
         assert is_any_list(start), "start should be a list"
         assert is_any_list(duration), "duration should be a list"
@@ -814,13 +824,22 @@ class Precedence(GlobalConstraint):
 
 class NoOverlap(GlobalConstraint):
     """
-    NoOverlap constraint, enforcing that the intervals defined by start, duration and end do not overlap.
-    Enforces:
-        dur >= 0
-        start + dur == end
+    Global no-overlap constraint. Used for scheduling problems
+    Ensures no tasks overlap and enforces:
+            duration >= 0
+            demand >= 0
+            start + duration == end
+
+    Equivalent to :class:`~cpmpy.expressions.globalconstraints.Cumulative` with demand and capacity 1
     """
 
     def __init__(self, start, dur, end=None):
+        """
+        Arguments:
+            `start`: List of Expression objects representing the start times of the tasks
+            `duration`: List of Expression objects representing the durations of the tasks
+            `end`: optional, list of Expression objects representing the end times of the tasks
+        """
        
         assert is_any_list(start), "start should be a list"
         assert is_any_list(dur), "duration should be a list"
