@@ -763,6 +763,9 @@ class Cumulative(GlobalConstraint):
         if any(s + d != e for s,d,e in zip(start, dur, end)):
             return False
 
+        if any(d < 0 for d in demand):
+            return False
+
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
         start, end = np.array(start), np.array(end) # eases check below
