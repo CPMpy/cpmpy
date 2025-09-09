@@ -189,7 +189,6 @@ def global_constraints(solver):
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
     for name, cls in classes:
-        if name not in ("Cumulative", "NoOverlap"): continue
         if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
             continue
 
@@ -217,9 +216,10 @@ def global_constraints(solver):
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
-            yield cls(s, dur, e, demand, cap)
-            yield cls(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
-            yield cls(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
+            yield Cumulative(s, dur, e, demand, cap)
+            yield Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
+            if solver != "pumpkin": # only supports with fixed durations
+                yield Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
             continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
@@ -236,9 +236,10 @@ def global_constraints(solver):
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
-            yield cls(s, dur, e)
-            yield cls(s, dur)
-            yield cls(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
+            yield NoOverlap(s, dur, e)
+            yield NoOverlap(s, dur)
+            if solver != "pumpkin": # only supports with fixed durations
+                yield NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
             continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
