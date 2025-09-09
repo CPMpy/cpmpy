@@ -81,13 +81,12 @@ Supported solvers
      - pip
      - 
    * - :doc:`PySDD <api/solvers/pysdd>`
-     - SAT Counter
+     - Decis. Diagram
      - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
 
 Native capability abbreviations:
-
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
     * OPT: Optimisation, IOPT: Incremental optimisation
     * PAR: Parallel solving, PROOF: Proof logging, KC: Knowledge Compilation
