@@ -634,6 +634,9 @@ class CPM_choco(SolverInterface):
                 start, dur, end, demand, cap = cpm_expr.args
                 # Choco allows negative durations, but this does not match CPMpy spec
                 dur, extra_cons = get_nonneg_args(dur)
+                # Choco allows negative demand, but this does not match CPMpy spec
+                demand, demand_cons = get_nonneg_args(demand)
+                extra_cons += demand_cons
                 # start, end, demand and cap should be var
                 if end is None:
                     start, demand, cap = self._to_vars([start, demand, cap])
