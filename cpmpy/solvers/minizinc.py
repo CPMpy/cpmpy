@@ -70,7 +70,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_num, is_any_list, argvals, argval
+from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -679,11 +679,12 @@ class CPM_minizinc(SolverInterface):
             start, dur, end, demand, capacity = expr.args
 
             global_str = "cumulative({},{},{},{})"
-            if end is None:
-                format_str = global_str
-            else:
-                durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
-                format_str = "forall(" + durstr + " ++ [" + global_str + "])"
+            # ensure duration is non-negative
+            dur, extra_cons = get_nonneg_args(dur)
+            if end is not None:
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
             return format_str.format(self._convert_expression(start), 
                                      self._convert_expression(dur), 
@@ -693,12 +694,13 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "no_overlap":
             start, dur, end = expr.args
             global_str = "disjunctive({},{})"
-            if end is None:
-                format_str = global_str
-            else:
-                durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
-                format_str = "forall(" + durstr + " ++ [" + global_str + "])"
-            
+            # ensure duration is non-negative
+            dur, extra_cons = get_nonneg_args(dur)
+            if end is not None:
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
             return format_str.format(self._convert_expression(start), self._convert_expression(dur))
 
         args_str = [self._convert_expression(e) for e in expr.args]
