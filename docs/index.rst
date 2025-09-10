@@ -32,22 +32,22 @@ Supported solvers
      - The default solver
    * - :doc:`Pumpkin <api/solvers/pumpkin>`
      - CP (LCG)
-     - SAT ASAT ALLSAT - OPT - PROOF
+     - SAT ASAT ALLSAT - OPT - PROOF -- ?ISAT IOPT?
      - local install (maturin)
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
-     - SAT ALLSAT - OPT - PROOF
+     - SAT ALLSAT - OPT - PROOF -- ?ISAT IOPT?
      - pip
      -
    * - :doc:`Choco <api/solvers/choco>`
      - CP
-     - SAT ALLSAT - OPT
+     - SAT ALLSAT - OPT -- ?ISAT IOPT?
      - pip
      - 
    * - :doc:`CP Optimizer <api/solvers/cpo>`
      - CP
-     - SAT - OPT - PAR
+     - SAT - OPT - PAR -- ?ISAT, IOPT?
      - pip + local + (aca.) license
      - 
    * - :doc:`MiniZinc <api/solvers/minizinc>`
@@ -62,7 +62,7 @@ Supported solvers
      - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
-     - SAT - OPT IOPT - PAR
+     - SAT - OPT IOPT - PAR -- ?ISAT?
      - pip + (aca.) license
      - 
    * - :doc:`Exact <api/solvers/exact>`
@@ -72,7 +72,7 @@ Supported solvers
      - Manual installation on Mac possible
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
      - Pseudo-Boolean
-     - SAT
+     - SAT -- ?ISAT?
      - local install (git + pip > 3.10)
      - Encodes to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
@@ -81,7 +81,7 @@ Supported solvers
      - pip
      - 
    * - :doc:`PySDD <api/solvers/pysdd>`
-     - SAT Counter
+     - Decis. Diagram
      - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
