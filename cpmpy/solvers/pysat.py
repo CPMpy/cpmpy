@@ -304,6 +304,8 @@ class CPM_pysat(SolverInterface):
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+            for enc in self.ivarmap.values():
+                enc._x._value = None
 
 
         return has_sol

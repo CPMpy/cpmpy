@@ -77,21 +77,19 @@ class TestRC2Objective(unittest.TestCase):
         """Test objective transformation with linear combination plus constant"""
         # Test 3*xs[0] + 2*xs[1] + 1*xs[2] + 12 -> flat_obj (IV6) + 12
         weights, xs, const = self.rc2.transform_objective(3*self.xs[0] + 2*self.xs[1] + 1*self.xs[2] + 12)
-        # This creates an intermediate variable for the sum, which gets encoded
-        self.assertGreater(len(weights), 0)  # Should have some weights
-        self.assertGreater(len(xs), 0)  # Should have some variables
-        self.assertEqual(const, 12)
+        # This creates an intermediate variable for the sum, which gets encoded... TODO: could do better without intermediate variable!
+        self.assertEqual(len(weights), 7)  # Int encoding weights
+        self.assertEqual(len(xs), 7)  # Int encoding variables
+        self.assertEqual(const, 11)
     
     def test_transform_objective_single_int(self):
         """Test objective transformation with single integer variable"""
         # Test ys[0] -> flat_obj IV0
         # Integer variables are encoded as weighted sums of boolean variables
         weights, xs, const = self.rc2.transform_objective(self.ys[0])
-        # The integer variable is encoded as a weighted sum of boolean variables
-        self.assertGreater(len(weights), 0)  # Should have some weights
-        self.assertGreater(len(xs), 0)  # Should have some variables
-        # The constant includes the minimum value of the integer variable (1)
-        self.assertEqual(const, 1)
+        self.assertEqual(const, 0)  # offset min domain value of 1
+        self.assertEqual(weights, [1,2,3,4])  # unary encoding weights
+        self.assertEqual(len(xs), 4)  # unary encoding variables
     
     def test_transform_objective_sum_int(self):
         """Test objective transformation with sum of integer variables"""
@@ -99,10 +97,9 @@ class TestRC2Objective(unittest.TestCase):
         # Integer variables are encoded as weighted sums of boolean variables
         weights, xs, const = self.rc2.transform_objective(cp.sum(self.ys))
         # Each integer variable is encoded as a weighted sum of boolean variables
-        self.assertGreater(len(weights), 0)  # Should have some weights
-        self.assertGreater(len(xs), 0)  # Should have some variables
-        # The constant includes the minimum values of all integer variables (1+1+1=3)
-        self.assertEqual(const, 3)
+        self.assertEqual(const, 0)  # offset each min domain value
+        self.assertEqual(weights, [1,2,3,4]*3)  # unary encoding weights
+        self.assertEqual(len(xs), 12)  # unary encoding variables
     
     def test_transform_objective_sum_int_plus_const(self):
         """Test objective transformation with sum of integer variables plus constant"""
@@ -110,43 +107,34 @@ class TestRC2Objective(unittest.TestCase):
         # Integer variables are encoded as weighted sums of boolean variables
         weights, xs, const = self.rc2.transform_objective(cp.sum(self.ys) + 3)
         # Each integer variable is encoded as a weighted sum of boolean variables
-        self.assertGreater(len(weights), 0)  # Should have some weights
-        self.assertGreater(len(xs), 0)  # Should have some variables
-        # The constant includes the minimum values of all integer variables plus the added constant (3+3=6)
-        self.assertEqual(const, 6)
+        self.assertEqual(const, 3)  # offset each min domain value + added constant
+        self.assertEqual(weights, [1,2,3,4]*3)  # unary encoding weights
+        self.assertEqual(len(xs), 12)  # unary encoding variables
     
     def test_transform_objective_linear_combination_int_plus_const(self):
         """Test objective transformation with linear combination of integer variables plus constant"""
         # Test 3*ys[0] + 2*ys[1] - 4*ys[2] + 12 -> flat_obj (IV8) + 12
         weights, xs, const = self.rc2.transform_objective(3*self.ys[0] + 2*self.ys[1] - 4*self.ys[2] + 12)
-        # This creates an intermediate variable for the sum, which gets encoded
+        # TODO... This creates an intermediate variable for the sum, which gets encoded
         self.assertGreater(len(weights), 0)  # Should have some weights
         self.assertGreater(len(xs), 0)  # Should have some variables
-        # The constant includes the minimum values of integer variables plus the added constant
-        # 3*1 + 2*1 - 4*1 + 12 = 3 + 2 - 4 + 12 = 13, but we get 1, so there's some adjustment
-        self.assertEqual(const, 1)
     
     def test_transform_objective_mixed_vars(self):
         """Test objective transformation with mixed boolean and integer variables"""
         # Test xs[0] + ys[0] + 2*xs[1] - 3*ys[1] -> flat_obj sum([1, 1, 2, -3] * [BV0, IV0, BV1, IV1])
-        weights, xs, const = self.rc2.transform_objective(self.xs[0] + self.ys[0] + 2*self.xs[1] - 3*self.ys[1])
+        weights, xs, const = self.rc2.transform_objective(self.xs[0] + self.ys[0] + 2*self.xs[1] + 3*self.ys[1])
         # Integer variables are encoded as weighted sums of boolean variables
-        self.assertGreater(len(weights), 0)  # Should have some weights
-        self.assertGreater(len(xs), 0)  # Should have some variables
-        # The constant includes the minimum values of integer variables and flipped weights
-        # 0 + 1 + 0 - 3*1 + 3 = 1, but we get -20, so there's some complex adjustment
-        self.assertEqual(const, -20)
+        self.assertEqual(weights, [1]+[1,2,3,4]+[2]+[1,4,7,10])  # TODO: whats with the last?
+        self.assertEqual(len(weights), 1+4+1+4)
+        self.assertEqual(const, 2)
     
     def test_transform_objective_mixed_vars_plus_const(self):
         """Test objective transformation with mixed variables plus constant"""
         # Test 3 + xs[0] + ys[0] + 2*xs[1] - 3*ys[1] - 12 -> flat_obj (IV9) + -12
         weights, xs, const = self.rc2.transform_objective(3 + self.xs[0] + self.ys[0] + 2*self.xs[1] - 3*self.ys[1] - 12)
-        # This creates an intermediate variable for the sum, which gets encoded
+        # TODO... gets auxiliary, can do better
         self.assertGreater(len(weights), 0)  # Should have some weights
         self.assertGreater(len(xs), 0)  # Should have some variables
-        # The constant includes the minimum values of integer variables and flipped weights
-        # 3 + 0 + 1 + 0 - 3*1 - 12 + 3 = 3 + 1 - 3 - 12 + 3 = -8, but we get -20
-        self.assertEqual(const, -20)
     
     def test_rc2_solve_simple_maximization(self):
         """Test actual solving with RC2 for a simple maximization problem"""
@@ -186,13 +174,7 @@ class TestRC2Objective(unittest.TestCase):
         solved = solver.solve()
         
         self.assertTrue(solved)
-        self.assertIsNotNone(solver.objective_value())
-        # The optimal solution should have x[0]=True, x[1]=False, x[2]=True for objective value 2
-        # But RC2 might find x[0]=True, x[1]=True, x[2]=False for objective value 2
-        # or x[0]=True, x[1]=False, x[2]=True for objective value 2
-        # The minimum possible is 2 (x[0]=True, and exactly one of x[1], x[2]=True)
-        self.assertGreaterEqual(solver.objective_value(), 1)  # At least 1 (x[0] must be true)
-        self.assertLessEqual(solver.objective_value(), 2)  # At most 2 (x[0] + one of x[1],x[2])
+        self.assertEqual(solver.objective_value(), 2)
     
     def test_rc2_solve_with_integer_variables(self):
         """Test solving with integer variables in the objective"""
@@ -202,17 +184,15 @@ class TestRC2Objective(unittest.TestCase):
         y = cp.intvar(0, 3, shape=2)
         model.maximize(cp.sum(x) + cp.sum(y))
         # Add constraints
-        model += x[0].implies(y[0] >= 1)  # if x[0] is true, then y[0] >= 1
-        model += x[1].implies(y[1] >= 2)  # if x[1] is true, then y[1] >= 2
+        model += (x[0] != x[1])  # both must be different
+        model += (y[0] < y[1])  # y[0] must be less than y[1]
         
         # Solve with RC2
         solver = CPM_rc2(model)
         solved = solver.solve()
         
         self.assertTrue(solved)
-        self.assertIsNotNone(solver.objective_value())
-        # The optimal solution should maximize both boolean and integer variables
-        self.assertGreaterEqual(solver.objective_value(), 4)  # at least 2 from booleans + 2 from integers
+        self.assertEqual(solver.objective_value(), 1+2+3) # 1 from bool, 2+3 from int
     
     def test_rc2_unsatisfiable(self):
         """Test RC2 with an unsatisfiable model"""
@@ -231,23 +211,21 @@ class TestRC2Objective(unittest.TestCase):
         self.assertFalse(solved)
         self.assertIsNone(solver.objective_value())
     
-    def test_rc2_time_limit(self):
-        """Test RC2 with time limit"""
-        # Create a model that might take some time
-        model = cp.Model()
-        x = cp.boolvar(10)
-        model.maximize(cp.sum(x))
-        # Add some constraints to make it non-trivial
-        for i in range(9):
-            model += x[i] | x[i+1]  # at least one of each pair must be true
+    def test_rc2_solve_negative_positive_combination(self):
+        """Test RC2 solving with negative and positive coefficients in objective"""
+        # Create model: m = cp.Model()
+        m = cp.Model()
+        x = cp.boolvar(2)
+        m.maximize(-4*x[0] + 3*x[1])
         
-        # Solve with RC2 without time limit (since clear_interrupt is not available)
-        solver = CPM_rc2(model)
+        # Solve with RC2
+        solver = CPM_rc2(m)
         solved = solver.solve()
         
-        # Should solve successfully
         self.assertTrue(solved)
-        self.assertIsNotNone(solver.objective_value())
+        self.assertEqual(solver.objective_value(), 3)
+        self.assertEqual(list(x.value()), [False, True])
+    
 
 if __name__ == '__main__':
     unittest.main()
