@@ -283,8 +283,9 @@ class CPM_rc2(CPM_pysat):
         new_weights, new_xs = [], []
         for w, x in zip(weights, xs):
             if isinstance(x, _BoolVarImpl):
-                new_weights.append(w)
-                new_xs.append(x)
+                if w != 0:
+                    new_weights.append(w)
+                    new_xs.append(x)
             elif isinstance(x, _IntVarImpl):
                 # replace the intvar with its linear encoding
                 # ensure encoding is created
@@ -341,13 +342,13 @@ class CPM_rc2(CPM_pysat):
 
         # transform the objective to a list of (w,x) and a constant
         weights, xs, const = self.transform_objective(expr)
-        assert len(weights) == len(xs), "CPM_rc2 objective: expected equal nr weights and vars, got {weights, xs}"
-        assert isinstance(const, int), "CPM_rc2 objective: expected constant to be an integer, got {const}"
+        assert len(weights) == len(xs), f"CPM_rc2 objective: expected equal nr weights and vars, got {weights, xs}"
+        assert isinstance(const, int), f"CPM_rc2 objective: expected constant to be an integer, got {const}"
         # we don't need to keep the constant, we will recompute the objective value
 
         # post weighted literals
         for wi,vi in zip(weights, xs):
-            assert wi > 0, "CPM_rc2 objective: strictly positive weights only, got {wi,vi}"
+            assert wi > 0, f"CPM_rc2 objective: strictly positive weights only, got {wi,vi}"
             self.pysat_solver.append([self.solver_var(vi)], weight=wi)
 
 
