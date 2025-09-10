@@ -88,7 +88,7 @@ m = cp.Model(
     cp.max(path) == path[4,4],
 
     # all totals different
-    cp.AllDifferentExcept0(path), # might already be implied by other constraints so check if can be removed
+    cp.AllDifferentExcept0(path), 
 
     # valid path traversal
     path_valid(path)
