@@ -124,7 +124,7 @@ class CPM_rc2(CPM_pysat):
         except Exception as e:
             raise e
 
-    def __init__(self, cpm_model=None, subsolver=None, stratified=False, adapt=True, exhaust=True, minz=True):
+    def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
 
@@ -136,12 +136,7 @@ class CPM_rc2(CPM_pysat):
         Arguments:
             cpm_model (Model(), optional): a CPMpy Model()
             subsolver (None): ignored
-            stratified (bool, optional): use the stratified solver for weighted maxsat (default: True)
-            adapt (bool, optional): detect and adapt intrinsic AtMost1 constraint (default: True)
-            exhaust (bool, optional): do core exhaustion (default: True)
-            minz (bool, optional): do heuristic core reduction (default: True)
         
-        The last 4 parameters default values were recommended by the PySAT authors, based on their MaxSAT Evaluation 2018 submission.
         """
         if not self.supported():
             raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
@@ -149,15 +144,11 @@ class CPM_rc2(CPM_pysat):
             raise NotSupportedError("CPM_rc2: only optimisation, does not support satisfaction")
 
         from pysat.formula import IDPool, WCNF
-        from pysat.examples import rc2
 
-        # determine subsolver
-        if stratified:
-            self.pysat_solver = rc2.RC2Stratified(WCNF(), adapt=adapt, exhaust=exhaust, minz=minz)
-        else:
-            self.pysat_solver = rc2.RC2(WCNF(), adapt=adapt, exhaust=exhaust, minz=minz)
+        self.pysat_solver = WCNF()  # not actually the solver...
         # fix an inconsistent API
-        self.pysat_solver.append_formula = lambda lst: [self.pysat_solver.add_clause(cl) for cl in lst]
+        self.pysat_solver.add_clause = self.pysat_solver.append
+        self.pysat_solver.append_formula = self.pysat_solver.extend
         self.pysat_solver.supports_atmost = lambda: False
         # TODO: accepts native cardinality constraints, not sure how to make clear...
 
@@ -179,7 +170,7 @@ class CPM_rc2(CPM_pysat):
         """
         return self.pysat_solver
 
-    def solve(self, time_limit=None):
+    def solve(self, time_limit=None, stratified=True, adapt=True, exhaust=True, minz=True, **kwargs):
         """
             Call the RC2 MaxSAT solver
 
@@ -189,7 +180,14 @@ class CPM_rc2(CPM_pysat):
                                                 
                                                 .. warning::
                                                     Warning: the time_limit is not very accurate at subsecond level
+                stratified (bool, optional): use the stratified solver for weighted maxsat (default: True)
+                adapt (bool, optional): detect and adapt intrinsic AtMost1 constraint (default: True)
+                exhaust (bool, optional): do core exhaustion (default: True)
+                minz (bool, optional): do heuristic core reduction (default: True)
+
+            The last 4 parameters default values were recommended by the PySAT authors, based on their MaxSAT Evaluation 2018 submission.
         """
+        from pysat.examples import rc2
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -210,11 +208,17 @@ class CPM_rc2(CPM_pysat):
             # we will have to manage it externally, e.g in a subprocess or so
             raise NotImplementedError("CPM_rc2: time limit not yet supported")
 
-        sol = self.pysat_solver.compute()  # return one solution
+        # determine subsolver
+        if stratified:
+            slv = rc2.RC2Stratified(self.pysat_solver, adapt=adapt, exhaust=exhaust, minz=minz, **kwargs)
+        else:
+            slv = rc2.RC2(self.pysat_solver, adapt=adapt, exhaust=exhaust, minz=minz, **kwargs)
+
+        sol = slv.compute()  # return one solution
         
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.pysat_solver.oracle_time()
+        self.cpm_status.runtime = slv.oracle_time()
 
         # translate exit status
         if sol is None:
@@ -344,7 +348,7 @@ class CPM_rc2(CPM_pysat):
         # post weighted literals
         for wi,vi in zip(weights, xs):
             assert wi > 0, "CPM_rc2 objective: strictly positive weights only, got {wi,vi}"
-            self.pysat_solver.add_clause([self.solver_var(vi)], weight=wi)
+            self.pysat_solver.append([self.solver_var(vi)], weight=wi)
 
 
     def objective_value(self):
