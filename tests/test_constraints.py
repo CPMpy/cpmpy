@@ -14,6 +14,7 @@ from utils import skip_on_missing_pblib
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+SOLVERNAMES = [n for n in SOLVERNAMES if n not in ["rc2"]]  # only supports optimisation
 ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
