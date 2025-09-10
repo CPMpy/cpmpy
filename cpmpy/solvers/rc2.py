@@ -124,7 +124,7 @@ class CPM_rc2(CPM_pysat):
         except Exception as e:
             raise e
 
-    def __init__(self, cpm_model=None, subsolver=None, stratified=False):
+    def __init__(self, cpm_model=None, subsolver=None, stratified=False, adapt=True, exhaust=True, minz=True):
         """
         Constructor of the native solver object
 
@@ -136,7 +136,12 @@ class CPM_rc2(CPM_pysat):
         Arguments:
             cpm_model (Model(), optional): a CPMpy Model()
             subsolver (None): ignored
-            stratified (bool, optional): use the stratified solver (default: False)
+            stratified (bool, optional): use the stratified solver for weighted maxsat (default: True)
+            adapt (bool, optional): detect and adapt intrinsic AtMost1 constraint (default: True)
+            exhaust (bool, optional): do core exhaustion (default: True)
+            minz (bool, optional): do heuristic core reduction (default: True)
+        
+        The last 4 parameters default values were recommended by the PySAT authors, based on their MaxSAT Evaluation 2018 submission.
         """
         if not self.supported():
             raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
@@ -148,9 +153,9 @@ class CPM_rc2(CPM_pysat):
 
         # determine subsolver
         if stratified:
-            self.pysat_solver = rc2.RC2Stratified(WCNF())
+            self.pysat_solver = rc2.RC2Stratified(WCNF(), adapt=adapt, exhaust=exhaust, minz=minz)
         else:
-            self.pysat_solver = rc2.RC2(WCNF())
+            self.pysat_solver = rc2.RC2(WCNF(), adapt=adapt, exhaust=exhaust, minz=minz)
         # fix an inconsistent API
         self.pysat_solver.append_formula = lambda lst: [self.pysat_solver.add_clause(cl) for cl in lst]
         self.pysat_solver.supports_atmost = lambda: False
@@ -199,21 +204,13 @@ class CPM_rc2(CPM_pysat):
                 user_vars.update(self.ivarmap[x.name].vars())
         self.user_vars = user_vars
 
-        sol = None
-        # set time limit
+        # TODO: set time limit
         if time_limit is not None:
-            if time_limit <= 0:
-                raise ValueError("Time limit must be positive")
-            
-            t = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
-            t.start()
-            sol = self.pysat_solver.compute()  # return one solution
-            # ensure timer is stopped if early stopping
-            t.cancel()
-            ## this part cannot be added to timer otherwhise it "interrups" the timeout timer too soon
-            self.pysat_solver.clear_interrupt()
-        else:
-            sol = self.pysat_solver.compute()
+            # rc2 does not support it, also not interrupts like pysat does
+            # we will have to manage it externally, e.g in a subprocess or so
+            raise NotImplementedError("CPM_rc2: time limit not yet supported")
+
+        sol = self.pysat_solver.compute()  # return one solution
         
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
