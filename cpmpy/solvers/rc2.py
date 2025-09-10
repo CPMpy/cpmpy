@@ -294,12 +294,12 @@ class CPM_rc2(CPM_pysat):
                 if isinstance(enc, IntVarEncDirect):
                     # tricky tricky! The weights can be 0..n but a soft literal of cost 0 is False, so we need to shift by 1
                     l = min([encw for encw, encx in tlst])
-                    # also in case of negative values, we need to shift to 1? or covered in tconst?
-                    assert l >= 0, f"CPM_rc2: EncDir, non-negative weights only, got {l}"
-                    if l == 0:
-                        # 0*b0 + 1*b1 + 2*b2 = -1 + 1*b0 + 2*b1 + 3*b2
-                        const += -1
-                        tlst = [(encw+1, encx) for encw, encx in tlst]
+                    # also in case of negative values, we need to shift to 1
+                    if l <= 0:
+                        shift = l-1
+                        # -1*b0 + 0*b1 + 1*b2 = -2 + 1*b0 + 2*b1 + 3*b2
+                        const += shift
+                        tlst = [(encw-shift, encx) for encw, encx in tlst]
                 for encw, encx in tlst:
                     assert encw > 0, f"CPM_rc2: positive weights only, got {encw,encx}"
                     new_weights.append(encw)
