@@ -38,7 +38,9 @@ SKIP_MZN = ['blocks_world.py', 'flexible_jobshop.py', 'pareto_optimal.py', 'npuz
 
 # SOLVERS = SolverLookup.supported()
 SOLVERS = [
-    "rc2",
+    "ortools",
+    "gurobi",
+    "minizinc",
 ]
 
 
