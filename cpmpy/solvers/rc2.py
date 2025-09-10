@@ -70,7 +70,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
-from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
+from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, IntVarEncDirect
 
 
 class CPM_rc2(CPM_pysat):
@@ -157,8 +157,7 @@ class CPM_rc2(CPM_pysat):
         # TODO: accepts native cardinality constraints, not sure how to make clear...
 
         # objective value related
-        self.objective_value_ = None
-        self.objective_const_ = 0  # constant to add to the objective of the solver
+        self.objective_ = None  # pysat returns the 'cost' of unsatisfied soft clauses, we want the value of the satisfied ones
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
@@ -198,7 +197,6 @@ class CPM_rc2(CPM_pysat):
             else:
                 # extends set with encoding variables of `x`
                 user_vars.update(self.ivarmap[x.name].vars())
-
         self.user_vars = user_vars
 
         sol = None
@@ -216,7 +214,7 @@ class CPM_rc2(CPM_pysat):
             self.pysat_solver.clear_interrupt()
         else:
             sol = self.pysat_solver.compute()
-
+        
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.pysat_solver.oracle_time()
@@ -247,15 +245,79 @@ class CPM_rc2(CPM_pysat):
             for enc in self.ivarmap.values():
                 enc._x._value = enc.decode()
 
-            # translate objective
-            print("Solved, cost is", self.pysat_solver.cost)
-            self.objective_value_ = self.pysat_solver.cost + self.objective_const_  # add constant value
-
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+            for enc in self.ivarmap.values():
+                enc._x._value = None
 
         return sol is not None
+
+
+    def transform_objective(self, expr):
+        """
+            Transform the objective to a list of (w,x) and a constant
+        """
+        # add new user vars to the set
+        get_variables(expr, collect=self.user_vars)
+
+        # try to flatten the objective
+        (flat_obj, flat_cons) = flatten_objective(expr)
+        self.add(flat_cons)
+
+        weights, xs, const = [], [], 0
+        # we assume flat_obj is a var, a sum or a wsum (over int and bool vars)
+        if isinstance(flat_obj, _IntVarImpl) or isinstance(flat_obj, NegBoolView):  # includes _BoolVarImpl
+            weights = [1]
+            xs = [flat_obj]
+        elif flat_obj.name == "sum":
+            xs = flat_obj.args
+            weights = [1] * len(xs)
+        elif flat_obj.name == "wsum":
+            weights, xs = flat_obj.args
+        else:
+            raise NotImplementedError(f"CPM_rc2: Non supported objective {flat_obj} (yet?)")
+        
+        # transform weighted integers to weighted sum of Booleans
+        new_weights, new_xs = [], []
+        for w, x in zip(weights, xs):
+            if isinstance(x, _BoolVarImpl):
+                new_weights.append(w)
+                new_xs.append(x)
+            elif isinstance(x, _IntVarImpl):
+                # replace the intvar with its linear encoding
+                # ensure encoding is created
+                self.solver_var(x)
+                enc = self.ivarmap[x.name]
+                tlst, tconst = enc.encode_term(w)
+                const += tconst
+                if isinstance(enc, IntVarEncDirect):
+                    # tricky tricky! The weights can be 0..n but a soft literal of cost 0 is False, so we need to shift by 1
+                    l = min([encw for encw, encx in tlst])
+                    # also in case of negative values, we need to shift to 1? or covered in tconst?
+                    assert l >= 0, f"CPM_rc2: EncDir, non-negative weights only, got {l}"
+                    if l == 0:
+                        # 0*b0 + 1*b1 + 2*b2 = -1 + 1*b0 + 2*b1 + 3*b2
+                        const += -1
+                        tlst = [(encw+1, encx) for encw, encx in tlst]
+                for encw, encx in tlst:
+                    assert encw > 0, f"CPM_rc2: positive weights only, got {encw,encx}"
+                    new_weights.append(encw)
+                    new_xs.append(encx)
+            elif isinstance(x, int):
+                const += w*x
+            else:
+                raise NotImplementedError(f"CPM_rc2: Non supported term {w,x} in objective {flat_obj} (yet?)")
+
+        # positive weights only, flip negative
+        for i in range(len(new_weights)):  # inline replace
+            if new_weights[i] < 0:  # negative weight
+                # wi*vi == wi*(1-(~vi)) == wi + -wi*~vi  # where wi is negative
+                const += new_weights[i]
+                new_weights[i] = -new_weights[i]
+                new_xs[i] = ~new_xs[i]
+        
+        return new_weights, new_xs, const
 
 
     def objective(self, expr, minimize):
@@ -268,65 +330,28 @@ class CPM_rc2(CPM_pysat):
 
         """
         # XXX WARNING, not incremental! Can NOT overwrite the objective.... only append to it!
-
-        # add new user vars to the set
-        get_variables(expr, collect=self.user_vars)
-
-        # try to flatten the objective
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        expr = flat_obj
-        self += flat_cons
+        if self.objective_ is not None:
+            raise NotSupportedError("CPM_rc2: objective can only be set once")
+        self.objective_ = expr
 
         # maxsat by default maximizes
-        d = 1
         if minimize:
-            d = -1
+            expr = -expr
 
-        self.objective_const_ = 0
-        weights, xs = [], []
-        if isinstance(expr, _IntVarImpl) or isinstance(expr, NegBoolView):  # includes _BoolVarImpl
-            weights = [1]
-            xs = [expr]
-        elif expr.name == "sum":
-            xs = expr.args
-            weights = [1] * len(xs)
-        elif expr.name == "wsum":
-            weights, xs = expr.args
-        else:
-            raise NotImplementedError(f"CPM_rc2: Non supported objective {expr} (yet?)")
-        
-        # ok, linear sum now; lets replace the intvars with their linear encoding
-        new_weights, new_xs = [], []
-        for w, x in zip(weights, xs):
-            if isinstance(x, _BoolVarImpl):
-                new_weights.append(w)
-                new_xs.append(x)
-            elif isinstance(x, _IntVarImpl):
-                # its an intvar
-                if x.name not in self.ivarmap:
-                    self.solver_var(expr)  # make sure its known
-                # replace the intvar with its linear encoding
-                enc = self.ivarmap[x.name]
-                terms, const = enc.encode_term(w)
-                self.objective_const_ += const
-                encw, encx = zip(*terms)
-                new_weights.extend(encw)
-                new_xs.extend(encx)
-            else:
-                raise NotImplementedError(f"CPM_rc2: Non supported objective {expr} (yet?)")
+        # transform the objective to a list of (w,x) and a constant
+        weights, xs, const = self.transform_objective(expr)
+        assert len(weights) == len(xs), "CPM_rc2 objective: expected equal nr weights and vars, got {weights, xs}"
+        assert isinstance(const, int), "CPM_rc2 objective: expected constant to be an integer, got {const}"
+        # we don't need to keep the constant, we will recompute the objective value
 
-        # positive weights only, flip negative w: ..w*v.. == ..w*(1-(~v)).. == ..w + -w*(~v)..
-        for wi,vi in zip(new_weights, new_xs):
-            if wi >= 0:  # positive
-                print("X", wi, vi)
-                self.pysat_solver.add_clause([self.solver_var(vi)], weight=wi)
-            else:  # negative
-                print("X", wi, vi, "--", wi, -wi, ~vi)
-                self.objective_const_ += wi
-                self.pysat_solver.add_clause([-self.solver_var(vi)], weight=-wi)
+        # post weighted literals
+        for wi,vi in zip(weights, xs):
+            assert wi > 0, "CPM_rc2 objective: strictly positive weights only, got {wi,vi}"
+            self.pysat_solver.add_clause([self.solver_var(vi)], weight=wi)
+
 
     def objective_value(self):
         """
             Get the objective value of the last optimisation problem
         """
-        return self.objective_value_
+        return self.objective_.value()
