@@ -43,7 +43,9 @@ def read_wcnf(wcnf: Union[str, os.PathLike]) -> cp.Model:
     Parser for WCNF format. Reads in an instance and returns its matching CPMpy model.
 
     Arguments: 
-        wcnf (str or os.PathLike): A string containing a WCNF-formatted model, or a path to a file containing containing the same.
+        wcnf (str or os.PathLike):
+            - A file path to an WCNF file (optionally LZMA-compressed with `.xz`)
+            - OR a string containing the WCNF content directly
 
     Returns:
         cp.Model: The CPMpy model of the WCNF instance.
