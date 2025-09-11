@@ -62,12 +62,13 @@ NUM_VAR = intvar(0, 10, name="l")                   # A numerical variable
 BOOL_ARGS = [boolvar(name=n) for n in "abc"]        # Boolean variables
 BOOL_VAR = boolvar(name="p")                        # A boolean variable
 
+floats = [0.5, 1.25, 2.5]
+
 def _generate_inputs(generator):
     exprs = []
     for solver in SOLVERNAMES:
         exprs += [(solver, expr) for expr in generator(solver)]
     return exprs
-
 
 def numexprs(solver):
     """
@@ -83,6 +84,7 @@ def numexprs(solver):
     for name, arity in names:
         if name == "wsum":
             yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
+            yield Operator("wsum", [floats, NUM_ARGS])
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
         elif name == "div" or name == "pow":
