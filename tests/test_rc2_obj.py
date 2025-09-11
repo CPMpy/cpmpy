@@ -78,18 +78,18 @@ class TestRC2Objective(unittest.TestCase):
         # Test 3*xs[0] + 2*xs[1] + 1*xs[2] + 12 -> flat_obj (IV6) + 12
         weights, xs, const = self.rc2.transform_objective(3*self.xs[0] + 2*self.xs[1] + 1*self.xs[2] + 12)
         # This creates an intermediate variable for the sum, which gets encoded... TODO: could do better without intermediate variable!
-        self.assertEqual(len(weights), 7)  # Int encoding weights
-        self.assertEqual(len(xs), 7)  # Int encoding variables
-        self.assertEqual(const, 11)
+        self.assertEqual(len(weights), 6)  # Int encoding weights
+        self.assertEqual(len(xs), 6)  # Int encoding variables
+        self.assertEqual(const, 12)
     
     def test_transform_objective_single_int(self):
         """Test objective transformation with single integer variable"""
         # Test ys[0] -> flat_obj IV0
         # Integer variables are encoded as weighted sums of boolean variables
         weights, xs, const = self.rc2.transform_objective(self.ys[0])
-        self.assertEqual(const, 0)  # offset min domain value of 1
-        self.assertEqual(weights, [1,2,3,4])  # unary encoding weights
-        self.assertEqual(len(xs), 4)  # unary encoding variables
+        self.assertEqual(const, 1)  # offset min domain value of 1
+        self.assertEqual(weights, [1,2,3])  # unary encoding weights
+        self.assertEqual(len(xs), 3)  # unary encoding variables
     
     def test_transform_objective_sum_int(self):
         """Test objective transformation with sum of integer variables"""
@@ -97,9 +97,9 @@ class TestRC2Objective(unittest.TestCase):
         # Integer variables are encoded as weighted sums of boolean variables
         weights, xs, const = self.rc2.transform_objective(cp.sum(self.ys))
         # Each integer variable is encoded as a weighted sum of boolean variables
-        self.assertEqual(const, 0)  # offset each min domain value
-        self.assertEqual(weights, [1,2,3,4]*3)  # unary encoding weights
-        self.assertEqual(len(xs), 12)  # unary encoding variables
+        self.assertEqual(const, 3)  # offset each min domain value
+        self.assertEqual(weights, [1,2,3]*3)  # unary encoding weights
+        self.assertEqual(len(xs), 9)  # unary encoding variables
     
     def test_transform_objective_sum_int_plus_const(self):
         """Test objective transformation with sum of integer variables plus constant"""
@@ -107,9 +107,9 @@ class TestRC2Objective(unittest.TestCase):
         # Integer variables are encoded as weighted sums of boolean variables
         weights, xs, const = self.rc2.transform_objective(cp.sum(self.ys) + 3)
         # Each integer variable is encoded as a weighted sum of boolean variables
-        self.assertEqual(const, 3)  # offset each min domain value + added constant
-        self.assertEqual(weights, [1,2,3,4]*3)  # unary encoding weights
-        self.assertEqual(len(xs), 12)  # unary encoding variables
+        self.assertEqual(const, 6)  # offset each min domain value + added constant
+        self.assertEqual(weights, [1,2,3]*3)  # unary encoding weights
+        self.assertEqual(len(xs), 9)  # unary encoding variables
     
     def test_transform_objective_linear_combination_int_plus_const(self):
         """Test objective transformation with linear combination of integer variables plus constant"""
@@ -124,9 +124,9 @@ class TestRC2Objective(unittest.TestCase):
         # Test xs[0] + ys[0] + 2*xs[1] - 3*ys[1] -> flat_obj sum([1, 1, 2, -3] * [BV0, IV0, BV1, IV1])
         weights, xs, const = self.rc2.transform_objective(self.xs[0] + self.ys[0] + 2*self.xs[1] + 3*self.ys[1])
         # Integer variables are encoded as weighted sums of boolean variables
-        self.assertEqual(weights, [1]+[1,2,3,4]+[2]+[1,4,7,10])  # TODO: whats with the last?
-        self.assertEqual(len(weights), 1+4+1+4)
-        self.assertEqual(const, 2)
+        self.assertEqual(weights, [1]+[1,2,3]+[2]+[3,6,9])
+        self.assertEqual(len(weights), 1+3+1+3)
+        self.assertEqual(const, 4)
     
     def test_transform_objective_mixed_vars_plus_const(self):
         """Test objective transformation with mixed variables plus constant"""
