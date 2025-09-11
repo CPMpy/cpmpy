@@ -15,6 +15,8 @@ class TestSolutionHinting:
 
 
     def test_hints(self, solver):
+        if solver == "rc2":
+            pytest.skip("does not support satisfaction")
 
         a,b = cp.boolvar(shape=2)
         model = cp.Model(a | b)

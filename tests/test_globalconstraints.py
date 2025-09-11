@@ -922,10 +922,8 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
     def test_gcc_onearg(self):
-
         iv = cp.intvar(0, 10)
         for s, cls in cp.SolverLookup.base_solvers():
-            print(s)
             if cls.supported():
                 try:
                     self.assertTrue(cp.Model(cp.GlobalCardinalityCount([iv], [3],[1])).solve(solver=s))
@@ -1356,9 +1354,12 @@ class TestTypeChecks(unittest.TestCase):
         SOLVERNAMES = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()]
         for name in SOLVERNAMES:
             if name == "pysdd": continue
-            self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name))
-            # test closed version
-            self.assertFalse(cp.Model(cp.GlobalCardinalityCount(iv, [1,4], [0,0], closed=True)).solve(solver=name))
+            try:
+                self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name))
+                # test closed version
+                self.assertFalse(cp.Model(cp.GlobalCardinalityCount(iv, [1,4], [0,0], closed=True)).solve(solver=name))
+            except (NotImplementedError, NotSupportedError):
+                pass
 
     def test_count(self):
         x = cp.intvar(0, 1)
