@@ -138,6 +138,13 @@ class CPM_gcs(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.gcs
+    
     def has_objective(self):
         return self.objective_var is not None
     

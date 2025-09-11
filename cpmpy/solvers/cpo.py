@@ -144,6 +144,13 @@ class CPM_cpo(SolverInterface):
         self.cpo_model = docp.model.CpoModel()
         super().__init__(name="cpo", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.cpo_model
+    
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
         """
             Call the CP Optimizer solver

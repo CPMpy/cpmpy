@@ -133,6 +133,7 @@ class CPM_ortools(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
+
     @property
     def native_model(self):
         """
