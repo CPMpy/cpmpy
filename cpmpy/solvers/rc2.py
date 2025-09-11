@@ -263,7 +263,7 @@ class CPM_rc2(CPM_pysat):
         get_variables(expr, collect=self.user_vars)
 
         # try to flatten the objective
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         self.add(flat_cons)
 
         weights, xs, const = [], [], 0
