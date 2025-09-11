@@ -12,12 +12,13 @@
     
   This file implements:
     - :func:`only_numexpr_equality()`:    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
+    - :func:`only_integer_coefficients()`: transforms constraints with float coefficients to integer coefficients
 """
 
 import copy
-from .flatten_model import get_or_make_var
 from ..expressions.core import Comparison, Operator
-from ..expressions.utils import is_boolexpr
+from .flatten_model import get_or_make_var
+from ..expressions.utils import is_boolexpr, is_num, is_int
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
 def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
@@ -109,5 +110,162 @@ def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap=None):
         return cpm_expr, new_cons
     
     return cpm_expr, []
+
+
+def only_integer_coefficients(constraints, csemap=None):
+    """
+    Transforms constraints with float coefficients to integer coefficients by 
+    multiplying with the smallest power of 10 that makes all coefficients integer.
+    
+    For expressions containing float coefficients (especially in 'sum' and 'wsum' expressions),
+    this transformation converts them to equivalent integer coefficients to ensure
+    compatibility with solvers that only support integer arithmetic.
+    
+    The transformation identifies the smallest power of 10 needed to convert all
+    float coefficients to integers while preserving the mathematical relationships.
+    
+    Expects the input constraints to be flat. Only apply after applying :func:`flatten_constraint`
+
+    Args:
+        constraints: list of CPMpy expressions to transform
+        
+    Returns:
+        list of CPMpy expressions with integer coefficients
+        
+    Example:
+        Input:  [2.5*x + 1.25*y <= 7.75]
+        Output: [20*x + 10*y <= 62]  # multiplied by 8 (2^3)
+    """
+    newlist = []
+    
+    for cpm_expr in constraints:
+        if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+            # Handle implication: condition -> constraint
+            cond, subexpr = cpm_expr.args
+            if not isinstance(cond, _BoolVarImpl): # expr -> bv
+                idx = 0
+            elif not isinstance(subexpr, _BoolVarImpl): # bv -> expr
+                idx = 1
+            else: # bv -> bv
+                newlist.append(cpm_expr)
+                continue
+
+            new_arg, new_cons = _convert_comparison_coefficients(cpm_expr.args[idx], csemap)
+            if new_arg is not cpm_expr.args[idx]: # changed
+                cpm_expr = copy.copy(cpm_expr) # shallow copy
+                cpm_expr.args[idx] = new_arg                
+            
+            newlist += [cpm_expr] + new_cons
+                
+        elif isinstance(cpm_expr, Comparison):
+            lhs, rhs = cpm_expr.args
+            if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
+                if not isinstance(lhs, _BoolVarImpl):  # expr == bv
+                    idx = 0
+                elif not isinstance(rhs, _BoolVarImpl):  # bv == expr
+                    idx = 1
+                else: # bv == bv
+                    newlist.append(cpm_expr)
+                    continue
+
+                new_arg, new_cons = _convert_comparison_coefficients(cpm_expr.args[idx], csemap)
+                if new_arg is not cpm_expr.args[idx]: # changed
+                    cpm_expr = copy.copy(cpm_expr) # shallow copy
+                    cpm_expr.args[idx] = new_arg
+
+                newlist += [cpm_expr] + new_cons
+            else:
+                # Regular comparison (numerical or equality)
+                new_expr, new_cons = _convert_comparison_coefficients(cpm_expr, csemap)
+                newlist += [new_expr] + new_cons
+        else:            
+            newlist += [cpm_expr] # Keep non-comparison expressions as is
+    
+    return newlist
+
+
+def _convert_comparison_coefficients(cpm_expr, csemap=None):
+    """
+    Convert float coefficients in a comparison expression to integers.
+    
+    Args:
+        cpm_expr: a Comparison expression
+        
+    Returns:
+        Comparison expression with integer coefficients
+    """
+    if not isinstance(cpm_expr, Comparison):
+        return cpm_expr, []
+        
+    lhs, rhs = cpm_expr.args # flat, so expression will be on left hand side
+    
+    # Only process if lhs is a wsum with float coefficients (floats cannot appear anywhere else)
+    if not (isinstance(lhs, Operator) and lhs.name == "wsum"):
+        return cpm_expr, []
+        
+    weights, args = lhs.args 
+    
+    # Collect all float values that need to be converted
+    float_values = []
+    for w in weights:
+        if is_num(w) and not is_int(w):
+            float_values.append(w)
+    if is_num(rhs) and not is_int(rhs):
+        float_values.append(rhs)
+    
+    # If no float values, no conversion needed
+    if not float_values:
+        return cpm_expr, []
+    
+    # Find the smallest power of 10 that makes all coefficients integers
+    PRECISION = 6  # Limit desired precision (SHOULD THIS BE A PARAMETER that the user can easily change?)
+    max_multiplier = 10**PRECISION
+    tolerance = 1 / max_multiplier
+    
+    # Keep multiplying by 10 until all float values become integers
+    multiplier = 1
+    for val in float_values:
+        while multiplier < max_multiplier:
+            if not is_int(val):
+                scaled_val = val * multiplier
+                if abs(scaled_val - round(scaled_val)) > tolerance:
+                    multiplier *= 10
+                else:
+                    break
+            else:
+                break
+    
+    # Apply the multiplier to all coefficients
+    new_weights = []
+    for w in weights:
+        if isinstance(w, float):
+            new_w = int(round(w * multiplier))
+        else:
+            new_w = int(w * multiplier)
+        new_weights.append(new_w)
+    
+    # Create new lhs with integer weights
+    new_lhs = Operator("wsum", [new_weights, args])
+    
+    cpm_expr = copy.copy(cpm_expr)
+    cpm_expr.args[0] = new_lhs
+    #new_lhs, new_cons = get_or_make_var(new_lhs, csemap=csemap)
+
+    # Handle rhs: multiply by the multiplier to maintain mathematical equivalence
+    if is_num(rhs):
+        # RHS is a number - multiply it directly
+        new_rhs = int(round(rhs * multiplier))        
+        cpm_expr.args[1] = new_rhs
+        return cpm_expr, []
+    else:
+        # RHS is a variable or expression - need to create auxiliary variable
+        # Transform: LHS <= RHS  becomes:  LHS <= aux_var  where aux_var = multiplier * RHS
+        
+        # Create expression for multiplier * RHS
+        new_rhs = rhs * multiplier
+        aux_var, defining_constraints = get_or_make_var(new_rhs, csemap=csemap)
+        cpm_expr.args[1] = aux_var
+        
+        return cpm_expr, defining_constraints
 
 
