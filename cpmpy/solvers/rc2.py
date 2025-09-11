@@ -293,19 +293,10 @@ class CPM_rc2(CPM_pysat):
                 enc = self.ivarmap[x.name]
                 tlst, tconst = enc.encode_term(w)
                 const += tconst
-                if isinstance(enc, IntVarEncDirect):
-                    # tricky tricky! The weights can be 0..n but a soft literal of cost 0 is False, so we need to shift by 1
-                    l = min([encw for encw, encx in tlst])
-                    # also in case of negative values, we need to shift to 1
-                    if l <= 0:
-                        shift = l-1
-                        # -1*b0 + 0*b1 + 1*b2 = -2 + 1*b0 + 2*b1 + 3*b2
-                        const += shift
-                        tlst = [(encw-shift, encx) for encw, encx in tlst]
                 for encw, encx in tlst:
-                    assert encw > 0, f"CPM_rc2: positive weights only, got {encw,encx}"
-                    new_weights.append(encw)
-                    new_xs.append(encx)
+                    if encw != 0:
+                        new_weights.append(encw)
+                        new_xs.append(encx)
             elif isinstance(x, int):
                 const += w*x
             else:
@@ -313,6 +304,7 @@ class CPM_rc2(CPM_pysat):
 
         # positive weights only, flip negative
         for i in range(len(new_weights)):  # inline replace
+            assert new_weights[i] != 0, f"CPM_rc2: positive weights only, got {new_weights[i],new_xs[i]}"
             if new_weights[i] < 0:  # negative weight
                 # wi*vi == wi*(1-(~vi)) == wi + -wi*~vi  # where wi is negative
                 const += new_weights[i]
