@@ -50,6 +50,7 @@ from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
 from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool
+from ..transformations.comparison import only_integer_coefficients
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import simplify_boolean, toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies
@@ -235,6 +236,7 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = only_integer_coefficients(cpm_cons, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(

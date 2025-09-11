@@ -61,6 +61,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
+from ..transformations.comparison import only_integer_coefficients
 from ..transformations.linearize import only_positive_coefficients
 from ..expressions.utils import flatlist
 from ..transformations.decompose_global import decompose_in_tree
@@ -369,6 +370,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({"alldifferent"}), csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = only_integer_coefficients(cpm_cons, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or"}), csemap=self._csemap)  # the core of the MIP-linearization
