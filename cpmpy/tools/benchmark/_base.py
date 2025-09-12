@@ -56,14 +56,14 @@ class Benchmark(ABC):
         """
         self.reader = reader
         
-    def read_instance(self, instance) -> cp.Model:
+    def read_instance(self, instance, open) -> cp.Model:
         """
         Parse a model instance to a CPMpy model.
 
         Arguments:
             instance (str or os.PathLike): The model instance to parse into a CPMpy model.
         """
-        return self.reader(instance)
+        return self.reader(instance, open=open)
     
     """
     Callback methods which can be overwritten to make a custom benchmark run.
@@ -326,13 +326,13 @@ class Benchmark(ABC):
     Methods which can, bit most likely shouldn't, be overwritten.
     """
     
-    def set_memory_limit(self, mem_limit, verbose=False):
-        set_memory_limit(mem_limit, verbose=verbose)
+    def set_memory_limit(self, mem_limit):
+        set_memory_limit(mem_limit)
 
-    def set_time_limit(self, time_limit, verbose=False):
+    def set_time_limit(self, time_limit):
         p = psutil.Process()
         if time_limit is not None:
-            set_time_limit(int(time_limit - _wall_time(p) + time.process_time()), verbose=verbose)
+            set_time_limit(int(time_limit - _wall_time(p) + time.process_time()))
         else:
             set_time_limit(None)
 
@@ -419,11 +419,11 @@ class Benchmark(ABC):
 
             # Set memory limit (if provided)
             if mem_limit is not None:
-                self.set_memory_limit(mem_limit, verbose=verbose)
+                self.set_memory_limit(mem_limit)
 
             # Set time limit (if provided)
             if time_limit is not None:
-                self.set_time_limit(time_limit, verbose=verbose) # set remaining process time != wall time
+                self.set_time_limit(time_limit) # set remaining process time != wall time
     
             # ------------------------------ Parse instance ------------------------------ #
 
