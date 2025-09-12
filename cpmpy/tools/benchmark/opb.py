@@ -31,6 +31,7 @@ List of classes
 .. autosummary::
     :nosignatures:
 
+    OPBExitStatus
     OPBBenchmark
 
 =================
@@ -56,7 +57,7 @@ from cpmpy.tools.opb import read_opb
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 
 
-class ExitStatus(Enum):
+class OPBExitStatus(Enum):
     unsupported:str = "UNSUPPORTED" # instance contains an unsupported feature (e.g. a unsupported global constraint)
     sat:str = "SATISFIABLE" # CSP : found a solution | COP : found a solution but couldn't prove optimality
     optimal:str = "OPTIMUM" + chr(32) + "FOUND" # optimal COP solution found
@@ -82,12 +83,12 @@ class OPBBenchmark(Benchmark):
     """
 
     def __init__(self):
-        super().__init__(reader=read_opb)
+        super().__init__(reader=read_opb, exit_status=OPBExitStatus)
     
     def print_comment(self, comment:str):
         print('c' + chr(32) + comment.rstrip('\n'), end="\r\n", flush=True)
 
-    def print_status(self, status: ExitStatus) -> None:
+    def print_status(self, status: OPBExitStatus) -> None:
         print('s' + chr(32) + status.value, end="\n", flush=True)
 
     def print_value(self, value: str) -> None:
@@ -101,27 +102,45 @@ class OPBBenchmark(Benchmark):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
             self.print_result()
             self.print_value(solution_opb(s))
-            self.print_status(ExitStatus.optimal)
+            self.print_status(OPBExitStatus.optimal)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
             self.print_value(solution_opb(s))
-            self.print_status(ExitStatus.sat)
+            self.print_status(OPBExitStatus.sat)
         elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
-            self.print_status(ExitStatus.unsat)
+            self.print_status(OPBExitStatus.unsat)
         else:
             self.print_comment("Solver did not find any solution within the time/memory limit")
-            self.print_status(ExitStatus.unknown)
+            self.print_status(OPBExitStatus.unknown)
 
     def handle_memory_error(self, mem_limit):
         super().handle_memory_error(mem_limit)
-        self.print_status(ExitStatus.unknown)
+        self.print_status(OPBExitStatus.unknown)
 
     def handle_not_implemented(self, e):
         super().handle_not_implemented(e)
-        self.print_status(ExitStatus.unsupported)
+        self.print_status(OPBExitStatus.unsupported)
 
     def handle_exception(self, e):
         super().handle_exception(e)
-        self.print_status(ExitStatus.unknown)
+        self.print_status(OPBExitStatus.unknown)
+
+    def handle_sigterm(self):
+        """
+        Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
+        """
+        # Report that we haven't found a solution in time
+        self.print_status(OPBExitStatus.unknown)
+        self.print_comment("SIGTERM raised.")
+        return 0
+        
+    def handle_rlimit_cpu(self):
+        """
+        Handles a SIGXCPU.
+        """
+        # Report that we haven't found a solution in time
+        self.print_status(OPBExitStatus.unknown)
+        self.print_comment("SIGXCPU raised.")
+        return 0
 
     def parse_output_line(self, line, result):
         if line.startswith('s '):

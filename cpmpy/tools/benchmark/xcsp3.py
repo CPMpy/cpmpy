@@ -31,6 +31,7 @@ List of classes
 .. autosummary::
     :nosignatures:
 
+    XCSP3ExitStatus
     XCSP3Benchmark
 
 =================
@@ -60,7 +61,7 @@ from xml.etree.ElementTree import ParseError
 import xml.etree.cElementTree as ET
 
 
-class ExitStatus(Enum):
+class XCSP3ExitStatus(Enum):
     unsupported:str = "UNSUPPORTED" # instance contains an unsupported feature (e.g. a unsupported global constraint)
     sat:str = "SATISFIABLE" # CSP : found a solution | COP : found a solution but couldn't prove optimality
     optimal:str = "OPTIMUM" + chr(32) + "FOUND" # optimal COP solution found
@@ -120,12 +121,12 @@ class XCSP3Benchmark(Benchmark):
     """
 
     def __init__(self):
-        super().__init__(reader=read_xcsp3)
+        super().__init__(reader=read_xcsp3, exit_status=XCSP3ExitStatus)
     
     def print_comment(self, comment:str):
         print('c' + chr(32) + comment.rstrip('\n'), end="\r\n", flush=True)
 
-    def print_status(self, status: ExitStatus) -> None:
+    def print_status(self, status: XCSP3ExitStatus) -> None:
         print('s' + chr(32) + status.value, end="\n", flush=True)
 
     def print_value(self, value: str) -> None:
@@ -139,35 +140,35 @@ class XCSP3Benchmark(Benchmark):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
             self.print_result()
             self.print_value(solution_xcsp3(s))
-            self.print_status(ExitStatus.optimal)
+            self.print_status(XCSP3ExitStatus.optimal)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
             self.print_value(solution_xcsp3(s))
-            self.print_status(ExitStatus.sat)
+            self.print_status(XCSP3ExitStatus.sat)
         elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
-            self.print_status(ExitStatus.unsat)
+            self.print_status(XCSP3ExitStatus.unsat)
         else:
             self.print_comment("Solver did not find any solution within the time/memory limit")
-            self.print_status(ExitStatus.unknown)
+            self.print_status(XCSP3ExitStatus.unknown)
 
     def handle_memory_error(self, mem_limit):
         super().handle_memory_error(mem_limit)
-        self.print_status(ExitStatus.unknown)
+        self.print_status(XCSP3ExitStatus.unknown)
 
     def handle_not_implemented(self, e):
         super().handle_not_implemented(e)
-        self.print_status(ExitStatus.unsupported)
+        self.print_status(XCSP3ExitStatus.unsupported)
 
     def handle_exception(self, e):
         if isinstance(e, ParseError):
             if "out of memory" in e.msg:
                 self.print_comment(f"MemoryError raised by parser.")
-                self.print_status(ExitStatus.unknown)
+                self.print_status(XCSP3ExitStatus.unknown)
             else:
                 self.print_comment(f"An {type(e)} got raised by the parser: {e}")
-                self.print_status(ExitStatus.unknown)
+                self.print_status(XCSP3ExitStatus.unknown)
         else:
             super().handle_exception(e)
-            self.print_status(ExitStatus.unknown)
+            self.print_status(XCSP3ExitStatus.unknown)
 
     def parse_output_line(self, line, result):
         if line.startswith('s '):

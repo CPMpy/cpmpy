@@ -31,6 +31,7 @@ List of classes
 .. autosummary::
     :nosignatures:
 
+    MSEExitStatus
     MSEBenchmark
 
 =================
