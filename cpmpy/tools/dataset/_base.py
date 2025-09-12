@@ -45,6 +45,10 @@ class _Dataset(ABC):
     def download(self, *args, **kwargs):
         pass
 
+    @abstractmethod
+    def open(self, instance):
+        pass
+
     def metadata(self, file):
         metadata = self.category() | {
             'name': pathlib.Path(file).stem.replace(self.extension, ''),

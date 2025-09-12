@@ -4,6 +4,7 @@ Pseudo Boolean Competition (PB) Dataset
 https://www.cril.univ-artois.fr/PB25/
 """
 
+import lzma
 import os
 import pathlib
 from urllib.request import urlretrieve
@@ -128,6 +129,9 @@ class OPBDataset(_Dataset):
 
         # Clean up the tar file
         tar_path.unlink()
+
+    def open(self, instance: os.PathLike) -> callable:
+        return lzma.open if str(instance).endswith(".xz") else open
 
 if __name__ == "__main__":
     dataset = OPBDataset(year=2024, track="DEC-LIN", download=True)

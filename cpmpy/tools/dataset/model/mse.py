@@ -4,13 +4,14 @@ MaxSAT Evaluation (MSE) Dataset
 https://maxsat-evaluations.github.io/
 """
 
+import lzma
+import os
 import zipfile
 import pathlib
 from urllib.request import urlretrieve
 from urllib.error import HTTPError, URLError
 
 from .._base import _Dataset
-
 
 class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
@@ -97,6 +98,8 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
         # Clean up the zip file
         zip_path.unlink()
 
+    def open(self, instance: os.PathLike) -> callable:
+        return lzma.open if str(instance).endswith(".xz") else open
 
 if __name__ == "__main__":
     dataset = MSEDataset(year=2024, track="exact-weighted", download=True)
