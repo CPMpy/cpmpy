@@ -30,15 +30,25 @@ Solution: ...
 
 from abc import ABC
 
+import os
+import signal
+import sys
 import time
 import random
 import psutil
 import warnings
+from enum import Enum
 from typing import Optional
 
 import cpmpy as cp
 from cpmpy.tools.benchmark import _mib_as_bytes, _wall_time, set_memory_limit, set_time_limit, _bytes_as_mb, _bytes_as_gb
 
+class ExitStatus(Enum):
+    unsupported:str = "unsupported" # instance contains an unsupported feature (e.g. a unsupported global constraint)
+    sat:str = "sat" # CSP : found a solution | COP : found a solution but couldn't prove optimality
+    optimal:str = "optimal" # optimal COP solution found
+    unsat:str = "unsat" # instance is unsatisfiable
+    unknown:str = "unknown" # any other case
 
 class Benchmark(ABC):
     """
@@ -49,12 +59,13 @@ class Benchmark(ABC):
     It is designed to be extended or customized for specific benchmarking needs.    
     """
 
-    def __init__(self, reader:callable):
+    def __init__(self, reader:callable, exit_status:Enum):
         """
         Arguments:
             reader (callable): A parser from a model format to a CPMPy model.
         """
         self.reader = reader
+        self.exit_status = exit_status
         
     def read_instance(self, instance, open) -> cp.Model:
         """
@@ -91,6 +102,12 @@ class Benchmark(ABC):
         for line in traceback.format_exc().split('\n'):
             if line.strip():
                 self.print_comment(line)
+
+    def handle_sigterm(self):
+        pass
+        
+    def handle_rlimit_cpu(self):
+        pass
 
     """
     Solver arguments (can also be tweaked for a specific benchmark).
@@ -336,6 +353,29 @@ class Benchmark(ABC):
         else:
             set_time_limit(None)
 
+    def sigterm_handler(self, _signo, _stack_frame):
+        exit_code = self.handle_sigterm()
+        print(flush=True)
+        os._exit(exit_code)
+        
+    def rlimit_cpu_handler(self, _signo, _stack_frame):
+        exit_code = self.handle_rlimit_cpu()
+        print(flush=True)
+        os._exit(exit_code)
+
+    def init_signal_handlers(self):
+        """
+        Configure signal handlers
+        """
+        signal.signal(signal.SIGINT, self.sigterm_handler)
+        signal.signal(signal.SIGTERM, self.sigterm_handler)
+        signal.signal(signal.SIGINT, self.sigterm_handler)
+        signal.signal(signal.SIGABRT, self.sigterm_handler)
+        if sys.platform != "win32":
+            signal.signal(signal.SIGXCPU, self.rlimit_cpu_handler)
+        else:
+            warnings.warn("Windows does not support setting SIGXCPU signal")
+
     def post_model(self, model, solver, solver_args):
         """
         Post the model to the selected backend solver.
@@ -417,6 +457,8 @@ class Benchmark(ABC):
             if seed is not None:
                 random.seed(seed)
 
+            self.init_signal_handlers()
+
             # Set memory limit (if provided)
             if mem_limit is not None:
                 self.set_memory_limit(mem_limit)
@@ -487,6 +529,9 @@ class Benchmark(ABC):
             raise e
         except NotImplementedError as e:
             self.handle_not_implemented(e)
+            raise e
+        except TimeoutError as e:
+            self.handle_exception(e) # TODO add callback for timeout?
             raise e
         except Exception as e:
             self.handle_exception(e)

@@ -30,8 +30,6 @@ from typing import Optional, Tuple
 from filelock import FileLock
 from concurrent.futures import ThreadPoolExecutor
 
-from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, init_signal_handlers, ExitStatus
-
 class Tee:
     """
     A stream-like object that duplicates writes to multiple underlying streams.
@@ -96,14 +94,22 @@ def wrapper(instance_runner, conn, kwargs, verbose):
         sys.stdout = Tee(original_stdout, pipe_writer) # forward to pipe and console
 
     try:
-        init_signal_handlers() # configure OS signal handlers
         instance_runner.run(**kwargs)
         conn.send({"status": "ok"})
+    except TimeoutError:
+        try:
+            conn.send({"status": "timeout"})
+        except (BrokenPipeError, EOFError):
+            pass
     except Exception as e: # capture exceptions and report in state
         tb_str = traceback.format_exc()
-        conn.send({"status": "error", "exception": e, "traceback": tb_str})
+        try:
+            conn.send({"status": "error", "exception": e, "traceback": tb_str})
+        except (BrokenPipeError, EOFError):
+            pass
+        #conn.send({"status": "error", "exception": e, "traceback": tb_str})
     finally:
-        sys.stdout = original_stdout
+        #sys.stdout = original_stdout
         conn.close()
 
 # exec_args = (instance_runner, filename, metadata, open, solver, time_limit, mem_limit, output_file, verbose) 
@@ -125,7 +131,7 @@ def execute_instance(args: Tuple[callable, str, dict, callable, str, int, int, i
     instance_runner, filename, metadata, open, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path = args
 
     # Fieldnames for the CSV file
-    fieldnames = ['instance'] + list(metadata.keys()) + \
+    fieldnames = list(metadata.keys()) + \
                  ['solver',
                   'time_total', 'time_parse', 'time_model', 'time_post', 'time_solve',
                   'status', 'objective_value', 'solution', 'intermediate', 'checker_result']
@@ -194,13 +200,13 @@ def execute_instance(args: Tuple[callable, str, dict, callable, str, int, int, i
             raise()
 
     # Parse the exit status
-    if status["status"] == "error":
+    if status["status"] == "timeout":
         # Ignore timeouts
-        if "TimeoutError" in repr(status["exception"]):
-            pass
-        # All other exceptions, put in solution field
-        elif result['solution'] is None:
-            result['status'] = ExitStatus.unknown.value
+        pass
+    elif status["status"] == "error":
+        # All exceptions, put in solution field
+        if result['solution'] is None:
+            result['status'] = instance_runner.exit_status.unknown.value
             result["solution"] = status["exception"]    
 
     # if checker_path is not None and complete_solution is not None: TODO: generalise 'checkers' for benchmarks
