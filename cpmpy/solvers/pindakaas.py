@@ -119,7 +119,7 @@ class CPM_pindakaas(SolverInterface):
 
     @property
     def native_model(self):
-        self.pdk_solver
+        return self.pdk_solver
 
     def solve(self, time_limit=None, assumptions=None):
         """
