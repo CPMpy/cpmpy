@@ -41,7 +41,7 @@ from enum import Enum
 from typing import Optional
 
 import cpmpy as cp
-from cpmpy.tools.benchmark import _mib_as_bytes, _wall_time, set_memory_limit, set_time_limit, _bytes_as_mb, _bytes_as_gb
+from cpmpy.tools.benchmark import _mib_as_bytes, _wall_time, set_memory_limit, set_time_limit, _bytes_as_mb, _bytes_as_gb, disable_memory_limit
 
 class ExitStatus(Enum):
     unsupported:str = "unsupported" # instance contains an unsupported feature (e.g. a unsupported global constraint)
@@ -525,6 +525,7 @@ class Benchmark(ABC):
 
             
         except MemoryError as e:
+            disable_memory_limit()
             self.handle_memory_error(mem_limit)
             raise e
         except NotImplementedError as e:

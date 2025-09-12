@@ -13,6 +13,7 @@ MEMORY_BUFFER_HARD = 0 # MiB
 MEMORY_BUFFER_SOLVER = 20 # MB
 
 
+
 def set_memory_limit(mem_limit):
     """
     Set memory limit (Virtual Memory Size). 
@@ -24,6 +25,12 @@ def set_memory_limit(mem_limit):
             resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
         else:
             warnings.warn("Memory limits using `resource` are not supported on Windows. Skipping hard limit.")
+
+def disable_memory_limit():
+    if sys.platform != "win32":
+        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+        # set a very high soft limit
+        resource.setrlimit(resource.RLIMIT_AS, (hard, hard))
 
 def set_time_limit(time_limit, verbose:bool=False):
     """
