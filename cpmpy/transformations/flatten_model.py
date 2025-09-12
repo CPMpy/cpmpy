@@ -100,19 +100,19 @@ from ..expressions.utils import is_num, is_any_list, is_int, is_star
 from .negation import push_down_negation
 
 
-def flatten_model(orig_model):
+def flatten_model(orig_model, csemap=None):
     """
         Receives model, returns new model where every constraint is in 'flat normal form'
     """
 
     # the top-level constraints
-    basecons = flatten_constraint(orig_model.constraints)
+    basecons = flatten_constraint(orig_model.constraints, csemap=csemap)
 
     # the objective
     if orig_model.objective_ is None:
         return cp.Model(*basecons)  # no objective, satisfaction problem
     else:
-        (newobj, newcons) = flatten_objective(orig_model.objective_)
+        (newobj, newcons) = flatten_objective(orig_model.objective_, csemap=csemap)
         basecons += newcons
         if orig_model.objective_is_min:
             return cp.Model(*basecons, minimize=newobj)
@@ -300,7 +300,7 @@ def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None):
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions: {expr}")
 
     expr = simplify_boolean([expr])[0]
-    (flatexpr, flatcons) = normalized_numexpr(expr)  # might rewrite expr into a (w)sum
+    (flatexpr, flatcons) = normalized_numexpr(expr, csemap=csemap)  # might rewrite expr into a (w)sum
     if isinstance(flatexpr, Expression) and flatexpr.name in supported:
         return (flatexpr, flatcons)
     else:

@@ -379,7 +379,7 @@ class CPM_gcs(SolverInterface):
                 are permanently posted to the solver
         """
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         self += flat_cons # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
