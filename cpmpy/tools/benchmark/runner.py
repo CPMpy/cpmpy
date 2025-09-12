@@ -107,6 +107,7 @@ def wrapper(instance_runner, conn, kwargs, verbose):
         conn.close()
 
 # exec_args = (instance_runner, filename, metadata, open, solver, time_limit, mem_limit, output_file, verbose) 
+_std_open = open
 def execute_instance(args: Tuple[callable, str, dict, callable, str, int, int, int, str, bool, bool, str]) -> None:
     """
     Solve a single benchmark instance and write results to file immediately.
@@ -224,7 +225,7 @@ def execute_instance(args: Tuple[callable, str, dict, callable, str, int, int, i
             # Pre-check if file exists to determine if we need to write header
             write_header = not os.path.exists(output_file)
 
-            with open(output_file, 'a', newline='') as f:
+            with _std_open(output_file, 'a', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 if write_header:
                     writer.writeheader()
