@@ -36,6 +36,10 @@ class _Dataset(ABC):
                 raise ValueError(f"Dataset not found. Please set download=True to download the dataset.")
             else:
                 self.download()
+
+        files = sorted(list(self.dataset_dir.glob(f"*{self.extension}")))
+        if len(files) == 0:
+            raise ValueError("Cannot find any instances inside dataset. Is it a valid dataset? If so, please report on GitHub.")
                 
     @abstractmethod
     def category(self) -> dict:
