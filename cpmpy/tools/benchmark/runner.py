@@ -273,15 +273,16 @@ def benchmark_runner(
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
         futures = [executor.submit(execute_instance,  # below: args
-                                   (instance_runner, filename, metadata, dataset.open(), solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
+                                   (instance_runner, filename, metadata, dataset.open, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
                    for filename, metadata in dataset]
         # Process results as they complete
-        for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
+        for i, future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
             try:
-                _ = future.result(timeout=time_limit+60)  # for cleanliness sake, result is empty
+                _ = future.result(timeout=time_limit + 60)  # for cleanliness sake, result is empty
             except TimeoutError:
                 pass
             except Exception as e:
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
+                if verbose: traceback.print_exc()
     
     return output_file
