@@ -100,7 +100,7 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
         zip_path.unlink()
 
     def open(self, instance: os.PathLike) -> callable:
-        return lzma.open if str(instance).endswith(".xz") else open
+        return lzma.open(instance, "rt") if str(instance).endswith(".xz") else open(instance)
 
 if __name__ == "__main__":
     dataset = MSEDataset(year=2024, track="exact-weighted", download=True)
