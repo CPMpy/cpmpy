@@ -73,16 +73,16 @@ class TestSolvers(unittest.TestCase):
 
         self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name="IV123"))
         self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name="IV123", shape=3))
-        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("BV0", "x", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("IV0", "x", "y"), shape=3))
         self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("x", "IV1", "y"), shape=3))
-        self.assertRaises(ValueError, lambda: cp.intvar(0,10, name=[["x","y","z"],["a", "BV0", "b"]], shape=(2,3)))
+        self.assertRaises(ValueError, lambda: cp.intvar(0,10, name=[["x","y","z"],["a", "IV0", "b"]], shape=(2,3)))
 
         # this seems fine but it is not!! can still clash
         self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name="BV123"))
         self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name="BV123", shape=3))
         self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("BV0", "x", "y"), shape=3))
         self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("x", "BV1", "y"), shape=3))
-        self.assertRaises(ValueError, lambda: cp.intvar(0,10, name=[["x","y","z"],["a", "IV0", "b"]], shape=(2,3)))
+        self.assertRaises(ValueError, lambda: cp.intvar(0,10, name=[["x","y","z"],["a", "BV0", "b"]], shape=(2,3)))
 
     def test_clear(self):
         def n_none(v):
