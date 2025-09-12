@@ -139,7 +139,7 @@ class OPBDataset(_Dataset):
         tar_path.unlink()
 
     def open(self, instance: os.PathLike) -> callable:
-        return lzma.open if str(instance).endswith(".xz") else open
+        return lzma.open(instance, 'rt') if str(instance).endswith(".xz") else open(instance)
 
 if __name__ == "__main__":
     dataset = OPBDataset(year=2024, track="DEC-LIN", download=True)

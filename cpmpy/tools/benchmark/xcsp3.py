@@ -138,7 +138,6 @@ class XCSP3Benchmark(Benchmark):
 
     def print_result(self, s):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
-            self.print_result()
             self.print_value(solution_xcsp3(s))
             self.print_status(XCSP3ExitStatus.optimal)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
@@ -176,7 +175,7 @@ class XCSP3Benchmark(Benchmark):
         elif line.startswith('v ') and result['solution'] is None:
             # only record first line, contains 'type' and 'cost'
             solution = line.split("\n")[0][2:].strip()
-            result['solution'] = str(solution)
+            result['solution'] = solution
             complete_solution = line
             if "cost" in solution:
                 result['objective_value'] = solution.split('cost="')[-1][:-2]

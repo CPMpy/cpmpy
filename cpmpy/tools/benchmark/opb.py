@@ -100,7 +100,6 @@ class OPBBenchmark(Benchmark):
 
     def print_result(self, s):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
-            self.print_result()
             self.print_value(solution_opb(s))
             self.print_status(OPBExitStatus.optimal)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:

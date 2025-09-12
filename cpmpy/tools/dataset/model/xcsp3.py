@@ -129,7 +129,7 @@ class XCSP3Dataset(_Dataset):
         zip_path.unlink()
 
     def open(self, instance: os.PathLike) -> callable:
-        return partial(lzma.open, mode='rt', encoding='utf-8') if str(instance).endswith(".lzma") else open
+        return lzma.open(instance, mode='rt', encoding='utf-8') if str(instance).endswith(".lzma") else open(instance)
 
 
 if __name__ == "__main__":
