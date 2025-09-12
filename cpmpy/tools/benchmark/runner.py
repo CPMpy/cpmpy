@@ -136,7 +136,7 @@ def execute_instance(args: Tuple[callable, str, dict, callable, str, int, int, i
 
     # Decompress before timers start
     with open(filename) as f:   # <- dataset-specific 'open' callable
-        filename = StringIO(f.read()) # read to memory-mapped file
+        filename = f.read() # read to memory-mapped file
 
     # Start total timing
     total_start = time.time()
