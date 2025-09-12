@@ -73,7 +73,7 @@ def solution_mse(model):
     Returns:
         str: MSE-formatted solution string.
     """
-    variables = [var for var in model.user_vars if var.name[:2] == "BV"] # dirty workaround for all missed aux vars in user vars
+    variables = [var for var in model.user_vars if var.name[:2] == "BV"] # dirty workaround for all missed aux vars in user vars TODO fix with Ignace
     variables = sorted(variables, key=lambda v: int("".join(filter(str.isdigit, v.name))))
     return " ".join([str(1 if var.value() else 0) for var in variables])
 

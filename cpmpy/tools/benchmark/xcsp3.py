@@ -92,7 +92,7 @@ def solution_xcsp3(model, useless_style="*", boolean_style="int"):
 
     # How useless variables should be handled
     #    (variables which have value `None` in the solution)
-    variables = {var.name: var for var in model.user_vars if var.name[:2] not in ["IV", "BV", "B#"]} # dirty workaround for all missed aux vars in user vars
+    variables = {var.name: var for var in model.user_vars if var.name[:2] not in ["IV", "BV", "B#"]} # dirty workaround for all missed aux vars in user vars TODO fix with Ignace
     if useless_style == "*":
         variables = {k:(v.value() if v.value() is not None else "*") for k,v in variables.items()}
     elif useless_style == "drop":
