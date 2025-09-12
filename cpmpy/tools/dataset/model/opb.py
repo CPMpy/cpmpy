@@ -63,19 +63,21 @@ class OPBDataset(_Dataset):
             download=download, extension=".opb.xz"
         )
 
-    def category(self):
+    def category(self) -> dict:
         return {
             "year": self.year,
             "track": self.track
         }
 
-    def metadata(self, file):
+    def metadata(self, file) -> dict:
+        # Add the author to the metadata
         return super().metadata(file) | {'author': str(file).split(os.sep)[-1].split("_")[0],}
                 
 
     def download(self):
         # TODO: add option to filter on competition instances
         print(f"Downloading OPB {self.year} {self.track} instances...")
+        
         url = f"https://www.cril.univ-artois.fr/PB24/benchs/"
         year_suffix = str(self.year)[2:]  # Drop the starting '20'
         url_path = url + f"normalized-PB{year_suffix}.tar"

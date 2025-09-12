@@ -64,7 +64,7 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
         )
 
 
-    def category(self):
+    def category(self) -> dict:
         return {
             "year": self.year,
             "track": self.track

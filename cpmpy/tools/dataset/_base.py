@@ -38,18 +38,32 @@ class _Dataset(ABC):
                 self.download()
                 
     @abstractmethod
-    def category(self):
+    def category(self) -> dict:
+        """
+        Labels to distinguish instances into categories matching to those of the dataset.
+        E.g. 
+            - year
+            - track
+        """
         pass
 
     @abstractmethod
     def download(self, *args, **kwargs):
+        """
+        How the dataset should be downloaded.
+        """
         pass
 
     @abstractmethod
-    def open(self, instance):
+    def open(self, instance) -> callable:
+        """
+        How an instance file from the dataset should be opened.
+        Especially usefull when files come compressed and won't work with 
+        python standard library's 'open', e.g. '.xz', '.lzma'.
+        """
         pass
 
-    def metadata(self, file):
+    def metadata(self, file) -> dict:
         metadata = self.category() | {
             'name': pathlib.Path(file).stem.replace(self.extension, ''),
             'path': file,

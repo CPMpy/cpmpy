@@ -65,7 +65,7 @@ class XCSP3Dataset(_Dataset):
         )
 
 
-    def category(self):
+    def category(self) -> dict:
         return {
             "year": self.year,
             "track": self.track
