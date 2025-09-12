@@ -1,8 +1,3 @@
-#!/usr/bin/env python
-#-*- coding:utf-8 -*-
-##
-## __init__.py
-##
 """
 Parser for the WCNF format.
 
@@ -39,8 +34,8 @@ def _get_var(i, vars_dict):
         vars_dict[i] = cp.boolvar(name=f"x{i}") # <- be carefull that name doesn't clash with generated variables during transformations / user variables
     return vars_dict[i]
 
-
-def read_wcnf(wcnf: Union[str, os.PathLike]) -> cp.Model:
+_std_open = open
+def read_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
     """
     Parser for WCNF format. Reads in an instance and returns its matching CPMpy model.
 
@@ -48,14 +43,18 @@ def read_wcnf(wcnf: Union[str, os.PathLike]) -> cp.Model:
         wcnf (str or os.PathLike):
             - A file path to an WCNF file (optionally LZMA-compressed with `.xz`)
             - OR a string containing the WCNF content directly
+        open: (callable):
+            If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
         cp.Model: The CPMpy model of the WCNF instance.
     """
     # If wcnf is a path to a file -> open file
     if isinstance(wcnf, (str, os.PathLike)) and os.path.exists(wcnf):
-        f_open = lzma.open if str(wcnf).endswith(".xz") else open
-        f = f_open(wcnf, "rt")
+        if open is not None:
+            f = open(wcnf)
+        else:
+            f = _std_open(wcnf, "rt")
     # If wcnf is a string containing a model -> create a memory-mapped file
     else:
         f = StringIO(wcnf)

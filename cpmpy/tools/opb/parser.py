@@ -105,7 +105,8 @@ def _parse_constraint(line, vars):
         right=rhs
     )
 
-def read_opb(opb: Union[str, os.PathLike]) -> cp.Model:
+_std_open = open
+def read_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
     """
     Parser for OPB (Pseudo-Boolean) format. Reads in an instance and returns its matching CPMpy model.
 
@@ -121,6 +122,8 @@ def read_opb(opb: Union[str, os.PathLike]) -> cp.Model:
         opb (str or os.PathLike): 
             - A file path to an OPB file (optionally LZMA-compressed with `.xz`)
             - OR a string containing the OPB content directly
+        open: (callable):
+            If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
         cp.Model: The CPMpy model of the OPB instance.
@@ -143,8 +146,10 @@ def read_opb(opb: Union[str, os.PathLike]) -> cp.Model:
     
     # If opb is a path to a file -> open file
     if isinstance(opb, (str, os.PathLike)) and os.path.exists(opb):
-        f_open = lzma.open if str(opb).endswith(".xz") else open
-        f = f_open(opb, 'rt')
+        if open is not None:
+            f = open(opb)
+        else:
+            f = _std_open(opb, "rt")
     # If opb is a string containing a model -> create a memory-mapped file
     else:
         f = StringIO(opb)
