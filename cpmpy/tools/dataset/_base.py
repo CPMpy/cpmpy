@@ -36,6 +36,8 @@ class _Dataset(ABC):
                 raise ValueError(f"Dataset not found. Please set download=True to download the dataset.")
             else:
                 self.download()
+                files = sorted(list(self.dataset_dir.glob(f"*{self.extension}")))
+                print(f"Finished downloading {len(files)} instances")
 
         files = sorted(list(self.dataset_dir.glob(f"*{self.extension}")))
         if len(files) == 0:
