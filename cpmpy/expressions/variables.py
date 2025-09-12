@@ -65,9 +65,9 @@ import cpmpy as cp  # to avoid circular import
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
-_BV_NAME = "BV"
-_IV_NAME = "IV"
-_VAR_ERR  = f"Variable names starting with {_IV_NAME} or {_BV_NAME} are reserved for internal use only, chose a different name"
+_BV_PREFIX = "BV"
+_IV_PREFIX = "IV"
+_VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
 
 def BoolVar(shape=1, name=None):
     """
@@ -344,7 +344,7 @@ class _IntVarImpl(_NumVarImpl):
         assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub), ub)
 
         if name is None:
-            name = "{}{}".format(_IV_NAME, _IntVarImpl.counter)
+            name = f"{_IV_PREFIX}{_IntVarImpl.counter}"
             _IntVarImpl.counter = _IntVarImpl.counter + 1 # static counter
 
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
@@ -371,7 +371,7 @@ class _BoolVarImpl(_IntVarImpl):
         assert(ub == 0 or ub == 1)
 
         if name is None:
-            name = "{}{}".format(_BV_NAME,_BoolVarImpl.counter)
+            name = f"{_BV_PREFIX}{_BoolVarImpl.counter}"
             _BoolVarImpl.counter = _BoolVarImpl.counter + 1 # static counter
         _IntVarImpl.__init__(self, lb, ub, name=name)
 
@@ -787,5 +787,5 @@ def _genname(basename, idxs):
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
 
 def _is_invalid_name(name):
-    return name.startswith(_IV_NAME) or name.startswith(_BV_NAME)
+    return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
 
