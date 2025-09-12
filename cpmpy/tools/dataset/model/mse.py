@@ -4,8 +4,9 @@ MaxSAT Evaluation (MSE) Dataset
 https://maxsat-evaluations.github.io/
 """
 
-import lzma
+
 import os
+import lzma
 import zipfile
 import pathlib
 from urllib.request import urlretrieve

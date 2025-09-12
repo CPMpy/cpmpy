@@ -43,15 +43,15 @@ List of functions
     solution_mse
 """
 
+import warnings
 import argparse
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
-import warnings
+from datetime import datetime
 
+# CPMpy
 from cpmpy.tools.benchmark.runner import benchmark_runner
-from _base import Benchmark
-
+from cpmpy.tools.benchmark._base import Benchmark
 from cpmpy.tools.wcnf import read_wcnf
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 
@@ -80,7 +80,7 @@ def solution_mse(model):
 class MSEBenchmark(Benchmark):
 
     """
-    Benchmark runner for MSE (MaxSAT Evaluation) competition instances.
+    MSE (MaxSAT Evaluation) competition as a CPMpy benchmark.
 
     This class extends `Benchmark` to implement MSE-specific solution printing
     in DIMACS-like output format (`c`, `s`, `v`, `o` lines). It uses CPMpy's `read_wcnf`
