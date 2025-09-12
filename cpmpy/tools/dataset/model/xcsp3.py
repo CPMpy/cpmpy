@@ -56,6 +56,12 @@ class XCSP3Dataset(_Dataset):
         self.year = year
         self.track = track
 
+        # Check requested dataset
+        if not str(year).startswith('20'):
+            raise ValueError("Year must start with '20'")
+        if not track:
+            raise ValueError("Track must be specified, e.g. COP, CSP, ...")
+
         dataset_dir = self.root / str(year) / track
 
         super().__init__(
