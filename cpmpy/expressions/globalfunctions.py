@@ -261,7 +261,7 @@ class Element(GlobalFunction):
 
     def __init__(self, arr, *idx):
         if any(is_boolexpr(i) for i in idx):
-            raise TypeError("index cannot be a boolean expression: {}".format(i))
+            raise TypeError("index cannot be a boolean expression: {}".format(idx))
         if isinstance(arr, ndarray):
             arr = arr.tolist()
         super().__init__("element", [arr]+list(idx))
