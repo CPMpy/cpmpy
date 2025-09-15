@@ -57,6 +57,7 @@ class CPM_hexaly(SolverInterface):
 
     Creates the following attributes (see parent constructor for more):
     - hex_model: object, Hexaly's model object
+    - hex_solver: object, Hexaly's solver object (to solve hex_model)
 
     Documentation of the solver's own Python API:
     https://www.hexaly.com/docs/last/pythonapi/index.html
@@ -67,7 +68,6 @@ class CPM_hexaly(SolverInterface):
         # try to import the package
         try:
             import hexaly as hex
-            # optionally enforce a specific version
             return True
         except ModuleNotFoundError: # if solver's Python package is not installed
             return False
