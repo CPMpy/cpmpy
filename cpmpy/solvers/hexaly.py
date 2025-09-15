@@ -275,6 +275,35 @@ class CPM_hexaly(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element"})
         return cpm_cons
 
+    def add(self, cpm_expr_orig):
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+        :param cpm_expr: CPMpy expression, or list thereof
+        :type cpm_expr: Expression or list of Expression
+
+        :return: self
+        """
+        # add new user vars to the set
+        get_variables(cpm_expr_orig, collect=self.user_vars)
+
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+            hex_expr = self._hex_expr(cpm_expr)
+            self.hex_model.add_constraint(hex_expr)
+
+        return self
+    __add__ = add  # avoid redirect in superclass
+
     def _hex_expr(self, cpm_expr):
 
         # get transformed constraint
@@ -353,34 +382,6 @@ class CPM_hexaly(SolverInterface):
 
         raise NotImplementedError(f"Unexpected expression {cpm_expr}")
 
-    def add(self, cpm_expr_orig):
-        """
-            Eagerly add a constraint to the underlying solver.
-
-            Any CPMpy expression given is immediately transformed (through `transform()`)
-            and then posted to the solver in this function.
-
-            This can raise 'NotImplementedError' for any constraint not supported after transformation
-
-            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-            the user knows and cares about (and will be populated with a value after solve). All other variables
-            are auxiliary variables created by transformations.
-
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
-
-        :return: self
-        """
-        # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
-
-        # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-            hex_expr = self._hex_expr(cpm_expr)
-            self.hex_model.add_constraint(hex_expr)
-
-        return self
-    __add__ = add  # avoid redirect in superclass
     
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         # time_limit = 10
