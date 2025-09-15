@@ -239,7 +239,6 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(lin_cons), "sum([1, -1] * [x, y]) == 3")
 
 
-
 class TestConstRhs(unittest.TestCase):
 
     def test_numvar(self):
@@ -336,7 +335,7 @@ class TestVarsLhs(unittest.TestCase):
 
     def test_pow(self):
 
-        a,b = cp.intvar(0,10, name=tuple("ab"), shape=2)
+        a,b = cp.intvar(0,32, name=tuple("ab"), shape=2)
 
         cons = a ** 3 == b
         lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
@@ -345,10 +344,39 @@ class TestVarsLhs(unittest.TestCase):
         self.assertEqual(str(lin_cons[1]), "((a) * (IV0)) == (IV1)")
         self.assertEqual(str(lin_cons[2]), "sum([1, -1] * [IV1, b]) == 0")
 
-        # this is not supported
+        cons = a ** 5 == b
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+        model = cp.Model(lin_cons + [a == 2])
+        self.assertTrue(model.solve())
+        self.assertEqual(b.value(), 32)  # 2^5 = 32
+
+        # Test x^0 == y (should equal 1)
+        cons = a ** 0 == b
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+        model = cp.Model(lin_cons + [a == 3])
+        self.assertTrue(model.solve())
+        self.assertEqual(b.value(), 1)
+
+        # not supported pow with exponent being a variable
         cons = a ** b == 3
         self.assertRaises(NotImplementedError,
                           lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
+
+        # not supported pow with exponent being a float
+        cons = a ** 3.5 == b
+        self.assertRaises(NotImplementedError,
+                          lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
+
+        # not supported pow with exponent being a negative integer
+        cons = a ** -3 == b
+        self.assertRaises(NotImplementedError,
+                          lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
+        
+        # not supported pow when mul is not supported
+        cons = a ** 3 == b
+        self.assertRaises(NotImplementedError,
+                          lambda :  linearize_constraint([cons], supported={"sum", "wsum"}))
+
 
     def test_mod_triv(self):
         x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
@@ -374,8 +402,25 @@ class TestVarsLhs(unittest.TestCase):
                           lambda : linearize_constraint([cons], supported={"sum", "wsum"}),
                           )
 
+        cons = (x % 2) == 1
+        sols = set()
+        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
+
+        lincons = linearize_constraint([cons], supported={"sum", "wsum"})
+        linsols = set()
+        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
+
+        self.assertSetEqual(sols, linsols)
+
+        # check for full support of mod
         same_cons = linearize_constraint([cons], supported={"mod"})
         self.assertEqual(str(same_cons[0]), str(cons))
+
+        # test unsafe modulo
+        z = cp.intvar(0, 10, name="z")
+        cons = (x % z) == 1
+        with self.assertRaises(ValueError):
+            linearize_constraint([cons], supported={"sum", "wsum", "mul"})
 
         # what about half-reified?
         bv = cp.boolvar(name="bv")
