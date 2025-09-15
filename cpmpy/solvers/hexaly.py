@@ -46,7 +46,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, is_boolexpr, eval_comparison
+from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
