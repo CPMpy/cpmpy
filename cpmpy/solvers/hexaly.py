@@ -107,6 +107,10 @@ class CPM_hexaly(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="hexaly", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        return self.hex_model
+
     def solve(self, time_limit=None, **kwargs):
         """
             Call the Hexaly solver
