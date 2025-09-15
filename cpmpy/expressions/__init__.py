@@ -21,10 +21,10 @@
 # others need to be imported by the developer explicitely
 from .variables import boolvar, intvar, cpm_array
 from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
-from .globalconstraints import AllDifferent, AllDifferentExcept0, AllDifferentExceptN, AllEqual, AllEqualExceptN, Circuit, Inverse, Table, Xor, Cumulative, \
+from .globalconstraints import AllDifferent, AllDifferentExcept0, AllDifferentExceptN, AllEqual, AllEqualExceptN, Circuit, Inverse, Table, ShortTable, Xor, Cumulative, \
     IfThenElse, GlobalCardinalityCount, DirectConstraint, InDomain, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, \
     LexLess, LexLessEq, LexChainLess, LexChainLessEq, Precedence, NoOverlap, \
-    NegativeTable
+    NegativeTable, Regular
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated
 from .globalfunctions import Maximum, Minimum, Abs, Element, Count, NValue, NValueExcept, Among
 from .core import BoolVal

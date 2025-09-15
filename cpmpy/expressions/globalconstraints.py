@@ -9,12 +9,12 @@
     Using global constraints
     ------------------------
 
-    Solvers can have specialised implementations for global constraints. CPMpy has GlobalConstraint
+    Solvers can have specialised implementations for global constraints. CPMpy has :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`
     expressions so that they can be passed to the solver as is when supported.
 
-    If a solver does not support a global constraint (see solvers/) then it will be automatically
-    decomposed by calling its `.decompose()` function.
-    The `.decompose()` function returns two arguments:
+    If a solver does not support a global constraint (see :ref:`Solver Interfaces <solver-interfaces>`) then it will be automatically
+    decomposed by calling its :func:`~cpmpy.expressions.globalconstraints.GlobalConstraint.decompose()` function.
+    The :func:`~cpmpy.expressions.globalconstraints.GlobalConstraint.decompose()` function returns two arguments:
         - a list of simpler constraints replacing the global constraint
         - if the decomposition introduces *new variables*, then the second argument has to be a list
             of constraints that (totally) define those new variables
@@ -34,26 +34,26 @@
     Numeric global constraints
     --------------------------
 
-    CPMpy also implements __Numeric Global Constraints__. For these, the CPMpy GlobalConstraint does not
+    CPMpy also implements `Numeric Global Constraints`. For these, the CPMpy :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint` does not
     exactly match what is implemented in the solver, but for good reason!!
 
-    For example solvers may implement the global constraint `Minimum(iv1, iv2, iv3) == iv4` through an API
-    call `addMinimumEquals([iv1,iv2,iv3], iv4)`.
+    For example solvers may implement the global constraint ``Minimum(iv1, iv2, iv3) == iv4`` through an API
+    call ``addMinimumEquals([iv1,iv2,iv3], iv4)``.
 
-    However, CPMpy also wishes to support the expressions `Minimum(iv1, iv2, iv3) > iv4` as well as
-    `iv4 + Minimum(iv1, iv2, iv3)`. 
+    However, CPMpy also wishes to support the expressions ``Minimum(iv1, iv2, iv3) > iv4`` as well as
+    ``iv4 + Minimum(iv1, iv2, iv3)``. 
 
-    Hence, the CPMpy global constraint only captures the `Minimum(iv1, iv2, iv3)` part, whose return type
+    Hence, the CPMpy global constraint only captures the ``Minimum(iv1, iv2, iv3)`` part, whose return type
     is numeric and can be used in any other CPMpy expression. Only at the time of transforming the CPMpy
     model to the solver API, will the expressions be decomposed and auxiliary variables introduced as needed
-    such that the solver only receives `Minimum(iv1, iv2, iv3) == ivX` expressions.
+    such that the solver only receives ``Minimum(iv1, iv2, iv3) == ivX`` expressions.
     This is the burden of the CPMpy framework, not of the user who wants to express a problem formulation.
 
 
     Subclassing GlobalConstraint
     ----------------------------
     
-    If you do wish to add a GlobalConstraint, because it is supported by solvers or because you will do
+    If you do wish to add a :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`, because it is supported by solvers or because you will do
     advanced analysis and rewriting on it, then preferably define it with a standard decomposition, e.g.:
 
     .. code-block:: python
@@ -65,20 +65,22 @@
             def decompose(self):
                 return [self.args[0] != self.args[1]] # your decomposition
 
-    If it is a __numeric global constraint__ meaning that its return type is numeric (see `Minimum` and `Element`)
-    then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
+    ..
+        If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
+        then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
 
 
     Alternative decompositions
     --------------------------
     
     For advanced use cases where you want to use another decomposition than the standard decomposition
-    of a GlobalConstraint expression, you can overwrite the 'decompose' function of the class, e.g.:
+    of a :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint` expression, you can overwrite the :func:`~cpmpy.expressions.globalconstraints.GlobalConstraint.decompose` function of the class, e.g.:
 
     .. code-block:: python
 
         def my_circuit_decomp(self):
             return [self.args[0] == 1], [] # does not actually enforce circuit
+
         circuit.decompose = my_circuit_decomp # attach it, no brackets!
 
         vars = intvar(1,9, shape=10)
@@ -86,8 +88,8 @@
 
         Model(constr).solve()
 
-    The above will use 'my_circuit_decomp', if the solver does not
-    natively support 'circuit'.
+    The above will use ``my_circuit_decomp``, if the solver does not
+    natively support :class:`~cpmpy.expressions.globalconstraints.Circuit`.
 
     ===============
     List of classes
@@ -104,17 +106,25 @@
         Circuit
         Inverse
         Table
+        ShortTable
         NegativeTable
+        Regular
+        IfThenElse
+        InDomain
         Xor
         Cumulative
-        IfThenElse
+        Precedence
+        NoOverlap
         GlobalCardinalityCount
-        DirectConstraint
-        InDomain
         Increasing
         Decreasing
         IncreasingStrict
         DecreasingStrict
+        LexLess
+        LexLessEq
+        LexChainLess
+        LexChainLessEq
+        DirectConstraint
 
 """
 import copy
@@ -123,7 +133,7 @@ import copy
 import cpmpy as cp
 
 from .core import BoolVal
-from .utils import all_pairs
+from .utils import all_pairs, is_int, is_bool, STAR
 from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 
@@ -133,8 +143,8 @@ class GlobalConstraint(Expression):
     """
         Abstract superclass of GlobalConstraints
 
-        Like all expressions it has a `.name` and `.args` property.
-        Overwrites the `.is_bool()` method.
+        Like all expressions it has a ``.name`` and ``.args`` property.
+        Overwrites the ``.is_bool()`` method.
     """
 
     def is_bool(self):
@@ -166,6 +176,10 @@ class GlobalConstraint(Expression):
 
 # Global Constraints (with Boolean return type)
 def alldifferent(args):
+    """
+    .. deprecated:: 0.9.0
+          Please use :class:`AllDifferent` instead.
+    """
     warnings.warn("Deprecated, use AllDifferent(v1,v2,...,vn) instead, will be removed in "
                   "stable version", DeprecationWarning)
     return AllDifferent(*args) # unfold list as individual arguments
@@ -196,8 +210,14 @@ class AllDifferentExceptN(GlobalConstraint):
         super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
-        return [(var1 == var2).implies(cp.any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        cons = []
+        arr, n = self.args
+        for x,y in all_pairs(arr):
+            cond = x == y
+            if is_bool(cond):
+                cond = cp.BoolVal(cond)
+            cons.append(cond.implies(cp.any(x == a for a in n))) # equivalent to (var1 in n) | (var2 in n) | (var1 != var2)
+        return cons, []
 
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
@@ -209,11 +229,14 @@ class AllDifferentExcept0(AllDifferentExceptN):
         All nonzero arguments have a distinct value
     """
     def __init__(self, *arr):
-        flatarr = flatlist(arr)
         super().__init__(arr, 0)
 
 
 def allequal(args):
+    """
+    .. deprecated:: 0.9.0
+          Please use :class:`AllEqual` instead.
+    """
     warnings.warn("Deprecated, use AllEqual(v1,v2,...,vn) instead, will be removed in stable version",
                   DeprecationWarning)
     return AllEqual(*args) # unfold list as individual arguments
@@ -256,6 +279,10 @@ class AllEqualExceptN(GlobalConstraint):
 
 
 def circuit(args):
+    """
+    .. deprecated:: 0.9.0
+          Please use :class:`Circuit` instead.
+    """
     warnings.warn("Deprecated, use Circuit(v1,v2,...,vn) instead, will be removed in stable version",
                   DeprecationWarning)
     return Circuit(*args) # unfold list as individual arguments
@@ -276,9 +303,10 @@ class Circuit(GlobalConstraint):
         """
             Decomposition for Circuit
 
-            Not sure where we got it from,
-            MiniZinc has slightly different one:
-            https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
+            ..
+                Not sure where we got it from,
+                MiniZinc has slightly different one:
+                https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
         """
         succ = cpm_array(self.args)
         n = len(succ)
@@ -352,9 +380,24 @@ class Inverse(GlobalConstraint):
         super().__init__("inverse", [fwd, rev])
 
     def decompose(self):
+
         fwd, rev = self.args
         rev = cpm_array(rev)
-        return [cp.all(rev[x] == i for i, x in enumerate(fwd))], []
+
+        constraining, defining = [], []
+        for i,x in enumerate(fwd):
+            if is_num(x) and not 0 <= x < len(rev): 
+                return [cp.BoolVal(False)], [] # can never satisfy the Inverse constraint
+           
+            lb, ub = get_bounds(x)
+            if lb >= 0 and ub < len(rev): # safe, index is within bounds
+                constraining.append(rev[x] == i)
+            else: # partial! need safening here
+                is_defined, total_expr, toplevel = cp.transformations.safening._safen_range(rev[x], (0, len(rev)-1), 1)
+                constraining += [is_defined, total_expr == i]
+                defining += toplevel
+        
+        return constraining, defining
 
     def value(self):
         fwd = argvals(self.args[0])
@@ -387,6 +430,35 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
 
+class ShortTable(GlobalConstraint):
+    """
+        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
+        no restrictions for the corresponding variable in that tuple.
+    """
+    def __init__(self, array, table):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
+        if not all(is_int(x) or x == STAR for row in table for x in row):
+            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        if isinstance(table, np.ndarray): # Ensure it is a list
+            table = table.tolist()
+        super().__init__("short_table", [array, table])
+
+    def decompose(self):
+        arr, tab = self.args
+        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
+
+    def value(self):
+        arr, tab = self.args
+        tab = np.array(tab)
+        arrval = np.array(argvals(arr))
+        for row in tab:
+            num_row = row[row != STAR].astype(int)
+            num_vals = arrval[row != STAR].astype(int)
+            if (num_row == num_vals).all():
+                return True
+        return False
 
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
@@ -407,12 +479,97 @@ class NegativeTable(GlobalConstraint):
         arrval = argvals(arr)
         tabval = argvals(tab)
         return arrval not in tabval
+    
 
+class Regular(GlobalConstraint):
+    """
+    Regular-constraint (or Automaton-constraint)
+    Takes as input a sequence of variables and a automaton representation using a transition table.
+    The constraint is satisfied if the sequence of variables corresponds to an accepting path in the automaton.
+
+    The automaton is defined by a list of transitions, a starting node and a list of accepting nodes.
+    The transitions are represented as a list of tuples, where each tuple is of the form (id1, value, id2).
+    An id is an integer or string representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
+    The starting node is an integer or string representing the starting state of the automaton.
+    The accepting nodes are a list of integers or strings representing the accepting states of the automaton.
+
+    Example: an automaton that accepts the language 0*10* (exactly 1 variable taking value 1) is defined as:
+        cp.Regular(array = cp.intvar(0,1, shape=4),
+                   transitions = [("A",0,"A"), ("A",1,"B"), ("B",0,"C"), ("C",0,"C")],
+                   start = "A",
+                   accepting = ["C"])
+    """
+    def __init__(self, array, transitions, start, accepting):
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
+        
+        if not is_any_list(transitions):
+            raise TypeError("The second argument of a regular constraint should be a list of transitions")
+        _node_type = type(transitions[0][0])
+        for s,v,e in transitions:
+            if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
+                raise TypeError(f"The second argument of a regular constraint should be a list of transitions ({_node_type}, int, {_node_type})")
+        if not isinstance(start, _node_type):
+            raise TypeError("The third argument of a regular constraint should be a node id")
+        if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
+            raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
+        super().__init__("regular", [array, transitions, start, list(accepting)])
+
+        self.nodes = set()
+        self.trans_dict = {}
+        for s, v, e in transitions:
+            self.nodes.update([s,e])
+            self.trans_dict[(s, v)] = e
+        self.nodes = sorted(self.nodes)
+        # normalize node_ids to be 0..n-1, allows for smaller domains
+        self.node_map = {n: i for i, n in enumerate(self.nodes)}
+
+    def decompose(self):
+        # Decompose to transition table using Table constraints
+        
+        arr, transitions, start, accepting = self.args
+        lbs, ubs = get_bounds(arr)
+        lb, ub = min(lbs), max(ubs)
+        
+        transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+
+        # add a sink node for transitions that are not defined
+        sink = len(self.nodes)
+        transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
+        transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
+
+        # keep track of current state when traversing the array
+        state_vars = intvar(0, sink, shape=len(arr))
+        id_start = self.node_map[start]
+        # optimization: we know the entry node of the automaton, results in smaller table
+        defining = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
+        # define the rest of the automaton using transition table
+        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
+        
+        # constraint is satisfied iff last state is accepting
+        return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+
+    def value(self):
+        arr, transitions, start, accepting = self.args
+        arrval = [argval(a) for a in arr]
+        curr_node = start
+        for v in arrval:
+            if (curr_node, v) in self.trans_dict:
+                curr_node = self.trans_dict[curr_node, v]
+            else:
+                return False
+        return curr_node in accepting
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
 # https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
 class IfThenElse(GlobalConstraint):
+    """
+        The IfThenElse constraint, defining a conditional expression
+        of the form: if condition then if_true else if_false
+        where condition, if_true and if_false are all boolean expressions.
+    """
     def __init__(self, condition, if_true, if_false):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
@@ -431,6 +588,8 @@ class IfThenElse(GlobalConstraint):
 
     def decompose(self):
         condition, if_true, if_false = self.args
+        if is_bool(condition):
+            condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
         return [condition.implies(if_true), (~condition).implies(if_false)], []
 
     def __repr__(self):
@@ -455,11 +614,11 @@ class InDomain(GlobalConstraint):
                they should be enforced toplevel.
         """
         expr, arr = self.args
-        lb, ub = expr.get_bounds()
-
+        lb, ub = get_bounds(expr)
+        
         defining = []
         #if expr is not a var
-        if not isinstance(expr,_IntVarImpl):
+        if not isinstance(expr,Expression):
             aux = intvar(lb, ub)
             defining.append(aux == expr)
             expr = aux
@@ -480,7 +639,7 @@ class InDomain(GlobalConstraint):
 
 class Xor(GlobalConstraint):
     """
-        The 'xor' exclusive-or constraint
+        The :class:`Xor` exclusive-or constraint
     """
 
     def __init__(self, arg_list):
@@ -513,9 +672,9 @@ class Xor(GlobalConstraint):
 class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
-        Ensures that the capacity of the resource is never exceeded
-        Equivalent to noOverlap when demand and capacity are equal to 1
-        Supports both varying demand across tasks or equal demand for all jobs
+        Ensures that the capacity of the resource is never exceeded.
+        Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
+        Supports both varying demand across tasks or equal demand for all jobs.
     """
     def __init__(self, start, duration, end, demand, capacity):
         assert is_any_list(start), "start should be a list"
@@ -603,7 +762,7 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of variables, but got", vars)
         if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
             raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
-        super().__init__("precedence", [vars, precedence])
+        super().__init__("precedence", [cpm_array(vars), precedence])
 
     def decompose(self):
         """
@@ -616,7 +775,10 @@ class Precedence(GlobalConstraint):
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             for j in range(len(args)):
-                constraints += [(args[j] == t).implies(cp.any(args[:j] == s))]
+                lhs = args[j] == t
+                if is_bool(lhs):  # args[j] and t could both be constants
+                    lhs = BoolVal(lhs)
+                constraints += [lhs.implies(cp.any(args[:j] == s))]
         return constraints, []
 
     def value(self):
@@ -632,6 +794,9 @@ class Precedence(GlobalConstraint):
 
 
 class NoOverlap(GlobalConstraint):
+    """
+    NoOverlap constraint, enforcing that the intervals defined by start, duration and end do not overlap.
+    """
 
     def __init__(self, start, dur, end):
         assert is_any_list(start), "start should be a list"
@@ -652,6 +817,7 @@ class NoOverlap(GlobalConstraint):
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons += [(e1 <= s2) | (e2 <= s1)]
         return cons, []
+
     def value(self):
         start, dur, end = argvals(self.args)
         if any(s + d != e for s,d,e in zip(start, dur, end)):
@@ -664,8 +830,8 @@ class NoOverlap(GlobalConstraint):
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
-    GlobalCardinalityCount(vars,vals,occ): The number of occurrences of each value vals[i] in the list of variables vars
-    must be equal to occ[i].
+    The number of occurrences of each value `vals[i]` in the list of variables `vars`
+    must be equal to `occ[i]`.
     """
 
     def __init__(self, vars, vals, occ, closed=False):
@@ -805,6 +971,9 @@ class LexLess(GlobalConstraint):
         """
         X, Y = cpm_array(self.args)
 
+        if len(X) == 0 == len(Y):
+            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
+
         bvar = boolvar(shape=(len(X) + 1))
 
         # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
@@ -851,6 +1020,9 @@ class LexLessEq(GlobalConstraint):
         """
         X, Y = cpm_array(self.args)
 
+        if len(X) == 0 == len(Y):
+            return [cp.BoolVal(False)], [] # based on the decomp, it's false...
+
         bvar = boolvar(shape=(len(X) + 1))
         defining = [bvar == ((X <= Y) & ((X < Y) | bvar[1:]))]
         defining.append(bvar[-1] == (X[-1] <= Y[-1]))
@@ -864,7 +1036,7 @@ class LexLessEq(GlobalConstraint):
 
 
 class LexChainLess(GlobalConstraint):
-    """ Given a matrix X, LexChainLess enforces that all rows are lexicographically ordered.
+    """ Given a matrix X, :class:`LexChainLess` enforces that all rows are lexicographically ordered.
     """
     def __init__(self, X):
         # Ensure the numpy array is 2D
@@ -905,7 +1077,7 @@ class LexChainLessEq(GlobalConstraint):
 
 class DirectConstraint(Expression):
     """
-        A DirectConstraint will directly call a function of the underlying solver when added to a CPMpy solver
+        A ``DirectConstraint`` will directly call a function of the underlying solver when added to a CPMpy solver
 
         It can not be reified, it is not flattened, it can not contain other CPMpy expressions than variables.
         When added to a CPMpy solver, it will literally just directly call a function on the underlying solver,
@@ -914,7 +1086,7 @@ class DirectConstraint(Expression):
         See the documentation of the solver (constructor) for details on how that solver handles them.
 
         If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
-        then use `directvar()` instead, or access the solver object from the solver interface directly.
+        then use :func:`~cpmpy.expressions.variables.directvar` instead, or access the solver object from the solver interface directly.
     """
     def __init__(self, name, arguments, novar=None):
         """
@@ -935,7 +1107,7 @@ class DirectConstraint(Expression):
 
     def callSolver(self, CPMpy_solver, Native_solver):
         """
-            Call the `directname`() function of the native solver,
+            Call the `directname()` function of the native solver,
             with stored arguments replacing CPMpy variables with solver variables as needed.
 
             SolverInterfaces will call this function when this constraint is added.

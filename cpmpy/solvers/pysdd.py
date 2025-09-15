@@ -6,19 +6,29 @@
 """
     Interface to PySDD's API
 
+    PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD).
+    (see https://pysdd.readthedocs.io/en/latest/)
+
+    .. warning::    
+        This solver can ONLY be used for solution checking and enumeration over Boolean variables!
+        It does not support optimization.
+
+    Always use :func:`cp.SolverLookup.get("pysdd") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
     Requires that the 'PySDD' python package is installed:
+
+    .. code-block:: console
 
         $ pip install PySDD
 
-    PySDD is a knowledge compilation package for Sentential Decision Diagrams (SDD)
-    https://pysdd.readthedocs.io/en/latest/
+    See detailed installation instructions at:
+    https://pysdd.readthedocs.io/en/latest/usage/installation.html
 
-    This solver can ONLY be used for solution checking and enumeration over Boolean variables!
-    That is, only logical constraints (and,or,implies,==,!=) and Boolean global constraints.
-
-    Documentation of the solver's own Python API:
-    https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
-
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -34,10 +44,13 @@
     ==============
 """
 from functools import reduce
+from typing import Optional
+import pkg_resources
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
@@ -46,20 +59,18 @@ from ..transformations.normalize import toplevel_list, simplify_boolean
 
 class CPM_pysdd(SolverInterface):
     """
-    Interface to pysdd's API
-
-    Requires that the 'PySDD' python package is installed:
-    $ pip install pysdd
-
-    See detailed installation instructions at:
-    https://pysdd.readthedocs.io/en/latest/usage/installation.html
+    Interface to PySDD's API.
 
     Creates the following attributes (see parent constructor for more):
-        - pysdd_vtree: a pysdd.sdd.Vtree
-        - pysdd_manager: a pysdd.sdd.SddManager
-        - pysdd_root: a pysdd.sdd.SddNode (changes whenever a formula is added)
 
-    The `DirectConstraint`, when used, calls a function on the `pysdd_manager` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
+    - ``pysdd_vtree`` : a pysdd.sdd.Vtree
+    - ``pysdd_manager`` : a pysdd.sdd.SddManager
+    - ``pysdd_root`` : a pysdd.sdd.SddNode (changes whenever a formula is added)
+
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``pysdd_manager`` object and replaces the root node with a conjunction of the previous root node and the result of this function call.
+
+    Documentation of the solver's own Python API:
+    https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
     """
 
     @staticmethod
@@ -68,8 +79,20 @@ class CPM_pysdd(SolverInterface):
         try:
             from pysdd.sdd import SddManager
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('pysdd').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -82,11 +105,11 @@ class CPM_pysdd(SolverInterface):
         Only supports satisfaction problems and solution enumeration
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model(), optional
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model(), optional
+            subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_pysdd: Install the python 'pysdd' package to use this solver interface")
+            raise Exception("CPM_pysdd: Install the python package 'pysdd' to use this solver interface")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
@@ -104,12 +127,20 @@ class CPM_pysdd(SolverInterface):
             See if an arbitrary model exists
 
             This is a knowledge compiler:
-                - building it is the (computationally) hard part
-                - checking for a solution is trivial after that
+
+            - building it is the (computationally) hard part
+            - checking for a solution is trivial after that
         """
 
+        if time_limit is not None:
+            raise NotImplementedError("PySDD.solve(), time_limit not (yet?) supported")
+        
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
 
         has_sol = True
         if self.pysdd_root is not None:
@@ -121,6 +152,7 @@ class CPM_pysdd(SolverInterface):
 
         # translate exit status
         if has_sol:
+            # Only CSP (does not support COP)
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -145,7 +177,8 @@ class CPM_pysdd(SolverInterface):
         """
             Compute all solutions and optionally display the solutions.
 
-            WARNING: setting 'display' will SIGNIFICANTLY slow down solution counting...
+            .. warning::
+                WARNING: setting 'display' will SIGNIFICANTLY slow down solution counting...
 
             Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
@@ -153,17 +186,22 @@ class CPM_pysdd(SolverInterface):
                 - time_limit, solution_limit, kwargs: not used
                 - call_from_model: whether the method is called from a CPMpy Model instance or not
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found            
         """
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
 
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
         if solution_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), solution_limit not (yet?) supported")
 
-        if self.pysdd_root is None:
+        if self.pysdd_root is None or self.pysdd_root.is_false():
             # clear user vars if no solution found
             for var in self.user_vars:
                 var._value = None
@@ -181,27 +219,32 @@ class CPM_pysdd(SolverInterface):
                 projected_sols.add(tuple(projectedsol))
         else:
             projected_sols = set(sddmodels)
-        if display is None:
-            # the desired, fast computation
-            return len(projected_sols)
 
+        if projected_sols:
+            if projected_sols == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else:
+                # time limit not (yet) supported -> always all solutions found
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         else:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+
+        # display if needed
+        if display is not None:
             # manually walking over the tree, much slower...
-            solution_count = 0
             for sol in projected_sols:
-                solution_count += 1
                 # fill in variable values
                 for i, cpm_var in enumerate(self.user_vars):
                     cpm_var._value = sol[i]
 
-                # display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
                     print(argvals(display))
                 else:
                     display()  # callback
-            return solution_count
+        
+        return len(projected_sols)
 
     def solver_var(self, cpm_var):
         """
@@ -233,22 +276,22 @@ class CPM_pysdd(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the ':ref:`Adding a new solver` docs on readthedocs for more information.
 
             For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}) #keep unsupported xor for error message purposes.
+        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}, csemap=self._csemap) #keep unsupported xor for error message purposes.
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -297,6 +340,7 @@ class CPM_pysdd(SolverInterface):
                                                 self._pysdd_expr(cpm_con))
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _pysdd_expr(self, cpm_con):
         """
@@ -369,8 +413,11 @@ class CPM_pysdd(SolverInterface):
             Returns a graphviz Dot object
 
             Display (in a notebook) with:
-            import graphviz
-            graphviz.Source(m.dot())
+
+            .. code-block:: python
+
+                import graphviz
+                graphviz.Source(m.dot())
         """
         if self.pysdd_root is None:
             from pysdd.sdd import SddManager

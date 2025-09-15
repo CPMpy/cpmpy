@@ -96,7 +96,6 @@ def is_any_list(arg):
     """
     return isinstance(arg, (list, tuple, np.ndarray))
 
-
 def flatlist(args):
     """ recursively flatten arguments into one single list
     """
@@ -123,18 +122,23 @@ def all_pairs(args):
 
 def argval(a):
     """ returns .value() of Expression, otherwise the variable itself
-        
+
         We check with hasattr instead of isinstance to avoid circular dependency
     """
     if hasattr(a, "value"):
         try:
-            return a.value()
+            val = a.value()
         except IncompleteFunctionError as e:
             if a.is_bool():
                 return False
             else:
                 raise e
-    return a
+    else:
+        val = a
+
+    if isinstance(val, np.generic):
+        return val.item() # ensure it is a Python native value
+    return val
 
 
 def argvals(arr):
@@ -158,6 +162,11 @@ def eval_comparison(str_op, lhs, rhs):
 
         Especially useful in decomposition and transformation functions that already involve a comparison.
     """
+    if isinstance(lhs, (np.integer, np.bool_)):
+        lhs = int(lhs)
+    if isinstance(rhs, (np.integer, np.bool_)):
+        rhs = int(rhs)
+
     if str_op == '==':
         return lhs == rhs
     elif str_op == '!=':
@@ -172,7 +181,6 @@ def eval_comparison(str_op, lhs, rhs):
         return lhs <= rhs
     else:
         raise Exception("Not a known comparison:", str_op)
-
 
 def get_bounds(expr):
     """ return the bounds of the expression
@@ -193,3 +201,22 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+
+def implies(expr, other):
+    """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
+    if isinstance(expr, cp.expressions.core.Expression):
+        return expr.implies(other)
+    elif is_true_cst(expr):
+        return other
+    elif is_false_cst(expr):
+        return cp.BoolVal(True)
+    else:
+        return expr.implies(other)
+
+# Specific stuff for ShortTabel global (should this be in globalconstraints.py instead?)
+STAR = "*" # define constant here
+def is_star(arg):
+    """
+        Check if arg is star as used in the ShortTable global constraint
+    """
+    return isinstance(arg, type(STAR)) and arg == STAR

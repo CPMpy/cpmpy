@@ -4,15 +4,7 @@
 ## minizinc.py
 ##
 """
-    Interface to MiniZinc's Python API
-
-    Requires that the 'minizinc' python package is installed:
-
-        $ pip install minizinc
-
-    as well as the Minizinc bundled binary packages, downloadable from:
-    https://github.com/MiniZinc/MiniZincIDE/releases
-
+    Interface to MiniZinc's Python API.
 
     MiniZinc is a free and open-source constraint modeling language.
     MiniZinc is used to model constraint satisfaction and optimization problems in
@@ -21,10 +13,32 @@
     language that is understood by a wide range of solvers.
     https://www.minizinc.org
 
-    Documentation of the solver's own Python API:
-    https://minizinc-python.readthedocs.io/
+    The MiniZinc interface is text-based: CPMpy writes a textfile and passes it to the minizinc Python package.
 
-    CPMpy can translate CPMpy models to the (text-based) MiniZinc language.
+    Always use :func:`cp.SolverLookup.get("minizinc") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'minizinc' python package is installed:
+
+    .. code-block:: console
+
+        $ pip install minizinc
+
+    as well as the MiniZinc bundled binary packages, downloadable from:
+    https://www.minizinc.org/software.html
+
+    See detailed installation instructions at:
+    https://minizinc-python.readthedocs.io/en/latest/getting_started.html
+
+    Note for **Jupyter notebook** users: MiniZinc uses AsyncIO, so using it in a Jupyter notebook gives
+    you the following error: ``RuntimeError: asyncio.run() cannot be called from a running event loop``
+    You can overcome this by ``pip install nest_asyncio``
+    and adding in the top cell ``import nest_asyncio; nest_asyncio.apply()``
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -40,16 +54,20 @@
     ==============
 """
 import re
+from typing import Optional
 import warnings
 import sys
 import os
+import json
 from datetime import timedelta  # for mzn's timeout
 
 import numpy as np
+import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, argvals, argval
@@ -63,34 +81,23 @@ class CPM_minizinc(SolverInterface):
     """
     Interface to MiniZinc's Python API
 
-    Requires that the 'minizinc' python package is installed:
-    $ pip install minizinc
-    
-    as well as the MiniZinc bundled binary packages, downloadable from:
-    https://www.minizinc.org/software.html
-
-    See detailed installation instructions at:
-    https://minizinc-python.readthedocs.io/en/latest/getting_started.html
-
-    Note for Jupyter users: MiniZinc uses AsyncIO, so using it in a jupyter notebook gives
-    you the following error: RuntimeError: asyncio.run() cannot be called from a running event loop
-    You can overcome this by `pip install nest_asyncio`
-    and adding in the top cell `import nest_asyncio; nest_asyncio.apply()`
-
-
     Creates the following attributes (see parent constructor for more):
-        - mzn_model: object, the minizinc.Model instance
-        - mzn_solver: object, the minizinc.Solver instance
-        - mzn_txt_solve: str, the 'solve' item in text form, so it can be overwritten
-        - mzn_result: object, containing solve results
 
-    The `DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
+    - ``mzn_model``: object, the minizinc.Model instance
+    - ``mzn_solver``: object, the minizinc.Solver instance
+    - ``mzn_txt_solve``: str, the 'solve' item in text form, so it can be overwritten
+    - ``mzn_result``: object, containing solve results
+
+    The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, adds a constraint with that name and the given args to the MiniZinc model.
+
+    Documentation of the solver's own Python API:
+    https://minizinc-python.readthedocs.io/
     """
 
     required_version = (2, 8, 2)
 
     @staticmethod
-    def supported():
+    def supported(): 
         return CPM_minizinc.installed() and CPM_minizinc.executable_installed() and not CPM_minizinc.outdated()
 
     @staticmethod
@@ -100,8 +107,10 @@ class CPM_minizinc(SolverInterface):
             #  check if MiniZinc Python is installed
             import minizinc
             return True
-        except ImportError as e:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     @staticmethod
     def executable_installed():
@@ -120,25 +129,107 @@ class CPM_minizinc(SolverInterface):
         else:
             # outdated
             return True
+                
 
     @staticmethod
-    def solvernames():
+    def solvernames(installed:bool=True, with_version:bool=False):
         """
-            Returns solvers supported by MiniZinc on your system
+            Returns solvers supported by MiniZinc (on your system) with optionally their installed version.
 
-            WARNING, some of them may not actually be installed on your system
-            (namely cplex, gurobi, scip, xpress)
-            the following are bundled in the bundle: chuffed, coin-bc, gecode
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those installed on your system (default True)
+                with_version (boolean): whether to additionally return the available version matching with each solvername 
+                                        (if not available on the system, the entry defaults to None)
+
+            Returns:
+                list of solver names if with_version==False, otherwise a tuple of two lists: the solver names and their versions
+
+            .. warning::
+                WARNING, some of the returned solver names (when ``installed=False``) may not actually 
+                be installed on your system (namely cplex, gurobi, scip, xpress).
+                The following are bundled with minizinc: chuffed, coin-bc, gecode.
+                Use ``installed=True`` (the default) if you only want the names of the actually installed solvers.
         """
-        import minizinc
-        solver_dict = minizinc.default_driver.available_solvers()
 
-        solver_names = set()
-        for full_name in solver_dict.keys():
-            name = full_name.split(".")[-1]
-            if name not in ['findmus', 'gist', 'globalizer']:  # not actually solvers
-                solver_names.add(name)
-        return solver_names
+        # Collect solver names and versions
+        if CPM_minizinc.supported(): # check if minizinc is installed
+            import minizinc
+            driver = minizinc.default_driver
+            
+            # Collect solver names
+            all_solvers, all_versions = [], []
+            output = driver._run(["--solvers-json"]) # get json-structured solver overview
+            solvers = json.loads(output.stdout)        
+            for solver_dict in solvers:
+                # get subsolver metadata
+                tag = solver_dict["id"].split(".")[-1]
+                version = solver_dict["version"]
+                if tag not in ['findmus', 'gist', 'globalizer']: # some are not actually solvers
+                    if tag not in all_solvers:
+                        all_solvers.append(tag)
+                        if version == '<unknown version>': # if no version info available, default to None
+                            version = None
+                        all_versions.append(version)
+        else:
+            warnings.warn("MiniZinc is not installed or not supported on this system.")
+            if with_version:
+                return ([], [])
+            else:
+                return []
+            
+
+        if not installed:
+            """
+            Return all solver names, without checking if they're actually available on the system.
+            """
+            if with_version:
+                return (all_solvers, all_versions)
+            else:
+                return all_solvers
+
+        else:
+            """
+            Test which solver executables are available by retrieving version information
+            """
+            valid_indices = [i for i, version in enumerate(all_versions) if version != "<unknown version>"] # check if version is available (required by minizinc)
+            installed_solvers = [all_solvers[i] for i in valid_indices]
+            installed_versions = [all_versions[i] for i in valid_indices]
+
+            if with_version:
+                return (installed_solvers, installed_versions)
+            else:
+                return installed_solvers       
+             
+    @staticmethod
+    def solverversion(subsolver:str) -> Optional[str]:
+        """
+        Returns the version of the requested subsolver.
+
+        Arguments:
+            subsolver (str): name of the subsolver
+
+        Returns:
+            Version number of the subsolver if installed, else None 
+        """
+        all_solvers, all_versions = CPM_minizinc.solvernames(installed=False, with_version=True)
+        try:
+            solver_index = all_solvers.index(subsolver) # find requested subsolver
+            return all_versions[solver_index]
+        except ValueError:
+            raise ValueError(f"Subsolver '{subsolver}' not found in the list of available solvers.")
+
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+
+        For Minizinc, two version numbers get returned: ``<minizinc python API version>/<minizinc driver version>``
+        """
+        try:
+            from minizinc import default_driver
+            return f"{pkg_resources.get_distribution('minizinc').version}/{'.'.join(str(a) for a in default_driver.parsed_version)}"
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            return None
 
     # variable name can not be any of these keywords
     keywords = frozenset(['ann', 'annotation', 'any', 'array', 'bool', 'case', 'constraint', 'diff', 'div', 'else',
@@ -154,12 +245,12 @@ class CPM_minizinc(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: str, name of a subsolver (optional)
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: str, name of a subsolver (optional)
                           has to be one of solvernames()
         """
         if not self.installed():
-            raise Exception("CPM_minizinc: Install the python package 'minizinc'")
+            raise Exception("CPM_minizinc: Install the python package 'minizinc' to use this solver interface.")
         elif not self.executable_installed():
             raise Exception("CPM_minizinc: Install the MiniZinc executable and make it available in path.")
         elif self.outdated():
@@ -219,21 +310,33 @@ class CPM_minizinc(SolverInterface):
         """
             Call the MiniZinc solver
             
-            Creates and calls an Instance with the already created mzn_model and mzn_solver
+            Creates and calls an Instance with the already created ``mzn_model`` and ``mzn_solver``
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
-
+                time_limit (float, optional):       maximum solve time in seconds 
+                **kwargs (any keyword argument):    sets parameters of solver object
+                
+            
             Arguments that correspond to solver parameters:
-                - free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
-                - optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
-                - ...                           I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+
+            =======================  ===========
+            Keyword                  Description
+            =======================  ===========
+            free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
+            optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
+            =======================  ===========             
+            
+            
+            I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
+            
             The minizinc solver parameters are partly defined in its API:
             https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
 
-            Does not store the minizinc.Instance() or minizinc.Result()
+            Does not store the ``minizinc.Instance()`` or ``minizinc.Result()``
         """
+
+        if time_limit is not None and time_limit <= 0:
+            raise ValueError("Time limit must be positive")
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -286,7 +389,7 @@ class CPM_minizinc(SolverInterface):
 
         return has_sol
 
-    def _post_solve(self, mzn_result):
+    def _post_solve(self, mzn_result, solve_all:bool=False):
         """ shared by solve() and solveAll() """
         import minizinc
 
@@ -309,7 +412,10 @@ class CPM_minizinc(SolverInterface):
         if mzn_status == minizinc.result.Status.SATISFIED:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.ALL_SOLUTIONS:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if solve_all:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif mzn_status == minizinc.result.Status.OPTIMAL_SOLUTION:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         elif mzn_status == minizinc.result.Status.UNSATISFIABLE:
@@ -335,6 +441,10 @@ class CPM_minizinc(SolverInterface):
 
     async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
         """ Special 'async' function because mzn.solutions() is async """
+
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+        
         # make mzn_inst
         (kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         kwargs['all_solutions'] = True
@@ -346,19 +456,17 @@ class CPM_minizinc(SolverInterface):
             if mzn_result.solution is None:
                 break
 
-            # display (and reverse-map first) if needed
+             # fill in variable values
+            mznsol = mzn_result.solution
+            for cpm_var in self.user_vars:
+                sol_var = self.solver_var(cpm_var)
+                if hasattr(mznsol, sol_var):
+                    cpm_var._value = getattr(mznsol, sol_var)
+                else:
+                    raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
+
+            # display if needed
             if display is not None:
-                mznsol = mzn_result.solution
-
-                # fill in variable values
-                for cpm_var in self.user_vars:
-                    sol_var = self.solver_var(cpm_var)
-                    if hasattr(mznsol, sol_var):
-                        cpm_var._value = getattr(mznsol, sol_var)
-                    else:
-                        print("Warning, no value for ", sol_var)
-
-                # and the actual displaying
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
@@ -372,7 +480,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars])
+            self += cpm_any([v != v.value() for v in self.user_vars])
 
         if solution_count == 0:
             # clear user vars if no solution found
@@ -381,19 +489,28 @@ class CPM_minizinc(SolverInterface):
                 var._value = None
 
         # status handling
-        self._post_solve(mzn_result)
+        self._post_solve(mzn_result, solve_all=True)
+
+        if solution_count: # found at least one solution
+            if solution_count == solution_limit: # matched solution limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # elif mzn_result.solution is None: <- is implicit since nothing needs to update
+                # last iteration didn't find a solution
+                # nothing needs to update since _post_solve already set state correctly (state from the second-last iteration)
 
         return solution_count
 
     def solver_var(self, cpm_var) -> str:
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created
+            or returns from cache if previously created.
 
-            Returns minizinc-friendly 'string' name of var
+            Returns:
+                minizinc-friendly 'string' name of var.
 
-            XXX WARNING, this assumes it is never given a 'NegBoolView'
-            might not be true... e.g. in revar after solve?
+            .. warning::
+                WARNING, this assumes it is never given a 'NegBoolView'
+                might not be true... e.g. in revar after solve?
         """
         if is_num(cpm_var):
             if cpm_var < -2147483646 or cpm_var > 2147483646:
@@ -452,10 +569,10 @@ class CPM_minizinc(SolverInterface):
             Decompose globals not supported (and flatten globalfunctions)
             ensure it is a list of constraints
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+            :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
@@ -463,9 +580,9 @@ class CPM_minizinc(SolverInterface):
                      "precedence", "no_overlap",
                      "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
                      "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"})
+        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"}, csemap=self._csemap)
 
-    def __add__(self, cpm_expr):
+    def add(self, cpm_expr):
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
 
@@ -491,6 +608,7 @@ class CPM_minizinc(SolverInterface):
             self.mzn_model.add_string(mzn_str)
 
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def _convert_expression(self, expr) -> str:
         """
@@ -695,23 +813,29 @@ class CPM_minizinc(SolverInterface):
         """
             Compute all solutions and optionally display the solutions.
 
-            MiniZinc-specific implementation
+            MiniZinc-specific implementation.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - kwargs:      any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
+                display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                                    default/None: nothing displayed
+                time_limit:         stop after this many seconds (default: None)
+                solution_limit:     stop after this many solutions (default: None)
+                call_from_model:    whether the method is called from a CPMpy Model instance or not
+                **kwargs:           any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
 
-            Returns: number of solutions found
+            Returns: 
+                number of solutions found
         """
         # XXX: check that no objective function??
         if self.has_objective():
             raise NotSupportedError("Minizinc Python does not support finding all optimal solutions (yet)")
 
         import asyncio
+
+        # set time limit
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
 
         # HAD TO DEFINE OUR OWN ASYNC HANDLER
         coroutine = self._solveAll(display=display, time_limit=time_limit,

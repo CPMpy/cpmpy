@@ -25,15 +25,15 @@
     Boolean and Integer decision variables are the key elements of a CP model.
 
     All variables in CPMpy are n-dimensional array objects and have defined dimensions. 
-    Following the numpy library, the dimension sizes of an n-dimenionsal array is called its __shape__. 
+    Following the numpy library, the dimension sizes of an n-dimenionsal array is called its ``shape``. 
     In CPMpy all variables are considered an array with a given shape. For 'single' variables the shape 
     is '1'. For an array of length `n` the shape is 'n'. An `n*m` matrix has shape (n,m), and tensors 
     with more than 2 dimensions are all supported too. For the implementation of this, 
-    CPMpy builts on numpy's n-dimensional ndarray and inherits many of its benefits 
-    (vectorized operators and advanced indexing).
+    CPMpy builts on numpy's n-dimensional `ndarray <https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html>`_ 
+    and inherits many of its benefits (vectorized operators and advanced indexing).
 
-    This module contains the cornerstone `boolvar()` and `intvar()` functions, which create (numpy arrays of) 
-    variables. There is also a helper function `cpm_array()` for wrapping standard numpy arrays so they can be 
+    This module contains the cornerstone ``boolvar()`` and ``intvar()`` functions, which create (numpy arrays of) 
+    variables. There is also a helper function ``cpm_array()`` for wrapping standard numpy arrays so they can be 
     indexed by a variable. Apart from these 3 functions, none of the classes in this module should be directly 
     instantiated; they are created by these 3 helper functions.
 
@@ -67,62 +67,59 @@ from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_
 
 
 def BoolVar(shape=1, name=None):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.boolvar` instead.
+    """
     warnings.warn("Deprecated, use boolvar() instead, will be removed in stable version", DeprecationWarning)
     return boolvar(shape=shape, name=name)
 
 
 def boolvar(shape=1, name=None):
     """
-    Boolean decision variables will take either the value `True` or `False`.
-    
+    Create Boolean decision variables that take either the value `True` or `False`.
+
     Arguments:
-    shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
-    name -- name to give to the variables (string or list/tuple/array of string, default: None)
+        shape (int or tuple of int, optional) : The shape of the n-dimensional array of variables. Default is 1.
+    
+        name (str, list of str, tuple of str, or None, optional) : 
+            Name(s) to assign to the variables. Default is None.
 
-    If name is None then a name 'BV<unique number>' will be assigned to it.
-    If name is a string, then assign it as the suffix of variable names.
-    If name is a list/tuple/array of string, then assign them as the variable names accordingly.
+            - If `name` is None, a name of the form ``BV<unique number>`` will be assigned to the variables.
+            - If `name` is a string, it will be used as the suffix of the variable names.
+            - If `name` is a list/tuple/array of strings, they will be assigned to the variable names accordingly.
 
-    If shape is different from 1, then each element of the array will have the location
-    of this specific variable in the array append to its name.
+    Notes:
 
-    For example,
-    - `print(boolvar(shape=3, name="x"))` will print `[x[0], x[1], x[2]]`
-    - `print(boolvar(shape=3, name=list("xyz"))` will print `[x, y, z]`
+        - If `shape` is not 1, each element of the array will have its specific location appended to its name.
+        - Examples:
+            - ``boolvar(shape=3, name="x")`` will create the variables ``[x[0], x[1], x[2]]``.
+            - ``boolvar(shape=3, name=list("xyz"))`` will create the variables ``[x, y, z]``.
 
+    Examples:
 
-    The following examples show how to create Boolean variables of different shapes:
-
-    - Creating a single (unit-sized or scalar) Boolean variable:
+        Creating a single Boolean variable:
+        
         .. code-block:: python
 
-            # creation of a unit Boolean variable
             x = boolvar(name="x")
-
-    - the creation of a vector boolean variables. 
-
+        
+        Creating a vector of Boolean variables:
+        
         .. code-block:: python
 
-            # creation of a vector of size 3 of Boolean variables
             x = boolvar(shape=3, name="x")
 
-            # note that with Python's unpacking, you can assign them
-            # to intermediate variables. This allows for fine-grained use of variables when
-            # defining the constraints of the model
+            # Assigning them to individual variables:
             e, x, a, m, p, l = boolvar(shape=6, name=list("exampl"))
 
-    - the creation of a matrix or higher-order tensor of Boolean variables. 
+        Creating a matrix or higher-order tensor of Boolean variables:
+        
         .. code-block:: python
 
-            # creation of a 9x9 matrix of Boolean variables:
             matrix = boolvar(shape=(9, 9), name="matrix")
-            # creation of a 2x2 matrix of Boolean variables, and give a name for each element:
             matrix2 = boolvar(shape=(2, 2), name=[['a', 'b'], ['c', 'd']])
-
-            # creation of a __tensor of Boolean variables where (3, 8, 7) reflects
-            # the dimensions of the tensor, a matrix of multiple-dimensions.
-            # In this case, we create an 3D-array of dimensions 3 x 8 x 7.
-            tensor = BoolVar(shape=(3, 8, 7), name="tensor")
+            tensor = boolvar(shape=(3, 8, 7), name="tensor")
     """
     if shape == 0 or shape is None:
         raise NullShapeError(shape)
@@ -141,6 +138,10 @@ def boolvar(shape=1, name=None):
 
 
 def IntVar(lb, ub, shape=1, name=None):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.intvar` instead.
+    """
     warnings.warn("Deprecated, use intvar() instead, will be removed in stable version", DeprecationWarning)
     return intvar(lb, ub, shape=shape, name=name)
 
@@ -151,32 +152,41 @@ def intvar(lb, ub, shape=1, name=None):
     the decision variable can take, as well as the highest value (ub).
 
     Arguments:
-    lb -- lower bound on the values the variable can take (int)
-    ub -- upper bound on the values the variable can take (int)
-    shape -- the shape of the n-dimensional array of variables (int or tuple of ints, default: 1)
-    name -- name to give to the variables (string or list/tuple/array of string, default: None)
+        lb (int) : Lower bound on the values the variable can take.
+        ub (int) : Upper bound on the values the variable can take.
+        shape (int or tuple of int, optional) :
+            The shape of the n-dimensional array of variables. Default is 1.
+        name (str, list of str, tuple of str, or None, optional) :
+            Name(s) to assign to the variables. Default is None.
 
-    The range of values between lb..ub is called the __domain__ of the integer variable.
-    All variables in an array start from the same domain.
-    Specific values in the domain of individual variables can be forbidden with constraints.
+            - If `name` is None, a name of the form ``IV<unique number>`` will be assigned to the variables.
+            - If `name` is a string, it will be used as the suffix of the variable names.
+            - If `name` is a list/tuple/array of strings, they will be assigned to the variable names accordingly.
 
-    If name is None then a name 'IV<unique number>' will be assigned to it.
-    If name is a string, then assign it as the suffix of variable names.
-    If name is a list/tuple/array of string, then assign them as the variable names accordingly.
+    Notes:
 
-    If shape is different from 1, then each element of the array will have the location
-    of this specific variable in the array append to its name.
+        The range of values between ``lb..ub`` is called the `domain` of the integer variable.
+        All variables in an array start from the same domain.
+        Specific values in the domain of individual variables can be forbidden with constraints.
 
-    The following examples show how to create integer variables of different shapes:
+        If `shape` is not 1, each element of the array will have its specific location appended to its name.
 
-    - Creation of a single (unit-sized or scalar) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
+        - ``intvar(0, 2, shape=3, name="x")`` will create the variables ``[x[0], x[1], x[2]]``.
+
+        If `shape` is not 1 and a list of names has been provided (with the same length as the array), each decision variable will receive its respective name.
+
+        - ``intvar(0, 2, shape=3, name=list("xyz"))`` will create the variables ``[x, y, z]``.
+
+    Examples:
+
+        Creation of a single (unit-sized or scalar) integer variable with a given lower bound (**lb**) of 3 and upper bound (**ub**) of 8. Variable `x` can thus take values 3, 4, 5, 6, 7, 8 (upper bound included!).
 
         .. code-block:: python
 
             # creation of a unit integer variable with lowerbound of 3 and upperbound of 8 
             x = intvar(3, 8, name="x")
 
-    - Creation of a vector of integer variables with all having the same given lower bound and upper bound:
+        Creation of a vector of integer variables with all having the same given lower bound and upper bound:
 
         .. code-block:: python
 
@@ -186,7 +196,8 @@ def intvar(lb, ub, shape=1, name=None):
             # Python's unpacking can assign multiple intermediate variables at once
             e, x, a, m, p, l = intvar(3, 8, shape=6, name=list("exampl"))
 
-    - Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
+        Creation of a 4D-array/tensor (of dimensions 100 x 100 x 100 x 100) of integer variables.
+        
         .. code-block:: python
 
             arrx s= intvar(3, 8, shape=(100, 100, 100, 100), name="arrx")
@@ -208,6 +219,10 @@ def intvar(lb, ub, shape=1, name=None):
     return r
 
 def cparray(arr):
+    """
+    .. deprecated:: 0.9.0
+          Please use :func:`~cpmpy.expressions.variables.cpm_array` instead.
+    """
     warnings.warn("Deprecated, use cpm_array() instead, will be removed in stable version", DeprecationWarning)
     return cpm_array(arr)
 
@@ -217,10 +232,10 @@ def cpm_array(arr):
     N-dimensional wrapper, to wrap standard numpy arrays or lists.
 
     In CP modeling languages, indexing an array by an integer variable is common, e.g. `[1,2,3,4][var1] == var2`.
-    This is called an __element__ constraint. Python does not allow expressing it on standard arrays,
+    This is called an `element` constraint. Python does not allow expressing it on standard arrays,
     but CPMpy-numpy arrays do allow it, so you first have to wrap the array.
 
-    Note that 'arr' will be transformed to vector and indexed as such, 2-dimensional indexing is not supported (yet?).
+    Note that `arr` will be transformed to vector and indexed as such, 2-dimensional indexing is not supported (yet?).
 
     .. code-block:: python
 
@@ -233,7 +248,11 @@ def cpm_array(arr):
 
         Model([ data[iv1] == iv2 ])
 
-    As an alternative, you can also write the `Element` constraint directly on `data`: `Element(data, iv1) == iv2`
+    As an alternative, you can also write the :class:`~cpmpy.expressions.globalfunctions.Element` constraint directly on `data`: 
+    
+    .. code-block:: python
+
+        Element(data, iv1) == iv2
     """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
@@ -256,9 +275,11 @@ class NullShapeError(Exception):
 
 class _NumVarImpl(Expression):
     """
-    Abstract **continuous numerical** variable with given lowerbound and upperbound.
+    Abstract base class for numerical variables in CPMpy.
 
-    Abstract class, only mean to be subclassed
+    This class implements the common functionality for numerical variables,
+    including bounds checking and value management. It should not be instantiated
+    directly, but rather through the helper functions :func:`~cpmpy.expressions.variables.intvar` and :func:`~cpmpy.expressions.variables.boolvar`.
     """
     def __init__(self, lb, ub, name):
         assert (is_num(lb) and is_num(ub))
@@ -304,9 +325,10 @@ class _NumVarImpl(Expression):
 
 class _IntVarImpl(_NumVarImpl):
     """
-    **Integer** variable with given lowerbound and upperbound.
+    Implementation class for integer variables in CPMpy.
 
-    Do not create this object directly, use `intvar()` instead
+    This class represents integer decision variables with a given domain [lb, ub] (inclusive).
+    It should not be instantiated directly, but rather through the :func:`~cpmpy.expressions.variables.intvar` helper function.
     """
     counter = 0
 
@@ -330,9 +352,10 @@ class _IntVarImpl(_NumVarImpl):
 
 class _BoolVarImpl(_IntVarImpl):
     """
-    **Boolean** variable with given lowerbound and upperbound.
+    Implementation class for Boolean variables in CPMpy.
 
-    Do not create this object directly, use `boolvar()` instead
+    This class represents Boolean decision variables that can take values True/False.
+    It should not be instantiated directly, but rather through the :func:`~cpmpy.expressions.variables.boolvar` helper function.
     """
     counter = 0
 

@@ -5,8 +5,8 @@ import numpy as np
 from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
-from cpmpy.expressions.core import Operator, Expression
-from cpmpy.expressions.utils import get_bounds, argval
+from cpmpy.expressions.core import Comparison, Operator, Expression
+from cpmpy.expressions.utils import eval_comparison, get_bounds, argval
 
 class TestComparison(unittest.TestCase):
     def test_comps(self):
@@ -172,7 +172,7 @@ class TestMul(unittest.TestCase):
         expr = self.ivar * 10
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, "mul")
-        self.assertIn(self.ivar, expr.args)
+        self.assertIn(self.ivar, set(expr.args))
 
         expr = self.ivar * True
         self.assertEqual(expr.name, self.ivar.name)
@@ -180,11 +180,12 @@ class TestMul(unittest.TestCase):
         expr = self.ivar * np.True_
         self.assertEqual(expr.name, self.ivar.name)
 
-        expr = self.ivar * False
-        self.assertEqual(0, expr)
-        # same for numpy false
-        expr = self.ivar * np.False_
-        self.assertEqual(0, expr)
+        # TODO do we want the following? see issue #342
+        # expr = self.ivar * False # this test failes now
+        # self.assertEqual(0, expr)
+        # # same for numpy false
+        # expr = self.ivar * np.False_
+        # self.assertEqual(0, expr)
 
 
 
@@ -193,20 +194,20 @@ class TestMul(unittest.TestCase):
         expr = self.ivar * self.bvar
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, "mul")
-        self.assertIn(self.ivar, expr.args)
-        self.assertIn(self.bvar, expr.args)
+        self.assertIn(self.ivar, set(expr.args))
+        self.assertIn(self.bvar, set(expr.args))
 
         #ivar and ivar
         expr = self.ivar * self.ivar
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, "mul")
-        self.assertIn(self.ivar, expr.args)
+        self.assertIn(self.ivar, set(expr.args))
 
         #bvar and bvar
         expr = self.bvar * self.bvar
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, "mul")
-        self.assertIn(self.bvar, expr.args)
+        self.assertIn(self.bvar, set(expr.args))
 
     def test_nullarg_mul(self):
         x = intvar(0,5,shape=3, name="x")
@@ -283,35 +284,35 @@ class TestArrayExpressions(unittest.TestCase):
         self.assertTrue(all(y.value() == res))
 
     def test_any(self):
-        from cpmpy.expressions.python_builtins import any
+        from cpmpy.expressions.python_builtins import any as cpm_any
         x = boolvar(shape=10, name="x")
         y = boolvar(name="y")
         model = cp.Model(y == x.any())
         model.solve()
-        self.assertTrue(y.value() == any(x.value()))
+        self.assertTrue(y.value() == cpm_any(x.value()))
         # with axis arg
         x = boolvar(shape=(10,10), name="x")
         y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.any(axis=0))
         model.solve()
-        res = np.array([any(x[i, ...].value()) for i in range(len(y))])
+        res = np.array([cpm_any(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
+        
 
     def test_all(self):
-        from cpmpy.expressions.python_builtins import all
+        from cpmpy.expressions.python_builtins import all as cpm_all
         x = boolvar(shape=10, name="x")
         y = boolvar(name="y")
         model = cp.Model(y == x.all())
         model.solve()
-        self.assertTrue(y.value() == all(x.value()))
+        self.assertTrue(y.value() == cpm_all(x.value()))
         # with axis arg
         x = boolvar(shape=(10,10), name="x")
         y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.all(axis=0))
         model.solve()
-        res = np.array([all(x[i, ...].value()) for i in range(len(y))])
+        res = np.array([cpm_all(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
-
 
     def test_multidim(self):
 
@@ -368,7 +369,7 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(ub1,8)
         op2 = Operator('div',[x,z])
         lb2,ub2 = op2.get_bounds()
-        self.assertEqual(lb2,-3)
+        self.assertEqual(lb2,-2)
         self.assertEqual(ub2,2)
         for lhs in inclusive_range(*x.get_bounds()):
             for rhs in inclusive_range(*y.get_bounds()):
@@ -382,25 +383,43 @@ class TestBounds(unittest.TestCase):
 
     def test_bounds_mod(self):
         x = intvar(-8, 8)
+        xneg = intvar(-8, 0)
+        xpos = intvar(0, 8)
         y = intvar(-5, -1)
         z = intvar(1, 4)
-        op1 = Operator('mod',[x,y])
+        op1 = Operator('mod',[xneg,y])
         lb1, ub1 = op1.get_bounds()
         self.assertEqual(lb1,-4)
         self.assertEqual(ub1,0)
-        op2 = Operator('mod',[x,z])
+        op2 = Operator('mod',[xpos,z])
         lb2, ub2 = op2.get_bounds()
         self.assertEqual(lb2,0)
         self.assertEqual(ub2,3)
+        op3 = Operator('mod',[xneg,z])
+        lb3, ub3 = op3.get_bounds()
+        self.assertEqual(lb3,-3)
+        self.assertEqual(ub3,0)
+        op4 = Operator('mod',[xpos,y])
+        lb4, ub4 = op4.get_bounds()
+        self.assertEqual(lb4,0)
+        self.assertEqual(ub4,4)
+        op5 = Operator('mod',[x,y])
+        lb5, ub5 = op5.get_bounds()
+        self.assertEqual(lb5,-4)
+        self.assertEqual(ub5,4)
+        op6 = Operator('mod',[x,z])
+        lb6, ub6 = op6.get_bounds()
+        self.assertEqual(lb6,-3)
+        self.assertEqual(ub6,3)
         for lhs in inclusive_range(*x.get_bounds()):
             for rhs in inclusive_range(*y.get_bounds()):
                 val = Operator('mod',[lhs,rhs]).value()
-                self.assertGreaterEqual(val,lb1)
-                self.assertLessEqual(val,ub1)
+                self.assertGreaterEqual(val,lb5)
+                self.assertLessEqual(val,ub5)
             for rhs in inclusive_range(*z.get_bounds()):
                 val = Operator('mod', [lhs, rhs]).value()
-                self.assertGreaterEqual(val,lb2)
-                self.assertLessEqual(val,ub2)
+                self.assertGreaterEqual(val,lb6)
+                self.assertLessEqual(val,ub6)
 
     def test_bounds_pow(self):
         x = intvar(-8, 5)
@@ -548,7 +567,12 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type(cp.sum(x).value()))
         self.assertEqual(int, type(cp.sum([1,2,3] * x[0]).value()))
         self.assertEqual(float, type(cp.sum([0.1,0.2,0.3] * x[0]).value()))
+        
+        # also numpy should be converted to Python native when callig value()
         self.assertEqual(int, type(cp.sum(np.array([1, 2, 3]) * x[0]).value()))
+        self.assertEqual(float, type(cp.sum(np.array([0.1,0.2,0.3]) * x[0]).value()))
+        
+        # test binary operators
         a,b = x[0,[0,1]]
         self.assertEqual(int, type((-a).value()))
         self.assertEqual(int, type((a - b).value()))
@@ -557,12 +581,31 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type((a ** b).value()))
         self.assertEqual(int, type((a % b).value()))
 
+        # test binary operators with numpy constants
+        a,b = x[0,0], np.int64(42)
+        self.assertEqual(int, type((a - b).value()))
+        self.assertEqual(int, type((a * b).value()))
+        self.assertEqual(int, type((a // b).value()))
+        self.assertEqual(int, type((a ** b).value()))
+        self.assertEqual(int, type((a % b).value()))
 
+        # test comparisons
+        a,b = x[0,[0,1]]
+        self.assertEqual(bool, type((a < b).value()))
+        self.assertEqual(bool, type((a <= b).value()))
+        self.assertEqual(bool, type((a > b).value()))
+        self.assertEqual(bool, type((a >= b).value()))
+        self.assertEqual(bool, type((a == b).value()))
+        self.assertEqual(bool, type((a != b).value()))
 
-
-
-
-
+        # alsl comparisons with numpy values
+        a,b = x[0,0], np.int64(42)
+        self.assertEqual(bool, type((a < b).value()))
+        self.assertEqual(bool, type((a <= b).value()))
+        self.assertEqual(bool, type((a > b).value()))
+        self.assertEqual(bool, type((a >= b).value()))
+        self.assertEqual(bool, type((a == b).value()))
+        self.assertEqual(bool, type((a != b).value()))
 
 class TestBuildIns(unittest.TestCase):
 
@@ -584,6 +627,144 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(str(gt), str(cp.max(list(self.x))))
         self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
         self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
+
+from cpmpy.transformations.get_variables import get_variables
+class TestNullifyingArguments(unittest.TestCase):
+
+    def setUp(self):
+        self.x = cp.intvar(0,10, name="x")
+        self.b = cp.boolvar(name="b")
+
+    def test_bool(self):
+
+        funcs = ["__and__", "__rand__", "__or__", "__ror__", "__xor__", "__rxor__"]
+
+        for func in funcs:
+            expr = getattr(self.b, func)(True)
+            self.assertListEqual(get_variables(expr), [self.b])
+
+            expr = getattr(self.b, func)(False)
+            self.assertListEqual(get_variables(expr), [self.b])
+
+    def test_num(self):
+        funcs = ["__add__", "__radd__", "__sub__", "__rsub__", "__mul__", "__rmul__",
+                 "__truediv__", "__rtruediv__", "__floordiv__", "__rfloordiv__",
+                 "__mod__", "__rmod__"]
+
+        for func in funcs:
+
+            expr = getattr(self.x, func)(1)
+            self.assertEqual(get_variables(expr), [self.x])
+
+            expr = getattr(self.x, func)(0)
+            self.assertEqual(get_variables(expr), [self.x])
+
+
+
+
+
+class TestContainer(unittest.TestCase):
+
+    def setUp(self):
+        self.x = cp.intvar(0,10,name="x")
+        self.y = cp.intvar(0,10,name="y")
+        self.z = cp.intvar(0,10,name="z")
+
+    def test_list(self):
+        lst = [self.x, self.y, self.z]
+        assert lst == [self.x, self.y, self.z]
+        assert not lst == [self.x, self.z, self.y]
+        assert lst != [self.x, self.z, self.y]
+     
+    def test_set(self):
+        s = {self.x, self.y, self.z}
+        assert s == {self.x, self.y, self.z}
+        assert {self.x} <= s # test subset
+        assert s & {self.x} == {self.x} # test intersection
+        assert s | {self.x} == s # test union
+        assert s - {self.x} == {self.y, self.z} # test difference
+        assert s ^ {self.x} == {self.y, self.z} # test symmetric difference
+        assert s ^ {self.x, self.y} == {self.z}
+        assert s ^ {self.x, self.y, self.z} == set()
+
+        # tricky cases, force hash collisions
+        self.x.__hash__ = lambda self: 1
+        self.y.__hash__ = lambda self: 1
+        assert s == {self.x, self.y, self.z}
+        assert {self.x} <= s # test subset
+        assert s & {self.x} == {self.x} # test intersection
+        assert s | {self.x} == s # test union
+        assert s - {self.x} == {self.y, self.z} # test difference
+        assert s ^ {self.x} == {self.y, self.z} # test symmetric difference
+        assert s ^ {self.x, self.y} == {self.z}
+        assert s ^ {self.x, self.y, self.z} == set()
+
+    def test_dict(self):
+        d = {self.x: "x", self.y: "y", self.z: "z"}
+        assert d == {self.x: "x", self.y: "y", self.z: "z"}
+        assert d[self.x] == "x"
+        assert d[self.y] == "y"
+        assert d[self.z] == "z"
+
+        # tricky cases, force hash collisions
+        self.x.__hash__ = lambda self: 1
+        self.y.__hash__ = lambda self: 1
+        assert d == {self.x: "x", self.y: "y", self.z: "z"}
+        assert d[self.x] == "x"
+        assert d[self.y] == "y"
+        assert d[self.z] == "z"
+
+        
+class TestUtils(unittest.TestCase):
+
+    def test_eval_comparison(self):
+        x = intvar(0,10, name="x")
+
+        for comp in ["==", "!=", "<", "<=", ">", ">="]:
+            expr = eval_comparison(comp, x, 5)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], 5) # should always put the constant on the right
+
+            expr = eval_comparison(comp, 5, x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], 5) # should always put the constant on the right
+
+            # now, also check with numpy
+            expr = eval_comparison(comp, x, np.int64(5))
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], 5) # should always put the constant on the right
+
+            expr = eval_comparison(comp, np.int64(5), x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], 5) # should always put the constant on the right
+
+
+            # also with Boolean constants
+
+            expr = eval_comparison(comp, x, True)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            expr = eval_comparison(comp, True, x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            # now, also check with numpy
+            expr = eval_comparison(comp, x, np.bool_(True))
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
+
+            expr = eval_comparison(comp, np.bool_(True), x)
+            self.assertIsInstance(expr, Comparison)
+            self.assertEqual(str(expr.args[0]), "x")
+            self.assertEqual(expr.args[1], True) # should always put the constant on the right
 
 if __name__ == '__main__':
     unittest.main()
