@@ -192,7 +192,7 @@ m = cp.Model(
     gate((6,6), (7,6)),
     
     # line constraints on path
-    split_lines([[]], (2,8), [(2,8)])
+    # split_lines([[]], (2,8), [(2,8)])
 )
 
 for idx in EMITTERS:
@@ -263,7 +263,7 @@ def print_grid(grid):
 print("The puzzle is:")
 print_grid(cells)
 
-print(m)
+# print(m)
 
 sol = m.solve()
 print("The solution is:")
