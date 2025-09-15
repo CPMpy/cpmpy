@@ -95,15 +95,14 @@ class CPM_hexaly(SolverInterface):
         if not self.supported():
             raise Exception("CPM_hexaly: Install the python package 'hexaly' to use this solver interface.")
 
-        from hexaly.optimizer import HexalyOptimizer, HxObjectiveDirection
+        from hexaly.optimizer import HexalyOptimizer
 
-        assert subsolver is None # unless you support subsolvers, see pysat or minizinc
+        assert subsolver is None # hexaly does not have subsolvers
 
         # initialise the native solver object
         self.hex_solver = HexalyOptimizer()
         self.hex_solver.param.verbosity = 0
         self.hex_model = self.hex_solver.model
-        self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="hexaly", cpm_model=cpm_model)
@@ -124,8 +123,7 @@ class CPM_hexaly(SolverInterface):
             full list of parameters availble at:
             https://www.hexaly.com/docs/last/pythonapi/optimizer/hxparam.html
         """
-
-        from hexaly.optimizer import HxParam, HxState
+        from hexaly.optimizer import HxObjectiveDirection
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -138,6 +136,10 @@ class CPM_hexaly(SolverInterface):
         # set solver parameters
         for arg, val in kwargs.items():
             setattr(self.hex_solver, arg, val)
+
+        # set dummy objective for satisfaction problems
+        if self.hex_model.nb_objectives == 0:
+            self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # new status, translate runtime
         self.hex_model.close() # model must be closed
@@ -237,10 +239,8 @@ class CPM_hexaly(SolverInterface):
         """
         from hexaly.optimizer import HxObjectiveDirection
         # make objective function or variable and post
-        # remove previous objectives
-        if self.has_objective(): # remove prev objective
+        while self.has_objective(): # remove prev objective(s)
             self.hex_model.remove_objective(1)
-        assert self.hex_model.nb_objectives == 1 # only the constant objective should be left now
         hex_obj = self._hex_expr(expr)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
@@ -248,7 +248,7 @@ class CPM_hexaly(SolverInterface):
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MAXIMIZE)
 
     def has_objective(self):
-        return self.hex_model.nb_objectives > 1
+        return self.hex_model.nb_objectives > 0
 
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
