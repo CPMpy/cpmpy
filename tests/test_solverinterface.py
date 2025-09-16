@@ -121,6 +121,10 @@ def test_solve_infeasible(solver_name):
     x, y, z = bvar
 
     solver += x.implies(y & z)
+
+    assert solver.solve()
+    assert solver.status().exitstatus == ExitStatus.FEASIBLE
+
     solver += ~ z
     solver += x
 
