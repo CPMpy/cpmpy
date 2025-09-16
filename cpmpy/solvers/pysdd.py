@@ -121,6 +121,12 @@ class CPM_pysdd(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysdd", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.pysdd_root
 
     def solve(self, time_limit=None, assumptions=None):
         """
