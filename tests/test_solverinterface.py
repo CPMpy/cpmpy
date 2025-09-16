@@ -138,18 +138,25 @@ def test_objective(solver_name):
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class() if solver_name != "z3" else solver_class(subsolver="opt")
 
-    ivar = intvar(1, 10, shape=2)
-    i, j = ivar
+    ivar = intvar(1, 10)
 
     try:
-        solver.minimize(i)
+        solver.minimize(ivar)
     except NotImplementedError:
-        # TODO: assert false or just ignore and return?
         return
 
     assert hasattr(solver, "objective_value_")
     assert solver.solve()
     assert solver.objective_value() == 1
+    assert solver.status().exitstatus == ExitStatus.OPTIMAL
+
+    try:
+        solver.maximize(ivar)
+    except NotImplementedError:
+        return
+
+    assert solver.solve()
+    assert solver.objective_value() == 10
     assert solver.status().exitstatus == ExitStatus.OPTIMAL
 
 # solver_var() tests
@@ -276,6 +283,9 @@ def test_has_objective(solver_name):
     try:
         ivar = intvar(1, 10)
         solver.minimize(ivar)
+        assert solver.has_objective()
+
+        solver.maximize(ivar)
         assert solver.has_objective()
     except NotImplementedError:
         # Solver doesn't support objectives
