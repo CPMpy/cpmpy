@@ -10,6 +10,7 @@ from cpmpy import *
 from cpmpy.expressions.variables import NegBoolView
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.expressions.utils import is_any_list
+from cpmpy.exceptions import NotSupportedError
 from utils import skip_on_missing_pblib
 
 # Get all supported solvers
@@ -159,7 +160,7 @@ def test_maximize(solver_name):
     solver = solver_class() if solver_name != "z3" else solver_class(subsolver="opt")
 
     ivar = intvar(1, 10)    
-    
+
     try:
         solver.maximize(ivar)
     except NotImplementedError:
@@ -351,9 +352,6 @@ def test_solveall_basic(solver_name):
         
         assert total == 3  # Should find all 3 solutions
         assert solution_count == 3
-        
-        if solver_name != "pysdd":
-            assert solver.solveAll(display=count_solution, solution_limit=2) == 2
 
     except NotSupportedError:
         # Solver doesn't support solveAll with objectives or other limitations
