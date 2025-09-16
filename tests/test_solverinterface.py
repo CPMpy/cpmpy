@@ -134,7 +134,8 @@ def test_solve_infeasible(solver_name):
 
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
-def test_objective(solver_name):
+def test_minimize(solver_name):
+    """Test minimize functionality"""
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class() if solver_name != "z3" else solver_class(subsolver="opt")
 
@@ -150,6 +151,15 @@ def test_objective(solver_name):
     assert solver.objective_value() == 1
     assert solver.status().exitstatus == ExitStatus.OPTIMAL
 
+@pytest.mark.parametrize("solver_name", SOLVERNAMES)
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_maximize(solver_name):
+    """Test maximize functionality"""
+    solver_class = SolverLookup.lookup(solver_name)
+    solver = solver_class() if solver_name != "z3" else solver_class(subsolver="opt")
+
+    ivar = intvar(1, 10)    
+    
     try:
         solver.maximize(ivar)
     except NotImplementedError:
