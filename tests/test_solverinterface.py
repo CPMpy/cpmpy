@@ -106,7 +106,7 @@ def test_solve(solver_name):
     solver += ~ z
 
     assert solver.solve()
-    assert solver.status().exitstatus == ExitStatus.FEASIBLE or solver.status().exitstatus == ExitStatus.OPTIMAL
+    assert solver.status().exitstatus == ExitStatus.FEASIBLE
 
     assert [x.value(), y.value(), z.value()] == [0, 1, 0]
 
