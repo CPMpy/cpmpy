@@ -124,13 +124,13 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
                     new_lst.append(cpm_expr)
                     continue
 
-                arr, *idx = args
+                arr, idx = args
                 arr = np.array(arr)
                 for i, (lb,ub) in enumerate(zip(*get_bounds(idx))):
                     if lb < 0 or ub >= arr.shape[i]: # can index can be out of bounds?
                         guard, output_expr, extra_cons = _safen_range(cpm_expr,
                                                                       safe_range=(0, arr.shape[i]-1),
-                                                                      idx_to_safen=i+1)
+                                                                      idx_to_safen=i)
 
                         _nbc.append(guard)  # guard must be added to nearest Boolean context
                         _toplevel += extra_cons  # any additional constraint that must be true
@@ -188,7 +188,8 @@ def _safen_range(partial_expr, safe_range, idx_to_safen):
     """
     safe_lb, safe_ub = safe_range
 
-    orig_arg = partial_expr.args[idx_to_safen]
+    orig_arg = partial_expr.args[idx_to_safen] if partial_expr.name != "element" \
+        else partial_expr.args[1][idx_to_safen]
     new_arg = intvar(safe_lb, safe_ub)  # values for which the partial function is defined
 
     total_expr = copy(partial_expr)  # the new total function, with the new arg
