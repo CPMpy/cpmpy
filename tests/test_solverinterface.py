@@ -352,6 +352,9 @@ def test_solveall_basic(solver_name):
         assert total == 3  # Should find all 3 solutions
         assert solution_count == 3
         
+        if solver_name != "pysdd":
+            assert solver.solveAll(display=count_solution, solution_limit=2) == 2
+
     except NotSupportedError:
         # Solver doesn't support solveAll with objectives or other limitations
         pass
