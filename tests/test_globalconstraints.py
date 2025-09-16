@@ -1126,7 +1126,7 @@ class TestBounds(unittest.TestCase):
         expr = cp.Xor(cp.boolvar(3))
         self.assertEqual(expr.get_bounds(),(0,1))
 
-
+@skip_on_missing_pblib(skip_on_exception_only=True)
 class TestTypeChecks(unittest.TestCase):
     def test_AllDiff(self):
         x = cp.intvar(-8, 8)
