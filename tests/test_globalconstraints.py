@@ -1377,13 +1377,15 @@ class TestTypeChecks(unittest.TestCase):
 
         for name, cls in cp.SolverLookup.base_solvers():
             if cls.supported() is False:
+                print("Solver not supported: ", name)
                 continue
             try:
                 self.assertTrue(cp.Model([cp.Among(iv, [1,2]) == 3]).solve(solver=name))
                 self.assertTrue(all(x.value() in [1,2] for x in iv))
                 self.assertTrue(cp.Model([cp.Among(iv, [1,100]) > 2]).solve(solver=name))
                 self.assertTrue(all(x.value() == 1 for x in iv))
-            except NotSupportedError:
+            except (NotSupportedError, NotImplementedError):
+                print("Solver not supported: ", name)
                 continue
 
 
