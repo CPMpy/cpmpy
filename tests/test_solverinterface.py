@@ -74,6 +74,7 @@ def test_add_var(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_add_constraint(solver_name):
+
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
 
@@ -82,6 +83,10 @@ def test_add_constraint(solver_name):
 
     solver += [x & y]
     assert len(solver.user_vars) == 2
+
+    # Skip pysdd as it doesn't support sum
+    if solver_name == "pysdd":
+        return
 
     solver += [sum(bvar) == 2]
     assert len(solver.user_vars) == 3
@@ -158,21 +163,9 @@ def test_solver_var(solver_name):
     # Should return something (not None)
     assert solver_bool is not None
     
-    # Test with integer variable
-    int_var = intvar(1, 10, name="test_int")
-    solver_int = solver.solver_var(int_var)
-    
-    # Should return something (not None)
-    assert solver_int is not None
-
     # Test if it is cashed correctly    
     # Should return the same object/reference
-    print(solver_bool)
-    print(solver.solver_var(bool_var))
     assert solver_bool is solver.solver_var(bool_var) if not is_any_list(solver_bool) else solver_bool == solver.solver_var(bool_var), f"Solver {solver_name} did not cache bool variable properly"
-    print(solver_int)
-    print(solver.solver_var(int_var))
-    assert solver_int is solver.solver_var(int_var) if not is_any_list(solver_int) else solver_int == solver.solver_var(int_var), f"Solver {solver_name} did not cache int variable properly"
 
     # Test with negative boolean view
     neg_bool_var = ~bool_var    
@@ -190,6 +183,22 @@ def test_solver_var(solver_name):
         # Some solvers might not support NegBoolView in solver_var
         # That's potentially OK if they handle it elsewhere
         print(f"Solver {solver_name} raised exception for NegBoolView: {e}")
+
+    # Test with integer variable
+
+    # Skip pysdd as it doesn't support sum
+    if solver_name == "pysdd":
+        return
+
+    # Test with integer variable
+    int_var = intvar(1, 10, name="test_int")
+    solver_int = solver.solver_var(int_var)
+    
+    # Should return something (not None)
+    assert solver_int is not None
+
+    # Test if it is cashed correctly    
+    assert solver_int is solver.solver_var(int_var) if not is_any_list(solver_int) else solver_int == solver.solver_var(int_var), f"Solver {solver_name} did not cache int variable properly"    
 
 
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
