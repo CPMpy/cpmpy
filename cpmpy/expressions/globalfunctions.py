@@ -259,18 +259,21 @@ class Element(GlobalFunction):
         `Element` function is also numeric, even if `Arr` only contains Boolean variables.
     """
 
-    def __init__(self, arr, *idx):
+    def __init__(self, arr, idx):
+        if not is_any_list(idx):
+            idx = [idx]
+        print("initializing element: ", arr, idx)
         if any(is_boolexpr(i) for i in idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
         if isinstance(arr, ndarray):
             arr = arr.tolist()
-        super().__init__("element", [arr]+list(idx))
+        super().__init__("element", [arr,idx])
 
     def __getitem__(self, index):
         raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
 
     def value(self):
-        arr, *idx = self.args
+        arr, idx = self.args
         idxval = argvals(idx)
         if any(v is None for v in idxval):
             return None
@@ -284,7 +287,7 @@ class Element(GlobalFunction):
         """
             Projects the indices to a combined index and transforms the array to 1D
         """
-        arr, *idx = self.args
+        arr, idx = self.args
         if len(idx) == 1:
             return self
         arr = np.array(arr)
@@ -311,6 +314,7 @@ class Element(GlobalFunction):
                they should be enforced toplevel.
 
         """
+
         arr, idx = self.args
         # Find where the array indices and the bounds of `idx` intersect
         lb, ub = get_bounds(idx)

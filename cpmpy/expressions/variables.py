@@ -482,11 +482,10 @@ class NDVarArray(np.ndarray, Expression):
 
         # index is single expression: direct element
         if isinstance(index, Expression):
-            return cp.Element(self, index)
+            return cp.Element(self, [index])
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
-
             if len(index) != self.ndim:
                 raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
 
@@ -501,7 +500,7 @@ class NDVarArray(np.ndarray, Expression):
                 else: # reduce dimension
                     arr = arr[el]
 
-            return cp.Element(arr, *new_idx)
+            return cp.Element(arr, new_idx)
 
         return super().__getitem__(index)
 
