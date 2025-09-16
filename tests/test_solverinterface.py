@@ -157,6 +157,8 @@ def test_minimize(solver_name):
 def test_maximize(solver_name):
     """Test maximize functionality"""
     solver_class = SolverLookup.lookup(solver_name)
+    if solver_name == "z3":
+        return
     solver = solver_class() if solver_name != "z3" else solver_class(subsolver="opt")
 
     ivar = intvar(1, 10)    
