@@ -320,11 +320,6 @@ class CPM_pysdd(SolverInterface):
 
         newvars = get_variables(cpm_expr)
 
-        # check only Boolean variables
-        # XXX a bit redundant, `solver_var()` already does this too
-        for v in newvars:
-            if not isinstance(v, _BoolVarImpl):
-                raise NotSupportedError(f"CPM_pysdd: only Boolean variables allowed -- {type(v)}: {v}")
         # add new user vars to the set
         self.user_vars |= set(newvars)
 
