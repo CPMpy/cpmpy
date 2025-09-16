@@ -132,7 +132,7 @@ def test_solve_infeasible(solver_name):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_objective(solver_name):
     solver_class = SolverLookup.lookup(solver_name)
-    solver = solver_class()
+    solver = solver_class() if solver_name != "z3" else solver_class(subsolver="opt")
 
     ivar = intvar(1, 10, shape=2)
     i, j = ivar
@@ -263,7 +263,7 @@ def test_time_limit(solver_name):
 def test_has_objective(solver_name):
     """Test has_objective() method"""
     solver_class = SolverLookup.lookup(solver_name)
-    solver = solver_class()
+    solver = solver_class() if solver_name != "z3" else solver_class(subsolver="opt")
     
     # Initially should have no objective
     assert not solver.has_objective()
