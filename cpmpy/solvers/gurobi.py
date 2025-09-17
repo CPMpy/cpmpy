@@ -253,11 +253,9 @@ class CPM_gurobi(SolverInterface):
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
+        # special case, negative-bool-view. Should be eliminated in linearize
         if isinstance(cpm_var, NegBoolView):
-            raise Exception("Negative literals should not be part of any equation. "
-                            "See /transformations/linearize for more details")
+            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
 
         # create if it does not exit
         if cpm_var not in self._varmap:
