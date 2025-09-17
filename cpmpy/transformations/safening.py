@@ -4,6 +4,8 @@
 
 from copy import copy
 
+import numpy as np
+
 from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray, cpm_array
 from ..expressions.core import Expression, Operator, BoolVal
 from ..expressions.utils import get_bounds, is_num
@@ -123,15 +125,18 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
                     continue
 
                 arr, idx = args
-                lb, ub = get_bounds(idx)
+                arr = np.array(arr)
+                idx = cpm_array(idx)
+                for i, (lb,ub) in enumerate(zip(*get_bounds(idx))):
+                    if lb < 0 or ub >= arr.shape[i]: # can index can be out of bounds?
+                        guard, output_idx, extra_cons = _safen_range(idx, safe_range=(0, arr.shape[i]-1), #safen index
+                                                                             idx_to_safen=i)
 
-                if lb < 0 or ub >= len(arr): # index can be out of bounds
-                    guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(0, len(arr)-1), idx_to_safen=1)
-
-                    _nbc.append(guard)  # guard must be added to nearest Boolean context
-                    _toplevel += extra_cons  # any additional constraint that must be true
-                    cpm_expr = output_expr  # replace partial function by this (total) new output expression
-
+                        _nbc.append(guard)  # guard must be added to nearest Boolean context
+                        _toplevel += extra_cons  # any additional constraint that must be true
+                        output_expr = copy(cpm_expr)
+                        output_expr.update_args([arr, output_idx]) # replace partial function by this (total) new output expression
+                        cpm_expr = output_expr
             elif cpm_expr.name == "div" or cpm_expr.name == "mod":
                 if _nbc is _toplevel and cpm_expr.name not in safen_toplevel: # no need to safen
                     new_lst.append(cpm_expr)
@@ -184,11 +189,14 @@ def _safen_range(partial_expr, safe_range, idx_to_safen):
     """
     safe_lb, safe_ub = safe_range
 
+    print("partial_expr: ", partial_expr)
     orig_arg = partial_expr.args[idx_to_safen]
+    print("orig_arg: ", orig_arg)
     new_arg = intvar(safe_lb, safe_ub)  # values for which the partial function is defined
 
     total_expr = copy(partial_expr)  # the new total function, with the new arg
     total_expr.update_args([new_arg if i == idx_to_safen else a for i,a in enumerate(partial_expr.args)])
+    
 
     is_defined = boolvar()
     toplevel = [is_defined == ((safe_lb <= orig_arg) & (orig_arg <= safe_ub)),

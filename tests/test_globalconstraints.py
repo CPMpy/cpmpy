@@ -645,18 +645,23 @@ class TestGlobal(unittest.TestCase):
         self.assertEqual(iv.value()[idx.value()], 8)
         # test 2-D
         iv = cp.intvar(-8, 8, shape=(3, 3), name="iv")
-        a,b = cp.intvar(0, 2, shape=2)
+        a,b = cp.intvar(0, 2, shape=2, name=tuple("ab"))
         cons = iv[a,b] == 8
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
         self.assertEqual(iv.value()[a.value(), b.value()], 8)
         arr = cp.cpm_array([[1, 2, 3], [4, 5, 6]])
-        cons = arr[a,b] == 1
+        cons = arr[a,b] == 4
         model = cp.Model(cons)
         self.assertTrue(model.solve())
         self.assertTrue(cons.value())
-        self.assertEqual(arr[a.value(), b.value()], 1)
+        self.assertEqual(arr[a.value(), b.value()], 4)
+
+        # this went wrong before (issue #444)
+        count = model.solveAll()
+        self.assertEqual(count, 1), # Element should be functional
+
         # test optimization where 1 dim is index
         cons = iv[2, idx] == 8
         self.assertEqual(str(cons), "[iv[2,0] iv[2,1] iv[2,2]][idx] == 8")
