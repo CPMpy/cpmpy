@@ -10,6 +10,8 @@ SIZE = 9
 cell_values = cp.intvar(1,SIZE, shape=(SIZE,SIZE))
 # decision variables for the regions
 cell_regions = cp.intvar(1,SIZE, shape=(SIZE,SIZE))
+# regions cardinals
+region_cardinals = cp.intvar(1,SIZE, shape=(SIZE,SIZE))
 
 
 def killer_cage(idxs, values, regions, total):
@@ -48,40 +50,7 @@ def get_neighbours(r, c):
     # check if in the middle
     else:
         return [(r-1, c), (r+1, c), (r, c-1), (r, c+1)]
-    
-def connected(idx1, idx2, regions, manhattan_allowance=SIZE-1, checked=None):
-    if checked is None:
-        checked = []
-    # the two cells must be in the same region
-    r1, c1 = idx1
-    r2, c2 = idx2
-    
-    # print(f"connected({idx1}, {idx2}, {manhattan_allowance})")
-    
-    manhattan_distance = abs(r1 - r2) + abs(c1 - c2)
-    # print(f"manhattan_distance: {manhattan_distance}")
-    
-    if (manhattan_distance > manhattan_allowance):
-        # print(f"manhattan_distance > manhattan_allowance")
-        return cp.BoolVal(False)
-    else:
-        if (manhattan_distance == 1):
-            return cp.BoolVal(True)
-        else:
-            constraints = []
-            neighbours = get_neighbours(r1, c1)
-            checked.append((r1, c1))
-            for n in neighbours:
-                # print(f"n: {n}")
-                r, c = n
-                if n in checked:
-                    continue
-                new_constraints = connected(n, idx2, regions, manhattan_allowance - 1, list(checked))
-                # print(f"new_constraints: {new_constraints}")
-                # print(new_constraints)
-                constraints.append(cp.all([cell_regions[r1, c1] == cell_regions[r, c], new_constraints]))
-                # print(constraints)
-            return cp.any(constraints)
+
     
 
 m = cp.Model(
@@ -116,13 +85,11 @@ for i in range(total_cells-1):
     r1 = i // SIZE
     c1 = i % SIZE
     
-    for j in range(i+1, total_cells):
-        r2 = j // SIZE
-        c2 = j % SIZE
-        if (abs(r1 - r2) + abs(c1 - c2) > SIZE-1): # can never be in the same region because too far apart (redundant constraint but should guide search?)
-            m += cell_regions[r1, c1] != cell_regions[r2, c2]
-        else:
-            m += (cell_regions[r1, c1] == cell_regions[r2, c2]).implies(connected((r1, c1), (r2, c2), cell_regions)) # TODO: make global, i.e. not pairwise connected, but whole region should be connected
+    neighbours = get_neighbours(r1, c1)
+    
+    # at least one neighbour must be in the same region with a smaller cardinal number (or the cell itself must have cardinal number 1)
+    m += cp.any([cp.all([cell_regions[r1,c1] == cell_regions[r2,c2], region_cardinals[r1, c1] > region_cardinals[r2, c2]]) for r2,c2 in neighbours]) | (region_cardinals[r1,c1] == 1)
+        
         
 
 for r in range(1, SIZE+1):
@@ -132,18 +99,15 @@ for r in range(1, SIZE+1):
     
 # Create unique IDs for each (value, region) pair to enforce all different
 m += cp.AllDifferent([(cell_values[i,j]-1)*SIZE+cell_regions[i,j]-1 for i in range(SIZE) for j in range(SIZE)])
+# Only 1 cell with cardinal number 1 per region
+for r in range(1, SIZE+1):
+    m += cp.Count([(region_cardinals[i,j])*(cell_regions[i,j] == r) for i in range(SIZE) for j in range(SIZE)], 1) == 1
 
     
-# TODO: Symmetry breaking for the regions?
+# Symmetry breaking for the regions
 # fix top-left and bottom-right region to reduce symmetry
 m += cell_regions[0,0] == 1
 m += cell_regions[SIZE-1, SIZE-1] == SIZE
-# TODO: symmetry breaking for all regions but slow
-# Probably not needed, because we don't really look for multiple solutions anyway
-# flat_regions = cell_regions.flatten()
-# for i in range(1, SIZE*SIZE):
-#     for j in range(i//SIZE+2, SIZE+1):
-#         m += (flat_regions[i] == j).implies(cp.any([flat_regions[k] == j-1 for k in range(i)]))  # ensure that regions are assigned in order
 
 
 
@@ -159,3 +123,5 @@ print("The solution is:")
 print(cell_values.value())
 print("The regions are:")
 print(cell_regions.value())
+print("The region cardinals are:")
+print(region_cardinals.value())
