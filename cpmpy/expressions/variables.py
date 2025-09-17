@@ -256,6 +256,9 @@ def cpm_array(arr):
     """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
+    elif not arr.flags['C_CONTIGUOUS'] and not arr.flags['F_CONTIGUOUS']:   # Ensure the array is contiguous
+        arr = np.ascontiguousarray(arr)
+    
     order = 'F' if arr.flags['F_CONTIGUOUS'] else 'C'
     return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr, order=order)
 

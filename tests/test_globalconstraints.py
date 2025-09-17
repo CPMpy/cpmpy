@@ -983,6 +983,10 @@ class TestGlobal(unittest.TestCase):
             self.assertTrue(cons.value())
         cp.Model(cons).solveAll(display=check_true)
 
+        # test not contiguous
+        iv = cp.intvar(0, 10, shape=(3, 3))
+        self.assertTrue(cp.Model([cp.NValue(i) == 3 for i in iv.T]).solve())
+        
     def test_nvalue_except(self):
 
         iv = cp.intvar(-8, 8, shape=3)
@@ -1010,6 +1014,11 @@ class TestGlobal(unittest.TestCase):
             self.assertTrue(cons.value())
 
         cp.Model(cons).solveAll(display=check_true)
+
+        # test not contiguous
+        iv = cp.intvar(0, 10, shape=(3, 3))
+        self.assertTrue(cp.Model([cp.NValueExcept(i, val) == 3 for i in iv.T]).solve())
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
