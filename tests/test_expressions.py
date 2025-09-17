@@ -717,6 +717,14 @@ class TestContainer(unittest.TestCase):
         
 class TestUtils(unittest.TestCase):
 
+    def test_cpm_array(self):
+        x = cp.intvar(0,10, shape=(3, 3))
+        self.assertIsInstance(cpm_array(x), NDVarArray)
+        self.assertEqual(cpm_array(x).shape, (3, 3))
+
+        self.assertIsInstance(cpm_array(x.T), NDVarArray)
+        self.assertEqual(cpm_array(x.T).shape, (3, 3))
+
     def test_eval_comparison(self):
         x = intvar(0,10, name="x")
 
