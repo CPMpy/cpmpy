@@ -272,7 +272,7 @@ def test_time_limit(solver_name):
     
     # Test with positive time limit
     assert solver.solve(time_limit=1.0)
-    assert solver.status().exitstatus == ExitStatus.FEASIBLE or solver.status().exitstatus == ExitStatus.OPTIMAL
+    assert solver.status().exitstatus == ExitStatus.FEASIBLE
     
     # Test with negative time limit should raise ValueError
     try:
