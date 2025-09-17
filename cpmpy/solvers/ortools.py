@@ -514,10 +514,10 @@ class CPM_ortools(SolverInterface):
                 elif lhs.name == 'element':
 
                     # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
-                    arr, *idx = lhs.args
+                    arr, idx = lhs.args
                     if len(idx) > 1: # multi-dim, convert here
                         arr, expr_idx = lhs.to_1d_element().args
-                        idx, newcons = get_or_make_var(expr_idx)
+                        idx, newcons = get_or_make_var(expr_idx[0])
                         self += newcons
                     else:
                         idx = idx[0]
