@@ -265,6 +265,8 @@ print_grid(cells)
 
 # print(m)
 
+print("Number of constraints:", len(m.constraints))
+
 sol = m.solve()
 print("The solution is:")
 print(cells.value())
