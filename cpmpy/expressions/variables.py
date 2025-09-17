@@ -449,6 +449,22 @@ class NDVarArray(np.ndarray, Expression):
         """
         return self # we can just return self
 
+    def update_args(self, args):
+        # take the list of args and replace the array with it
+        # This method is used to update the arguments of the NDVarArray Expression.
+        if isinstance(args, NDVarArray):
+            arr = args
+        else:
+            arr = np.array(args)
+
+        # Copy the contents of arr into self
+        if arr.shape == self.shape:
+            np.copyto(self, arr)
+        else:
+            # If shapes differ, reshape self to arr's shape and copy
+            self.resize(arr.shape, refcheck=False)
+            np.copyto(self, arr)
+        
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
