@@ -313,7 +313,10 @@ class Element(GlobalFunction):
 
         """
 
-        arr, idx = self.args
+        new_element = self.to_1d_element()
+        arr, idx = new_element.args
+        idx = idx[0]
+
         # Find where the array indices and the bounds of `idx` intersect
         lb, ub = get_bounds(idx)
         new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
