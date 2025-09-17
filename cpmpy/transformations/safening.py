@@ -189,9 +189,7 @@ def _safen_range(partial_expr, safe_range, idx_to_safen):
     """
     safe_lb, safe_ub = safe_range
 
-    print("partial_expr: ", partial_expr)
     orig_arg = partial_expr.args[idx_to_safen]
-    print("orig_arg: ", orig_arg)
     new_arg = intvar(safe_lb, safe_ub)  # values for which the partial function is defined
 
     total_expr = copy(partial_expr)  # the new total function, with the new arg
