@@ -515,12 +515,10 @@ class CPM_ortools(SolverInterface):
 
                     # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
                     arr, idx = lhs.args
-                    if len(idx) > 1: # multi-dim, convert here
-                        arr, expr_idx = lhs.to_1d_element().args
-                        idx, newcons = get_or_make_var(expr_idx[0])
-                        self += newcons
-                    else:
-                        idx = idx[0]
+                    arr, expr_idx = lhs.to_1d_element().args
+                    idx, newcons = get_or_make_var(expr_idx[0])
+                    self += newcons
+ 
                     return self.ort_model.AddElement(self.solver_var(idx), self.solver_vars(arr), ortrhs)
 
                 elif lhs.name == 'mod':
