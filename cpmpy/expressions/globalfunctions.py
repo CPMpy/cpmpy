@@ -262,7 +262,6 @@ class Element(GlobalFunction):
     def __init__(self, arr, idx):
         if not is_any_list(idx):
             idx = [idx]
-        print("initializing element: ", arr, idx)
         if any(is_boolexpr(i) for i in idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
         if isinstance(arr, ndarray):
@@ -292,7 +291,6 @@ class Element(GlobalFunction):
             return self
         arr = np.array(arr)
         for i, (lb,ub) in enumerate(zip(*get_bounds(idx))):
-            print(i,lb,ub,arr.shape[i])
             assert lb >= 0 and ub < arr.shape[i], "Cannot convert unsafe Element constraint to 1d, safen first"
 
         flat_index = idx[-1]
