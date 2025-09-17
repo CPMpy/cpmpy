@@ -118,7 +118,7 @@ model = Model(
     (Count(board[0], P) == 0),
     (Count(board[7], p) == 0),
     (Count(board[7], P) == 0),
-    # The number of pieces of each piece type without promotion
+    # The number of pieces of each piece type with promotion
     (
         (Count(board, b) + Count(board, r) + Count(board, n) + Count(board, q) <= 2+2+1+1 + 8-Count(board, p))
     ),
