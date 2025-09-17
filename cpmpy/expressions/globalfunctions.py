@@ -328,7 +328,9 @@ class Element(GlobalFunction):
         return cons, []  # no auxiliary variables
 
     def __repr__(self):
-        return "{}{}".format(np.array(self.args[0]), self.args[1:])
+        arr, idx = self.args
+        idx_str = ", ".join(str(i) for i in idx)
+        return "{}[{}]".format(np.array(arr), idx_str)
 
     def get_bounds(self):
         """
