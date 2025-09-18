@@ -60,14 +60,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-length", type=int,help="Length of array, 12 by default", default=12)
-    parser.add_argument("--solution_limit", type=int, help="Number of solutions to find, find all by default", default=0)
+    parser.add_argument("--solution_limit", type=int, help="Number of solutions to find, find all by default", default=10)
 
     args = parser.parse_args()
 
     model, (x, diffs) = all_interval(args.length)
     found_n = model.solveAll(solution_limit=args.solution_limit,
                              display=lambda: print_solution(x, diffs))
-    if found_n == 0:
-        print(f"Fund {found_n} solutions")
+    if found_n > 0:
+        print(f"Found {found_n} solutions")
     else:
         raise ValueError("Problem is unsatisfiable")

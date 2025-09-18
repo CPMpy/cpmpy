@@ -66,6 +66,7 @@ from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import flatlist, argvals, argval
+from ..exceptions import NotSupportedError
 
 import numpy as np
 import numbers
@@ -150,6 +151,7 @@ class CPM_exact(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
+        
     @property
     def native_model(self):
         """
@@ -397,8 +399,9 @@ class CPM_exact(SolverInterface):
         if is_num(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # variables to be translated should be positive
-        assert not isinstance(cpm_var, NegBoolView), "Internal error: found negative Boolean variables where only positive ones were expected, please report."
+        # special case, negative-bool-view. Should be eliminated in linearize
+        if isinstance(cpm_var, NegBoolView):
+            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
 
         # return it if it already exists
         if cpm_var in self._varmap:
