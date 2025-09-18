@@ -7,8 +7,11 @@ import numpy as np
 cells = cp.intvar(1,9, shape=(9,9))
 # path indices 0 if not on path else the var indicates at what point the rat passes this cell
 path = cp.intvar(0, 81, shape=(9,9))
-# line modifiers
-line = cp.intvar(0,6, shape=(2,9,9))
+# # line modifiers
+# line = cp.intvar(0,6, shape=(2,9,9))
+# list of cells (before, after) on path with indices and value (Due to the structure of the puzzle, the max amount of neighbours is 20, before running into another emitter. It is more efficient to reduce the amount like this. This amount can also be proven with a cpmpy model that runs before this one.)
+sequence = cp.intvar(-1, 9, shape=(9,9,6,20))
+
 # inducers for induced C_WALLS
 inducers = cp.intvar(0, 80, shape=(8,8))
 
@@ -88,13 +91,15 @@ def path_valid(path):
             neighbours = get_reachable_neighbours(r, c)
             non_emitter_neighbours = [n for n in neighbours if tuple(n) not in EMITTERS]
             if (r,c) == (2,8):
-                # path starts on emitter, the next pathcell must have its first line value equal to this emitters value
-                constraints.append(cp.any([cp.all([path[neighbour[0], neighbour[1]] == 2, line[0, neighbour[0], neighbour[1]] == 1]) for neighbour in neighbours]))
+                # # path starts on emitter, the next pathcell must have its first line value equal to this emitters value
+                # constraints.append(cp.any([cp.all([path[neighbour[0], neighbour[1]] == 2, line[0, neighbour[0], neighbour[1]] == 1]) for neighbour in neighbours]))
+                # The path starts on emitter. It doesn't have any previous cells so the first 3 vectors in the sequence must be fully -1. As for the the last 3, they are taken from the neighbour. Vice versa also applies.
+                constraints.append(cp.all([sequence[r,c,:3] == -1]))
+                constraints.append(cp.any([cp.all([path[nr,nc] == 2, sequence[r,c,3,0] == cells[nr,nc], sequence[r,c,4,0] == nr, sequence[r,c,5,0] == nc, sequence[r,c,3,1:] == sequence[nr,nc,3,:19], sequence[r,c,4,1:] == sequence[nr,nc,4,:19], sequence[r,c,5,1:] == sequence[nr,nc,5,:19], sequence[nr,nc,0,0] == cells[r,c], sequence[nr,nc,1,0] == r, sequence[nr,nc,2,0] == c, sequence[nr,nc,0,1:] == sequence[r,c,0,:19], sequence[nr,nc,1,1:] == sequence[r,c,1,:19], sequence[nr,nc,2,1:] == sequence[r,c,2,:19]]) for nr, nc in neighbours]))
             elif (r,c) == (6,6):
                 # path ends on emitter, the previous pathcell must have its second line value equal to this emitters value
                 constraints.append(cp.any([cp.all([path[neighbour[0], neighbour[1]] == cp.max(path)-1, line[1, neighbour[0], neighbour[1]] == 4]) for neighbour in neighbours]))
             else:
-                
                 # for any pathcell, the next pathcell must always be reachable
                 constraints.append((path[r,c] != 0).implies(cp.any([path[neighbour[0], neighbour[1]] == path[r,c] + 1 for neighbour in neighbours])))
                 if (r,c) not in EMITTERS:
