@@ -159,12 +159,20 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] we commonly use 3-letter abbrivations to refer to native objects:
         #           OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
         self.TPL_solver = TEMPLATEpy.Solver("cpmpy") 
+        self.TPL_model = TEMPLATEpy.model("cpmpy")
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
         #           internally, the constructor relies on `add()` which uses the above solver native object(s)
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
+
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.TPL_model
 
     def solve(self, time_limit=None, **kwargs):
         """

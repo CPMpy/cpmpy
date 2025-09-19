@@ -265,10 +265,8 @@ class Expression(object):
         # some simple constant removal
         if is_true_cst(other):
             return self
-        if is_false_cst(other):
-            return BoolVal(False)
         # catch beginner mistake
-        if is_num(other):
+        if is_num(other) and not is_bool(other):
             raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forget to put brackets? "
                             f"E.g. always write (x==2)&(y<5).")
         return Operator("and", [self, other])
@@ -277,34 +275,28 @@ class Expression(object):
         # some simple constant removal
         if is_true_cst(other):
             return self
-        if is_false_cst(other):
-            return BoolVal(False)
         # catch beginner mistake
-        if is_num(other):
+        if is_num(other) and not is_bool(other):
             raise TypeError(f"{other}&{self} is not valid because {other} is a number, "
                             f"did you forget to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
     def __or__(self, other):
         # some simple constant removal
-        if is_true_cst(other):
-            return BoolVal(True)
         if is_false_cst(other):
             return self
         # catch beginner mistake
-        if is_num(other):
+        if is_num(other) and not is_bool(other):
             raise TypeError(f"{self}|{other} is not valid because {other} is a number, "
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [self, other])
 
     def __ror__(self, other):
         # some simple constant removal
-        if is_true_cst(other):
-            return BoolVal(True)
         if is_false_cst(other):
             return self
         # catch beginner mistake
-        if is_num(other):
+        if is_num(other) and not is_bool(other):
             raise TypeError(f"{other}|{self} is not valid because {other} is a number, "
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
@@ -396,8 +388,6 @@ class Expression(object):
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
         if is_num(other):
-            if other == 0:
-                return 1
             if other == 1:
                 return self
         return Operator("pow", [self, other])
