@@ -1,3 +1,16 @@
+"""
+Command-line interface for CPMpy.
+
+This module provides a simple CLI to interact with CPMpy, primarily to display
+version information about CPMpy itself and the available solver backends.
+
+Usage:
+    cpmpy <COMMAND>
+
+Commands:
+    version   Show the CPMpy library version and the versions of installed solver backends.
+"""
+
 import argparse
 from cpmpy import __version__
 import cpmpy as cp
