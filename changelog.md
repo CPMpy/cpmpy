@@ -1,5 +1,29 @@
 # Change log
 
+## 0.9.27
+
+### Added
+
+* Solver capability overview in docs [d8d3a2d](https://github.com/CPMpy/cpmpy/commit/d8d3a2d0f78438aa0f0da6909d74b5a505b5f8a5)
+* PSP-lib dataset and loader [#701](https://github.com/CPMpy/cpmpy/pull/701)
+
+### Changed
+
+* SolverInterface consistency improvements and added tests [#726](https://github.com/CPMpy/cpmpy/pull/726)
+* Improve testing of examples [#651](https://github.com/CPMpy/cpmpy/pull/651)
+* Modernize shebangs of examples [#644](https://github.com/CPMpy/cpmpy/pull/644)
+* Linearize improvements [e721b0a](https://github.com/CPMpy/cpmpy/commit/e721b0ab960be632c525bfbbf493876031ca9d98)
+* Update waterfall (added automated int-to-bool) [710ec42](https://github.com/CPMpy/cpmpy/commit/710ec42fc34a014084e0f6bbe8d1e5eed72c3dcf)
+* Collection of improvements to GitHub README
+
+### Fixed
+
+* Remove simplification of nullifying arguments from constructors [#725](https://github.com/CPMpy/cpmpy/pull/725)
+* Skip psplib in testset due to random failure on GitHub actions [7a15d07](https://github.com/CPMpy/cpmpy/commit/7a15d07962610e3844d358a05c7c419e110f110c)
+* Pin Pumpkin solver git commit [#719](https://github.com/CPMpy/cpmpy/pull/719)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.26...v0.9.27
+
 ## 0.9.26
 
 ### Added
