@@ -16,11 +16,13 @@
     Installation
     ===============
 
-    The `pumpkin_solver_py` python package is currently not available on PyPI.
-    It can be installed from source using the following steps:
-     1. clone the release `v0.2.1` repository from github, e.g.: `git clone https://github.com/consol-lab/pumpkin pumpkin --branch pumpkin-core-v0.2.1`
-     2. install the "maturin" package to build the python bindings: :code:`pip install maturin`
-     3. build and install the package: :code:`cd pumpkin/pumpkin-solver-py && maturin develop`
+    Requires that the 'pumpkin-solver' python package is installed:
+
+    .. code-block:: console
+    
+        $ pip install pumpkin-solver
+
+    The rest of this documentation is for advanced users
 
     ===============
     List of classes
