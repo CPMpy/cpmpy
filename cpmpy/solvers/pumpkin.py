@@ -77,7 +77,7 @@ class CPM_pumpkin(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import pumpkin_solver_py as psp
+            import pumpkin_solver as psp
             return True
         except ModuleNotFoundError:
             return False
@@ -107,9 +107,9 @@ class CPM_pumpkin(SolverInterface):
             subsolver: None, not used
         """
         if not self.supported():
-            raise Exception("CPM_Pumpkin: Install the python package 'pumpkin_solver_py'")
+            raise Exception("CPM_Pumpkin: Install the python package 'pumpkin_solver'")
 
-        from pumpkin_solver_py import Model
+        from pumpkin_solver import Model
 
         assert subsolver is None 
 
@@ -147,9 +147,9 @@ class CPM_pumpkin(SolverInterface):
         """
 
         # Again, I don't know why this is necessary, but the PyO3 modules seem to be a bit wonky.
-        from pumpkin_solver_py import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
-        from pumpkin_solver_py import SatisfactionResult, SatisfactionUnderAssumptionsResult
-        from pumpkin_solver_py.optimisation import OptimisationResult, Direction
+        from pumpkin_solver import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
+        from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult
+        from pumpkin_solver.optimisation import OptimisationResult, Direction
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -348,7 +348,7 @@ class CPM_pumpkin(SolverInterface):
         """
             Convert a CPMpy expression to a Pumpkin predicate (comparison with constant)
         """
-        from pumpkin_solver_py import Comparator, Predicate
+        from pumpkin_solver import Comparator, Predicate
 
         if isinstance(cpm_expr, _BoolVarImpl):
             if isinstance(cpm_expr, NegBoolView):
@@ -459,7 +459,7 @@ class CPM_pumpkin(SolverInterface):
             Convert a CPMpy expression into a Pumpkin constraint
             Expects a transformed CPMpy expression, this logic is implemented as a separate function so we can support reification in `add()`
         """
-        from pumpkin_solver_py import constraints
+        from pumpkin_solver import constraints
         if tag is None:
             tag = self.pum_solver.new_constraint_tag()
         if isinstance(cpm_expr, _BoolVarImpl):
