@@ -774,11 +774,14 @@ class Precedence(GlobalConstraint):
         args, precedence = self.args
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
-            for j in range(len(args)):
+            # constraint 1 from paper
+            constraints.append(args[0] != t) 
+            # constraint 2 from paper
+            for j in range(1,len(args)):
                 lhs = args[j] == t
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
-                constraints += [lhs.implies(cp.any(args[:j] == s))]
+                constraints += [lhs.implies(cp.any(cp.cpm_array(args[:j]) == s))] # wrap with cpm_array to capture non-iterable when j=1
         return constraints, []
 
     def value(self):
