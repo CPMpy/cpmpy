@@ -33,6 +33,7 @@ def mus(soft, hard=[], solver="ortools"):
         :param: solver: name of a solver, see SolverLookup.solvernames()
             "z3" and "gurobi" are incremental, "ortools" restarts the solver
     """
+    print(f"Finding MUS using solver {solver}")
     # make assumption (indicator) variables and soft-constrained model
     (m, soft, assump) = make_assump_model(soft, hard=hard)
     s = cp.SolverLookup.get(solver, m)
@@ -54,6 +55,8 @@ def mus(soft, hard=[], solver="ortools"):
             core.add(c)
         else: # UNSAT, use new solver core (clause set refinement)
             core = set(s.get_core())
+            
+        print(f"Current MUS size: {len(core)}")
 
     return [dmap[avar] for avar in core]
 

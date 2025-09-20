@@ -4,6 +4,8 @@ import numpy as np
 
 from cpmpy.tools.explain import optimal_mus, mus
 
+solver = "exact"
+
 
 # This cpmpy example solves a sudoku by Zanno, which can be found on https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000N39
 
@@ -272,10 +274,12 @@ m = cp.Model(
 cons = activate_lines(sequence)
 for c in cons:
     m += c
+# m += cons
 
 cons = path_valid(path)
 for c in cons:
     m += c
+# m += cons
 
 def regroup_to_blocks(grid):
     # Create an empty list to store the blocks
@@ -351,7 +355,7 @@ with open("sudoku_schrodingers_rat.txt", "w") as f:
 print("Number of constraints:", len(m.constraints))
 
 start = time.time()
-sol = m.solve()
+sol = m.solve(solver=solver)
 end = time.time()
 
 print(f"Solved in {end - start} seconds")
@@ -368,7 +372,7 @@ if sol:
 else:
     print("Model UNSAT, finding MUS...")
 
-    res = mus(m.constraints)
+    res = mus(m.constraints, solver=solver)
 
     print(f"{len(res)} of {len(m.constraints)} constraints in the MUS:")
 
