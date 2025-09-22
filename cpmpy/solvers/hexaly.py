@@ -135,7 +135,7 @@ class CPM_hexaly(SolverInterface):
         if time_limit is not None:
             if time_limit < 0:
                 raise ValueError(f"Time limit must be positive but was {time_limit}")
-            self.hex_solver.param.time_limit = time_limit
+            self.hex_solver.param.time_limit = int(time_limit)  # hexaly does not support float time limit
 
         # set solver parameters
         for arg, val in kwargs.items():
