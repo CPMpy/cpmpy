@@ -348,9 +348,13 @@ class CPM_hexaly(SolverInterface):
                 a,b = self._hex_expr(cpm_expr.args)
                 return a * b
             if cpm_expr.name == "div":
-                raise NotImplementedError("hexaly supports division, but result is float, TODO")
                 a, b = self._hex_expr(cpm_expr.args)
-                return a / b # TODO: check what kind of div
+                # ensure we are rounding towards zero
+                return self.hex_model.iif((a >= 0) & (b >= 0), self.hex_model.floor(a / b), # result is positive
+                       self.hex_model.iif((a <= 0) & (b <= 0), self.hex_model.floor(a / b), # result is positive
+                       self.hex_model.iif((a >= 0) & (b <= 0), self.hex_model.ceil(a / b), # result is negative
+                       self.hex_model.iif((a <= 0) & (b >= 0), self.hex_model.ceil(a / b), 0)))) # result is negative
+
             if cpm_expr.name == "mod":
                 a, b = self._hex_expr(cpm_expr.args)
                 return a % b
