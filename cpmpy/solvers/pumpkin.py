@@ -37,11 +37,8 @@
     Module details
     ==============
 """
-import warnings
-import re
 from typing import Optional
-import pkg_resources
-
+from importlib.metadata import version, PackageNotFoundError
 from os.path import join
 
 import numpy as np
@@ -86,7 +83,7 @@ class CPM_pumpkin(SolverInterface):
 
 
     @staticmethod
-    def version() -> Optional[str]:
+    def version(cls) -> Optional[str]:
         """
         Returns the installed version of the solver's Python API.
         """
@@ -94,8 +91,8 @@ class CPM_pumpkin(SolverInterface):
             # there is also a version of the solver itself in the Cargo.toml (/pumpkin-solver/Cargo.toml)
             # currently not accessible through the python api
             # dynamic = ["version"] in the pyproject.toml does not seem to get the right value?
-            return pkg_resources.get_distribution('pumpkin-solver-py').version 
-        except pkg_resources.DistributionNotFound:
+            return version('pumpkin-solver')
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
