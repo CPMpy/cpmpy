@@ -247,7 +247,7 @@ class CPM_hexaly(SolverInterface):
         from hexaly.optimizer import HxObjectiveDirection
         # make objective function or variable and post
         while self.has_objective(): # remove prev objective(s)
-            self.hex_model.remove_objective(1)
+            self.hex_model.remove_objective(0)
         hex_obj = self._hex_expr(expr)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
