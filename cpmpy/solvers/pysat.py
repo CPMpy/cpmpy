@@ -25,7 +25,7 @@
 
     .. code-block:: console
 
-        $ pip install pysat
+        $ pip install python-sat
 
     If you want to also solve pseudo-Boolean constraints, you should also install its optional dependency 'pypblib', as follows:
 
