@@ -141,8 +141,8 @@ class CPM_hexaly(SolverInterface):
         for arg, val in kwargs.items():
             setattr(self.hex_solver, arg, val)
 
-        # set dummy objective for satisfaction problems
-        if self.hex_model.nb_objectives == 0:
+        is_satisfaction = self.hex_model.nb_objectives == 0
+        if is_satisfaction: # set dummy objective for satisfaction problems
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # new status, translate runtime
@@ -167,10 +167,10 @@ class CPM_hexaly(SolverInterface):
         elif self.hex_sol.status == HxSolutionStatus.FEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.hex_sol.status == HxSolutionStatus.OPTIMAL:
-            if self.has_objective():
-                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-            else:
+            if is_satisfaction:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         else:  # another?
             raise NotImplementedError(self.hex_sol.status)  # a new status type was introduced, please report on github
 
@@ -188,10 +188,9 @@ class CPM_hexaly(SolverInterface):
                 else:
                     cpm_var._value = int(self.hex_sol.get_value(sol_var))
 
-
             # translate objective, for optimisation problems only
-            if self.has_objective():
-                self.objective_value_ = self.hex_sol.get_objective_bound(1)
+            if not is_satisfaction:
+                self.objective_value_ = self.hex_sol.get_objective_bound(0)
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -199,6 +198,10 @@ class CPM_hexaly(SolverInterface):
 
         # now open model again, we might want to add new constraints after
         self.hex_model.open()
+
+        if is_satisfaction:
+            self.hex_model.remove_objective(0) # reset to not have any objectives
+
         return has_sol
 
 
