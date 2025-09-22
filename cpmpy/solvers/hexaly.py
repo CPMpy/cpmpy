@@ -7,7 +7,7 @@
     Interface to Hexaly's API
 
 
-    Hexaly is a local search solver with suppport for  global constraints.
+    Hexaly is a local search solver with support for  global constraints.
 
     Always use :func:`cp.SolverLookup.get("hexaly") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
