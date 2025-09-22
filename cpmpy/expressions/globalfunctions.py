@@ -306,9 +306,13 @@ class Element(GlobalFunction):
             Projects the indices to a combined index and transforms the array to 1D
         """
         arr, idx = self.args
+
         if len(idx) == 1:
             return self
-        arr = np.array(arr)
+
+        if not isinstance(arr, NDVarArray):
+            arr = cpm_array(arr)
+
         for i, (lb,ub) in enumerate(zip(*get_bounds(idx))):
             assert lb >= 0 and ub < arr.shape[i], "Cannot convert unsafe Element constraint to 1d, safen first"
 
