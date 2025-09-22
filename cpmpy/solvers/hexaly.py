@@ -40,7 +40,8 @@
 """
 
 from typing import Optional
-import pkg_resources
+
+from importlib.metadata import version, PackageNotFoundError
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -80,8 +81,8 @@ class CPM_hexaly(SolverInterface):
         Returns the installed version of the solver's Python API.
         """
         try:
-            return pkg_resources.get_distribution('hexaly').version
-        except pkg_resources.DistributionNotFound:
+            return version('hexaly')
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
