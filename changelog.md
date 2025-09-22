@@ -6,6 +6,7 @@
 
 * Solver capability overview in docs [d8d3a2d](https://github.com/CPMpy/cpmpy/commit/d8d3a2d0f78438aa0f0da6909d74b5a505b5f8a5)
 * PSP-lib dataset and loader [#701](https://github.com/CPMpy/cpmpy/pull/701)
+* Safen name collision between user and aux variables [#731](https://github.com/CPMpy/cpmpy/pull/731)
 
 ### Changed
 
