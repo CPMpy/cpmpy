@@ -349,6 +349,9 @@ def test_solveall_basic(solver_name):
         if solver_name == "pysdd":
             # pysdd doesn't support solution_limit
             total = solver.solveAll(display=count_solution)
+        if solver_name == "hexaly":
+            # set time limit, hexaly cannot prove UNSAT at last call
+            total = solver.solveAll(display=count_solution, solution_limit=10, time_limit=5)
         else:
             total = solver.solveAll(display=count_solution, solution_limit=10)
         
