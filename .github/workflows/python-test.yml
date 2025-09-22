@@ -13,7 +13,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install ".[test, z3, exact, pysat, pysdd, pychoco, minizinc, pindakaas, pumpkin-solver]"
+          pip install ".[test, z3, exact, pysat, pysdd, pychoco, minizinc, pindakaas, pumpkin]"
           pip install pypblib  # dependency of pysat for PB constraints
           pip install pytest-xdist
           sudo snap install minizinc --classic          
