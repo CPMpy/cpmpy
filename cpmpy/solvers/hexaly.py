@@ -47,7 +47,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, eval_comparison
+from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
@@ -104,6 +104,7 @@ class CPM_hexaly(SolverInterface):
         self.hex_solver = HexalyOptimizer()
         self.hex_solver.param.verbosity = 0
         self.hex_model = self.hex_solver.model
+        self.is_satisfaction = True
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="hexaly", cpm_model=cpm_model)
@@ -142,8 +143,7 @@ class CPM_hexaly(SolverInterface):
         for arg, val in kwargs.items():
             setattr(self.hex_solver, arg, val)
 
-        is_satisfaction = self.hex_model.nb_objectives == 0
-        if is_satisfaction: # set dummy objective for satisfaction problems
+        if self.is_satisfaction: # set dummy objective for satisfaction problems
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # new status, translate runtime
@@ -168,7 +168,7 @@ class CPM_hexaly(SolverInterface):
         elif self.hex_sol.status == HxSolutionStatus.FEASIBLE:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif self.hex_sol.status == HxSolutionStatus.OPTIMAL:
-            if is_satisfaction:
+            if self.is_satisfaction:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else:
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
@@ -190,7 +190,7 @@ class CPM_hexaly(SolverInterface):
                     cpm_var._value = int(self.hex_sol.get_value(sol_var))
 
             # translate objective, for optimisation problems only
-            if not is_satisfaction:
+            if not self.is_satisfaction:
                 self.objective_value_ = self.hex_sol.get_objective_bound(0)
 
         else: # clear values of variables
@@ -200,7 +200,7 @@ class CPM_hexaly(SolverInterface):
         # now open model again, we might want to add new constraints after
         self.hex_model.open()
 
-        if is_satisfaction:
+        if self.is_satisfaction:
             self.hex_model.remove_objective(0) # reset to not have any objectives
 
         return has_sol
@@ -249,6 +249,7 @@ class CPM_hexaly(SolverInterface):
         # make objective function or variable and post
         while self.has_objective(): # remove prev objective(s)
             self.hex_model.remove_objective(0)
+        self.is_satisfaction = False
         hex_obj = self._hex_expr(expr)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
@@ -401,3 +402,17 @@ class CPM_hexaly(SolverInterface):
                              "Set time limit or solution limit to do a limited search")
 
         return super(CPM_hexaly, self).solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
+
+
+    def solution_hint(self, cpm_vars, vals):
+        from hexaly.optimizer import HxObjectiveDirection
+        if self.is_satisfaction: # set dummy objective, otherwise cannot close model
+            self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
+
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+
+        self.hex_model.close() # must be closed before we can set a solution hint
+        for hex_var, val in zip(self.solver_vars(cpm_vars), vals):
+            hex_var.value = val
+        self.hex_model.open() # re-open
