@@ -51,7 +51,6 @@ EXCLUDE_OPERATORS = {"gurobi": {},
                      "pindakaas": {"mul", "div", "pow", "mod"},
                      "exact": {},
                      "pumpkin": {"pow", "mod"},
-                     "hexaly": {"div"} # supported but converts result to float, TODO
                      }
 
 # Variables to use in the rest of the test script

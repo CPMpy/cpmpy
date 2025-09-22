@@ -912,7 +912,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin", "hexaly"):  # don't support div or mod with vars
+        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin"):  # don't support div or mod with vars
             return
         
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
@@ -923,9 +923,12 @@ class TestSupportedSolvers:
         m += x % y == r
         sols = set()
         solution_limit = None
+        time_limit = None
         if solver == 'gurobi':
             solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
-        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        if solver == "hexaly":
+            time_limit = 5
+        m.solveAll(solver=solver, solution_limit=solution_limit, time_limit=time_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
