@@ -52,6 +52,38 @@ class TestSolvers(unittest.TestCase):
         c = cp.boolvar(shape=(2,3), name="c")
         self.assertEqual(str(c), "[[c[0,0] c[0,1] c[0,2]]\n [c[1,0] c[1,1] c[1,2]]]")
 
+    def test_invalid_bv(self):
+
+        self.assertRaises(ValueError, lambda: cp.boolvar(name="BV123"))
+        self.assertRaises(ValueError, lambda: cp.boolvar(name="BV123", shape=3))
+        self.assertRaises(ValueError, lambda: cp.boolvar(name=("BV0", "x", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.boolvar(name=("x", "BV1", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.boolvar(name=[["x","y","z"],["a", "BV1", "b"]], shape=(2,3)))
+
+
+        # this seems fine but it is not!! can still clash
+        self.assertRaises(ValueError, lambda: cp.boolvar(name="IV123"))
+        self.assertRaises(ValueError, lambda: cp.boolvar(name="IV123", shape=3))
+        self.assertRaises(ValueError, lambda: cp.boolvar(name=("IV0", "x", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.boolvar(name=("x", "IV1", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.boolvar(name=[["x","y","z"],["a", "IV1", "b"]], shape=(2,3)))
+
+
+    def test_invalid_iv(self):
+
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name="IV123"))
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name="IV123", shape=3))
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("IV0", "x", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("x", "IV1", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.intvar(0,10, name=[["x","y","z"],["a", "IV0", "b"]], shape=(2,3)))
+
+        # this seems fine but it is not!! can still clash
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name="BV123"))
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name="BV123", shape=3))
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("BV0", "x", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("x", "BV1", "y"), shape=3))
+        self.assertRaises(ValueError, lambda: cp.intvar(0,10, name=[["x","y","z"],["a", "BV0", "b"]], shape=(2,3)))
+
     def test_clear(self):
         def n_none(v):
             return sum(v.value() == None)
