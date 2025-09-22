@@ -71,9 +71,9 @@ from numpy import ndarray
 
 import cpmpy as cp
 
-from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
+from ..exceptions import CPMpyException, IncompleteFunctionError, NotSupportedError, TypeError
 from .core import Expression, Operator
-from .variables import boolvar, intvar, cpm_array
+from .variables import NDVarArray, boolvar, intvar, cpm_array
 from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, get_bounds, implies
 
 
@@ -260,13 +260,32 @@ class Element(GlobalFunction):
     """
 
     def __init__(self, arr, idx):
+        arr = cpm_array(arr)
         if not is_any_list(idx):
             idx = [idx]
+
         if any(is_boolexpr(i) for i in idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
-        if isinstance(arr, ndarray):
-            arr = arr.tolist()
-        super().__init__("element", [arr,idx])
+        
+        # multi-dimensional index
+        if not any(isinstance(el, Expression) for el in idx):
+            raise NotSupportedError("Element constraint should have an expression as an index")
+
+        if len(idx) != arr.ndim:
+            raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
+
+        # remove constants from idx
+        new_idx =  []
+        for i, el in enumerate(idx):
+            if isinstance(el, Expression):
+                new_idx.append(el)
+                if arr.ndim != 1: # might have removed all other dimensions
+                    arr = np.moveaxis(arr, 0, -1) # move expression-index to back
+            else: # reduce dimension
+                arr = arr[el]
+
+        super().__init__("element", [arr,new_idx])
+
 
     def __getitem__(self, index):
         raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
