@@ -45,7 +45,7 @@ from importlib.metadata import version, PackageNotFoundError
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction
+from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_any_list, eval_comparison
 from ..transformations.get_variables import get_variables
@@ -387,6 +387,9 @@ class CPM_hexaly(SolverInterface):
             if cpm_expr.name == "max":
                 return self.hex_model.max(*self._hex_expr(cpm_expr.args))
             raise ValueError(f"Global function {cpm_expr} is not supported by hexaly")
+
+        elif isinstance(cpm_expr, DirectConstraint):
+            return cpm_expr.callSolver(self, self.hex_model)
 
         raise NotImplementedError(f"Unexpected expression {cpm_expr}")
 
