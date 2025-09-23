@@ -566,7 +566,7 @@ class CPM_exact(SolverInterface):
                         assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} " \
                                                                       f"only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
-                            rhs = intvar(rhs, rhs)
+                            rhs = cp.intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
                                                                                   "rewritten by linearize"
