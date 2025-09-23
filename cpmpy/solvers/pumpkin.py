@@ -83,14 +83,11 @@ class CPM_pumpkin(SolverInterface):
 
 
     @staticmethod
-    def version(cls) -> Optional[str]:
+    def version() -> Optional[str]:
         """
         Returns the installed version of the solver's Python API.
         """
         try:
-            # there is also a version of the solver itself in the Cargo.toml (/pumpkin-solver/Cargo.toml)
-            # currently not accessible through the python api
-            # dynamic = ["version"] in the pyproject.toml does not seem to get the right value?
             return version('pumpkin-solver')
         except PackageNotFoundError:
             return None
