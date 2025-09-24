@@ -10,13 +10,14 @@ def log(*mess, verbosity=1, end="\n"):
         print(*mess, end=end)
 
 
-# x = cp.intvar(1, 4, name="x")
-# y = cp.intvar(1, 3, name="y")
-# z = cp.intvar(1, 3, name="z")
-# X = (x, y, z)
-# T = [(2, 1, 1), (3, 2, 2), (4, 3, 3), (1, 2, 3), (2, 1, 2)]
-# T = np.array(T)
-
+def generate_table_from_example():
+    x = cp.intvar(1, 4, name="x")
+    y = cp.intvar(1, 3, name="y")
+    z = cp.intvar(1, 3, name="z")
+    X = (x, y, z)
+    T = [(2, 1, 1), (3, 2, 2), (4, 3, 3), (1, 2, 3), (2, 1, 2)]
+    T = np.array(T)
+    return X,T
 
 def generate_table_from_data(rows, d):
     """Generate a table constraint with the given `rows` and with var domains of size `d`"""
@@ -59,13 +60,15 @@ def cols(T, i, j=1):
 
 def shrink(C, T):
     for i in C:
-        print(f"shrinking {i}")
-        S = set.intersection({rows(T, l) for l in C if l != i})
-        print(f"intersection: ", S)
+        log(f"shrinking {i} in {C}", verbosity=3)
+
+        if len(C) <= 1: # slightly different from
+            return C
+
+        S = set.intersection(*[rows(T, l) for l in (C - {i})])
         if len(S) == 0:
             C = C - {i}
     return C
-
 
 def explain(A_enc, T_enc, X_enc):
     log(f"Explain {A_enc} {[X_enc[i] for i in A_enc]}")
@@ -84,11 +87,18 @@ def explain(A_enc, T_enc, X_enc):
         dbg += 1
         assert LOOP_LIMIT is None or dbg < LOOP_LIMIT
 
-    log(f"  by explanation ({len(C)}): {C}")
+    log(f"  by explanation of size ({len(C)}): {C}")
     if SHRINK:
+        size = len(C)
         C = shrink(C, T_enc)
-        log(f"  shrunk to ({len(C)}): {C}")
-    # sum X[i] < len(X)
+        if len(C) < size:
+            log(f"  shrunk to size ({len(C)}): {C}")
+            # assert False, "TODO; shrinking is not triggering"
+
+    if DEBUG_CUTS is not None:
+        assert C not in DEBUG_CUTS, f"Already found cut {C} previously in {DEBUG_CUTS}"
+        DEBUG_CUTS.append(C)
+
     constraint = cp.any(~X_enc[i] for i in C)
     log(f"  cut == {constraint}")
     return constraint
@@ -124,27 +134,40 @@ def solve(X, T):
             log(show_sols(sols, T), verbosity=2)
             # TODO check whether all are still in table
 
-            for t in T:
-                assert t.tolist() in sols, f"Removed sol: {t}"
+            for row in T:
+                assert row.tolist() in sols, f"Removed sol: {row}"
+
+            if DEBUG_UNLUCKY:
+                # force getting unlucky
+                non_sol = next((sol for sol in sols if sol not in T.tolist()), sols[0])
+                for x, a in zip(X, non_sol):
+                    x._value = a
+            else:
+                X.clear()
 
             assert len(sols)
-        # assert m.solve()
 
-        m.solve()
+        if any(x._value is None for x in X):
+            log("Solving.. ", end="")
+            assert m.solve()
+
         A = [x.value() for x in X]
+        log(A)
 
         if constraint.value():
-            log("Satisfying sol:", A)
             return A
 
+        X.clear()
+
+        # encode assignment
         A_enc = [encode_x(a, x.lb, x.ub) for a, x in zip(A, X)]
         A_enc = [ai for a in A_enc for ai in a]
-        # A = set(np.where(np.array(A) == 1)[0])
         A_enc = cols(np.array([A_enc]), 0)
 
         explanation = explain(A_enc, T_enc, X_enc)
         m += [explanation]
-        log("New model\n", m, verbosity=3)
+        log("New model", verbosity=3)
+        log(m, verbosity=3)
 
         dbg += 1
         assert LOOP_LIMIT is None or dbg < LOOP_LIMIT
@@ -153,15 +176,19 @@ def solve(X, T):
 # TODO use gurobi lazy constraints interface
 
 if __name__ == "__main__":
-    VERBOSITY = 2
-    DEBUG = True
+    VERBOSITY = 1
+    DEBUG = False
+    DEBUG_UNLUCKY = True
     LOOP_LIMIT = None
-    SHRINK = False
+    SHRINK = True
     random.seed(42)
+    DEBUG_CUTS = []
 
-    X, T = generate_table_from_data([[1, 1], [2, 2]], 3)
+    # X, T = generate_table_from_data([[1, 1], [2, 2]], 3)
+    # X, T = generate_table_from_example()
     # X, T = generate_table(2, 2, 3)
     # X, T = generate_table(3, 10, 5)
-    # X, T = generate_table(10, 100, 10)
+    # X, T = generate_table(5, 25, 10)
+    X, T = generate_table(10, 100, 10)
 
     solve(X, T)
