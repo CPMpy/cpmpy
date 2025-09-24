@@ -19,8 +19,8 @@ import itertools
 EXAMPLES = glob(join("examples", "*.py")) + glob(join("examples", "csplib", "*.py"))
 ADVANCED_EXAMPLES = glob(join("examples", "advanced", "*.py"))
 
-EXAMPLES = sorted(EXAMPLES, key=str)
-ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES, key=str)
+EXAMPLES = sorted(EXAMPLES)
+ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES)
 
 SKIPPED_EXAMPLES = [
                     "ocus_explanations.py", # waiting for issues to be resolved 
