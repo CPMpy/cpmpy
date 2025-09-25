@@ -437,7 +437,7 @@ class CPM_exact(SolverInterface):
         self.objective_is_min_ = minimize
 
         # make objective function non-nested and with positive BoolVars only
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
         self += flat_cons  # add potentially created constraints
@@ -566,7 +566,7 @@ class CPM_exact(SolverInterface):
                         assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} " \
                                                                       f"only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
-                            rhs = intvar(rhs, rhs)
+                            rhs = cp.intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
                                                                                   "rewritten by linearize"

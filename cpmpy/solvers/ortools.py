@@ -340,7 +340,7 @@ class CPM_ortools(SolverInterface):
                 are premanently posted to the solver
         """
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         self += flat_cons  # add potentially created constraints
         get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
 
