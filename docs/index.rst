@@ -80,6 +80,11 @@ Supported solvers
      - SAT ASAT ISAT
      - pip
      - 
+   * - :doc:`RC2 <api/solvers/rc2>`
+     - MaxSAT
+     - OPT
+     - pip
+     - 
    * - :doc:`PySDD <api/solvers/pysdd>`
      - SAT Counter
      - SAT ISAT ALLSAT - KC 

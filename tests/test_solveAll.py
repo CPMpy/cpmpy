@@ -15,7 +15,8 @@ class TestSolveAll(unittest.TestCase):
         for name, solver in cp.SolverLookup.base_solvers():
             if not solver.supported():
                 continue
-
+            if name == "rc2":
+                continue  # does not support solveAll
 
             sols = set()
             add_sol = lambda: sols.add(str([a.value(), b.value()]))
@@ -37,6 +38,9 @@ class TestSolveAll(unittest.TestCase):
         m = cp.Model(cp.sum(x) >= 1, minimize=cp.sum(x))
 
         for name in cp.SolverLookup.solvernames():
+            if name.startswith("rc2"):
+                continue  # does not support solveAll
+
             try:
                 sols = set()
                 add_sol = lambda: sols.add(str(x.value().tolist()))

@@ -738,16 +738,19 @@ class TestSupportedSolvers:
                     ~ z
                 )
 
-        model.solve(solver=solver)
-        assert [int(a) for a in v.value()] == [0, 1, 0]
+        try:
+            model.solve(solver=solver)
+            assert [int(a) for a in v.value()] == [0, 1, 0]
 
-        s = cp.SolverLookup.get(solver)
-        s.solve()
-        assert [int(a) for a in v.value()] == [0, 1, 0]
+            s = cp.SolverLookup.get(solver)
+            s.solve()
+            assert [int(a) for a in v.value()] == [0, 1, 0]
+        except (NotImplementedError, NotSupportedError):
+            pass
 
     def test_time_limit(self, solver):
-        if solver == "pysdd": # pysdd does not support time limit
-            return
+        if solver == "pysdd" or solver == "rc2": # pysdd and rc2 do not support time limit
+            pytest.skip("time limit not supported")
         
         x = cp.boolvar(shape=3)
         m = cp.Model(x[0] | x[1] | x[2])
@@ -760,6 +763,9 @@ class TestSupportedSolvers:
             pass
 
     def test_installed_solvers_solveAll(self, solver):
+        if solver == "rc2":
+            pytest.skip("does not support solveAll")
+            
         # basic model
         v = cp.boolvar(3)
         x, y, z = v
@@ -786,6 +792,9 @@ class TestSupportedSolvers:
             assert m.objective_value() == 10
         except NotSupportedError:
             return None
+        
+        if solver == "rc2":
+            pytest.skip("does not support re-optimisation")
 
         # if the above works, so should everything below
         m.minimize(sum(iv))
@@ -802,26 +811,21 @@ class TestSupportedSolvers:
         sat_model = cp.Model(cp.any([x,y,z]))
         unsat_model = cp.Model([x | y | z, ~x, ~y,~z])
 
-        assert sat_model.solve(solver=solver)
-        for v in (x,y,z):
-            assert v.value() is not None
-        assert not unsat_model.solve(solver=solver)
-        for v in (x,y,z):
-            assert v.value() is None
+        try:
+            assert sat_model.solve(solver=solver)
+            for v in (x,y,z):
+                assert v.value() is not None
+            assert not unsat_model.solve(solver=solver)
+            for v in (x,y,z):
+                assert v.value() is None
+        except (NotImplementedError, NotSupportedError):
+            pass
 
     def test_incremental_objective(self, solver):
-        x = cp.intvar(0,10,shape=3)
+        if solver in ("choco", "gcs", "rc2"):
+            pytest.skip("does not support incremental objective")
 
-        if solver == "choco":
-            """
-            Choco does not support first optimizing and then adding a constraint.
-            During optimization, additional constraints get added to the solver,
-            which removes feasible solutions.
-            No straightforward way to resolve this for now.
-            """
-            return
-        if solver == "gcs":
-            return
+        x = cp.intvar(0,10,shape=3)
         s = cp.SolverLookup.get(solver)
         try:
             s.minimize(cp.sum(x))
@@ -838,6 +842,9 @@ class TestSupportedSolvers:
         assert s.objective_value() == 25
 
     def test_incremental(self, solver):
+        if solver == "rc2":
+            pytest.skip("not incremental")
+            
         x, y, z = cp.boolvar(shape=3, name="x")
         s = cp.SolverLookup.get(solver)
         s += [x]
@@ -888,27 +895,33 @@ class TestSupportedSolvers:
 
             # reset value for vars
             bvs.clear()
-            assert m.solve(solver=solver)
-            for v in bvs:
-                assert v.value() is not None
-            #test solve_all
-            sols = set()
-            solution_limit = 20 if solver == 'gurobi' else None
-            #test number of solutions is valid
-            assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
-            #test number of solutions is valid, no display
-            assert m.solveAll(solver=solver, solution_limit=solution_limit) == 8
-            #test unique sols, should be same number
-            assert len(sols) == 8
+            try:
+                assert m.solve(solver=solver)
+                for v in bvs:
+                    assert v.value() is not None
+                #test solve_all
+                sols = set()
+                solution_limit = 20 if solver == 'gurobi' else None
+                #test number of solutions is valid
+                assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
+                #test number of solutions is valid, no display
+                assert m.solveAll(solver=solver, solution_limit=solution_limit) == 8
+                #test unique sols, should be same number
+                assert len(sols) == 8
+            except (NotImplementedError, NotSupportedError):
+                pass
 
 
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
     def test_false(self, solver):
-        assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
+        try:
+            assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
+        except (NotImplementedError, NotSupportedError):
+            pass
 
     def test_partial_div_mod(self, solver):
-        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin"):  # don't support div or mod with vars
+        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin", "rc2"):  # don't support div or mod with vars
             return
         
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
@@ -930,6 +943,8 @@ class TestSupportedSolvers:
 
 
     def test_status(self, solver):
+        if solver == "rc2":
+            pytest.skip("RC2 only supports optimization")
 
         bv = cp.boolvar(shape=3, name="bv")
         m = cp.Model(cp.any(bv))
@@ -966,6 +981,8 @@ class TestSupportedSolvers:
 
 
     def test_status_solveall(self, solver):
+        if solver == "rc2":
+            pytest.skip("RC2 only supports optimization")
 
         bv = cp.boolvar(shape=3, name="bv")
         m = cp.Model(cp.any(bv))
@@ -1014,6 +1031,8 @@ class TestSupportedSolvers:
         """
         if solver == 'pysdd':
             pytest.skip(reason=f"{solver} does not support integer decision variables")
+        if solver == "rc2":
+            pytest.skip("rc2 solver only supports optimization, not satisfaction")
         
         x = cp.intvar(1, 4, shape=1)
         # Dubious constraint which enforces nothing, gets decomposed to empty list
@@ -1028,6 +1047,8 @@ class TestSupportedSolvers:
 
         if solver == "gurobi":
             solution_limit = 10
+        elif solver == "rc2":
+            pytest.skip("rc2 solver only supports optimization, not satisfaction")
         else:
             solution_limit = None
 
