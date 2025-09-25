@@ -21,7 +21,7 @@
 
         $ pip install hexaly -i https://pip.hexaly.com                
     
-    Hexaly local solver requires an active licence (for example a free academic license)
+    The Hexaly local solver requires an active licence (for example a free academic license)
     You can read more about available licences at https://www.hexaly.com/
 
     See detailed installation instructions at:
