@@ -781,7 +781,7 @@ class Precedence(GlobalConstraint):
                 lhs = args[j] == t
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
-                constraints += [lhs.implies(cp.any(cp.cpm_array(args[:j]) == s))] # wrap with cpm_array to capture non-iterable when j=1
+                constraints += [lhs.implies(cp.any(args[:j] == s))]
         return constraints, []
 
     def value(self):
