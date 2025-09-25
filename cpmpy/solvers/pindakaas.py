@@ -215,7 +215,7 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
             # insert if new
             if cpm_var.name not in self._varmap:
-                (self._varmap[cpm_var.name],) = self.pdk_solver.new_vars(1)
+                self._varmap[cpm_var.name] = self.pdk_solver.new_vars(1)[0]  # TODO workaround current issue
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
