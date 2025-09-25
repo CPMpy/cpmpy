@@ -285,7 +285,7 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
 
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
         self += flat_cons
