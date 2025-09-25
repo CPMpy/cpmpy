@@ -459,6 +459,22 @@ class NDVarArray(np.ndarray, Expression):
         """
         return self # we can just return self
 
+    def update_args(self, args):
+        # take the list of args and replace the array with it
+        # This method is used to update the arguments of the NDVarArray Expression.
+        if isinstance(args, NDVarArray):
+            arr = args
+        else:
+            arr = np.array(args)
+
+        # Copy the contents of arr into self
+        if arr.shape == self.shape:
+            np.copyto(self, arr)
+        else:
+            # If shapes differ, reshape self to arr's shape and copy
+            self.resize(arr.shape, refcheck=False)
+            np.copyto(self, arr)
+        
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
@@ -492,34 +508,25 @@ class NDVarArray(np.ndarray, Expression):
 
         # index is single expression: direct element
         if isinstance(index, Expression):
-            return cp.Element(self, index)
+            return cp.Element(self, [index])
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
-
             if len(index) != self.ndim:
                 raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
 
-            # find dimension of expression in index
-            expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
-            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
-                # TODO can we do the same for more than one Expression? Not sure...
-                index  = list(index)
-                index += [index.pop(expr_dim[0])]
+            # remove constants from idx
+            new_idx =  []
+            arr = self.copy()
+            for i, el in enumerate(index):
+                if isinstance(el, Expression):
+                    new_idx.append(el)
+                    if arr.ndim != 1: # might have removed all other dimensions
+                        arr = np.moveaxis(arr, 0, -1) # move expression-index to back
+                else: # reduce dimension
+                    arr = arr[el]
 
-                arr = np.moveaxis(self, expr_dim[0], -1)
-                return cp.Element(arr[index[:-1]], index[-1])
-
-
-            arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
-            index = index[expr_dim[0]:]
-
-            # calculate index for flat array
-            flat_index = index[-1]
-            for dim, idx in enumerate(index[:-1]):
-                flat_index += idx * math.prod(arr.shape[dim+1:])
-            # using index expression as single var for flat array
-            return cp.Element(arr.flatten(), flat_index)
+            return cp.Element(arr, new_idx)
 
         return super().__getitem__(index)
 

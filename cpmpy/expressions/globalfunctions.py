@@ -64,13 +64,16 @@
         NValueExcept
 
 """
+import math
 import warnings  # for deprecation warning
 import numpy as np
+from numpy import ndarray
+
 import cpmpy as cp
 
-from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
+from ..exceptions import CPMpyException, IncompleteFunctionError, NotSupportedError, TypeError
 from .core import Expression, Operator
-from .variables import boolvar, intvar, cpm_array
+from .variables import NDVarArray, boolvar, intvar, cpm_array
 from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, get_bounds, implies
 
 
@@ -248,6 +251,8 @@ class Element(GlobalFunction):
         Solvers implement it as `Arr[Idx] == Y`, but CPMpy will automatically derive or create
         an appropriate `Y`. Hence, you can write expressions like `Arr[Idx] + 3 <= Y`.
 
+        CPMpy supports multi-dimensional Element constaints such as arr[a,b] == 10
+
         Element is a CPMpy built-in global constraint, so the class implements a few more
         extra things for convenience (`.value()` and `.__repr__()`). It is also an example of
         a 'numeric' global constraint. Consequently, the return expression of the
@@ -255,24 +260,67 @@ class Element(GlobalFunction):
     """
 
     def __init__(self, arr, idx):
-        if is_boolexpr(idx):
+        arr = cpm_array(arr)
+        if not is_any_list(idx):
+            idx = [idx]
+
+        if any(is_boolexpr(i) for i in idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
-        if is_any_list(idx):
-            raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
-        super().__init__("element", [arr, idx])
+        
+        # multi-dimensional index
+        if not any(isinstance(el, Expression) for el in idx):
+            raise NotSupportedError("Element constraint should have an expression as an index")
+
+        if len(idx) != arr.ndim:
+            raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
+
+        # remove constants from idx
+        new_idx =  []
+        for i, el in enumerate(idx):
+            if isinstance(el, Expression):
+                new_idx.append(el)
+                if arr.ndim != 1: # might have removed all other dimensions
+                    arr = np.moveaxis(arr, 0, -1) # move expression-index to back
+            else: # reduce dimension
+                arr = arr[el]
+
+        super().__init__("element", [arr,new_idx])
+
 
     def __getitem__(self, index):
         raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
 
     def value(self):
         arr, idx = self.args
-        idxval = argval(idx)
-        if idxval is not None:
-            if idxval >= 0 and idxval < len(arr):
-                return argval(arr[idxval])
+        idxval = argvals(idx)
+        if any(v is None for v in idxval):
+            return None
+        try:
+            return argval(np.array(arr)[tuple(idxval)])
+        except IndexError:
             raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
-                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
-        return None # default
+                                             + "\n Use argval(expr) to get the value of expr with relational semantics.")
+
+    def to_1d_element(self):
+        """
+            Projects the indices to a combined index and transforms the array to 1D
+        """
+        arr, idx = self.args
+
+        if len(idx) == 1:
+            return self
+
+        if not isinstance(arr, NDVarArray):
+            arr = cpm_array(arr)
+
+        for i, (lb,ub) in enumerate(zip(*get_bounds(idx))):
+            assert lb >= 0 and ub < arr.shape[i], "Cannot convert unsafe Element constraint to 1d, safen first"
+
+        flat_index = idx[-1]
+        for dim, idx in enumerate(idx[:-1]):
+            flat_index += idx * math.prod(arr.shape[dim + 1:])
+        return Element(arr.flatten(), flat_index)
+
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
@@ -287,7 +335,11 @@ class Element(GlobalFunction):
                they should be enforced toplevel.
 
         """
-        arr, idx = self.args
+
+        new_element = self.to_1d_element()
+        arr, idx = new_element.args
+        idx = idx[0]
+
         # Find where the array indices and the bounds of `idx` intersect
         lb, ub = get_bounds(idx)
         new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
@@ -299,7 +351,9 @@ class Element(GlobalFunction):
         return cons, []  # no auxiliary variables
 
     def __repr__(self):
-        return "{}[{}]".format(self.args[0], self.args[1])
+        arr, idx = self.args
+        idx_str = ", ".join(str(i) for i in idx)
+        return "{}[{}]".format(np.array(arr), idx_str)
 
     def get_bounds(self):
         """

@@ -404,7 +404,7 @@ class CPM_ortools(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap", "regular"}
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod", "element"})) # before decompose, assumes total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
@@ -513,15 +513,15 @@ class CPM_ortools(SolverInterface):
                 elif lhs.name == 'div':
                     return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
                 elif lhs.name == 'element':
+
+                    # arr[idx]==rvar (arr=arg0,idx=arg1), ort: (idx,arr,target)
                     arr, idx = lhs.args
-                    if is_int(idx): # OR-Tools does not handle all constant integer cases
-                        idx = intvar(idx,idx)
-                    # OR-Tools has slight different in argument order
-                    return self.ort_model.AddElement(
-                        self.solver_var(idx),
-                        self.solver_vars(arr),
-                        ortrhs
-                    )
+                    arr, expr_idx = lhs.to_1d_element().args
+                    idx, newcons = get_or_make_var(expr_idx[0])
+                    self += newcons
+ 
+                    return self.ort_model.AddElement(self.solver_var(idx), self.solver_vars(arr), ortrhs)
+
                 elif lhs.name == 'mod':
                     # catch tricky-to-find ortools limitation
                     x,y = lhs.args

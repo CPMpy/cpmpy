@@ -134,7 +134,7 @@ import cpmpy as cp
 
 from .core import BoolVal
 from .utils import all_pairs, is_int, is_bool, STAR
-from .variables import _IntVarImpl
+from .variables import _IntVarImpl, cpm_array
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -393,7 +393,8 @@ class Inverse(GlobalConstraint):
             if lb >= 0 and ub < len(rev): # safe, index is within bounds
                 constraining.append(rev[x] == i)
             else: # partial! need safening here
-                is_defined, total_expr, toplevel = cp.transformations.safening._safen_range(rev[x], (0, len(rev)-1), 1)
+                is_defined, total_index, toplevel = cp.transformations.safening._safen_range(cpm_array([x]), (0, len(rev)-1), 0)
+                total_expr = Element(rev, total_index)
                 constraining += [is_defined, total_expr == i]
                 defining += toplevel
         

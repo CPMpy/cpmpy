@@ -59,7 +59,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
@@ -533,6 +533,9 @@ class CPM_choco(SolverInterface):
                     elif lhs.name == "element": # varsvar[var] = var
                         # TODO: actually, Choco also supports ints[var] = var, but no mix of var and int in array
                         arr, idx = chc_args
+                        arr, expr_idx = lhs.to_1d_element().args
+                        idx, newcons = get_or_make_var(expr_idx[0])
+                        self += newcons
                         return self.chc_model.element(chc_rhs, arr, idx)
                     elif lhs.name == "nvalue": # nvalue(vars) = var
                         # TODO: should look into leaving nvalue <= arg so can post atmost_nvalues here
