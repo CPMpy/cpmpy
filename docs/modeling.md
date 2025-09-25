@@ -511,6 +511,7 @@ If that is not sufficient or you want to debug an unexpected (non)solution, have
 The default solver is [OR-Tools CP-SAT](https://developers.google.com/optimization), an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
 
+
 The list of supported solver interfaces can be found in [the API documentation](./api/solvers.rst) or by using the following:
 
 ```python
@@ -520,15 +521,13 @@ cp.SolverLookup.base_solvers() # returns a list of tuples,
 # [('ortools', <class 'cpmpy.solvers.ortools.CPM_ortools'>), ('z3', <class 'cpmpy.solvers.z3.CPM_z3'>), ('minizinc', <class 'cpmpy.solvers.minizinc.CPM_minizinc'>), ('gcs', <class 'cpmpy.solvers.gcs.CPM_gcs'>), ('gurobi', <class 'cpmpy.solvers.gurobi.CPM_gurobi'>), ('pysat', <class 'cpmpy.solvers.pysat.CPM_pysat'>), ('pysdd', <class 'cpmpy.solvers.pysdd.CPM_pysdd'>), ('exact', <class 'cpmpy.solvers.exact.CPM_exact'>), ('choco', <class 'cpmpy.solvers.choco.CPM_choco'>), ('cpo', <class 'cpmpy.solvers.cpo.CPM_cpo'>)]
 ```
 
+To get some information on which solvers are currently available on your system, you can make use of our convenient CLI:
 
-Additionally, one can get the version (if available) of each of these solvers:
-```python
-import cpmpy as cp
-cp.SolverLookup.version() # returns list of per-solver version reports: {name: ..., installed: ..., version: ...}
-# [{'name': 'ortools', 'installed': True, 'version': '9.12.4544'}, {'name': 'pysat', 'installed': True, 'version': '1.8.dev16'}, ...]
-cp.SolverLookup.print_version() # prints 'solver version' table to stdout
+```bash
+cpmpy version
 ```
 ```console
+CPMpy version: 0.9.26
 Solver               Installed  Version        
 --------------------------------------------------
 ortools              Yes        9.12.4544
@@ -547,7 +546,19 @@ pysdd                No         -
 exact                Yes        2.1.0
 choco                No         -
 cpo                  No         -
+...                  ...        ...
 ```
+
+
+Additionally, we provide programatic access to that same information:
+
+```python
+import cpmpy as cp
+cp.SolverLookup.version() # returns list of per-solver version reports: {name: ..., installed: ..., version: ...}
+# [{'name': 'ortools', 'installed': True, 'version': '9.12.4544'}, {'name': 'pysat', 'installed': True, 'version': '1.8.dev16'}, ...]
+cp.SolverLookup.print_version() # prints 'solver version' table to stdout, same as the CLI
+```
+
 
 Some solvers (like minizinc and pysat) also provide a collection of subsolvers:
 ```python
