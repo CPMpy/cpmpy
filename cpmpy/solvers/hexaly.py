@@ -416,3 +416,8 @@ class CPM_hexaly(SolverInterface):
         for hex_var, val in zip(self.solver_vars(cpm_vars), vals):
             hex_var.value = val
         self.hex_model.open() # re-open
+
+    def __del__(self):
+        # release lock on licence file
+        self.hex_solver.delete()
+
