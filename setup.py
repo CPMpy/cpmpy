@@ -30,8 +30,8 @@ solver_dependencies = {
     "pysdd": ["pysdd"],
     "gcs": ["gcspy"],
     "cpo": ["docplex"],
-    "pindakaas": ["pindakaas"],
-    "pumpkin": ["pumpkin-solver>=0.2.1"]
+    "pumpkin": ["pumpkin-solver>=0.2.1"],
+    "pindakaas": ["pindakaas>=0.2.0"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
@@ -61,6 +61,11 @@ setup(
         # Other
         "test": ["pytest", "pytest-timeout"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
+    },
+    entry_points={
+        'console_scripts': [
+            'cpmpy = cpmpy.cli:main',
+        ],
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
