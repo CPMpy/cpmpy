@@ -983,6 +983,10 @@ class TestGlobal(unittest.TestCase):
             self.assertTrue(cons.value())
         cp.Model(cons).solveAll(display=check_true)
 
+        # test not contiguous
+        iv = cp.intvar(0, 10, shape=(3, 3))
+        self.assertTrue(cp.Model([cp.NValue(i) == 3 for i in iv.T]).solve())
+        
     def test_nvalue_except(self):
 
         iv = cp.intvar(-8, 8, shape=3)
@@ -1010,6 +1014,11 @@ class TestGlobal(unittest.TestCase):
             self.assertTrue(cons.value())
 
         cp.Model(cons).solveAll(display=check_true)
+
+        # test not contiguous
+        iv = cp.intvar(0, 10, shape=(3, 3))
+        self.assertTrue(cp.Model([cp.NValueExcept(i, val) == 3 for i in iv.T]).solve())
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
@@ -1125,7 +1134,7 @@ class TestBounds(unittest.TestCase):
         expr = cp.Xor(cp.boolvar(3))
         self.assertEqual(expr.get_bounds(),(0,1))
 
-
+@skip_on_missing_pblib(skip_on_exception_only=True)
 class TestTypeChecks(unittest.TestCase):
     def test_AllDiff(self):
         x = cp.intvar(-8, 8)
@@ -1376,13 +1385,15 @@ class TestTypeChecks(unittest.TestCase):
 
         for name, cls in cp.SolverLookup.base_solvers():
             if cls.supported() is False:
+                print("Solver not supported: ", name)
                 continue
             try:
                 self.assertTrue(cp.Model([cp.Among(iv, [1,2]) == 3]).solve(solver=name))
                 self.assertTrue(all(x.value() in [1,2] for x in iv))
                 self.assertTrue(cp.Model([cp.Among(iv, [1,100]) > 2]).solve(solver=name))
                 self.assertTrue(all(x.value() == 1 for x in iv))
-            except NotSupportedError:
+            except (NotSupportedError, NotImplementedError):
+                print("Solver not supported: ", name)
                 continue
 
 

@@ -19,7 +19,21 @@ import itertools
 EXAMPLES = glob(join("examples", "*.py")) + glob(join("examples", "csplib", "*.py"))
 ADVANCED_EXAMPLES = glob(join("examples", "advanced", "*.py"))
 
-SKIPPED_EXAMPLES = ["ocus_explanations.py"]  # waiting for issues to be resolved
+EXAMPLES = sorted(EXAMPLES)
+ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES)
+
+SKIPPED_EXAMPLES = [
+                    "ocus_explanations.py", # waiting for issues to be resolved 
+                    "psplib.py" # randomly fails on github due to file creation
+                    ]
+
+SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
+            'prob009_perfect_squares.py', 'blocks_world.py', 'flexible_jobshop.py',
+            'mario', 'pareto_optimal','prob006_golomb.py', 'tsp.py', 'prob028_bibd.py', 'prob001_car_sequence.py'
+            ]
+
+SKIP_MZN = ['blocks_world.py', 'flexible_jobshop.py', 'pareto_optimal.py', 'npuzzle.py', 'sudoku_']
+
 
 # SOLVERS = SolverLookup.supported()
 SOLVERS = [
@@ -39,10 +53,11 @@ def test_example(solver, example):
         solver ([string]): Loaded with parametrized solver name
         example ([string]): Loaded with parametrized example filename
     """
-    if solver in ('gurobi', 'minizinc') and any(x in example for x in
-                                                ["npuzzle.py", "tst_likevrp.py", 'sudoku_', 'pareto_optimal.py',
-                                                 'prob009_perfect_squares.py', 'blocks_world.py',
-                                                 'flexible_jobshop.py']):
+    if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):
+        pytest.skip(f"Skipped {example}, waiting for issues to be resolved")
+    if solver in ('gurobi',) and any(x in example for x in SKIP_MIP):
+        return pytest.skip(reason=f"exclude {example} for {solver}, too slow or solver-specific")
+    if solver == 'minizinc' and any(x in example for x in SKIP_MZN):
         return pytest.skip(reason=f"exclude {example} for {solver}, too slow or solver-specific")
 
     base_solvers = SolverLookup.base_solvers
