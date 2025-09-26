@@ -873,9 +873,6 @@ class TestSupportedSolvers:
         s += y | ~z
         assert not s.solve(assumptions=[~x, ~y])
 
-        if solver == "pindakaas":
-            return # not implemented in pindakaas
-
         core = s.get_core()
         assert ~y in set([~x,~y])
         assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat

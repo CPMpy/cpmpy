@@ -74,7 +74,7 @@ if __name__ == "__main__":
     # argument parsing
     url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob009_perfect_squares.json"
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-instance', nargs='?', default="problem7", help="Name of the problem instance found in file 'filename'")
+    parser.add_argument('-instance', nargs='?', default="problem2", help="Name of the problem instance found in file 'filename'")
     parser.add_argument('-filename', nargs='?', default=url, help="File containing problem instances, can be local file or url")
     parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
