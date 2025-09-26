@@ -35,8 +35,8 @@ def progressive_party(n_boats, n_periods, capacity, crew_size, **kwargs):
     # The total number of people aboard a boat, including the host crew and guest crews, must not exceed the capacity.
     for slot in range(n_periods):
         for boat in range(n_boats):
-            # Sum of crew sizes of visiting boats + crew size of host boat
-            model += sum((visits[slot] == boat) * crew_size) + crew_size[boat] * is_host[boat] <= capacity[boat]
+            # Sum of crew sizes of visiting boats + crew size of host boat (hosts are also included in visits, so no need to add separately)
+            model += sum((visits[slot] == boat) * crew_size) <= capacity[boat]
 
     # Guests cannot visit a boat twice
     for boat in range(n_boats):

@@ -38,7 +38,7 @@ def sport_scheduling(n_teams):
         # can be written cleaner, see issue #117
         # sum((home == t) | (away == t), axis=1) <= 2
         for p in range(n_periods):
-            model += sum((home[p] == t) | (away[p] == t)) <= 2
+            model += sum((home[:, p] == t) | (away[:, p] == t)) <= 2
 
     return model, (home, away)
 
