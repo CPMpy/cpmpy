@@ -40,6 +40,7 @@
         pysdd
         pindakaas
         pumpkin
+        cplex
 
     =========================
     List of helper submodules
@@ -72,3 +73,4 @@ from .gcs import CPM_gcs
 from .cpo import CPM_cpo
 from .pindakaas import CPM_pindakaas
 from .pumpkin import CPM_pumpkin
+from .cplex import CPM_cplex

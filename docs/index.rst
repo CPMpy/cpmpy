@@ -65,6 +65,11 @@ Supported solvers
      - SAT - OPT IOPT - PAR
      - pip + (aca.) license
      - 
+   * - :doc:`CPLEX <api/solvers/cplex>`
+     - ILP
+     - pip + local + (aca.) license
+     - No
+     - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF

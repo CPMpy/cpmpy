@@ -32,6 +32,7 @@ solver_dependencies = {
     "cpo": ["docplex"],
     "pumpkin": ["pumpkin-solver>=0.2.1"],
     "pindakaas": ["pindakaas>=0.2.0"],
+    "cplex": ["docplex", "cplex"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
