@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from cpmpy import *
-from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact, CPM_choco
+from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact, CPM_choco, CPM_hexaly
 
 
 class TestDirectORTools(unittest.TestCase):
@@ -140,4 +140,20 @@ class TestDirectChoco(unittest.TestCase):
         model += iv[1] < iv[0]
 
         self.assertFalse(model.solve())
+
+
+@pytest.mark.skipif(not CPM_hexaly.supported(),
+                    reason="hexaly is not installed")
+class TestDirectHexaly(unittest.TestCase):
+
+    def test_direct_distance(self):
+
+        a,b = intvar(0,10,shape=2, name=tuple("ab"))
+
+        model = SolverLookup.get("hexaly")
+
+        model += DirectConstraint("dist",(a,b)) >= 3 # model distance between two variables
+        assert model.solve()
+
+        self.assertGreaterEqual(abs(a.value() - b.value()),3)
 

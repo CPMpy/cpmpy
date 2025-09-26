@@ -13,7 +13,6 @@ import pytest
 )
 class TestSolutionHinting:
 
-
     def test_hints(self, solver):
 
         a,b = cp.boolvar(shape=2)
@@ -35,6 +34,7 @@ class TestSolutionHinting:
         else:
             args = {}
 
+        slv.solution_hint([a,b], [True, False]) # set hint
         assert slv.solve(**args)
         assert a.value() == True
         assert b.value() == False

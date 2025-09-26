@@ -769,12 +769,12 @@ class TestSupportedSolvers:
                     y | z
                 )
 
-        if solver == "pysdd":
-            assert model.solveAll(solver=solver) == 4
+        if solver in ("gurobi", "hexaly"): # do not support exhaustive search
+            time_limit = 2 # should be able to find all solutions in this limit
         else:
-            # some solvers do not support searching for all solutions...
-            # TODO: remove solution limit and replace with time limit (atm pysat does not support time limit and gurobi needs any(solution_limit, time_limit)...
-            assert model.solveAll(solver=solver, solution_limit=4) == 4
+            time_limit = None
+
+        assert model.solveAll(solver=solver, time_limit=time_limit) == 4
 
     def test_objective(self, solver):
         iv = cp.intvar(0, 10, shape=2)
@@ -880,23 +880,27 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
-            bvs = cp.boolvar(shape=3)
-            m = cp.Model([cp.any(bvs) <= 2])
+        bvs = cp.boolvar(shape=3)
+        m = cp.Model([cp.any(bvs) <= 2])
 
-            # reset value for vars
-            bvs.clear()
-            assert m.solve(solver=solver)
-            for v in bvs:
-                assert v.value() is not None
-            #test solve_all
-            sols = set()
-            solution_limit = 20 if solver == 'gurobi' else None
-            #test number of solutions is valid
-            assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
-            #test number of solutions is valid, no display
-            assert m.solveAll(solver=solver, solution_limit=solution_limit) == 8
-            #test unique sols, should be same number
-            assert len(sols) == 8
+        # reset value for vars
+        bvs.clear()
+        assert m.solve(solver=solver)
+        for v in bvs:
+            assert v.value() is not None
+        #test solve_all
+        sols = set()
+        if solver in ("gurobi", "hexaly"):
+            time_limit = 2
+        else:
+            time_limit = None
+        #test number of solutions is valid
+        assert m.solveAll(solver=solver, time_limit=time_limit,
+                          display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
+        #test number of solutions is valid, no display
+        assert m.solveAll(solver=solver, time_limit=time_limit) == 8
+        #test unique sols, should be same number
+        assert len(sols) == 8
 
 
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
@@ -916,9 +920,12 @@ class TestSupportedSolvers:
         m += x % y == r
         sols = set()
         solution_limit = None
+        time_limit = None
         if solver == 'gurobi':
             solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
-        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        if solver == "hexaly":
+            time_limit = 5
+        m.solveAll(solver=solver, solution_limit=solution_limit, time_limit=time_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
@@ -963,6 +970,8 @@ class TestSupportedSolvers:
 
 
     def test_status_solveall(self, solver):
+        if solver == "hexaly":
+            pytest.skip("hexaly cannot proveably find all solutions, so status is never OPTIMAL")
 
         bv = cp.boolvar(shape=3, name="bv")
         m = cp.Model(cp.any(bv))
@@ -1018,30 +1027,36 @@ class TestSupportedSolvers:
         m = cp.Model([cp.AllDifferentExceptN([x], 1)])
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
-        solution_limit = 5 if solver == "gurobi" else None
-        assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
+
+        kwargs = dict()
+        if solver == "hexaly":
+            kwargs['time_limit'] = 2
+        if solver == "gurobi":
+            kwargs['solution_limit'] = 5
+        assert s.solveAll(**kwargs ) == 4   # check if still correct number of solutions, even though empty model
 
     def test_model_no_vars(self, solver):
 
+        kwargs = dict()
         if solver == "gurobi":
-            solution_limit = 10
-        else:
-            solution_limit = None
+            kwargs['solution_limit'] = 10
+        if solver == "hexaly":
+            kwargs['time_limit'] = 2
 
         # empty model
-        num_sols = cp.Model().solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model().solveAll(solver=solver, **kwargs)
         assert num_sols == 1    
 
         # model with one True constant
-        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver,**kwargs)
         assert num_sols == 1        
 
         # model with two True constants
-        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, **kwargs)
         assert num_sols == 1
 
         # model with one False constant
-        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, **kwargs)
         assert num_sols == 0
 
     def test_version(self, solver):
