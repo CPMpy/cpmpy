@@ -38,6 +38,9 @@
         z3
         pysat
         pysdd
+        pindakaas
+        pumpkin
+        cplex
 
     =========================
     List of helper submodules
@@ -68,4 +71,6 @@ from .exact import CPM_exact
 from .choco import CPM_choco
 from .gcs import CPM_gcs
 from .cpo import CPM_cpo
-
+from .pindakaas import CPM_pindakaas
+from .pumpkin import CPM_pumpkin
+from .cplex import CPM_cplex

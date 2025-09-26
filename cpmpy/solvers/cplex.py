@@ -6,16 +6,36 @@
 """
     Interface to CPLEX Optimizer using the python 'docplex.mp' package
 
-    Requires that the 'docplex' python package is installed:
-
-        $ pip install docplex
-    
     CPLEX, standing as an acronym for ‘Complex Linear Programming Expert’,
     is a high-performance mathematical programming solver specializing in linear programming (LP),
     mixed integer programming (MIP), and quadratic programming (QP).
 
-    Documentation of the solver's own Python API:
-    https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
+    Always use :func:`cp.SolverLookup.get("cplex") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+    
+    Requires that both the 'docplex' and the 'cplex' python packages are installed:
+
+    .. code-block:: console
+
+        $ pip install docplex cplex
+
+    Detailed installation instructions available at:
+    https://ibmdecisionoptimization.github.io/docplex-doc/getting_started_python.html
+
+    You will also need to install CPLEX Optimization Studio from IBM's website.
+    There is a free community version available.
+    https://www.ibm.com/products/ilog-cplex-optimization-studio
+    See detailed installation instructions at:
+    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
+    
+    It also requires an active licence.
+    Academic license:
+    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -30,12 +50,13 @@
     Module details
     ==============
 """
-import numpy as np
+import warnings
+from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
-from ..expressions.utils import argvals, argval
+from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_bool
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -57,28 +78,9 @@ class CPM_cplex(SolverInterface):
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, 
     calls a function on the ``cplex_model`` object.
 
-    Requires that the 'docplex' python package is installed:
-    $ pip install docplex
-
-    docplex documentation:
-    https://ibmdecisionoptimization.github.io/docplex-doc/
-    You will also need to install CPLEX Optimization Studio from IBM's website.
-    There is a free community version available.
-    https://www.ibm.com/products/ilog-cplex-optimization-studio
-    See detailed installation instructions at:
-    https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
-    Academic license:
-    https://community.ibm.com/community/user/ai-datascience/blogs/xavier-nodet1/2020/07/09/cplex-free-for-students
+    Documentation of the solver's own Python API:
+    https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
     """
-
-    _domp = None  # Static attribute to hold the docplex.cp module
-
-    @classmethod
-    def get_domp(cls):
-        if cls._domp is None:
-            import docplex.mp as domp  # Import only once
-            cls._domp = domp
-        return cls._domp
 
     @staticmethod
     def supported():
@@ -89,15 +91,21 @@ class CPM_cplex(SolverInterface):
         # try to import the package
         try:
             import docplex.mp as domp
+        except ModuleNotFoundError as e:
+            warnings.warn(f"CPM_cplex: Could not import docplex: {e}")
+            return False
+        try:
+            import cplex
             return True
-        except ModuleNotFoundError:
+        except ModuleNotFoundError as e:
+            warnings.warn(f"CPM_cplex: Could not import cplex: {e}")
             return False
 
     @staticmethod
     def license_ok():
         if not CPM_cplex.installed():
             warnings.warn(
-                f"License check failed, python package 'docplex' is not installed! Please check 'CPM_cplex.installed()' before attempting to check license.")
+                f"License check failed, python package 'docplex' or 'cplex' is not installed! Please check 'CPM_cplex.installed()' before attempting to check license.")
             return False
         else:
             try:
@@ -109,6 +117,21 @@ class CPM_cplex(SolverInterface):
                 warnings.warn(f"Problem encountered with CPLEX installation: {e}")
                 return False
 
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        
+        Two version numbers get returned: ``<docplex version>/<solver version>``
+        """
+        try:
+            import pkg_resources
+            import cplex
+            cpx = cplex.Cplex()
+            return f"{pkg_resources.get_distribution('docplex').version}/{cpx.get_version()}"
+        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            return None
+
     def __init__(self, cpm_model=None, subsolver=None):
         """
         Constructor of the native solver object
@@ -118,12 +141,12 @@ class CPM_cplex(SolverInterface):
         - subsolver: None, not used
         """
         if not self.installed():
-            raise Exception("CPM_cplex: Install the python package 'docplex' to use this solver interface.")
+            raise Exception("CPM_cplex: Install the python packages 'docplex' and 'cplex' to use this solver interface.")
         elif not self.license_ok():
-            raise Exception("CPM_cplex: A problem occured during license check. Make sure your installed the CPLEX Optimization Studio")
-        import docplex.mp.model as dmm
+            raise Exception("CPM_cplex: A problem occured during license check. Make sure your installed the CPLEX Optimization Studio and that you have an active license.")
 
-        self.cplex_model = dmm.Model()
+        from docplex.mp.model import Model
+        self.cplex_model = Model()
         super().__init__(name="cplex", cpm_model=cpm_model)
 
     @property
@@ -133,24 +156,25 @@ class CPM_cplex(SolverInterface):
         """
         return self.cplex_model
 
-    def solve(self, time_limit=None, nb_threads=1, **kwargs):
+    def solve(self, time_limit=None, **kwargs):
         """
             Call the cplex solver
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional)
-            - nb_threads:  how many threads to use during solve (int, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+            - kwargs:      any keyword argument, sets parameters of solver object and cplex parameters
 
-            Examples of supported arguments include:
-                - context (optional) – context to use during solve
-                - cplex_parameters (optional) – A set of CPLEX parameters to use
-                - checker (optional) – a string which controls which type of checking is performed. (type checks etc.)
-                - log_output (optional) – if True, solver logs are output to stdout.
-                - clean_before_solve (optional) – default False (iterative solving)
+            Supported keyword arguments are all solve parameters and cplex parameters:
+                - solve_parameters:
+                    - context (optional) – context to use during solve
+                    - checker (optional) – a string which controls which type of checking is performed. (type checks etc.)
+                    - log_output (optional) – if True, solver logs are output to stdout.
+                    - clean_before_solve (optional) – default False (iterative solving)
+                - cplex_parameters:
+                    - any cplex parameter, see https://www.ibm.com/docs/en/icos/22.1.2?topic=cplex-list-parameters
+                    - a well-know parameter is the `threads` parameter, used to set the number of threads to use during solve
 
-            For a full list of parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
-            and for cplex parameters: https://www.ibm.com/docs/en/icos/22.1.1?topic=cplex-topical-list-parameters
+            For a full description of the parameters, please visit https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html?#docplex.mp.model.Model.solve
 
             After solving, all solve details can be accessed through self.cplex_model.solve_details:
             https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.sdetails.html#docplex.mp.sdetails.SolveDetails
@@ -158,17 +182,30 @@ class CPM_cplex(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
+            
         # set time limit
-        if time_limit is not None and not np.isinf(time_limit):
+        if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             self.cplex_model.set_time_limit(time_limit)
-
-        # set nb of threads
-        self.cplex_model.context.cplex_parameters.threads = nb_threads
-
-        cplex_objective = self.cplex_model.get_objective_expr()
-        self.cplex_model.solve(**kwargs)
+    
+        # Handle special arguments
+        solve_args = ["clean_before_solve", "checker", "log_output"]
+        cplex_params = {}
+        
+        for arg in list(kwargs.keys()):
+            if arg == "context":
+                self.cplex_model.context = kwargs[arg]
+                del kwargs[arg]
+            elif arg not in solve_args:
+                # Set as cplex parameter
+                cplex_params[arg] = kwargs[arg] 
+                del kwargs[arg]
+        
+        self.cplex_model.solve(cplex_parameters=cplex_params, **kwargs)
         
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -183,19 +220,17 @@ class CPM_cplex(SolverInterface):
         elif cplex_status == "Unknown":
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-        elif "optimal" in cplex_status:
-            # COP
-            if self.has_objective():
+        elif "optimal" in cplex_status:            
+            if self.has_objective(): # COP
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
-            # CSP
-            else:
+            else: # CSP
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif cplex_status == "JobFailed":
             self.cpm_status.exitstatus = ExitStatus.ERROR
         elif "aborted" in cplex_status:
             self.cpm_status.exitstatus = ExitStatus.NOT_RUN
-        else:  # another? This can happen when error during solve. Error message will be in the status.
-            raise NotImplementedError(f"Translation of cplex status {cplex_status} to CPMpy status not implemented")  # if a new status type was introduced, please report on GitHub
+        else:  # another? This can happen when error during solve.
+            raise NotImplementedError(f"Translation of cplex status {cplex_status} to CPMpy status not implemented")
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
@@ -209,10 +244,10 @@ class CPM_cplex(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = solver_val >= 0.5
                 else:
-                    cpm_var._value = int(solver_val)
+                    cpm_var._value = round(solver_val)
             # set _objective_value
             if self.has_objective():
-                obj_val = cplex_objective.solution_value
+                obj_val = self.cplex_model.get_objective_expr().solution_value
                 if round(obj_val) == obj_val: # it is an integer?:
                     self.objective_value_ = int(obj_val)
                 else: #  can happen with DirectVar or when using floats as coefficients
@@ -235,7 +270,8 @@ class CPM_cplex(SolverInterface):
 
         # special case, negative-bool-view
         if isinstance(cpm_var, NegBoolView):
-            raise Exception("Negative literals should not be part of any equation. "
+            raise ValueError("Negative literals should not be part of any equation. "
+                            "Should have been removed by the only_positive_bv() transformation. "
                             "See /transformations/linearize for more details")
 
         # create if it does not exit
@@ -266,7 +302,7 @@ class CPM_cplex(SolverInterface):
         (flat_obj, flat_cons) = flatten_objective(expr)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
-        self += flat_cons
+        self.add(flat_cons)
 
         # make objective function or variable and post
         obj = self._make_numexpr(flat_obj)
@@ -324,30 +360,30 @@ class CPM_cplex(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"})  # linearize expects safe exprs
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs"}))  # Don't support div, since cplex is not doing integer division.
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
+        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs", "mul"}), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
+        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
     def add(self, cpm_expr_orig):
       """
-            Eagerly add a constraint to the underlying solver.
+        Eagerly add a constraint to the underlying solver.
 
-            Any CPMpy expression given is immediately transformed (through `transform()`)
-            and then posted to the solver in this function.
+        Any CPMpy expression given is immediately transformed (through `transform()`)
+        and then posted to the solver in this function.
 
-            This can raise 'NotImplementedError' for any constraint not supported after transformation
+        This can raise 'NotImplementedError' for any constraint not supported after transformation
 
-            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-            the user knows and cares about (and will be populated with a value after solve). All other variables
-            are auxiliary variables created by transformations.
+        The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+        the user knows and cares about (and will be populated with a value after solve). All other variables
+        are auxiliary variables created by transformations.
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
@@ -380,8 +416,14 @@ class CPM_cplex(SolverInterface):
                     cplexlhs = self._make_numexpr(lhs)
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
 
+                elif lhs.name == 'mul':
+                    assert len(lhs.args) == 2, "CPLEX only supports multiplication with 2 variables"
+                    a, b = self.solver_vars(lhs.args)
+                    # CPLEX supports quadratic constraints
+                    self.cplex_model.add_constraint(a * b == cplexrhs)
+
                 else:
-                    # General constraints
+                    # Global functions
                     if lhs.name == 'min':
                         self.cplex_model.add_constraint(self.cplex_model.min(self.solver_vars(lhs.args)) == cplexrhs)
                     elif lhs.name == 'max':
@@ -402,27 +444,25 @@ class CPM_cplex(SolverInterface):
             assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
             assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
             if isinstance(cond, NegBoolView):
-                cond, trigger_val = self.solver_var(cond._bv), 0
+                cond, trigger_val = self.solver_var(cond._bv), False
             else:
-                cond, trigger_val = self.solver_var(cond), 1
+                cond, trigger_val = self.solver_var(cond), True
 
             lhs, rhs = sub_expr.args
             if isinstance(lhs, _NumVarImpl) or (lhs.name in {'sum', 'wsum', 'sub'}):
                 lin_expr = self._make_numexpr(lhs)
             else:
-                raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
-            if sub_expr.name == "<=":
-                self.cplex_model.add_indicator(cond, lin_expr <= self.solver_var(rhs), trigger_val)
-            elif sub_expr.name == ">=":
-                self.cplex_model.add_indicator(cond, lin_expr >= self.solver_var(rhs), trigger_val)
-            elif sub_expr.name == "==":
-                self.cplex_model.add_indicator(cond, lin_expr == self.solver_var(rhs), trigger_val)
-            else:
-                raise Exception(f"Unknown linear expression {sub_expr} name")
+                raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
+            constraint = eval_comparison(sub_expr.name, lin_expr, self.solver_var(rhs))
+            self.cplex_model.add_indicator(cond, constraint, trigger_val)
 
         # True or False
         elif isinstance(cpm_expr, BoolVal):
-            self.cplex_model.add_constraint(cpm_expr.args[0])
+            if cpm_expr.args[0]: # just true
+                pass # do nothing
+            else: # just false
+                a = self.cplex_model.binary_var()
+                self.cplex_model.add_constraint(a - a >= 1) # create a constraint that is always false
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
@@ -434,7 +474,44 @@ class CPM_cplex(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solution_hint(self, cpm_vars, vals):
+        """
+        CPLEX supports warmstarting the solver with a (in)feasible solution.
+        This is done using MIP starts which provide the solver with a starting point
+        for the branch-and-bound algorithm.
+
+        The solution hint does NOT need to satisfy all constraints, it should just provide 
+        reasonable default values for the variables. It can decrease solving times substantially, 
+        especially when solving a similar model repeatedly.
+
+        To learn more about solution hinting in CPLEX, see:
+        https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html#docplex.mp.model.Model.add_mip_start
+
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        # Flatten nested lists to handle test cases like solution_hint([a,[b]], [[[False]], True])
+        cpm_vars = flatlist(cpm_vars)
+        vals = flatlist(vals)
+        
+        # Validate input lengths
+        if len(cpm_vars) != len(vals):
+            raise ValueError(f"Number of variables ({len(cpm_vars)}) and values ({len(vals)}) must match")
+        
+        self.cplex_model.clear_mip_starts()
+
+        # Create a MIP start solution using the proper docplex API
+        if len(cpm_vars) > 0:
+            warmstart = self.cplex_model.new_solution()
+            for cpm_var, val in zip(cpm_vars, vals):
+                # Convert boolean values to numeric (True -> 1, False -> 0) for docplex
+                if is_bool(val):
+                    val = int(val)
+                warmstart.add_var_value(self.solver_var(cpm_var), val)
+
+            self.cplex_model.add_mip_start(warmstart)
+
+    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -446,11 +523,16 @@ class CPM_cplex(SolverInterface):
                         default/None: nothing displayed
                 time_limit: stop after this many seconds (default: None)
                 solution_limit: stop after this many solutions (default: None)
-                call_from_model: whether the method is called from a CPMpy Model instance or not
                 any other keyword argument
 
             Returns: number of solutions found
         """
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(intvar(1, 1) == 1)
 
         # set time limit
         if time_limit is not None:
@@ -465,59 +547,80 @@ class CPM_cplex(SolverInterface):
 
         # Ask for multiple solutions
         self.cplex_model.context.cplex_parameters.mip.limits.populate = solution_limit
-        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4  # (optional) max effort for finding solutions
+        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 4 # (optional) max effort for finding solutions
+        
+        # For optimization problems, ensure we only get optimal solutions
+        if self.has_objective():
+            self.cplex_model.context.cplex_parameters.mip.pool.absgap = 0.0  # Only optimal solutions
+            self.cplex_model.context.cplex_parameters.mip.pool.relgap = 0.0  # Only optimal solutions
 
-        solutions_pool = self.cplex_model.populate_solution_pool()
+        # Handle special arguments (same as in solve())
+        solve_args = ["clean_before_solve", "checker", "log_output"]
+        cplex_params = {}
+        
+        for arg in list(kwargs.keys()):
+            if arg == "context":
+                self.cplex_model.context = kwargs[arg]
+                del kwargs[arg]
+            elif arg not in solve_args:
+                # Set as cplex parameter
+                cplex_params[arg] = kwargs[arg] 
+                del kwargs[arg]
+
+        solutions_pool = self.cplex_model.populate_solution_pool(cplex_parameters=cplex_params, **kwargs)
 
         optimal_val = None
-        solution_count = len(solutions_pool)
         opt_sol_count = 0
 
         # clear user vars if no solution found
-        if solution_count == 0:
+        if solutions_pool is None:
             self.objective_value_ = None
             for var in self.user_vars:
                 var._value = None
 
-        for i in range(solution_count):
-            # Specify which solution to query
-            solution = solutions_pool[i]
-            sol_obj_val = solution.get_objective_value()
-            if optimal_val is None:
-                optimal_val = sol_obj_val
-            if optimal_val is not None:
-                # sub-optimal solutions
-                if sol_obj_val != optimal_val:
+        else:
+            for i, solution in enumerate(solutions_pool):
+                if i == solution_limit:
                     break
-            opt_sol_count += 1
 
-            # Translate solution to variables
-            for cpm_var in self.user_vars:
-                solver_val = solution.get_value(self.solver_var(cpm_var))
-                if cpm_var.is_bool():
-                    cpm_var._value = solver_val >= 0.5
-                else:
-                    cpm_var._value = int(solver_val)
+                sol_obj_val = solution.get_objective_value()
+                if optimal_val is None:
+                    optimal_val = sol_obj_val
+                if optimal_val is not None:
+                    # sub-optimal solutions
+                    if sol_obj_val != optimal_val:
+                        continue
+                opt_sol_count += 1
 
-            # Translate objective
-            if self.has_objective():
-                self.objective_value_ = sol_obj_val
+                # Translate solution to variables
+                for cpm_var in self.user_vars:
+                    solver_val = solution.get_value(self.solver_var(cpm_var))
+                    if cpm_var.is_bool():
+                        cpm_var._value = solver_val >= 0.5
+                    else:
+                        cpm_var._value = int(solver_val)
 
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
+                # Translate objective
+                if self.has_objective():
+                    self.objective_value_ = sol_obj_val
+
+                if display is not None:
+                    if isinstance(display, Expression):
+                        print(argval(display))
+                    elif isinstance(display, list):
+                        print(argvals(display))
+                    else:
+                        display()  # callback
 
         # Reset pool search mode to default
         self.cplex_model.context.cplex_parameters.mip.limits.populate = 1
-        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 0  # (optional) max effort for finding solutions
+        self.cplex_model.context.cplex_parameters.mip.pool.intensity = 0
+        self.cplex_model.context.cplex_parameters.mip.pool.absgap = 1e-6  # Default value
+        self.cplex_model.context.cplex_parameters.mip.pool.relgap = 1e-4  # Default value
 
         cplex_status = self.cplex_model.solve_details.status
         if opt_sol_count:
-            if opt_sol_count >= solution_limit:
+            if opt_sol_count == solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
             else:
                 if cplex_status == "Unknown": # reached time limit

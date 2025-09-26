@@ -1,3 +1,4 @@
+import inspect
 import importlib
 import inspect
 import unittest
@@ -9,6 +10,7 @@ from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
@@ -25,6 +27,14 @@ pysat_available = CPM_pysat.supported()
 pblib_available = importlib.util.find_spec("pypblib") is not None
 
 class TestSolvers(unittest.TestCase):
+
+    
+    @pytest.mark.skip(reason="upstream bug, waiting on release for https://github.com/google/or-tools/issues/4640")
+    def test_implied_linear(self):
+        x,y,z = cp.intvar(0, 2, shape=3,name="xyz")
+        p = cp.boolvar(name="p")
+        user_vars = (x, y, z, p)
+        test_solve(cp.Model(cp.BoolVal(True)).solveAll(), None, user_vars)
 
     # should move this test elsewhere later
     def test_tsp(self):
@@ -322,6 +332,15 @@ class TestSolvers(unittest.TestCase):
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertSetEqual(set(ps2.get_core()), set([mayo,inds[6],inds[9]]))
 
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
+    def test_pysat_subsolver(self):
+        pysat = CPM_pysat(subsolver="pysat:cadical195")
+        x, y = cp.boolvar(shape=2)
+        pysat += x | y
+        pysat += ~x | ~y
+        assert pysat.solve()
+
     @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
     @skip_on_missing_pblib()
     def test_pysat_card(self):
@@ -333,6 +352,30 @@ class TestSolvers(unittest.TestCase):
         for c in cons:
             self.assertTrue(cp.Model(c).solve("pysat"))
             self.assertTrue(c.value())
+
+    @pytest.mark.skipif(not CPM_pindakaas.supported(),
+                        reason="pindakaas not installed")
+    def test_pindakaas(self):
+        # Construct the model.
+
+        b = cp.boolvar()
+        x = cp.boolvar(shape=5)
+        y = cp.intvar(0, 2, shape=3)
+        model = cp.Model([
+            cp.any((x[0], x[1])),
+            cp.any((~x[0], ~x[1])),
+            2*x[0] + 3*x[1] + 5*x[2] <= 6,
+            b.implies(2*x[0] + 3*x[1] + 5*x[2] <= 6),
+            2*y[0] + 3*y[1] + 5*y[2] <= 6,
+            (cp.Xor([x[0], x[1], x[2]])) >= (cp.BoolVal(True))
+        ])
+
+        # any solver
+        self.assertTrue(model.solve())
+        
+        # direct solver
+        ps = CPM_pindakaas(model)
+        self.assertTrue(ps.solve())
 
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
@@ -665,6 +708,30 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(s.solve())
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
+    @pytest.mark.skipif(not CPM_gurobi.supported(),
+                        reason="Gurobi not installed")
+    def test_gurobi_float_objective(self):
+        """Test that Gurobi properly handles float objective values."""
+        # Test case with float coefficients that should result in a float objective value
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        
+        # Create a model with float coefficients - this can happen with DirectVar 
+        # or when using floats as coefficients
+        m = cp.Model()
+        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
+        
+        s = cp.SolverLookup.get("gurobi", m)
+        self.assertTrue(s.solve())
+        
+        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
+        expected_obj = 2.5
+        actual_obj = s.objective_value()
+        
+        # Verify that the objective value is returned as a float (not int)
+        self.assertIsInstance(actual_obj, float)
+        self.assertAlmostEqual(actual_obj, expected_obj, places=5)
+ 
+
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
     def test_cplex(self):
@@ -695,12 +762,35 @@ class TestSolvers(unittest.TestCase):
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
+    def test_cplex_float_objective(self):
+        """Test that cplex properly handles float objective values."""
+        # Test case with float coefficients that should result in a float objective value
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        
+        # Create a model with float coefficients - this can happen with DirectVar 
+        # or when using floats as coefficients
+        m = cp.Model()
+        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
+        
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue(s.solve())
+        
+        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
+        expected_obj = 2.5
+        actual_obj = s.objective_value()
+        
+        # Verify that the objective value is returned as a float (not int)
+        self.assertIsInstance(actual_obj, float)
+        self.assertAlmostEqual(actual_obj, expected_obj, places=5)
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
     def test_cplex_solveAll(self):
         iv = cp.intvar(0,5, shape=3)
         m = cp.Model(cp.AllDifferent(iv))
         s = cp.SolverLookup.get("cplex", m)
         sol_count = s.solveAll(solution_limit=10)
-        self.assertTrue(sol_count >= 10)
+        self.assertTrue(sol_count == 10)
         self.assertEqual(s.status().exitstatus, ExitStatus.FEASIBLE)
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
@@ -882,16 +972,16 @@ class TestSupportedSolvers:
         s += y | ~z
         assert not s.solve(assumptions=[~x, ~y])
 
+        if solver == "pindakaas":
+            return # not implemented in pindakaas
+
         core = s.get_core()
         assert ~y in set([~x,~y])
         assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat
 
         assert s.solve(assumptions=[])
 
-    def test_vars_not_removed(self, solver):
-            
-        if solver == 'cplex':
-            pytest.skip("skip for cplex, cplex throws an error if you add just BoolVal(True) to a model..")
+    def test_vars_not_removed(self, solver):        
         
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
@@ -903,7 +993,7 @@ class TestSupportedSolvers:
             assert v.value() is not None
         #test solve_all
         sols = set()
-        solution_limit = 20 if solver == 'gurobi' else None
+        solution_limit = 20 if solver in ['gurobi', 'cplex'] else None
         #test number of solutions is valid
         assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
         #test number of solutions is valid, no display
@@ -915,13 +1005,13 @@ class TestSupportedSolvers:
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
     def test_false(self, solver):
-        if solver == 'cplex':
-            pytest.skip("skip for cplex, cplex throws an error if you add False to a model..")
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver == 'pysdd' or solver == 'pysat':  # don't support div with vars
+        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin"):  # don't support div or mod with vars
             return
+        if solver == 'cplex':
+            pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
@@ -930,8 +1020,8 @@ class TestSupportedSolvers:
         m += x % y == r
         sols = set()
         solution_limit = None
-        if solver == 'gurobi':
-            solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
+        if solver in ('gurobi', 'cplex'):
+            solution_limit = 15 # Gurobi and Cplex need a solution limit
         m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
@@ -982,7 +1072,7 @@ class TestSupportedSolvers:
         m = cp.Model(cp.any(bv))
 
         limit = None
-        if solver == "gurobi": limit = 100000
+        if solver in ("gurobi", "cplex"): limit = 100000
 
         num_sols = m.solveAll(solver=solver, solution_limit=limit)
         assert num_sols == 7
@@ -998,7 +1088,7 @@ class TestSupportedSolvers:
             assert m.status().exitstatus == ExitStatus.FEASIBLE
 
             num_sols = m.solveAll(solver=solver, solution_limit=10)
-            assert num_sols == 10
+            assert num_sols == 10 
             assert m.status().exitstatus == ExitStatus.FEASIBLE
 
             # edge-case: nb of solutions is exactly the sol limit
@@ -1023,8 +1113,8 @@ class TestSupportedSolvers:
         Tests whether decision variables which are part of a constraint that never gets posted to the underlying solver
         still get correctly captured and posted.
         """
-        if solver == 'pysdd' or solver == 'pysat':  # pysat and pysdd don't support integer decision variables
-            return
+        if solver == 'pysdd':
+            pytest.skip(reason=f"{solver} does not support integer decision variables")
         
         x = cp.intvar(1, 4, shape=1)
         # Dubious constraint which enforces nothing, gets decomposed to empty list
@@ -1032,5 +1122,31 @@ class TestSupportedSolvers:
         m = cp.Model([cp.AllDifferentExceptN([x], 1)])
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
-        solution_limit = 5 if solver == "gurobi" else None
+        solution_limit = 5 if solver in ("gurobi", "cplex") else None
         assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
+
+    def test_model_no_vars(self, solver):
+
+        if solver in ("gurobi", "cplex"):
+            solution_limit = 10
+        else:
+            solution_limit = None
+
+        # empty model
+        num_sols = cp.Model().solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1    
+
+        # model with one True constant
+        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1        
+
+        # model with two True constants
+        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 1
+
+        # model with one False constant
+        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
+        assert num_sols == 0
+
+    def test_version(self, solver):
+        assert SolverLookup.lookup(solver).version() is not None
