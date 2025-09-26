@@ -30,8 +30,8 @@ solver_dependencies = {
     "pysdd": ["pysdd"],
     "gcs": ["gcspy"],
     "cpo": ["docplex"],
-    "pindakaas": ["pindakaas"],
-    "pumpkin": ["pumpkin-solver>=0.2.1"]
+    "pumpkin": ["pumpkin-solver>=0.2.1"],
+    "pindakaas": ["pindakaas>=0.2.0"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
