@@ -227,7 +227,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 if is_bool(res): # Result is a Boolean constant
                     newlist.append(int(res) if num_context else BoolVal(res))
                 else: # Result is an expression
-                    newlist.append(res)                    
+                    newlist.append(res)    
+
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
             newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?
             if any(a1 is not a2 for a1,a2 in zip(expr.args, newargs)):
