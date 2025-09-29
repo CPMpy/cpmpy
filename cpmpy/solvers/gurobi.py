@@ -296,7 +296,7 @@ class CPM_gurobi(SolverInterface):
             self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
         else:
             self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
-        self.grb_model.optimize()
+        self.grb_model.update()
 
     def has_objective(self):
         return self.grb_model.getObjective().size() != 0  # TODO: check if better way to do this...
