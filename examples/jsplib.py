@@ -96,7 +96,7 @@ class JSPLibDataset(object):  # torch.utils.data.Dataset compatible
             raise IndexError("Index out of range")
 
         # Get all instance files and sort for deterministic behavior # TODO: use natsort instead?
-        files = sorted(list(self.instance_dir.glob("*")))
+        files = sorted(list(self.instance_dir.glob("*[!.json]"))) # exclude metadata file
         if isinstance(index, int):
             file_path = files[index]
         elif isinstance(index, str):
