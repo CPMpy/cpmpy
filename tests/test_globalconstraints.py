@@ -1059,6 +1059,12 @@ class TestGlobal(unittest.TestCase):
         cons = cp.Precedence([iv[0], iv[1], 4], [0, 1, 2]) # python list in stead of cpm_array
         self.assertTrue(cp.Model([cons]).solve())
 
+        # Check bug fix pull request #742
+        # - ensure first constraint from paper is satisfied
+        cons = cp.Precedence(iv, [0, 1, 2])
+        self.assertFalse(cp.Model([cons, (iv[0] == 1) | (iv[0] == 2)]).solve())
+
+
     def test_no_overlap(self):
         start = cp.intvar(0,5, shape=3)
         end = cp.intvar(0,5, shape=3)
