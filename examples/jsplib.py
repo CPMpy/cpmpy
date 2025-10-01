@@ -189,11 +189,9 @@ if __name__ == "__main__":
     print("Durations:", dur)
     print("Metadata:", metadata)
 
+    print("Solving", metadata['name'])
     model, (start, makespan) = jobshop_model(task_to_machines=machines, task_durations=dur)
-    assert model.solve()
-
-    print("Found solution:", model.status())
-    print("Makespan:", makespan.value())
+    assert model.solve(time_limit=10)
 
     import pandas as pd
     import plotly.express as px
@@ -206,5 +204,7 @@ if __name__ == "__main__":
     df["Name"] = "T" + df["Job"].astype(str) + "-" + df["Task"].astype(str)
     print(df)
     ghant_fig = px.bar(df, orientation='h',
-                       base="Start", x="Duration", y="Machine", color="Job", text="Name")
+                       base="Start", x="Duration", y="Machine", color="Job", text="Name",
+                       title=f"Jobshop instance {metadata['name']}, makespan: {makespan.value()}, status: {model.status()}"
+                       )
     ghant_fig.show()
