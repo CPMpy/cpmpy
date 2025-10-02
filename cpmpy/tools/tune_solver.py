@@ -65,6 +65,8 @@ class ParameterTuner:
         self.base_runtime = solver.status().runtime
         self.best_runtime = self.base_runtime
 
+
+
         # Get all possible hyperparameter configurations
         combos = list(param_combinations(self.all_params))
         combos_np = self._params_to_np(combos)
@@ -104,6 +106,7 @@ class ParameterTuner:
                 self.best_runtime = solver.status().runtime
                 # update surrogate
                 self._best_config = params_np
+
             i += 1
 
         self.best_params = self._np_to_params(self._best_config)
@@ -153,7 +156,6 @@ class GridSearchTuner(ParameterTuner):
 
         self.base_runtime = solver.status().runtime
         self.best_runtime = self.base_runtime
-
         # Get all possible hyperparameter configurations
         combos = list(param_combinations(self.all_params))
         shuffle(combos) # test in random order
@@ -238,8 +240,6 @@ class MultiSolver(SolverInterface):
         self.solvers = []
         for mdl in models:
             self.solvers.append(SolverLookup.get(solvername,mdl))
-        self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.exitstatus = [ExitStatus.NOT_RUN] * len(self.solvers)
 
     def solve(self, time_limit=None, **kwargs):
         """
@@ -257,11 +257,14 @@ class MultiSolver(SolverInterface):
         bool
             True if all solvers returned a solution, False otherwise.
         """
-        start = time.time()
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.exitstatus = [ExitStatus.NOT_RUN] * len(self.solvers)
         all_has_sol = True
         # initialize exitstatus list
+        init_start = time.time()
         for i, s in enumerate(self.solvers):
             # call solver
+            start = time.time()
             has_sol = s.solve(time_limit=time_limit, **kwargs)
             # update only the current solver's exitstatus
             self.cpm_status.exitstatus[i] = s.status().exitstatus
@@ -272,7 +275,7 @@ class MultiSolver(SolverInterface):
             all_has_sol = all_has_sol and has_sol
         end = time.time()
         # update runtime
-        self.cpm_status.runtime = end - start
+        self.cpm_status.runtime = end - init_start
         return all_has_sol
 
     def has_finished(self):
