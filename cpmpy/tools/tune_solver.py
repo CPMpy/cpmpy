@@ -101,12 +101,18 @@ class ParameterTuner:
                     break
                 timeout = min(timeout, time_limit - (time.time() - start_time))
             # run solver
+            print(f'Try config : {params_dict}')
             solver.solve(**params_dict, time_limit=timeout)
             if _has_finished(solver):
                 self.best_runtime = solver.status().runtime
+                print(f'Time remaining: {time_limit - (time.time() - start_time)}')
+                print(f'Found a better config : {self.best_runtime} vs {timeout}')
                 # update surrogate
                 self._best_config = params_np
-
+            else:
+                print(f'Time remaining: {time_limit - (time.time() - start_time)}')
+                print(f'Found a worse config : {solver.status().runtime} vs {timeout}')
+            print(f'Best config found:{self._best_config}')
             i += 1
 
         self.best_params = self._np_to_params(self._best_config)
@@ -156,6 +162,7 @@ class GridSearchTuner(ParameterTuner):
 
         self.base_runtime = solver.status().runtime
         self.best_runtime = self.base_runtime
+        print(f'Solved problems in {self.best_runtime}')
         # Get all possible hyperparameter configurations
         combos = list(param_combinations(self.all_params))
         shuffle(combos) # test in random order
@@ -181,8 +188,14 @@ class GridSearchTuner(ParameterTuner):
             solver.solve(**params_dict, time_limit=timeout)
             if _has_finished(solver):
                 self.best_runtime = solver.status().runtime
+                print(f'Time remaining: {time_limit - (time.time() - start_time)}')
+                print(f'Found a better config : {self.best_runtime} vs {timeout}')
+                print(params_dict)
                 # update surrogate
                 self.best_params = params_dict
+            else:
+                print(f'Time remaining: {time_limit - (time.time() - start_time)}')
+                print(f'Found a worse config : {solver.status().runtime} vs {timeout}')
         return self.best_params
 
 def _has_finished(solver):
