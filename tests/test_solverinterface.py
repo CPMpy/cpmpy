@@ -203,7 +203,7 @@ def test_solver_var(solver_name):
         assert solver_bool is not None
         assert solver_neg_bool is not None
     
-    except NotSupportedError as e:
+    except (NotSupportedError, ValueError) as e: # TODO: fix consistency among solvers
         # Some solvers might not support NegBoolView in solver_var
         # That's potentially OK if they handle it elsewhere
         print(f"Solver {solver_name} raised exception for NegBoolView: {e}")

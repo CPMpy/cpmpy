@@ -31,10 +31,12 @@ class TestSolutionHinting:
         
         if solver == "ortools":
             args = {"cp_model_presolve": False} # hints are not taken into account in presolve
+        elif solver == "cplex":
+            args = {"clean_before_solve": True} # will continue from previous solution otherwise
         else:
             args = {}
 
-        slv.solution_hint([a,b], [True, False]) # set hint
+        slv.solution_hint([a,b], [True, False]) # check hints are used
         assert slv.solve(**args)
         assert a.value() == True
         assert b.value() == False

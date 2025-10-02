@@ -17,6 +17,7 @@ from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
+from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
@@ -707,6 +708,104 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(s.solve())
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
+    @pytest.mark.skipif(not CPM_gurobi.supported(),
+                        reason="Gurobi not installed")
+    def test_gurobi_float_objective(self):
+        """Test that Gurobi properly handles float objective values."""
+        # Test case with float coefficients that should result in a float objective value
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+
+        # Create a model with float coefficients - this can happen with DirectVar
+        # or when using floats as coefficients
+        m = cp.Model()
+        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
+
+        s = cp.SolverLookup.get("gurobi", m)
+        self.assertTrue(s.solve())
+
+        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
+        expected_obj = 2.5
+        actual_obj = s.objective_value()
+
+        # Verify that the objective value is returned as a float (not int)
+        self.assertIsInstance(actual_obj, float)
+        self.assertAlmostEqual(actual_obj, expected_obj, places=5)
+
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
+    def test_cplex(self):
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0, 10, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        m += sum(bv) == len(bv)
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertFalse(s.solve())
+
+        m = cp.Model(~(iv[0] != iv[1]))
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue(s.solve())
+
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
+    def test_cplex_float_objective(self):
+        """Test that cplex properly handles float objective values."""
+        # Test case with float coefficients that should result in a float objective value
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+
+        # Create a model with float coefficients - this can happen with DirectVar
+        # or when using floats as coefficients
+        m = cp.Model()
+        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
+
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue(s.solve())
+
+        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
+        expected_obj = 2.5
+        actual_obj = s.objective_value()
+
+        # Verify that the objective value is returned as a float (not int)
+        self.assertIsInstance(actual_obj, float)
+        self.assertAlmostEqual(actual_obj, expected_obj, places=5)
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
+    def test_cplex_solveAll(self):
+        iv = cp.intvar(0,5, shape=3)
+        m = cp.Model(cp.AllDifferent(iv))
+        s = cp.SolverLookup.get("cplex", m)
+        sol_count = s.solveAll(solution_limit=10)
+        self.assertTrue(sol_count == 10)
+        self.assertEqual(s.status().exitstatus, ExitStatus.FEASIBLE)
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
+    def test_cplex_objective(self):
+        iv = cp.intvar(0,10, shape=2)
+        m = cp.Model(iv >= 1, iv <= 5, maximize=sum(iv))
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue( s.solve() )
+        self.assertEqual( s.objective_value(), 10)
+
+        m = cp.Model(iv >= 1, iv <= 5, minimize=sum(iv))
+        s = cp.SolverLookup.get("cplex", m)
+        self.assertTrue( s.solve() )
+        self.assertEqual(s.objective_value(), 2)
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
@@ -769,12 +868,13 @@ class TestSupportedSolvers:
                     y | z
                 )
 
-        if solver in ("gurobi", "hexaly"): # do not support exhaustive search
-            time_limit = 2 # should be able to find all solutions in this limit
-        else:
-            time_limit = None
+        time_limit, solution_limit = None, None
+        if solver in ("gurobi", "cplex"):
+            solution_limit = 5
+        if solver == "hexaly":
+            time_limit =2
 
-        assert model.solveAll(solver=solver, time_limit=time_limit) == 4
+        assert model.solveAll(solver=solver, time_limit=time_limit, solution_limit=solution_limit) == 4
 
     def test_objective(self, solver):
         iv = cp.intvar(0, 10, shape=2)
@@ -880,6 +980,7 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
+
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
@@ -890,15 +991,16 @@ class TestSupportedSolvers:
             assert v.value() is not None
         #test solve_all
         sols = set()
-        if solver in ("gurobi", "hexaly"):
+        time_limit, solution_limit = None, None
+        if solver in ("gurobi", "cplex"):
+            solution_limit = 10
+        if solver == "hexaly":
             time_limit = 2
-        else:
-            time_limit = None
-        #test number of solutions is valid
-        assert m.solveAll(solver=solver, time_limit=time_limit,
+        # test number of solutions is valid
+        assert m.solveAll(solver=solver, time_limit=time_limit, solution_limit=solution_limit,
                           display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
         #test number of solutions is valid, no display
-        assert m.solveAll(solver=solver, time_limit=time_limit) == 8
+        assert m.solveAll(solver=solver, solution_limit=solution_limit, time_limit=time_limit) == 8
         #test unique sols, should be same number
         assert len(sols) == 8
 
@@ -911,7 +1013,8 @@ class TestSupportedSolvers:
     def test_partial_div_mod(self, solver):
         if solver in ("pysdd", "pysat", "pindakaas", "pumpkin"):  # don't support div or mod with vars
             return
-        
+        if solver == 'cplex':
+            pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
@@ -977,7 +1080,7 @@ class TestSupportedSolvers:
         m = cp.Model(cp.any(bv))
 
         limit = None
-        if solver == "gurobi": limit = 100000
+        if solver in ("gurobi", "cplex"): limit = 100000
 
         num_sols = m.solveAll(solver=solver, solution_limit=limit)
         assert num_sols == 7
@@ -1029,16 +1132,16 @@ class TestSupportedSolvers:
         assert len(s.user_vars) == 1 # check if var captured as a user_var
 
         kwargs = dict()
+        if solver in ("gurobi", "cplex"):
+            kwargs['solution_limit'] = 5
         if solver == "hexaly":
             kwargs['time_limit'] = 2
-        if solver == "gurobi":
-            kwargs['solution_limit'] = 5
         assert s.solveAll(**kwargs ) == 4   # check if still correct number of solutions, even though empty model
 
     def test_model_no_vars(self, solver):
 
         kwargs = dict()
-        if solver == "gurobi":
+        if solver in ("gurobi", "cplex"):
             kwargs['solution_limit'] = 10
         if solver == "hexaly":
             kwargs['time_limit'] = 2

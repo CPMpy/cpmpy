@@ -29,6 +29,7 @@ from .exact import CPM_exact
 from .choco import CPM_choco
 from .pumpkin import CPM_pumpkin
 from .cpo   import CPM_cpo
+from .cplex import CPM_cplex
 from .pindakaas import CPM_pindakaas
 from .hexaly import CPM_hexaly
 
@@ -84,6 +85,7 @@ class SolverLookup():
                 ("choco", CPM_choco),
                 ("pumpkin", CPM_pumpkin),
                 ("cpo", CPM_cpo),
+                ("cplex", CPM_cplex),
                 ("pindakaas", CPM_pindakaas),
                 ("hexaly", CPM_hexaly)
                ]
