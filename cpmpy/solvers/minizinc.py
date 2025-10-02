@@ -74,6 +74,7 @@ from ..expressions.utils import is_num, is_any_list, argvals, argval
 from ..transformations.decompose_global import decompose_in_tree
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
+from ..transformations.flatten_model import get_or_make_var
 from ..transformations.normalize import toplevel_list
 
 
@@ -679,6 +680,28 @@ class CPM_minizinc(SolverInterface):
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)
 
+        if expr.name == "element":
+            arr, idx = expr.args
+            arr, expr_idx = expr.to_1d_element().args
+            idx, newcons = get_or_make_var(expr_idx[0])
+            self += newcons
+
+            arr_str = self._convert_expression(arr)
+            idx_str = self._convert_expression(idx)
+            subtype = "int"
+            if all(isinstance(v, bool) or \
+                   (isinstance(v, Expression) and v.is_bool()) \
+                   for v in arr):
+                subtype = "bool"
+            idx = idx_str
+            # minizinc is offset 1, which can be problematic for element...
+            # thx Hakan, fix by using array1d(0..len, []), issue #54
+            txt = "\n    let {{ array[int] of var {}: arr=array1d({}..{},{}) }} in\n".format(subtype, 0,
+                                                                                             len(arr) - 1,
+                                                                                             arr_str)
+            txt += f"      arr[{idx}]"
+            return txt
+
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
@@ -731,22 +754,7 @@ class CPM_minizinc(SolverInterface):
                 return "{}([{}])".format(op_str, ",".join(args_str))
 
             # default: prefix printing
-            return "{}({})".format(op_str, ",".join(args_str))
-
-        elif expr.name == "element":
-            subtype = "int"
-            if all(isinstance(v, bool) or \
-                   (isinstance(v, Expression) and v.is_bool()) \
-                   for v in expr.args[0]):
-                subtype = "bool"
-            idx = args_str[1]
-            # minizinc is offset 1, which can be problematic for element...
-            # thx Hakan, fix by using array1d(0..len, []), issue #54
-            txt = "\n    let {{ array[int] of var {}: arr=array1d({}..{},{}) }} in\n".format(subtype, 0,
-                                                                                             len(expr.args[0]) - 1,
-                                                                                             args_str[0])
-            txt += f"      arr[{idx}]"
-            return txt
+            return "{}({})".format(op_str, ",".join(args_str))        
 
         # rest: global constraints
         elif expr.name.endswith('circuit'):  # circuit, subcircuit
