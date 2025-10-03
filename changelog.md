@@ -4,7 +4,7 @@
 
 ### Added
 
-* **New solver**: CPLEX [#583](https://github.com/CPMpy/cpmpy/pull/583), [#762](https://github.com/CPMpy/cpmpy/pull/762), [#763](https://github.com/CPMpy/cpmpy/pull/763)
+* **New solver**: CPLEX ILP solver [#583](https://github.com/CPMpy/cpmpy/pull/583), [#762](https://github.com/CPMpy/cpmpy/pull/762), [#763](https://github.com/CPMpy/cpmpy/pull/763)
 * **New solver**: Hexaly local search solver [#718](https://github.com/CPMpy/cpmpy/pull/718)
 * **New tool**: CPMpy cli (get version information on all subsolvers) [#693](https://github.com/CPMpy/cpmpy/pull/693)
 * Use of CSE in `flatten_objective` [#730](https://github.com/CPMpy/cpmpy/pull/730)
