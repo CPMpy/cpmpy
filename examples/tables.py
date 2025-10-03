@@ -157,7 +157,13 @@ def solve(X, T, env):
         sols = []
 
         if DEBUG:
-            m.solveAll(display=lambda: sols.append([x.value() for x in X]))
+            n_sols = m.solveAll(
+                display=lambda: sols.append([x.value() for x in X]),
+                solver=env["solver"],
+                solution_limit=1000 if env["solver"] == "gurobi" else None,
+            )
+            assert env["solver"] != "gurobi" or n_sols < 1000
+
             log(f"Search space remaining: ({len(sols)})")
             log(show_sols(sols, T), verbosity=2)
             if len(env["cuts"]) > 0:
@@ -179,7 +185,7 @@ def solve(X, T, env):
 
         if any(x._value is None for x in X):
             log("Solving.. ", end="")
-            assert m.solve()
+            assert m.solve(solver=env["solver"])
 
         A = [x.value() for x in X]
         log(A)
@@ -205,8 +211,19 @@ def solve(X, T, env):
 
 # TODO use gurobi lazy constraints interface
 
+
+def show_env(env):
+    log(", ".join(f"{k}={env[k]}" for k in ["shrink", "heuristic"]), verbosity=0)
+    log(f"n_cuts = {len(env['cuts'])}", verbosity=0)
+    log(
+        "cut cardinalities/strengths:",
+        ", ".join(f"{len(c['cut'])} / {c.get('space', '?')}" for c in env["cuts"]),
+        verbosity=2,
+    )
+
+
 if __name__ == "__main__":
-    VERBOSITY = 0
+    VERBOSITY = 1
     DEBUG = True
     DEBUG_UNLUCKY = False
     LOOP_LIMIT = None
@@ -214,6 +231,8 @@ if __name__ == "__main__":
 
     envs = [
         {
+            "solver": "gurobi",
+            # "solver": "ortools",
             "shrink": shrink,
             "heuristic": heuristic,
             "cuts": [],
@@ -221,8 +240,8 @@ if __name__ == "__main__":
         for heuristic in [
             # heuristics
             Heuristic.INPUT,
-            Heuristic.GREEDY,
-            Heuristic.REDUCE,
+            # Heuristic.GREEDY,
+            # Heuristic.REDUCE,
         ]
         for shrink in [
             # shrink
@@ -235,14 +254,14 @@ if __name__ == "__main__":
     #         "explanations":
     #         }
 
-    # X, T = generate_table_from_data([[1, 1], [2, 2]], 3)
+    X, T = generate_table_from_data([[1, 1], [2, 2]], 3)
     # X, T = generate_table_from_example()
     # X, T = generate_table(2, 2, 3)
     # X, T = generate_table(3, 10, 5)
 
-    DEBUG = False
+    # DEBUG = False
     # X, T = generate_table(5, 25, 10)
-    X, T = generate_table(10, 100, 10)
+    # X, T = generate_table(10, 100, 10)
 
     # envs = envs[0:1]
     for env in envs:
@@ -257,5 +276,5 @@ if __name__ == "__main__":
         log(
             "cut cardinalities/strengths:",
             ", ".join(f"{len(c['cut'])} / {c.get('space', '?')}" for c in env["cuts"]),
-            verbosity=2
+            verbosity=2,
         )
