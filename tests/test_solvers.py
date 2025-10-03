@@ -714,23 +714,23 @@ class TestSolvers(unittest.TestCase):
         """Test that Gurobi properly handles float objective values."""
         # Test case with float coefficients that should result in a float objective value
         x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        
-        # Create a model with float coefficients - this can happen with DirectVar 
+
+        # Create a model with float coefficients - this can happen with DirectVar
         # or when using floats as coefficients
         m = cp.Model()
         m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
-        
+
         s = cp.SolverLookup.get("gurobi", m)
         self.assertTrue(s.solve())
-        
+
         # The optimal solution should be x=True, y=True, z=True with objective = 2.5
         expected_obj = 2.5
         actual_obj = s.objective_value()
-        
+
         # Verify that the objective value is returned as a float (not int)
         self.assertIsInstance(actual_obj, float)
         self.assertAlmostEqual(actual_obj, expected_obj, places=5)
- 
+
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
@@ -766,19 +766,19 @@ class TestSolvers(unittest.TestCase):
         """Test that cplex properly handles float objective values."""
         # Test case with float coefficients that should result in a float objective value
         x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        
-        # Create a model with float coefficients - this can happen with DirectVar 
+
+        # Create a model with float coefficients - this can happen with DirectVar
         # or when using floats as coefficients
         m = cp.Model()
         m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
-        
+
         s = cp.SolverLookup.get("cplex", m)
         self.assertTrue(s.solve())
-        
+
         # The optimal solution should be x=True, y=True, z=True with objective = 2.5
         expected_obj = 2.5
         actual_obj = s.objective_value()
-        
+
         # Verify that the objective value is returned as a float (not int)
         self.assertIsInstance(actual_obj, float)
         self.assertAlmostEqual(actual_obj, expected_obj, places=5)
@@ -868,12 +868,13 @@ class TestSupportedSolvers:
                     y | z
                 )
 
-        if solver == "pysdd":
-            assert model.solveAll(solver=solver) == 4
-        else:
-            # some solvers do not support searching for all solutions...
-            # TODO: remove solution limit and replace with time limit (atm pysat does not support time limit and gurobi needs any(solution_limit, time_limit)...
-            assert model.solveAll(solver=solver, solution_limit=4) == 4
+        time_limit, solution_limit = None, None
+        if solver in ("gurobi", "cplex"):
+            solution_limit = 5
+        if solver == "hexaly":
+            time_limit =2
+
+        assert model.solveAll(solver=solver, time_limit=time_limit, solution_limit=solution_limit) == 4
 
     def test_objective(self, solver):
         iv = cp.intvar(0, 10, shape=2)
@@ -978,8 +979,8 @@ class TestSupportedSolvers:
 
         assert s.solve(assumptions=[])
 
-    def test_vars_not_removed(self, solver):        
-        
+    def test_vars_not_removed(self, solver):
+
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
@@ -990,11 +991,16 @@ class TestSupportedSolvers:
             assert v.value() is not None
         #test solve_all
         sols = set()
-        solution_limit = 20 if solver in ['gurobi', 'cplex'] else None
-        #test number of solutions is valid
-        assert m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
+        time_limit, solution_limit = None, None
+        if solver in ("gurobi", "cplex"):
+            solution_limit = 10
+        if solver == "hexaly":
+            time_limit = 2
+        # test number of solutions is valid
+        assert m.solveAll(solver=solver, time_limit=time_limit, solution_limit=solution_limit,
+                          display=lambda: sols.add(tuple([x.value() for x in bvs]))) == 8
         #test number of solutions is valid, no display
-        assert m.solveAll(solver=solver, solution_limit=solution_limit) == 8
+        assert m.solveAll(solver=solver, solution_limit=solution_limit, time_limit=time_limit) == 8
         #test unique sols, should be same number
         assert len(sols) == 8
 
@@ -1017,9 +1023,12 @@ class TestSupportedSolvers:
         m += x % y == r
         sols = set()
         solution_limit = None
-        if solver in ('gurobi', 'cplex'):
-            solution_limit = 15 # Gurobi and Cplex need a solution limit
-        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        time_limit = None
+        if solver == 'gurobi':
+            solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
+        if solver == "hexaly":
+            time_limit = 5
+        m.solveAll(solver=solver, solution_limit=solution_limit, time_limit=time_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
@@ -1064,6 +1073,8 @@ class TestSupportedSolvers:
 
 
     def test_status_solveall(self, solver):
+        if solver == "hexaly":
+            pytest.skip("hexaly cannot proveably find all solutions, so status is never OPTIMAL")
 
         bv = cp.boolvar(shape=3, name="bv")
         m = cp.Model(cp.any(bv))
@@ -1085,7 +1096,7 @@ class TestSupportedSolvers:
             assert m.status().exitstatus == ExitStatus.FEASIBLE
 
             num_sols = m.solveAll(solver=solver, solution_limit=10)
-            assert num_sols == 10 
+            assert num_sols == 10
             assert m.status().exitstatus == ExitStatus.FEASIBLE
 
             # edge-case: nb of solutions is exactly the sol limit
@@ -1119,30 +1130,36 @@ class TestSupportedSolvers:
         m = cp.Model([cp.AllDifferentExceptN([x], 1)])
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
-        solution_limit = 5 if solver in ("gurobi", "cplex") else None
-        assert s.solveAll(solution_limit=solution_limit) == 4     # check if still correct number of solutions, even though empty model
+
+        kwargs = dict()
+        if solver in ("gurobi", "cplex"):
+            kwargs['solution_limit'] = 5
+        if solver == "hexaly":
+            kwargs['time_limit'] = 2
+        assert s.solveAll(**kwargs ) == 4   # check if still correct number of solutions, even though empty model
 
     def test_model_no_vars(self, solver):
 
+        kwargs = dict()
         if solver in ("gurobi", "cplex"):
-            solution_limit = 10
-        else:
-            solution_limit = None
+            kwargs['solution_limit'] = 10
+        if solver == "hexaly":
+            kwargs['time_limit'] = 2
 
         # empty model
-        num_sols = cp.Model().solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model().solveAll(solver=solver, **kwargs)
         assert num_sols == 1    
 
         # model with one True constant
-        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(True)).solveAll(solver=solver,**kwargs)
         assert num_sols == 1        
 
         # model with two True constants
-        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(True), cp.BoolVal(True)).solveAll(solver=solver, **kwargs)
         assert num_sols == 1
 
         # model with one False constant
-        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, solution_limit=solution_limit)
+        num_sols = cp.Model(cp.BoolVal(False)).solveAll(solver=solver, **kwargs)
         assert num_sols == 0
 
     def test_version(self, solver):

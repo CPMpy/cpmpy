@@ -91,6 +91,12 @@ Supported solvers
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
 
+   * - :doc:`Hexaly <api/solvers/hexaly>`
+     - Local search
+     - SAT ALLSAT - OPT IOPT
+     - pip + local + (aca.) licence
+     -
+
 Native capability abbreviations:
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
     * OPT: Optimisation, IOPT: Incremental optimisation

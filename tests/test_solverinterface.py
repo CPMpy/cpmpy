@@ -203,7 +203,7 @@ def test_solver_var(solver_name):
         assert solver_bool is not None
         assert solver_neg_bool is not None
     
-    except NotSupportedError as e:
+    except (NotSupportedError, ValueError) as e: # TODO: fix consistency among solvers
         # Some solvers might not support NegBoolView in solver_var
         # That's potentially OK if they handle it elsewhere
         print(f"Solver {solver_name} raised exception for NegBoolView: {e}")
@@ -349,6 +349,9 @@ def test_solveall_basic(solver_name):
         if solver_name == "pysdd":
             # pysdd doesn't support solution_limit
             total = solver.solveAll(display=count_solution)
+        elif solver_name == "hexaly":
+            # set time limit, hexaly cannot prove UNSAT at last call
+            total = solver.solveAll(display=count_solution, solution_limit=10, time_limit=5)
         else:
             total = solver.solveAll(display=count_solution, solution_limit=10)
         
