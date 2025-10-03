@@ -623,7 +623,7 @@ class CPM_cplex(SolverInterface):
             if opt_sol_count == solution_limit:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
             else:
-                if cplex_status == "Unknown": # reached time limit
+                if cplex_status == "Unknown" or cplex_status == "time limit exceeded": # reached time limit
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
                 else: # found all solutions   
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
