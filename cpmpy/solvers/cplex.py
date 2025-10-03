@@ -417,10 +417,7 @@ class CPM_cplex(SolverInterface):
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
 
                 elif lhs.name == 'mul':
-                    assert len(lhs.args) == 2, "CPLEX only supports multiplication with 2 variables"
-                    a, b = self.solver_vars(lhs.args)
-                    # CPLEX supports quadratic constraints
-                    self.cplex_model.add_constraint(a * b == cplexrhs)
+                    raise NotSupportedError(f'CPLEX only supports quadratic constraints that define a convex region, i.e. quadratic equalities are not supported: {cpm_expr}')
 
                 else:
                     # Global functions
@@ -619,18 +616,29 @@ class CPM_cplex(SolverInterface):
         self.cplex_model.context.cplex_parameters.mip.pool.relgap = 1e-4  # Default value
 
         cplex_status = self.cplex_model.solve_details.status
-        if opt_sol_count:
-            if opt_sol_count == solution_limit:
-                self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
-            else:
-                if cplex_status == "Unknown": # reached time limit
+        if cplex_status == "JobFailed": # something went wrong
+            self.cpm_status.exitstatus = ExitStatus.ERROR
+        elif "aborted" in cplex_status: # solve got prematurely aborted
+            self.cpm_status.exitstatus = ExitStatus.NOT_RUN
+        elif opt_sol_count: # found at least a single optimal solution
+            if cplex_status == "populate solution limit exceeded": # reached solution limit
+                # Sanity check
+                if opt_sol_count == solution_limit: # reach set solution limit
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-                else: # found all solutions   
-                    self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+                else:
+                    raise ValueError(f"cplex returned status {cplex_status}, but solution count {opt_sol_count} doesn't match set limit of {solution_limit}. Please report on GitHub.")
+            elif cplex_status == "all reachable solutions enumerated, integer optimal" or cplex_status == "integer optimal solution": # found all solutions
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            elif cplex_status == "Unknown" or cplex_status == "time limit exceeded": # reached time limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else:
+                raise NotImplementedError(f"Translation of cplex status {cplex_status} to CPMpy status not implemented. Please report on GitHub")
         else:
             if cplex_status == "Unknown": # reached time limit
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-            else: # Did not find any solution
+            elif cplex_status == "integer infeasible": # Did not find any solution
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            else: 
+                raise NotImplementedError(f"Translation of cplex status {cplex_status} to CPMpy status not implemented. Please report on GitHub")
 
         return opt_sol_count

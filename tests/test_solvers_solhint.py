@@ -13,7 +13,6 @@ import pytest
 )
 class TestSolutionHinting:
 
-
     def test_hints(self, solver):
 
         a,b = cp.boolvar(shape=2)
