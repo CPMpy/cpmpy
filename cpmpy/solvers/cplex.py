@@ -73,6 +73,7 @@ class CPM_cplex(SolverInterface):
     Interface to the CPLEX solver.
 
     Creates the following attributes (see parent constructor for more):
+
     - cplex_model: object, CPLEX model object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, 
@@ -379,7 +380,7 @@ class CPM_cplex(SolverInterface):
         Any CPMpy expression given is immediately transformed (through `transform()`)
         and then posted to the solver in this function.
 
-        This can raise 'NotImplementedError' for any constraint not supported after transformation
+        This can raise `NotImplementedError` for any constraint not supported after transformation
 
         The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
         the user knows and cares about (and will be populated with a value after solve). All other variables
@@ -417,7 +418,7 @@ class CPM_cplex(SolverInterface):
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
 
                 elif lhs.name == 'mul':
-                    raise NotSupportedError(f'CPLEX only supports quadratic constraints that define a convex region, i.e. quadratic equalities are not supported: {cpm_expr}')
+                    raise NotImplementedError(f'CPLEX only supports quadratic constraints that define a convex region, i.e. quadratic equalities are not supported: {cpm_expr}')
 
                 else:
                     # Global functions
