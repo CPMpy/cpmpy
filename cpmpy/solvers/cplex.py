@@ -417,10 +417,7 @@ class CPM_cplex(SolverInterface):
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
 
                 elif lhs.name == 'mul':
-                    assert len(lhs.args) == 2, "CPLEX only supports multiplication with 2 variables"
-                    a, b = self.solver_vars(lhs.args)
-                    # CPLEX supports quadratic constraints
-                    self.cplex_model.add_constraint(a * b == cplexrhs)
+                    raise NotSupportedError(f'CPLEX only supports quadratic constraints that define a convex region, i.e. quadratic equalities are not supported: {cpm_expr}')
 
                 else:
                     # Global functions
