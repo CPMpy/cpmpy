@@ -628,7 +628,7 @@ class CPM_cplex(SolverInterface):
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
                 else:
                     raise ValueError(f"cplex returned status {cplex_status}, but solution count {opt_sol_count} doesn't match set limit of {solution_limit}. Please report on GitHub.")
-            elif cplex_status == "all reachable solutions enumerated, integer optimal" or cplex_status == "integer optimal solution": # found all solutions
+            elif "all reachable solutions enumerated" in cplex_status or cplex_status == "integer optimal solution": # found all solutions
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             elif cplex_status == "Unknown" or cplex_status == "time limit exceeded": # reached time limit
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
