@@ -57,6 +57,7 @@ class CPM_hexaly(SolverInterface):
     Interface to Hexaly's API
 
     Creates the following attributes (see parent constructor for more):
+
     - hex_model: object, Hexaly's model object
     - hex_solver: object, Hexaly's solver object (to solve hex_model)
 
@@ -118,10 +119,11 @@ class CPM_hexaly(SolverInterface):
             Call the Hexaly solver
 
             Arguments:
-            - time_limit:  maximum solve time in seconds (float, optional)
-            - kwargs:      any keyword argument, sets parameters of solver object
+                time_limit:  maximum solve time in seconds (float, optional)
+                kwargs:      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
+
             - nb_threads: number of threads used to parallelize the search.
             - iteration_limit: max number of iterations
             - verbosity: verbosity level
@@ -267,7 +269,7 @@ class CPM_hexaly(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
@@ -396,6 +398,21 @@ class CPM_hexaly(SolverInterface):
 
     
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+        """
+            A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
+
+            Arguments:
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                solution_limit: stop after this many solutions (default: None)
+                time_limit (float):   maximum solve time in seconds
+
+            Returns: 
+                number of solutions found
+
+            .. note::
+                Hexaly does not support exhaustive search to find all solutions. Set `time_limit` to do a limited search.
+        """
         if time_limit is None:
             raise ValueError("Hexaly does not support exhaustive search to find all solutions. "
                              "Set time limit to do a limited search")

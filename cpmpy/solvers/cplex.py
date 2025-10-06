@@ -73,6 +73,7 @@ class CPM_cplex(SolverInterface):
     Interface to the CPLEX solver.
 
     Creates the following attributes (see parent constructor for more):
+
     - cplex_model: object, CPLEX model object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, 
@@ -350,7 +351,7 @@ class CPM_cplex(SolverInterface):
             Implemented through chaining multiple solver-independent **transformation functions** from
             the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
@@ -379,7 +380,7 @@ class CPM_cplex(SolverInterface):
         Any CPMpy expression given is immediately transformed (through `transform()`)
         and then posted to the solver in this function.
 
-        This can raise 'NotImplementedError' for any constraint not supported after transformation
+        This can raise `NotImplementedError` for any constraint not supported after transformation
 
         The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
         the user knows and cares about (and will be populated with a value after solve). All other variables
@@ -417,7 +418,7 @@ class CPM_cplex(SolverInterface):
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
 
                 elif lhs.name == 'mul':
-                    raise NotSupportedError(f'CPLEX only supports quadratic constraints that define a convex region, i.e. quadratic equalities are not supported: {cpm_expr}')
+                    raise NotImplementedError(f'CPLEX only supports quadratic constraints that define a convex region, i.e. quadratic equalities are not supported: {cpm_expr}')
 
                 else:
                     # Global functions
@@ -627,7 +628,7 @@ class CPM_cplex(SolverInterface):
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
                 else:
                     raise ValueError(f"cplex returned status {cplex_status}, but solution count {opt_sol_count} doesn't match set limit of {solution_limit}. Please report on GitHub.")
-            elif cplex_status == "all reachable solutions enumerated, integer optimal" or cplex_status == "integer optimal solution": # found all solutions
+            elif "all reachable solutions enumerated" in cplex_status or cplex_status == "integer optimal solution": # found all solutions
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             elif cplex_status == "Unknown" or cplex_status == "time limit exceeded": # reached time limit
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
