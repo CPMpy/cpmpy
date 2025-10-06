@@ -7,3 +7,4 @@ readthedocs-sphinx-search>=0.3.2
 sphinx_book_theme
 sphinx-gallery
 plotly
+sphinx_immaterial
