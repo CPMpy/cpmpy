@@ -12,9 +12,13 @@
 #
 import os
 import sys
+sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('../..'))
 import cpmpy
+
+# Import and run gallery preparation script
+from prepare_galleries import prepare_galleries
 
 
 # -- Project information -----------------------------------------------------
@@ -56,6 +60,9 @@ extensions = [
     # "sphinx_immaterial.apidoc.json.domain",
     # "sphinx_immaterial.apidoc.python.apigen",
     # "sphinx_immaterial.graphviz",
+    'sphinx_gallery.gen_gallery',
+    # "nbsphinx",
+    # "myst_nb"
 ]
 
 myst_enable_extensions = [
@@ -138,7 +145,7 @@ html_theme_options = {
         # "navigation.instant",
         # "header.autohide",
         "navigation.top",
-        "navigation.footer",
+        # "navigation.footer",
         # "navigation.tracking",
         # "search.highlight",
         "search.share",
@@ -195,6 +202,38 @@ html_theme_options = {
         },
     ]
     
+}
+
+# Prepare galleries before sphinx-gallery processes them
+gallery_dirs = prepare_galleries()
+
+import plotly.io as pio
+pio.renderers.default = 'sphinx_gallery_png'
+
+sphinx_gallery_conf = {
+    'examples_dirs': [
+        '_temp_galleries/basic',
+        '_temp_galleries/csplib',
+        #'_temp_galleries/tutorial_ijcai22',
+    ],
+    'gallery_dirs': [
+        'auto_examples/basic',
+        'auto_examples/csplib',
+        #'auto_examples/tutorial_ijcai22',
+    ],
+    'filename_pattern': r'\.py$',  # Only process .py files with sphinx-gallery
+    'ignore_pattern': r'__init__\.py',
+    'download_all_examples': False,
+    # 'show_download_links': False,
+    'show_memory': False,
+    'remove_config_comments': True,
+    'expected_failing_examples': [],
+    'plot_gallery': 'True',
+    'abort_on_example_error': False,
+    'example_extensions': {'.py', '.ipynb'},
+    'image_scrapers': ('matplotlib', 'plotly.io._sg_scraper.plotly_sg_scraper'),
+    # 'reset_modules': ('matplotlib', 'seaborn', 'plotly'),
+    'capture_repr': ('_repr_html_', '__repr__', '__str__'),
 }
 
 html_title = "CPMpy documentation"

@@ -30,10 +30,10 @@
 
 /* Change navigation link colors */
 .md-nav__sticky {
-    color: #2563eb !important;
+    color: #131313 !important;
 }
 
-.md-nav__sticky:hover {
-    color: #1d4ed8 !important;
-}
+/* .md-nav__sticky:hover {
+    color: #131313  !important;
+} */
 

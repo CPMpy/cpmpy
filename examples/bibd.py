@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 Balanced Incomplete Block Design (BIBD) in CPMpy
+================================================
 
 CSPlib prob028
 

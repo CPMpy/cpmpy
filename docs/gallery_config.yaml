@@ -1,0 +1,87 @@
+galleries:
+
+  basic:
+    title: "Basic Problems"
+    description: "..."
+    source_dir: "../examples"
+    target_dir: "_temp_galleries/basic"
+    include_files:
+      - "bibd.py"
+      - "set_game.ipynb"
+      - "scheduling.ipynb"
+      - "room_assignment.ipynb"
+      - "quickstart_sudoku.ipynb"
+      - "packing_rectangles.ipynb"
+      - "nonagram_ortools.ipynb"
+      - "map_coloring_os.ipynb"
+      - "graph_coloring.ipynb"
+      - "car_sequencing.ipynb"
+      - "tsp.ipynb"
+      - "vehicle_routing.ipynb"
+    # Optional: specify assets/data files to copy for this gallery
+    assets:
+      - "assets/room_assignment.csv"
+      - "assets/*.json"
+  # tutorial:
+  #   title: "Tutorial Examples"
+  #   description: "Basic examples to get started with CPMpy"
+  #   source_dir: "../examples/tutorial"
+  #   target_dir: "_temp_galleries/tutorial"
+  #   # Optional: specify which files to include (if not specified, includes all matching file_patterns)
+  #   # include_files:
+  #   #   - "basic_example.py"
+  #   #   - "modeling_*.py"
+  #   # Optional: specify which files to exclude (in addition to global exclude_patterns)
+  #   # exclude_files:
+  #   #   - "complex_example.py"
+    
+  # advanced:
+  #   title: "Advanced Examples"
+  #   description: "More complex modeling examples"
+  #   source_dir: "../examples/advanced"
+  #   target_dir: "_temp_galleries/advanced"
+    
+  #   # Example of excluding specific files
+  #   # exclude_files:
+  #   #   - "experimental_*.py"
+    
+  csplib:
+    title: "CSPlib Problems"
+    description: "Classic constraint programming problems from CSPlib"
+    source_dir: "../examples/csplib"
+    target_dir: "_temp_galleries/csplib"
+    include_files:
+      - "prob001_car_sequence.py"
+    # Optional: specify assets for this gallery
+    # assets:
+    #   - "data/*.txt"
+
+  tutorial_ijcai22:
+    title: "Tutorial IJCAI 2022"
+    description: "..."
+    source_dir: "../examples/tutorial_ijcai22"
+    target_dir: "_temp_galleries/tutorial_ijcai22"
+    include_files:
+      - "1_room_assignment_incr.ipynb"
+    # Optional: specify assets for this gallery
+    # assets:
+    #   - "data/*.txt"
+
+# Global settings
+file_patterns:
+  - "*.py"
+  - "*.ipynb"
+
+# Data file patterns to copy alongside examples
+data_patterns:
+  - "*.csv"
+  - "*.json"
+  - "*.txt"
+  - "*.xlsx"
+  - "assets/*"
+  
+exclude_patterns:
+  - "__pycache__"
+  - "*.pyc"
+  - "test_*"
+  - "*_test.py"

@@ -126,3 +126,12 @@ Are you a solver developer? We are keen to `integrate solvers <adding_solver.htm
    api/transformations
    api/solvers
    api/tools
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Examples:
+
+   auto_examples/basic/index
+   auto_examples/csplib/index
+   auto_examples/tutorial_ijcai22/index

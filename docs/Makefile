@@ -15,6 +15,13 @@ help:
 
 .PHONY: help Makefile
 
+# Custom clean target to also remove temp galleries
+clean:
+	@$(SPHINXBUILD) -M clean "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	@echo "Removing temp galleries..."
+	@rm -rf _temp_galleries auto_examples
+	@echo "Temp galleries removed."
+
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
