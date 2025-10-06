@@ -5,3 +5,4 @@ sphinx>=5.3.0 # cannot be updated due to m2r2 no longer being maintained -> swit
 sphinx_rtd_theme>=2.0.0
 readthedocs-sphinx-search>=0.3.2
 sphinx_book_theme
+sphinx-gallery
