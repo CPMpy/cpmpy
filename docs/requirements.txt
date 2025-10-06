@@ -11,3 +11,5 @@ sphinx_immaterial
 psutil
 tqdm
 matplotlib
+pandas
+networkx
