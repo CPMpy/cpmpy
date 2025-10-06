@@ -13,3 +13,8 @@ tqdm
 matplotlib
 pandas
 networkx
+filelock
+scipy
+geopy
+cpmpy
+ortools
