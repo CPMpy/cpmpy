@@ -8,3 +8,6 @@ sphinx_book_theme
 sphinx-gallery
 plotly
 sphinx_immaterial
+psutil
+tqdm
+matplotlib
