@@ -18,3 +18,5 @@ scipy
 geopy
 cpmpy
 ortools
+folium
+seaborn
