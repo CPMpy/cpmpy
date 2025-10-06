@@ -20,3 +20,4 @@ cpmpy
 ortools
 folium
 seaborn
+orca
