@@ -143,17 +143,20 @@ from gurobipy import GRB
 
 
 def get_solution_callback(slv, X, constraint, T_enc, X_enc, env):
-    def solution_callback(model, where):
+    def solution_callback(what, where):
         A = None
         match where:
             case GRB.Callback.MIPNODE:
-                status = model.cbGet(GRB.Callback.MIPNODE_STATUS)
-                if status == GRB.OPTIMAL:
-                    A = [int(model.cbGetNodeRel(slv.solver_var(x))) for x in X]
+                if what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL:
+                    A = [what.cbGetNodeRel(slv.solver_var(x)) for x in X]
+                    log("MIPNODE-OPT", A, verbosity=2)
+                    A = [int(a) for a in A]
                 else:
                     return
             case GRB.Callback.MIPSOL:
-                A = [int(model.cbGetSolution(slv.solver_var(x))) for x in X]
+                A = [what.cbGetSolution(slv.solver_var(x)) for x in X]
+                log("MIPSOL", A, verbosity=2)
+                A = [int(a) for a in A]
             case _:
                 return
 
@@ -164,22 +167,20 @@ def get_solution_callback(slv, X, constraint, T_enc, X_enc, env):
         X.clear()
 
         # encode assignment
-        A_enc = [encode_x(a, x.lb, x.ub) for a, x in zip(A, X)]
-        A_enc = [ai for a in A_enc for ai in a]
-        A_enc = cols(np.array([A_enc]), 0)
-
-        explanation = explain(A_enc, T_enc, X_enc, env)
+        explanation = explain_assignment(A, X, X_enc, T_enc, env)
         grbs = [slv.solver_var(c) for c in explanation]
-        model.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
-        model.write("/tmp/gurobi.lp")
-        # slv.add(explanation)
-        # log("New model", verbosity=3)
-        # log(m, verbosity=3)
-
-        # dbg += 1
-        # assert LOOP_LIMIT is None or dbg < LOOP_LIMIT
+        what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
+        what.write("/tmp/gurobi.lp")
 
     return solution_callback
+
+
+def explain_assignment(A, X, X_enc, T_enc, env):
+    # encode assignment
+    A_enc = [encode_x(a, x.lb, x.ub) for a, x in zip(A, X)]
+    A_enc = [ai for a in A_enc for ai in a]
+    A_enc = cols(np.array([A_enc]), 0)
+    return explain(A_enc, T_enc, X_enc, env)
 
 
 def solve(X, T, env):
@@ -191,16 +192,14 @@ def solve(X, T, env):
     log(T_enc, verbosity=1)
 
     X_enc = [x == d for x in X for d in range(x.lb, x.ub + 1)]
-    # X_enc = [cp.boolvar(name=f"{x}={d}") for x in X for d in range(x.lb, x.ub + 1)]
-    # m = cp.Model([cp.sum(x == d for d in range(x.lb, x.ub + 1)) == 1 for x in X])
-    m = cp.Model([cp.sum(x == d for d in range(x.lb, x.ub + 1)) == 1 for x in X])
-    constraint = cp.Table(X, T)
+    model = cp.Model([cp.sum(x == d for d in range(x.lb, x.ub + 1)) == 1 for x in X])
+    table = cp.Table(X, T)
 
     dbg = 0
     sols = []
 
     if DEBUG:
-        n_sols = m.solveAll(
+        n_sols = model.solveAll(
             display=lambda: sols.append([x.value() for x in X]),
             solver=env["solver"],
             solution_limit=1000 if env["solver"] == "gurobi" else None,
@@ -226,31 +225,28 @@ def solve(X, T, env):
 
         assert len(sols)
 
-    log("Model:", m, verbosity=2)
+    log("Model:", model, verbosity=2)
     log("Solving.. ", end="")
-    slv = cp.SolverLookup.get(env["solver"], m)
+    slv = cp.SolverLookup.get(env["solver"], model)
     slv.native_model.Params.LazyConstraints = 1
     # slv.native_model.Params.LogFile = "/tmp/gurobi.log"
     if VERBOSITY >= 3:
         slv.native_model.Params.OutputFlag = 1
 
     A = None
-    while A is None or not constraint.value():
+    while True:
         # https://or.stackexchange.com/questions/12591/ensure-gurobi-uses-callback-on-all-feasible-solutions It looks like if the solution at the end of the root node is integer, gurobi doesn't pass through callbacks for fractional solutions.
-        slv.solve(solution_callback=get_solution_callback(slv, X, constraint, T_enc, X_enc, env))
+        slv.solve(solution_callback=get_solution_callback(slv, X, table, T_enc, X_enc, env))
 
+        if table.value():
+            return True
         A = [x.value() for x in X]
-
-        A_enc = [encode_x(a, x.lb, x.ub) for a, x in zip(A, X)]
-        A_enc = [ai for a in A_enc for ai in a]
-        A_enc = cols(np.array([A_enc]), 0)
-
-        C = explain(A_enc, T_enc, X_enc, env)
-        C = cp.sum(C) < len(C)
-        log(f"  constraint == {C}")
+        log("SOL", A, verbosity=2)
+        explanation = explain_assignment(A, X, X_enc, T_enc, env)
+        explanation = cp.sum(explanation) < len(explanation)
+        log(f"  constraint == {explanation}")
         # assert False
-        slv += [C]
-    return True
+        slv += [explanation]
 
 
 # TODO use gurobi lazy constraints interface
