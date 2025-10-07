@@ -250,6 +250,9 @@ class CPM_gurobi(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
+        if cpm_var in self._csemap:
+            return self.solver_var(self._csemap[cpm_var])
+
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
