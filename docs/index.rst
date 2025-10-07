@@ -81,17 +81,17 @@ Supported solvers
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
-     - Pseudo-Boolean
+     - SAT Encoder
      - SAT
      - local install (git + pip > 3.10)
-     - Encodes to SAT
+     - 
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - SAT ASAT ISAT
      - pip
      - 
    * - :doc:`PySDD <api/solvers/pysdd>`
-     - SAT Counter
+     - Decis. Diagram
      - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
