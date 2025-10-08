@@ -119,7 +119,7 @@ class CPM_pindakaas(SolverInterface):
 
     @property
     def native_model(self):
-        self.pdk_solver
+        return self.pdk_solver
 
     def solve(self, time_limit=None, assumptions=None):
         """
@@ -215,7 +215,7 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
             # insert if new
             if cpm_var.name not in self._varmap:
-                (self._varmap[cpm_var.name],) = self.pdk_solver.new_vars(1)
+                self._varmap[cpm_var.name] = self.pdk_solver.new_var()
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
@@ -305,9 +305,6 @@ class CPM_pindakaas(SolverInterface):
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 
     def get_core(self):
-        raise NotSupportedError(
-            "Solver does not support unsat core extraction"
-        )  # TODO awaiting https://github.com/pindakaashq/pindakaas/pull/135
         assert self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE and self.core is not None, (
             "get_core(): requires a previous solve call with assumption variables and an UNSATISFIABLE result"
         )

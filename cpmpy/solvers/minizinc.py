@@ -518,6 +518,10 @@ class CPM_minizinc(SolverInterface):
                     "minizinc does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
             return str(cpm_var)
 
+        # Assumes it is never given a 'NegBoolView'
+        if isinstance(cpm_var, NegBoolView):
+            raise NotSupportedError("Negative literals are not handled here. Please report.")
+
         if cpm_var not in self._varmap:
             # clean the varname
             varname = cpm_var.name

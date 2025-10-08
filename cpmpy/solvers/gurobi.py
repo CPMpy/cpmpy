@@ -253,11 +253,9 @@ class CPM_gurobi(SolverInterface):
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
+        # special case, negative-bool-view. Should be eliminated in linearize
         if isinstance(cpm_var, NegBoolView):
-            raise Exception("Negative literals should not be part of any equation. "
-                            "See /transformations/linearize for more details")
+            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
 
         # create if it does not exit
         if cpm_var not in self._varmap:
@@ -287,7 +285,7 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
 
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
         self += flat_cons
@@ -298,6 +296,7 @@ class CPM_gurobi(SolverInterface):
             self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
         else:
             self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
+        self.grb_model.update()
 
     def has_objective(self):
         return self.grb_model.getObjective().size() != 0  # TODO: check if better way to do this...
