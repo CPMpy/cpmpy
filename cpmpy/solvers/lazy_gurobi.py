@@ -1,0 +1,282 @@
+import sys
+import math
+import gurobipy as gp
+from gurobipy import GRB
+import itertools
+import numpy as np
+import cpmpy as cp
+
+from cpmpy.solvers.gurobi import CPM_gurobi
+from enum import Enum
+
+
+def rows(T, i, j=1):
+    """Row indices where T[i]==j"""
+    return set(int(i) for i in np.where(T[:, i] == j)[0].flatten())
+
+
+def cols(T, i, j=1):
+    """Col indices where T[i]==j"""
+    return set(int(i) for i in np.where(T[i, :] == j)[0].flatten())
+
+
+def get_x_enc(ivarmap):
+    return [x_enc_i for x_enc in ivarmap.values() for x_enc_i in x_enc._xs]
+
+
+def is_integer_solution(A_enc):
+    return all(math.isclose(a_enc_i, a_enc_i > 0.5, abs_tol=1e-5) for a_enc_i in A_enc)
+
+
+def encode_x(a, lb, ub):
+    X = (ub - lb + 1) * [0]
+    X[a - lb] = 1
+    return X
+
+
+def encode(X, T):
+    enc = []
+    for t in T:
+        row_i = []
+        for x, row in zip(X, t):
+            row_i += encode_x(row, x.lb, x.ub)
+        enc += [row_i]
+    return np.array(enc)
+    return np.array([xij for x, t in zip(X, T) for row in t for xij in encode_x(row, x.lb, x.ub)])
+
+
+class Heuristic(Enum):
+    INPUT = 1
+    GREEDY = 2
+    REDUCE = 3
+
+
+class CPM_lazy_gurobi(CPM_gurobi):
+    def __init__(self, cpm_model=None, subsolver=None, env=None):
+        self.env = {}
+        self.env["debug"] = False
+        self.env["debug_unlucky"] = False  # TODO re-enable
+        self.env["cuts"] = []
+        self.env["verbosity"] = 1
+        self.env["heuristic"] = Heuristic.INPUT
+        # self.env["max_iterations"] = 100
+
+        if self.env["verbosity"] >= 3:
+            np.set_printoptions(threshold=sys.maxsize)
+            np.set_printoptions(linewidth=np.inf)
+
+        if env is not None:
+            self.env = {**self.env, **env}
+        self.ivarmap = {}
+
+        self.tables = []
+        super().__init__(cpm_model=cpm_model, subsolver=subsolver, lazy=True)
+
+    def log(self, *mess, verbosity=1, end="\n"):
+        if verbosity <= self.env["verbosity"]:
+            print(*mess, end=end)
+
+    def show_env(self):
+        self.log(", ".join(f"{k}={self.env[k]}" for k in ["shrink", "heuristic"]), verbosity=0)
+        # log(f"cuts = {env['cuts']}", env=env, verbosity=1)
+        self.log(f"n_cuts = {sum(len(c['cut']) > 0 for c in self.env['cuts'])}", verbosity=0)
+        self.log(f"n_unexplained = {list(len(c['cut']) for c in self.env['cuts']).count(0)}", verbosity=0)
+        self.log(
+            "cut cardinalities/strengths:",
+            ", ".join(f"{len(c['cut'])}" for c in self.env["cuts"]),
+            verbosity=2,
+        )
+
+    def choose(self, A, T_enc, R, heuristic=Heuristic.GREEDY):
+        self.log(f"Choose from {sorted(A)} from remaining choices {R}", verbosity=2)
+        if len(A) == 0:
+            return None
+        match heuristic:
+            case Heuristic.INPUT:
+                return min(i for i in A)
+            case Heuristic.GREEDY:
+                return min(A, key=lambda i: len(R.intersection(rows(T_enc, i))))
+            case Heuristic.REDUCE:
+                choice = min(
+                    (i for i in A if R.intersection(rows(T_enc, i)) != R),
+                    key=lambda i: len(rows(T_enc, i)),
+                    default=None,  # TODO [?] check this edge-case
+                )
+                return choice if choice is not None else self.choose(A, T_enc, R, heuristic=Heuristic.GREEDY)
+
+    def shrink(self, C, T):
+        for i in C:
+            self.log(f"shrinking {i} in {C}", verbosity=3)
+
+            if len(C) <= 1:  # slightly different from
+                return C
+
+            S = set.intersection(*[rows(T, l) for l in (C - {i})])
+            if len(S) == 0:
+                C = C - {i}
+        return C
+
+    def explain(self, A_enc, T_enc):
+        """The `explain_frac` alg."""
+
+        # TODO convert T_enc to set of tuples?
+        self.log(f"Explain")
+        self.log("", np.array(A_enc), verbosity=2)
+        self.log(np.array(T_enc), verbosity=2)
+
+        X = set()  # columns added to cut
+        R = set(range(len(T_enc)))  # remaining columns
+        W = set(i for i, a in enumerate(A_enc) if a == 1.0)
+        F = set(i for i, a in enumerate(A_enc) if 0.0 < a < 1.0)
+
+        self.log(f"W = {sorted(W)}", verbosity=3)
+        self.log(f"F = {sorted(F)}", verbosity=3)
+
+        for iteration in itertools.count(start=1):
+            if not len(R):
+                break
+            if W <= X:
+                self.log("  unexplainable")
+                self.log(f"    because {W} <= {X}", verbosity=3)
+                # if is_integer_solution(A_enc):
+                # assert not is_integer_solution(A_enc), f"Could not explain an integer solution: {A_enc}"
+                return set()  # no cut
+
+            # choose some col which is 1
+            self.log("A", A_enc, X, verbosity=3)
+            i = self.choose(W - X, T_enc, R, heuristic=self.env["heuristic"])
+            self.log(f"chosen {i}", verbosity=3)
+
+            R = R.intersection(rows(T_enc, i))
+            X.add(i)
+
+            # Loop termination for debug purposes
+            assert iteration <= self.env.get("max_iterations", iteration)
+
+        self.log(f"  by explanation of size ({len(X)}): {X}")
+        if self.env.get("shrink", True):
+            size = len(X)
+            X = self.shrink(X, T_enc)
+            if len(X) < size:
+                self.log(f"  shrunk to size ({len(X)}): {X}")
+
+        self.log(f"  cut == {X}")
+        return X
+
+    def log_explanation(self, explanation, frm):
+        if "cuts" in self.env:
+            if self.env["debug"]:
+                assert explanation not in (c["cut"] for c in self.env["cuts"]), (
+                    f"Already found cut {explanation} previously in {self.env['cuts']}"
+                )
+            self.env["cuts"].append({"cut": explanation, "shrunk": 0, "from": frm})
+
+    def get_solution_callback(self):
+        all_xs = get_x_enc(self.ivarmap)
+
+        def solution_callback(what, where):
+            try:
+                x_enc_a = None
+                frm = None
+                match where:
+                    case GRB.Callback.MIPNODE:
+                        # Optimal solution to LP relaxation
+                        if what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL:
+                            x_enc_a = {
+                                x_enc_i: what.cbGetNodeRel(self.solver_var(x_enc_i)) for x_enc_i in all_xs
+                            }
+                            frm = "MIPNODE-OPT"
+                        else:
+                            return
+                    case GRB.Callback.MIPSOL:  # Integer solution
+                        x_enc_a = {
+                            x_enc_i: what.cbGetSolution(self.solver_var(x_enc_i)) for x_enc_i in all_xs
+                        }
+                        frm = "MIPSOL"
+                        assert is_integer_solution(x_enc_a.values()), (
+                            f"Expected integer solution for MIP, but got {x_enc_a}"
+                        )
+                        # Recommended way to convert fractional integer solution into Boolean, then using `int` to convert to 01
+                        x_enc_a = {x_enc_i: int(a_enc_i > 0.5) for x_enc_i, a_enc_i in x_enc_a.items()}
+                    case _:
+                        return
+
+                self.log(frm, x_enc_a, verbosity=2)
+
+                # If fully integer, we can check if the tables are feasible yet
+                for X_enc, T_enc in self.tables:
+                    A_enc = [x_enc_a[x_enc_i] for x_enc_i in X_enc]
+
+                    # TODO figure out when can be skipped
+                    # if frm == "MIPNODE-OPT" and is_integer_solution(A_enc) and
+                    if A_enc in T_enc.tolist():
+                        continue
+
+                    # encode assignment
+                    explanation = self.explain(A_enc, T_enc)
+                    self.log_explanation(explanation, frm)
+
+                    if explanation:
+                        grbs = [self.solver_var(X_enc[c]) for c in explanation]
+                        what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
+                    elif frm == "MIPSOL":  # unsat
+                        what.cbLazy(False)
+
+                assert len(self.env.get("cuts", [])) <= self.env.get(
+                    "max_iterations", self.env.get("cuts", [])
+                )
+            except Exception as e:
+                what._callback_exception = e
+                what.terminate()
+
+        return solution_callback
+
+    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+        """
+        Call the gurobi solver with cut generation
+        """
+
+        self.log("Solving.. ")
+        self.native_model.Params.LazyConstraints = 1
+        if self.env["verbosity"] >= 4:
+            self.native_model.Params.LogFile = "/tmp/gurobi.log"
+            self.native_model.Params.OutputFlag = 1
+            self.native_model.write("/tmp/gurobi.lp")
+
+        hassol = super().solve(solution_callback=self.get_solution_callback())
+        # TODO recheck https://or.stackexchange.com/questions/12591/ensure-gurobi-uses-callback-on-all-feasible-solutions It looks like if the solution at the end of the root node is integer, gurobi doesn't pass through callbacks for fractional solutions.
+
+        return hassol
+
+    def transform(self, cpm_expressions):
+        cpm_cons = []  # all but tables
+        for cpm_expr in cpm_expressions:
+            if hasattr(cpm_expr, "name") and cpm_expr.name == "table":
+                cpm_expr_tfs = [cpm_expr]
+            else:
+                cpm_expr_tfs = super().transform(cpm_expr)
+
+            for cpm_expr_tf in cpm_expr_tfs:
+                if cpm_expr_tf.name == "table":
+                    X, T = cpm_expr_tf.args
+                    self.log("X =", ", ".join(f"{x} in {x.lb}..{x.ub}" for x in X), verbosity=0)
+                    self.log("T =", verbosity=1)
+                    self.log(T, verbosity=1)
+                    T_enc = encode(X, T)
+                    self.log("T_enc =", verbosity=1)
+                    self.log(T_enc, verbosity=1)
+
+                    for x in X:
+                        x_enc, exactly_one_con = cp.transformations.int2bool._encode_int_var(
+                            self.ivarmap, x, "direct"
+                        )
+                        expr, k = x_enc.encode_term()
+                        # TODO if only BV, then need to assign (but no need to assign if decoding constraint present)
+                        cpm_cons += self.transform(
+                            [*exactly_one_con, cp.sum(c * b for c, b in expr) + k == x]
+                        )
+                    X_enc = get_x_enc(self.ivarmap)
+                    self.tables.append((X_enc, T_enc))
+                else:
+                    cpm_cons.append(cpm_expr_tf)
+        return cpm_cons

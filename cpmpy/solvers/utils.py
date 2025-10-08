@@ -19,6 +19,7 @@
 import warnings # for deprecation warning
 
 from .gurobi import CPM_gurobi
+from .lazy_gurobi import CPM_lazy_gurobi
 from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
@@ -79,6 +80,7 @@ class SolverLookup():
                 ("minizinc", CPM_minizinc),
                 ("gcs", CPM_gcs),
                 ("gurobi", CPM_gurobi),
+                ("lazy_gurobi", CPM_lazy_gurobi),
                 ("pysat", CPM_pysat),
                 ("pysdd", CPM_pysdd),
                 ("exact", CPM_exact),

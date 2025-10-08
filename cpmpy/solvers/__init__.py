@@ -66,6 +66,7 @@ from .ortools import CPM_ortools
 from .pysat import CPM_pysat
 from .minizinc import CPM_minizinc
 from .gurobi import  CPM_gurobi
+from .lazy_gurobi import  CPM_lazy_gurobi
 from .pysdd import CPM_pysdd
 from .z3 import CPM_z3
 from .exact import CPM_exact
