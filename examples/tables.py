@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import numpy as np
+import math
 import cpmpy as cp
+from cpmpy.transformations import int2bool
 
 import random
 
@@ -98,8 +100,9 @@ def choose(A, T_enc, R, heuristic=Heuristic.INPUT):
             return choice or choose(A, T_enc, R, heuristic=Heuristic.GREEDY)
 
 
-def explain(A_enc, T_enc, X_enc, env):
-    log(f"Explain {A_enc} {[X_enc[i] for i in A_enc]}")
+def explain(A_enc, X_enc, T_enc, env):
+    A_enc = cols(np.array([A_enc]), 0)
+    log(f"Explain {A_enc}")
     C = set()  # vars added to cut
     R = set(range(len(T_enc)))
     dbg = 0
@@ -142,45 +145,69 @@ import gurobipy as gp
 from gurobipy import GRB
 
 
-def get_solution_callback(slv, X, constraint, T_enc, X_enc, env):
+def get_x_enc(ivarmap):
+    return [x_enc_i for x_enc in ivarmap.values() for x_enc_i in x_enc._xs]
+
+
+
+def get_solution_callback(slv, ivarmap, T_enc, env):
+    X_enc = get_x_enc(ivarmap)
+    X_enc_grb = [slv.solver_var(x_enc_i) for x_enc_i in X_enc]
+
     def solution_callback(what, where):
-        A = None
-        match where:
-            case GRB.Callback.MIPNODE:
-                if what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL:
-                    A = [what.cbGetNodeRel(slv.solver_var(x)) for x in X]
-                    log("MIPNODE-OPT", A, verbosity=2)
-                    A = [int(a) for a in A]
-                else:
+        try:
+            A_enc = None
+            match where:
+                case GRB.Callback.MIPNODE:
+                    return  # TODO implement fractional explanation
+                    if (  # Optimal solution to LP relaxation
+                        what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL
+                    ):
+                        A_enc = [what.cbGetNodeRel(x_enc_i) for x_enc_i in X_enc_grb]
+                        log("MIPNODE-OPT", A_enc, verbosity=2)
+                        A_enc = [int(a_enc_i) for a_enc_i in A_enc]
+                    else:
+                        return
+                case GRB.Callback.MIPSOL:  # Integer solution
+                    A_enc = [what.cbGetSolution(x_enc_i) for x_enc_i in X_enc_grb]
+                    log("MIPSOL", A_enc, verbosity=2)
+                    for a_enc_i in A_enc:
+                        assert math.isclose(a_enc_i, round(a_enc_i), abs_tol=1e-5), (
+                            f"Expected integer solution for MIP, but got {a_enc_i} in {A_enc}"
+                        )
+                    A_enc = [round(a_enc_i) for a_enc_i in A_enc]
+                case _:
                     return
-            case GRB.Callback.MIPSOL:
-                A = [what.cbGetSolution(slv.solver_var(x)) for x in X]
-                log("MIPSOL", A, verbosity=2)
-                A = [int(a) for a in A]
-            case _:
+
+            A_enc = [int(a_enc_i) for a_enc_i in A_enc]
+            # if constraint.value():
+            if A_enc in T_enc.tolist():
                 return
 
-        # if constraint.value():
-        if A in T.tolist():
-            return
+            X.clear()
 
-        X.clear()
-
-        # encode assignment
-        explanation = explain_assignment(A, X, X_enc, T_enc, env)
-        grbs = [slv.solver_var(c) for c in explanation]
-        what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
-        what.write("/tmp/gurobi.lp")
+            # encode assignment
+            explanation = explain(A_enc, X_enc, T_enc, env)
+            grbs = [slv.solver_var(c) for c in explanation]
+            what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
+            what.write("/tmp/gurobi.lp")
+        except Exception as e:
+            what._callback_exception = e
+            what.terminate()
 
     return solution_callback
 
 
-def explain_assignment(A, X, X_enc, T_enc, env):
+def explain_assignment(A_enc, X_enc, T_enc, env):
     # encode assignment
-    A_enc = [encode_x(a, x.lb, x.ub) for a, x in zip(A, X)]
-    A_enc = [ai for a in A_enc for ai in a]
-    A_enc = cols(np.array([A_enc]), 0)
-    return explain(A_enc, T_enc, X_enc, env)
+
+    # X_enc = get_x_enc(ivarmap)
+    # A_enc = cols(np.array([[int(x_enc_i.value()) for x_enc_i in X_enc]]), 0)
+
+    # A_enc = [encode_x(a, x.lb, x.ub) for a, x in zip(A, X)]
+    # A_enc = [ai for a in A_enc for ai in a]
+    # A_enc = cols(np.array([A_enc]), 0)
+    return explain(A_enc, X_enc, T_enc, env)
 
 
 def solve(X, T, env):
@@ -191,11 +218,18 @@ def solve(X, T, env):
     log("T_enc =", verbosity=1)
     log(T_enc, verbosity=1)
 
-    X_enc = [x == d for x in X for d in range(x.lb, x.ub + 1)]
-    model = cp.Model([cp.sum(x == d for d in range(x.lb, x.ub + 1)) == 1 for x in X])
+    # X_enc = [x == d for x in X for d in range(x.lb, x.ub + 1)]
+    ivarmap = {}
+    model = cp.Model()
+    for x in X:
+        x_enc, cons = int2bool._encode_int_var(ivarmap, x, "direct")
+        model += [cons]
+        expr, k = x_enc.encode_term()
+        # model += cp.sum(c * b for c, b in expr) + k == x
+    X_enc = get_x_enc(ivarmap)
+    # model.minimize(sum(X))
     table = cp.Table(X, T)
 
-    dbg = 0
     sols = []
 
     if DEBUG:
@@ -233,20 +267,30 @@ def solve(X, T, env):
     if VERBOSITY >= 3:
         slv.native_model.Params.OutputFlag = 1
 
-    A = None
+    i = 0
     while True:
         # https://or.stackexchange.com/questions/12591/ensure-gurobi-uses-callback-on-all-feasible-solutions It looks like if the solution at the end of the root node is integer, gurobi doesn't pass through callbacks for fractional solutions.
-        slv.solve(solution_callback=get_solution_callback(slv, X, table, T_enc, X_enc, env))
+        hassol = slv.solve(solution_callback=get_solution_callback(slv, ivarmap, T_enc, env))
+
+        for enc in ivarmap.values():
+            enc._x._value = enc.decode()
+
+        assert hassol, f"Unsat model for {slv}"
 
         if table.value():
             return True
-        A = [x.value() for x in X]
-        log("SOL", A, verbosity=2)
-        explanation = explain_assignment(A, X, X_enc, T_enc, env)
+
+        A_enc = [x.value() for x in X_enc]
+        explanation = explain(A_enc, X_enc, T_enc, env)
         explanation = cp.sum(explanation) < len(explanation)
+        assert explanation is not False, f"{A_enc}"
         log(f"  constraint == {explanation}")
         # assert False
         slv += [explanation]
+
+        i += 1
+        if LOOP_LIMIT and i == LOOP_LIMIT:
+            return False
 
 
 # TODO use gurobi lazy constraints interface
@@ -263,7 +307,7 @@ def show_env(env):
 
 
 if __name__ == "__main__":
-    VERBOSITY = 2
+    VERBOSITY = 1
     DEBUG = False
     DEBUG_UNLUCKY = False
     LOOP_LIMIT = None

@@ -213,6 +213,8 @@ class CPM_gurobi(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
             else:
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif grb_status == GRB.INTERRUPTED:
+            raise self.native_model._callback_exception or Exception("Gurobi was interrupted (perhaps the solution callback called model.terminate())")
         else:  # another?
             raise NotImplementedError(
                 f"Translation of gurobi status {grb_status} to CPMpy status not implemented")  # a new status type was introduced, please report on github
@@ -250,8 +252,6 @@ class CPM_gurobi(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if cpm_var in self._csemap:
-            return self.solver_var(self._csemap[cpm_var])
 
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
