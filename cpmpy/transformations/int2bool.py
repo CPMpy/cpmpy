@@ -216,9 +216,10 @@ class IntVarEnc(ABC):
         """Return the integer value of the encoding."""
         terms, k = self.encode_term()
         for weight, lit in terms:
-            if lit is None:
+            a = lit.value()
+            if a is None:
                 return None
-            elif lit.value() is True:
+            elif a is True:
                 k += weight
         return k
 
