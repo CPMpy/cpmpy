@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import itertools
 import numpy as np
 import math
 import cpmpy as cp
@@ -7,8 +8,8 @@ from cpmpy.transformations import int2bool
 import random
 
 
-def log(*mess, verbosity=1, end="\n"):
-    if verbosity <= VERBOSITY:
+def log(*mess, env, verbosity=1, end="\n"):
+    if verbosity <= env["verbosity"]:
         print(*mess, end=end)
 
 
@@ -63,7 +64,7 @@ def cols(T, i, j=1):
 
 def shrink(C, T):
     for i in C:
-        log(f"shrinking {i} in {C}", verbosity=3)
+        log(f"shrinking {i} in {C}", env=env, verbosity=3)
 
         if len(C) <= 1:  # slightly different from
             return C
@@ -100,41 +101,41 @@ def choose(A, T_enc, R, heuristic=Heuristic.INPUT):
             return choice or choose(A, T_enc, R, heuristic=Heuristic.GREEDY)
 
 
-def explain(A_enc, X_enc, T_enc, env):
+def explain(A_enc, T_enc, env):
     A_enc = cols(np.array([A_enc]), 0)
-    log(f"Explain {A_enc}")
+    log(f"Explain {sorted(A_enc)}", env=env)
     C = set()  # vars added to cut
     R = set(range(len(T_enc)))
-    dbg = 0
+    iterations = 0
     while len(R):
         # choose some col which is 1
-        i = choose(A_enc - C, T_enc, R, heuristic=env["heuristic"])
+        i = choose(A_enc - C, T_enc, R, heuristic=env.get("heuristic"))
 
         if i is None:  # TODO [?] slightly different stopping condition
             break
 
-        log("A", A_enc, C, verbosity=3)
-        log(f"adding {i + 1}", verbosity=3)
+        log("A", A_enc, C, env=env, verbosity=3)
+        log(f"adding {i + 1}", env=env, verbosity=3)
         T_i = rows(T_enc, i)
         R = R.intersection(T_i)
         C.add(i)
-        dbg += 1
-        assert LOOP_LIMIT is None or dbg < LOOP_LIMIT
+        iterations += 1
+        assert iterations <= env.get("max_iterations", iterations)
 
-    log(f"  by explanation of size ({len(C)}): {C}")
-    if env["shrink"]:
+    log(f"  by explanation of size ({len(C)}): {C}", env=env)
+    if env.get("shrink", True):
         size = len(C)
         C = shrink(C, T_enc)
         if len(C) < size:
-            log(f"  shrunk to size ({len(C)}): {C}")
+            log(f"  shrunk to size ({len(C)}): {C}", env=env)
             # assert False, "TODO; shrinking is not triggering"
 
-    if env["cuts"] is not None:
+    if env.get("cuts"):
         assert C not in env["cuts"], f"Already found cut {C} previously in {env['cuts']}"
         env["cuts"].append({"cut": C, "shrunk": 0})
 
-    log(f"  cut == {C}")
-    return [X_enc[i] for i in C]
+    log(f"  cut == {C}", env=env)
+    return C
 
 
 def show_sols(sols, T):
@@ -147,7 +148,6 @@ from gurobipy import GRB
 
 def get_x_enc(ivarmap):
     return [x_enc_i for x_enc in ivarmap.values() for x_enc_i in x_enc._xs]
-
 
 
 def get_solution_callback(slv, ivarmap, T_enc, env):
@@ -164,13 +164,13 @@ def get_solution_callback(slv, ivarmap, T_enc, env):
                         what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL
                     ):
                         A_enc = [what.cbGetNodeRel(x_enc_i) for x_enc_i in X_enc_grb]
-                        log("MIPNODE-OPT", A_enc, verbosity=2)
+                        log("MIPNODE-OPT", A_enc, env=env, verbosity=2)
                         A_enc = [int(a_enc_i) for a_enc_i in A_enc]
                     else:
                         return
                 case GRB.Callback.MIPSOL:  # Integer solution
                     A_enc = [what.cbGetSolution(x_enc_i) for x_enc_i in X_enc_grb]
-                    log("MIPSOL", A_enc, verbosity=2)
+                    log("MIPSOL", A_enc, env=env, verbosity=2)
                     for a_enc_i in A_enc:
                         assert math.isclose(a_enc_i, round(a_enc_i), abs_tol=1e-5), (
                             f"Expected integer solution for MIP, but got {a_enc_i} in {A_enc}"
@@ -187,8 +187,9 @@ def get_solution_callback(slv, ivarmap, T_enc, env):
             X.clear()
 
             # encode assignment
-            explanation = explain(A_enc, X_enc, T_enc, env)
-            grbs = [slv.solver_var(c) for c in explanation]
+            explanation = explain(A_enc, T_enc, env)
+            print("e", explanation)
+            grbs = [slv.solver_var(X_enc[c]) for c in explanation]
             what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
             what.write("/tmp/gurobi.lp")
         except Exception as e:
@@ -198,25 +199,13 @@ def get_solution_callback(slv, ivarmap, T_enc, env):
     return solution_callback
 
 
-def explain_assignment(A_enc, X_enc, T_enc, env):
-    # encode assignment
-
-    # X_enc = get_x_enc(ivarmap)
-    # A_enc = cols(np.array([[int(x_enc_i.value()) for x_enc_i in X_enc]]), 0)
-
-    # A_enc = [encode_x(a, x.lb, x.ub) for a, x in zip(A, X)]
-    # A_enc = [ai for a in A_enc for ai in a]
-    # A_enc = cols(np.array([A_enc]), 0)
-    return explain(A_enc, X_enc, T_enc, env)
-
-
 def solve(X, T, env):
-    log("X =", ", ".join(f"{x} in {x.lb}..{x.ub}" for x in X), verbosity=0)
-    log("T =", verbosity=1)
-    log(T, verbosity=1)
+    log("X =", ", ".join(f"{x} in {x.lb}..{x.ub}" for x in X), env=env, verbosity=0)
+    log("T =", env=env, verbosity=1)
+    log(T, env=env, verbosity=1)
     T_enc = encode(X, T)
-    log("T_enc =", verbosity=1)
-    log(T_enc, verbosity=1)
+    log("T_enc =", env=env, verbosity=1)
+    log(T_enc, env=env, verbosity=1)
 
     # X_enc = [x == d for x in X for d in range(x.lb, x.ub + 1)]
     ivarmap = {}
@@ -240,8 +229,8 @@ def solve(X, T, env):
         )
         assert env["solver"] != "gurobi" or n_sols < 1000
 
-        log(f"Search space remaining: ({len(sols)})")
-        log(show_sols(sols, T), verbosity=2)
+        log(f"Search space remaining: ({len(sols)})", env=env)
+        log(show_sols(sols, T), env=env, verbosity=2)
         if len(env["cuts"]) > 0:
             env["cuts"][-1]["space"] = len(sols)
         # TODO check whether all are still in table
@@ -259,16 +248,16 @@ def solve(X, T, env):
 
         assert len(sols)
 
-    log("Model:", model, verbosity=2)
-    log("Solving.. ", end="")
+    log("Model:", model, env=env, verbosity=2)
+    log("Solving.. ", env=env, end="")
     slv = cp.SolverLookup.get(env["solver"], model)
     slv.native_model.Params.LazyConstraints = 1
     # slv.native_model.Params.LogFile = "/tmp/gurobi.log"
-    if VERBOSITY >= 3:
+    if env["verbosity"] >= 3:
         slv.native_model.Params.OutputFlag = 1
 
-    i = 0
-    while True:
+    # while True with a counter
+    for iteration in itertools.count(start=1):
         # https://or.stackexchange.com/questions/12591/ensure-gurobi-uses-callback-on-all-feasible-solutions It looks like if the solution at the end of the root node is integer, gurobi doesn't pass through callbacks for fractional solutions.
         hassol = slv.solve(solution_callback=get_solution_callback(slv, ivarmap, T_enc, env))
 
@@ -281,15 +270,14 @@ def solve(X, T, env):
             return True
 
         A_enc = [x.value() for x in X_enc]
-        explanation = explain(A_enc, X_enc, T_enc, env)
-        explanation = cp.sum(explanation) < len(explanation)
+        explanation = explain(A_enc, T_enc, env)
+        explanation = cp.sum(X_enc[c] for c in explanation) < len(explanation)
         assert explanation is not False, f"{A_enc}"
-        log(f"  constraint == {explanation}")
+        log(f"  constraint == {explanation}", env=env)
         # assert False
         slv += [explanation]
 
-        i += 1
-        if LOOP_LIMIT and i == LOOP_LIMIT:
+        if iteration <= env.get("max_iterations", iteration):
             return False
 
 
@@ -297,20 +285,19 @@ def solve(X, T, env):
 
 
 def show_env(env):
-    log(", ".join(f"{k}={env[k]}" for k in ["shrink", "heuristic"]), verbosity=0)
-    log(f"n_cuts = {len(env['cuts'])}", verbosity=0)
+    log(", ".join(f"{k}={env[k]}" for k in ["shrink", "heuristic"]), env=env, verbosity=0)
+    log(f"n_cuts = {len(env['cuts'])}", env=env, verbosity=0)
     log(
         "cut cardinalities/strengths:",
         ", ".join(f"{len(c['cut'])} / {c.get('space', '?')}" for c in env["cuts"]),
+        env=env,
         verbosity=2,
     )
 
 
 if __name__ == "__main__":
-    VERBOSITY = 1
     DEBUG = False
     DEBUG_UNLUCKY = False
-    LOOP_LIMIT = None
     random.seed(42)
 
     envs = [
@@ -320,12 +307,13 @@ if __name__ == "__main__":
             "shrink": shrink,
             "heuristic": heuristic,
             "cuts": [],
+            "verbosity": 1,
         }
         for heuristic in [
             # heuristics
             Heuristic.INPUT,
-            # Heuristic.GREEDY,
-            # Heuristic.REDUCE,
+            Heuristic.GREEDY,
+            Heuristic.REDUCE,
         ]
         for shrink in [
             # shrink
@@ -344,8 +332,8 @@ if __name__ == "__main__":
     # X, T = generate_table(3, 10, 5)
 
     # DEBUG = False
-    X, T = generate_table(5, 25, 10)
-    # X, T = generate_table(10, 100, 10)
+    # X, T = generate_table(5, 25, 10)
+    X, T = generate_table(10, 100, 10)
 
     # envs = envs[0:1]
     for env in envs:
@@ -354,12 +342,25 @@ if __name__ == "__main__":
         assert A in T.tolist(), f"Check failed: assignment {A} was not in the table."
         X.clear()
 
-    log("STATS")
+    log("STATS", env=env)
     for env in envs:
-        log(", ".join(f"{k}={env[k]}" for k in ["shrink", "heuristic"]), verbosity=0)
-        log(f"n_cuts = {len(env['cuts'])}", verbosity=0)
+        log(", ".join(f"{k}={env[k]}" for k in ["shrink", "heuristic"]), env=env, verbosity=0)
+        log(f"n_cuts = {len(env['cuts'])}", env=env, verbosity=0)
         log(
             "cut cardinalities:",
             ", ".join(f"{len(c['cut'])}" for c in env["cuts"]),
+            env=env,
             verbosity=2,
         )
+
+
+class TestTables:
+    @classmethod
+    def setup_class(cls):
+        cls.TEST_ENV = {"verbosity": 4}
+
+    def test_explain_frac(self):
+        X, T = generate_table_from_example()
+        T_enc = encode(X, T)
+        print(T_enc)
+        assert explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc, self.__class__.TEST_ENV) == {42}
