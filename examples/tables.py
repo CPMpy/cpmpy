@@ -4,6 +4,9 @@ import itertools
 import numpy as np
 import math
 import cpmpy as cp
+
+from cpmpy.tools.xcsp3 import XCSP3Dataset, read_xcsp3
+
 from cpmpy.transformations import int2bool
 
 import random
@@ -329,6 +332,51 @@ def show_env(env):
         env=env,
         verbosity=2,
     )
+
+
+def load_xcsp():
+    tables = []
+    seen_problems = set()
+    for year, track in (
+        (2025, "COP25"),
+        # (2025, "MiniCOP25"),
+        # (2024, "COP"),
+    ):
+        max_iterations = None
+        for i, (filename, metadata) in enumerate(XCSP3Dataset(year=year, track=track, download=True)):
+            # Do whatever you want here, e.g. reading to a CPMpy model and solving it:
+            print("f", filename, metadata)
+
+            def get_problem_name(name):
+                return name.split("-")[0]
+
+            problem_name = get_problem_name(metadata["name"])
+            if problem_name in seen_problems:
+                continue
+            else:
+                seen_problems.add(problem_name)
+
+            model = read_xcsp3(filename)
+            if model is None:
+                continue
+
+            instance_tables = []
+            for c in model.constraints:
+                if isinstance(c, cp.expressions.core.Expression) and c.name == "table":
+                    _, tab = c.args
+                    height, width = len(tab), len(tab[0])
+                    # print("t", tab, height, width)
+                    instance_tables.append((height, width))
+
+            tables.append((filename, sum(w * h for w, h in instance_tables), instance_tables))
+
+            if max_iterations is not None and i > max_iterations:
+                break
+
+    print("TABLES", tables)
+    with open("./cpmpy/tools/xcsp3/tables.txt", "w") as file:
+        file.write("\n".join(":".join(str(t) for t in table) for table in tables))
+    return
 
 
 def main():
