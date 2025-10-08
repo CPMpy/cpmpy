@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import pytest
 import itertools
 import numpy as np
 import math
@@ -62,7 +63,7 @@ def cols(T, i, j=1):
     return set(int(i) for i in np.where(T[i, :] == j)[0].flatten())
 
 
-def shrink(C, T):
+def shrink(C, T, env):
     for i in C:
         log(f"shrinking {i} in {C}", env=env, verbosity=3)
 
@@ -84,10 +85,11 @@ class Heuristic(Enum):
     REDUCE = 3
 
 
-def choose(A, T_enc, R, heuristic=Heuristic.INPUT):
+def choose(A, T_enc, R, env):
+    log(f"Choose from {sorted(A)} for table {T_enc} from remaining choices {R}", env=env, verbosity=2)
     if len(A) == 0:
         return None
-    match heuristic:
+    match env.get("heuristic", Heuristic.INPUT):
         case Heuristic.INPUT:
             return min(i for i in A)
         case Heuristic.GREEDY:
@@ -98,44 +100,51 @@ def choose(A, T_enc, R, heuristic=Heuristic.INPUT):
                 key=lambda i: len(rows(T_enc, i)),
                 default=None,  # TODO [?] check this edge-case
             )
-            return choice or choose(A, T_enc, R, heuristic=Heuristic.GREEDY)
+            return (
+                choice if choice is not None else choose(A, T_enc, R, {**env, "heuristic": Heuristic.GREEDY})
+            )
 
 
+# TODO convert T_enc to set of tuples?
 def explain(A_enc, T_enc, env):
-    A_enc = cols(np.array([A_enc]), 0)
-    log(f"Explain {sorted(A_enc)}", env=env)
-    C = set()  # vars added to cut
-    R = set(range(len(T_enc)))
-    iterations = 0
-    while len(R):
-        # choose some col which is 1
-        i = choose(A_enc - C, T_enc, R, heuristic=env.get("heuristic"))
+    log(f"Explain {A_enc}", env=env)
 
-        if i is None:  # TODO [?] slightly different stopping condition
+    X = set()  # columns added to cut
+    R = set(range(len(T_enc)))  # remaining columns
+    W = set(i for i, a in enumerate(A_enc) if a == 1.0)
+    F = set(i for i, a in enumerate(A_enc) if 0.0 < a < 1.0)
+
+    log(f"W = {sorted(W)}", verbosity=3, env=env)
+    log(f"F = {sorted(F)}", verbosity=3, env=env)
+
+    for iteration in itertools.count(start=1):
+        if not len(R):
             break
+        if W <= X:
+            log("  unexplainable", env=env)
+            log(f"    because {W} <= {X}", env=env, verbosity=3)
+            return set()  # no cut
 
-        log("A", A_enc, C, env=env, verbosity=3)
-        log(f"adding {i + 1}", env=env, verbosity=3)
-        T_i = rows(T_enc, i)
-        R = R.intersection(T_i)
-        C.add(i)
-        iterations += 1
-        assert iterations <= env.get("max_iterations", iterations)
+        # choose some col which is 1
+        log("A", A_enc, X, env=env, verbosity=3)
+        i = choose(W - X, T_enc, R, env=env)
+        log(f"chosen {i}", env=env, verbosity=3)
 
-    log(f"  by explanation of size ({len(C)}): {C}", env=env)
+        R = R.intersection(rows(T_enc, i))
+        X.add(i)
+
+        # Loop termination for debug purposes
+        assert iteration <= env.get("max_iterations", iteration)
+
+    log(f"  by explanation of size ({len(X)}): {X}", env=env)
     if env.get("shrink", True):
-        size = len(C)
-        C = shrink(C, T_enc)
-        if len(C) < size:
-            log(f"  shrunk to size ({len(C)}): {C}", env=env)
-            # assert False, "TODO; shrinking is not triggering"
+        size = len(X)
+        X = shrink(X, T_enc, env)
+        if len(X) < size:
+            log(f"  shrunk to size ({len(X)}): {X}", env=env)
 
-    if env.get("cuts"):
-        assert C not in env["cuts"], f"Already found cut {C} previously in {env['cuts']}"
-        env["cuts"].append({"cut": C, "shrunk": 0})
-
-    log(f"  cut == {C}", env=env)
-    return C
+    log(f"  cut == {X}", env=env)
+    return X
 
 
 def show_sols(sols, T):
@@ -146,8 +155,24 @@ import gurobipy as gp
 from gurobipy import GRB
 
 
+def assert_integer_solution(A_enc):
+    for a_enc_i in A_enc:
+        assert math.isclose(a_enc_i, round(a_enc_i), abs_tol=1e-5), (
+            f"Expected integer solution for MIP, but got {a_enc_i} in {A_enc}"
+        )
+
+
 def get_x_enc(ivarmap):
     return [x_enc_i for x_enc in ivarmap.values() for x_enc_i in x_enc._xs]
+
+
+def log_explanation(explanation, frm, env):
+    if "cuts" in env:
+        if env["debug"]:
+            assert explanation not in (c["cut"] for c in env["cuts"]), (
+                f"Already found cut {explanation} previously in {env['cuts']}"
+            )
+        env["cuts"].append({"cut": explanation, "shrunk": 0, "from": frm})
 
 
 def get_solution_callback(slv, ivarmap, T_enc, env):
@@ -157,38 +182,40 @@ def get_solution_callback(slv, ivarmap, T_enc, env):
     def solution_callback(what, where):
         try:
             A_enc = None
+            frm = None
             match where:
                 case GRB.Callback.MIPNODE:
-                    return  # TODO implement fractional explanation
                     if (  # Optimal solution to LP relaxation
                         what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL
                     ):
                         A_enc = [what.cbGetNodeRel(x_enc_i) for x_enc_i in X_enc_grb]
-                        log("MIPNODE-OPT", A_enc, env=env, verbosity=2)
+                        frm = "MIPNODE-OPT"
                         A_enc = [int(a_enc_i) for a_enc_i in A_enc]
                     else:
                         return
                 case GRB.Callback.MIPSOL:  # Integer solution
                     A_enc = [what.cbGetSolution(x_enc_i) for x_enc_i in X_enc_grb]
-                    log("MIPSOL", A_enc, env=env, verbosity=2)
-                    for a_enc_i in A_enc:
-                        assert math.isclose(a_enc_i, round(a_enc_i), abs_tol=1e-5), (
-                            f"Expected integer solution for MIP, but got {a_enc_i} in {A_enc}"
-                        )
+                    frm = "MIPSOL"
+                    assert_integer_solution(A_enc)
                     A_enc = [round(a_enc_i) for a_enc_i in A_enc]
                 case _:
                     return
 
+            log(frm, A_enc, env=env, verbosity=2)
             A_enc = [int(a_enc_i) for a_enc_i in A_enc]
             # if constraint.value():
             if A_enc in T_enc.tolist():
                 return
 
-            X.clear()
-
             # encode assignment
             explanation = explain(A_enc, T_enc, env)
-            print("e", explanation)
+            log_explanation(explanation, frm, env)
+
+            if not explanation:
+                assert not assert_integer_solution(A_enc)
+                # TODO assert this was integer solution?
+                return  # did not find solution
+
             grbs = [slv.solver_var(X_enc[c]) for c in explanation]
             what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
             what.write("/tmp/gurobi.lp")
@@ -207,6 +234,11 @@ def solve(X, T, env):
     log("T_enc =", env=env, verbosity=1)
     log(T_enc, env=env, verbosity=1)
 
+    # Init env
+    env["debug"] = env.get("debug", False)
+    env["debug_unlucky"] = False  # TODO re-enable
+    env["cuts"] = []
+
     # X_enc = [x == d for x in X for d in range(x.lb, x.ub + 1)]
     ivarmap = {}
     model = cp.Model()
@@ -216,15 +248,15 @@ def solve(X, T, env):
         expr, k = x_enc.encode_term()
         # model += cp.sum(c * b for c, b in expr) + k == x
     X_enc = get_x_enc(ivarmap)
-    # model.minimize(sum(X))
+    model.minimize(sum(X))
     table = cp.Table(X, T)
 
     sols = []
 
-    if DEBUG:
+    if env.get("debug", False):
         n_sols = model.solveAll(
             display=lambda: sols.append([x.value() for x in X]),
-            solver=env["solver"],
+            solver=env.get("solver", "gurobi"),
             solution_limit=1000 if env["solver"] == "gurobi" else None,
         )
         assert env["solver"] != "gurobi" or n_sols < 1000
@@ -238,7 +270,7 @@ def solve(X, T, env):
         for row in T:
             assert row.tolist() in sols, f"Removed sol: {row}"
 
-        if DEBUG_UNLUCKY:
+        if env["debug_unlucky"]:
             # force getting unlucky
             non_sol = next((sol for sol in sols if sol not in T.tolist()), sols[0])
             for x, a in zip(X, non_sol):
@@ -250,7 +282,7 @@ def solve(X, T, env):
 
     log("Model:", model, env=env, verbosity=2)
     log("Solving.. ", env=env, end="")
-    slv = cp.SolverLookup.get(env["solver"], model)
+    slv = cp.SolverLookup.get(env.get("solver", "gurobi"), model)
     slv.native_model.Params.LazyConstraints = 1
     # slv.native_model.Params.LogFile = "/tmp/gurobi.log"
     if env["verbosity"] >= 3:
@@ -271,13 +303,15 @@ def solve(X, T, env):
 
         A_enc = [x.value() for x in X_enc]
         explanation = explain(A_enc, T_enc, env)
+        log_explanation(explanation, "SOL", env)
+        assert explanation, "Expected explanation for integer solution"
         explanation = cp.sum(X_enc[c] for c in explanation) < len(explanation)
         assert explanation is not False, f"{A_enc}"
         log(f"  constraint == {explanation}", env=env)
-        # assert False
         slv += [explanation]
 
-        if iteration <= env.get("max_iterations", iteration):
+        if iteration > env.get("max_iterations", iteration):
+            raise Exception(f"Out of iterations ({env['max_iterations']=})")
             return False
 
 
@@ -286,24 +320,21 @@ def solve(X, T, env):
 
 def show_env(env):
     log(", ".join(f"{k}={env[k]}" for k in ["shrink", "heuristic"]), env=env, verbosity=0)
-    log(f"n_cuts = {len(env['cuts'])}", env=env, verbosity=0)
+    # log(f"cuts = {env['cuts']}", env=env, verbosity=1)
+    log(f"n_cuts = {sum(len(c['cut']) > 0 for c in env['cuts'])}", env=env, verbosity=0)
+    log(f"n_unexplained = {list(len(c['cut']) for c in env['cuts']).count(0)}", env=env, verbosity=0)
     log(
         "cut cardinalities/strengths:",
-        ", ".join(f"{len(c['cut'])} / {c.get('space', '?')}" for c in env["cuts"]),
+        ", ".join(f"{len(c['cut'])}" for c in env["cuts"]),
         env=env,
         verbosity=2,
     )
 
 
-if __name__ == "__main__":
-    DEBUG = False
-    DEBUG_UNLUCKY = False
-    random.seed(42)
-
+def main():
     envs = [
         {
             "solver": "gurobi",
-            # "solver": "ortools",
             "shrink": shrink,
             "heuristic": heuristic,
             "cuts": [],
@@ -331,7 +362,6 @@ if __name__ == "__main__":
     # X, T = generate_table(2, 2, 3)
     # X, T = generate_table(3, 10, 5)
 
-    # DEBUG = False
     # X, T = generate_table(5, 25, 10)
     X, T = generate_table(10, 100, 10)
 
@@ -344,23 +374,44 @@ if __name__ == "__main__":
 
     log("STATS", env=env)
     for env in envs:
-        log(", ".join(f"{k}={env[k]}" for k in ["shrink", "heuristic"]), env=env, verbosity=0)
-        log(f"n_cuts = {len(env['cuts'])}", env=env, verbosity=0)
-        log(
-            "cut cardinalities:",
-            ", ".join(f"{len(c['cut'])}" for c in env["cuts"]),
-            env=env,
-            verbosity=2,
-        )
+        show_env(env)
+
+
+if __name__ == "__main__":
+    random.seed(42)
+    assert pytest.main() == pytest.ExitCode.OK
+    main()
+
+
+@pytest.fixture()
+def env():
+    yield {"verbosity": 4}
 
 
 class TestTables:
-    @classmethod
-    def setup_class(cls):
-        cls.TEST_ENV = {"verbosity": 4}
-
-    def test_explain_frac(self):
+    def test_explain_frac(self, env):
         X, T = generate_table_from_example()
         T_enc = encode(X, T)
-        print(T_enc)
-        assert explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc, self.__class__.TEST_ENV) == {42}
+        assert (  # Example 1 from assignment [2,2,2]
+            explain([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc, env) == {1, 5}
+        )
+        assert (  # Example 6
+            explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc, env) == set()
+        )
+
+    @pytest.mark.parametrize(
+        "table",
+        (
+            generate_table_from_data([[1, 1], [2, 2]], 3),
+            generate_table_from_example(),
+            generate_table(2, 2, 3),
+            generate_table(3, 10, 5),
+            generate_table(5, 25, 10),
+            # generate_table(10, 100, 10),
+        ),
+    )
+    def test_tables(self, table, env):
+        X, T = table
+        assert solve(X, T, env), "Expected feasible"
+        A = [x.value() for x in X]
+        assert A in T.tolist(), f"Check failed: assignment {A} was not in the table."
