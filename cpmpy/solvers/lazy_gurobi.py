@@ -10,6 +10,10 @@ from cpmpy.solvers.gurobi import CPM_gurobi
 from enum import Enum
 
 
+class Infeasible(Exception):
+    pass
+
+
 def rows(T, i, j=1):
     """Row indices where T[i]==j"""
     return set(int(i) for i in np.where(T[:, i] == j)[0].flatten())
@@ -18,10 +22,6 @@ def rows(T, i, j=1):
 def cols(T, i, j=1):
     """Col indices where T[i]==j"""
     return set(int(i) for i in np.where(T[i, :] == j)[0].flatten())
-
-
-def get_x_enc(ivarmap):
-    return [x_enc_i for x_enc in ivarmap.values() for x_enc_i in x_enc._xs]
 
 
 def is_integer_solution(A_enc):
@@ -172,7 +172,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
             self.env["cuts"].append({"cut": explanation, "shrunk": 0, "from": frm})
 
     def get_solution_callback(self):
-        all_xs = get_x_enc(self.ivarmap)
+        all_xs = self.get_x_encs(self.ivarmap.keys())
 
         def solution_callback(what, where):
             try:
@@ -204,6 +204,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 self.log(frm, x_enc_a, verbosity=2)
 
                 # If fully integer, we can check if the tables are feasible yet
+                print("s", self.tables)
                 for X_enc, T_enc in self.tables:
                     A_enc = [x_enc_a[x_enc_i] for x_enc_i in X_enc]
 
@@ -220,10 +221,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
                         grbs = [self.solver_var(X_enc[c]) for c in explanation]
                         what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
                     elif frm == "MIPSOL":  # unsat
-                        what.cbLazy(False)
+                        raise Infeasible
+                        # what.cbLazy(1 <= 0)
 
                 assert len(self.env.get("cuts", [])) <= self.env.get(
-                    "max_iterations", self.env.get("cuts", [])
+                    "max_iterations", len(self.env.get("cuts", []))
                 )
             except Exception as e:
                 what._callback_exception = e
@@ -243,10 +245,19 @@ class CPM_lazy_gurobi(CPM_gurobi):
             self.native_model.Params.OutputFlag = 1
             self.native_model.write("/tmp/gurobi.lp")
 
-        hassol = super().solve(solution_callback=self.get_solution_callback())
+        try:
+            hassol = super().solve(solution_callback=self.get_solution_callback())
+        except Infeasible:
+            hassol = False
+
         # TODO recheck https://or.stackexchange.com/questions/12591/ensure-gurobi-uses-callback-on-all-feasible-solutions It looks like if the solution at the end of the root node is integer, gurobi doesn't pass through callbacks for fractional solutions.
 
         return hassol
+
+    def get_x_encs(self, X):
+        print("X", X)
+        print("X", self.ivarmap)
+        return [x_enc_i for x in X for x_enc_i in self.ivarmap[x]._xs]
 
     def transform(self, cpm_expressions):
         cpm_cons = []  # all but tables
@@ -275,7 +286,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                         cpm_cons += self.transform(
                             [*exactly_one_con, cp.sum(c * b for c, b in expr) + k == x]
                         )
-                    X_enc = get_x_enc(self.ivarmap)
+                    X_enc = self.get_x_encs(x.name for x in X)
                     self.tables.append((X_enc, T_enc))
                 else:
                     cpm_cons.append(cpm_expr_tf)
