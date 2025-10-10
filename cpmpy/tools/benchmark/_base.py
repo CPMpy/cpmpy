@@ -156,7 +156,7 @@ class Benchmark(ABC):
                     
                     current_time = time.time()
                     obj = int(self.ObjectiveValue())
-                    _self.print_comment('Solution %i, time = %0.2fs' % 
+                    _self.print_comment('Solution %i, time = %0.4fs' % 
                                 (self.__solution_count, current_time - self.__start_time))
                     _self.print_intermediate(obj)
                     self.__solution_count += 1
@@ -286,7 +286,7 @@ class Benchmark(ABC):
                         if model.cbGet(GRB.Callback.MIP_SOLCNT) > self.__solution_count: # do we have a new solution?
 
                             obj = int(model.cbGet(GRB.Callback.MIP_OBJBST))
-                            _self.print_comment('Solution %i, time = %0.2fs' % 
+                            _self.print_comment('Solution %i, time = %0.4fs' % 
                                         (self.__solution_count, current_time - self.__start_time))
                             _self.print_intermediate(obj)
                             self.__solution_count = model.cbGet(GRB.Callback.MIP_SOLCNT)
@@ -324,7 +324,7 @@ class Benchmark(ABC):
                     current_time = time.time()
                     obj = sres.get_objective_value()
                     if obj is not None:
-                        _self.print_comment('Solution %i, time = %0.2fs' % 
+                        _self.print_comment('Solution %i, time = %0.4fs' % 
                                     (self.__solution_count, current_time - self.__start_time))
                         _self.print_intermediate(obj)
                         self.__solution_count += 1
@@ -472,7 +472,7 @@ class Benchmark(ABC):
             time_parse = time.time()
             model = self.read_instance(instance, open=open)
             time_parse = time.time() - time_parse
-            if verbose: self.print_comment(f"took {time_parse:.4f} seconds to parse model [{instance}]")
+            if verbose: self.print_comment(f"took {time_parse:.4f} seconds to parse model")
 
             if time_limit and time_limit < _wall_time(p):
                 raise TimeoutError("Time's up after parse")
