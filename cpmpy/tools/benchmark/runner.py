@@ -94,6 +94,7 @@ def wrapper(instance_runner, conn, kwargs, verbose):
         sys.stdout = Tee(original_stdout, pipe_writer) # forward to pipe and console
 
     try:
+        kwargs["verbose"] = verbose
         instance_runner.run(**kwargs)
         conn.send({"status": "ok"})
     except TimeoutError:

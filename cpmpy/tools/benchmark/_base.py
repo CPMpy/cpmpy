@@ -84,7 +84,7 @@ class Benchmark(ABC):
         print(comment)
 
     def print_intermediate(self, objective:int):
-        print("Intermediate solution:", objective)
+        self.print_comment("Intermediate solution:", objective)
 
     def print_result(self, s):
         self.print_comment(s.status())

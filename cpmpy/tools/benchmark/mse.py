@@ -99,11 +99,13 @@ class MSEBenchmark(Benchmark):
         print('s' + chr(32) + status.value, end="\n", flush=True)
 
     def print_value(self, value: str) -> None:
-        value = value[:-2].replace("\n", "\nv" + chr(32)) + value[-2:]
         print('v' + chr(32) + value, end="\n", flush=True)
 
     def print_objective(self, objective: int) -> None:
         print('o' + chr(32) + str(objective), end="\n", flush=True)
+    
+    def print_intermediate(self, objective:int):
+        self.print_objective(objective)
 
     def print_result(self, s):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
@@ -159,17 +161,17 @@ class MSEBenchmark(Benchmark):
                 result['solution'] = solution
             else:
                 result['solution'] = result['solution'] + ' ' + str(solution)
+        elif line.startswith('c Solution'):
+            parts = line.split(', time = ')
+            # Get solution time from comment for intermediate solution -> used for annotating 'o ...' lines
+            self._sol_time = float(parts[-1].replace('s', '').rstrip())
         elif line.startswith('o '):
             obj = int(line[2:].strip())
             if result['intermediate'] is None:
                 result['intermediate'] = []
-            result['intermediate'] += [(sol_time, obj)]
+            result['intermediate'] += [(self._sol_time, obj)]
             result['objective_value'] = obj
             obj = None
-        elif line.startswith('c Solution'):
-            parts = line.split(', time = ')
-            # Get solution time from comment for intermediate solution -> used for annotating 'o ...' lines
-            sol_time = float(parts[-1].replace('s', '').rstrip())
         elif line.startswith('c took '):
             # Parse timing information
             parts = line.split(' seconds to ')

@@ -136,6 +136,9 @@ class XCSP3Benchmark(Benchmark):
     def print_objective(self, objective: int) -> None:
         print('o' + chr(32) + str(objective), end="\n", flush=True)
 
+    def print_intermediate(self, objective:int):
+        self.print_objective(objective)
+
     def print_result(self, s):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
             self.print_value(solution_xcsp3(s))
