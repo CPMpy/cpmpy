@@ -421,7 +421,7 @@ class Benchmark(ABC):
             return self.cpo_arguments(model=model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
         else:
             self.print_comment(f"setting parameters of {solver} is not (yet) supported")
-            return dict()
+            return dict(), None
 
     def run(
         self,
