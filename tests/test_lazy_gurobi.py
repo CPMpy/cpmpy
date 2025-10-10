@@ -63,7 +63,6 @@ def show_assignment(X):
 
 def check_model(model):
     violations = [c for c in model.constraints if c.value() is False]
-    print("V", violations, ",".join(str(v.value()) for v in violations))
     X = cp.transformations.get_variables.get_variables_model(model)
     if model.copy().solve():
         assert all(x.value() is not None for x in X), (

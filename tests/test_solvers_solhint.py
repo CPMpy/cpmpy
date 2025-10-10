@@ -25,7 +25,7 @@ class TestSolutionHinting:
             pytest.skip(f"{solver} does not support solution hinting")
             return
         
-        if solver == "gurobi":
+        if solver in ("gurobi", "lazy_gurobi"):
             pytest.skip("Gurobi supports solution hinting, but simple models are solved too fast to see the effect")
             return
         

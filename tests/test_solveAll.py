@@ -24,7 +24,7 @@ class TestSolveAll(unittest.TestCase):
 
             # special case for some solvers
             kwargs = dict(display=add_sol)
-            if name in ("gurobi", "cplex"):
+            if name in ("gurobi", "lazy_gurobi", "cplex"):
                 kwargs['solution_limit'] =  1000
             elif name == "hexaly":
                 kwargs['time_limit'] = 5
@@ -45,7 +45,7 @@ class TestSolveAll(unittest.TestCase):
                 add_sol = lambda: sols.add(str(x.value().tolist()))
 
                 kwargs = dict(display=add_sol)
-                if name in ("gurobi", "cplex"):
+                if name in ("gurobi", "lazy_gurobi", "cplex"):
                     kwargs['solution_limit'] = 1000
                 elif name == "hexaly":
                     kwargs['time_limit'] = 5

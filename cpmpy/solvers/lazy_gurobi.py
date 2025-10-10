@@ -204,7 +204,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 self.log(frm, x_enc_a, verbosity=2)
 
                 # If fully integer, we can check if the tables are feasible yet
-                print("s", self.tables)
                 for X_enc, T_enc in self.tables:
                     A_enc = [x_enc_a[x_enc_i] for x_enc_i in X_enc]
 
@@ -237,6 +236,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         """
         Call the gurobi solver with cut generation
         """
+        assert solution_callback is None, "For now, no solution_callback in `CPM_lazy_gurobi`"
 
         self.log("Solving.. ")
         self.native_model.Params.LazyConstraints = 1
@@ -246,7 +246,9 @@ class CPM_lazy_gurobi(CPM_gurobi):
             self.native_model.write("/tmp/gurobi.lp")
 
         try:
-            hassol = super().solve(solution_callback=self.get_solution_callback())
+            hassol = super().solve(
+                solution_callback=self.get_solution_callback(), time_limit=time_limit, **kwargs
+            )
         except Infeasible:
             hassol = False
 
@@ -255,39 +257,30 @@ class CPM_lazy_gurobi(CPM_gurobi):
         return hassol
 
     def get_x_encs(self, X):
-        print("X", X)
-        print("X", self.ivarmap)
         return [x_enc_i for x in X for x_enc_i in self.ivarmap[x]._xs]
 
     def transform(self, cpm_expressions):
         cpm_cons = []  # all but tables
+        cpm_expressions = super().transform(cpm_expressions)
         for cpm_expr in cpm_expressions:
-            if hasattr(cpm_expr, "name") and cpm_expr.name == "table":
-                cpm_expr_tfs = [cpm_expr]
+            if cpm_expr.name == "table":
+                X, T = cpm_expr.args
+                self.log("X =", ", ".join(f"{x} in {x.lb}..{x.ub}" for x in X), verbosity=0)
+                self.log("T =", verbosity=1)
+                self.log(T, verbosity=1)
+                T_enc = encode(X, T)
+                self.log("T_enc =", verbosity=1)
+                self.log(T_enc, verbosity=1)
+
+                for x in X:
+                    x_enc, exactly_one_con = cp.transformations.int2bool._encode_int_var(
+                        self.ivarmap, x, "direct"
+                    )
+                    expr, k = x_enc.encode_term()
+                    # TODO if only BV, then need to assign (but no need to assign if decoding constraint present)
+                    cpm_cons += self.transform([*exactly_one_con, cp.sum(c * b for c, b in expr) + k == x])
+                X_enc = self.get_x_encs(x.name for x in X)
+                self.tables.append((X_enc, T_enc))
             else:
-                cpm_expr_tfs = super().transform(cpm_expr)
-
-            for cpm_expr_tf in cpm_expr_tfs:
-                if cpm_expr_tf.name == "table":
-                    X, T = cpm_expr_tf.args
-                    self.log("X =", ", ".join(f"{x} in {x.lb}..{x.ub}" for x in X), verbosity=0)
-                    self.log("T =", verbosity=1)
-                    self.log(T, verbosity=1)
-                    T_enc = encode(X, T)
-                    self.log("T_enc =", verbosity=1)
-                    self.log(T_enc, verbosity=1)
-
-                    for x in X:
-                        x_enc, exactly_one_con = cp.transformations.int2bool._encode_int_var(
-                            self.ivarmap, x, "direct"
-                        )
-                        expr, k = x_enc.encode_term()
-                        # TODO if only BV, then need to assign (but no need to assign if decoding constraint present)
-                        cpm_cons += self.transform(
-                            [*exactly_one_con, cp.sum(c * b for c, b in expr) + k == x]
-                        )
-                    X_enc = self.get_x_encs(x.name for x in X)
-                    self.tables.append((X_enc, T_enc))
-                else:
-                    cpm_cons.append(cpm_expr_tf)
+                cpm_cons.append(cpm_expr)
         return cpm_cons
