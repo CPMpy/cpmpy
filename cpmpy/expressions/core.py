@@ -552,7 +552,7 @@ class Comparison(Expression):
     """
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
-    def __init__(self, name, left, right):
+    def __init__(self, name:str, left:ExprOrConst, right:ExprOrConst):
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
 
@@ -570,7 +570,7 @@ class Comparison(Expression):
 
     # return the value of the expression
     # optional, default: None
-    def value(self):
+    def value(self) -> Optional[bool]:
         arg_vals = argvals(self.args)
 
         if any(a is None for a in arg_vals): return None
