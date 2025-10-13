@@ -607,7 +607,7 @@ class Operator(Expression):
     }
     printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
 
-    def __init__(self, name, arg_list):
+    def __init__(self, name: str, arg_list: NestedList[ExprOrConst]):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         arity, is_bool_op = Operator.allowed[name]
