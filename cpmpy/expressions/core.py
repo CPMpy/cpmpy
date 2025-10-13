@@ -440,21 +440,21 @@ class BoolVal(Expression):
         Wrapper for python or numpy BoolVals
     """
 
-    def __init__(self, arg):
+    def __init__(self, arg: BoolConst) -> None:
         assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
         return self.args[0]
 
-    def __invert__(self):
+    def __invert__(self) -> "BoolVal":
         return BoolVal(not self.args[0])
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
 
-    def __int__(self):
+    def __int__(self) -> int:
         """Called to implement conversion to numerical"""
         return int(self.args[0])
 
@@ -462,7 +462,7 @@ class BoolVal(Expression):
         v = int(self.args[0])
         return (v,v)
 
-    def __and__(self, other):
+    def __and__(self, other: ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
             return BoolVal(self.args[0] and other)
         elif isinstance(other, Expression) and other.is_bool():
@@ -473,7 +473,7 @@ class BoolVal(Expression):
         raise ValueError(f"{self}&{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
         
     
-    def __rand__(self, other):
+    def __rand__(self, other: ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
             return BoolVal(self.args[0] and other)
         elif isinstance(other, Expression) and other.is_bool():
@@ -484,7 +484,7 @@ class BoolVal(Expression):
         raise ValueError(f"{self}&{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
 
     
-    def __or__(self, other):
+    def __or__(self, other : ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
             return BoolVal(self.args[0] or other)
         elif isinstance(other, Expression) and other.is_bool():
@@ -495,7 +495,7 @@ class BoolVal(Expression):
         raise ValueError(f"{self}|{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
         
         
-    def __ror__(self, other):
+    def __ror__(self, other: ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
             return BoolVal(self.args[0] or other)
         elif isinstance(other, Expression) and other.is_bool():
@@ -505,7 +505,7 @@ class BoolVal(Expression):
                 return BoolVal(True)
         raise ValueError(f"{self}|{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
         
-    def __xor__(self, other):
+    def __xor__(self, other : ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
             return BoolVal(self.args[0] ^ other)
         elif isinstance(other, Expression) and other.is_bool():
@@ -516,7 +516,7 @@ class BoolVal(Expression):
         raise ValueError(f"{self}^^{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
     
     
-    def __rxor__(self, other):
+    def __rxor__(self, other: ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
             return BoolVal(self.args[0] ^ other)
         elif isinstance(other, Expression) and other.is_bool():
@@ -536,6 +536,7 @@ class BoolVal(Expression):
 
     def implies(self, other):
         if self.args[0]:
+    def implies(self, other: ExprOrConst) -> "Expression":
             return other
         else:
             return other == other  # Always true, but keep variables in the model
