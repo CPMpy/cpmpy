@@ -534,12 +534,17 @@ class BoolVal(Expression):
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other):
-        if self.args[0]:
     def implies(self, other: ExprOrConst) -> "Expression":
+        # other constant
+        if is_true_cst(other):
+            return BoolVal(True)
+        elif is_false_cst(other):
+            return ~self
+        elif self.args[0] and isinstance(other, Expression):
             return other
-        else:
-            return other == other  # Always true, but keep variables in the model
+        elif not self.args[0]:
+            return Operator('->', [self, other])
+        raise ValueError(f"Expected Boolean constant or Expression but got {other} of type {type(other)}.")
 
 
 class Comparison(Expression):
