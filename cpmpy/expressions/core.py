@@ -120,7 +120,7 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name, arg_list):
+    def __init__(self, name:str, arg_list):
         self.name = name
 
         if isinstance(arg_list, (tuple, GeneratorType)):
@@ -159,7 +159,7 @@ class Expression(object):
         self._override_print = override_print
         self._full_print = full_print
 
-    def __str__(self):
+    def __str__(self) -> str:
         if not hasattr(self, "desc") or self._override_print is False:
             return self.__repr__()
         out = self.desc
@@ -168,7 +168,7 @@ class Expression(object):
         return out
 
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         strargs = []
         for arg in self.args:
             if isinstance(arg, np.ndarray):
@@ -236,7 +236,7 @@ class Expression(object):
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
     # for double implication, use equivalence self == other
-    def implies(self, other):
+    def implies(self, other:ExprOrConst) -> "Expression":
         # other constant
         if is_true_cst(other):
             return BoolVal(True)
@@ -245,7 +245,7 @@ class Expression(object):
         return Operator('->', [self, other])
 
     # Comparisons
-    def __eq__(self, other):
+    def __eq__(self, other: ExprOrConst) -> "Expression":  # type: ignore
         # BoolExpr == 1|true|0|false, common case, simply BoolExpr
         if self.is_bool() and is_num(other):
             if other is True or other == 1:
@@ -254,24 +254,24 @@ class Expression(object):
                 return ~self
         return Comparison("==", self, other)
 
-    def __ne__(self, other):
+    def __ne__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
         return Comparison("!=", self, other)
 
-    def __lt__(self, other):
+    def __lt__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
         return Comparison("<", self, other)
 
-    def __le__(self, other):
+    def __le__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
         return Comparison("<=", self, other)
 
-    def __gt__(self, other):
+    def __gt__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
         return Comparison(">", self, other)
 
-    def __ge__(self, other):
+    def __ge__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
         return Comparison(">=", self, other)
 
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
-    def __and__(self, other):
+    def __and__(self, other: ExprOrConst) -> "Expression":
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -281,7 +281,7 @@ class Expression(object):
                             f"E.g. always write (x==2)&(y<5).")
         return Operator("and", [self, other])
 
-    def __rand__(self, other):
+    def __rand__(self, other: ExprOrConst) -> "Expression":
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -291,7 +291,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
-    def __or__(self, other):
+    def __or__(self, other: ExprOrConst) -> "Expression":
         # some simple constant removal
         if is_false_cst(other):
             return self
@@ -301,7 +301,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [self, other])
 
-    def __ror__(self, other):
+    def __ror__(self, other: ExprOrConst) -> "Expression":
         # some simple constant removal
         if is_false_cst(other):
             return self
@@ -311,7 +311,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
 
-    def __xor__(self, other):
+    def __xor__(self, other: ExprOrConst) -> "Expression":
         # some simple constant removal
         if is_true_cst(other):
             return ~self
@@ -319,7 +319,7 @@ class Expression(object):
             return self
         return cp.Xor([self, other])
 
-    def __rxor__(self, other):
+    def __rxor__(self, other: ExprOrConst) -> "Expression":
         # some simple constant removal
         if is_true_cst(other):
             return ~self
@@ -329,31 +329,31 @@ class Expression(object):
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
-    def __add__(self, other):
+    def __add__(self, other: ExprOrConst) -> "Expression":
         if is_num(other) and other == 0:
             return self
         return Operator("sum", [self, other])
 
-    def __radd__(self, other):
+    def __radd__(self, other: ExprOrConst) -> "Expression":  # type: ignore
         if is_num(other) and other == 0:
             return self
         return Operator("sum", [other, self])
 
     # substraction
-    def __sub__(self, other):
+    def __sub__(self, other: ExprOrConst) -> "Expression":
         # if is_num(other) and other == 0:
         #     return self
         # return Operator("sub", [self, other])
         return self.__add__(-other)
 
-    def __rsub__(self, other):
+    def __rsub__(self, other: ExprOrConst) -> "Expression":  # type: ignore
         # if is_num(other) and other == 0:
         #     return -self
         # return Operator("sub", [other, self])
         return (-self).__radd__(other)
     
     # multiplication, puts the 'constant' (other) first
-    def __mul__(self, other):
+    def __mul__(self, other: ExprOrConst) -> "Expression":
         if is_num(other) and other == 1:
             return self
         # this unnecessarily complicates wsum creation
@@ -361,7 +361,7 @@ class Expression(object):
         #    return other
         return Operator("mul", [self, other])
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: ExprOrConst) -> "Expression":  # type: ignore
         if is_num(other) and other == 1:
             return self
         # this unnecessarily complicates wsum creation
@@ -373,36 +373,36 @@ class Expression(object):
     #object.__matmul__(self, other)
 
     # other mathematical ones
-    def __truediv__(self, other):
+    def __truediv__(self, other: ExprOrConst) -> "Expression":
         warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
         return self.__floordiv__(other)
 
-    def __rtruediv__(self, other):
+    def __rtruediv__(self, other: ExprOrConst) -> "Expression":  # type: ignore
         warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
         return self.__rfloordiv__(other)
 
-    def __floordiv__(self, other):
+    def __floordiv__(self, other: ExprOrConst) -> "Expression":
         if is_num(other) and other == 1:
             return self
         return Operator("div", [self, other])
 
-    def __rfloordiv__(self, other):
+    def __rfloordiv__(self, other: ExprOrConst) -> "Expression":  # type: ignore
         return Operator("div", [other, self])
 
-    def __mod__(self, other):
+    def __mod__(self, other: ExprOrConst) -> "Expression":
         return Operator("mod", [self, other])
 
-    def __rmod__(self, other):
+    def __rmod__(self, other: ExprOrConst) -> "Expression":  # type: ignore
         return Operator("mod", [other, self])
 
-    def __pow__(self, other, modulo=None):
+    def __pow__(self, other: ExprOrConst, modulo=None) -> "Expression":
         assert (modulo is None), "Power operator: modulo not supported"
         if is_num(other):
             if other == 1:
                 return self
         return Operator("pow", [self, other])
 
-    def __rpow__(self, other, modulo=None):
+    def __rpow__(self, other: ExprOrConst, modulo=None) -> "Expression":  # type: ignore
         assert (modulo is None), "Power operator: modulo not supported"
         return Operator("pow", [other, self])
 
@@ -410,7 +410,7 @@ class Expression(object):
     #object.__divmod__(self, other)
 
     # unary mathematical operators
-    def __neg__(self):
+    def __neg__(self) -> "Expression":
         # special case, -(w*x) -> -w*x
         if self.name == 'mul' and is_num(self.args[0]):
             return Operator(self.name, [-self.args[0], self.args[1]])
@@ -419,13 +419,13 @@ class Expression(object):
             return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
         return Operator("-", [self])
 
-    def __pos__(self):
+    def __pos__(self) -> "Expression":
         return self
 
-    def __abs__(self):
+    def __abs__(self) -> "Expression":
         return cp.Abs(self)
 
-    def __invert__(self):
+    def __invert__(self) -> "Expression":
         if not (is_boolexpr(self)):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", [self])
