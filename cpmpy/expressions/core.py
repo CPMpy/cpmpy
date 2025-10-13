@@ -87,7 +87,7 @@
 import copy
 import warnings
 from types import GeneratorType
-from typing import Union, TypeAlias, TypeVar,Collection
+from typing import Union, TypeAlias, TypeVar, Collection, Optional
 
 import numpy as np
 import cpmpy as cp
