@@ -96,7 +96,7 @@ from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexp
 from ..exceptions import IncompleteFunctionError, TypeError
 
 # Define types
-BoolConst : TypeAlias = Union[bool, np.bool, "BoolVal"]
+BoolConst : TypeAlias = Union[bool, np.bool_, "BoolVal"]
 NumConst : TypeAlias = Union[BoolConst, int, float, np.integer, np.floating]
 ExprOrConst : TypeAlias = Union["Expression", NumConst]
 
