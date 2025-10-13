@@ -87,12 +87,22 @@
 import copy
 import warnings
 from types import GeneratorType
+from typing import Union, TypeAlias, TypeVar,Collection
+
 import numpy as np
 import cpmpy as cp
 
 from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
 
+# Define types
+BoolConst : TypeAlias = Union[bool, np.bool, "BoolVal"]
+NumConst : TypeAlias = Union[BoolConst, int, float, np.integer, np.floating]
+ExprOrConst : TypeAlias = Union["Expression", NumConst]
+
+T = TypeVar('T')
+FlatList = Collection[T] | "NDVarArray"
+NestedList = Collection[Union[T, Collection[T]]]
 
 class Expression(object):
     """
