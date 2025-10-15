@@ -341,6 +341,10 @@ class CPM_cplex(SolverInterface):
         if cpm_expr.name == "sub":
             a,b = self.solver_vars(cpm_expr.args)
             return a - b
+
+        if cpm_expr.name == "mul":
+            a,b = self.solver_vars(cpm_expr.args)
+            return a * b
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
