@@ -158,9 +158,25 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
             # linearize unsupported operators
             elif isinstance(lhs, Operator) and lhs.name not in supported:
 
-                if lhs.name == "mul" and is_num(lhs.args[0]):
-                    lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
-                    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+                if lhs.name == "mul":
+                    bv_idx = None
+                    if is_num(lhs.args[0]): # const * iv <comp> rhs
+                        lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
+                        cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+                    elif isinstance(lhs.args[0], _BoolVarImpl):
+                        bv_idx = 0
+                    elif isinstance(lhs.args[1], _BoolVarImpl):
+                        bv_idx = 1
+
+                    if bv_idx is not None:
+                        # bv * iv <comp> rhs, rewrite to (bv -> iv <comp> rhs) & (~bv -> 0 <comp> rhs)
+                        bv, iv = lhs.args[bv_idx], lhs.args[1-bv_idx]
+                        bv_true = bv.implies(eval_comparison(cpm_expr.name, iv, rhs))
+                        bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
+                        newlist += linearize_constraint([bv_true, bv_false], supported=supported, reified=reified, csemap=csemap)
+                        continue
+                    else:
+                        raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
 
                 elif lhs.name == "pow" and "pow" not in supported:
                     if "mul" not in supported:
