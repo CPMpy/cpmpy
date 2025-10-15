@@ -48,9 +48,9 @@ EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
 EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysat": {"mul", "div", "pow", "mod"},  # int2bool but mul, and friends, not linearized
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "pindakaas": {"mul", "div", "pow", "mod"},
+                     "pindakaas": {"mul-int", "div", "pow", "mod"},
                      "exact": {},
-                     "cplex": {"mul", "div", "mod", "pow"},
+                     "cplex": {"mul-int", "div", "mod", "pow"},
                      "pumpkin": {"pow", "mod"},
                      }
 
@@ -87,13 +87,15 @@ def numexprs(solver):
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
         elif name == "div" or name == "pow":
-            operator_args = [NN_VAR,3]
+            yield Operator(name, [NN_VAR,3])
+        elif name == "mul" and "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
+            yield Operator(name, NUM_ARGS[:arity])
+        elif name == "mul" and "mul-bool" not in EXCLUDE_OPERATORS.get(solver, {}):
+            yield Operator(name, BOOL_ARGS[:arity])
         elif arity != 0:
-            operator_args = NUM_ARGS[:arity]
+            yield Operator(name, NUM_ARGS[:arity])
         else:
-            operator_args = NUM_ARGS
-
-        yield Operator(name, operator_args)
+            yield Operator(name, NUM_ARGS)
 
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
