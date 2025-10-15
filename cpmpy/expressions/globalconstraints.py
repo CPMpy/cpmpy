@@ -770,7 +770,7 @@ class Cumulative(GlobalConstraint):
         lb, ub = min(start), max(end)
         start, end = np.array(start), np.array(end) # eases check below
         for t in range(lb, ub+1):
-            if capacity < sum(demand * ((start <= t) & (t < end))):
+            if capacity < sum(demand * ((start <= t) & (end > t))):
                 return False
 
         return True
