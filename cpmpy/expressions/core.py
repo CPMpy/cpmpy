@@ -464,7 +464,7 @@ class BoolVal(Expression):
 
     def __and__(self, other: ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
-            return BoolVal(self.args[0] and other)
+            return BoolVal(cast("bool", self.args[0] and other))
         elif isinstance(other, Expression) and other.is_bool():
             if self.args[0]:
                 return other
@@ -475,7 +475,7 @@ class BoolVal(Expression):
     
     def __rand__(self, other: ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
-            return BoolVal(self.args[0] and other)
+            return BoolVal(cast("bool", self.args[0] and other))
         elif isinstance(other, Expression) and other.is_bool():
             if self.args[0]:
                 return other
@@ -486,7 +486,7 @@ class BoolVal(Expression):
     
     def __or__(self, other : ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
-            return BoolVal(self.args[0] or other)
+            return BoolVal(cast("bool", self.args[0] or other))
         elif isinstance(other, Expression) and other.is_bool():
             if not self.args[0]:
                 return other
@@ -497,7 +497,7 @@ class BoolVal(Expression):
         
     def __ror__(self, other: ExprOrConst) -> Expression:
         if is_bool(other): # Boolean constant
-            return BoolVal(self.args[0] or other)
+            return BoolVal(cast("bool", self.args[0] or other))
         elif isinstance(other, Expression) and other.is_bool():
             if not self.args[0]:
                 return other
