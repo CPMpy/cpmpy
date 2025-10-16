@@ -24,7 +24,9 @@ ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES)
 
 SKIPPED_EXAMPLES = [
                     "ocus_explanations.py", # waiting for issues to be resolved 
-                    "psplib.py" # randomly fails on github due to file creation
+                    "psplib.py", # randomly fails on github due to file creation
+                    "prob044_steiner.py", # depends on pysat
+                    "exact_maximal_propagate.py" # depends on exact
                     ]
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
