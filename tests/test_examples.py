@@ -25,9 +25,13 @@ ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES)
 SKIPPED_EXAMPLES = [
                     "ocus_explanations.py", # waiting for issues to be resolved 
                     "psplib.py", # randomly fails on github due to file creation
-                    "prob044_steiner.py", # depends on pysat
-                    "exact_maximal_propagate.py" # depends on exact
                     ]
+
+SOLVER_SPECIFIC_EXAMPLES = {
+    "pysat": ["prob044_steiner.py"],
+    "exact": ["exact_maximal_propagate.py"]
+}
+_SOLVER_SPECIFIC_EXAMPLES_REVERSE = {v:k for k,vs in SOLVER_SPECIFIC_EXAMPLES.items() for v in vs}
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
             'prob009_perfect_squares.py', 'blocks_world.py', 'flexible_jobshop.py',
@@ -61,6 +65,13 @@ def test_example(solver, example):
         return pytest.skip(reason=f"exclude {example} for {solver}, too slow or solver-specific")
     if solver == 'minizinc' and any(x in example for x in SKIP_MZN):
         return pytest.skip(reason=f"exclude {example} for {solver}, too slow or solver-specific")
+    # Skip solver specific tests for which the solver is not installed
+    for skip_name in _SOLVER_SPECIFIC_EXAMPLES_REVERSE.keys():
+        if skip_name in example:
+            if not SolverLookup.lookup(_SOLVER_SPECIFIC_EXAMPLES_REVERSE[skip_name]).supported():
+                pytest.skip(f"Skipped {example} due to solver {_SOLVER_SPECIFIC_EXAMPLES_REVERSE[skip_name]} not being available on the current system.")
+            else:
+                break
 
     base_solvers = SolverLookup.base_solvers
     try:
@@ -97,4 +108,11 @@ def test_advanced_example(example):
     """Loads the advanced example file and executes its __main__ block with no default solver set."""
     if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):
         pytest.skip(f"Skipped {example}, waiting for issues to be resolved")
+    # Skip solver specific tests for which the solver is not installed
+    for skip_name in _SOLVER_SPECIFIC_EXAMPLES_REVERSE.keys():
+        if skip_name in example:
+            if not SolverLookup.lookup(_SOLVER_SPECIFIC_EXAMPLES_REVERSE[skip_name]).supported():
+                pytest.skip(f"Skipped {example} due to solver {_SOLVER_SPECIFIC_EXAMPLES_REVERSE[skip_name]} not being available on the current system.")
+            else:
+                break
     test_example(None, example)
