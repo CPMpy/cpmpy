@@ -4,10 +4,6 @@
 
 This is a very small release with a hotfix for multi-dimensional indexing where the index is a decision variable.
 
-### Changed
-
-* Bump ReadTheDocs python version from 3.7 to 3.12 [2d958b1](https://github.com/CPMpy/cpmpy/commit/2d958b1b91dc928b38d626e2aa420cb3cc3a37a4)
-
 ### Fixed
 
 * Hotfix for single expression in multi-dimensional indexing [#772](https://github.com/CPMpy/cpmpy/pull/772)
