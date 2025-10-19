@@ -139,7 +139,7 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit=None, assumptions=[], **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions=[], **kwargs):
         """
             Call the z3 solver
 

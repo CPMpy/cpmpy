@@ -148,7 +148,7 @@ class CPM_gcs(SolverInterface):
     def has_objective(self):
         return self.objective_var is not None
     
-    def solve(self, time_limit=None, prove=False, proof_name=None, proof_location=".", 
+    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name=None, proof_location=".",
               verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
@@ -250,7 +250,7 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def solveAll(self, time_limit=None, display=None, solution_limit=None, call_from_model=False, 
+    def solveAll(self, time_limit:Optional[float]=None, display=None, solution_limit=None, call_from_model=False,
                  prove=False, proof_name=None, proof_location=".", verify=False, verify_time_limit=None, veripb_args = [], 
                  display_verifier_output=True, **kwargs):
         """

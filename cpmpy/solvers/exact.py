@@ -172,7 +172,7 @@ class CPM_exact(SolverInterface):
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
-    def solve(self, time_limit=None, assumptions=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions=None, **kwargs):
         """
             Call Exact
 
@@ -274,7 +274,7 @@ class CPM_exact(SolverInterface):
             if timelim == 0: timelim = -1
         return timelim
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally, display the solutions.
 
