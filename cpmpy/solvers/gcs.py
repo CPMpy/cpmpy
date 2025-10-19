@@ -96,6 +96,7 @@ class CPM_gcs(SolverInterface):
         # try to import the package
         try:
             import gcspy
+            pkg_resources.require("gcspy>=0.1.8")
             return True
         except ModuleNotFoundError:
             return False
