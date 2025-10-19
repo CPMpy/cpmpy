@@ -138,7 +138,7 @@ class SolverInterface(object):
     def status(self):
         return self.cpm_status
 
-    def solve(self, model, time_limit=None):
+    def solve(self,model, time_limit:Optional[float]=None):
         """
             Build the CPMpy model into solver-supported model ready for solving
             and returns the answer (True/False/objective.value())
