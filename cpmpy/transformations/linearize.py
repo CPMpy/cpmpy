@@ -132,8 +132,14 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                             break # do not need to add other
                         elif "->" in supported and not reified:
                             indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
-                        else: # need to implement using big-M
+                        else: # Nested -> or implication constraints are not supported
                             assert isinstance(lin, Comparison)
+                            if lin.args[0].name not in {"sum", "wsum"}:
+                                assert lin.args[0].name in supported, f"Unexpected rhs of implication: {lin}, it is not supported ({supported})"
+                                indicator_constraints.append(cond.implies(lin))
+                                continue
+
+                            # need to write as big-M
                             assert lin.args[0].name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as rhs of implication constraint, but got {lin}"
                             assert is_num(lin.args[1])
                             lb, ub = get_bounds(lin.args[0])
