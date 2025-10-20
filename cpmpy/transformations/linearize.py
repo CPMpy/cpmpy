@@ -154,7 +154,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     newlist+=indicator_constraints
 
                     # ensure no new solutions are created
-                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
+                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr)) - {cond, ~cond}
                     newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified, csemap=csemap)
 
             else: # supported operator
