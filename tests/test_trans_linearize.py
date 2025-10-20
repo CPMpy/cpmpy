@@ -238,6 +238,73 @@ class TestTransLinearize(unittest.TestCase):
         [lin_cons] = linearize_constraint([cons])
         self.assertEqual(str(lin_cons), "sum([1, -1] * [x, y]) == 3")
 
+    def test_bool_mult(self):
+
+        x = cp.intvar(-5, 10, name="x")
+        y = cp.intvar(-5, 10, name="y")
+        a = cp.boolvar(name="a")
+        b = cp.boolvar(name="b")
+
+        def assert_cons_is_true(cons):
+            return lambda : self.assertTrue(cons.value())
+
+        cons = b * x == y
+        bt,bf = linearize_constraint([cons])
+        self.assertEqual(str(bt), "(b) -> (sum([1, -1] * [x, y]) == 0)")
+        self.assertEqual(str(bf), "(~b) -> (sum([y]) == 0)")
+
+        cp.Model([bt,bf]).solveAll(display=assert_cons_is_true(cons))
+
+        cons = x * b == y
+        bt,bf = linearize_constraint([cons])
+        self.assertEqual(str(bt), "(b) -> (sum([1, -1] * [x, y]) == 0)")
+        self.assertEqual(str(bf), "(~b) -> (sum([y]) == 0)")
+
+        cp.Model([bt,bf]).solveAll(display=assert_cons_is_true(cons))
+
+        cons = a.implies(b * x <= y)
+        lin_cons = linearize_constraint([cons])
+        self.assertEqual(str(lin_cons[0]), "(a) -> (sum([1, -1, -15] * [x, y, ~b]) <= 0)")
+        self.assertEqual(str(lin_cons[1]), "(a) -> (sum([1, 5] * [y, b]) >= 0)")
+
+        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cp.all(lin_cons)))
+        self.assertEqual(lin_cnt, cons_cnt)
+
+        cons = a.implies(b * x >= y)
+        lin_cons = linearize_constraint([cons])
+        self.assertEqual(str(lin_cons[0]), "(a) -> (sum([1, -1, 15] * [x, y, ~b]) >= 0)")
+        self.assertEqual(str(lin_cons[1]), "(a) -> (sum([1, -10] * [y, b]) <= 0)")
+
+        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cp.all(lin_cons)))
+        self.assertEqual(lin_cnt, cons_cnt)
+
+
+    def test_implies(self):
+
+        x = cp.intvar(1, 10, name="x")
+        y = cp.intvar(1, 10, name="y")
+        b = cp.boolvar(name="b")
+
+        cons = b.implies(x + y <= 5)
+        [lin_cons] = linearize_constraint([cons], supported={"sum", "wsum"}) # no support for "->"
+        self.assertEqual(str(lin_cons), "sum([1, 1, -15] * [x, y, ~b]) <= 5")
+
+        cons = b.implies(x + y >= 5)
+        [lin_cons] = linearize_constraint([cons], supported={"sum", "wsum"})  # no support for "->"
+        self.assertEqual(str(lin_cons), "sum([1, 1, 3] * [x, y, ~b]) >= 5")
+
+        cons = b.implies(x + y == 5)
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum"})  # no support for "->"
+        assert len(lin_cons) == 2
+        self.assertEqual(str(lin_cons[0]), "sum([1, 1, -15] * [x, y, ~b]) <= 5")
+        self.assertEqual(str(lin_cons[1]), "sum([1, 1, 3] * [x, y, ~b]) >= 5")
+
+
+
+
+
 
 class TestConstRhs(unittest.TestCase):
 
