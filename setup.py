@@ -51,7 +51,7 @@ setup(
     zip_safe=False,
     install_requires=[
         'ortools>=9.9',
-        'numpy>=1.5',
+        'numpy>=1.5,<2',
         'setuptools',
     ],
     extras_require={
