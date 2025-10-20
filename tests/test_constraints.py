@@ -46,7 +46,7 @@ EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {},
-                     "pysat": {"mul", "div", "pow", "mod"},  # int2bool but mul, and friends, not linearized
+                     "pysat": {"mul-int", "div", "pow", "mod"},  # int2bool but integer-multiplication, and friends, not linearized
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pindakaas": {"mul-int", "div", "pow", "mod"},
                      "exact": {},
