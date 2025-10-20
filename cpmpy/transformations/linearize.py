@@ -128,7 +128,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                             continue
                         elif is_false_cst(lin):
                             indicator_constraints=[] # do not add any constraints
-                            newlist+=linearize_constraint([~cond], supported=supported, csemap=csemap) # post linear version of unary constraint
+                            newlist+=linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified) # post linear version of unary constraint
                             break # do not need to add other
                         else:
                             indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
