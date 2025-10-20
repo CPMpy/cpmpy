@@ -173,7 +173,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                         bv, iv = lhs.args[bv_idx], lhs.args[1-bv_idx]
                         bv_true = bv.implies(eval_comparison(cpm_expr.name, iv, rhs))
                         bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
-                        newlist += linearize_constraint([bv_true, bv_false], supported=supported, reified=reified, csemap=csemap)
+                        newlist += simplify_boolean(linearize_constraint([bv_true, bv_false], supported=supported, reified=reified, csemap=csemap))
                         continue
                     else:
                         raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
