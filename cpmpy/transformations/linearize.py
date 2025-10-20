@@ -188,6 +188,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     if is_num(lhs.args[0]): # const * iv <comp> rhs
                         lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
                         newlist += linearize_constraint([eval_comparison(cpm_expr.name, lhs, rhs)], supported=supported, reified=reified, csemap=csemap)
+                        continue
                     elif isinstance(lhs.args[0], _BoolVarImpl):
                         bv_idx = 0
                     elif isinstance(lhs.args[1], _BoolVarImpl):
