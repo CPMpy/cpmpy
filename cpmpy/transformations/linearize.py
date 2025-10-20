@@ -70,7 +70,7 @@ from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
-def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, csemap=None):
+def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -130,8 +130,27 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                             indicator_constraints=[] # do not add any constraints
                             newlist+=linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified) # post linear version of unary constraint
                             break # do not need to add other
-                        else:
+                        elif "->" in supported and not reified:
                             indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
+                        else: # need to implement using big-M
+                            assert isinstance(lin, Comparison)
+                            assert lin.args[0].name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as rhs of implication constraint, but got {lin}"
+                            assert is_num(lin.args[1])
+                            lb, ub = get_bounds(lin.args[0])
+                            if lin.name == "<=":
+                                M = lin.args[1] - ub # substracting M from lhs will always satisfy the implied constraint
+                                lin.args[0] += M * ~cond
+                                indicator_constraints.append(lin)
+                            elif lin.name == ">=":
+                                M = lin.args[1] - lb # adding M to lhs will always satisfy the implied constraint
+                                lin.args[0] += M * ~cond
+                                indicator_constraints.append(lin)
+                            elif lin.name == "==":
+                                indicator_constraints += linearize_constraint([cond.implies(lin.args[0] <= lin.args[1]),
+                                                                               cond.implies(lin.args[0] >= lin.args[1])],
+                                                                              supported=supported, reified=True, csemap=csemap)
+                            else:
+                                raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
                     newlist+=indicator_constraints
 
                     # ensure no new solutions are created
