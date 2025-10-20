@@ -138,7 +138,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                             assert is_num(lin.args[1])
                             lb, ub = get_bounds(lin.args[0])
                             if lin.name == "<=":
-                                M = lin.args[1] - ub # substracting M from lhs will always satisfy the implied constraint
+                                M = lin.args[1] - ub # subtracting M from lhs will always satisfy the implied constraint
                                 lin.args[0] += M * ~cond
                                 indicator_constraints.append(lin)
                             elif lin.name == ">=":
