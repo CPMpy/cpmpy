@@ -86,14 +86,16 @@ def numexprs(solver):
             yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
+        elif name == "mul":
+            yield Operator(name, [3,NUM_ARGS[0]])
+            yield Operator(name, NUM_ARGS[:2])
         elif name == "div" or name == "pow":
-            operator_args = [NN_VAR,3]
+            yield Operator(name, [NN_VAR,3])
         elif arity != 0:
-            operator_args = NUM_ARGS[:arity]
+            yield Operator(name, NUM_ARGS[:arity])
         else:
-            operator_args = NUM_ARGS
+            yield Operator(name, NUM_ARGS)
 
-        yield Operator(name, operator_args)
 
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
