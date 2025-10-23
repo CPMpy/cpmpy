@@ -89,6 +89,7 @@ def numexprs(solver):
         elif name == "mul":
             yield Operator(name, [3,NUM_ARGS[0]])
             yield Operator(name, NUM_ARGS[:2])
+            yield Operator(name, [3,BOOL_ARGS[0]])
         elif name == "div" or name == "pow":
             yield Operator(name, [NN_VAR,3])
         elif arity != 0:
