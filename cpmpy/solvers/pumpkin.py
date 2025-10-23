@@ -272,13 +272,6 @@ class CPM_pumpkin(SolverInterface):
             # return from cache
             return self._varmap[cpm_var]
         
-        # can also be a scaled variable (multiplication view)
-        elif isinstance(cpm_var, Operator) and cpm_var.name == "mul":
-            const, cpm_var = cpm_var.args
-            if not is_num(const):
-                raise ValueError(f"Cannot create view from non-constant multiplier {const} * {cpm_var}")
-            return self.solver_var(cpm_var).scaled(const)
-        
         raise ValueError(f"Not a known var {cpm_var}")
 
 
@@ -396,6 +389,12 @@ class CPM_pumpkin(SolverInterface):
             return self.pum_solver.boolean_as_integer(self.solver_var(cpm_var), tag=tag)
         elif is_num(cpm_var):
             return self.solver_var(intvar(cpm_var, cpm_var))
+        # can also be a scaled variable (multiplication view)
+        elif isinstance(cpm_var, Operator) and cpm_var.name == "mul":
+            const, cpm_var = cpm_var.args
+            if not is_num(const):
+                raise ValueError(f"Cannot create view from non-constant multiplier {const} * {cpm_var}")
+            return self.to_pum_ivar(cpm_var, tag=tag).scaled(const)
         else:
             return self.solver_var(cpm_var)
 
