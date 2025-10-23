@@ -66,10 +66,10 @@ def _parse_term(line, vars):
 
         for v in vars_str.split():
             if v.startswith("~x"):
-                idx = int(v[2:]) # remove "~x"
+                idx = int(v[2:]) - 1 # remove "~x" and opb is 1-based indexing
                 factors.append(~vars[idx])
             else:
-                idx = int(v[1:]) # remove "x"
+                idx = int(v[1:]) - 1 # remove "x" and opb is 1-based indexing
                 factors.append(vars[idx])
         
         term = int(w) * reduce(mul, factors, 1) # create weighted term
@@ -162,13 +162,15 @@ def read_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
         header = HEADER_RE.match(_line)
         if not header:
             raise ValueError(f"Missing or incorrect header: \n0: {line}1: {_line}2: ...")
-    nr_vars = int(header.group(2)) + 1
+    nr_vars = int(header.group(2))
 
     # Generator without comment lines
     reader = (l for l in map(str.strip, f) if l and l[0] != '*')
 
     # CPMpy objects
     vars = cp.boolvar(shape=nr_vars, name="x")
+    if nr_vars == 1:
+        vars = cp.cpm_array([vars]) # ensure vars is indexable even for single variable case
     model = cp.Model()
     
     # Special case for first line -> might contain objective function
