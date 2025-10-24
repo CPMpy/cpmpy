@@ -658,7 +658,7 @@ class Xor(GlobalConstraint):
         decomp = [sum(self.args[:2]) == 1]
         if len(self.args) > 2:
             decomp = Xor([decomp,self.args[2:]]).decompose()[0]
-        return decomp, []
+        return cp.transformations.normalize.simplify_boolean(decomp), []
 
     def value(self):
         return sum(argvals(self.args)) % 2 == 1
