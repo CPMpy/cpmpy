@@ -1,3 +1,8 @@
+"""
+PSPlib Dataset
+
+https://www.om-db.wi.tum.de/psplib/getdata_sm.html
+"""
 import os
 import pathlib
 from typing import Tuple, Any
@@ -10,18 +15,25 @@ class PSPLibDataset(object):  # torch.utils.data.Dataset compatible
     """
     PSPlib Dataset in a PyTorch compatible format.
     
-    Arguments:
-        root (str): Root directory containing the psplib instances (if 'download', instances will be downloaded to this location)
-        variant (str): scheduling variant (only 'rcpsp' is supported for now)
-        family (str): family name (e.g. j30, j60, etc...)
-        transform (callable, optional): Optional transform to be applied on the instance data
-        target_transform (callable, optional): Optional transform to be applied on the file path
-        download (bool): If True, downloads the dataset from the internet and puts it in `root` directory
+    More information on PSPlib can be found here: https://www.om-db.wi.tum.de/psplib/main.html
     """
     
     def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False):
         """
-        Initialize the PSPLib Dataset.
+        Constructor for a dataset object for PSPlib.
+
+        Arguments:
+            root (str): Root directory containing the psplib instances (if 'download', instances will be downloaded to this location)
+            variant (str): scheduling variant (only 'rcpsp' is supported for now)
+            family (str): family name (e.g. j30, j60, etc...)
+            transform (callable, optional): Optional transform to be applied on the instance data
+            target_transform (callable, optional): Optional transform to be applied on the file path
+            download (bool): If True, downloads the dataset from the internet and puts it in `root` directory
+
+
+        Raises:
+            ValueError: If the dataset directory does not exist and `download=False`,
+                or if the requested variant/family combination is not available.
         """
         
         self.root = pathlib.Path(root)
@@ -117,3 +129,8 @@ class PSPLibDataset(object):  # torch.utils.data.Dataset compatible
             metadata = self.target_transform(metadata)
             
         return filename, metadata
+    
+if __name__ == "__main__":
+    dataset = PSPLibDataset(variant="rcpsp", family="j30", download=True)
+    print("Dataset size:", len(dataset))
+    print("Instance 0:", dataset[0])
