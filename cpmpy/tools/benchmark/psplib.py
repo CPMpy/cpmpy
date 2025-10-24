@@ -9,7 +9,7 @@ Command-line Interface
 This script can be run directly to benchmark solvers on PSPLIB datasets.
 
 Usage:
-    python psplib.py --year 2024 --track exact-weighted --solver ortools
+    python psplib.py --year 2024 --variant rcpsp --family j30
 
 Arguments:
     --variant       Problem variant (e.g., rcpsp).
@@ -30,8 +30,7 @@ List of classes
 .. autosummary::
     :nosignatures:
 
-    MSEExitStatus
-    MSEBenchmark
+    PSPLIBBenchmark
 
 =================
 List of functions
@@ -40,7 +39,7 @@ List of functions
 .. autosummary::
     :nosignatures:
 
-    solution_mse
+    solution_psplib
 """
 
 import warnings
