@@ -45,25 +45,25 @@ if __name__ == "__main__":
     lr = 0.01
     num_epochs = 15
 
+    
     # Generate data
     weights, x, y = pyepo.data.knapsack.genData(num_data, num_feat, num_item, 1, deg, noise_width, seed)
     weights = weights[0]
-    capacity = 0.5 * sum(weights)
+    capacity = 0.2 weights.sum()
 
+    
     # Initialize PyEPO-wrapped optimisation model (just the constraints, works for any CPMpy model)
-    m = cp.Model()
     dv = cp.boolvar(shape=num_item, name="x")
-    m += weights * dv <= 0.2 * weights.sum()
+    m = cp.Model(
+        weights * dv <= capacity,  # capacity constraint
+    )
     optmodel = optCPMpyModel(m, dv, sense=pyepo.EPO.MAXIMIZE, solver="gurobi")
 
-    # Initialize linear regressor
-    pred_model = nn.Linear(num_feat, num_item)
-
-    # Use ADAM optimizer
+    # Initialize machine learning model, optimizer and PyEPO-wrapped loss
+    pred_model = nn.Linear(num_feat, num_item)  # linear regressor
     optimizer = torch.optim.Adam(pred_model.parameters(), lr=lr)
-
-    # Init Torch loss: PyEPO's SPO+ loss over the PyEPO optimisation model
-    spo_plus = pyepo.func.SPOPlus(optmodel, processes=1)
+    spo_plus = pyepo.func.SPOPlus(optmodel, processes=1)  # PyEPO's SPO+ loss over the PyEPO optimisation model
+    
 
     # Split dataset into training and test sets
     n_training = int(num_data * 0.8)
@@ -76,6 +76,7 @@ if __name__ == "__main__":
     test_dataset = pyepo.data.dataset.optDataset(optmodel, x_test, y_test)
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=32)
 
+    
     # Training
     pred_model.train()
     training_regrets = []
@@ -98,6 +99,7 @@ if __name__ == "__main__":
         print(f"Epoch {epoch + 1}, Training normalized regret: {normalized_regret:.4f}")
         pred_model.train()  # Switch back to training mode
 
+    
     # Plot training regrets
     plt.figure(figsize=(10, 6))
     plt.plot(
