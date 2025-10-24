@@ -142,7 +142,7 @@ class CPM_ortools(SolverInterface):
         return self.ort_model
 
 
-    def solve(self, time_limit=None, assumptions=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions=None, solution_callback=None, **kwargs):
         """
             Call the CP-SAT solver
 
@@ -277,7 +277,7 @@ class CPM_ortools(SolverInterface):
                 cpm_var._value = None
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 

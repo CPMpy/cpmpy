@@ -138,18 +138,11 @@ class SolverInterface(object):
     def status(self):
         return self.cpm_status
 
-    def solve(self, model, time_limit=None):
+    def solve(self,time_limit:Optional[float]=None):
         """
-            Build the CPMpy model into solver-supported model ready for solving
-            and returns the answer (True/False/objective.value())
+            Call the underlying solver.
 
             Overwrites self.cpm_status
-
-            :param model: CPMpy model to be parsed.
-            :type model: Model
-
-            :param time_limit: optional, time limit in seconds
-            :type time_limit: int or float
 
             :return: Bool:
                 - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
@@ -236,7 +229,7 @@ class SolverInterface(object):
 
     # OPTIONAL functions
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
