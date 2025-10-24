@@ -388,13 +388,16 @@ class TestGlobal(unittest.TestCase):
         from cpmpy.expressions.utils import argval
         self.assertTrue(sum(argval(X)) == 0)
 
-        Z = cp.intvar(0, 1, shape=(3,2))
+        Z = cp.intvar(0, 1, shape=(4,2))
         c = cp.LexChainLess(Z)
         m = cp.Model(c)
         self.assertTrue(m.solve())
         self.assertTrue(sum(argval(Z[0])) == 0)
         self.assertTrue(sum(argval(Z[1])) == 1)
-        self.assertTrue(sum(argval(Z[2])) >= 1)
+        self.assertTrue(argval(Z[1,0]) == 0)
+        self.assertTrue(sum(argval(Z[2])) == 1)
+        self.assertTrue(argval(Z[2,1]) == 0)
+        self.assertTrue(sum(argval(Z[3])) >= 1)
 
 
     def test_indomain_onearg(self):
