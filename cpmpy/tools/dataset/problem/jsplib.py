@@ -120,6 +120,9 @@ class JSPLibDataset(object):  # torch.utils.data.Dataset compatible
             for entry in json.load(f):
                 if entry["name"] == file_path.stem:
                     metadata = entry
+                    if "bounds" not in metadata: 
+                        metadata["bounds"] = {"upper": metadata["optimum"], "lower": metadata["optimum"]}
+                    del metadata['path']
                     metadata['path'] = str(file_path)
                     break
             else:
