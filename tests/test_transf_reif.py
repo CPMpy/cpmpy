@@ -1,4 +1,5 @@
 import unittest
+import pytest
 import numpy as np
 from cpmpy import *
 from cpmpy.transformations.decompose_global import decompose_in_tree
@@ -7,6 +8,7 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
+@pytest.mark.usefixtures("solver")
 class TestTransfReif(unittest.TestCase):
     def setUp(self):
         _IntVarImpl.counter = 0
@@ -30,7 +32,7 @@ class TestTransfReif(unittest.TestCase):
         # test transformation
         for (expr, strexpr) in cases:
             self.assertEqual( str(only_implies(only_bv_reifies((expr,)))), strexpr )
-            self.assertTrue(Model(expr).solve())
+            self.assertTrue(Model(expr).solve(solver=self.solver))
 
     def test_reif_element(self):
         bvs = boolvar(shape=5, name="bvs")
@@ -45,7 +47,7 @@ class TestTransfReif(unittest.TestCase):
         e1 = (bvs[iv] == rv)
         e2 = (cpm_array([1,0,1,1])[iv] == rv)
         for e in [e1,e2]:
-            self.assertTrue(Model(e).solve())
+            self.assertTrue(Model(e).solve(solver=self.solver))
 
 
         # Another case to be careful with:
@@ -68,11 +70,11 @@ class TestTransfReif(unittest.TestCase):
         for (lb,ub,cnt) in cases:
             idx = intvar(lb,ub, name="idx")
             e = (rv == (arr[idx] != 1))
-            self.assertEqual(Model(e).solveAll(), cnt)
+            self.assertEqual(Model(e).solveAll(solver=self.solver), cnt)
 
         # Another case, with a more specific check... if the element-wise decomp is empty
         e = bvs[0].implies(Element([1,2,3], iv) < 1)
-        self.assertFalse(Model(e, bvs[0]==True).solve())
+        self.assertFalse(Model(e, bvs[0]==True).solve(solver=self.solver))
 
 
     def test_reif_rewrite(self):

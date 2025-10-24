@@ -24,6 +24,7 @@ def frietkot():
     model = Model(allwishes)
     return model, [mayo, ketchup, curry, andalouse, samurai]
 
+@pytest.mark.requires_solver("pysat")
 @pytest.mark.skipif(not CPM_pysat.supported(),
                     reason="PySAT not installed")
 class TestPySATInterrupt(unittest.TestCase):

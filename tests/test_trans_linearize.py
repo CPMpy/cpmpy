@@ -1,4 +1,5 @@
 import unittest
+import pytest
 
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
@@ -9,7 +10,7 @@ from cpmpy.transformations.flatten_model import flatten_objective
 from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
-
+@pytest.mark.usefixtures("solver")
 class TestTransLinearize(unittest.TestCase):
 
     def setUp(self):
@@ -35,6 +36,7 @@ class TestTransLinearize(unittest.TestCase):
         cons = linearize_constraint([a.implies(b)])[0]
         self.assertEqual("sum([1, -1] * [a, b]) <= 0", str(cons))
     
+    @pytest.mark.requires_solver("gurobi")
     def test_bug_168(self):
         from cpmpy.solvers import CPM_gurobi
         if CPM_gurobi.supported():
@@ -44,7 +46,8 @@ class TestTransLinearize(unittest.TestCase):
             s1 = cp.Model(e1).solve("gurobi")
             self.assertTrue(s1)
             self.assertEqual([bv[0].value(), bv[1].value(), iv.value()],[True, True, 1])
-            
+    
+    @pytest.mark.requires_solver("gurobi", "exact")
     def test_bug_468(self):
         from cpmpy.solvers import CPM_exact, CPM_gurobi
         a, b, c = boolvar(shape=3)
@@ -159,8 +162,8 @@ class TestTransLinearize(unittest.TestCase):
 
         for lhs in (pos,neg,x):
             cons = cp.Abs(lhs) == y
-            cnt = cp.Model(cons).solveAll()
-            lcnt = cp.Model(linearize_constraint([cons])).solveAll(display=self.assertTrue(cons.value()))
+            cnt = cp.Model(cons).solveAll(solver=self.solver)
+            lcnt = cp.Model(linearize_constraint([cons])).solveAll(solver=self.solver, display=self.assertTrue(cons.value()))
             self.assertEqual(cnt, lcnt)
 
 
@@ -174,7 +177,7 @@ class TestTransLinearize(unittest.TestCase):
         def cb():
             assert cons.value()
 
-        n_sols = cp.Model(lincons).solveAll(display=cb)
+        n_sols = cp.Model(lincons).solveAll(solver=self.solver, display=cb)
         self.assertEqual(n_sols, 5 * 4 * 3)
 
         # should also work with constants in arguments
@@ -185,25 +188,26 @@ class TestTransLinearize(unittest.TestCase):
         def cb():
             assert cons.value()
 
-        n_sols = cp.Model(lincons).solveAll(display=cb)
+        n_sols = cp.Model(lincons).solveAll(solver=self.solver, display=cb)
         self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
 
     def test_issue_580(self):
         x = cp.intvar(1, 5, name='x')
         lin_mod = linearize_constraint([x % 2 == 0], supported={"mul","sum", "wsum"})
-        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertTrue(cp.Model(lin_mod).solve(solver=self.solver))
         self.assertIn(x.value(),{2,4})
 
 
         lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
         self.assertEqual(str(lin_mod), '[IV7 <= 0, sum([2, -1] * [IV8, IV9]) == 0, sum([1, 1, -1] * [IV9, IV7, x]) == 0]')
-        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertTrue(cp.Model(lin_mod).solve(solver=self.solver))
         self.assertIn(x.value(), {2, 4}) # can never be < 0
 
         lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
-        self.assertTrue(cp.Model(lin_mod).solve())
+        self.assertTrue(cp.Model(lin_mod).solve(solver=self.solver))
         self.assertIn(x.value(), {1,3,5})
 
+    @pytest.mark.requires_solver("gurobi", "exact")
     def test_issue_546(self):
         # https://github.com/CPMpy/cpmpy/issues/546
         arr = cp.cpm_array([cp.intvar(0, 5), cp.intvar(0, 5), 5, 4]) # combination of decision variables and constants
@@ -290,7 +294,7 @@ class TestConstRhs(unittest.TestCase):
         cons = linearize_constraint(cons, supported={"alldifferent"})[0]
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
-
+@pytest.mark.usefixtures("solver")
 class TestVarsLhs(unittest.TestCase):
 
     def setUp(self): # reset counters
@@ -347,14 +351,14 @@ class TestVarsLhs(unittest.TestCase):
         cons = a ** 5 == b
         lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
         model = cp.Model(lin_cons + [a == 2])
-        self.assertTrue(model.solve())
+        self.assertTrue(model.solve(solver=self.solver))
         self.assertEqual(b.value(), 32)  # 2^5 = 32
 
         # Test x^0 == y (should equal 1)
         cons = a ** 0 == b
         lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
         model = cp.Model(lin_cons + [a == 3])
-        self.assertTrue(model.solve())
+        self.assertTrue(model.solve(solver=self.solver))
         self.assertEqual(b.value(), 1)
 
         # not supported pow with exponent being a variable
@@ -390,11 +394,11 @@ class TestVarsLhs(unittest.TestCase):
         # disallows 2 mod 3 = 2
         cons = (x % y) <= 1
         sols = set()
-        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
+        cp.Model(cons).solveAll(solver=self.solver, display=lambda : sols.add((x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
 
         linsols = set()
-        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
+        cp.Model(lincons).solveAll(solver=self.solver, display=lambda : linsols.add((x.value(), y.value())))
         self.assertSetEqual(sols, linsols)
 
         # check special cases of supported sets
@@ -404,11 +408,11 @@ class TestVarsLhs(unittest.TestCase):
 
         cons = (x % 2) == 1
         sols = set()
-        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
+        cp.Model(cons).solveAll(solver=self.solver, display=lambda : sols.add((x.value(), y.value())))
 
         lincons = linearize_constraint([cons], supported={"sum", "wsum"})
         linsols = set()
-        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
+        cp.Model(lincons).solveAll(solver=self.solver, display=lambda : linsols.add((x.value(), y.value())))
 
         self.assertSetEqual(sols, linsols)
 
@@ -426,11 +430,11 @@ class TestVarsLhs(unittest.TestCase):
         bv = cp.boolvar(name="bv")
         cons = bv.implies((x % y) <= 1)
         sols = set()
-        cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value())))
+        cp.Model(cons).solveAll(solver=self.solver, display=lambda: sols.add((bv.value(), x.value(), y.value())))
         lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
 
         linsols = set()
-        cp.Model(lincons).solveAll(display=lambda: linsols.add((bv.value(), x.value(), y.value())))
+        cp.Model(lincons).solveAll(solver=self.solver, display=lambda: linsols.add((bv.value(), x.value(), y.value())))
         self.assertSetEqual(sols, linsols)
 
     def test_others(self):
