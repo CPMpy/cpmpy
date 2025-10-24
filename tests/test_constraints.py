@@ -218,6 +218,9 @@ def global_constraints(solver):
             demand = [4, 5, 7]
             cap = 10
             yield Cumulative(s, dur, e, demand, cap)
+            yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="time")[0])
+            yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="task")[0])
+
             yield Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
             if solver != "pumpkin": # only supports with fixed durations
                 yield Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
