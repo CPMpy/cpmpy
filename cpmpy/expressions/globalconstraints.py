@@ -715,13 +715,60 @@ class Cumulative(GlobalConstraint):
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
-    def decompose(self):
+    def decompose(self, how="auto"):
         """
-            Time-resource decomposition from:
+           Decompose the Cumulative constraint
+
+            Arguments:
+                how (str): how the cumulative constraint should be decomposed, can be "time", "task", or "auto" (default)
+        """
+
+        assert how in ["time", "task", "auto"], "how can only be time, task, or auto (default), but got {}".format(how)
+
+        start, duration, end, demand, capacity = self.args
+
+        lbs, ubs = get_bounds(start)
+        horizon = max(ubs) - min(lbs)
+        if how == "time" or how == "auto" and len(start) <= horizon:
+            return self._time_decomposition()
+        elif how == "task" or how == "auto" and len(start) > horizon:
+            return self._task_decomposition()
+        raise Exception
+
+    def _task_decomposition(self):
+        """
+         Task-based decomposition of the cumulative constraint.
             Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
             International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         """
+        start, duration, end, demand, capacity = self.args
 
+        cons = [d >= 0 for d in duration]  # enforce non-negative durations
+        cons += [h >= 0 for h in demand]  # enforce non-negative demand
+
+        # set duration of tasks, only if end is user-provided
+        if end is None:
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
+
+        # demand doesn't exceed capacity
+        for i in range(len(start)):
+            demand_at_i = demand[i]
+            for j in range(len(start)):
+                if i != j:
+                    demand_at_i += demand[j] * ((start[j] <= start[i]) & (end[j] > start[i]))
+
+            cons += [demand_at_i <= capacity]
+
+        return cons, []
+
+    def _time_decomposition(self):
+        """
+         Time-resource decomposition of the cumulative constraint.
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        """
         start, duration, end, demand, capacity = self.args
 
         cons = [d >= 0 for d in duration] # enforce non-negative durations
