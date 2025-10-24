@@ -169,11 +169,13 @@ def simplify_boolean(lst_of_expr, num_context=False):
         elif isinstance(expr, Comparison):
             lhs, rhs = simplify_boolean(expr.args, num_context=True)
             name = expr.name
-            if all(eval_comparison(expr.name, x,y) for x in get_bounds(lhs) for y in get_bounds(rhs)):
-                newlist.append(1 if num_context else BoolVal(True))
-                continue
-            if not any(eval_comparison(expr.name, x,y) for x in get_bounds(lhs) for y in get_bounds(rhs)):
+
+            lb, ub = get_bounds(eval_comparison(name, lhs, rhs))
+            if lb == 0 == ub:
                 newlist.append(0 if num_context else BoolVal(False))
+                continue
+            if lb == 1 == ub:
+                newlist.append(1 if num_context else BoolVal(True))
                 continue
 
             if is_num(lhs) and is_boolexpr(rhs):  # flip arguments of comparison to reduct nb of cases
