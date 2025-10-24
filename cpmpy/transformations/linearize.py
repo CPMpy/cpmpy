@@ -154,7 +154,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                             elif lin.name == "==":
                                 indicator_constraints += linearize_constraint([cond.implies(lin.args[0] <= lin.args[1]),
                                                                                cond.implies(lin.args[0] >= lin.args[1])],
-                                                                              supported=supported, reified=True, csemap=csemap)
+                                                                              supported=supported, reified=reified, csemap=csemap)
                             else:
                                 raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
                     newlist+=indicator_constraints
