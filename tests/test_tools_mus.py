@@ -1,11 +1,12 @@
 import unittest
+import pytest
 from unittest import TestCase
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs
 
-
+@pytest.mark.usefixtures("solver")
 class MusTests(TestCase):
 
     def __init__(self, *args, **kwargs):
@@ -81,10 +82,10 @@ class MusTests(TestCase):
         #self.assertEqual(set(mus(cons)), set(cons[1:3]))
         ms = self.mus_func(cons)
         self.assertLess(len(ms), len(cons))
-        self.assertFalse(cp.Model(ms).solve())
+        self.assertFalse(cp.Model(ms).solve(solver=self.solver))
         ms = self.naive_func(cons)
         self.assertLess(len(ms), len(cons))
-        self.assertFalse(cp.Model(ms).solve())
+        self.assertFalse(cp.Model(ms).solve(solver=self.solver))
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
 
 

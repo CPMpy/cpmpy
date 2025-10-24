@@ -10,6 +10,7 @@ from utils import skip_on_missing_pblib
 
 SOLVER = "pysat"
 
+@pytest.mark.requires_solver("pysat")
 @pytest.mark.skipif(not CPM_pysat.supported(),
                     reason="PySAT not installed")
 class TestCardinality(unittest.TestCase):

@@ -1,9 +1,10 @@
 import unittest
+import pytest
 import cpmpy as cp
 import numpy as np
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray, _gen_var_names
 
-
+@pytest.mark.usefixtures("solver")
 class TestSolvers(unittest.TestCase):
     def test_zero_boolvar(self):
         with self.assertRaises(NullShapeError):
@@ -91,7 +92,7 @@ class TestSolvers(unittest.TestCase):
         iv = cp.intvar(1,9, shape=9)
         m = cp.Model(cp.AllDifferent(iv))
         self.assertEqual(n_none(iv), 9)
-        m.solve()
+        m.solve(solver=self.solver)
         self.assertEqual(n_none(iv), 0)
         iv.clear()
         self.assertEqual(n_none(iv), 9)
@@ -99,7 +100,7 @@ class TestSolvers(unittest.TestCase):
         bv = cp.boolvar(9)
         m = cp.Model(sum(bv) > 3)
         self.assertEqual(n_none(bv), 9)
-        m.solve()
+        m.solve(solver=self.solver)
         self.assertEqual(n_none(bv), 0)
         bv.clear()
         self.assertEqual(n_none(bv), 9)
