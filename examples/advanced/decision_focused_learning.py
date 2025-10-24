@@ -49,7 +49,7 @@ if __name__ == "__main__":
     # Generate data
     weights, x, y = pyepo.data.knapsack.genData(num_data, num_feat, num_item, 1, deg, noise_width, seed)
     weights = weights[0]
-    capacity = 0.2 weights.sum()
+    capacity = 0.2 * weights.sum()
 
     
     # Initialize PyEPO-wrapped optimisation model (just the constraints, works for any CPMpy model)
