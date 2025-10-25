@@ -34,6 +34,7 @@ import os
 import signal
 import sys
 import time
+import math
 import random
 import psutil
 import warnings
@@ -191,7 +192,7 @@ class Benchmark(ABC):
 
         return res, None
 
-    def choco_arguments(): 
+    def choco_arguments(self): 
         # Documentation: https://github.com/chocoteam/pychoco/blob/master/pychoco/solver.py
         return {}, None
 
