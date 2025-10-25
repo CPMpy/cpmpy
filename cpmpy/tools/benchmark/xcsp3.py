@@ -182,17 +182,17 @@ class XCSP3Benchmark(Benchmark):
             complete_solution = line
             if "cost" in solution:
                 result['objective_value'] = solution.split('cost="')[-1][:-2]
+        elif line.startswith('c Solution'):
+            parts = line.split(', time = ')
+            # Get solution time from comment for intermediate solution -> used for annotating 'o ...' lines
+            self._sol_time = float(parts[-1].replace('s', '').rstrip())
         elif line.startswith('o '):
             obj = int(line[2:].strip())
             if result['intermediate'] is None:
                 result['intermediate'] = []
-            result['intermediate'] += [(sol_time, obj)]
+            result['intermediate'] += [(self._sol_time, obj)]
             result['objective_value'] = obj
             obj = None
-        elif line.startswith('c Solution'):
-            parts = line.split(', time = ')
-            # Get solution time from comment for intermediate solution -> used for annotating 'o ...' lines
-            sol_time = float(parts[-1].replace('s', '').rstrip())
         elif line.startswith('c took '):
             # Parse timing information
             parts = line.split(' seconds to ')

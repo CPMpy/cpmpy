@@ -75,6 +75,7 @@ class PSPLIBBenchmark(Benchmark):
     """
 
     def __init__(self):
+        self.sol_time = None
         super().__init__(reader=read_rcpsp) # TODO: reader should depend on problem variant
     
     def print_comment(self, comment:str):
@@ -94,9 +95,11 @@ class PSPLIBBenchmark(Benchmark):
 
     def print_result(self, s):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
+            self.print_objective(s.objective_value())
             self.print_value(solution_psplib(s))
             self.print_status(ExitStatus.optimal)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
+            self.print_objective(s.objective_value())
             self.print_value(solution_psplib(s))
             self.print_status(ExitStatus.sat)
         elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
@@ -154,7 +157,8 @@ class PSPLIBBenchmark(Benchmark):
             obj = int(line[2:].strip())
             if result['intermediate'] is None:
                 result['intermediate'] = []
-            result['intermediate'] += [(self.sol_time, obj)]
+            if self.sol_time is not None:
+                result['intermediate'] += [(self.sol_time, obj)]
             result['objective_value'] = obj
             obj = None
         elif line.startswith('c took '):
