@@ -60,7 +60,7 @@ class Benchmark(ABC):
     It is designed to be extended or customized for specific benchmarking needs.    
     """
 
-    def __init__(self, reader:callable, exit_status:Enum):
+    def __init__(self, reader:callable, exit_status:Enum=ExitStatus):
         """
         Arguments:
             reader (callable): A parser from a model format to a CPMPy model.

@@ -1,20 +1,19 @@
 """
-PB competition as a CPMpy benchmark
+PSPLIB as a CPMpy benchmark
 
-This module provides a benchmarking framework for running CPMpy on PB 
-competition instances. It extends the generic `Benchmark` base class with
-PB Competition-specific logging and result reporting.
+This module provides a benchmarking framework for running CPMpy on PSPLIB 
+instances.
 
 Command-line Interface
 ----------------------
-This script can be run directly to benchmark solvers on MSE datasets.
+This script can be run directly to benchmark solvers on PSPLIB datasets.
 
 Usage:
-    python opb.py --year 2024 --track OPT-LIN --solver ortools
+    python psplib.py --year 2024 --variant rcpsp --family j30
 
 Arguments:
-    --year          Competition year (e.g., 2024).
-    --track         Track type (e.g., OPT_LIN, DEC_LIN).
+    --variant       Problem variant (e.g., rcpsp).
+    --family        Problem family (e.g., j30, j120, ...)
     --solver        Solver name (e.g., ortools, exact, choco, ...).
     --workers       Number of parallel workers to use.
     --time-limit    Time limit in seconds per instance.
@@ -31,8 +30,7 @@ List of classes
 .. autosummary::
     :nosignatures:
 
-    OPBExitStatus
-    OPBBenchmark
+    PSPLIBBenchmark
 
 =================
 List of functions
@@ -41,7 +39,7 @@ List of functions
 .. autosummary::
     :nosignatures:
 
-    solution_opb
+    solution_psplib
 """
 
 import warnings
@@ -52,86 +50,80 @@ from datetime import datetime
 
 # CPMpy
 from cpmpy.tools.benchmark.runner import benchmark_runner
-from cpmpy.tools.benchmark._base import Benchmark
-from cpmpy.tools.opb import read_opb
+from cpmpy.tools.benchmark._base import Benchmark, ExitStatus
+from cpmpy.tools.rcpsp import read_rcpsp
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 
 
-class OPBExitStatus(Enum):
-    unsupported:str = "UNSUPPORTED" # instance contains an unsupported feature (e.g. a unsupported global constraint)
-    sat:str = "SATISFIABLE" # CSP : found a solution | COP : found a solution but couldn't prove optimality
-    optimal:str = "OPTIMUM" + chr(32) + "FOUND" # optimal COP solution found
-    unsat:str = "UNSATISFIABLE" # instance is unsatisfiable
-    unknown:str = "UNKNOWN" # any other case
-
-def solution_opb(model):
+def solution_psplib(model):
     """
-        Formats a solution according to the PB24 specification.
+    Convert a CPMpy model solution into the solution string format.
 
-        Arguments:
-            model: CPMpy model for which to format its solution (should be solved first)
+    Arguments:
+        model (cp.solvers.SolverInterface): The solver-specific model for which to print its solution
 
-        Returns:
-            Formatted model solution according to PB24 specification.
+    Returns:
+        str: formatted solution string.
     """
-    variables = [var for var in model.user_vars if var.name[:2] not in ["IV", "BV", "B#"]] # dirty workaround for all missed aux vars in user vars TODO fix with Ignace
-    return " ".join([var.name.replace("[","").replace("]","") if var.value() else "-"+var.name.replace("[","").replace("]","") for var in variables])
+    variables = {var.name: var.value() for var in model.user_vars if var.name[:2] not in ["IV", "BV", "B#"]} # dirty workaround for all missed aux vars in user vars TODO fix with Ignace
+    return str(variables)
 
-class OPBBenchmark(Benchmark):
+class PSPLIBBenchmark(Benchmark):
+
     """
-    The PB competition as a CPMpy benchmark.
+    PSPLIB as a CPMpy benchmark.
     """
 
     def __init__(self):
-        super().__init__(reader=read_opb, exit_status=OPBExitStatus)
+        super().__init__(reader=read_rcpsp) # TODO: reader should depend on problem variant
     
     def print_comment(self, comment:str):
         print('c' + chr(32) + comment.rstrip('\n'), end="\r\n", flush=True)
 
-    def print_status(self, status: OPBExitStatus) -> None:
+    def print_status(self, status: ExitStatus) -> None:
         print('s' + chr(32) + status.value, end="\n", flush=True)
 
     def print_value(self, value: str) -> None:
-        value = value[:-2].replace("\n", "\nv" + chr(32)) + value[-2:]
         print('v' + chr(32) + value, end="\n", flush=True)
 
     def print_objective(self, objective: int) -> None:
         print('o' + chr(32) + str(objective), end="\n", flush=True)
-
+    
     def print_intermediate(self, objective:int):
         self.print_objective(objective)
 
     def print_result(self, s):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
-            self.print_value(solution_opb(s))
-            self.print_status(OPBExitStatus.optimal)
+            self.print_value(solution_psplib(s))
+            self.print_status(ExitStatus.optimal)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
-            self.print_value(solution_opb(s))
-            self.print_status(OPBExitStatus.sat)
+            self.print_value(solution_psplib(s))
+            self.print_status(ExitStatus.sat)
         elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
-            self.print_status(OPBExitStatus.unsat)
+            self.print_status(ExitStatus.unsat)
         else:
             self.print_comment("Solver did not find any solution within the time/memory limit")
-            self.print_status(OPBExitStatus.unknown)
+            self.print_status(ExitStatus.unknown)
 
     def handle_memory_error(self, mem_limit):
         super().handle_memory_error(mem_limit)
-        self.print_status(OPBExitStatus.unknown)
+        self.print_status(ExitStatus.unknown)
 
     def handle_not_implemented(self, e):
         super().handle_not_implemented(e)
-        self.print_status(OPBExitStatus.unsupported)
+        self.print_status(ExitStatus.unsupported)
 
     def handle_exception(self, e):
         super().handle_exception(e)
-        self.print_status(OPBExitStatus.unknown)
+        self.print_status(ExitStatus.unknown)
 
+    
     def handle_sigterm(self):
         """
         Handles a SIGTERM. Gives us 1 second to finish the current job before we get killed.
         """
         # Report that we haven't found a solution in time
-        self.print_status(OPBExitStatus.unknown)
+        self.print_status(ExitStatus.unknown)
         self.print_comment("SIGTERM raised.")
         return 0
         
@@ -140,7 +132,7 @@ class OPBBenchmark(Benchmark):
         Handles a SIGXCPU.
         """
         # Report that we haven't found a solution in time
-        self.print_status(OPBExitStatus.unknown)
+        self.print_status(ExitStatus.unknown)
         self.print_comment("SIGXCPU raised.")
         return 0
 
@@ -182,9 +174,9 @@ class OPBBenchmark(Benchmark):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Benchmark solvers on OPB instances')
-    parser.add_argument('--year', type=int, required=True, help='Competition year (e.g., 2023)')
-    parser.add_argument('--track', type=str, required=True, help='Track type (e.g., OPT-LIN, DEC-LIN)')
+    parser = argparse.ArgumentParser(description='Benchmark solvers on PSPLIB instances')
+    parser.add_argument('--variant', type=str, required=True, help='Problem variant (e.g., rcpsp)')
+    parser.add_argument('--family', type=str, required=True, help='Problem family (e.g., j30, j120, ...)')
     parser.add_argument('--solver', type=str, required=True, help='Solver name (e.g., ortools, exact, choco, ...)')
     parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
     parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
@@ -193,14 +185,16 @@ if __name__ == "__main__":
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
+    # parser.add_argument('--checker-path', type=str, default=None,
+    #                 help='Path to the XCSP3 solution checker JAR file')
     args = parser.parse_args()
 
     if not args.verbose:
         warnings.filterwarnings("ignore")
     
     # Load benchmark instances (as a dataset)
-    from cpmpy.tools.dataset.model.opb import OPBDataset
-    dataset = OPBDataset(year=args.year, track=args.track, download=True)
+    from cpmpy.tools.dataset.problem.psplib import PSPLibDataset
+    dataset = PSPLibDataset(variant=args.variant, family=args.family, download=True)
     
     # Create output directory
     output_dir = Path(args.output_dir)
@@ -210,9 +204,9 @@ if __name__ == "__main__":
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # Define output file path with timestamp
-    output_file = str(output_dir / "opb" / f"opb_{args.year}_{args.track}_{args.solver}_{timestamp}.csv")
+    output_file = str(output_dir / "psplib" / f"psplib_{args.variant}_{args.family}_{args.solver}_{timestamp}.csv")
 
     # Run the benchmark
-    instance_runner = OPBBenchmark()
+    instance_runner = PSPLIBBenchmark()
     output_file = benchmark_runner(dataset=dataset, instance_runner=instance_runner, output_file=output_file, **vars(args))
     print(f"Results added to {output_file}")

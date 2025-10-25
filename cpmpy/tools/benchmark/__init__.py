@@ -1,5 +1,3 @@
-
-import resource
 import sys
 import time
 import warnings
@@ -22,12 +20,14 @@ def set_memory_limit(mem_limit):
         soft = max(_mib_as_bytes(mem_limit) - _mib_as_bytes(MEMORY_BUFFER_SOFT), _mib_as_bytes(MEMORY_BUFFER_SOFT))
         hard = max(_mib_as_bytes(mem_limit) - _mib_as_bytes(MEMORY_BUFFER_HARD), _mib_as_bytes(MEMORY_BUFFER_HARD))
         if sys.platform != "win32":
+            import resource
             resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
         else:
             warnings.warn("Memory limits using `resource` are not supported on Windows. Skipping hard limit.")
 
 def disable_memory_limit():
     if sys.platform != "win32":
+        import resource
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
         # set a very high soft limit
         resource.setrlimit(resource.RLIMIT_AS, (hard, hard))
@@ -38,6 +38,7 @@ def set_time_limit(time_limit, verbose:bool=False):
     """
     if time_limit is not None:
         if sys.platform != "win32":
+            import resource
             soft = time_limit
             hard = resource.RLIM_INFINITY
             resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
