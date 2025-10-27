@@ -71,6 +71,7 @@ from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3 import _parse_xcsp3, _load_xcsp3
 from cpmpy.tools.xcsp3 import globals
 from cpmpy.solvers.ortools import CPM_ortools
+from cpmpy.expressions.variables import _BV_PREFIX, _IV_PREFIX
 
 # PyCSP3
 from xml.etree.ElementTree import ParseError
@@ -259,7 +260,7 @@ def solution_xml(model, useless_style="*", boolean_style="int"):
 
     # How useless variables should be handled
     #    (variables which have value `None` in the solution)
-    variables = {var.name: var for var in model.user_vars if var.name[:2] not in ["IV", "BV", "B#"]} # dirty workaround for all missed aux vars in user vars
+    variables = {var.name: var for var in model.user_vars if var.name[:2] not in [_IV_PREFIX, _BV_PREFIX, "B#"]} # dirty workaround for all missed aux vars in user vars
     if useless_style == "*":
         variables = {k:(v.value() if v.value() is not None else "*") for k,v in variables.items()}
     elif useless_style == "drop":

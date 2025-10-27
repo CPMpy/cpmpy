@@ -13,18 +13,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install ".[test, z3, choco, exact, pysat, pysdd, choco, minizinc, pindakaas]"
+          pip install ".[test, z3, exact, pysat, pysdd, choco, minizinc, pindakaas, pumpkin]"
           pip install pypblib  # dependency of pysat for PB constraints
           pip install pytest-xdist
-          sudo snap install minizinc --classic
-          
-          # install pumpkin from source
-          pip install maturin
-          git clone https://github.com/consol-lab/pumpkin pumpkin --branch pumpkin-core-v0.2.1
-          cd pumpkin/pumpkin-solver-py
-          maturin build
-          pip install ../target/wheels/*.whl # name can change based on version
-          cd ../../ # back to cpmpy
+          sudo snap install minizinc --classic          
 
       - name: Test with pytest
         run: |

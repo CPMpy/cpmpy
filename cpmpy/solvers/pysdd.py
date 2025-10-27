@@ -113,14 +113,22 @@ class CPM_pysdd(SolverInterface):
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
-        # these will be loaded once a first formula is added
-        self.pysdd_vtree = None
-        self.pysdd_manager = None
-        self.pysdd_root = None
+        from pysdd.sdd import SddManager, Vtree
+
+        cnt = 1
+        self.pysdd_vtree = Vtree(var_count=cnt, vtree_type="balanced")
+        self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
+        self.pysdd_root = self.pysdd_manager.true()
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysdd", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.pysdd_root
 
     def solve(self, time_limit=None, assumptions=None):
         """
@@ -312,25 +320,8 @@ class CPM_pysdd(SolverInterface):
 
         newvars = get_variables(cpm_expr)
 
-        # check only Boolean variables
-        # XXX a bit redundant, `solver_var()` already does this too
-        for v in newvars:
-            if not isinstance(v, _BoolVarImpl):
-                raise NotSupportedError(f"CPM_pysdd: only Boolean variables allowed -- {type(v)}: {v}")
         # add new user vars to the set
         self.user_vars |= set(newvars)
-
-        # if needed initialize (arbitrary) vtree from all user-specified vars
-        # we waited till here to already have some vars... beneficial?
-        if self.pysdd_root is None:
-            from pysdd.sdd import SddManager, Vtree
-
-            cnt = len(self.user_vars)
-            if cnt == 0:
-                cnt = 1  # otherwise segfault
-            self.pysdd_vtree = Vtree(var_count=cnt, vtree_type="balanced")
-            self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
-            self.pysdd_root = self.pysdd_manager.true()
 
         # transform and post the constraints
         # XXX the order in the for loop will matter on runtime efficiency...

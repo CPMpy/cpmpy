@@ -647,8 +647,11 @@ class CPM_choco(SolverInterface):
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 
         # unlikely base case: Boolean variable
-        elif isinstance(cpm_expr, _BoolVarImpl):
-            return self.chc_model.and_([self.solver_var(cpm_expr)])
+        elif isinstance(cpm_expr, _BoolVarImpl):    
+            if isinstance(cpm_expr, NegBoolView):
+                return self.chc_model.arithm(self.solver_var(cpm_expr._bv), "=", 0)
+
+            return self.chc_model.arithm(self.solver_var(cpm_expr), "=", 1)
 
         # unlikely base case: True or False
         elif isinstance(cpm_expr, BoolVal):
