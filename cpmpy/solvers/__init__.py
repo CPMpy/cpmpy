@@ -40,6 +40,7 @@
         pysdd
         pindakaas
         pumpkin
+        rc2
         cplex
         hexaly
 
@@ -74,5 +75,6 @@ from .gcs import CPM_gcs
 from .cpo import CPM_cpo
 from .pindakaas import CPM_pindakaas
 from .pumpkin import CPM_pumpkin
+from .rc2 import CPM_rc2
 from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
