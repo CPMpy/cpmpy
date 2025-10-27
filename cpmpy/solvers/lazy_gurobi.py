@@ -77,10 +77,20 @@ class CPM_lazy_gurobi(CPM_gurobi):
             print(*mess, end=end)
 
     def show_env(self):
-        self.log(", ".join(f"{k}={self.env[k]}" for k in ["shrink", "heuristic"]), verbosity=0)
+        self.log(
+            ", ".join(f"{k}={self.env[k]}" for k in ["shrink", "heuristic", "explain_fractional"]),
+            verbosity=0,
+        )
         # log(f"cuts = {env['cuts']}", env=env, verbosity=1)
-        self.log(f"n_cuts = {sum(len(c['cut']) > 0 for c in self.env['cuts'])}", verbosity=0)
-        self.log(f"n_unexplained = {list(len(c['cut']) for c in self.env['cuts']).count(0)}", verbosity=0)
+        cuts = [c for c in self.env["cuts"] if len(c["cut"]) > 0]
+        cuts_mipsol = [c for c in self.env["cuts"] if c["from"] == "MIPSOL"]
+        assert all(len(c["cut"]) > 0 for c in cuts_mipsol)
+        cuts_mipnode = [c for c in self.env["cuts"] if c["from"] == "MIPNODE-OPT"]
+        cuts_mipnode_exp = [c for c in cuts_mipnode if len(c["cut"]) > 0]
+        cuts_mipnode_unexp = [c for c in cuts_mipnode if len(c["cut"]) == 0]
+        self.log(f"cuts (MIPSOL) = {len(cuts_mipsol)}")
+        self.log(f"cuts (MIPNODE, explained) = {len(cuts_mipnode_exp)}")
+        self.log(f"cuts (MIPNODE, unexplainable) = {len(cuts_mipnode_unexp)}")
         self.log(
             "cut cardinalities/strengths:",
             ", ".join(f"{len(c['cut'])}" for c in self.env["cuts"]),
@@ -120,9 +130,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
         """The `explain_frac` alg."""
 
         # TODO convert T_enc to set of tuples?
-        self.log(f"Explain")
-        self.log("", np.array(A_enc), verbosity=2)
+        self.log(f"Explain", end="\n")
+        # self.log("", A_enc, verbosity=1)
+        self.log("", sorted(cols(np.array([A_enc]), 0)), verbosity=1)
         self.log(np.array(T_enc), verbosity=2)
+        self.log("")
 
         X = set()  # columns added to cut
         R = set(range(len(T_enc)))  # remaining columns
@@ -153,14 +165,14 @@ class CPM_lazy_gurobi(CPM_gurobi):
             # Loop termination for debug purposes
             assert iteration <= self.env.get("max_iterations", iteration)
 
-        self.log(f"  by explanation of size ({len(X)}): {X}")
+        self.log(f"  by explanation of size ({len(X)}): {sorted(X)}")
         if self.env.get("shrink", True):
             size = len(X)
             X = self.shrink(X, T_enc)
             if len(X) < size:
-                self.log(f"  shrunk to size ({len(X)}): {X}")
+                self.log(f"  shrunk to size ({len(X)}): {sorted(X)}")
 
-        self.log(f"  cut == {X}")
+        self.log(f"  cut == {sorted(X)}")
         return X
 
     def log_explanation(self, explanation, frm):
@@ -180,6 +192,8 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 frm = None
                 match where:
                     case GRB.Callback.MIPNODE:
+                        if not self.env.get("explain_fractional", True):
+                            return
                         # Optimal solution to LP relaxation
                         if what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL:
                             x_enc_a = {
@@ -217,15 +231,22 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     self.log_explanation(explanation, frm)
 
                     if explanation:
+                        self.log(
+                            f"  cons == {' + '.join(X_enc[c].name for c in explanation)} < {len(explanation)}",
+                            verbosity=1,
+                        )
                         grbs = [self.solver_var(X_enc[c]) for c in explanation]
                         what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
                     elif frm == "MIPSOL":  # unsat
+                        self.log("INFEASIBLE")
                         raise Infeasible
                         # what.cbLazy(1 <= 0)
 
                 assert len(self.env.get("cuts", [])) <= self.env.get(
                     "max_iterations", len(self.env.get("cuts", []))
                 )
+
+                self.log("end callback", verbosity=1)
             except Exception as e:
                 what._callback_exception = e
                 what.terminate()
@@ -265,12 +286,12 @@ class CPM_lazy_gurobi(CPM_gurobi):
         for cpm_expr in cpm_expressions:
             if cpm_expr.name == "table":
                 X, T = cpm_expr.args
-                self.log("X =", ", ".join(f"{x} in {x.lb}..{x.ub}" for x in X), verbosity=0)
-                self.log("T =", verbosity=1)
-                self.log(T, verbosity=1)
+                self.log("X =", ", ".join(f"{x} in {x.lb}..{x.ub}" for x in X), verbosity=2)
+                self.log("T =", verbosity=2)
+                self.log(T, verbosity=2)
                 T_enc = encode(X, T)
-                self.log("T_enc =", verbosity=1)
-                self.log(T_enc, verbosity=1)
+                self.log("T_enc =", verbosity=2)
+                self.log(T_enc, verbosity=2)
 
                 for x in X:
                     x_enc, exactly_one_con = cp.transformations.int2bool._encode_int_var(

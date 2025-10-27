@@ -78,8 +78,8 @@ def _encode_expr(ivarmap, expr, encoding):
 
 def _encode_int_var(ivarmap, x, encoding):
     """Return encoding of integer variable `x` and its domain constraints (if newly encoded)."""
-    if isinstance(x, (BoolVal, _BoolVarImpl)):
-        raise TypeError
+    if isinstance(x, (BoolVal,)):
+        raise TypeError(f"Expected {x} to not be of type BoolVal, _BoolVarImpl")
     elif x.name in ivarmap:  # already encoded
         return ivarmap[x.name], []
     else:
