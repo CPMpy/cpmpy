@@ -182,9 +182,9 @@ def _decide_encoding(x, cmp=None, encoding="auto"):
     elif _dom_size(x) >= 100:
         # This heuristic is chosen to be small to favour the binary encoding. This is because the PB encoding (e.g. generalized totalizer, ...) of a direct/order encoded PB constraints is quite inefficient unless the AMO/IC side-constraint is taken into account (which is not the case for pysat/pblib/pysdd).
         return "binary"
-    elif cmp in (None, "==", "!="):
+    elif cmp in ("==", "!="):
         return "direct"  # equalities suit the direct encoding
-    else:  # inequalities suit the order encoding
+    else:  # we use the order encoding for inequalities, en when we do not have `cmp`
         return "order"
 
 
