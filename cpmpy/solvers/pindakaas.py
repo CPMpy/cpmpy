@@ -230,7 +230,17 @@ class CPM_pindakaas(SolverInterface):
             raise TypeError
 
     def transform(self, cpm_expr):
-        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = [cpm_expr]
+
+        # eagerly encode integer variables to maximize CSE
+        for x in get_variables(cpm_expr):
+            if (not isinstance(x, _BoolVarImpl)) and isinstance(x, _IntVarImpl):
+                _, cons = _encode_int_var(
+                    self.ivarmap, x, _decide_encoding(x, encoding=self.encoding), csemap=self._csemap
+                )
+                cpm_cons += cons
+
+        cpm_cons = toplevel_list(cpm_cons)
         cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons, csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)
@@ -240,7 +250,7 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = linearize_constraint(
             cpm_cons, supported=frozenset({"sum", "wsum", "and", "or"}), csemap=self._csemap
         )
-        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
+        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         return cpm_cons
 
     def add(self, cpm_expr_orig):
