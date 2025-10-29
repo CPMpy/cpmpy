@@ -392,7 +392,8 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
         return metadata
 
     dataset = XCSP3Dataset(year=year, track=track, download=True, target_transform=update_metadata_table)
-    dataset = ((filename, metadata) for filename, metadata in dataset if glob in filename)
+    if glob is not None:
+        dataset = ((filename, metadata) for filename, metadata in dataset if glob in filename)
     dataset = ((filename, metadata) for filename, metadata in dataset if metadata['area'] > 0)
 
     # Process instances in parallel
