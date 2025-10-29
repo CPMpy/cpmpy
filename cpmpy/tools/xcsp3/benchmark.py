@@ -423,7 +423,7 @@ if __name__ == "__main__":
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
     parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign tp a single instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
-    parser.add_argument('--no-timestamp', action='store_true', default='results', help='Add timestamp to file names')
+    parser.add_argument('--no-timestamp', action='store_true', help='Add timestamp to file names')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
     parser.add_argument('--checker-path', type=str, default=None,
