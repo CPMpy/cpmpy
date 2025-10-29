@@ -347,11 +347,12 @@ def get_table_metadata(model):
 
 
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
-                   time_limit: int = 300, mem_limit: Optional[int] = 4096, cores: int=1,
+                   time_limit: int = 300,
+                    mem_limit: Optional[int] = 4096, cores: int=1,
                    output_dir: str = 'results',
                    no_timestamp: bool = False,
                    verbose: bool = False, intermediate: bool = False,
-                    checker_path: Optional[str] = None, limit_instances: Optional[int] = None) -> str:
+                    checker_path: Optional[str] = None, glob: Optional[str] = None) -> str:
     """
     Benchmark a solver on XCSP3 instances.
     
@@ -361,6 +362,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
         solver (str): Solver name (e.g., ortools, exact, choco, ...)
         workers (int): Number of parallel workers
         time_limit (int): Time limit in seconds per instance
+        glob (int): Filter instances
         mem_limit (int): Memory limit in MB per instance
         output_dir (str): Output directory for CSV files
         verbose (bool): Whether to show solver output
@@ -385,17 +387,19 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     # Initialize dataset
     def update_metadata_table(metadata):
         if 'tables' not in metadata:
+            print("Updatng table metadata for metadata['name']")
             metadata = { **metadata, **get_table_metadata(read_xcsp3(metadata['path']))}
         return metadata
 
     dataset = XCSP3Dataset(year=year, track=track, download=True, target_transform=update_metadata_table)
+    dataset = ((filename, metadata) for filename, metadata in dataset if glob in filename)
+    dataset = ((filename, metadata) for filename, metadata in dataset if metadata['area'] > 0)
 
     # Process instances in parallel
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
-        dataset = itertools.islice(((filename, metadata) for filename, metadata in dataset if metadata['area'] > 0), limit_instances)
         futures = [executor.submit(execute_instance,  # below: args
-                                   (filename, metadata, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
+                                   (filename, metadata, solver, time_limit, grace_time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
                    for filename, metadata in dataset]
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
@@ -420,9 +424,9 @@ if __name__ == "__main__":
     parser.add_argument('--solver', type=str, required=True, help='Solver name (e.g., ortools, exact, choco, ...)')
     parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
     parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
-    parser.add_argument('--limit-instances', type=int, help='Limit number of instances')
+    parser.add_argument('--glob', type=str, help='Filter instances according to glob expression')
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
-    parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign tp a single instance')
+    parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign to a single instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
     parser.add_argument('--no-timestamp', action='store_true', help='Add timestamp to file names')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
