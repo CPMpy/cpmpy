@@ -701,7 +701,7 @@ def xcsp3_cpmpy(
         try:
             if internal_options is not None:
                 internal_options(s) # Set more internal solver options (need access to native solver object)
-            s.solve(**solver_args)
+            s.solve(**solver_args, time_limit=time_limit)
         except RuntimeError as e:
             if "Program interrupted by user." in str(e): # Special handling for Exact
                 raise TimeoutError("Exact interrupted due to timeout")

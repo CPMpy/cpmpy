@@ -182,7 +182,8 @@ class CPM_gurobi(SolverInterface):
             # self.time_limit = time_limit - (time.time() - self.time)
 
         if self.time_limit is not None:
-            if self.time_limit < 0:
+            self.time_limit -= time.time() - self.time
+            if self.time_limit <= 0:
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
                 return
             self.grb_model.setParam("TimeLimit", self.time_limit)
