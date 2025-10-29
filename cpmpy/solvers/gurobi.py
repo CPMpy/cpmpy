@@ -42,6 +42,7 @@
     ==============
 """
 
+import time
 from typing import Optional
 import pkg_resources
 
@@ -122,7 +123,7 @@ class CPM_gurobi(SolverInterface):
         except pkg_resources.DistributionNotFound:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None, lazy=False):
+    def __init__(self, cpm_model=None, subsolver=None, lazy=False, time_limit=None):
         """
         Constructor of the native solver object
 
@@ -139,6 +140,8 @@ class CPM_gurobi(SolverInterface):
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
         self.lazy = lazy
+        self.time_limit = time_limit
+        self.time = time.time()
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -172,6 +175,18 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
+            self.time_limit = time_limit
+            # self.time_limit = time_limit - (time.time() - self.time)
+
+        if self.time_limit is not None:
+            if self.time_limit < 0:
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+                return
+            self.grb_model.setParam("TimeLimit", self.time_limit)
+
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
@@ -179,12 +194,6 @@ class CPM_gurobi(SolverInterface):
         if not len(self.user_vars):
             self.add(intvar(1, 1) == 1)
         
-        # set time limit
-        if time_limit is not None:
-            if time_limit <= 0:
-                raise ValueError("Time limit must be positive")
-            self.grb_model.setParam("TimeLimit", time_limit)
-
         # call the solver, with parameters
         for param, val in kwargs.items():
             self.grb_model.setParam(param, val)
@@ -394,6 +403,12 @@ class CPM_gurobi(SolverInterface):
 
       # transform and post the constraints
       for cpm_expr in self.transform(cpm_expr_orig):
+        if self.time_limit is not None:
+            runtime = time.time() - self.time
+            if runtime > self.time_limit:
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+                self.cpm_status.runtime = runtime
+                break
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const

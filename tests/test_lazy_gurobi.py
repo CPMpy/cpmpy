@@ -126,7 +126,7 @@ class TestTables:
         print("Test model:")
         print(model)
         is_sat = model.solve()
-        assert CPM_lazy_gurobi(model, env=env).solve() == is_sat, "Expected equisat"
+        assert CPM_lazy_gurobi(cpm_model=model, env=env).solve() == is_sat, "Expected equisat"
         check_model(model)
 
     def test_table_enc(self, env):
@@ -137,8 +137,8 @@ class TestTables:
         T = np.array([(2, 1, 1), (3, 2, 2), (4, 3, 3), (1, 2, 3), (2, 1, 2)])
         model = cp.Model(cp.Table(X, T), cp.AllDifferent(X))
         is_sat = model.solve()
-        assert CPM_lazy_gurobi(model, env=env).solve() == is_sat, "Expected equisat"
+        assert CPM_lazy_gurobi(cpm_model=model, env=env).solve() == is_sat, "Expected equisat"
         print("Test model", model)
-        print("TF", CPM_lazy_gurobi(model, env=env).transform(model.constraints))
+        print("TF", CPM_lazy_gurobi(cpm_model=model, env=env).transform(model.constraints))
         check_model(model)
 

@@ -133,7 +133,7 @@ def main():
 
     # envs = envs[0:1]
     for env in envs:
-        slv = CPM_lazy_gurobi(model.copy(), env=env)
+        slv = CPM_lazy_gurobi(cpm_model=model.copy(), env=env)
         assert slv.solve() == is_sat
         print("SOL", X)
         # print(show_assignment(X))

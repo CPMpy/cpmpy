@@ -147,7 +147,7 @@ class SolverLookup():
         subname = None
         if name is not None and ':' in name:
             _,subname = name.split(':',maxsplit=1)
-        return solver_cls(model, subsolver=subname, **init_kwargs)
+        return solver_cls(cpm_model=model, subsolver=subname, **init_kwargs)
 
     @classmethod
     def lookup(cls, name=None):

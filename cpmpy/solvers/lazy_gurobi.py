@@ -54,7 +54,7 @@ class Heuristic(Enum):
 
 
 class CPM_lazy_gurobi(CPM_gurobi):
-    def __init__(self, cpm_model=None, subsolver=None, env=None):
+    def __init__(self, env=None, **kwargs):
         self.env = {}
         self.env["debug"] = False
         self.env["debug_unlucky"] = False  # TODO re-enable
@@ -73,7 +73,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.ivarmap = {}
 
         self.tables = []
-        super().__init__(cpm_model=cpm_model, subsolver=subsolver, lazy=True)
+        super().__init__(lazy=True, **kwargs)
 
     def log(self, *mess, verbosity=1, end="\n"):
         if verbosity <= self.env["verbosity"]:

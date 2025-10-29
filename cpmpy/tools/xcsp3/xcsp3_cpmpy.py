@@ -677,10 +677,10 @@ def xcsp3_cpmpy(
         time_post = time.time()
 
         if solver == "exact": # Exact2 takes its options at creation time
-            s = cp.SolverLookup.get(solver, model, **solver_args)
+            s = cp.SolverLookup.get(name=solver, model=model, time_limit=time_limit, **solver_args)
             solver_args = dict()  # no more solver args needed
         else:
-            s = cp.SolverLookup.get(solver, model)
+            s = cp.SolverLookup.get(name=solver, model=model, time_limit=time_limit)
         time_post = time.time() - time_post
         if verbose: print_comment(f"took {time_post:.4f} seconds to post model to {solver}")
 
@@ -701,7 +701,7 @@ def xcsp3_cpmpy(
         try:
             if internal_options is not None:
                 internal_options(s) # Set more internal solver options (need access to native solver object)
-            s.solve(time_limit=time_limit, **solver_args)
+            s.solve(**solver_args)
         except RuntimeError as e:
             if "Program interrupted by user." in str(e): # Special handling for Exact
                 raise TimeoutError("Exact interrupted due to timeout")

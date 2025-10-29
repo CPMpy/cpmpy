@@ -38,7 +38,7 @@ def test_constructor(solver_name):
     x, y, z = bvar
 
     m = Model([x & y])
-    solver = solver_class(m)
+    solver = solver_class(cpm_model=m)
 
     assert solver.status() is not None
     assert solver.status().exitstatus == ExitStatus.NOT_RUN
@@ -54,7 +54,7 @@ def test_native_model(solver_name):
     x, y, z = bvar
 
     m = Model([x & y])
-    solver = solver_class(m)
+    solver = solver_class(cpm_model=m)
     assert solver.native_model is not None
 
 
