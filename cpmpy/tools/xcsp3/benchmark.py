@@ -254,7 +254,13 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
                         result['time_post'] = time_val
                     elif action.startswith('solve'):
                         result['time_solve'] = time_val
-        
+            elif line.startswith('c Stat'): # c Stat=x=y
+                parts = line.split('=')
+                field = parts[1]
+                result[field] = parts[2]
+                if field not in fieldnames:
+                    fieldnames.append(field)
+
         # Received a new status from the subprocess
         elif isinstance(line, dict):
             status = line

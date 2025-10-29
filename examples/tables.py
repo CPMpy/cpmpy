@@ -65,7 +65,7 @@ def run_xcsp3_table_instances(env):
                         slv = CPM_lazy_gurobi(cpm_model=model.copy(), env=env)
                         slv.solve(time_limit=time_limit)
                         print(slv.status(), slv.objective_value())
-                        slv.show_env()
+                        slv.stats()
 
                         return
                     else:
@@ -143,7 +143,7 @@ def main():
 
     print("STATS")
     for env in envs:
-        CPM_lazy_gurobi(env=env).show_env()
+        CPM_lazy_gurobi(env=env).stats()
 
 
 if __name__ == "__main__":

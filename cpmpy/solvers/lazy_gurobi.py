@@ -1,4 +1,5 @@
 import sys
+import time
 import math
 import gurobipy as gp
 from gurobipy import GRB
@@ -57,10 +58,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.env = {}
         self.env["debug"] = False
         self.env["debug_unlucky"] = False  # TODO re-enable
-        self.env["cuts"] = []
         self.env["verbosity"] = 0
         self.env["heuristic"] = Heuristic.INPUT
-        # self.env["max_iterations"] = 100
+        self.env["shrink"] = True
+        self.env["explain_fractional"] = True
+        self.env["max_iterations"] = None
 
         if self.env["verbosity"] >= 3:
             np.set_printoptions(threshold=sys.maxsize)
@@ -77,7 +79,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         if verbosity <= self.env["verbosity"]:
             print(*mess, end=end)
 
-    def show_env(self):
+    def stats(self):
         self.log(
             ", ".join(f"{k}={self.env[k]}" for k in ["shrink", "heuristic", "explain_fractional"]),
             verbosity=0,
@@ -89,6 +91,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         cuts_mipnode = [c for c in self.env["cuts"] if c["from"] == "MIPNODE-OPT"]
         cuts_mipnode_exp = [c for c in cuts_mipnode if len(c["cut"]) > 0]
         cuts_mipnode_unexp = [c for c in cuts_mipnode if len(c["cut"]) == 0]
+        self.log(f"cb_time = {self.env['cb_time']}")
         self.log(f"cuts (MIPSOL) = {len(cuts_mipsol)}")
         self.log(f"cuts (MIPNODE, explained) = {len(cuts_mipnode_exp)}")
         self.log(f"cuts (MIPNODE, unexplainable) = {len(cuts_mipnode_unexp)}")
@@ -97,6 +100,12 @@ class CPM_lazy_gurobi(CPM_gurobi):
             ", ".join(f"{len(c['cut'])}" for c in self.env["cuts"]),
             verbosity=2,
         )
+        return {
+            "cb_time": self.env["cb_time"],
+            "n_cuts": len(cuts_mipsol),
+            "n_cuts_explained": len(cuts_mipnode_exp),
+            "n_cuts_unexplained": len(cuts_mipnode_unexp),
+        }
 
     def choose(self, A, T_enc, R, heuristic=Heuristic.GREEDY):
         self.log(f"Choose from {sorted(A)} from remaining choices {R}", verbosity=2)
@@ -164,10 +173,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
             X.add(i)
 
             # Loop termination for debug purposes
-            assert iteration <= self.env.get("max_iterations", iteration)
+            if self.env["max_iterations"] is not None:
+                assert iteration <= self.env["max_iterations"]
 
         self.log(f"  by explanation of size ({len(X)}): {sorted(X)}")
-        if self.env.get("shrink", True):
+        if self.env["shrink"]:
             size = len(X)
             X = self.shrink(X, T_enc)
             if len(X) < size:
@@ -188,6 +198,8 @@ class CPM_lazy_gurobi(CPM_gurobi):
         all_xs = self.get_x_encs(self.ivarmap.keys())
 
         def solution_callback(what, where):
+            cb_time = time.time()
+
             try:
                 x_enc_a = None
                 frm = None
@@ -200,7 +212,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
                 match where:
                     case GRB.Callback.MIPNODE:
-                        if not self.env.get("explain_fractional", True):
+                        if not self.env["explain_fractional"]:
                             return
                         # Optimal solution to LP relaxation
                         if what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL:
@@ -245,10 +257,10 @@ class CPM_lazy_gurobi(CPM_gurobi):
                         raise Infeasible
                         # what.cbLazy(1 <= 0)
 
-                assert len(self.env.get("cuts", [])) <= self.env.get(
-                    "max_iterations", len(self.env.get("cuts", []))
-                )
+                if self.env["max_iterations"] is not None:
+                    assert len(self.env["cuts"]) <= self.env["max_iterations"]
 
+                self.env["cb_time"] += time.time() - cb_time
                 self.log("end callback")
             except Exception as e:
                 what._callback_exception = e
@@ -260,6 +272,10 @@ class CPM_lazy_gurobi(CPM_gurobi):
         """
         Call the gurobi solver with cut generation
         """
+
+        self.env["cuts"] = []
+        self.env["cb_time"] = 0.0
+
         assert solution_callback is None, "For now, no solution_callback in `CPM_lazy_gurobi`"
 
         self.log("Solving.. ")
@@ -275,6 +291,9 @@ class CPM_lazy_gurobi(CPM_gurobi):
             )
         except Infeasible:
             hassol = False
+
+        for field, stat in self.stats().items():
+            print(f"c Stat={field}={stat}")
 
         # TODO recheck https://or.stackexchange.com/questions/12591/ensure-gurobi-uses-callback-on-all-feasible-solutions It looks like if the solution at the end of the root node is integer, gurobi doesn't pass through callbacks for fractional solutions.
 
