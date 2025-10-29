@@ -220,3 +220,6 @@ def is_star(arg):
         Check if arg is star as used in the ShortTable global constraint
     """
     return isinstance(arg, type(STAR)) and arg == STAR
+
+def dom_size(x):
+    return x.ub - x.lb + 1

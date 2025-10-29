@@ -5,6 +5,7 @@ from gurobipy import GRB
 import itertools
 import numpy as np
 import cpmpy as cp
+from cpmpy.expressions.variables import NegBoolView
 
 from cpmpy.solvers.gurobi import CPM_gurobi
 from enum import Enum
@@ -57,7 +58,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.env["debug"] = False
         self.env["debug_unlucky"] = False  # TODO re-enable
         self.env["cuts"] = []
-        self.env["verbosity"] = 1
+        self.env["verbosity"] = 0
         self.env["heuristic"] = Heuristic.INPUT
         # self.env["max_iterations"] = 100
 
@@ -132,7 +133,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         # TODO convert T_enc to set of tuples?
         self.log(f"Explain", end="\n")
         # self.log("", A_enc, verbosity=1)
-        self.log("", sorted(cols(np.array([A_enc]), 0)), verbosity=1)
+        self.log("", sorted(cols(np.array([A_enc]), 0)))
         self.log(np.array(T_enc), verbosity=2)
         self.log("")
 
@@ -190,22 +191,25 @@ class CPM_lazy_gurobi(CPM_gurobi):
             try:
                 x_enc_a = None
                 frm = None
+
+                def cbGetVal(cpm_var, cbGet):
+                    if isinstance(cpm_var, NegBoolView):
+                        # assert False, cpm_var
+                        return 1.0 - cbGet(self.solver_var(~cpm_var))
+                    return cbGet(self.solver_var(cpm_var))
+
                 match where:
                     case GRB.Callback.MIPNODE:
                         if not self.env.get("explain_fractional", True):
                             return
                         # Optimal solution to LP relaxation
                         if what.cbGet(GRB.Callback.MIPNODE_STATUS) == GRB.OPTIMAL:
-                            x_enc_a = {
-                                x_enc_i: what.cbGetNodeRel(self.solver_var(x_enc_i)) for x_enc_i in all_xs
-                            }
+                            x_enc_a = {x_enc_i: cbGetVal(x_enc_i, what.cbGetNodeRel) for x_enc_i in all_xs}
                             frm = "MIPNODE-OPT"
                         else:
                             return
                     case GRB.Callback.MIPSOL:  # Integer solution
-                        x_enc_a = {
-                            x_enc_i: what.cbGetSolution(self.solver_var(x_enc_i)) for x_enc_i in all_xs
-                        }
+                        x_enc_a = {x_enc_i: cbGetVal(x_enc_i, what.cbGetSolution) for x_enc_i in all_xs}
                         frm = "MIPSOL"
                         assert is_integer_solution(x_enc_a.values()), (
                             f"Expected integer solution for MIP, but got {x_enc_a}"
@@ -233,7 +237,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     if explanation:
                         self.log(
                             f"  cons == {' + '.join(X_enc[c].name for c in explanation)} < {len(explanation)}",
-                            verbosity=1,
                         )
                         grbs = [self.solver_var(X_enc[c]) for c in explanation]
                         what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
@@ -246,7 +249,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     "max_iterations", len(self.env.get("cuts", []))
                 )
 
-                self.log("end callback", verbosity=1)
+                self.log("end callback")
             except Exception as e:
                 what._callback_exception = e
                 what.terminate()
@@ -295,7 +298,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
                 for x in X:
                     x_enc, exactly_one_con = cp.transformations.int2bool._encode_int_var(
-                        self.ivarmap, x, "direct"
+                        self.ivarmap, x, "direct", csemap=self._csemap
                     )
                     expr, k = x_enc.encode_term()
                     # TODO if only BV, then need to assign (but no need to assign if decoding constraint present)

@@ -34,6 +34,7 @@ Since the dataset is PyTorch compatible, it can be used with a DataLoader:
         # Your code here
 """
 
+import json
 import pathlib
 from typing import Tuple, Any
 import xml.etree.ElementTree as ET
@@ -156,14 +157,21 @@ class XCSP3Dataset(object):  # torch.utils.data.Dataset compatible
             filename = self.transform(filename)
             
         # Basic metadata about the instance
-        metadata = {
-            'year': self.year,
-            'track': self.track,
-            'name': file_path.stem.replace('.xml.lzma', ''),
-            'path': filename,
-        }
-        if self.target_transform:
-            metadata = self.target_transform(metadata)
+        metadata_filename = pathlib.Path(file_path).with_suffix('').with_suffix('.json')
+        if metadata_filename.exists():
+            with open(metadata_filename) as f:
+                metadata = json.load(f)
+        else:
+            metadata = {
+                'year': self.year,
+                'track': self.track,
+                'name': file_path.stem.replace('.xml.lzma', ''),
+                'path': filename,
+            }
+            if self.target_transform:
+                metadata = self.target_transform(metadata)
+            with open(metadata_filename, "w") as f:
+                json.dump(metadata, f, indent=4)
             
         return filename, metadata
 

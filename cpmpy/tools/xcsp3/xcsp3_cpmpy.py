@@ -83,7 +83,7 @@ sys.path.append(os.path.join(pathlib.Path(__file__).parent.resolve()))
 
 
 # Configuration
-SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc", "gurobi"]
+SUPPORTED_SOLVERS = ["choco", "ortools", "exact", "z3", "minizinc", "gurobi", "lazy_gurobi"]
 SUPPORTED_SUBSOLVERS = {
     "minizinc": ["gecode", "chuffed"]
 }
@@ -476,6 +476,7 @@ def gurobi_arguments(model: cp.Model,
 
         res |= { "solution_callback": GurobiSolutionCallback(model).callback }
 
+    assert "solution_callback" not in res
     return res, None
 
 def cpo_arguments(model: cp.Model,
@@ -539,11 +540,12 @@ def solver_arguments(solver: str,
         return z3_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, **kwargs)
     elif solver.startswith("minizinc"):  # also can have a subsolver
         return minizinc_arguments(solver, cores=cores, seed=seed, **kwargs)
-    elif solver == "gurobi":
+    elif solver in ("gurobi", "lazy_gurobi"):
         return gurobi_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, intermediate=intermediate, opt=opt, **kwargs)
     elif solver == "cpo":
         return cpo_arguments(model=model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
     else:
+        # TODO [thomas] raise exception?
         print_comment(f"setting parameters of {solver} is not (yet) supported")
         return dict()
 

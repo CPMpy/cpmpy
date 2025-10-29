@@ -41,12 +41,14 @@ import os
 import signal
 import subprocess
 import time
+import pathlib
 import lzma
 import sys
 import argparse
 import warnings
 import traceback
 import multiprocessing
+import itertools
 from tqdm import tqdm
 from pathlib import Path
 from typing import Optional, Tuple
@@ -55,7 +57,9 @@ from datetime import datetime
 from filelock import FileLock
 from concurrent.futures import ThreadPoolExecutor
 
+import cpmpy as cp
 from cpmpy.tools.xcsp3.dataset import XCSP3Dataset
+from cpmpy.tools.xcsp3 import read_xcsp3
 from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, init_signal_handlers, ExitStatus
 
 class Tee:
@@ -124,7 +128,7 @@ def xcsp3_wrapper(conn, kwargs, verbose):
 
     try:
         init_signal_handlers() # configure OS signal handlers
-        xcsp3_cpmpy(**kwargs)
+        xcsp3_cpmpy(**kwargs, verbose=verbose)
         conn.send({"status": "ok"})
     except Exception as e: # capture exceptions and report in state
         tb_str = traceback.format_exc()
@@ -322,11 +326,25 @@ def run_solution_checker(JAR, instance_location, out_file, verbose, cpm_time):
     return test_res_str.stdout.split("\n")[-2], checker_time
 
 
+def get_table_metadata(model):
+    tables = []
+    for c in model.constraints:
+        if isinstance(c, cp.expressions.core.Expression) and c.name == "table":
+            # TODO involve int var doms
+            X, tab = c.args
+            cols = [cp.expressions.utils.dom_size(x) for x in X]
+            rows = len(tab)
+            tables.append({"cols": cols, "rows": rows, "area": rows * sum(cols)})
+    return { "area": sum(t["area"] for t in tables), "tables": tables}
+
+
+
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, cores: int=1,
                    output_dir: str = 'results',
+                   no_timestamp: bool = False,
                    verbose: bool = False, intermediate: bool = False,
-                   checker_path: Optional[str] = None) -> str:
+                    checker_path: Optional[str] = None, limit_instances: Optional[int] = None) -> str:
     """
     Benchmark a solver on XCSP3 instances.
     
@@ -347,18 +365,28 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Get current timestamp in a filename-safe format
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = f"xcsp3_{year}_{track}_{solver}"
+    if no_timestamp is False:
+        # Get current timestamp in a filename-safe format
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = f"{output_file}_{timestamp}"
     
     # Define output file path with timestamp
-    output_file = str(output_dir / f"xcsp3_{year}_{track}_{solver}_{timestamp}.csv")
+    output_file = str(output_dir / f"{output_file}.csv")
+    pathlib.Path(output_file).unlink(missing_ok=True)
     
     # Initialize dataset
-    dataset = XCSP3Dataset(year=year, track=track, download=True)
+    def update_metadata_table(metadata):
+        if 'tables' not in metadata:
+            metadata = { **metadata, **get_table_metadata(read_xcsp3(metadata['path']))}
+        return metadata
+
+    dataset = XCSP3Dataset(year=year, track=track, download=True, target_transform=update_metadata_table)
 
     # Process instances in parallel
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
+        dataset = itertools.islice(((filename, metadata) for filename, metadata in dataset if metadata['area'] > 0), limit_instances)
         futures = [executor.submit(execute_instance,  # below: args
                                    (filename, metadata, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
                    for filename, metadata in dataset]
@@ -371,7 +399,9 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
             except Exception as e:
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
 
-        raise()
+        # raise()
+        # TODO [thomas] ?
+        # raise Exception()
     
     return output_file
 
@@ -383,9 +413,11 @@ if __name__ == "__main__":
     parser.add_argument('--solver', type=str, required=True, help='Solver name (e.g., ortools, exact, choco, ...)')
     parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
     parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
+    parser.add_argument('--limit-instances', type=int, help='Limit number of instances')
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
     parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign tp a single instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
+    parser.add_argument('--no-timestamp', action='store_true', default='results', help='Add timestamp to file names')
     parser.add_argument('--verbose', action='store_true', help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
     parser.add_argument('--checker-path', type=str, default=None,
