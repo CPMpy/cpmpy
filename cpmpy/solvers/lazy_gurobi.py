@@ -32,7 +32,13 @@ def is_integer_solution(A_enc):
 
 def encode_x(a, lb, ub):
     X = (ub - lb + 1) * [0]
-    X[a - lb] = 1
+    try:
+        X[a - lb] = 1
+    except IndexError:
+        # Fortress1-03_c25 case
+        # ['0..0', '0..1']
+        # [[0, 1], [1, 0]]
+        pass
     return X
 
 
