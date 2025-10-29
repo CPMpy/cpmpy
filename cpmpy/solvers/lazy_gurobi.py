@@ -206,7 +206,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
                 def cbGetVal(cpm_var, cbGet):
                     if isinstance(cpm_var, NegBoolView):
-                        # assert False, cpm_var
                         return 1.0 - cbGet(self.solver_var(~cpm_var))
                     return cbGet(self.solver_var(cpm_var))
 

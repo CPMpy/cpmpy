@@ -259,7 +259,7 @@ class CPM_gurobi(SolverInterface):
 
         # special case, negative-bool-view. Should be eliminated in linearize
         if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+            return 1 - self.solver_var(~cpm_var)
 
         # create if it does not exit
         if cpm_var not in self._varmap:

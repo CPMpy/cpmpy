@@ -80,6 +80,7 @@ class SolverInterface(object):
         self.cpm_status = SolverStatus(self.name) # status of solving this model
         self.objective_value_ = None
 
+
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
         self._varmap = dict()  # maps cpmpy variables to native solver variables
