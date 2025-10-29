@@ -182,6 +182,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
                                                     child_conn, 
                                                       {
                                                           "benchname": filename, 
+                                                          "metadata": metadata,
                                                           "solver": solver, 
                                                           "time_limit": time_limit, 
                                                           "mem_limit": mem_limit, 

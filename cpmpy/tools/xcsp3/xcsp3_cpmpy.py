@@ -581,6 +581,7 @@ def prepend_print():
 # Run the instance; exceptions are caught and printed but also re-raised
 def xcsp3_cpmpy(
         benchname: str,
+        metadata: Optional[dict] = None,
         seed: Optional[int] = None,
         time_limit: Optional[int] = None,
         mem_limit: Optional[int] = None,  # MiB: 1024 * 1024 bytes
@@ -625,7 +626,7 @@ def xcsp3_cpmpy(
         time_parse = time.time()
         parser = _parse_xcsp3(benchname)
         time_parse = time.time() - time_parse
-        if verbose: print_comment(f"took {time_parse:.4f} seconds to parse XCSP3 model [{benchname}]")
+        if verbose: print_comment(f"took {time_parse:.4f} seconds to parse XCSP3 model [{metadata['name']}]")
 
         if time_limit and time_limit < wall_time(p):
             raise TimeoutError("Time's up after parse")
