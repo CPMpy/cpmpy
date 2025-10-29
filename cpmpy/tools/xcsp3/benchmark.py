@@ -399,7 +399,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
         futures = [executor.submit(execute_instance,  # below: args
-                                   (filename, metadata, solver, time_limit, grace_time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
+                                   (filename, metadata, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
                    for filename, metadata in dataset]
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
