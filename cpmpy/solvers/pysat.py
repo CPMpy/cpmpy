@@ -427,10 +427,9 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.append_formula(cnf)
             elif isinstance(a1, Comparison) and a1.args[0].name == "wsum":  # implied pseudo-boolean comparison (a0->wsum(ws,bvs)<>val)
                 # implied sum comparison (a0->wsum([w,bvs])<>val or a0->(w*bv<>val))
-                cnf = self._pysat_pseudoboolean(a1)
+                cnf = self._pysat_pseudoboolean(a1, conditional=a0)
                 # implication of conjunction is conjunction of individual implications
-                antecedent = [self.solver_var(~a0)]
-                self.pysat_solver.append_formula([antecedent+c for c in cnf])
+                self.pysat_solver.append_formula(cnf)
             else:
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
 
@@ -548,7 +547,7 @@ class CPM_pysat(SolverInterface):
         else:
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
 
-    def _pysat_pseudoboolean(self, cpm_expr):
+    def _pysat_pseudoboolean(self, cpm_expr, conditional=None):
         """Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses."""
         if self._pb is None:
             raise ImportError("The model contains a PB constraint, for which PySAT needs an additional dependency (PBLib). To install it, run `pip install pypblib`.")
@@ -563,6 +562,8 @@ class CPM_pysat(SolverInterface):
         lits = self.solver_vars(lhs.args[1])
         pysat_args = {"weights": lhs.args[0], "lits": lits, "bound": rhs, "vpool":self.pysat_vpool }
 
+        if conditional is not None:
+            pysat_args["conditionals"] = [self.solver_var(conditional)]
 
         if cpm_expr.name == "<=":
             return self._pb.PBEnc.atmost(**pysat_args).clauses
