@@ -221,6 +221,19 @@ class ExitStatus(Enum):
     optimal:str = "OPTIMUM" + chr(32) + "FOUND" # optimal COP solution found
     unsat:str = "UNSATISFIABLE" # instance is unsatisfiable
     unknown:str = "UNKNOWN" # any other case
+    
+    def abbrev(self):
+        match self:
+            case unsupported:
+                return "UNSUP"
+            case sat:
+                return "SAT"
+            case optimal:
+                return "OPT"
+            case unsat:
+                return "UNS"
+            case unknown:
+                return "UNK"
 
 def print_status(status: ExitStatus) -> None:
     print(status_line_start() + status.value, end="\n", flush=True)

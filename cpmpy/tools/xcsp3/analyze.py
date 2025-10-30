@@ -26,6 +26,7 @@ Optional Arguments
 
 import argparse
 import ast
+import json
 from pathlib import Path
 import re
 import matplotlib
@@ -44,17 +45,22 @@ def _extract_cost(solution_str):
     return np.nan
 
 
-def xcsp3_plot(df, time_limit=None):
+OPT = 'OPTIMUM FOUND'
+UNS = 'UNSATISFIABLE'
+SAT = 'SATISFIABLE'
+
+def xcsp3_plot(df, time_limit=None, metric="time_total"):
     # Get unique solvers
     solvers = df['solver'].unique()
 
     # Determine the status to plot (Opt if at least one opt, otherwise sat)
     statuses = df['status'].unique()
-    if 'OPTIMUM FOUND' in statuses:
-        status_filter = 'OPTIMUM FOUND'
+    if OPT in statuses:
+        # status_filter = ('OPTIMUM FOUND', 'SATISFIABLE')
+        status_filter = (OPT,)
     else:
         status_filter = 'SATISFIABLE'
-    df = df[(df['status'] == status_filter) | (df['status'] == 'UNSATISFIABLE')]  # only those that reached the desired status
+    df = df[(df['status'].isin((*status_filter, 'UNSATISFIABLE')))]  # only those that reached the desired status
 
     # Count how many instances each solver solved (with correct status)
     solver_counts = df['solver'].value_counts()
@@ -70,14 +76,14 @@ def xcsp3_plot(df, time_limit=None):
         solver_data = df[df['solver'] == solver]
         
         # Sort by time_total
-        solver_data = solver_data.sort_values('time_total')
+        solver_data = solver_data.sort_values(metric)
         
         # If time_limit is set, truncate data
         if time_limit is not None:
-            solver_data = solver_data[solver_data['time_total'] <= time_limit]
+            solver_data = solver_data[solver_data[metric] <= time_limit]
         
         # Build x and y values
-        x = [0.0] + solver_data['time_total'].tolist()
+        x = [0.0] + solver_data[metric].tolist()
         y = [0] + list(range(1, len(solver_data) + 1))
         
         # Plot the performance curve
@@ -85,7 +91,7 @@ def xcsp3_plot(df, time_limit=None):
     
     # Set plot properties
     plt.xlabel('Time (seconds)')
-    plt.ylabel(f'Number of instances returning \'{status_filter}\'')
+    plt.ylabel(f'Number of instances returning \'{','.join(status_filter)}\'')
     # Get unique year-track combinations
     year_track_pairs = df[['year', 'track']].drop_duplicates()
     datasets = ', '.join([f'{row.year}:{row.track}' for _, row in year_track_pairs.iterrows()])
@@ -178,16 +184,52 @@ def xcsp3_stats(df):
         if slowest_idx is not None and not pd.isna(slowest_idx):
             print(f"Slowest {phase}: {df.loc[slowest_idx, f'time_{phase}']}s ({df.loc[slowest_idx, 'instance']}, {df.loc[slowest_idx, 'solver']})")
 
-    for solver in df['solver'].unique():
-        solver_total = df[df['solver'] == solver]['time_total'].sum()
-        print(f"Grand total for {solver}: {solver_total/60:.2f} minutes")
+    df['problem'] = df['instance'].map(lambda x: x.split("-")[0])
+    def get_metadata(x):
+        with open(x) as f:
+            metadata = json.load(f)
+        return metadata["area"]
+    df["file_name"] = df["year"].map(str) + "/" + df["track"] + "/" + df["instance"].map(lambda x: x[:-4] + ".json")
+    df["area"] = df["file_name"].map(get_metadata)
+    pd.set_option('display.float_format', '{:0.1f}'.format)
+
+
+    df["posted"] = ~df["time_post"].isna()
+    df["time_cb"] = df["cb_time"].fillna(value=0.0)
+    df["cb_rel"] = 100 * (df["time_cb"] / df["time_solve"])
+    df = df[df["solver"].isin(("gurobi", "lazy_gurobi"))]
+    print(df[["instance", "solver", "time_solve", "area", "cb_rel"]])
+
+    TO = 600
+    for t in ("post", "solve", "total"):
+        df[f"time_{t}"] = df[f"time_{t}"].fillna(value=TO*2)
+
+    groupings = ['problem', 'solver']
+    groups = df.groupby(groupings).agg(
+            area = ('area', 'sum'),
+            t_post_p2 = ('time_post', 'sum'),
+            t_solv_p2 = ('time_solve', 'sum'),
+            t_totl_p2 = ('time_total', 'sum'),
+            insts = ('status', 'count'),
+            posted = ('posted', 'sum'),
+            feasib = ('status', lambda x: x[x.isin((OPT, UNS, SAT))].count()),
+            solved = ('status', lambda x: x[x.isin((OPT, UNS))].count()),
+            cb_rel = ('cb_rel', 'mean'),
+            )
+
+    # groups = groups.sort_index(level=["problem"], by="area")
+    # groups = groups.sort_values(by="area", ascending=False)
+    groups["area"] = groups["area"].map(lambda x: f"{x:.1e}")
+
+    print(groups)
+
     
     
 def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Analyze XCSP3 solver performance data')
     parser.add_argument('files', nargs='+', help='List of CSV files or directories to analyze')
-    parser.add_argument('--time_limit', type=float, default=None, 
+    parser.add_argument('--time-limit', type=float, default=None, 
                         help='Maximum time limit in seconds to show on x-axis')
     parser.add_argument('--output', '-o', type=str, default=None,
                         help='Path to save the plot image (e.g., output.png)')
@@ -214,13 +256,16 @@ def main():
         df = pd.read_csv(file)
         dfs.append(df)
     
-    merged_df = pd.concat(dfs, ignore_index=True)
+    df = pd.concat(dfs, ignore_index=True)
     
     # Print some stats
-    xcsp3_stats(merged_df)
+    xcsp3_stats(df)
     
     # Create performance plot
-    fig = xcsp3_plot(merged_df, args.time_limit)
+    # df[cb_time] = df[f"time_{t}"].fillna(value=TO*2)
+    # df["t_solve_wo_cb"] = df["time_solve"] - df["cb_time"].fillna(value=0)
+    # fig = xcsp3_plot(df, args.time_limit, metric="t_solve_wo_cb")
+    fig = xcsp3_plot(df, args.time_limit)
     # fig = xcsp3_objective_performance_profile(merged_df)
 
     # Save or show plot
