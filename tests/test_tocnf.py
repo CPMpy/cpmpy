@@ -54,7 +54,8 @@ class TestToCnf(unittest.TestCase):
         for case in cases:
             vs = cp.cpm_array(get_variables(case))
             s1 = self.allsols([case], vs)
-            cnf, ivarmap = to_cnf(case)
+            ivarmap = dict()
+            cnf = to_cnf(case, ivarmap=ivarmap)
 
             # TODO
             # assert (

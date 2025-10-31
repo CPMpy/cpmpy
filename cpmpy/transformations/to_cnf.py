@@ -65,4 +65,4 @@ def to_cnf(constraints, csemap=None, ivarmap=None):
     clauses += (cp.any(to_cpmpy_clause(clause)) for clause in slv.pdk_solver.clauses())
     clauses += ((x | ~x) for x in free_vars)  # add free variables so they are "known" by the CNF
 
-    return clauses, slv.ivarmap
+    return clauses
