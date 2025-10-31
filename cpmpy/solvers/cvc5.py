@@ -8,7 +8,8 @@
 
     cvc5 is an open-source automatic theorem prover for Satisfiability Modulo Theories (SMT) problems that
     supports a large number of theories and their combination. It is the successor of CVC4 and is intended 
-    to be an open and extensible SMT engine. (see https://cvc5.github.io/)
+    to be an open and extensible SMT engine. cvc5 is a joint project led by Stanford University and the 
+    University of Iowa.(see https://cvc5.github.io/)
 
     This implemantation makes use of cvc5's "pythonic" API, closely replicating the Z3 API.
 
