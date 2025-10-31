@@ -121,6 +121,20 @@ class CPM_pindakaas(SolverInterface):
     def native_model(self):
         return self.pdk_solver
 
+    def _int2bool_user_vars(self):
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
+        user_vars = set()
+        for x in self.user_vars:
+            if isinstance(x, _BoolVarImpl):
+                user_vars.add(x)
+            else:
+                # extends set with encoding variables of `x`
+                user_vars.update(self.ivarmap[x.name].vars())
+        return user_vars
+
     def solve(self, time_limit=None, assumptions=None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
@@ -135,19 +149,7 @@ class CPM_pindakaas(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
-
-        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        user_vars = set()
-        for x in self.user_vars:
-            if isinstance(x, _BoolVarImpl):
-                user_vars.add(x)
-            else:
-                # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
-
-        self.user_vars = user_vars
+        self.user_vars = self._int2bool_user_vars()
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
