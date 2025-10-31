@@ -115,7 +115,7 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
         pb_clauses = solver._pysat_pseudoboolean(cons2, conditional=sel_var)
         
         # the first three clauses seem useless to me.. Just enforcing the selector var to be false should be enough
-        self.assertEqual(str(pb_clauses), "[[3, -4], [1, -4], [2, -4], [-4]]")
+        self.assertEqual(str(pb_clauses), "[[-4]]")
         
         # trivially sat constraint
         cons3 = sum(self.bv*[2,1,1]) >= 0
