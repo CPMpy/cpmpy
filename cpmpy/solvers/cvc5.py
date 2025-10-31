@@ -147,6 +147,7 @@ class CPM_cvc5(SolverInterface):
             =============================   ============
             ``rlimit-per``                    set resource limit
             ``random_seed``                   random seed
+            ``compute-partitions``            number of parallel workers (default=0)
             =============================   ============
         """  
 
