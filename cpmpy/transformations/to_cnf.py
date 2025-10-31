@@ -31,6 +31,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None):
 def to_cpmpy_cnf(slv):
     # from pdk var to cpmpy var
     cpmpy_vars = {str(slv.solver_var(x).var()): x for x in slv._int2bool_user_vars()}
+    free_vars = set(cpmpy_vars.values())
 
     def to_cpmpy_clause(clause):
         for lit in clause:
@@ -38,14 +39,15 @@ def to_cpmpy_cnf(slv):
             if x not in cpmpy_vars:
                 cpmpy_vars[x] = cp.boolvar()
             y = cpmpy_vars[x]
+            try:
+                free_vars.remove(y)
+            except KeyError:
+                pass
             if lit.is_negated():
                 yield ~y
             else:
                 yield y
 
-    return list(
-        itertools.chain(
-            (x | ~x for x in cpmpy_vars.values()),  # ensure all vars are "known" in the CNF
-            (cp.any(to_cpmpy_clause(clause)) for clause in slv.pdk_solver.clauses()),
-        )
-    )
+    clauses = [cp.any(to_cpmpy_clause(clause)) for clause in slv.pdk_solver.clauses()]
+    free_vars = [ (x | ~x) for x in free_vars ]  # add free variables so they are "known" in the CNF
+    return clauses + free_vars
