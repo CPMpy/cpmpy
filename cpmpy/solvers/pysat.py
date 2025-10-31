@@ -428,7 +428,6 @@ class CPM_pysat(SolverInterface):
             elif isinstance(a1, Comparison) and a1.args[0].name == "wsum":  # implied pseudo-boolean comparison (a0->wsum(ws,bvs)<>val)
                 # implied sum comparison (a0->wsum([w,bvs])<>val or a0->(w*bv<>val))
                 cnf = self._pysat_pseudoboolean(a1, conditional=a0)
-                # implication of conjunction is conjunction of individual implications
                 self.pysat_solver.append_formula(cnf)
             else:
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
