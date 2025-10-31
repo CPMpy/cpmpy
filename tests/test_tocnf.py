@@ -1,9 +1,11 @@
 import unittest
 import cpmpy as cp
 
+
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.globalconstraints import Xor
+from cpmpy.expressions.utils import argvals
 from cpmpy.solvers.pindakaas import CPM_pindakaas
 
 import pytest
