@@ -9,7 +9,7 @@ import cpmpy as cp
 
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
+from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool, get_bounds
 from ..expressions.variables import NDVarArray, _BoolVarImpl
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
@@ -169,6 +169,15 @@ def simplify_boolean(lst_of_expr, num_context=False):
         elif isinstance(expr, Comparison):
             lhs, rhs = simplify_boolean(expr.args, num_context=True)
             name = expr.name
+
+            lb, ub = get_bounds(eval_comparison(name, lhs, rhs))
+            if lb == 0 == ub:
+                newlist.append(0 if num_context else BoolVal(False))
+                continue
+            if lb == 1 == ub:
+                newlist.append(1 if num_context else BoolVal(True))
+                continue
+
             if is_num(lhs) and is_boolexpr(rhs):  # flip arguments of comparison to reduct nb of cases
                 if name == "<":    name = ">"
                 elif name == ">":  name = "<"

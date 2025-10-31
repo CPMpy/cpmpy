@@ -566,6 +566,28 @@ class Comparison(Expression):
         elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
         return None # default
 
+    def get_bounds(self):
+        (lb1, ub1), (lb2, ub2) = get_bounds(self.args[0]), get_bounds(self.args[1])
+        if self.name == "==":
+            if lb1 == ub1 == lb2 == ub2: return (1,1)   # equal domains, trivially true
+            if ub1 < lb2 or ub2 < lb1: return (0,0)     # disjoint, trivially false
+        if self.name == "!=":
+            if ub1 < lb2 or ub2 < lb1: return (1,1)    # disjoint, trivially true
+            if lb1 == ub1 == lb2 == ub2: return (0,0)     # equal domains, trivially false
+        if self.name == "<=":
+            if ub1 <= lb2: return (1,1) # domain of lhs is leq domain of rhs
+            if lb1 > ub2: return (0,0)  # domain of lhs is gt domain of rhs
+        if self.name == "<":
+            if ub1 < lb2: return (1,1)  # domain of lhs is lt domain of rhs
+            if lb1 >= ub2: return (0,0) # domain of lhs is geq domain of rhs
+        if self.name == ">=":
+            if lb1 >= ub2: return (1,1)  # domain of lhs is geq domain of rhs
+            if ub1 < lb2: return (0,0)  # domain of lhs is lt domain of rhs
+        if self.name == ">":
+            if lb1 > ub2: return (1,1)  # domain of lhs is gt domain of rhs
+            if ub1 <= lb2: return (0,0) # domain of lhs is leq domain of rhs
+        return (0,1)
+
 
 class Operator(Expression):
     """
