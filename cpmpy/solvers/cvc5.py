@@ -144,7 +144,7 @@ class CPM_cvc5(SolverInterface):
             =============================   ============
             Argument                        Description
             =============================   ============
-            `` rlimit-per``                   set resource limit
+            ``rlimit-per``                    set resource limit
             ``random_seed``                   random seed
             =============================   ============
         """  
