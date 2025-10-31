@@ -2,9 +2,7 @@
 Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of literals, i.e. Boolean variables or their negation, e.g. from `x xor y` to `(x or ~y) and (~x or y)`) using a back-end encoding library and its transformation pipeline.
 """
 
-import itertools
 import cpmpy as cp
-import pindakaas as pdk
 from ..solvers.pindakaas import CPM_pindakaas
 from ..transformations.get_variables import get_variables
 
@@ -20,6 +18,13 @@ def to_cnf(constraints, csemap=None, ivarmap=None):
     Returns:
         Equivalent CPMpy constraints in CNF, and the updated `ivarmap`
     """
+    if not CPM_pindakaas.supported():
+        raise ImportError(
+            f"Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use the `to_cnf` transformation"
+        )
+
+    import pindakaas as pdk
+
     slv = CPM_pindakaas()
     if ivarmap is not None:
         slv.ivarmap = ivarmap

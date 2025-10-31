@@ -1,13 +1,15 @@
 import unittest
 import cpmpy as cp
 
-from cpmpy.expressions.variables import _BoolVarImpl
-from cpmpy.expressions.utils import is_bool, argvals
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.globalconstraints import Xor
+from cpmpy.solvers.pindakaas import CPM_pindakaas
+
+import pytest
 
 
+@pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
 class TestToCnf(unittest.TestCase):
     def test_tocnf(self):
         a, b, clause = cp.boolvar(shape=3)
@@ -36,7 +38,7 @@ class TestToCnf(unittest.TestCase):
             cp.sum([2 * x + 3 * y]) <= 4,
             cp.sum([2 * x + 3 * y + 5 * z]) <= 6,
             cp.sum([2 * cp.intvar(1, 2) + 3 * cp.intvar(0, 1)]) <= 4,
-            cp.sum([ 3 * cp.intvar(0,1) ]) <= 4,
+            cp.sum([3 * cp.intvar(0, 1)]) <= 4,
             (a + b + clause) == 1,
             # a * b == 1,  # TODO in linearization!
             # a * b != 1,
