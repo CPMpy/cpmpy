@@ -212,7 +212,7 @@ class CPM_pysat(SolverInterface):
         return self.pysat_solver
 
 
-    def solve(self, time_limit=None, assumptions=None):
+    def solve(self, time_limit:Optional[float]=None, assumptions=None):
         """
             Call the PySAT solver
 
