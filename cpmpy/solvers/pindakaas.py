@@ -265,22 +265,33 @@ class CPM_pindakaas(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
+    def _add_clause(self, cpm_expr):
+        if not isinstance(cpm_expr, list):
+            raise TypeError
+
+        self.pdk_solver.add_clause(self.solver_vars(cpm_expr))
+
     def _post_constraint(self, cpm_expr, conditions=[]):
+        if not isinstance(conditions, list):
+            raise TypeError
+
         """Add a single, *transformed* constraint, implied by conditions."""
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                self.pdk_solver.add_clause(conditions)
+                self._add_clause(conditions)
 
         elif isinstance(cpm_expr, _BoolVarImpl):  # (implied) literal
-            self.pdk_solver.add_clause(conditions + [self.solver_var(cpm_expr)])
+            self._add_clause(conditions + [cpm_expr])
 
         elif cpm_expr.name == "or":  # (implied) clause
-            self.pdk_solver.add_clause(conditions + self.solver_vars(cpm_expr.args))
+            self._add_clause(conditions + cpm_expr.args)
 
         elif cpm_expr.name == "->":  # implication
             a0, a1 = cpm_expr.args
-            self._post_constraint(a1, conditions=conditions + [~self.solver_var(a0)])
+            if not isinstance(a0, _BoolVarImpl):
+                raise TypeError
+            self._post_constraint(a1, conditions=conditions + [~a0])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
             assert cpm_expr.name in {"<=", ">=", "=="}, (
@@ -302,7 +313,9 @@ class CPM_pindakaas(SolverInterface):
 
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=conditions)
+            self.pdk_solver.add_encoding(
+                eval_comparison(cpm_expr.name, lhs, rhs), conditions=self.solver_vars(conditions)
+            )
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 

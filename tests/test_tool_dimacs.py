@@ -60,7 +60,8 @@ class CNFTool(unittest.TestCase):
         m += a <= 0
 
         cnf_txt = write_dimacs(m)
-        gt_cnf = "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
+        # TODO note the order is slightly unexpected, because of an optimization in `to_cnf` which puts simple clauses before encoded constraints (i.e.) sums
+        gt_cnf = "p cnf 3 3\n1 2 3 0\n-1 0\n-2 -3 0\n"
 
         self.assertEqual(cnf_txt, gt_cnf)
 
