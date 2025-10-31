@@ -1,82 +1,68 @@
 """
-  Meta-transformation for obtaining a CNF from a list of constraints.
-
-  Converts the logical constraints into disjuctions using the tseitin transform,
-  including flattening global constraints that are :func:`~cpmpy.expressions.core.Expression.is_bool()` and not in `supported`.
-
-  .. note::
-    The transformation is no longer used by the SAT solvers, and may be outdated.
-    Check :meth:`CPM_pysat.transform <cpmpy.solvers.pysat.CPM_pysat.transform>` for an up-to-date alternative.
-  
-  Other constraints are copied verbatim so this transformation
-  can also be used in non-pure CNF settings.
-
-  The implementation first converts the list of constraints
-  to **Flat Normal Form**, this already flattens subexpressions using
-  auxiliary variables.
-
-  What is then left to do is to tseitin encode the following into CNF:
-
-  - ``BV`` with BV a ``BoolVar`` (or ``NegBoolView``)
-  - ``or([BV])`` constraint
-  - ``and([BV])`` constraint
-  - ``BE != BV``  with ``BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV``
-  - ``BE == BV``
-  - ``BE -> BV``
-  - ``BV -> BE``
+Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of literals, i.e. Boolean variables or their negation, e.g. from `x xor y` to `(x or ~y) and (~x or y)`) using a back-end encoding library and its transformation pipeline.
 """
-from ..expressions.core import Operator
-from ..expressions.variables import _BoolVarImpl
-from .reification import only_implies
-from .flatten_model import flatten_constraint
 
-def to_cnf(constraints, csemap=None):
+import cpmpy as cp
+from ..solvers.pindakaas import CPM_pindakaas
+from ..transformations.get_variables import get_variables
+
+
+def to_cnf(constraints, csemap=None, ivarmap=None):
     """
-        Converts all logical constraints into **Conjunctive Normal Form**
+    Converts all constraints into **Conjunctive Normal Form**
 
-        Arguments:
-            constraints:    list[Expression] or Operator
-            supported:      (frozen)set of global constraint names that do not need to be decomposed
+    Arguments:
+        constraints:    list[Expression] or Operator
+        csemap:         `dict()` used for CSE
+        ivarmap:        `dict()` used to map integer variables to their encoding (usefull for finding the values of the now-encoded integer variables)
+    Returns:
+        Equivalent CPMpy constraints in CNF, and the updated `ivarmap`
     """
-    fnf = flatten_constraint(constraints, csemap=csemap)
-    fnf = only_implies(fnf, csemap=csemap)
-    return flat2cnf(fnf)
+    if not CPM_pindakaas.supported():
+        raise ImportError(
+            f"Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use the `to_cnf` transformation"
+        )
 
-def flat2cnf(constraints):
-    """
-        Converts from **Flat Normal Form** all logical constraints into **Conjunctive Normal Form**,
-        including flattening global constraints that are :func:`~cpmpy.expressions.core.Expression.is_bool()` and not in `supported`.
+    import pindakaas as pdk
 
-        What is now left to do is to tseitin encode:
+    slv = CPM_pindakaas()
+    if ivarmap is not None:
+        slv.ivarmap = ivarmap
+    slv._csemap = csemap
 
-        - ``BV`` with BV a ``BoolVar`` (or ``NegBoolView``)
-        - ``or([BV])`` constraint
-        - ``and([BV])`` constraint
-        - ``BE != BV``  with ``BE :: BV|or()|and()|BV!=BV|BV==BV|BV->BV``
-        - ``BE == BV``
-        - ``BE -> BV``
-        - ``BV -> BE``
+    # the encoded constraints (i.e. `PB`s) will be added to this `pdk.CNF` object
+    slv.pdk_solver = pdk.CNF()
 
-        We do it in a principled way for each of the cases. (in)equalities
-        get transformed into implications, everything is modular.
+    # however, we bypass `pindakaas` for simple clauses
+    clauses = []
+    slv._add_clause = lambda cpm_expr: clauses.append(cp.any(cpm_expr))
 
-        Arguments:
-            constraints: list[Expression] or Operator
-    """
-    cnf = []
-    for expr in constraints:
-        # BE -> BE
-        if expr.name == '->':
-            a0,a1 = expr.args
+    # add, transform, and encode constraints into CNF/clauses
+    slv += constraints
 
-            # BoolVar() -> BoolVar()
-            if isinstance(a1, _BoolVarImpl) or \
-                    (isinstance(a1, Operator) and a1.name == 'or'):
-                cnf.append(~a0 | a1)
-                continue
+    # now we read the pdk.CNF back to cpmpy constraints by mapping from `pdk.Lit` to CPMpy lit
+    cpmpy_vars = {str(slv.solver_var(x).var()): x for x in slv._int2bool_user_vars()}
 
-        # all other cases added as is...
-        # TODO: we should raise here? is not really CNF...
-        cnf.append(expr)
+    # if a user variable `x` does not occur in any clause, they should be added as `x | ~x`
+    free_vars = set(cpmpy_vars.values()) - set(get_variables(clauses))
 
-    return cnf
+    def to_cpmpy_clause(clause):
+        """Lazily convert `pdk.CNF` to CPMpy."""
+        for lit in clause:
+            x = str(lit.var())
+            if x not in cpmpy_vars:
+                cpmpy_vars[x] = cp.boolvar()
+            y = cpmpy_vars[x]
+            try:
+                free_vars.remove(y)
+            except KeyError:
+                pass
+            if lit.is_negated():
+                yield ~y
+            else:
+                yield y
+
+    clauses += (cp.any(to_cpmpy_clause(clause)) for clause in slv.pdk_solver.clauses())
+    clauses += ((x | ~x) for x in free_vars)  # add free variables so they are "known" by the CNF
+
+    return clauses
