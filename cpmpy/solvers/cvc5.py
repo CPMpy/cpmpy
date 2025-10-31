@@ -60,7 +60,7 @@ from ..transformations.safening import no_partial_functions
 
 class CPM_cvc5(SolverInterface):
     """
-    Interface to CVC5's Python API.
+    Interface to cvc5's Python API.
 
     Creates the following attributes (see parent constructor for more):
         
@@ -135,7 +135,18 @@ class CPM_cvc5(SolverInterface):
                                                     get_core() returns a small subset of assumption variables that are unsat together.
                 **kwargs:                           any keyword argument, sets parameters of solver object
 
-            TODO: find some solver args
+            An overview of the cvc5 solver parameters can found at 
+            https://cvc5.github.io/docs/cvc5-1.0.8/options.html
+
+            You can use any of these parameters as keyword argument to `solve()` and they will
+            be forwarded to the solver. Examples include:
+
+            =============================   ============
+            Argument                        Description
+            =============================   ============
+            `` rlimit-per``                   set resource limit
+            ``random_seed``                   random seed
+            =============================   ============
         """  
 
         import cvc5.pythonic as cvc5
@@ -156,7 +167,7 @@ class CPM_cvc5(SolverInterface):
 
         # call the solver, with parameters
         for (key,value) in kwargs.items():
-            self.cvc5_solver.set(key, value)
+            self.cvc5_solver.setOption(key, value)
 
         # check assumption variables
         my_status = repr(self.cvc5_solver.check(*cvc5_assum_vars))
