@@ -93,6 +93,41 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
         ## check all types of linear constraints are handled
         for expression in expressions:
             Model(expression).solve("pysat")
+            
+    def test_encode_pb_reified(self):
+        # Instantiate the solver with an empty model to get access to vpool and solver_var
+        solver = CPM_pysat(cp.Model())
+        
+        sel_var = cp.boolvar(name="s")
+        # Define the pseudo-Boolean constraint (the consequent)
+        cons1 = sum(self.bv*[2,1,1]) >= 2
+        
+        
+        # Convert the conditional constraint using _pysat_pseudoboolean
+        pb_clauses = solver._pysat_pseudoboolean(cons1, conditional=sel_var)
+        
+        # Check the result
+        self.assertEqual(str(pb_clauses), "[[5], [-5, 6], [3, 6], [-5, 3, 7], [2, 6], [-5, 2, 7], [3, 2, 7], [-5, 3, 2, 8], [1, 9], [-7, 9], [1, -7, 10], [-10, -4]]")
+        
+        # trivially unsat constraint
+        cons2 = sum(self.bv*[2,1,1]) >= 10
+        
+        pb_clauses = solver._pysat_pseudoboolean(cons2, conditional=sel_var)
+        
+        # the first three clauses seem useless to me.. Just enforcing the selector var to be false should be enough
+        self.assertEqual(str(pb_clauses), "[[3, -4], [1, -4], [2, -4], [-4]]")
+        
+        # trivially sat constraint
+        cons3 = sum(self.bv*[2,1,1]) >= 0
+        
+        pb_clauses = solver._pysat_pseudoboolean(cons3, conditional=sel_var)
+        
+        # no clauses expected
+        self.assertEqual(str(pb_clauses), "[]")
+        
+        
+        
+        
 
 if __name__ == '__main__':
     unittest.main()
