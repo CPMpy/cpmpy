@@ -125,10 +125,10 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 cond, bool_expr = args
                 if is_false_cst(cond) or is_true_cst(bool_expr):
                     newlist.append(1 if num_context else BoolVal(True))
-                elif is_true_cst(cond):
-                    newlist.append(bool_expr)
                 elif is_false_cst(bool_expr):
                     newlist += simplify_boolean([cp.transformations.negation.recurse_negation(cond)])
+                elif is_true_cst(cond):
+                    newlist.append(bool_expr)
                 else:
                     newlist.append(cond.implies(bool_expr))
 
