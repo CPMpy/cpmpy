@@ -242,9 +242,9 @@ class CPM_cvc5(SolverInterface):
             # we assume al variables are user variables (because nested expressions)
             self.user_vars.add(cpm_var)
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = cvc5.Bool(str(cpm_var))
+                revar = cvc5.Bool(str(str(cpm_var))) # TODO: first str call shouldn't return a np.str_
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = cvc5.Int(str(cpm_var))
+                revar = cvc5.Int(str(str(cpm_var)))
                 # set bounds
                 self.cvc5_solver.add(revar >= cpm_var.lb)
                 self.cvc5_solver.add(revar <= cpm_var.ub)
@@ -254,6 +254,8 @@ class CPM_cvc5(SolverInterface):
 
         return self._varmap[cpm_var]
 
+    def objective(self, expr, minimize=True):
+        raise NotSupportedError("CVC5 only supports satisfaction problems.")
 
     def transform(self, cpm_expr):
         """
@@ -469,7 +471,10 @@ class CPM_cvc5(SolverInterface):
             # TODO:
 
             if cpm_con.name == 'alldifferent':
-                return cvc5.Distinct(self._cvc5_expr(cpm_con.args))
+                if len(cpm_con.args) > 1:
+                    return cvc5.Distinct(self._cvc5_expr(cpm_con.args))
+                else:
+                    return True
             elif cpm_con.name == 'xor':
                 cvc5_args = self._cvc5_expr(cpm_con.args)
                 if len(cvc5_args) == 1: # just the arg
@@ -490,19 +495,19 @@ class CPM_cvc5(SolverInterface):
 
         raise NotImplementedError("CVC5: constraint not (yet) supported", cpm_con)
 
+    # CVC5 currently to does not provide access to unsat cores through the "pythonic" Python API
+    # def get_core(self):
+    #     """
+    #         For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
-    def get_core(self):
-        """
-            For use with :func:`s.solve(assumptions=[...]) <solve()>`. Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
+    #         CPMpy will return only those variables that are False (in the UNSAT core)
 
-            CPMpy will return only those variables that are False (in the UNSAT core)
+    #         Note that there is no guarantee that the core is minimal, though this interface does upon up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
+    #     """
+    #     assert (self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE), "Can only extract core form UNSAT model"
+    #     assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
-            Note that there is no guarantee that the core is minimal, though this interface does upon up the possibility to add more advanced Minimal Unsatisfiabile Subset algorithms on top. All contributions welcome!
-        """
-        assert (self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE), "Can only extract core form UNSAT model"
-        assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
-
-        return [self.assumption_dict[cvc5_var] for cvc5_var in self.cvc5_solver.unsat_core()]
+    #     return [self.assumption_dict[cvc5_var] for cvc5_var in self.cvc5_solver.unsat_core()]
 
 
 

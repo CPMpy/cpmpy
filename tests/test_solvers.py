@@ -13,6 +13,7 @@ from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
+from cpmpy.solvers.cvc5 import CPM_cvc5
 from cpmpy.solvers.minizinc import CPM_minizinc
 from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
@@ -493,6 +494,38 @@ class TestSolvers(unittest.TestCase):
         s = cp.SolverLookup.get("z3", m)
         self.assertFalse(s.solve()) # upgrade z3 with pip install --upgrade z3-solver
 
+    @pytest.mark.skipif(not CPM_cvc5.supported(),
+                    reason="cvc5 not installed")
+    def test_cvc5(self):
+        bv = cp.boolvar(shape=3)
+        iv = cp.intvar(0, 9, shape=3)
+        # circular 'bigger then', UNSAT
+        m = cp.Model([
+            bv[0].implies(iv[0] > iv[1]),
+            bv[1].implies(iv[1] > iv[2]),
+            bv[2].implies(iv[2] > iv[0])
+        ])
+        s = cp.SolverLookup.get("cvc5", m)
+        self.assertFalse(s.solve(assumptions=bv))
+
+        m = cp.Model(~(iv[0] != iv[1]))
+        s = cp.SolverLookup.get("cvc5", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model((iv[0] == 0) & ((iv[0] != iv[1]) == 0))
+        s = cp.SolverLookup.get("cvc5", m)
+        self.assertTrue(s.solve())
+
+        m = cp.Model([~bv, ~((iv[0] + abs(iv[1])) == sum(iv))])
+        s = cp.SolverLookup.get("cvc5", m)
+        self.assertTrue(s.solve())
+
+        x = cp.intvar(0, 1)
+        m = cp.Model((x >= 0.1) & (x != 1))
+        s = cp.SolverLookup.get("cvc5", m)
+        self.assertFalse(s.solve()) # TODO: same bug as z3?
+
+
     def test_pow(self):
         iv1 = cp.intvar(2,9)
         for i in [0,1,2]:
@@ -956,8 +989,8 @@ class TestSupportedSolvers:
         if "assumptions" not in inspect.signature((s.solve)).parameters:
             return # solver does not support solving under assumptions
         
-        if solver == "pysdd":
-            return # not implemented in pysdd
+        if solver == "pysdd" or solver == "cvc5":
+            return # not implemented in pysdd or cvc5
         
         s += x | y
         assert s.solve(assumptions=[x])
