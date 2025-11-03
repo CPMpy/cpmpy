@@ -16,8 +16,6 @@ from urllib.error import HTTPError, URLError
 import zipfile
 import numpy as np
 
-from matplotlib import pyplot as plt
-
 import cpmpy as cp
 
 class JSPLibDataset(object):  # torch.utils.data.Dataset compatible
