@@ -249,7 +249,9 @@ class CPM_z3(SolverInterface):
             # translate objective, for optimisation problems only
             if self.has_objective():
                 obj = self.z3_solver.objectives()[0]
-                self.objective_value_ = sol.evaluate(obj).as_long()
+                self.objective_value_ = sol.evaluate(obj).as_long() 
+                if not self._minimize:
+                    self.objective_value_ = -1*self.objective_value_ # Z3 negates the objective function to turn a maximisation problem into a minimisation one, undoing negation here
 
         else:  # clear values of variables
             for cpm_var in self.user_vars:
@@ -318,8 +320,10 @@ class CPM_z3(SolverInterface):
         obj = self._z3_expr(expr)
         if minimize:
             self.obj_handle = self.z3_solver.minimize(obj)
+            self._minimize = True # record direction of optimisation
         else:
             self.obj_handle = self.z3_solver.maximize(obj)
+            self._minimize = False # record direction of optimisation
 
 
     def transform(self, cpm_expr):
