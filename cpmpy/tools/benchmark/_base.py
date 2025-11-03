@@ -338,7 +338,96 @@ class Benchmark(ABC):
             res |= { "solution_callback": CpoSolutionCallback }
 
         return res, None
+
+    def cplex_arguments(
+        self,
+        cores: Optional[int] = None,
+        seed: Optional[int] = None,
+        **kwargs
+    ):
+        res = dict()
+        if cores is not None:
+            res |= {"threads": cores}
+        if seed is not None:
+            res |= {"randomseed": seed}
+
+        return res, None
     
+    def hexaly_arguments(
+        self,
+        model: cp.Model,
+        cores: Optional[int] = None,
+        seed: Optional[int] = None,
+        intermediate: bool = False,
+        **kwargs
+    ):
+        res = dict()
+        #res |= {"nb_threads": cores}
+        #res |= {"seed": seed}
+
+
+        if intermediate and model.has_objective():
+            # Define custom Hexaly solution callback, then register it
+
+            _self = self
+            class HexSolutionCallback:
+    
+                def __init__(self):
+                    self.__start_time = time.time()
+                    self.__solution_count = 0
+          
+
+                def on_solution_callback(self, optimizer, cb_type):
+                    """Called on each new solution."""
+                    # check if solution with different objective (or if verbose)
+                    current_time = time.time()
+                    obj = optimizer.model.objectives[0]
+                    _self.print_comment('Solution %i, time = %0.4fs' % 
+                                (self.__solution_count, current_time - self.__start_time))
+                    _self.print_intermediate(obj)
+                    self.__solution_count += 1
+
+                def solution_count(self):
+                    return self.__solution_count
+                
+            # Register the callback
+            res |= { "solution_callback": HexSolutionCallback().on_solution_callback }
+
+
+        # def internal_options(solver: "CPM_hexaly"):
+        #     # https://github.com/google/or-tools/blob/1c5daab55dd84bca7149236e4b4fa009e5fd95ca/ortools/flatzinc/cp_model_fz_solver.cc#L1688
+        #     #solver.native_model.get_param().set_seed(seed)
+        #     #solver.native_model.get_param().set_nr_threads(cores)
+
+        #     _self = self
+        #     class CallbackExample:
+        #         def __init__(self):
+        #             self.last_best_value = 0
+        #             self.last_best_running_time = 0
+        #             self.__solution_count = 0
+        #             self.__start_time = time.time()
+
+        #         def my_callback(self, optimizer, cb_type):
+        #             stats = optimizer.statistics
+        #             obj = optimizer.model.objectives[0]
+        #             current_time = time.time()
+        #             #obj = int(self.ObjectiveValue())
+        #             #obj = optimizer.get_objective_bound(0).value
+        #             if obj.value > self.last_best_value:
+        #                 self.last_best_running_time = stats.running_time
+        #                 self.last_best_value = obj.value
+        #                 self.__solution_count += 1
+                  
+        #                 _self.print_comment('Solution %i, time = %0.4fs' % 
+        #                         (self.__solution_count, current_time - self.__start_time))
+        #                 _self.print_intermediate(obj.value)
+
+            # optimizer = solver.native_model
+            # cb = CallbackExample()
+            # from hexaly.optimizer import HxCallbackType
+            # optimizer.add_callback(HxCallbackType.TIME_TICKED, cb.my_callback)
+
+        return res, None
 
     """
     Methods which can, bit most likely shouldn't, be overwritten.
@@ -420,6 +509,10 @@ class Benchmark(ABC):
             return self.gurobi_arguments(model, cores=cores, seed=seed, mem_limit=mem_limit, intermediate=intermediate, opt=opt, **kwargs)
         elif solver == "cpo":
             return self.cpo_arguments(model=model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
+        elif solver == "hexaly":
+            return self.hexaly_arguments(model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
+        elif solver == "cplex":
+            return self.cplex_arguments(cores=cores, **kwargs) 
         else:
             self.print_comment(f"setting parameters of {solver} is not (yet) supported")
             return dict(), None
