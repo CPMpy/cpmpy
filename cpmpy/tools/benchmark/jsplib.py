@@ -205,7 +205,7 @@ if __name__ == "__main__":
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # Define output file path with timestamp
-    output_file = str(output_dir / "jsplib" / f"psplib_{args.solver}_{timestamp}.csv")
+    output_file = str(output_dir / "jsplib" / f"jsplib_{args.solver}_{timestamp}.csv")
 
     # Run the benchmark
     instance_runner = JSPLibBenchmark()
