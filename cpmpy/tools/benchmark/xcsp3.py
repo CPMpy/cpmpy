@@ -121,6 +121,7 @@ class XCSP3Benchmark(Benchmark):
     """
 
     def __init__(self):
+        self._sol_time = None
         super().__init__(reader=read_xcsp3, exit_status=XCSP3ExitStatus)
     
     def print_comment(self, comment:str):
@@ -190,7 +191,8 @@ class XCSP3Benchmark(Benchmark):
             obj = int(line[2:].strip())
             if result['intermediate'] is None:
                 result['intermediate'] = []
-            result['intermediate'] += [(self._sol_time, obj)]
+            if self._sol_time is not None:
+                result['intermediate'] += [(self._sol_time, obj)]
             result['objective_value'] = obj
             obj = None
         elif line.startswith('c took '):
