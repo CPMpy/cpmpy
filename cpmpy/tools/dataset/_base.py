@@ -60,14 +60,13 @@ class _Dataset(ABC):
         """
         pass
 
-    @abstractmethod
     def open(self, instance) -> callable:
         """
         How an instance file from the dataset should be opened.
         Especially usefull when files come compressed and won't work with 
         python standard library's 'open', e.g. '.xz', '.lzma'.
         """
-        pass
+        return open(instance)
 
     def metadata(self, file) -> dict:
         metadata = self.category() | {

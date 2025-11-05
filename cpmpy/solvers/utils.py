@@ -32,6 +32,7 @@ from .cpo   import CPM_cpo
 from .cplex import CPM_cplex
 from .pindakaas import CPM_pindakaas
 from .hexaly import CPM_hexaly
+from .pysmt import CPM_pysmt
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -87,7 +88,8 @@ class SolverLookup():
                 ("cpo", CPM_cpo),
                 ("cplex", CPM_cplex),
                 ("pindakaas", CPM_pindakaas),
-                ("hexaly", CPM_hexaly)
+                ("hexaly", CPM_hexaly),
+                ("pysmt", CPM_pysmt)
                ]
 
     @classmethod
@@ -197,7 +199,7 @@ class SolverLookup():
             
             # Handle subsolvers if applicable
             if installed and hasattr(CPM_slv, 'solvernames'):
-                subnames = CPM_slv.solvernames()
+                subnames = CPM_slv.solvernames(installed=False)
                 installed_subnames = CPM_slv.solvernames(installed=True)
                 for subn in subnames:
                     is_installed = subn in installed_subnames
