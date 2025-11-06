@@ -736,7 +736,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(~expr).solve(solver=self.solver))
         self.assertFalse(expr.value())
         x,y, z = x.value(), y.value(), z.value()
-        self.assertTrue((x and z) or (not x and y))
+        self.assertTrue((x and not y) or (not x and not z))
 
 
 
