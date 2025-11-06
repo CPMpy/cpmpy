@@ -8,6 +8,7 @@ from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
 
+@pytest.mark.usefixtures("solver")
 class CNFTool(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -32,12 +33,12 @@ class CNFTool(unittest.TestCase):
 
     def test_empty_formula(self):
         model = self.dimacs_to_model("p cnf 0 0")
-        self.assertTrue(model.solve())
+        self.assertTrue(model.solve(solver=self.solver))
         self.assertEqual(model.status().exitstatus, ExitStatus.FEASIBLE)
 
     def test_empty_clauses(self):
         model = self.dimacs_to_model("p cnf 0 2\n0\n0")
-        self.assertFalse(model.solve())
+        self.assertFalse(model.solve(solver=self.solver))
         self.assertEqual(model.status().exitstatus, ExitStatus.UNSATISFIABLE)
 
     def test_with_comments(self):
@@ -47,7 +48,7 @@ class CNFTool(unittest.TestCase):
         sols = set()
         addsol = lambda : sols.add(tuple([v.value() for v in vars]))
 
-        self.assertEqual(model.solveAll(display=addsol), 2)
+        self.assertEqual(model.solveAll(solver=self.solver, display=addsol), 2)
         self.assertSetEqual(sols, {(False, False, True), (False, True, False)})
 
     def test_write_cnf(self):
