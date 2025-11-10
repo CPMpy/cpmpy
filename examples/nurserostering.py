@@ -258,10 +258,6 @@ if __name__ == "__main__":
     dataset = NurseRosteringDataset(root=".", download=True, transform=parse_scheduling_period)
     print("Dataset size:", len(dataset))
     data, metadata = dataset[1]
-    print(metadata)
-    for key, df in data.items():
-        print(key)
-        print(df)
 
     for key, value in data.items():
         print(key,":")
