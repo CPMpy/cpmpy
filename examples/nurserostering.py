@@ -4,7 +4,7 @@ PyTorch-style Dataset for Nurserostering instances from schedulingbenchmarks.org
 Simply create a dataset instance and start iterating over its contents:
 The `metadata` contains usefull information about the current problem instance.
 """
-import json
+import copy
 import pathlib
 from io import StringIO
 from os.path import join
@@ -13,9 +13,7 @@ from urllib.request import urlretrieve
 from urllib.error import HTTPError, URLError
 import zipfile
 
-import faker
-import numpy as np
-import xml.etree.ElementTree as ET
+from faker import Faker
 import pandas as pd
 from natsort import natsorted
 
@@ -83,14 +81,14 @@ class NurseRosteringDataset(object):  # torch.utils.data.Dataset compatible
 
     def __len__(self) -> int:
         """Return the total number of instances."""
-        return len(list(self.instance_dir.glob("*")))
+        return len(list(self.instance_dir.glob("*.txt")))
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """
-        Get a single RCPSP instance filename and metadata.
+        Get a single Nurserostering instance filename and metadata.
 
         Args:
-            index (int or str): Index or name of the instance to retrieve
+            index (int): Index of the instance to retrieve
 
         Returns:
             Tuple[Any, Any]: A tuple containing:
@@ -127,11 +125,10 @@ def _tag_to_data(string, tag, skip_lines=0, datatype=pd.DataFrame, *args, **kwar
     if datatype == pd.DataFrame:
         kwargs = {"header":0, "index_col":0} | kwargs
         df = pd.read_csv(StringIO(data), *args, **kwargs)
-        return  df.rename(columns=lambda x: x.strip())
+        return  df.rename(columns=lambda x: x.replace("#","").strip())
     return datatype(data, *args, **kwargs)
 
 def parse_scheduling_period(fname):
-    from faker import Faker
     fake = Faker()
     fake.seed_instance(0)
 
@@ -143,7 +140,7 @@ def parse_scheduling_period(fname):
     shifts = _tag_to_data(string, "SECTION_SHIFTS", names=["ShiftID", "Length", "cannot follow"],
                           dtype={'ShiftID':str, 'Length':int, 'cannot follow':str})
     shifts.fillna("", inplace=True)
-    shifts["cannot follow"] = shifts["cannot follow"].apply(lambda val : val.split("|"))
+    shifts["cannot follow"] = shifts["cannot follow"].apply(lambda val : [v.strip() for v in val.split("|") if len(v.strip())])
 
     staff = _tag_to_data(string, "SECTION_STAFF", index_col=False)
     maxes = staff["MaxShifts"].str.split("|", expand=True)
@@ -175,39 +172,120 @@ def nurserostering_model(horizon, shifts:pd.DataFrame, staff, days_off, shift_on
     n_nurses = len(staff)
 
     FREE = 0
-    SHIFTS = list(shifts.index)
+    SHIFTS = ["F"] + list(shifts.index)
 
     nurse_view = cp.intvar(0,len(shifts), shape=(n_nurses, horizon), name="nv")
 
     model = cp.Model()
 
     # Shifts which cannot follow the shift on the previous day.
-    for id, shift in enumerate(shifts.iterrows()):
+    for id, shift in shifts.iterrows():
         for other_shift in shift['cannot follow']:
-            model += (nurse_view[:,:-1] == id).implies(nurse_view[:,1:] != other_shift)
+            model += (nurse_view[:,:-1] == SHIFTS.index(id)).implies(nurse_view[:,1:] != SHIFTS.index(other_shift))
 
     # Maximum number of shifts of each type that can be assigned to each employee.
-    for _, nurse in staff.iterrows():
-
-
-        n = self.nurse_map.index(nurse['# ID'])
-        for shift_id, shift in self.data.shifts.iterrows():
-            n_shifts = cp.Count(self.nurse_view[n], self.shift_name_to_idx[shift_id])
+    for i, nurse in staff.iterrows():
+        for shift_id, shift in shifts.iterrows():
             max_shifts = nurse[f"max_shifts_{shift_id}"]
-            cons = n_shifts <= max_shifts
-            cons.set_description(f"{nurse['name']} can work at most {max_shifts} {shift_id}-shifts")
-            cons.visualize = get_visualizer(n, shift_id)
-            constraints.append(cons)
+            model += cp.Count(nurse_view[i], SHIFTS.index(shift_id)) <= max_shifts
 
-    return constraints
+    # Minimum and maximum amount of total time in minutes that can be assigned to each employee.
+    shift_length = cp.cpm_array([0] + shifts['Length'].tolist()) # FREE = length 0
+    for i, nurse in staff.iterrows():
+        time_worked = cp.sum(shift_length[nurse_view[i,d]] for d in range(horizon))
+        model += time_worked <= nurse['MaxTotalMinutes']
+        model += time_worked >= nurse['MinTotalMinutes']
+
+    # Maximum number of consecutive shifts that can be worked before having a day off.
+    for i, nurse in staff.iterrows():
+        max_days = nurse['MaxConsecutiveShifts']
+        for d in range(horizon - max_days):
+            window = nurse_view[i,d:d+max_days+1]
+            model += cp.Count(window, FREE) >= 1 # at least one holiday in this window
+
+    # Minimum number of concecutive shifts that must be worked before having a day off.
+    for i, nurse in staff.iterrows():
+        min_days = nurse['MinConsecutiveShifts']
+        for d in range(1,horizon):
+            is_start_of_working_period = (nurse_view[i, d-1] == FREE) & (nurse_view[i, d] != FREE)
+            model += is_start_of_working_period.implies(cp.all(nurse_view[i,d:d+min_days] != FREE))
+
+    # Minimum number of concecutive days off.
+    for i, nurse in staff.iterrows():
+        min_days = nurse['MinConsecutiveDaysOff']
+        for d in range(1,horizon):
+            is_start_of_free_period = (nurse_view[i, d - 1] != FREE) & (nurse_view[i, d] == FREE)
+            model += is_start_of_free_period.implies(cp.all(nurse_view[i, d:d + min_days] == FREE))
+
+    # Max number of working weekends for each nurse
+    weekends = [(i - 1, i) for i in range(1,horizon) if (i + 1) % 7 == 0]
+    for i, nurse in staff.iterrows():
+        n_weekends = cp.sum((nurse_view[i,sat] != FREE) | (nurse_view[i,sun] != FREE) for sat,sun in weekends)
+        model += n_weekends <= nurse['MaxWeekends']
+
+    # Days off
+    for _, holiday in days_off.iterrows(): # could also do this vectorized... TODO?
+        i = staff.index[staff['ID'] == holiday['EmployeeID']][0]
+        model += nurse_view[i,holiday['DayIndex']] == FREE
+
+    # Shift requests, encode in linear objective
+    objective = 0
+    for _, request in shift_on.iterrows():
+        i = staff.index[staff['ID'] == request['EmployeeID']][0]
+        cpm_request = nurse_view[i, request['Day']] == SHIFTS.index(request['ShiftID'])
+        objective += request['Weight'] * ~cpm_request
+
+    # Shift off requests, encode in linear objective
+    for _, request in shift_off.iterrows():
+        i = staff.index[staff['ID'] == request['EmployeeID']][0]
+        cpm_request = nurse_view[i, request['Day']] != SHIFTS.index(request['ShiftID'])
+        objective += request['Weight'] * ~cpm_request
+
+    # Cover constraints, encode in objective with slack variables
+    for _, cover_request in cover.iterrows():
+        nb_nurses = cp.Count(nurse_view[:, cover_request['Day']], SHIFTS.index(cover_request['ShiftID']))
+        slack_over, slack_under = cp.intvar(0, len(staff), shape=2)
+        model += nb_nurses - slack_over + slack_under == cover_request["Requirement"]
+
+        objective += cover_request["Weight for over"] * slack_over + cover_request["Weight for under"] * slack_under
+
+    model.minimize(objective)
+
+    return model, nurse_view
 
 if __name__ == "__main__":
 
     dataset = NurseRosteringDataset(root=".", download=True, transform=parse_scheduling_period)
     print("Dataset size:", len(dataset))
-    print("Instance 0:")
     data, metadata = dataset[1]
     print(metadata)
     for key, df in data.items():
         print(key)
         print(df)
+
+    for key, value in data.items():
+        print(key,":")
+        print(value)
+
+    model, nurse_view = nurserostering_model(**data)
+    assert model.solve()
+
+    print(f"Found optimal solution with penalty of {model.objective_value()}")
+
+    # pretty print solution
+    names = ["-"] + data['shifts'].index.tolist()
+    sol = nurse_view.value()
+    df = pd.DataFrame(sol, index=data['staff'].name).map(names.__getitem__)
+
+    for shift, _ in data['shifts'].iterrows():
+        df.loc[f'Cover {shift}'] = ""
+
+    for _, cover_request in data['cover'].iterrows():
+        shift = cover_request['ShiftID']
+        num_shifts = sum(df[cover_request['Day']] == shift)
+        df.loc[f"Cover {shift}",cover_request['Day']] = f"{num_shifts}/{cover_request['Requirement']}"
+
+    days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    df.columns = [days[(int(col)) % 7] for col in df.columns]
+
+    print(df.to_markdown())
