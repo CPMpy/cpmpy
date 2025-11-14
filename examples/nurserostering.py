@@ -20,9 +20,6 @@ from natsort import natsorted
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 5000)
 
-
-
-
 import cpmpy as cp
 
 class NurseRosteringDataset(object):  # torch.utils.data.Dataset compatible
@@ -50,7 +47,6 @@ class NurseRosteringDataset(object):  # torch.utils.data.Dataset compatible
         # Create root directory if it doesn't exist
         self.root.mkdir(parents=True, exist_ok=True)
 
-        print(self.instance_dir, self.instance_dir.exists(), self.instance_dir.is_dir())
         if not self.instance_dir.exists():
             if not download:
                 raise ValueError(f"Dataset not found in local file system. Please set download=True to download the dataset.")
@@ -257,7 +253,7 @@ if __name__ == "__main__":
 
     dataset = NurseRosteringDataset(root=".", download=True, transform=parse_scheduling_period)
     print("Dataset size:", len(dataset))
-    data, metadata = dataset[1]
+    data, metadata = dataset[0]
 
     for key, value in data.items():
         print(key,":")
