@@ -1164,3 +1164,32 @@ class TestSupportedSolvers:
 
     def test_version(self, solver):
         assert SolverLookup.lookup(solver).version() is not None
+
+    def test_optimisation_direction(self, solver):
+        x = cp.intvar(0, 10, shape=1)
+        m = cp.Model(x >= 5)
+
+        # TODO: in the future this might be simplified to a filter using pytest markers, first #780 needs to be merged
+        # 1) Maximisation - model
+        try: # one try-except to detect if the solver supports optimisation
+            m.maximize(x)
+            assert m.solve(solver=solver)
+        except (NotImplementedError, NotSupportedError):
+            pytest.skip(reason=f"{solver} does not support optimisation")
+            return
+        assert m.objective_value() == 10
+
+        # 2) Maximisation - solver
+        s = cp.SolverLookup.get(solver, m)
+        assert s.solve()
+        assert s.objective_value() == 10
+
+        # 3) Minimisation - model
+        m.minimize(x)
+        assert m.solve(solver=solver)
+        assert m.objective_value() == 5
+
+        # 4) Minimisation - solver
+        s = cp.SolverLookup.get(solver, m)
+        assert s.solve()
+        assert s.objective_value() == 5
