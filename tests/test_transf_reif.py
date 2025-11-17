@@ -77,7 +77,7 @@ class TestTransfReif(unittest.TestCase):
 
     def test_reif_rewrite(self):
         bvs = boolvar(shape=4, name="bvs")
-        ivs = intvar(1,9, shape=3, name="ivs")
+        ivs = intvar(0,9, shape=3, name="ivs")
         rv = boolvar(name="rv")
         arr = cpm_array([0,1,2])
 
