@@ -773,18 +773,10 @@ class Operator(Expression):
             lowerbound, upperbound = sum(lbs), sum(ubs)
         elif self.name == 'wsum':
             weights, vars = self.args
-            bounds = []
-            lowerbound, upperbound = 0,0
-            #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
-            for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]):
-                x,y = int(w) * lb, int(w) * ub
-                if x <= y: # x is the lb of this arg
-                    lowerbound += x
-                    upperbound += y
-                else:
-                    lowerbound += y
-                    upperbound += x
-
+            lbs, ubs = get_bounds(vars)
+            lbs, ubs = [w * lb for w,lb in zip(weights,lbs)], [w * ub for w, ub in zip(weights,ubs)]
+            lowerbound = sum(lb if lb <= ub else ub for lb,ub in zip(lbs,ubs))
+            upperbound = sum(ub if ub >= lb else lb for lb, ub in zip(lbs, ubs))
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
