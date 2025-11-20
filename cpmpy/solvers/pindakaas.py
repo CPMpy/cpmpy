@@ -38,7 +38,6 @@ Module details
 """
 
 import time
-import pkg_resources
 from datetime import timedelta
 from typing import Optional
 
@@ -89,9 +88,10 @@ class CPM_pindakaas(SolverInterface):
     @staticmethod
     def version() -> Optional[str]:
         """Return the installed version of the solver's Python API."""
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution("pindakaas").version
-        except pkg_resources.DistributionNotFound:
+            return version('pindakaas')
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):

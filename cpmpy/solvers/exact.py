@@ -50,8 +50,7 @@ import sys  # for stdout checking
 import time
 from typing import Optional
 
-import pkg_resources
-from pkg_resources import VersionConflict
+from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import *
@@ -90,15 +89,13 @@ class CPM_exact(SolverInterface):
         try:
             # check if exact is installed
             import exact
-            # check installed version
-            pkg_resources.require("exact>=2.1.0")
+            xct_version = CPM_exact.version()
+            if Version(xct_version) < Version("2.1.0"):
+                warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version "
+                              f"{xct_version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
+                return False
             return True
         except ModuleNotFoundError: # exact is not installed
-            return False
-        except VersionConflict: # unsupported version of exact
-            warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version "
-                          f"{pkg_resources.get_distribution('exact').version}, beware exact>=2.1.0 requires "
-                          f"Python 3.10 or higher.")
             return False
         except Exception as e:
             raise e
@@ -108,9 +105,10 @@ class CPM_exact(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('exact').version
-        except pkg_resources.DistributionNotFound:
+            return version('exact')
+        except PackageNotFoundError:
             return None
 
 
@@ -563,8 +561,6 @@ class CPM_exact(SolverInterface):
                     assert isinstance(lhs, Operator)
                     # can be sum, wsum or mul
                     if lhs.name == "mul":
-                        assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} " \
-                                                                      f"only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
                             rhs = cp.intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)

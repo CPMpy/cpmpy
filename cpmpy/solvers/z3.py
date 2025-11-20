@@ -46,7 +46,6 @@
     ==============
 """
 from typing import Optional
-import pkg_resources
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -94,9 +93,10 @@ class CPM_z3(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('z3-solver').version
-        except pkg_resources.DistributionNotFound:
+            return version('z3-solver')
+        except PackageNotFoundError:
             return None
         
     def __init__(self, cpm_model=None, subsolver="sat"):

@@ -45,7 +45,6 @@
 """
 from functools import reduce
 from typing import Optional
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -89,9 +88,10 @@ class CPM_pysdd(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('pysdd').version
-        except pkg_resources.DistributionNotFound:
+            return version('pysdd')
+        except PackageNotFoundError:
             return None
 
 
