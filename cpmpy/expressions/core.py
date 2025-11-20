@@ -87,7 +87,7 @@
 import copy
 import warnings
 from types import GeneratorType
-from typing import Union, TypeAlias, TypeVar, Collection, Optional
+from typing import Union, TypeAlias, TypeVar, Collection, Optional, Sequence, cast, List
 
 import numpy as np
 import cpmpy as cp
@@ -101,8 +101,8 @@ NumConst : TypeAlias = Union[BoolConst, int, float, np.integer, np.floating]
 ExprOrConst : TypeAlias = Union["Expression", NumConst]
 
 T = TypeVar('T')
-FlatList = Collection[T] | "NDVarArray"
-NestedList = Collection[Union[T, Collection[T]]]
+FlatList = Sequence[T] | "NDVarArray"
+NestedList = Sequence[Union[T, Collection[T]]]
 
 class Expression(object):
     """
