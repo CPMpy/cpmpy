@@ -7,7 +7,11 @@ import cpmpy as cp
 from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
+from cpmpy.solvers.pindakaas import CPM_pindakaas
 
+
+
+@pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
 class CNFTool(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -60,7 +64,8 @@ class CNFTool(unittest.TestCase):
         m += a <= 0
 
         cnf_txt = write_dimacs(m)
-        gt_cnf = "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
+        # TODO note the order is slightly unexpected, because of an optimization in `to_cnf` which puts simple clauses before encoded constraints (i.e.) sums
+        gt_cnf = "p cnf 3 3\n1 2 3 0\n-1 0\n-2 -3 0\n"
 
         self.assertEqual(cnf_txt, gt_cnf)
 
