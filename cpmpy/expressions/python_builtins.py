@@ -142,15 +142,14 @@ def min(*iterable, **kwargs):
     return Minimum(iterable)
 
 
-def sum(*iterable, **kwargs):
+def sum(iterable, **kwargs):
     """
         sum() overwrites the python built-in to support decision variables.
 
         if iterable does not contain CPMpy expressions, the built-in is called
         checks if all constants and uses built-in sum() in that case
     """
-    if len(iterable) == 1:
-        iterable = tuple(iterable[0]) # Fix generator polling
+    iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
         return builtins.sum(iterable, **kwargs)
 
