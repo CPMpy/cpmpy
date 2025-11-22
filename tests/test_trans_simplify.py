@@ -133,3 +133,42 @@ class TransSimplify(unittest.TestCase):
         self.assertEqual(str(self.transform(cons)), "[sum([1, 2] * [bv[0], ~bv[1]]) == 1]")
         self.assertTrue(cp.Model(cons).solve())
 
+    def test_implies(self):
+
+        true = cp.BoolVal(True)
+        false = cp.BoolVal(False)
+        expr = cp.intvar(0,10,name="x") >= 3
+
+        e = true.implies(expr)
+        self.assertEqual(str(e), "x >= 3")
+        e = Operator("->", [true, expr])
+        self.assertEqual(str(self.transform(e)), "[x >= 3]")
+
+        e = false.implies(expr)
+        self.assertEqual(str(e), "(boolval(False)) -> (x >= 3)")
+        e = Operator("->", [false, expr])
+        self.assertEqual(str(self.transform(e)), "[boolval(True)]")
+
+        e = false.implies(true)
+        self.assertEqual(str(e), "boolval(True)")
+        e = true.implies(false)
+        self.assertEqual(str(e), "boolval(False)")
+
+        e = Operator("->", [false, true])
+        self.assertEqual(str(self.transform(e)), "[boolval(True)]")
+        e = Operator("->", [true, false])
+        self.assertEqual(str(self.transform(e)), "[boolval(False)]")
+
+        # with non-CPMpy constants
+        e = true.implies(False)
+        self.assertEqual(str(e), "boolval(False)")
+        e = Operator("->", [true, False])
+        self.assertEqual(str(self.transform(e)), "[boolval(False)]")
+        e = false.implies(True)
+        self.assertEqual(str(e), "boolval(True)")
+        e = Operator("->", [false, True])
+        self.assertEqual(str(self.transform(e)), "[boolval(True)]")
+
+
+
+
