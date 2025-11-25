@@ -2,7 +2,7 @@ import unittest
 from unittest import TestCase
 
 import cpmpy as cp
-from cpmpy.tools import mss_opt, marco
+from cpmpy.tools import mss_opt, marco, OCUSException
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive
 
 
@@ -159,14 +159,14 @@ class OCUSTests(OptimalMUSTests):
         self.assertSetEqual(set(subset), {b,d})
         subset2 = self.mus_func([a,b,c,d], hard, meta_constraint = a & d)
         self.assertSetEqual(set(subset2), {a,b,d}) # not subset-minimal
-        self.assertRaises(ValueError, lambda: self.mus_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
+        self.assertRaises(OCUSException, lambda: self.mus_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.naive_func([a, b, c, d], hard=hard, meta_constraint = ~b | d)
         self.assertSetEqual(set(subset), {b,d})
         subset2 = self.naive_func([a,b,c,d], hard, meta_constraint = a & d)
         self.assertSetEqual(set(subset2), {a,b,d}) # not subset-minimal
-        self.assertRaises(ValueError, lambda: self.naive_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
+        self.assertRaises(OCUSException, lambda: self.naive_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
 
 
 
