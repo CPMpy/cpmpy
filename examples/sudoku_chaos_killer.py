@@ -1,8 +1,15 @@
 import cpmpy as cp
 import numpy as np
-import time
 
-# This CPMpy example solves a sudoku by KNT, which can be found on https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0009KE
+
+"""
+Place the numbers from 1 to 9 exactly once in every row, column, and region. 
+Each region is orthogonally connected and must be located by the solver.
+
+An area outlined by dashes is called a killer cage. 
+All numbers in a killer cage belong to the same region and sum to the number in the top left corner of the killer cage.
+Puzzle source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0009KE
+"""
 
 SIZE = 9
 
@@ -115,5 +122,15 @@ print("The solution is:")
 print(cell_values.value())
 print("The regions are:")
 print(cell_regions.value())
-print("The region cardinals are:")
-print(region_cardinals.value())
+
+assert cell_values.value() == [[9, 6, 7, 4, 8, 5, 2, 1, 3],
+                               [2, 3, 8, 1, 5, 4, 6, 9, 7],
+                               [1, 5, 2, 3, 9, 7, 4, 8, 6],
+                               [4, 7, 6, 2, 1, 8, 3, 5, 9],
+                               [8, 9, 3, 6, 4, 1, 5, 7, 2],
+                               [7, 1, 9, 5, 3, 6, 8, 2, 4],
+                               [6, 8, 5, 9, 2, 3, 7, 4, 1],
+                               [5, 2, 4, 7, 6, 9, 1, 3, 8],
+                               [3, 4, 1, 8, 7, 2, 9, 6, 5]]
+
+# can not assert regions as there are symmetric solutions.. I can add symmetry breaking constraint, but it is slow in this case
