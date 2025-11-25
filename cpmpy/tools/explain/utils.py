@@ -59,3 +59,6 @@ def replace_cons_with_assump(cpm_cons, assump_map):
     elif isinstance(cpm_cons, NegBoolView):
         return ~replace_cons_with_assump(cpm_cons._bv, assump_map)
     return cpm_cons
+
+class OCUSException(Exception):
+    pass

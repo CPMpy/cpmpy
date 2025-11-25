@@ -184,7 +184,7 @@ def ocus(soft, hard=[], weights=None, meta_constraint=True, solver="ortools", hs
             hs_solver += cp.sum(new_corr_subset) >= 1 # add new corr subset to hitting set solver
 
     if hs_solver.status().exitstatus == ExitStatus.UNSATISFIABLE:
-        raise ValueError("No unsatisfiable constrained subset could be found") # TODO: better exception?
+        raise OCUSException(f"No unsatisfiable subset adhereing to constraint {meta_constraint} could be found.")
 
     return [dmap[a] for a in hitting_set]
 
