@@ -63,7 +63,7 @@ from functools import reduce
 import numpy as np
 import cpmpy as cp  # to avoid circular import
 from .core import Expression, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
+from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds, is_any_list
 
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
@@ -489,6 +489,10 @@ class NDVarArray(np.ndarray, Expression):
 
     def __getitem__(self, index):
         # array access, check if variables are used in the indexing
+
+        if is_any_list(index) and any(isinstance(el, _BoolVarImpl) for el in index):
+            raise IndexError("Dynamic masking with boolean variables is not supported")
+            
 
         # index is single expression: direct element
         if isinstance(index, Expression):
