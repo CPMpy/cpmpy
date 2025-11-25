@@ -1,15 +1,17 @@
+import itertools
+import math
+import pprint
 import sys
 import time
-import math
+from enum import Enum
+
 import gurobipy as gp
-from gurobipy import GRB
-import itertools
 import numpy as np
+from gurobipy import GRB
+
 import cpmpy as cp
 from cpmpy.expressions.variables import NegBoolView
-
 from cpmpy.solvers.gurobi import CPM_gurobi
-from enum import Enum
 
 
 class Infeasible(Exception):
@@ -90,24 +92,23 @@ class CPM_lazy_gurobi(CPM_gurobi):
             ", ".join(f"{k}={self.env[k]}" for k in ["shrink", "heuristic", "explain_fractional"]),
             verbosity=0,
         )
-        # log(f"cuts = {env['cuts']}", env=env, verbosity=1)
-        cuts = [c for c in self.env["cuts"] if len(c["cut"]) > 0]
-        cuts_mipsol = [c for c in self.env["cuts"] if c["from"] == "MIPSOL"]
-        assert all(len(c["cut"]) > 0 for c in cuts_mipsol)
-        cuts_mipnode = [c for c in self.env["cuts"] if c["from"] == "MIPNODE-OPT"]
-        cuts_mipnode_exp = [c for c in cuts_mipnode if len(c["cut"]) > 0]
-        cuts_mipnode_unexp = [c for c in cuts_mipnode if len(c["cut"]) == 0]
+        import pandas as pd
+
+        cuts_df = pd.DataFrame.from_dict(self.env["cuts"])
+        self.log(cuts_df.drop(["failure"], axis=1, errors="ignore"), verbosity=2)
+        # self.log(pprint.pformat(self.env["cuts"]), verbosity=2)
+        cuts = [c for c in self.env["cuts"] if "size" in c]
+        cuts_mipsol = [c for c in cuts if c["from"] == "MIPSOL"]
+        assert all(c["size"] > 0 for c in cuts_mipsol)
+        cuts_mipnode = [c for c in cuts if c["from"] == "MIPNODE-OPT"]
+        cuts_mipnode_exp = [c for c in cuts_mipnode if c["size"] > 0]
+        cuts_mipnode_unexp = [c for c in cuts_mipnode if c["size"] == 0]
         self.log(f"cb_time = {self.env['cb_time']}")
         self.log(f"cuts (MIPSOL) = {len(cuts_mipsol)}")
         self.log(f"cuts (MIPNODE, explained) = {len(cuts_mipnode_exp)}")
         self.log(f"cuts (MIPNODE, unexplainable) = {len(cuts_mipnode_unexp)}")
-        self.log(
-            "cut cardinalities/strengths:",
-            ", ".join(f"{len(c['cut'])}" for c in self.env["cuts"]),
-            verbosity=2,
-        )
         return {
-            "cb_time": self.env["cb_time"],
+            "cb_time": sum(c["time"] for c in self.env["cuts"]),
             "n_cuts": len(cuts_mipsol),
             "n_cuts_explained": len(cuts_mipnode_exp),
             "n_cuts_unexplained": len(cuts_mipnode_unexp),
@@ -142,12 +143,12 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 C = C - {i}
         return C
 
-    def explain(self, A_enc, T_enc):
+    def explain(self, A_enc, T_enc, frm=None):
         """The `explain_frac` alg."""
 
         # TODO convert T_enc to set of tuples?
-        self.log(f"Explain", end="\n")
-        # self.log("", A_enc, verbosity=1)
+        self.log("Explain", end="\n")
+        self.log("", A_enc, verbosity=1)
         self.log("", sorted(cols(np.array([A_enc]), 0)))
         self.log(np.array(T_enc), verbosity=2)
         self.log("")
@@ -183,22 +184,26 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 assert iteration <= self.env["max_iterations"]
 
         self.log(f"  by explanation of size ({len(X)}): {sorted(X)}")
-        if self.env["shrink"]:
-            size = len(X)
-            X = self.shrink(X, T_enc)
-            if len(X) < size:
-                self.log(f"  shrunk to size ({len(X)}): {sorted(X)}")
 
+        if self.env["debug"]:
+            self.env["cuts"][-1]["cut"] = X.copy()
+
+        if self.env["shrink"]:
+            X_shrunk = self.shrink(X, T_enc)
+            shrunk = len(X) - len(X_shrunk)
+            if shrunk:
+                self.log(f"  shrunk by {shrunk}: {sorted(X)} --> {sorted(X_shrunk)}")
+                if self.env["debug"]:
+                    self.env["cuts"][-1] = {
+                        **self.env["cuts"][-1],
+                        "pre_shrunk": self.env["cuts"][-1]["cut"],
+                        "cut": X_shrunk,
+                    }
+                self.env["cuts"][-1]["shrunk"] = shrunk
+
+        self.env["cuts"][-1]["size"] = len(X)
         self.log(f"  cut == {sorted(X)}")
         return X
-
-    def log_explanation(self, explanation, frm):
-        if "cuts" in self.env:
-            if self.env["debug"]:
-                assert explanation not in (c["cut"] for c in self.env["cuts"]), (
-                    f"Already found cut {explanation} previously in {self.env['cuts']}"
-                )
-            self.env["cuts"].append({"cut": explanation, "shrunk": 0, "from": frm})
 
     def get_solution_callback(self):
         all_xs = self.get_x_encs(self.ivarmap.keys())
@@ -228,13 +233,20 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     case GRB.Callback.MIPSOL:  # Integer solution
                         x_enc_a = {x_enc_i: cbGetVal(x_enc_i, what.cbGetSolution) for x_enc_i in all_xs}
                         frm = "MIPSOL"
-                        assert is_integer_solution(x_enc_a.values()), (
-                            f"Expected integer solution for MIP, but got {x_enc_a}"
-                        )
-                        # Recommended way to convert fractional integer solution into Boolean, then using `int` to convert to 01
-                        x_enc_a = {x_enc_i: int(a_enc_i > 0.5) for x_enc_i, a_enc_i in x_enc_a.items()}
+                        if self.env["debug"]:
+                            assert is_integer_solution(x_enc_a.values()), (
+                                f"Expected integer solution for MIP, but got {x_enc_a}"
+                            )
                     case _:
                         return
+
+                self.env["cuts"].append({"from": frm})
+                if self.env["debug"]:
+                    self.env["cuts"][-1]["failure"] = list(x_enc_a.values())
+
+                if frm == "MIPSOL":
+                    # Recommended way to convert fractional integer solution into Boolean, then using `int` to convert to 01
+                    x_enc_a = {x_enc_i: int(a_enc_i > 0.5) for x_enc_i, a_enc_i in x_enc_a.items()}
 
                 self.log(frm, x_enc_a, verbosity=2)
 
@@ -248,15 +260,14 @@ class CPM_lazy_gurobi(CPM_gurobi):
                         continue
 
                     # encode assignment
-                    explanation = self.explain(A_enc, T_enc)
-                    self.log_explanation(explanation, frm)
+                    explanation = self.explain(A_enc, T_enc, frm=frm)
 
                     if explanation:
                         self.log(
                             f"  cons == {' + '.join(X_enc[c].name for c in explanation)} < {len(explanation)}",
                         )
                         grbs = [self.solver_var(X_enc[c]) for c in explanation]
-                        what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1)
+                        what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1.0)
                     elif frm == "MIPSOL":  # unsat
                         self.log("INFEASIBLE")
                         raise Infeasible
@@ -265,7 +276,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 if self.env["max_iterations"] is not None:
                     assert len(self.env["cuts"]) <= self.env["max_iterations"]
 
-                self.env["cb_time"] += time.time() - cb_time
+                self.env["cuts"][-1]["time"] = time.time() - cb_time
                 self.log("end callback")
             except Exception as e:
                 what._callback_exception = e
@@ -294,8 +305,14 @@ class CPM_lazy_gurobi(CPM_gurobi):
             hassol = super().solve(
                 solution_callback=self.get_solution_callback(), time_limit=time_limit, **kwargs
             )
+
         except Infeasible:
             hassol = False
+
+        if getattr(self.native_model, "_callback_exception", None):
+            raise self.grb_model._callback_exception or Exception(
+                "Gurobi was interrupted (perhaps the solution callback called model.terminate())"
+            )
 
         for field, stat in self.stats().items():
             print(f"c Stat={field}={stat}")
@@ -332,3 +349,19 @@ class CPM_lazy_gurobi(CPM_gurobi):
             else:
                 cpm_cons.append(cpm_expr)
         return cpm_cons
+
+    def _check_repeat_failure(self):
+        if self.env["debug"] and False:
+            prev = next(
+                (c for c in self.env["cuts"][:-1] if self.env["cuts"][-1]["failure"] == c["failure"]),
+                None,
+            )
+
+            assert prev is None, f"""Encountered same failure twice:
+
+        {pprint.pformat(self.env["cuts"][-1])}
+
+        should have been prevented by earlier cut:
+
+        {pprint.pformat(prev)}
+        """

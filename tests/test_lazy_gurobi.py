@@ -1,14 +1,11 @@
-import numpy as np
 import math
-
-import pytest
-import cpmpy as cp
-
-
-from cpmpy.solvers.lazy_gurobi import CPM_lazy_gurobi, Heuristic, encode
-from cpmpy.tools.xcsp3 import XCSP3Dataset, read_xcsp3
-
 import random
+
+import numpy as np
+import pytest
+
+import cpmpy as cp
+from cpmpy.solvers.lazy_gurobi import CPM_lazy_gurobi, encode
 
 
 def generate_table_from_example():
@@ -62,19 +59,20 @@ def show_assignment(X):
 
 
 def check_model(model):
-    violations = [c for c in model.constraints if c.value() is False]
     X = cp.transformations.get_variables.get_variables_model(model)
-    if model.copy().solve():
-        assert all(x.value() is not None for x in X), (
-            f"Expected all variables to be assigned, but found: {show_assignment(X)}"
-        )
-        assert not violations, (
-            f"Infeasible constraints for assignment:\n\n{show_assignment(X)}\n\n{'\n\n'.join(str(v) for v in violations)}"
-        )
-    else:
-        assert all(x.value() is None for x in X), (
-            f"Expected all variables to be assigned, but found: {show_assignment(X)}"
-        )
+    assert all(x.value() is not None for x in X), (
+        f"Expected all variables to be assigned, but found: {show_assignment(X)}"
+    )
+
+    violations = [c for c in model.constraints if c.value() is False]
+    assert not violations, f"""For assignment:
+
+{show_assignment(X)}
+
+The following constraints are Infeasible:
+
+{"\n\n".join(str(v) for v in violations)}
+        """
 
 
 def show_sols(sols, T):
@@ -137,8 +135,14 @@ class TestTables:
         T = np.array([(2, 1, 1), (3, 2, 2), (4, 3, 3), (1, 2, 3), (2, 1, 2)])
         model = cp.Model(cp.Table(X, T), cp.AllDifferent(X))
         is_sat = model.solve()
-        assert CPM_lazy_gurobi(cpm_model=model, env=env).solve() == is_sat, "Expected equisat"
         print("Test model", model)
         print("TF", CPM_lazy_gurobi(cpm_model=model, env=env).transform(model.constraints))
+        slv = CPM_lazy_gurobi(cpm_model=model, env=env)
+        assert slv.solve() == is_sat, "Expected equisat"
+
+
         check_model(model)
 
+        from pprint import pprint
+
+        pprint(slv.env)

@@ -223,16 +223,17 @@ class ExitStatus(Enum):
     unknown:str = "UNKNOWN" # any other case
     
     def abbrev(self):
+        print("S", self)
         match self:
-            case unsupported:
+            case ExitStatus.unsupported:
                 return "UNSUP"
-            case sat:
+            case ExitStatus.sat:
                 return "SAT"
-            case optimal:
+            case ExitStatus.optimal:
                 return "OPT"
-            case unsat:
+            case ExitStatus.unsat:
                 return "UNS"
-            case unknown:
+            case ExitStatus.unknown:
                 return "UNK"
 
 def print_status(status: ExitStatus) -> None:
