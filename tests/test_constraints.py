@@ -29,11 +29,12 @@ NUM_GLOBAL = {
     "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
 }
 
-# Solvers not supporting arithmetic constraints
-SAT_SOLVERS = {"pysat", "pysdd"}
+# Solvers not supporting arithmetic constraints (numeric comparisons)
+SAT_SOLVERS = {"pysdd"}
 
-EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
+EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
                   "pysdd": NUM_GLOBAL | {"Xor"},
+                  "pindakaas": {},
                   "z3": {},
                   "choco": {},
                   "ortools":{},
@@ -45,9 +46,12 @@ EXCLUDE_GLOBAL = {"pysat": NUM_GLOBAL,
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {},
-                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "pysat": {"mul", "div", "pow", "mod"},  # int2bool but mul, and friends, not linearized
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
+                     "pindakaas": {"mul", "div", "pow", "mod"},
                      "exact": {},
+                     "cplex": {"mul", "div", "mod", "pow"},
+                     "pumpkin": {"pow", "mod"},
                      }
 
 # Variables to use in the rest of the test script
@@ -79,15 +83,21 @@ def numexprs(solver):
         names = [(name, arity) for name, arity in names if name not in EXCLUDE_OPERATORS[solver]]
     for name, arity in names:
         if name == "wsum":
-            operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
+            yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
+            yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
+            continue
+        elif name == "mul":
+            yield Operator(name, [3,NUM_ARGS[0]])
+            yield Operator(name, NUM_ARGS[:2])
+            if solver != "minizinc": # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
+                yield Operator(name, [3,BOOL_ARGS[0]])
         elif name == "div" or name == "pow":
-            operator_args = [NN_VAR,3]
+            yield Operator(name, [NN_VAR,3])
         elif arity != 0:
-            operator_args = NUM_ARGS[:arity]
+            yield Operator(name, NUM_ARGS[:arity])
         else:
-            operator_args = NUM_ARGS
+            yield Operator(name, NUM_ARGS)
 
-        yield Operator(name, operator_args)
 
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
@@ -188,7 +198,9 @@ def global_constraints(solver):
             continue
 
         if name == "Xor":
-            expr = cls(BOOL_ARGS)
+            yield Xor(BOOL_ARGS)
+            yield Xor(BOOL_ARGS + [True,False])
+            continue
         elif name == "Inverse":
             expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":

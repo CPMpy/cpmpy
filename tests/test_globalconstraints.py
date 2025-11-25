@@ -663,7 +663,19 @@ class TestGlobal(unittest.TestCase):
         cons = iv[idx, 2] == 8
         self.assertEqual(str(cons), "[iv[0,2] iv[1,2] iv[2,2]][idx] == 8")
 
+    def test_multid_1expr(self):
 
+        x = cp.intvar(1,5, shape=(3,4,5),name="x")
+        a,b = cp.intvar(0,2, shape=2, name=tuple("ab")) # idx is always safe
+
+        expr = x[a,1,3]
+        self.assertEqual(str(expr), "[x[0,1,3] x[1,1,3] x[2,1,3]][a]")
+
+        expr = x[1,a,3]
+        self.assertEqual(str(expr), "[x[1,0,3] x[1,1,3] x[1,2,3] x[1,3,3]][a]")
+
+        expr = x[1,2,a]
+        self.assertEqual(str(expr), "[x[1,2,0] x[1,2,1] x[1,2,2] x[1,2,3] x[1,2,4]][a]")
 
     def test_element_onearg(self):
 
@@ -681,6 +693,49 @@ class TestGlobal(unittest.TestCase):
         bv = cp.boolvar(5)
         self.assertTrue(cp.Model(cp.Xor(bv)).solve())
         self.assertTrue(cp.Xor(bv).value())
+
+    def test_xor_with_constants(self):
+
+        bvs = cp.boolvar(shape=3)
+
+        cases =[bvs.tolist() + [True],
+                bvs.tolist() + [True, True],
+                bvs.tolist() + [True, True, True],
+                bvs.tolist() + [False],
+                bvs.tolist() + [False, True],
+                [True]]
+
+        for args in cases:
+            expr = cp.Xor(args)
+            model = cp.Model(expr)
+
+            self.assertTrue(model.solve())
+            self.assertTrue(expr.value())
+
+            # also check with decomposition
+            model = cp.Model(expr.decompose())
+            self.assertTrue(model.solve())
+            self.assertTrue(expr.value())
+
+        # edge case with False constants
+        self.assertFalse(cp.Model(cp.Xor([False, False])).solve())
+        self.assertFalse(cp.Model(cp.Xor([False, False, False])).solve())
+
+    def test_ite_with_constants(self):
+        x,y,z = cp.boolvar(shape=3)
+        expr = cp.IfThenElse(True, y, z)
+        self.assertTrue(cp.Model(expr).solve())
+        self.assertTrue(expr.value())
+        expr = cp.IfThenElse(False, y, z)
+        self.assertTrue(cp.Model(expr).solve())
+
+        expr = cp.IfThenElse(x, y, z)
+        self.assertTrue(cp.Model(~expr).solve())
+        self.assertFalse(expr.value())
+        x,y, z = x.value(), y.value(), z.value()
+        self.assertTrue((x and z) or (not x and y))
+
+
 
     def test_not_xor(self):
         bv = cp.boolvar(5)
@@ -940,6 +995,10 @@ class TestGlobal(unittest.TestCase):
             self.assertTrue(cons.value())
         cp.Model(cons).solveAll(display=check_true)
 
+        # test not contiguous
+        iv = cp.intvar(0, 10, shape=(3, 3))
+        self.assertTrue(cp.Model([cp.NValue(i) == 3 for i in iv.T]).solve())
+        
     def test_nvalue_except(self):
 
         iv = cp.intvar(-8, 8, shape=3)
@@ -967,6 +1026,11 @@ class TestGlobal(unittest.TestCase):
             self.assertTrue(cons.value())
 
         cp.Model(cons).solveAll(display=check_true)
+
+        # test not contiguous
+        iv = cp.intvar(0, 10, shape=(3, 3))
+        self.assertTrue(cp.Model([cp.NValueExcept(i, val) == 3 for i in iv.T]).solve())
+
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
@@ -1006,6 +1070,11 @@ class TestGlobal(unittest.TestCase):
 
         cons = cp.Precedence([iv[0], iv[1], 4], [0, 1, 2]) # python list in stead of cpm_array
         self.assertTrue(cp.Model([cons]).solve())
+
+        # Check bug fix pull request #742
+        # - ensure first constraint from paper is satisfied
+        cons = cp.Precedence(iv, [0, 1, 2])
+        self.assertFalse(cp.Model([cons, (iv[0] == 1) | (iv[0] == 2)]).solve())
 
 
     def test_no_overlap(self):
@@ -1083,7 +1152,7 @@ class TestBounds(unittest.TestCase):
         expr = cp.Xor(cp.boolvar(3))
         self.assertEqual(expr.get_bounds(),(0,1))
 
-
+@skip_on_missing_pblib(skip_on_exception_only=True)
 class TestTypeChecks(unittest.TestCase):
     def test_AllDiff(self):
         x = cp.intvar(-8, 8)
@@ -1312,7 +1381,7 @@ class TestTypeChecks(unittest.TestCase):
         iv = cp.intvar(0,10, shape=3)
         SOLVERNAMES = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()]
         for name in SOLVERNAMES:
-            if name in ("pysat", "pysdd"): continue
+            if name == "pysdd": continue
             self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name))
             # test closed version
             self.assertFalse(cp.Model(cp.GlobalCardinalityCount(iv, [1,4], [0,0], closed=True)).solve(solver=name))
@@ -1333,16 +1402,16 @@ class TestTypeChecks(unittest.TestCase):
         iv = cp.intvar(0,10, shape=3, name="x")
 
         for name, cls in cp.SolverLookup.base_solvers():
-            # The decomposition of this global introduces (as of yet) unsupported integer variables for PySAT
-            if name == "pysat": continue
             if cls.supported() is False:
+                print("Solver not supported: ", name)
                 continue
             try:
                 self.assertTrue(cp.Model([cp.Among(iv, [1,2]) == 3]).solve(solver=name))
                 self.assertTrue(all(x.value() in [1,2] for x in iv))
                 self.assertTrue(cp.Model([cp.Among(iv, [1,100]) > 2]).solve(solver=name))
                 self.assertTrue(all(x.value() == 1 for x in iv))
-            except NotSupportedError:
+            except (NotSupportedError, NotImplementedError):
+                print("Solver not supported: ", name)
                 continue
 
 
@@ -1367,6 +1436,13 @@ class TestTypeChecks(unittest.TestCase):
                     self.assertFalse(cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s))
                 except (NotImplementedError, NotSupportedError):
                     pass
+
+    def test_issue_699(self):
+        x,y = cp.intvar(0,10, shape=2, name=tuple("xy"))
+        self.assertTrue(cp.Model(cp.AllDifferentExcept0([x,0,y,0]).decompose()).solve())
+        self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], 3).decompose()).solve())
+        self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], [3,0]).decompose()).solve())
+
 
     def test_element_index_dom_mismatched(self):
         """

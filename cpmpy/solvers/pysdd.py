@@ -44,10 +44,13 @@
     ==============
 """
 from functools import reduce
+from typing import Optional
+import pkg_resources
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
@@ -80,6 +83,16 @@ class CPM_pysdd(SolverInterface):
             return False
         except Exception as e:
             raise e
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('pysdd').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -100,14 +113,22 @@ class CPM_pysdd(SolverInterface):
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
-        # these will be loaded once a first formula is added
-        self.pysdd_vtree = None
-        self.pysdd_manager = None
-        self.pysdd_root = None
+        from pysdd.sdd import SddManager, Vtree
+
+        cnt = 1
+        self.pysdd_vtree = Vtree(var_count=cnt, vtree_type="balanced")
+        self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
+        self.pysdd_root = self.pysdd_manager.true()
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysdd", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.pysdd_root
 
     def solve(self, time_limit=None, assumptions=None):
         """
@@ -124,6 +145,10 @@ class CPM_pysdd(SolverInterface):
         
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
+
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
 
         has_sol = True
         if self.pysdd_root is not None:
@@ -175,12 +200,16 @@ class CPM_pysdd(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
+
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
         if solution_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), solution_limit not (yet?) supported")
 
-        if self.pysdd_root is None:
+        if self.pysdd_root is None or self.pysdd_root.is_false():
             # clear user vars if no solution found
             for var in self.user_vars:
                 var._value = None
@@ -291,25 +320,8 @@ class CPM_pysdd(SolverInterface):
 
         newvars = get_variables(cpm_expr)
 
-        # check only Boolean variables
-        # XXX a bit redundant, `solver_var()` already does this too
-        for v in newvars:
-            if not isinstance(v, _BoolVarImpl):
-                raise NotSupportedError(f"CPM_pysdd: only Boolean variables allowed -- {type(v)}: {v}")
         # add new user vars to the set
         self.user_vars |= set(newvars)
-
-        # if needed initialize (arbitrary) vtree from all user-specified vars
-        # we waited till here to already have some vars... beneficial?
-        if self.pysdd_root is None:
-            from pysdd.sdd import SddManager, Vtree
-
-            cnt = len(self.user_vars)
-            if cnt == 0:
-                cnt = 1  # otherwise segfault
-            self.pysdd_vtree = Vtree(var_count=cnt, vtree_type="balanced")
-            self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
-            self.pysdd_root = self.pysdd_manager.true()
 
         # transform and post the constraints
         # XXX the order in the for loop will matter on runtime efficiency...

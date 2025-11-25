@@ -30,6 +30,9 @@ solver_dependencies = {
     "pysdd": ["pysdd"],
     "gcs": ["gcspy"],
     "cpo": ["docplex"],
+    "pumpkin": ["pumpkin-solver>=0.2.1"],
+    "pindakaas": ["pindakaas>=0.2.1"],
+    "cplex": ["docplex", "cplex"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
@@ -55,10 +58,15 @@ setup(
         # Solvers
         **solver_dependencies,
         # Tools
-        # "xcsp3": ["pycsp3"], <- for when xcsp3 is merged
+        "xcsp3": ["pycsp3", "requests", "tqdm", "matplotlib", "psutil", "filelock", "gnureadline; platform_system != 'Windows'", "pyreadline3; platform_system == 'Windows'"], # didn't add CLI-specific req since some are not cross-platform
         # Other
-        "test": ["pytest"],
+        "test": ["pytest", "pytest-timeout"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
+    },
+    entry_points={
+        'console_scripts': [
+            'cpmpy = cpmpy.cli:main',
+        ],
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",

@@ -1,5 +1,93 @@
 # Change log
 
+## 0.9.28
+
+This is a very small release with a hotfix for multi-dimensional indexing where the index is a decision variable.
+
+### Fixed
+
+* Hotfix for single expression in multi-dimensional indexing [#772](https://github.com/CPMpy/cpmpy/pull/772)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.27...v0.9.28
+
+## 0.9.27
+
+### Added
+
+* **New solver**: CPLEX ILP solver [#583](https://github.com/CPMpy/cpmpy/pull/583), [#762](https://github.com/CPMpy/cpmpy/pull/762), [#763](https://github.com/CPMpy/cpmpy/pull/763)
+* **New solver**: Hexaly local search solver [#718](https://github.com/CPMpy/cpmpy/pull/718)
+* **New tool**: CPMpy cli (get version information on all subsolvers) [#693](https://github.com/CPMpy/cpmpy/pull/693)
+* Use of CSE in `flatten_objective` [#730](https://github.com/CPMpy/cpmpy/pull/730)
+* Constraint tagging for `pumpkin` [#720](https://github.com/CPMpy/cpmpy/pull/720)
+* Solver capability overview in docs [d8d3a2d](https://github.com/CPMpy/cpmpy/commit/d8d3a2d0f78438aa0f0da6909d74b5a505b5f8a5)
+* PSP-lib dataset and loader [#701](https://github.com/CPMpy/cpmpy/pull/701)
+* Safen name collision between user and aux variables [#731](https://github.com/CPMpy/cpmpy/pull/731)
+
+### Changed
+
+* Update `pindakaas` to version 0.2.1 [#753](https://github.com/CPMpy/cpmpy/pull/753)
+* Exclude slow examples from testset [#746](https://github.com/CPMpy/cpmpy/pull/746)
+* Safe variable names [#731](https://github.com/CPMpy/cpmpy/pull/731)
+* SolverInterface consistency improvements and added tests [#726](https://github.com/CPMpy/cpmpy/pull/726)
+* Improve testing of examples [#651](https://github.com/CPMpy/cpmpy/pull/651)
+* Modernize shebangs of examples [#644](https://github.com/CPMpy/cpmpy/pull/644)
+* Linearize improvements [e721b0a](https://github.com/CPMpy/cpmpy/commit/e721b0ab960be632c525bfbbf493876031ca9d98)
+* Update waterfall (added automated int-to-bool) [710ec42](https://github.com/CPMpy/cpmpy/commit/710ec42fc34a014084e0f6bbe8d1e5eed72c3dcf)
+* Collection of improvements to GitHub README
+
+### Fixed
+
+* `Precedence` global decomposition [#742](https://github.com/CPMpy/cpmpy/pull/742)
+* Minor bugs in examples [#739](https://github.com/CPMpy/cpmpy/pull/739)
+* `gnureadline` typo in `setup.py` [#722](https://github.com/CPMpy/cpmpy/pull/722)
+* Non-contiguous array handling in `cpm_array` [#738](https://github.com/CPMpy/cpmpy/pull/738)
+* Remove simplification of nullifying arguments from constructors [#725](https://github.com/CPMpy/cpmpy/pull/725)
+* Skip psplib in testset due to random failure on GitHub actions [7a15d07](https://github.com/CPMpy/cpmpy/commit/7a15d07962610e3844d358a05c7c419e110f110c)
+* (Pin Pumpkin solver git commit [#719](https://github.com/CPMpy/cpmpy/pull/719)) outdated by [#720](https://github.com/CPMpy/cpmpy/pull/720)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.26...v0.9.27
+
+## 0.9.26
+
+### Added
+
+* **New solver**: Pumpkin LCG solver (by the ConSol Lab at TU Delft) [#669](https://github.com/CPMpy/cpmpy/pull/669)
+* **New solver**: Pindakaas library for transforming pseudo Boolean to CNF [#600](https://github.com/CPMpy/cpmpy/pull/600)
+* **New global**: `Regular` [#677](https://github.com/CPMpy/cpmpy/pull/677)
+* **New tool**: Tooling for the XCSP3 format: dataset, loader, CLI, benchmarking [#597](https://github.com/CPMpy/cpmpy/pull/597)
+* Common Subexpression Elimination (CSE) with normalized expressions [#679](https://github.com/CPMpy/cpmpy/pull/679)
+* Integer to boolean direct encoding [#653](https://github.com/CPMpy/cpmpy/pull/653)
+* Solution hinting for Gurobi [#691](https://github.com/CPMpy/cpmpy/pull/691)
+* Solution callback for CP Optimizer [#682](https://github.com/CPMpy/cpmpy/pull/682)
+* Acces to (installed) solver status/version: call `.version()` on a specific solver or on `SolverLookup` to get an overview. Or use `cp.SolverLookup.print_version()` for pretty printing. [#628](https://github.com/CPMpy/cpmpy/pull/628)
+* Support for canonicalisation of subtraction expressions [#686](https://github.com/CPMpy/cpmpy/pull/686) 
+* Allow use of boolean constants in weighted sum [#711](https://github.com/CPMpy/cpmpy/pull/711)
+* Added testset for incremental assumptions
+* Catch beginner mistakes linked to incorrect usage of boolean expression [#660](https://github.com/CPMpy/cpmpy/pull/660)
+
+### Changed
+
+* Refactoring of int2bool/pysat [#714](https://github.com/CPMpy/cpmpy/pull/714)
+* Updated instructions for adding a new solver with request to add solver to overview table
+* Improve efficiency `only_implies`: avoid retransform if no subexpression [#680](https://github.com/CPMpy/cpmpy/pull/680)
+* Consistent state reporting of `.solve()` across all solvers [#545](https://github.com/CPMpy/cpmpy/pull/545)
+* Improved docs and error messages for `canonical_comparison` [#678](https://github.com/CPMpy/cpmpy/pull/678)
+
+### Fixed
+
+* Support special cases for Xor global (boolean constants, single argument) [#717](https://github.com/CPMpy/cpmpy/pull/717)
+* Missing `optimal` exit status for GCS [#705](https://github.com/CPMpy/cpmpy/pull/705)
+* Missing solution for empty csp when enumerating [#674](https://github.com/CPMpy/cpmpy/pull/674)
+* Use of constants in globals [#700](https://github.com/CPMpy/cpmpy/pull/700)
+* CSE edge-case in `only_numexpr_equality` [#696](https://github.com/CPMpy/cpmpy/pull/696)
+* Choco `shorttable` star symbol data type [#697](https://github.com/CPMpy/cpmpy/pull/697)
+* Ensure python-native expression values to prevent unexpected behaviour with numpy constants [#695](https://github.com/CPMpy/cpmpy/pull/695)
+* Correctly handle numpy integers in `eval_comparison` [#683](https://github.com/CPMpy/cpmpy/pull/683)
+* CP Optimizer fix cumulative with zero-duration task [#681](https://github.com/CPMpy/cpmpy/pull/681)
+* Fix incorrect decomposition of `Inverse` global constraint [#673](https://github.com/CPMpy/cpmpy/pull/673)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.25...v0.9.26
+
 ## 0.9.25
 
 ### Added

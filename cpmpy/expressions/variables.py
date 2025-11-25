@@ -65,6 +65,9 @@ import cpmpy as cp  # to avoid circular import
 from .core import Expression, Operator
 from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
+_BV_PREFIX = "BV"
+_IV_PREFIX = "IV"
+_VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
 
 def BoolVar(shape=1, name=None):
     """
@@ -124,6 +127,8 @@ def boolvar(shape=1, name=None):
     if shape == 0 or shape is None:
         raise NullShapeError(shape)
     if shape == 1:
+        if name is not None and _is_invalid_name(name):
+            raise ValueError(_VAR_ERR)
         return _BoolVarImpl(name=name)
 
     # collect the `names` of each individual decision variable
@@ -206,6 +211,8 @@ def intvar(lb, ub, shape=1, name=None):
     if shape == 0 or shape is None:
         raise NullShapeError(shape)
     if shape == 1:
+        if name is not None and _is_invalid_name(name):
+            raise ValueError(_VAR_ERR)
         return _IntVarImpl(lb, ub, name=name)
 
     # collect the `names` of each individual decision variable
@@ -256,6 +263,9 @@ def cpm_array(arr):
     """
     if not isinstance(arr, np.ndarray):
         arr = np.array(arr)
+    elif not arr.flags['FORC']:   # Ensure the array is contiguous
+        arr = np.ascontiguousarray(arr)
+    
     order = 'F' if arr.flags['F_CONTIGUOUS'] else 'C'
     return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr, order=order)
 
@@ -337,7 +347,7 @@ class _IntVarImpl(_NumVarImpl):
         assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub), ub)
 
         if name is None:
-            name = "IV{}".format(_IntVarImpl.counter)
+            name = f"{_IV_PREFIX}{_IntVarImpl.counter}"
             _IntVarImpl.counter = _IntVarImpl.counter + 1 # static counter
 
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
@@ -364,7 +374,7 @@ class _BoolVarImpl(_IntVarImpl):
         assert(ub == 0 or ub == 1)
 
         if name is None:
-            name = "BV{}".format(_BoolVarImpl.counter)
+            name = f"{_BV_PREFIX}{_BoolVarImpl.counter}"
             _BoolVarImpl.counter = _BoolVarImpl.counter + 1 # static counter
         _IntVarImpl.__init__(self, lb, ub, name=name)
 
@@ -498,7 +508,7 @@ class NDVarArray(np.ndarray, Expression):
                 index += [index.pop(expr_dim[0])]
 
                 arr = np.moveaxis(self, expr_dim[0], -1)
-                return cp.Element(arr[index[:-1]], index[-1])
+                return cp.Element(arr[(*index[:-1],)], index[-1])
 
 
             arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
@@ -756,6 +766,8 @@ def _gen_var_names(name, shape):
             raise ValueError(f"The shape of name sequence {name_arr.shape} does not match {shape}.")
         if len(name_arr.flat) != len(np.unique(name_arr)):
             raise ValueError(f"Duplicated names in {name_arr}.")
+        if any(_is_invalid_name(n) for n in name_arr.flat):
+            raise ValueError(_VAR_ERR)
         return [name_arr[idx] for idx in np.ndindex(shape)]
     else:
         raise TypeError(f"Unsupported type for name: {type(name)}")
@@ -772,6 +784,11 @@ def _genname(basename, idxs):
     """
     if basename == None:
         return None
+    if _is_invalid_name(basename):
+        raise ValueError(_VAR_ERR)
     stridxs = ",".join(map(str, idxs))
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
+
+def _is_invalid_name(name):
+    return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
 

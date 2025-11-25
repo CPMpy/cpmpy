@@ -48,6 +48,7 @@
         CPM_template
 """
 
+from typing import Optional
 import warnings
 import pkg_resources
 from pkg_resources import VersionConflict
@@ -91,6 +92,53 @@ class CPM_template(SolverInterface):
         except Exception as e:
             raise e
 
+    @classmethod
+    def version(cls) -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('TEMPLATEpy').version
+        except pkg_resources.DistributionNotFound:
+            return None
+        
+    # [GUIDELINE] If your solver supports different subsolvers, implement below method to return a list of subsolver names
+    @staticmethod
+    def solvernames(installed:bool=True):
+        """
+            Returns solvers supported by TEMPLATE (on your system).
+
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those installed on your system (default True)
+               
+            Returns:
+                list of solver names
+        """
+        if CPM_template.supported():
+            # Collect solver names
+            if installed:
+                return # [ ... list of the installed subsolver names ... ]
+            else:
+                return # [ ... list of all subsolver names ... ]
+        else:
+            warnings.warn("TEMPLATE is not installed or not supported on this system.")
+            return []
+
+    # [GUIDELINE] If your solver supports different subsolvers, implement below method to return their respective versions
+    @classmethod
+    def solverversion(cls, subsolver:str) -> Optional[str]:
+        """
+        Returns the version of the requested subsolver.
+
+        Arguments:
+            subsolver (str): name of the subsolver
+
+        Returns:
+            Version number of the subsolver if installed, else None 
+        """
+        # return version of requested subsolver (if installed)
+        # if requested subsolver does not exist, raise ValueError
+        pass
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -111,12 +159,20 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] we commonly use 3-letter abbrivations to refer to native objects:
         #           OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
         self.TPL_solver = TEMPLATEpy.Solver("cpmpy") 
+        self.TPL_model = TEMPLATEpy.model("cpmpy")
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
         #           internally, the constructor relies on `add()` which uses the above solver native object(s)
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
+
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.TPL_model
 
     def solve(self, time_limit=None, **kwargs):
         """
@@ -237,7 +293,7 @@ class CPM_template(SolverInterface):
             are permanently posted to the solver)
         """
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         self += flat_cons # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 

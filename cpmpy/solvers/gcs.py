@@ -50,6 +50,9 @@
 
         CPM_gcs
 """
+from typing import Optional
+import pkg_resources
+
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
@@ -98,6 +101,16 @@ class CPM_gcs(SolverInterface):
             return False
         except Exception as e:
             raise e
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('gcspy').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -125,6 +138,13 @@ class CPM_gcs(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.gcs
+    
     def has_objective(self):
         return self.objective_var is not None
     
@@ -182,7 +202,10 @@ class CPM_gcs(SolverInterface):
 
         # translate exit status
         if self.gcs_result['solutions'] != 0:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if self.gcs_result['completed'] and self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif not self.gcs_result['completed']:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
@@ -363,7 +386,7 @@ class CPM_gcs(SolverInterface):
                 are permanently posted to the solver
         """
         # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         self += flat_cons # add potentially created constraints
         self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 

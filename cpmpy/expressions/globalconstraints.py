@@ -210,8 +210,14 @@ class AllDifferentExceptN(GlobalConstraint):
         super().__init__("alldifferent_except_n", [flatarr, n])
 
     def decompose(self):
-        # equivalent to (var1 == n) | (var2 == n) | (var1 != var2)
-        return [(var1 == var2).implies(cp.any(var1 == a for a in self.args[1])) for var1, var2 in all_pairs(self.args[0])], []
+        cons = []
+        arr, n = self.args
+        for x,y in all_pairs(arr):
+            cond = x == y
+            if is_bool(cond):
+                cond = cp.BoolVal(cond)
+            cons.append(cond.implies(cp.any(x == a for a in n))) # equivalent to (var1 in n) | (var2 in n) | (var1 != var2)
+        return cons, []
 
     def value(self):
         vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
@@ -223,7 +229,6 @@ class AllDifferentExcept0(AllDifferentExceptN):
         All nonzero arguments have a distinct value
     """
     def __init__(self, *arr):
-        flatarr = flatlist(arr)
         super().__init__(arr, 0)
 
 
@@ -583,6 +588,8 @@ class IfThenElse(GlobalConstraint):
 
     def decompose(self):
         condition, if_true, if_false = self.args
+        if is_bool(condition):
+            condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
         return [condition.implies(if_true), (~condition).implies(if_false)], []
 
     def __repr__(self):
@@ -767,7 +774,10 @@ class Precedence(GlobalConstraint):
         args, precedence = self.args
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
-            for j in range(len(args)):
+            # constraint 1 from paper
+            constraints.append(args[0] != t) 
+            # constraint 2 from paper
+            for j in range(1,len(args)):
                 lhs = args[j] == t
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)

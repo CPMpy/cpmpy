@@ -48,6 +48,7 @@
 """
 import sys  # for stdout checking
 import time
+from typing import Optional
 
 import pkg_resources
 from pkg_resources import VersionConflict
@@ -65,6 +66,7 @@ from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import flatlist, argvals, argval
+from ..exceptions import NotSupportedError
 
 import numpy as np
 import numbers
@@ -100,6 +102,16 @@ class CPM_exact(SolverInterface):
             return False
         except Exception as e:
             raise e
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        try:
+            return pkg_resources.get_distribution('exact').version
+        except pkg_resources.DistributionNotFound:
+            return None
 
 
     def __init__(self, cpm_model=None, subsolver=None, **kwargs):
@@ -139,6 +151,7 @@ class CPM_exact(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
+        
     @property
     def native_model(self):
         """
@@ -386,8 +399,9 @@ class CPM_exact(SolverInterface):
         if is_num(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # variables to be translated should be positive
-        assert not isinstance(cpm_var, NegBoolView), "Internal error: found negative Boolean variables where only positive ones were expected, please report."
+        # special case, negative-bool-view. Should be eliminated in linearize
+        if isinstance(cpm_var, NegBoolView):
+            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
 
         # return it if it already exists
         if cpm_var in self._varmap:
@@ -423,7 +437,7 @@ class CPM_exact(SolverInterface):
         self.objective_is_min_ = minimize
 
         # make objective function non-nested and with positive BoolVars only
-        (flat_obj, flat_cons) = flatten_objective(expr)
+        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
         flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
         self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
         self += flat_cons  # add potentially created constraints
@@ -552,7 +566,7 @@ class CPM_exact(SolverInterface):
                         assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} " \
                                                                       f"only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
-                            rhs = intvar(rhs, rhs)
+                            rhs = cp.intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
                                                                                   "rewritten by linearize"

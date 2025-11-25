@@ -2,7 +2,7 @@ import unittest
 import cpmpy as cp
 
 from cpmpy.transformations.comparison import only_numexpr_equality
-from cpmpy.transformations.flatten_model import flatten_constraint
+from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 from cpmpy.transformations.linearize import linearize_constraint
@@ -94,9 +94,7 @@ class TestCSE(unittest.TestCase):
         csemap = dict()
         eq_cons = only_numexpr_equality([cons], csemap=csemap)
         
-        self.assertEqual(len(eq_cons), 2)
-        self.assertEqual(str(eq_cons[0]), "(max(x,y,z)) == (IV0)")
-        self.assertEqual(str(eq_cons[1]), "IV0 <= 42")
+        self.assertSetEqual(set([str(c) for c in eq_cons]), {"(max(x,y,z)) == (IV0)", "IV0 <= 42"})
         self.assertEqual(len(csemap), 1)
         
         # next time we use max([x,y,z]) it should replace it with IV0
@@ -118,7 +116,31 @@ class TestCSE(unittest.TestCase):
         self.assertEqual(str(lin_cons[1]), "sum([1, -1] * [z, IV0]) == 1")
         
         # next time we use z - 1 it should replace it with IV0
-        # ... not sure how to find a test for this...        
+        # ... not sure how to find a test for this...
+
+    def test_objective(self):
+
+        x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
+
+        obj = cp.max(x+y,z) - cp.min(x+y,z)
+
+        csemap = dict()
+        flat_obj, cons = flatten_objective(obj, csemap=csemap)
+        self.assertEqual(len(cons), 3)
+        self.assertEqual(len(csemap), 3)
+        self.assertSetEqual(set(csemap.keys()),
+                            {cp.max(x+y,z), cp.min(x+y,z), x+y}
+        )
+
+        # assume we did some transformations before
+        csemap = {cp.max(x+y,z) : cp.intvar(0,20, name="aux")}
+        flat_obj, cons = flatten_objective(obj, csemap=csemap)
+        self.assertEqual(len(cons), 2) # just replaced max with aux var
+        self.assertEqual(len(csemap), 3)
+        self.assertSetEqual(set(csemap.keys()),
+                            {cp.max(x + y, z), cp.min(x + y, z), x + y}
+                            )
+
 
     ### other transformations only use csemap as argument to flatten_constraint internally, not sure how to easily test them
 
