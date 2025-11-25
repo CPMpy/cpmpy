@@ -12,8 +12,7 @@ from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.normalize import toplevel_list
 
-from .utils import make_assump_model, replace_cons_with_assump
-from ...expressions.utils import is_num
+from .utils import make_assump_model, replace_cons_with_assump, OCUSException
 
 
 def mus(soft, hard=[], solver="ortools"):
