@@ -10,7 +10,7 @@
     ------------------------
 
     If a solver does not support such a global function (see solvers/), then it will be automatically
-    decomposed by calling its `.decompose_comparison()` function.
+    decomposed by calling its `.decompose()` function.
 
     CPMpy GlobalFunctions does not exactly match what is implemented in the solvers.
     Solvers can have specialised implementations for global functions, when used in a comparison, as global constraints.
@@ -42,8 +42,8 @@
             def __init__(self, args):
                 super().__init__("my_global", args)
 
-            def decompose_comparison(self):
-                return [self.args[0] + self.args[1]] # your decomposition
+            def decompose(self):
+                return [self.args[0] + self.args[1]], [] # your decomposition
 
     Also, implement `.value()` accordingly.
 
@@ -65,6 +65,8 @@
 
 """
 import warnings  # for deprecation warning
+from warnings import deprecated
+
 import numpy as np
 import cpmpy as cp
 
@@ -87,6 +89,18 @@ class GlobalFunction(Expression):
         """
         return False
 
+    def decompose(self):
+        """
+            Returns a decomposition into smaller constraints.
+            Returns a numerical expression and a list of defining constraints.
+
+            The decomposition might create auxiliary variables
+            and use other global constraints as long as
+            it does not create a circular dependency.
+        """
+        raise NotImplementedError("Decomposition for", self, "not available")
+
+    @deprecated("Deprecated, will be removed in stable version. Use .decompose() instead.")
     def decompose_comparison(self, cmp_op, cmp_rhs):
         """
             Returns a decomposition into smaller constraints.
@@ -95,7 +109,9 @@ class GlobalFunction(Expression):
             and use other global constraints as long as
             it does not create a circular dependency.
         """
-        raise NotImplementedError("Decomposition for", self, "not available")
+        val, tl = self.decompose()
+        return eval_comparison(cmp_op, val, cmp_rhs), tl
+
 
     def get_bounds(self):
         """
@@ -126,20 +142,15 @@ class Minimum(GlobalFunction):
         else:
             return min(argvals)
 
-    def decompose_comparison(self, cpm_op, cpm_rhs):
+    def decompose(self):
         """
-        Decomposition if it's part of a comparison
-
-        Returns two lists of constraints:
-
-        1) constraints representing the comparison
-        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-           they should be enforced toplevel.
+        Decomposition of Minimum constraint.
+        Returns
+        1) a numerical value to replace the constraint, and
+        2) a list of defining constraints, which should be enforced toplevel
         """
-        lb, ub = self.get_bounds()
-        _min = intvar(lb, ub)
-        return [eval_comparison(cpm_op, _min, cpm_rhs)], \
-               [cp.any(x <= _min for x in self.args), cp.all(x >= _min for x in self.args), ]
+        _min = intvar(*self.get_bounds())
+        return _min, [cp.all(x >= _min for x in self.args), cp.any(x <= _min for x in self.args)]
 
     def get_bounds(self):
         """
@@ -164,20 +175,15 @@ class Maximum(GlobalFunction):
         else:
             return max(argvals)
 
-    def decompose_comparison(self, cpm_op, cpm_rhs):
+    def decompose(self):
         """
-        Decomposition if it's part of a comparison
-
-        Returns two lists of constraints:
-
-        1) constraints representing the comparison
-        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-           they should be enforced toplevel.
+        Decomposition of Maximum constraint.
+        Returns
+        1) a numerical value to replace the constraint, and
+        2) a list of defining constraints, which should be enforced toplevel
         """
-        lb, ub = self.get_bounds()
-        _max = intvar(lb, ub)
-        return [eval_comparison(cpm_op, _max, cpm_rhs)], \
-               [cp.any(x >= _max for x in self.args), cp.all(x <= _max for x in self.args)]
+        _max = intvar(*self.get_bounds())
+        return _max, [cp.all(x <= _max for x in self.args), cp.any(x >= _max for x in self.args)]
 
     def get_bounds(self):
         """
@@ -197,30 +203,25 @@ class Abs(GlobalFunction):
     def value(self):
         return abs(argval(self.args[0]))
 
-    def decompose_comparison(self, cpm_op, cpm_rhs):
+    def decompose(self):
         """
-        Decomposition if it's part of a comparison
-
-        Returns two lists of constraints:
-
-        1) constraints representing the comparison
-        2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-           they should be enforced toplevel.
+        Decomposition of Abs constraint.
+        Returns
+        1) a numerical value to replace the constraint, and
+        2) a list of defining constraints, which should be enforced toplevel
         """
         arg = self.args[0]
         lb, ub = get_bounds(arg)
-        # when argument is exclusively on one side of the sign
-        if lb >= 0:
-            return [eval_comparison(cpm_op, arg, cpm_rhs)], []
-        elif ub <= 0:
-            return [eval_comparison(cpm_op, -arg, cpm_rhs)], []
-        else: # when domain crosses over 0
-            newarg = intvar(*self.get_bounds())
-            is_pos = boolvar()
-            return [eval_comparison(cpm_op, newarg, cpm_rhs)], \
-                    [is_pos == (arg >= 0), is_pos.implies(arg == newarg), (~is_pos).implies(-arg == newarg)]
+        if lb >= 0: # always positive
+            return arg, []
+        if ub <= 0: # always negative
+            return -arg, []
 
+        _abs = intvar(*self.get_bounds())
+        assert _abs.lb == 0
 
+        is_pos = arg >= 0
+        return _abs, [is_pos.implies(arg == _abs), (~is_pos).implies(arg == -_abs)]
 
     def get_bounds(self):
         """
@@ -274,29 +275,22 @@ class Element(GlobalFunction):
                                           + "\n Use argval(expr) to get the value of expr with relational semantics.")
         return None # default
 
-    def decompose_comparison(self, cpm_op, cpm_rhs):
+    def decompose(self):
         """
-            `Element(arr,ix)` represents the array lookup itself (a numeric variable)
-            When used in a comparison relation: Element(arr,idx) <CMP_OP> CMP_RHS
-            it is a constraint, and that one can be decomposed.
-
-            Returns two lists of constraints:
-
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
-
+        Decomposition of Abs constraint.
+        Returns
+        1) a numerical value to replace the constraint, and
+        2) a list of defining constraints, which should be enforced toplevel
         """
         arr, idx = self.args
-        # Find where the array indices and the bounds of `idx` intersect
-        lb, ub = get_bounds(idx)
-        new_lb, new_ub = max(lb, 0), min(ub, len(arr) - 1)
-        cons=[]
-        # For every `i` in that intersection, post `(idx = i) -> idx=i -> arr[i] <CMP_OP> cpm_rhs`.
-        for i in range(new_lb, new_ub+1):
-            cons.append(implies(idx == i, eval_comparison(cpm_op, arr[i], cpm_rhs)))
-        cons+=[idx >= new_lb, idx <= new_ub]  # also enforce the new bounds 
-        return cons, []  # no auxiliary variables
+
+        idx_lb, idx_ub = get_bounds(idx)
+        assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
+
+        _elem = intvar(*self.get_bounds())
+
+        return _elem, [implies(idx == i, _elem == arr[i]) for i in range(len(arr))]
+
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
@@ -320,12 +314,15 @@ class Count(GlobalFunction):
             raise TypeError("count takes an array and a value as input, not: {} and {}".format(arr,val))
         super().__init__("count", [arr,val])
 
-    def decompose_comparison(self, cmp_op, cmp_rhs):
+    def decompose(self):
         """
-        Count(arr,val) can only be decomposed if it's part of a comparison
+        Decomposition of the Count constraint.
+        Returns
+        1) a numerical value to replace the constraint, and
+        2) a list of defining constraints, which should be enforced toplevel
         """
         arr, val = self.args
-        return [eval_comparison(cmp_op, Operator('sum',[ai==val for ai in arr]), cmp_rhs)], []
+        return cp.sum(a == val for a in arr), []
 
     def value(self):
         arr, val = self.args
@@ -353,13 +350,17 @@ class Among(GlobalFunction):
             raise TypeError(f"Among takes a set of values as input, not {vals}")
         super().__init__("among", [arr,vals])
 
-    def decompose_comparison(self, cmp_op, cmp_rhs):
+    def decompose(self):
         """
-            Among(arr, vals) can only be decomposed if it's part of a comparison'
+             Decomposition of the Among constraint.
+        Returns
+        1) a numerical value to replace the constraint, and
+        2) a list of defining constraints, which should be enforced toplevel
+
         """
         arr, values = self.args
-        count_for_each_val = [Count(arr, val) for val in values]
-        return [eval_comparison(cmp_op, cp.sum(count_for_each_val), cmp_rhs)], []
+        return cp.sum(Count(arr, val) for val in values), []
+
 
     def value(self):
         return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
@@ -379,31 +380,27 @@ class NValue(GlobalFunction):
             raise ValueError("NValue takes an array as input")
         super().__init__("nvalue", arr)
 
-    def decompose_comparison(self, cmp_op, cpm_rhs):
+    def decompose(self):
         """
-        NValue(arr) can only be decomposed if it's part of a comparison
+        Decomposition of the Count constraint.
+        Returns
+        1) a numerical value to replace the constraint, and
+        2) a list of defining constraints, which should be enforced toplevel
 
         Based on "simple decomposition" from:
-        
+
             Bessiere, Christian, et al. "Decomposition of the NValue constraint."
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
         """
-
         lbs, ubs = get_bounds(self.args)
         lb, ub = min(lbs), max(ubs)
 
-        constraints = []
+        n_values = 0
+        for v in range(lb, ub+1):
+            n_values += cp.any(a == v for a in self.args)
 
-        # introduce boolvar for each possible value
-        bvars = boolvar(shape=(ub+1-lb,)) # shape is tuple to ensure it is a 1D array
-
-        args = cpm_array(self.args)
-        # bvar is true if the value is taken by any variable
-        for bv, val in zip(bvars, range(lb, ub+1)):
-            constraints += [cp.any(args == val) == bv]
-
-        return [eval_comparison(cmp_op, cp.sum(bvars), cpm_rhs)], constraints
+        return n_values, []
 
     def value(self):
         return len(set(argval(a) for a in self.args))
@@ -429,9 +426,12 @@ class NValueExcept(GlobalFunction):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
         super().__init__("nvalue_except",[arr, n])
 
-    def decompose_comparison(self, cmp_op, cpm_rhs):
+    def decompose(self):
         """
-        NValue(arr) can only be decomposed if it's part of a comparison
+        Decomposition of the Count constraint.
+        Returns
+        1) a numerical value to replace the constraint, and
+        2) a list of defining constraints, which should be enforced toplevel
 
         Based on "simple decomposition" from:
 
@@ -439,27 +439,19 @@ class NValueExcept(GlobalFunction):
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
         """
-
         arr, n = self.args
-        arr = cpm_array(arr)
+        assert is_num(n)
+
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
 
-        constraints = []
+        n_values = 0
+        for v in range(lb, ub+1):
+            if v == n:
+                continue
+            n_values += cp.any(a == v for a in arr)
 
-        # introduce boolvar for each possible value
-        bvars = boolvar(shape=(ub+1-lb,)) # shape is tuple to ensure it is a 1D array
-        idx_of_n = n - lb
-        if 0 <= idx_of_n < len(bvars):
-            count_of_vals = cp.sum(bvars[:idx_of_n]) + cp.sum(bvars[idx_of_n+1:])
-        else:
-            count_of_vals = cp.sum(bvars)
-
-        # bvar is true if the value is taken by any variable
-        for bv, val in zip(bvars, range(lb, ub + 1)):
-            constraints += [cp.any(arr == val) == bv]
-
-        return [eval_comparison(cmp_op, count_of_vals, cpm_rhs)], constraints
+        return n_values, []
 
     def value(self):
         return len(set(argval(a) for a in self.args[0]) - {self.args[1]})
