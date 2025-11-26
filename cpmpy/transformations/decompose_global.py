@@ -36,9 +36,6 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
     if _toplevel is None:
         _toplevel = []
 
-    # swap the arguments of a comparison while maintaining its semantics
-    flipmap = {"==": "==", "!=": "!=", "<": ">", "<=": ">=", ">": "<", ">=": "<="}
-
     newlist = []  # decomposed constraints will go here
     for expr in lst_of_expr:
 
@@ -63,9 +60,9 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 newlist.append(expr)
                 continue
 
-            if any(isinstance(a,GlobalFunction) for a in expr.args):
-                expr, base_con = normalized_numexpr(expr, csemap=csemap)
-                _toplevel.extend(base_con)  # should be added toplevel
+            # if any(isinstance(a,GlobalFunction) for a in expr.args):
+            #     expr, base_con = normalized_numexpr(expr, csemap=csemap)
+            #     _toplevel.extend(base_con)  # should be added toplevel
             # recurse into arguments, recreate through constructor (we know it stores no other state)
             args = decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
             newlist.append(Operator(expr.name, args))
@@ -89,93 +86,34 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     expr.update_args(decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap))
                     newlist.append(expr)
 
-            else:
+            else: # unsupported, need to decompose
+                dec = expr.decompose()
+                if not isinstance(dec, tuple):
+                    warnings.warn(f"Decomposing an old-style global ({expr}) that does not return a tuple, which is "
+                                  "deprecated. Support for old-style globals will be removed in stable version",
+                                  DeprecationWarning)
+                    dec = (dec, [])
+                value, define = dec
+                if not is_any_list(value):
+                    value = [value]
+
+                _toplevel.extend(define)  # definitions should be added toplevel
+                # the `decomposed` expression might contain other global constraints, check it
+                decomposed = decompose_in_tree(value, supported, supported_reified, _toplevel, nested=nested, csemap=csemap)
                 if expr.is_bool():
-                    assert isinstance(expr, GlobalConstraint)
-                    # boolean global constraints
-                    dec = expr.decompose()
-                    if not isinstance(dec, tuple):
-                        warnings.warn(f"Decomposing an old-style global ({expr}) that does not return a tuple, which is "
-                                      "deprecated. Support for old-style globals will be removed in stable version",
-                                      DeprecationWarning)
-                        dec = (dec, [])
-                    decomposed, define = dec
-
-                    _toplevel.extend(define)  # definitions should be added toplevel
-                    # the `decomposed` expression might contain other global constraints, check it
-                    decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=nested, csemap=csemap)
                     newlist.append(all(decomposed))
-
                 else:
-                    # global function, replace by a fresh variable and decompose the equality to this
-                    assert isinstance(expr, GlobalFunction)
-                    lb,ub = expr.get_bounds()
-                    
-                    if csemap is not None and expr in csemap:
-                        aux = csemap[expr]
-                    else:
-                        aux = intvar(lb, ub)
-                        if csemap is not None:
-                            csemap[expr] = aux
-
-                    # NOTE Do we need to decompose here (the expr's args)? As done in the Comparison's section?
-
-                    dec = expr.decompose_comparison("==", aux)
-                    if not isinstance(dec, tuple):
-                        warnings.warn(f"Decomposing an old-style global ({expr}) that does not return a tuple, which is "
-                                      "deprecated. Support for old-style globals will be removed in stable version",
-                                      DeprecationWarning)
-                        dec = (dec, [])
-                    auxdef, otherdef = dec
-
-                    _toplevel.extend(auxdef + otherdef)  # all definitions should be added toplevel
-                    newlist.append(aux)  # replace original expression by aux
+                    assert len(decomposed) == 1, "Global functions should return a single numerical value, not a list"
+                    newlist.append(decomposed[0])
 
         elif isinstance(expr, Comparison):
             if not expr.has_subexpr(): # Only recurse if there are nested expressions
                 newlist.append(expr)
                 continue
 
-            # if one of the two children is a (numeric) global constraint, we can decompose the comparison directly
-            # otherwise e.g., min(x,y,z) == a would become `min(x,y,z).decompose_comparison('==',aux) + [aux == a]`
-            lhs, rhs = expr.args
-            exprname = expr.name  # can change when rhs needs decomp
-
-            decomp_lhs = isinstance(lhs, GlobalFunction) and not lhs.name in supported
-            decomp_rhs = isinstance(rhs, GlobalFunction) and not rhs.name in supported
-
-            if not decomp_lhs:
-                if not decomp_rhs:
-                    # nothing special, create a fresh version and recurse into arguments
-                    expr = copy.copy(expr)
-                    expr.update_args(decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap))
-                    newlist.append(expr)
-
-                else:
-                    # only rhs needs decomposition, so flip comparison to make lhs needing the decomposition
-                    exprname = flipmap[expr.name]
-                    lhs, rhs = rhs, lhs
-                    decomp_lhs, decomp_rhs = True, False  # continue into next 'if'
-
-            if decomp_lhs:
-                if lhs.has_subexpr():
-                    # recurse into lhs args and decompose nested subexpressions
-                    lhs = copy.copy(lhs)
-                    lhs.update_args(decompose_in_tree(lhs.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap))
-
-                # decompose comparison of lhs and rhs
-                dec = lhs.decompose_comparison(exprname, rhs)
-                if not isinstance(dec, tuple):
-                    warnings.warn(f"Decomposing an old-style global ({lhs}) that does not return a tuple, which is "
-                                  f"deprecated. Support for old-style globals will be removed in stable version",
-                                  DeprecationWarning)
-                    dec = (dec, [])
-                decomposed, define = dec
-
-                _toplevel.extend(define)  # definitions should be added toplevel
-                # the `decomposed` expression (and rhs) might contain other global constraints, check it
-                decomposed = decompose_in_tree(decomposed, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
-                newlist.append(all(decomposed))
+            expr = copy.copy(expr)
+            expr.update_args(decompose_in_tree(expr.args, supported, supported_reified, _toplevel, nested=True, csemap=csemap))
+            newlist.append(expr)
 
         else:  # constants, variables, direct constraints
             newlist.append(expr)
