@@ -309,42 +309,20 @@ class Circuit(GlobalConstraint):
                 https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
         """
         succ = cpm_array(self.args)
-        n = len(succ)
-        order = intvar(0,n-1, shape=n)
+
+        order = [succ[0]]
+        for i in range(1, len(succ)):
+            order.append(succ[order[i-1]])
+
+        # Decomposition must be total, so safen here
+        nbc = []
         defining = []
-        constraining = []
+        cons = cp.transformations.safening.no_partial_functions([order[-1] == 0],
+                                                                _toplevel=defining,
+                                                                _nbc=nbc,
+                                                                safen_toplevel={"element"})
 
-        # We define the auxiliary order variables to represent the order we visit all the nodes.
-        # `order[i] == succ[order[i - 1]]`
-        # These constraints need to be in the defining part, since they define our auxiliary vars
-        # However, this would make it impossible for ~circuit to be satisfied in some cases,
-        # because there does not always exist a valid ordering
-        # This happens when the variables in succ don't take values in the domain of 'order',
-        # i.e. for succ = [9,-1,0], there is no valid ordering, but we satisfy ~circuit(succ)
-        # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
-
-        lbs, ubs = get_bounds(succ)
-        if min(lbs) > 0 or max(ubs) < n - 1:
-            # no way this can be a circuit
-            return [BoolVal(False)], []
-        elif min(lbs) >= 0 and max(ubs) < n:
-            # there always exists a valid ordering, since our bounds are tight
-            a = BoolVal(True)
-        else:
-            # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
-            a = boolvar()
-            defining += [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
-            for i in range(n):
-                defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
-
-        constraining += [AllDifferent(succ)]  # different successors
-        constraining += [AllDifferent(order)]  # different orders
-        constraining += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
-        defining += [a.implies(order[0] == succ[0])]
-        for i in range(1, n):
-            defining += [a.implies(
-                order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
-        return constraining, defining
+        return cons + nbc, defining
 
     def value(self):
         pathlen = 0
