@@ -3,12 +3,14 @@ import numpy as np
 
 
 """
-Place the numbers from 1 to 9 exactly once in every row, column, and region. 
-Each region is orthogonally connected and must be located by the solver.
-
-An area outlined by dashes is called a killer cage. 
-All numbers in a killer cage belong to the same region and sum to the number in the top left corner of the killer cage.
 Puzzle source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=0009KE
+
+Rules:
+
+- Place the numbers from 1 to 9 exactly once in every row, column, and region. 
+- Each region is orthogonally connected and must be located by the solver.
+- An area outlined by dashes is called a killer cage. 
+  All numbers in a killer cage belong to the same region and sum to the number in the top left corner of the killer cage.
 """
 
 SIZE = 9
@@ -22,14 +24,35 @@ region_cardinals = cp.intvar(1,SIZE, shape=(SIZE,SIZE))
 
 
 def killer_cage(idxs, values, regions, total):
-    # the sum of the cells in the cage must equal the total
-    # all cells in the cage must be in the same region
+    """
+    the sum of the cells in the cage must equal the total
+    all cells in the cage must be in the same region
+    
+    Args:
+        idxs (np.array): array of indices representing the cells in the cage
+        values (cp.intvar): cpmpy variable representing the cell values
+        regions (cp.intvar): cpmpy variable representing the cell regions
+        total (int): the total sum for the cage
+    
+    Returns:
+        list: list of cpmpy constraints enforcing the killer cage rules
+    """
     constraints = []
     constraints.append(cp.sum([values[r, c] for r,c in idxs]) == total)
     constraints.append(cp.AllEqual([regions[r, c] for r,c in idxs]))
     return constraints
 
 def get_neighbours(r, c):
+    """
+    from a cell get the indices of its orthogonally adjacent neighbours
+
+    Args:
+        r (int): row index
+        c (int): column index
+
+    Returns:
+        list: list of tuples representing the indices of orthogonally adjacent neighbours
+    """
     # a cell must be orthogonally adjacent to a cell in the same region
 
     # check if on top row
@@ -123,7 +146,7 @@ print(cell_values.value())
 print("The regions are:")
 print(cell_regions.value())
 
-assert cell_values.value() == [[9, 6, 7, 4, 8, 5, 2, 1, 3],
+assert (cell_values.value() == [[9, 6, 7, 4, 8, 5, 2, 1, 3],
                                [2, 3, 8, 1, 5, 4, 6, 9, 7],
                                [1, 5, 2, 3, 9, 7, 4, 8, 6],
                                [4, 7, 6, 2, 1, 8, 3, 5, 9],
@@ -131,6 +154,6 @@ assert cell_values.value() == [[9, 6, 7, 4, 8, 5, 2, 1, 3],
                                [7, 1, 9, 5, 3, 6, 8, 2, 4],
                                [6, 8, 5, 9, 2, 3, 7, 4, 1],
                                [5, 2, 4, 7, 6, 9, 1, 3, 8],
-                               [3, 4, 1, 8, 7, 2, 9, 6, 5]]
+                               [3, 4, 1, 8, 7, 2, 9, 6, 5]]).all()
 
 # can not assert regions as there are symmetric solutions.. I can add symmetry breaking constraint, but it is slow in this case

@@ -1,14 +1,38 @@
-import time
 import cpmpy as cp
 import numpy as np
 
-from cpmpy.tools.explain import optimal_mus, mus
-from cpmpy.tools.explain.utils import make_assump_model
-from cpmpy.transformations.get_variables import get_variables
+""" 
+Puzzle source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000N39
 
-solver = "ortools"
+Rules: 
 
-# This cpmpy example solves a sudoku by Zanno, which can be found on https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000N39
+- Normal Sudoku rules apply.
+
+- Standart RAT RUN RULES apply: 
+- The rat must reach the hole by finding a path through the maze. 
+- The path must not visit any cell more than once, cross itself, or pass through any thick maze walls.
+  As well as moving orthogonally, the rat may move diagonally if there's a 2x2 space in which to do so, 
+  but may never pass diagonally through a round wall-spot on the corner of a cell.
+- The rat may only pass directly through a purple arrow if moving in the direction the arrow is pointing.
+- An arrow always points to the smaller of the two digits it sits between.
+
+SCHRÖDINGER LINE EMITTERS: 
+- Scattered around the lab are colored line emitters. 
+  The path segment connecting two Emitters (including the emitter cells themselves) 
+  must follow the rules of both emitters (see below). The emitters at both ends 
+  of a segment must have different colors.
+Clarification: The two segments extending from a single emitter are considered independent lines 
+(For example, a digit may appear on both sides of a renban emitter without violating its rule). 
+The segments extending from a region sum emitter may have different sums.
+
+EMITTER RULES:
+- RENBAN (purple): The line contains a set of consecutive digits (not necessarily in order).
+- NABNER (yellow): No two digits are consecutive, and no digit repeats.
+- MODULAR (teal): Every set of three consecutive digits must include one digit from {1,4,7}, one from {2,5,8}, and one from {3,6,9}.
+- ENTROPY (peach): Every set of three consecutive digits must include one digit from {1,2,3}, one from {4,5,6}, and one from {7,8,9}.
+- REGION SUM (blue): The sum of the digits on the line is the same in every 3×3 box it passes through. The line has to cross at least one box-border.
+- TEN SUM (gray): The line can be divided into one or more non-overlapping segments that each sum to 10.
+"""
 
 # sudoku cells
 cells = cp.intvar(1,9, shape=(9,9), name="values")
@@ -55,13 +79,31 @@ C_WALLS = np.array([[1,1,0,1,0,1,1,1],
 EMITTERS = {(0, 5): 6, (2, 1): 5, (2, 4): 3, (2, 8): 1, (4, 2): 4, (4, 6): 6, (5, 0): 3, (5, 6): 2, (6, 5): 2, (6, 6): 4, (7, 5): 5, (8, 2): 1}
 
 def gate(idx1, idx2):
-    # the path can not pass from idx2 to idx1, and the value in idx1 must be greater than the value in idx2
+    """
+    the path can not pass from idx2 to idx1, and the value in idx1 must be greater than the value in idx2
+    
+    Args:
+        idx1 (tuple): tuple representing the indices of cell 1
+        idx2 (tuple): tuple representing the indices of cell 2
+        
+    Returns:
+        cpmpy constraint enforcing the gate rule
+    """
     r1, c1 = idx1
     r2, c2 = idx2
     return cp.all([cells[r1,c1] > cells[r2,c2], path[r1,c1] - 1 != path[r2,c2]])
 
 def get_reachable_neighbours(row, column):
-    # from a cell get the indices of its reachable neighbours
+    """
+    from a cell get the indices of its reachable neighbours
+    
+    Args:
+        row (int): row index
+        column (int): column index
+        
+    Returns:
+        list: list of tuples representing the indices of reachable neighbours
+    """
     reachable_neighbours = []
     if row != 0:
         if H_WALLS[row-1, column] == 0:
@@ -90,6 +132,16 @@ def get_reachable_neighbours(row, column):
     return reachable_neighbours
 
 def path_valid(path):
+    """
+    Add constraints to ensure the path is valid according to the walls and emitters.
+    Enforce Sequence values.
+    
+    Args:
+        path (cp.intvar): cpmpy variable representing the path indices
+        
+    Returns:
+        list: list of cpmpy constraints enforcing the path validity rules
+    """
     constraints = []
     for r in range(path.shape[0]):
         for c in range(path.shape[0]):
@@ -98,8 +150,21 @@ def path_valid(path):
             emitter_neighbours = [n for n in neighbours if tuple(n) in EMITTERS]
             if (r,c) == (2,8):
                 # The path starts on emitter. It doesn't have any previous cells so the first 3 vectors in the sequence must be fully -1. As for the the last 3, they are taken from the neighbour. Vice versa also applies.
-                constraints.append(cp.all([cp.all(sequence[r,c,:3].flatten() == -1)]))
-                constraints.append(cp.any([cp.all([path[nr,nc] == 2, sequence[r,c,3,0] == cells[nr,nc], sequence[r,c,4,0] == nr, sequence[r,c,5,0] == nc, cp.all(sequence[r,c,3,1:] == sequence[nr,nc,3,:19]), cp.all(sequence[r,c,4,1:] == sequence[nr,nc,4,:19]), cp.all(sequence[r,c,5,1:] == sequence[nr,nc,5,:19]), sequence[nr,nc,0,0] == cells[r,c], sequence[nr,nc,1,0] == r, sequence[nr,nc,2,0] == c, cp.all(sequence[nr,nc,0,1:] == sequence[r,c,0,:19]), cp.all(sequence[nr,nc,1,1:] == sequence[r,c,1,:19]), cp.all(sequence[nr,nc,2,1:] == sequence[r,c,2,:19])]) for nr, nc in neighbours]))
+                constraints.append(cp.all([cp.all(sequence[r,c,:3].flatten() == -1)])) # no previous cells in sequence
+                constraints.append(cp.any([cp.all([path[nr,nc] == 2, # next cell must be the second on the path
+                                                   sequence[r,c,3,0] == cells[nr,nc], # the immediate next cell value must be that of the neighbour
+                                                   sequence[r,c,4,0] == nr, # the immediate next cell row must be that of the neighbour
+                                                   sequence[r,c,5,0] == nc, # the immediate next cell column must be that of the neighbour
+                                                   cp.all(sequence[r,c,3,1:] == sequence[nr,nc,3,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                                   cp.all(sequence[r,c,4,1:] == sequence[nr,nc,4,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                                   cp.all(sequence[r,c,5,1:] == sequence[nr,nc,5,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                                   sequence[nr,nc,0,0] == cells[r,c], # the immediate previous cell value of the neighbour must be that of the current cell
+                                                   sequence[nr,nc,1,0] == r, # the immediate previous cell row of the neighbour must be that of the current cell
+                                                   sequence[nr,nc,2,0] == c, # the immediate previous cell column of the neighbour must be that of the current cell
+                                                   cp.all(sequence[nr,nc,0,1:] == sequence[r,c,0,:19]), # the rest of the sequence vectors must be carried over from the current cell
+                                                   cp.all(sequence[nr,nc,1,1:] == sequence[r,c,1,:19]), # the rest of the sequence vectors must be carried over from the current cell
+                                                   cp.all(sequence[nr,nc,2,1:] == sequence[r,c,2,:19]) # the rest of the sequence vectors must be carried over from the current cell
+                                                   ]) for nr, nc in neighbours]))
             elif (r,c) == (6,6):
                 # nothing comes after this emitter on the path
                 constraints.append(cp.all([cp.all(sequence[r,c,3:].flatten() == -1)]))
@@ -109,14 +174,66 @@ def path_valid(path):
                 constraints.append((path[r,c] != 0).implies(cp.any([path[neighbour[0], neighbour[1]] == path[r,c] + 1 for neighbour in neighbours])))
                 if (r,c) not in EMITTERS:
                     # carry over sequence values from non-emitter to non-emitter
-                    constraints.append(cp.all([((path[r,c] != 0) & (path[r,c] + 1 == path[nr,nc])).implies(cp.all([sequence[r,c,3,0] == cells[nr,nc], sequence[r,c,4,0] == nr, sequence[r,c,5,0] == nc, cp.all(sequence[r,c,3,1:] == sequence[nr,nc,3,:19]), cp.all(sequence[r,c,4,1:] == sequence[nr,nc,4,:19]), cp.all(sequence[r,c,5,1:] == sequence[nr,nc,5,:19]), sequence[nr,nc,0,0] == cells[r,c], sequence[nr,nc,1,0] == r, sequence[nr,nc,2,0] == c, cp.all(sequence[nr,nc,0,1:] == sequence[r,c,0,:19]), cp.all(sequence[nr,nc,1,1:] == sequence[r,c,1,:19]), cp.all(sequence[nr,nc,2,1:] == sequence[r,c,2,:19])])) for nr,nc in non_emitter_neighbours]))
+                    constraints.append(cp.all([((path[r,c] != 0) & (path[r,c] + 1 == path[nr,nc])).implies( # non-emitter neighbour that is next on path
+                        cp.all([sequence[r,c,3,0] == cells[nr,nc], # the immediate next cell value must be that of the neighbour
+                                sequence[r,c,4,0] == nr, # the immediate next cell row must be that of the neighbour
+                                sequence[r,c,5,0] == nc, # the immediate next cell column must be that of the neighbour
+                                cp.all(sequence[r,c,3,1:] == sequence[nr,nc,3,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                cp.all(sequence[r,c,4,1:] == sequence[nr,nc,4,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                cp.all(sequence[r,c,5,1:] == sequence[nr,nc,5,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                sequence[nr,nc,0,0] == cells[r,c], # the immediate previous cell value of the neighbour must be that of the current cell
+                                sequence[nr,nc,1,0] == r, # the immediate previous cell row of the neighbour must be that of the current cell
+                                sequence[nr,nc,2,0] == c, # the immediate previous cell column of the neighbour must be that of the current cell
+                                cp.all(sequence[nr,nc,0,1:] == sequence[r,c,0,:19]), # the rest of the sequence vectors must be carried over from the current cell
+                                cp.all(sequence[nr,nc,1,1:] == sequence[r,c,1,:19]), # the rest of the sequence vectors must be carried over from the current cell
+                                cp.all(sequence[nr,nc,2,1:] == sequence[r,c,2,:19]) # the rest of the sequence vectors must be carried over from the current cell
+                                ])) for nr,nc in non_emitter_neighbours]))
                     # carry over sequence values from non-emitter to emitter
-                    constraints.append(cp.all([((path[r,c] != 0) & (path[r,c] + 1 == path[nr,nc])).implies(cp.all([sequence[r,c,3,0] == cells[nr,nc], sequence[r,c,4,0] == nr, sequence[r,c,5,0] == nc, cp.all(sequence[r,c,3,1:] == -1), cp.all(sequence[r,c,4,1:] == -1), cp.all(sequence[r,c,5,1:] == -1), sequence[nr,nc,0,0] == cells[r,c], sequence[nr,nc,1,0] == r, sequence[nr,nc,2,0] == c, cp.all(sequence[nr,nc,0,1:] == sequence[r,c,0,:19]), cp.all(sequence[nr,nc,1,1:] == sequence[r,c,1,:19]), cp.all(sequence[nr,nc,2,1:] == sequence[r,c,2,:19])])) for nr,nc in emitter_neighbours]))
+                    constraints.append(cp.all([((path[r,c] != 0) & (path[r,c] + 1 == path[nr,nc])).implies( # emitter neighbour that is next on path
+                        cp.all([sequence[r,c,3,0] == cells[nr,nc], # the immediate next cell value must be that of the neighbour
+                                sequence[r,c,4,0] == nr, # the immediate next cell row must be that of the neighbour
+                                sequence[r,c,5,0] == nc, # the immediate next cell column must be that of the neighbour
+                                cp.all(sequence[r,c,3,1:] == -1), # no continuation after emitter
+                                cp.all(sequence[r,c,4,1:] == -1), # no continuation after emitter
+                                cp.all(sequence[r,c,5,1:] == -1), # no continuation after emitter
+                                sequence[nr,nc,0,0] == cells[r,c], # the immediate previous cell value of the neighbour must be that of the current cell
+                                sequence[nr,nc,1,0] == r, # the immediate previous cell row of the neighbour must be that of the current cell
+                                sequence[nr,nc,2,0] == c, # the immediate previous cell column of the neighbour must be that of the current cell
+                                cp.all(sequence[nr,nc,0,1:] == sequence[r,c,0,:19]), # the rest of the sequence vectors must be carried over from the current cell
+                                cp.all(sequence[nr,nc,1,1:] == sequence[r,c,1,:19]), # the rest of the sequence vectors must be carried over from the current cell
+                                cp.all(sequence[nr,nc,2,1:] == sequence[r,c,2,:19]) # the rest of the sequence vectors must be carried over from the current cell
+                                ])) for nr,nc in emitter_neighbours]))
                 else:
                     # carry over sequence values from emitter to non-emitter
-                    constraints.append(cp.all([((path[r,c] != 0) & (path[r,c] + 1 == path[nr,nc])).implies(cp.all([sequence[r,c,3,0] == cells[nr,nc], sequence[r,c,4,0] == nr, sequence[r,c,5,0] == nc, cp.all(sequence[r,c,3,1:] == sequence[nr,nc,3,:19]), cp.all(sequence[r,c,4,1:] == sequence[nr,nc,4,:19]), cp.all(sequence[r,c,5,1:] == sequence[nr,nc,5,:19]), sequence[nr,nc,0,0] == cells[r,c], sequence[nr,nc,1,0] == r, sequence[nr,nc,2,0] == c, cp.all(sequence[nr,nc,0,1:] == -1), cp.all(sequence[nr,nc,1,1:] == -1), cp.all(sequence[nr,nc,2,1:] == -1)])) for nr,nc in non_emitter_neighbours]))
+                    constraints.append(cp.all([((path[r,c] != 0) & (path[r,c] + 1 == path[nr,nc])).implies( # non-emitter neighbour that is next on path
+                        cp.all([sequence[r,c,3,0] == cells[nr,nc], # the immediate next cell value must be that of the neighbour
+                                sequence[r,c,4,0] == nr, # the immediate next cell row must be that of the neighbour
+                                sequence[r,c,5,0] == nc, # the immediate next cell column must be that of the neighbour
+                                cp.all(sequence[r,c,3,1:] == sequence[nr,nc,3,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                cp.all(sequence[r,c,4,1:] == sequence[nr,nc,4,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                cp.all(sequence[r,c,5,1:] == sequence[nr,nc,5,:19]), # the rest of the sequence vectors must be carried over from the neighbour
+                                sequence[nr,nc,0,0] == cells[r,c], # the immediate previous cell value of the neighbour must be that of the current cell
+                                sequence[nr,nc,1,0] == r, # the immediate previous cell row of the neighbour must be that of the current cell
+                                sequence[nr,nc,2,0] == c, # the immediate previous cell column of the neighbour must be that of the current cell
+                                cp.all(sequence[nr,nc,0,1:] == -1), # no continuation before emitter
+                                cp.all(sequence[nr,nc,1,1:] == -1), # no continuation before emitter
+                                cp.all(sequence[nr,nc,2,1:] == -1) # no continuation before emitter
+                                ])) for nr,nc in non_emitter_neighbours]))
                     # carry over sequence values from emitter to emitter
-                    constraints.append(cp.all([((path[r,c] != 0) & (path[r,c] + 1 == path[nr,nc])).implies(cp.all([sequence[r,c,3,0] == cells[nr,nc], sequence[r,c,4,0] == nr, sequence[r,c,5,0] == nc, cp.all(sequence[r,c,3,1:] == -1), cp.all(sequence[r,c,4,1:] == -1), cp.all(sequence[r,c,5,1:] == -1), sequence[nr,nc,0,0] == cells[r,c], sequence[nr,nc,1,0] == r, sequence[nr,nc,2,0] == c, cp.all(sequence[nr,nc,0,1:] == -1), cp.all(sequence[nr,nc,1,1:] == -1), cp.all(sequence[nr,nc,2,1:] == -1)])) for nr,nc in emitter_neighbours]))
+                    constraints.append(cp.all([((path[r,c] != 0) & (path[r,c] + 1 == path[nr,nc])).implies( # emitter neighbour that is next on path
+                        cp.all([sequence[r,c,3,0] == cells[nr,nc], # the immediate next cell value must be that of the neighbour
+                                sequence[r,c,4,0] == nr, # the immediate next cell row must be that of the neighbour
+                                sequence[r,c,5,0] == nc, # the immediate next cell column must be that of the neighbour
+                                cp.all(sequence[r,c,3,1:] == -1), # no continuation after emitter
+                                cp.all(sequence[r,c,4,1:] == -1), # no continuation after emitter
+                                cp.all(sequence[r,c,5,1:] == -1), # no continuation after emitter
+                                sequence[nr,nc,0,0] == cells[r,c], # the immediate previous cell value of the neighbour must be that of the current cell
+                                sequence[nr,nc,1,0] == r, # the immediate previous cell row of the neighbour must be that of the current cell
+                                sequence[nr,nc,2,0] == c, # the immediate previous cell column of the neighbour must be that of the current cell
+                                cp.all(sequence[nr,nc,0,1:] == -1), # no continuation before emitter
+                                cp.all(sequence[nr,nc,1,1:] == -1), # no continuation before emitter
+                                cp.all(sequence[nr,nc,2,1:] == -1) # no continuation before emitter
+                                ])) for nr,nc in emitter_neighbours]))
 
             # for any non-pathcell, its sequence must be fully -1
             constraints.append((path[r,c] == 0).implies(cp.all(sequence[r,c] == -1)))
@@ -130,11 +247,32 @@ def path_valid(path):
     return constraints
 
 def same_region(r1, c1, r2, c2):
-    # check if two cells are in the same 3x3 region
+    """
+    check if two cells are in the same 3x3 region
+    
+    Args:
+        r1 (int): row index of cell 1
+        c1 (int): column index of cell 1
+        r2 (int): row index of cell 2
+        c2 (int): column index of cell 2
+        
+    Returns:
+        cpmpy constraint enforcing the same region rule; will evaluate to BoolVal(True) if both cells are in the same 3x3 region, else BoolVal(False)
+    """
     return cp.all([(r1 // 3 == r2 // 3), (c1 // 3 == c2 // 3)])
 
 def renban(array, rs, cs):
-    # the line must form a set of consecutive non repeating digits
+    """
+    the line must form a set of consecutive non repeating digits
+    
+    Args:
+        array (cp.intvar): cpmpy variable representing the cells in the line segment
+        rs (list): list of row indices for the cells in the line segment
+        cs (list): list of column indices for the cells in the line segment
+        
+    Returns:
+        list: list of cpmpy constraints enforcing the renban rule
+    """
     cons = []
     renban_emitters = [k for k, v in EMITTERS.items() if v == 1]
 
@@ -144,7 +282,17 @@ def renban(array, rs, cs):
     return cons
 
 def nabner(array, rs, cs):
-    # no two digits are consecutive and no digit repeats
+    """
+    no two digits are consecutive and no digit repeats
+    
+    Args:
+        array (cp.intvar): cpmpy variable representing the cells in the line segment
+        rs (list): list of row indices for the cells in the line segment
+        cs (list): list of column indices for the cells in the line segment
+        
+    Returns:
+        list: list of cpmpy constraints enforcing the nabner rule
+    """
     cons = []
     nabner_emitters = [k for k, v in EMITTERS.items() if v == 2]
 
@@ -157,7 +305,17 @@ def nabner(array, rs, cs):
     return cons
 
 def modular(array, rs, cs):
-    # every set of 3 consecutive digits must have a different value mod 3
+    """
+    every set of 3 consecutive digits must have a different value mod 3
+    
+    Args:
+        array (cp.intvar): cpmpy variable representing the cells in the line segment
+        rs (list): list of row indices for the cells in the line segment
+        cs (list): list of column indices for the cells in the line segment
+        
+    Returns:
+        list: list of cpmpy constraints enforcing the modular rule
+    """
     cons = []
     modular_emitters = [k for k, v in EMITTERS.items() if v == 3]
 
@@ -168,7 +326,17 @@ def modular(array, rs, cs):
     return cons
 
 def entropy(array, rs, cs):
-    # every set of 3 consecutive digit must have 1 low digit (1-3) and 1 middle digit (4-6) and 1 high digit (7-9)
+    """
+    every set of 3 consecutive digit must have 1 low digit (1-3) and 1 middle digit (4-6) and 1 high digit (7-9)
+    
+    Args:
+        array (cp.intvar): cpmpy variable representing the cells in the line segment
+        rs (list): list of row indices for the cells in the line segment
+        cs (list): list of column indices for the cells in the line segment
+        
+    Returns:
+        list: list of cpmpy constraints enforcing the entropy rule
+    """
     cons = []
     entropy_emitters = [k for k, v in EMITTERS.items() if v == 4]
 
@@ -178,7 +346,18 @@ def entropy(array, rs, cs):
     return cons
 
 def region_sum(array, rs, cs, order):
-    # box borders divide the line into segments of the same sum
+    """
+    box borders divide the line into segments of the same sum
+    
+    Args:
+        array (cp.intvar): cpmpy variable representing the cells in the line segment
+        rs (list): list of row indices for the cells in the line segment
+        cs (list): list of column indices for the cells in the line segment
+        order (string): order of the line segment (before or after emitter)
+        
+    Returns:
+        list: list of cpmpy constraints enforcing the region sum rule
+    """
     running_sums = cp.intvar(-1, 45, shape=len(array), name=f"running_sums_{rs[0]}_{cs[0]}_{order}")
     region_sum = cp.intvar(1, 45, name=f"region_sum_{rs[0]}_{cs[0]}_{order}")
     cons = []
@@ -197,7 +376,18 @@ def region_sum(array, rs, cs, order):
     return cons
 
 def ten_sum(array, rs, cs, order):
-    # the line can be divided into one or more non-overlapping segments that each sum to 10
+    """
+    the line can be divided into one or more non-overlapping segments that each sum to 10
+    
+    Args:
+        array (cp.intvar): cpmpy variable representing the cells in the line segment
+        rs (list): list of row indices for the cells in the line segment
+        cs (list): list of column indices for the cells in the line segment
+        order (string): order of the line segment (before or after emitter)
+        
+    Returns:
+        list: list of cpmpy constraints enforcing the ten sum rule
+    """
     running_sums = cp.intvar(-1, 45, shape=len(array), name=f"ten_running_sums_{rs[0]}_{cs[0]}_{order}")
     splits = cp.boolvar(shape=len(array)-1, name=f"splits_{rs[0]}_{cs[0]}_{order}")
     region_sum = 10
@@ -214,7 +404,15 @@ def ten_sum(array, rs, cs, order):
     return cons
 
 def activate_lines(sequence):
-    # Iterate over all emitters and activate their respective constraints based on if they are on the path
+    """
+    Iterate over all emitters and activate their respective constraints based on if they are on the path
+    
+    Args:
+        sequence (cp.intvar): cpmpy variable representing the sequence of cells (values, rows, columns) before and after each cell
+    
+    Returns:
+        list: list of cpmpy constraints enforcing the emitter rules
+    """
     constraints = []
 
     for er,ec in EMITTERS:
@@ -274,6 +472,15 @@ m = cp.Model(
 )
 
 def regroup_to_blocks(grid):
+    """
+    Regroup the 9x9 grid into its 3x3 blocks.
+    
+    Args:
+        grid (cp.intvar): A 9x9 grid of integer variables.
+        
+    Returns:
+        list: A list of 9 lists, each containing the elements of a 3x
+    """
     # Create an empty list to store the blocks
     blocks = [[] for _ in range(9)]
 
@@ -295,6 +502,7 @@ for i in range(cells.shape[0]):
     m += cp.AllDifferent(blocks[i])
 
 def print_grid(grid):
+    """Print the start grid with walls and emitters."""
     for r in range(grid.shape[0]*2+1):
         row = ""
         if r == 0 or r == grid.shape[0]*2:
@@ -339,9 +547,29 @@ print_grid(cells)
 
 print("Number of constraints:", len(m.constraints))
 
-sol = m.solve(solver=solver)
+sol = m.solve()
 
 print("The solution is:")
 print(cells.value())
 print("The path is (0 if not on the path):")
 print(path.value())
+
+assert (cells.value() == [[9, 7, 3, 5, 6, 4, 2, 8, 1],
+                          [1, 6, 5, 8, 3, 2, 9, 7, 4],
+                          [8, 4, 2, 9, 1, 7, 5, 6, 3],
+                          [3, 8, 4, 2, 9, 6, 7, 1, 5],
+                          [7, 1, 9, 3, 5, 8, 6, 4, 2],
+                          [2, 5, 6, 4, 7, 1, 3, 9, 8],
+                          [6, 2, 1, 7, 4, 3, 8, 5, 9],
+                          [4, 9, 8, 6, 2, 5, 1, 3, 7],
+                          [5, 3, 7, 1, 8, 9, 4, 2, 6]]).all()
+
+assert (path.value() == [[ 0,  0,  0, 16, 15, 14,  0,  0,  0],
+                         [ 0, 18, 17,  0, 12, 13,  0,  0,  0],
+                         [20, 19,  0,  0, 11,  0,  0,  0,  1],
+                         [21,  0,  0,  0, 10,  0,  0,  0,  2],
+                         [22,  0,  0,  0,  9,  0,  5,  4,  3],
+                         [23,  0,  0,  0,  8,  6,  0,  0,  0],
+                         [24,  0,  0,  0, 31,  7, 36, 35,  0],
+                         [25,  0, 29, 30,  0, 32, 34,  0,  0],
+                         [26, 27, 28,  0,  0, 33,  0,  0,  0]]).all()
