@@ -58,14 +58,20 @@ def show_assignment(X):
     return ", ".join(f"{x}={x.value()}" for x in X)
 
 
-def check_model(model):
-    X = cp.transformations.get_variables.get_variables_model(model)
-    assert all(x.value() is not None for x in X), (
-        f"Expected all variables to be assigned, but found: {show_assignment(X)}"
-    )
+def check_model(model, env=None):
+    is_sat = model.deepcopy().solve()
 
-    violations = [c for c in model.constraints if c.value() is False]
-    assert not violations, f"""For assignment:
+    slv = CPM_lazy_gurobi(cpm_model=model, env=env)
+    assert slv.solve() == is_sat, "Expected equisat"
+
+    if is_sat:
+        X = cp.transformations.get_variables.get_variables_model(model)
+        assert all(x.value() is not None for x in X), (
+            f"Expected all variables to be assigned, but found: {show_assignment(X)}"
+        )
+
+        violations = [c for c in model.constraints if c.value() is False]
+        assert not violations, f"""For assignment:
 
 {show_assignment(X)}
 
@@ -123,9 +129,7 @@ class TestTables:
     def test_models(self, model, env):
         print("Test model:")
         print(model)
-        is_sat = model.solve()
-        assert CPM_lazy_gurobi(cpm_model=model, env=env).solve() == is_sat, "Expected equisat"
-        check_model(model)
+        check_model(model, env=env)
 
     def test_table_enc(self, env):
         x = cp.intvar(1, 4, name="x")
@@ -134,15 +138,6 @@ class TestTables:
         X = (x, y, z)
         T = np.array([(2, 1, 1), (3, 2, 2), (4, 3, 3), (1, 2, 3), (2, 1, 2)])
         model = cp.Model(cp.Table(X, T), cp.AllDifferent(X))
-        is_sat = model.solve()
         print("Test model", model)
         print("TF", CPM_lazy_gurobi(cpm_model=model, env=env).transform(model.constraints))
-        slv = CPM_lazy_gurobi(cpm_model=model, env=env)
-        assert slv.solve() == is_sat, "Expected equisat"
-
-
         check_model(model)
-
-        from pprint import pprint
-
-        pprint(slv.env)

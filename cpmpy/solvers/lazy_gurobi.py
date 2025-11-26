@@ -14,6 +14,10 @@ from cpmpy.expressions.variables import NegBoolView
 from cpmpy.solvers.gurobi import CPM_gurobi
 
 
+def show_set(S):
+    return f"{{{', '.join(str(s) for s in sorted(S))}}}"
+
+
 class Infeasible(Exception):
     pass
 
@@ -71,6 +75,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.env["shrink"] = True
         self.env["explain_fractional"] = True
         self.env["max_iterations"] = None
+        self.env["cuts"] = []
 
         if self.env["verbosity"] >= 3:
             np.set_printoptions(threshold=sys.maxsize)
@@ -115,7 +120,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         }
 
     def choose(self, A, T_enc, R, heuristic=Heuristic.GREEDY):
-        self.log(f"Choose from {sorted(A)} from remaining choices {R}", verbosity=2)
+        self.log(f"Choose from {show_set(A)} from remaining choices {show_set(R)}", verbosity=2)
         if len(A) == 0:
             return None
         match heuristic:
@@ -153,10 +158,14 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.log(np.array(T_enc), verbosity=2)
         self.log("")
 
-        X = set()  # columns added to cut
-        R = set(range(len(T_enc)))  # remaining columns
+        self.env["cuts"].append({"from": frm})
+        if self.env["debug"]:
+            self.env["cuts"][-1]["failure"] = A_enc
+
         W = set(i for i, a in enumerate(A_enc) if a == 1.0)
         F = set(i for i, a in enumerate(A_enc) if 0.0 < a < 1.0)
+        X = set()  # columns added to cut
+        R = set(range(len(T_enc)))  # remaining columns
 
         self.log(f"W = {sorted(W)}", verbosity=3)
         self.log(f"F = {sorted(F)}", verbosity=3)
@@ -166,7 +175,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 break
             if W <= X:
                 self.log("  unexplainable")
-                self.log(f"    because {W} <= {X}", verbosity=3)
+                self.log(f"    because {show_set(W)} <= {show_set(X)}", verbosity=3)
                 # if is_integer_solution(A_enc):
                 # assert not is_integer_solution(A_enc), f"Could not explain an integer solution: {A_enc}"
                 return set()  # no cut
@@ -239,10 +248,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
                             )
                     case _:
                         return
-
-                self.env["cuts"].append({"from": frm})
-                if self.env["debug"]:
-                    self.env["cuts"][-1]["failure"] = list(x_enc_a.values())
 
                 if frm == "MIPSOL":
                     # Recommended way to convert fractional integer solution into Boolean, then using `int` to convert to 01
