@@ -96,19 +96,23 @@ def with_constraints(model, with_alldiff=False, with_min=False):
 
 @pytest.fixture()
 def env():
-    yield {"verbosity": 3, "debug": True, "max_iterations": 20}
+    yield {"verbosity": 3, "debug": True, "max_iterations": 100}
 
 
 class TestTables:
     def test_explain_frac(self, env):
-        slv = CPM_lazy_gurobi(env=env)
+        slv = CPM_lazy_gurobi(env={**env, **{"shrink": False}})
         X, T = generate_table_from_example().constraints[0].args
         T_enc = encode(X, T)
+        parts = [4, 3, 3]
         assert (  # Example 1 from assignment [2,2,2]
-            slv.explain([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc) == {1, 5}
+            slv.explain([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc, parts) == {1, 5}
         )
-        assert (  # Example 6
-            slv.explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc) == set()
+        # assert (  # Example 7; no longer in use since explain_frac2
+        #     slv.explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc) == {1, 5, 8}
+        # )
+        assert (  # Example 9
+            slv.explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5, 0.0], T_enc, parts) == {1, 5}
         )
 
     @pytest.mark.parametrize(

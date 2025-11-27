@@ -13,9 +13,11 @@ import cpmpy as cp
 from cpmpy.expressions.variables import NegBoolView
 from cpmpy.solvers.gurobi import CPM_gurobi
 
+INDEX = 1
 
-def show_set(S):
-    return f"{{{', '.join(str(s) for s in sorted(S))}}}"
+
+def show_set(S, index=INDEX):
+    return f"{{{', '.join(str(s + index) for s in sorted(S))}}}"
 
 
 class Infeasible(Exception):
@@ -72,9 +74,10 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.env["debug_unlucky"] = False  # TODO re-enable
         self.env["verbosity"] = 0
         self.env["heuristic"] = Heuristic.INPUT
-        self.env["shrink"] = True
+        self.env["shrink"] = False
         self.env["explain_fractional"] = True
         self.env["cuts"] = []
+        self.env["max_iterations"] = None
         self.indent = 0
 
         if env is not None:
@@ -90,9 +93,10 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.tables = []
         super().__init__(lazy=True, **kwargs)
 
-    def log(self, *mess, verbosity=1, end="\n"):
+    def log(self, *mess, verbosity=1, end="\n", indent=None):
         if verbosity <= self.env["verbosity"]:
-            print(" " * self.indent * 2, *mess, end=end, flush=self.env["debug"])
+            indent = self.indent if indent is None else indent
+            print(" " * indent * 2, *mess, end=end, flush=self.env["debug"])
 
     def stats(self):
         self.log(
@@ -115,7 +119,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.log(f"cuts (MIPNODE, explained) = {len(cuts_mipnode_exp)}")
         self.log(f"cuts (MIPNODE, unexplainable) = {len(cuts_mipnode_unexp)}")
         return {
-            "cb_time": sum(c["time"] for c in self.env["cuts"]),
+            "cb_time": self.env["cb_time"],
             "n_cuts": len(cuts_mipsol),
             "n_cuts_explained": len(cuts_mipnode_exp),
             "n_cuts_unexplained": len(cuts_mipnode_unexp),
@@ -140,7 +144,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
     def shrink(self, C, T):
         for i in C:
-            self.log(f"shrinking {i} in {C}", verbosity=3)
+            self.log(f"shrinking {i + INDEX} in {show_set(C)}", verbosity=3)
 
             if len(C) <= 1:  # slightly different from
                 return C
@@ -150,8 +154,16 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 C = C - {i}
         return C
 
-    def explain(self, A_enc, T_enc, frm=None):
+    def explain(self, A_enc, T_enc, parts, frm=None):
         """The `explain_frac` alg."""
+
+        parts_ = [0]
+        for p in parts:
+            parts_.append(parts_[-1] + p)
+        parts = parts_[1:]
+
+        def p(i):
+            return next(l for l in range(len(parts)) if i < parts[l])
 
         # TODO convert T_enc to set of tuples?
         self.log("Explain", end="\n")
@@ -173,53 +185,59 @@ class CPM_lazy_gurobi(CPM_gurobi):
         D = set(r for r in range(m) if cols(T_enc, r) <= W.union(F))  # difficult rows; either frac/whole
         U = set(i for i in F if all(T_enc[r, i] == 0 for r in D))  # frac except difficult
 
-        parts = [range(0, 4), range(4, 7), range(7, 10)]
 
         self.log(f"W = {show_set(W)}", verbosity=3)
         self.log(f"F = {show_set(F)}", verbosity=3)
         self.log(f"D = {show_set(D)}", verbosity=3)
         self.log(f"U = {show_set(U)}", verbosity=3)
 
-        if not U:
-            self.log("  unexplainable")
-            self.log("    because U is empty", verbosity=3)
-            return
+        if F:
+            if not U:
+                self.log("  unexplainable")
+                self.log("    because U is empty", verbosity=3)
+                return
+            else:
+                i = self.choose(U, T_enc, R, heuristic=self.env["heuristic"])
+                self.log(f"chosen {i + INDEX}", verbosity=3, indent=self.indent + 2)
 
-        i = self.choose(U, T_enc, R, heuristic=self.env["heuristic"])
-        self.log(f"chosen {i}", verbosity=3)
+                # TODO [peter] should be T_hat[i]?
+                R = rows(T_enc, i)
+                X = {i}
+                V = {p(i)}
+                s = 0
+        else:
+            R = set(range(m))
+            X = set()
+            V = set()
+            s = -1
 
-        def p(i):
-            return next(l for l in range(len(parts)) if i in parts[l])
-
-        X = {i}
-        V = {p(i)}
-        s = 0
-        # TODO [peter] should be T_hat[i]?
-        R = rows(T_enc, i)
         for iteration in itertools.count(start=1):
             self.check_max_iterations(iteration)
             self.indent = 1
             self.log(f"X = {show_set(X)}", verbosity=3)
             self.log(f"V = {show_set(V)}", verbosity=3)
             self.log(f"R = {show_set(R)}", verbosity=3)
+            self.log(f"s = {s}", verbosity=3)
             if not R:
                 break
             l = next(l for l in set(range(len(parts))) - V)
-            self.log(f"Choose integer l = {l}", verbosity=3)
+            self.log(f"Choose integer l = {INDEX + l}", verbosity=3)
             V.add(l)
             s += 1
 
             def C(v, l):
+                self.log(f"C({v}, {l})", verbosity=3)
                 return set(i for i in range(len(v)) if v[i] > 0 and p(i) == l)
 
-            R.intersection_update(set.union(*(rows(T_enc, i) for i in C(A_enc, l))))
+            sets = [rows(T_enc, i) for i in C(A_enc, l)]
+            R.intersection_update(set.union(*sets) if sets else set())
             X = X.union(C(A_enc, l))
 
         self.indent = 1
         self.log(f"chosen {show_set(V)}", verbosity=3)
 
         self.indent = 0
-        self.log(f"  by explanation of size ({len(X)}): {sorted(X)}")
+        self.log(f"  by explanation of size ({len(X)}): {show_set(X)}")
 
         if self.env["debug"]:
             self.env["cuts"][-1]["cut"] = X.copy()
@@ -228,7 +246,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
             X_shrunk = self.shrink(X, T_enc)
             shrunk = len(X) - len(X_shrunk)
             if shrunk:
-                self.log(f"  shrunk by {shrunk}: {sorted(X)} --> {sorted(X_shrunk)}")
+                self.log(f"  shrunk by {shrunk}: {show_set(X)} --> {show_set(X_shrunk)}")
                 if self.env["debug"]:
                     self.env["cuts"][-1] = {
                         **self.env["cuts"][-1],
@@ -238,7 +256,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 self.env["cuts"][-1]["shrunk"] = shrunk
 
         self.env["cuts"][-1]["size"] = len(X)
-        self.log(f"  cut == {sorted(X)}")
+        self.log(f"  cut == {show_set(X)}")
         return X
 
     def check_max_iterations(self, i):
@@ -247,7 +265,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
             assert i <= self.env["max_iterations"]
 
     def get_solution_callback(self):
-        all_xs = self.get_x_encs(self.ivarmap.keys())
+        all_xs = {x_enc_i for x_enc, _, _ in self.tables for x_enc_i in x_enc}
 
         def solution_callback(what, where):
             cb_time = time.time()
@@ -288,7 +306,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 self.log(frm, x_enc_a, verbosity=2)
 
                 # If fully integer, we can check if the tables are feasible yet
-                for X_enc, T_enc in self.tables:
+                for X_enc, T_enc, parts in self.tables:
                     A_enc = [x_enc_a[x_enc_i] for x_enc_i in X_enc]
 
                     # TODO figure out when can be skipped
@@ -297,7 +315,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                         continue
 
                     # encode assignment
-                    explanation = self.explain(A_enc, T_enc, frm=frm)
+                    explanation = self.explain(A_enc, T_enc, parts, frm=frm)
 
                     if explanation:
                         self.log(
@@ -308,10 +326,10 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     elif frm == "MIPSOL":  # unsat
                         self.log("INFEASIBLE")
                         raise Infeasible
-                        # what.cbLazy(1 <= 0)
 
-                    # self.env["cuts"][-1]["time"] = time.time() - cb_time
-                    self.log("end callback")
+                    cb_time = time.time() - cb_time
+                    self.log(f"end callback, time = {cb_time}")
+                    self.env["cb_time"] += cb_time
                     self.check_max_iterations(len(self.env["cuts"]))
             except Exception as e:
                 what._callback_exception = e
@@ -379,8 +397,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     expr, k = x_enc.encode_term()
                     # TODO if only BV, then need to assign (but no need to assign if decoding constraint present)
                     cpm_cons += self.transform([*exactly_one_con, cp.sum(c * b for c, b in expr) + k == x])
-                X_enc = self.get_x_encs(x.name for x in X)
-                self.tables.append((X_enc, T_enc))
+
+                x_encs = [self.ivarmap[x.name]._xs for x in X]
+                parts = [len(x_enc) for x_enc in x_encs]
+                X_enc = [x_enc_i for x_enc in x_encs for x_enc_i in x_enc]
+                self.tables.append((X_enc, T_enc, parts))
             else:
                 cpm_cons.append(cpm_expr)
         return cpm_cons
