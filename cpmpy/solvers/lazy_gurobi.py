@@ -74,15 +74,17 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.env["heuristic"] = Heuristic.INPUT
         self.env["shrink"] = True
         self.env["explain_fractional"] = True
-        self.env["max_iterations"] = None
         self.env["cuts"] = []
+        self.indent = 0
+
+        if env is not None:
+            self.env = {**self.env, **env}
 
         if self.env["verbosity"] >= 3:
             np.set_printoptions(threshold=sys.maxsize)
             np.set_printoptions(linewidth=np.inf)
+            pprint.pprint(env)
 
-        if env is not None:
-            self.env = {**self.env, **env}
         self.ivarmap = {}
 
         self.tables = []
@@ -90,7 +92,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
     def log(self, *mess, verbosity=1, end="\n"):
         if verbosity <= self.env["verbosity"]:
-            print(*mess, end=end)
+            print(" " * self.indent * 2, *mess, end=end, flush=self.env["debug"])
 
     def stats(self):
         self.log(
@@ -153,45 +155,70 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
         # TODO convert T_enc to set of tuples?
         self.log("Explain", end="\n")
-        self.log("", A_enc, verbosity=1)
-        self.log("", sorted(cols(np.array([A_enc]), 0)))
+
+        self.log("", np.array(A_enc), verbosity=1)
         self.log(np.array(T_enc), verbosity=2)
         self.log("")
+        assert len(A_enc) == len(T_enc.T)
 
         self.env["cuts"].append({"from": frm})
         if self.env["debug"]:
             self.env["cuts"][-1]["failure"] = A_enc
 
-        W = set(i for i, a in enumerate(A_enc) if a == 1.0)
+        m = len(T_enc)  # number of cols
+        W = set(i for i, a in enumerate(A_enc) if a == 1.0)  #
         F = set(i for i, a in enumerate(A_enc) if 0.0 < a < 1.0)
         X = set()  # columns added to cut
         R = set(range(len(T_enc)))  # remaining columns
+        D = set(r for r in range(m) if cols(T_enc, r) <= W.union(F))  # difficult rows; either frac/whole
+        U = set(i for i in F if all(T_enc[r, i] == 0 for r in D))  # frac except difficult
 
-        self.log(f"W = {sorted(W)}", verbosity=3)
-        self.log(f"F = {sorted(F)}", verbosity=3)
+        parts = [range(0, 4), range(4, 7), range(7, 10)]
 
+        self.log(f"W = {show_set(W)}", verbosity=3)
+        self.log(f"F = {show_set(F)}", verbosity=3)
+        self.log(f"D = {show_set(D)}", verbosity=3)
+        self.log(f"U = {show_set(U)}", verbosity=3)
+
+        if not U:
+            self.log("  unexplainable")
+            self.log("    because U is empty", verbosity=3)
+            return
+
+        i = self.choose(U, T_enc, R, heuristic=self.env["heuristic"])
+        self.log(f"chosen {i}", verbosity=3)
+
+        def p(i):
+            return next(l for l in range(len(parts)) if i in parts[l])
+
+        X = {i}
+        V = {p(i)}
+        s = 0
+        # TODO [peter] should be T_hat[i]?
+        R = rows(T_enc, i)
         for iteration in itertools.count(start=1):
-            if not len(R):
+            self.check_max_iterations(iteration)
+            self.indent = 1
+            self.log(f"X = {show_set(X)}", verbosity=3)
+            self.log(f"V = {show_set(V)}", verbosity=3)
+            self.log(f"R = {show_set(R)}", verbosity=3)
+            if not R:
                 break
-            if W <= X:
-                self.log("  unexplainable")
-                self.log(f"    because {show_set(W)} <= {show_set(X)}", verbosity=3)
-                # if is_integer_solution(A_enc):
-                # assert not is_integer_solution(A_enc), f"Could not explain an integer solution: {A_enc}"
-                return set()  # no cut
+            l = next(l for l in set(range(len(parts))) - V)
+            self.log(f"Choose integer l = {l}", verbosity=3)
+            V.add(l)
+            s += 1
 
-            # choose some col which is 1
-            self.log("A", A_enc, X, verbosity=3)
-            i = self.choose(W - X, T_enc, R, heuristic=self.env["heuristic"])
-            self.log(f"chosen {i}", verbosity=3)
+            def C(v, l):
+                return set(i for i in range(len(v)) if v[i] > 0 and p(i) == l)
 
-            R = R.intersection(rows(T_enc, i))
-            X.add(i)
+            R.intersection_update(set.union(*(rows(T_enc, i) for i in C(A_enc, l))))
+            X = X.union(C(A_enc, l))
 
-            # Loop termination for debug purposes
-            if self.env["max_iterations"] is not None:
-                assert iteration <= self.env["max_iterations"]
+        self.indent = 1
+        self.log(f"chosen {show_set(V)}", verbosity=3)
 
+        self.indent = 0
         self.log(f"  by explanation of size ({len(X)}): {sorted(X)}")
 
         if self.env["debug"]:
@@ -213,6 +240,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.env["cuts"][-1]["size"] = len(X)
         self.log(f"  cut == {sorted(X)}")
         return X
+
+    def check_max_iterations(self, i):
+        # Loop termination for debug purposes
+        if self.env["max_iterations"] is not None:
+            assert i <= self.env["max_iterations"]
 
     def get_solution_callback(self):
         all_xs = self.get_x_encs(self.ivarmap.keys())
@@ -278,11 +310,9 @@ class CPM_lazy_gurobi(CPM_gurobi):
                         raise Infeasible
                         # what.cbLazy(1 <= 0)
 
-                if self.env["max_iterations"] is not None:
-                    assert len(self.env["cuts"]) <= self.env["max_iterations"]
-
-                self.env["cuts"][-1]["time"] = time.time() - cb_time
-                self.log("end callback")
+                    # self.env["cuts"][-1]["time"] = time.time() - cb_time
+                    self.log("end callback")
+                    self.check_max_iterations(len(self.env["cuts"]))
             except Exception as e:
                 what._callback_exception = e
                 what.terminate()

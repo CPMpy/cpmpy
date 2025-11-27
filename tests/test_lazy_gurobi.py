@@ -96,7 +96,7 @@ def with_constraints(model, with_alldiff=False, with_min=False):
 
 @pytest.fixture()
 def env():
-    yield {"verbosity": 2}
+    yield {"verbosity": 3, "debug": True, "max_iterations": 20}
 
 
 class TestTables:
