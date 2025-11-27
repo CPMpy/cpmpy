@@ -65,7 +65,6 @@
 
 """
 import warnings  # for deprecation warning
-from warnings import deprecated
 
 import numpy as np
 import cpmpy as cp
@@ -100,7 +99,6 @@ class GlobalFunction(Expression):
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
-    @deprecated("Deprecated, will be removed in stable version. Use .decompose() instead.")
     def decompose_comparison(self, cmp_op, cmp_rhs):
         """
             Returns a decomposition into smaller constraints.
@@ -109,6 +107,8 @@ class GlobalFunction(Expression):
             and use other global constraints as long as
             it does not create a circular dependency.
         """
+        warnings.warn(f"Deprecated, use {self}.decompose() instead, will be removed in "
+                      "stable version", DeprecationWarning)
         val, tl = self.decompose()
         return eval_comparison(cmp_op, val, cmp_rhs), tl
 
