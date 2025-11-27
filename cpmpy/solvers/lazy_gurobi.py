@@ -7,6 +7,7 @@ from enum import Enum
 
 import gurobipy as gp
 import numpy as np
+import pandas as pd
 from gurobipy import GRB
 
 import cpmpy as cp
@@ -69,29 +70,34 @@ class Heuristic(Enum):
 
 class CPM_lazy_gurobi(CPM_gurobi):
     def __init__(self, env=None, **kwargs):
-        self.env = {}
-        self.env["debug"] = False
-        self.env["debug_unlucky"] = False  # TODO re-enable
-        self.env["verbosity"] = 0
-        self.env["heuristic"] = Heuristic.INPUT
-        self.env["shrink"] = False
-        self.env["explain_fractional"] = True
-        self.env["cuts"] = []
-        self.env["max_iterations"] = None
+        self.env = {
+            "debug": False,
+            "verbosity": 0,
+            "heuristic": Heuristic.INPUT,
+            "shrink": False,
+            "explain_fractional": True,
+            "cuts": [],
+            "max_iterations": None,
+            "seed": 42,
+            **({} if env is None else self.env),
+        }
         self.indent = 0
 
-        if env is not None:
-            self.env = {**self.env, **env}
-
         if self.env["verbosity"] >= 3:
-            np.set_printoptions(threshold=sys.maxsize)
-            np.set_printoptions(linewidth=np.inf)
+            np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
             pprint.pprint(env)
 
         self.ivarmap = {}
 
         self.tables = []
+
         super().__init__(lazy=True, **kwargs)
+        self.native_model.Params.LazyConstraints = 1
+        self.native_model.Params.Seed = self.env["seed"]
+        if self.env["verbosity"] >= 4:
+            self.native_model.Params.LogFile = "/tmp/gurobi.log"
+            self.native_model.Params.OutputFlag = 1
+            self.native_model.write("/tmp/gurobi.lp")
 
     def log(self, *mess, verbosity=1, end="\n", indent=None):
         if verbosity <= self.env["verbosity"]:
@@ -103,7 +109,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
             ", ".join(f"{k}={self.env[k]}" for k in ["shrink", "heuristic", "explain_fractional"]),
             verbosity=0,
         )
-        import pandas as pd
 
         cuts_df = pd.DataFrame.from_dict(self.env["cuts"])
         self.log(cuts_df.drop(["failure"], axis=1, errors="ignore"), verbosity=2)
@@ -185,7 +190,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
         D = set(r for r in range(m) if cols(T_enc, r) <= W.union(F))  # difficult rows; either frac/whole
         U = set(i for i in F if all(T_enc[r, i] == 0 for r in D))  # frac except difficult
 
-
         self.log(f"W = {show_set(W)}", verbosity=3)
         self.log(f"F = {show_set(F)}", verbosity=3)
         self.log(f"D = {show_set(D)}", verbosity=3)
@@ -233,11 +237,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
             R.intersection_update(set.union(*sets) if sets else set())
             X = X.union(C(A_enc, l))
 
-        self.indent = 1
-        self.log(f"chosen {show_set(V)}", verbosity=3)
-
-        self.indent = 0
-        self.log(f"  by explanation of size ({len(X)}): {show_set(X)}")
+        self.log(f"by explanation of size ({len(X)}): {show_set(X)}")
 
         if self.env["debug"]:
             self.env["cuts"][-1]["cut"] = X.copy()
@@ -348,11 +348,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
         assert solution_callback is None, "For now, no solution_callback in `CPM_lazy_gurobi`"
 
         self.log("Solving.. ")
-        self.native_model.Params.LazyConstraints = 1
-        if self.env["verbosity"] >= 4:
-            self.native_model.Params.LogFile = "/tmp/gurobi.log"
-            self.native_model.Params.OutputFlag = 1
-            self.native_model.write("/tmp/gurobi.lp")
 
         try:
             hassol = super().solve(
@@ -361,6 +356,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
         except Infeasible:
             hassol = False
+        except Exception as e:
+            self.log("Exception")
+            np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
+            self.stats()
+            raise e
 
         if getattr(self.native_model, "_callback_exception", None):
             raise self.grb_model._callback_exception or Exception(
