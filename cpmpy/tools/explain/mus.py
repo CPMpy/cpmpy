@@ -317,7 +317,7 @@ def ocus_naive(soft, hard=[], weights=None, meta_constraint=True, solver="ortool
             sat_subset += false_constraints
 
     if hs_solver.status().exitstatus == ExitStatus.UNSATISFIABLE:
-        raise OCUSException("No unsatisfiable constrained subset could be found") # TODO: better exception?
+        raise ValueError("No unsatisfiable constrained subset could be found") # TODO: better exception?
 
     return hitting_set
 
