@@ -11,7 +11,7 @@ from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import intvar, cpm_array, NDVarArray
 from ..expressions.utils import is_any_list, eval_comparison
-from ..expressions.python_builtins import all
+from ..expressions.python_builtins import all as cpm_all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
 
@@ -101,10 +101,15 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 # the `decomposed` expression might contain other global constraints, check it
                 decomposed = decompose_in_tree(value, supported, supported_reified, _toplevel, nested=nested, csemap=csemap)
                 if expr.is_bool():
-                    newlist.append(all(decomposed))
+                    value = cpm_all(decomposed)
+
                 else:
                     assert len(decomposed) == 1, "Global functions should return a single numerical value, not a list"
-                    newlist.append(decomposed[0])
+                    value = decomposed[0]
+
+                newlist.append(value)
+                # TODO save decomp in csemap? Seems to not work with flatten_objective...
+
 
         elif isinstance(expr, Comparison):
             if not expr.has_subexpr(): # Only recurse if there are nested expressions
