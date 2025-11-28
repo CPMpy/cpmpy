@@ -87,6 +87,10 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     newlist.append(expr)
 
             else: # unsupported, need to decompose
+                # check if it is in the csemap
+                if csemap is not None and expr in csemap:
+                    newlist.append(csemap[expr])
+
                 dec = expr.decompose()
                 if not isinstance(dec, tuple):
                     warnings.warn(f"Decomposing an old-style global ({expr}) that does not return a tuple, which is "
@@ -108,7 +112,8 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                     value = decomposed[0]
 
                 newlist.append(value)
-                # TODO save decomp in csemap? Seems to not work with flatten_objective...
+                if csemap is not None:
+                    csemap[expr] = value
 
 
         elif isinstance(expr, Comparison):
