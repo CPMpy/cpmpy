@@ -628,6 +628,18 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
         self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
 
+    def test_abs(self):
+        gt = Abs(self.x[0])
+        self.assertEqual(str(gt), str(cp.abs(self.x[0])))
+        self.x[0]._value = 1
+        self.assertEqual(gt.value(), 1)
+        self.x[0]._value = -1
+        self.assertEqual(gt.value(), 1)
+        self.x[0]._value = 0
+        self.assertEqual(gt.value(), 0)
+        self.x[0]._value = None
+        self.assertEqual(gt.value(), None)
+
 from cpmpy.transformations.get_variables import get_variables
 class TestNullifyingArguments(unittest.TestCase):
 
