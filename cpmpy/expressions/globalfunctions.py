@@ -195,7 +195,8 @@ class Abs(GlobalFunction):
         super().__init__("abs", [expr])
 
     def value(self):
-        return abs(argval(self.args[0]))
+        val = argval(self.args[0])
+        return abs(val) if val is not None else None
 
     def decompose_comparison(self, cpm_op, cpm_rhs):
         """
