@@ -1165,5 +1165,4 @@ class TestSupportedSolvers:
     def test_version(self, solver):
         solver_version = SolverLookup.lookup(solver).version()
         assert solver_version is not None
-        print(solver_version, type(solver_version))
         assert isinstance(solver_version, str)
