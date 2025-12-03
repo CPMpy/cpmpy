@@ -85,6 +85,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
 
     newlist = []
     for cpm_expr in lst_of_expr:
+        if cpm_expr.name in supported:
+            newlist.append(cpm_expr)
+            continue
+        
         # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
             if "or" in supported:
