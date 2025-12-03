@@ -528,21 +528,21 @@ class CPM_pumpkin(SolverInterface):
 
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args
-                return [constraints.Table(self.to_pum_ivar(arr), 
+                return [constraints.Table(self.to_pum_ivar(arr, tag=tag), 
                                           np.array(table).tolist(), # ensure Python list
                                           constraint_tag=tag)
                         ]
             
             elif cpm_expr.name == "negative_table":
                 arr, table = cpm_expr.args
-                return [constraints.NegativeTable(self.to_pum_ivar(arr), 
+                return [constraints.NegativeTable(self.to_pum_ivar(arr, tag=tag), 
                                                   np.array(table).tolist(),# ensure Python list
                                                   constraint_tag=tag)  
                         ]
             
             elif cpm_expr.name == "InDomain":
                 val, domain = cpm_expr.args
-                return [constraints.Table([self.to_pum_ivar(val)], 
+                return [constraints.Table([self.to_pum_ivar(val, tag=tag)], 
                                           np.array(domain).tolist(), # ensure Python list
                                           constraint_tag=tag)
                         ] 
