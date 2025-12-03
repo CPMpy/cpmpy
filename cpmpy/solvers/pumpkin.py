@@ -50,7 +50,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.utils import is_num, is_any_list, get_bounds
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import canonical_comparison
+from ..transformations.linearize import canonical_comparison, linearize_constraint
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
@@ -327,6 +327,8 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         supported_halfreif = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max"}
         cpm_cons = reify_rewrite(cpm_cons, supported=supported_halfreif, csemap=self._csemap) # reified element not supported yet
+        supported_linear = {"or", "sum", "wsum", "sub", "mul", "div", "abs", "min", "max", "alldifferent", "cumulative", "table", "negative_table", "element"}
+        cpm_cons = linearize_constraint(cpm_cons, supported=supported_linear, csemap=self._csemap) # linearize unsupported constraints for pumpkin
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]),csemap=self._csemap)  # supports >, <, !=
         cpm_cons = canonical_comparison(cpm_cons) # ensure rhs is always a constant
         return cpm_cons
