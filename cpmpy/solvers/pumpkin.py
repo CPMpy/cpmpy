@@ -555,9 +555,9 @@ class CPM_pumpkin(SolverInterface):
         elif isinstance(cpm_expr, BoolVal): # unlikely base case
             a = boolvar() # dummy variable
             if cpm_expr.value() is True:
-                return self._get_constraint(Operator("sum", [a]) >= 1)
+                return self._get_constraint(Operator("sum", [a]) >= 1, tag=tag)
             else:
-                return self._get_constraint(Operator("sum", [a]) <= -1)
+                return self._get_constraint(Operator("sum", [a]) <= -1, tag=tag)
 
         else:
             raise ValueError("Unexpected constraint:", cpm_expr)
