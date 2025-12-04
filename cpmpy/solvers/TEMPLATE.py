@@ -59,10 +59,12 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies
+from ..transformations.safening import safen_objective
+
 
 class CPM_template(SolverInterface):
     """
@@ -292,21 +294,28 @@ class CPM_template(SolverInterface):
 
             are permanently posted to the solver)
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
-        self += flat_cons # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
+
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        # [GUIDELINE] all globals which unsupported in a nested context should be decomposed here.
+        obj, decomp_cons = decompose_objective(obj, supported={"min", "max", "element"}, csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+
+        self.add(safe_cons + decomp_cons + flat_cons)
 
         # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        tpl_obj = self._make_numexpr(obj)
         # [GUIDELINE] if the solver interface does not provide a solver native "numeric expression" object,
         #         _make_numexpr may be removed and an objective can be posted as:
         #           self.TPL_solver.MinimizeWeightedSum(obj.args[0], self.solver_vars(obj.args[1]) or similar
 
         if minimize:
-            self.TPL_solver.Minimize(obj)
+            self.TPL_solver.Minimize(tpl_obj)
         else:
-            self.TPL_solver.Maximize(obj)
+            self.TPL_solver.Maximize(tpl_obj)
 
     def has_objective(self):
         return self.TPL_solver.hasObjective()
