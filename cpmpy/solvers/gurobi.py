@@ -52,13 +52,13 @@ from ..expressions.utils import argvals, argval
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 
 try:
     import gurobipy as gp
@@ -284,18 +284,20 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
-        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
-        self += flat_cons
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj, supported={"min", "max", "abs"}, csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+
+        self.add(safe_cons + decomp_cons + flat_cons)
 
         # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        grb_obj = self._make_numexpr(obj)
         if minimize:
-            self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
+            self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
         else:
-            self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
+            self.grb_model.setObjective(grb_obj, sense=GRB.MAXIMIZE)
         self.grb_model.update()
 
     def has_objective(self):
@@ -347,7 +349,7 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"})  # linearize expects safe exprs
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
         supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
         cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
