@@ -56,7 +56,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.safening import no_partial_functions
 
 
@@ -379,14 +379,23 @@ class CPM_cpo(SolverInterface):
             
                 technical side note: any constraints created during conversion of the objective are permanently posted to the solver
         """
+
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        supported = {'max', 'min', 'abs', 'element', 'nvalue', 'alldifferent', 'table', 'indomain', 'negative_table'}
+        obj, decomp_cons = decompose_objective(expr, supported=supported)
+        self.add(decomp_cons)
+
         dom = self.get_docp().modeler
         if self.has_objective():
             self.cpo_model.remove(self.cpo_model.get_objective_expression())
-        expr = self._cpo_expr(expr)
+
+        cpo_obj = self._cpo_expr(obj)
         if minimize:
-            self.cpo_model.add(dom.minimize(expr))
+            self.cpo_model.add(dom.minimize(cpo_obj))
         else:
-            self.cpo_model.add(dom.maximize(expr))
+            self.cpo_model.add(dom.maximize(cpo_obj))
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
