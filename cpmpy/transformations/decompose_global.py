@@ -90,6 +90,7 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
                 # check if it is in the csemap
                 if csemap is not None and expr in csemap:
                     newlist.append(csemap[expr])
+                    continue # no need to decompose, just use the variable we already have
 
                 dec = expr.decompose()
                 if not isinstance(dec, tuple):
