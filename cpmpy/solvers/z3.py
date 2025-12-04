@@ -56,9 +56,9 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.normalize import toplevel_list
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 
 
 class CPM_z3(SolverInterface):
@@ -312,17 +312,20 @@ class CPM_z3(SolverInterface):
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
-        if isinstance(expr, GlobalFunction): # not supported by Z3
-            obj_var = intvar(*expr.get_bounds())
-            self += expr == obj_var
-            expr = obj_var
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj, csemap=self._csemap)
 
-        obj = self._z3_expr(expr)
+        self.add(safe_cons + decomp_cons)
+
+        z3_obj = self._z3_expr(obj)
+        if isinstance(z3_obj, z3.BoolRef):
+            z3_obj = z3.If(z3_obj, 1, 0) # must be integer
         if minimize:
-            self.obj_handle = self.z3_solver.minimize(obj)
+            self.obj_handle = self.z3_solver.minimize(z3_obj)
             self._minimize = True # record direction of optimisation
         else:
-            self.obj_handle = self.z3_solver.maximize(obj)
+            self.obj_handle = self.z3_solver.maximize(z3_obj)
             self._minimize = False # record direction of optimisation
 
 
