@@ -284,6 +284,9 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
+        # save user variables
+        get_variables(expr, self.user_vars)
+
         # transform objective
         obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_objective(obj, supported={"min", "max", "abs"}, csemap=self._csemap)
