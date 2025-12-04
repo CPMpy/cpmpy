@@ -283,10 +283,13 @@ class Element(GlobalFunction):
         2) a list of defining constraints, which should be enforced toplevel
         """
         arr, idx = self.args
+
         idx_lb, idx_ub = get_bounds(idx)
         assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
 
-        return sum((idx == i) * arr[i] for i in range(len(arr))), []
+        _elem = intvar(*self.get_bounds())
+
+        return _elem, [implies(idx == i, _elem == arr[i]) for i in range(len(arr))]
 
 
     def __repr__(self):
