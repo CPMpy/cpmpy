@@ -52,8 +52,8 @@ from ..expressions.utils import is_num, is_any_list, get_bounds
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from ..transformations.safening import no_partial_functions
@@ -290,11 +290,21 @@ class CPM_pumpkin(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
-        # make objective function non-nested
-        obj_var = intvar(*get_bounds(expr))
-        self += expr == obj_var
 
-        # make objective function or variable and post
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, decomp_cons = decompose_objective(expr, supported={"min", "max", "element", "abs"}, csemap=self._csemap)
+        obj_var, obj_cons = get_or_make_var(obj, csemap=self._csemap)
+        if expr.is_bool():
+            ivar = intvar(0,1)
+            obj_cons += [ivar == obj_var]
+            obj_var = ivar
+
+        self.add(decomp_cons + obj_cons)
+
+        # save objective function
         self._objective = obj_var
         self.objective_is_min = minimize
 
