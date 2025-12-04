@@ -59,7 +59,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
@@ -351,13 +351,13 @@ class CPM_choco(SolverInterface):
 
             .. note::
                 technical side note: constraints created during conversion of the objective
-                are premanently posted to the solver. Choco accepts variables to maximize or minimize
+                are permanently posted to the solver. Choco accepts variables to maximize or minimize
                 so it is needed to post constraints and create auxiliary variables
         """
 
         # make objective function non-nested
-        obj_var = intvar(*get_bounds(expr))
-        self += obj_var == expr
+        obj_var, obj_cons = get_or_make_var(expr, csemap=self._csemap)
+        self.add(obj_cons)
 
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
