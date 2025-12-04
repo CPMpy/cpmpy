@@ -57,7 +57,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
@@ -355,9 +355,18 @@ class CPM_choco(SolverInterface):
                 so it is needed to post constraints and create auxiliary variables
         """
 
+        # save user vars
+        get_variables(expr, self.user_vars)
+        # transform objective
+        supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
+                     "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
+        obj, decomp_cons = decompose_objective(expr, supported=supported, csemap=self._csemap)
+
         # make objective function non-nested
-        obj_var, obj_cons = get_or_make_var(expr, csemap=self._csemap)
-        self.add(obj_cons)
+        obj_var, obj_cons = get_or_make_var(obj, csemap=self._csemap)
+
+        self.add(decomp_cons + obj_cons)
 
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
