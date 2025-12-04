@@ -1205,5 +1205,9 @@ def test_objective_numexprs(solver, expr):
     try:
         model.minimize(expr)
         assert model.solve(solver=solver)
+        assert expr.value() < expr.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
+        model.maximize(expr)
+        assert model.solve(solver=solver)
+        assert expr.value() > expr.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
