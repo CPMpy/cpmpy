@@ -71,7 +71,7 @@ from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_num, is_any_list, argvals, argval
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -555,15 +555,27 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        # get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
+
+        # save user variables
+        get_variables(expr, collect=self.user_vars) # add objvars to vars
+
+        supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
+                     "inverse", "ite" "xor", "table", "cumulative", "gcc", "increasing", "decreasing",
+                     "no_overlap", "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
+                     "lex_chain_lesseq", "among"}
+
+        # transform objective
+        obj, decomp_cons = decompose_objective(expr, supported=supported)
+        self.add(decomp_cons)
 
         # make objective function or variable and post
-        obj = self._convert_expression(expr)
+
+        mzn_obj = self._convert_expression(obj)
         # do not add it to the mzn_model yet, supports only one 'solve' entry
         if minimize:
-            self.mzn_txt_solve = "solve minimize {};\n".format(obj)
+            self.mzn_txt_solve = "solve minimize {};\n".format(mzn_obj)
         else:
-            self.mzn_txt_solve = "solve maximize {};\n".format(obj)
+            self.mzn_txt_solve = "solve maximize {};\n".format(mzn_obj)
 
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
