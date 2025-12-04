@@ -108,8 +108,10 @@ class CPM_pumpkin(SolverInterface):
         assert subsolver is None 
 
         # initialise the native solver object
-        self.pum_solver = Model() 
+        self.pum_solver = None # we'll initialize this at the first solve call
         self.predicate_map = {} # cache predicates for reuse
+        self._constraint_cache = [] # we keep constraints here until the first solve call
+
 
         # for objective
         self._objective = None
@@ -123,6 +125,16 @@ class CPM_pumpkin(SolverInterface):
         """
             Returns the solver's underlying native model (for direct solver access).
         """
+        return self.pum_solver
+
+    def _pre_solve(self, prove=False, proof_name="proof.drcp", proof_location="."):
+
+        from pumpkin_solver import Model
+        if self.pum_solver is None: # this is the first solve call
+            self.pum_solver = Model(proof=join(proof_location, proof_name) if prove else None,)
+            self.add(self._constraint_cache) # post all constraints
+            self._constraint_cache = None # set to None, we'll not re-use this
+
         return self.pum_solver
 
 
@@ -145,6 +157,8 @@ class CPM_pumpkin(SolverInterface):
         from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult
         from pumpkin_solver.optimisation import OptimisationResult, Direction
 
+        self.pum_solver = self._pre_solve(prove=prove, proof_name=proof_name, proof_location=proof_location)
+
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
@@ -156,8 +170,7 @@ class CPM_pumpkin(SolverInterface):
         if self.has_objective():
             assert assumptions is None, "Optimization under assumptions is not supported"
             solve_func = self.pum_solver.optimise
-            kwargs.update(proof=join(proof_location, proof_name) if prove else None,
-                          objective=self.solver_var(self._objective),
+            kwargs.update(objective=self.solver_var(self._objective),
                           direction=Direction.Minimise if self.objective_is_min else Direction.Maximise)
 
         elif assumptions is not None:
@@ -169,7 +182,6 @@ class CPM_pumpkin(SolverInterface):
 
         else:
             solve_func = self.pum_solver.satisfy
-            kwargs.update(proof=join(proof_location, proof_name) if prove else None)
 
         self._pum_core = None
         
@@ -581,20 +593,26 @@ class CPM_pumpkin(SolverInterface):
 
             :return: self
         """
+        
+        if self.pum_solver is None:
+            # do we want to keep transformed constraints here instead?
+            self._constraint_cache.append(cpm_expr_orig)
 
-        # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        else:
+            # add new user vars to the set
+            get_variables(cpm_expr_orig, collect=self.user_vars)
 
-        for cpm_expr in self.transform(cpm_expr_orig):
-            if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
-                bv, subexpr = cpm_expr.args
-                for pum_cons in self._get_constraint(subexpr):
-                    self.pum_solver.add_implication(pum_cons, self.solver_var(bv))
-            else:
-                for pum_cons in self._get_constraint(cpm_expr):
-                    self.pum_solver.add_constraint(pum_cons)
+            for cpm_expr in self.transform(cpm_expr_orig):
+                if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
+                    bv, subexpr = cpm_expr.args
+                    for pum_cons in self._get_constraint(subexpr):
+                        self.pum_solver.add_implication(pum_cons, self.solver_var(bv))
+                else:
+                    for pum_cons in self._get_constraint(cpm_expr):
+                        self.pum_solver.add_constraint(pum_cons)
 
-        return self
+            return self
+
     __add__ = add # avoid redirect in superclass
 
 
