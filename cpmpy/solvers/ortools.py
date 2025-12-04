@@ -56,13 +56,13 @@ from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegB
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds, is_true_cst, \
     is_false_cst
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 
 
 class CPM_ortools(SolverInterface):
@@ -339,17 +339,20 @@ class CPM_ortools(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
-        self += flat_cons  # add potentially created constraints
-        get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
+
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj, supported={"min", "max", "abs", "element"}, csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+
+        self.add(safe_cons+decomp_cons+flat_cons)
 
         # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        ort_obj = self._make_numexpr(obj)
         if minimize:
-            self.ort_model.Minimize(obj)
+            self.ort_model.Minimize(ort_obj)
         else:
-            self.ort_model.Maximize(obj)
+            self.ort_model.Maximize(ort_obj)
 
     def has_objective(self):
         return self.ort_model.HasObjective()
