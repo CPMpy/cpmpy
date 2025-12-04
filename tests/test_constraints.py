@@ -204,7 +204,8 @@ def global_constraints(solver):
         elif name == "Inverse":
             expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
-            expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+            yield cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+            yield cls(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
         elif name == "Regular":
             expr = Regular(intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
