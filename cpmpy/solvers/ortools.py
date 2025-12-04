@@ -340,6 +340,9 @@ class CPM_ortools(SolverInterface):
                 are premanently posted to the solver
         """
 
+        # save user varables
+        get_variables(expr, self.user_vars)
+
         # transform objective
         obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_objective(obj, supported={"min", "max", "abs", "element"}, csemap=self._csemap)
