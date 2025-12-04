@@ -345,7 +345,7 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod"})
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
         supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap)
         return cpm_cons
