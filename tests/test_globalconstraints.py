@@ -1460,8 +1460,5 @@ class TestTypeChecks(unittest.TestCase):
             "(~BV0) -> (IV0 == 0)",
             "BV0",
             # actual decomposition
-            '(IV0 == 0) -> (IV1 == 0)',
-            '(IV0 == 1) -> (IV1 == 1)',
-            '(IV0 == 2) -> (IV1 == 2)',
-            '(IV1) <= (y)'
+            '(sum([0, 1, 2] * [IV0 == 0, IV0 == 1, IV0 == 2])) <= (y)'
         })
