@@ -58,12 +58,12 @@ from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, argval, argvals
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.safening import no_partial_functions
 
 from ..transformations.normalize import toplevel_list
@@ -385,20 +385,22 @@ class CPM_gcs(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are permanently posted to the solver
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
-        self += flat_cons # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
-        (obj, obj_cons) = get_or_make_var(flat_obj, csemap=self._csemap)
-        self += obj_cons
+        # save variables
+        get_variables(expr, collect=self.user_vars)
 
-        self.objective_var = obj
+        # transform objective
+        obj, decomp_cons = decompose_objective(expr, csemap=self._csemap,
+                                               supported={"min", "max", "abs", "element", "nvalue", "count"})
+        obj_var, obj_cons = get_or_make_var(obj, csemap=self._csemap)
+        self.add(decomp_cons + obj_cons)
+
+        self.objective_var = obj_var
 
         if minimize:
-            self.gcs.minimise(self.solver_var(obj))  
+            self.gcs.minimise(self.solver_var(obj_var))
         else:
-            self.gcs.maximise(self.solver_var(obj))
+            self.gcs.maximise(self.solver_var(obj_var))
 
     def transform(self, cpm_expr):
         """
