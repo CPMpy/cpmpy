@@ -392,7 +392,7 @@ class CPM_gcs(SolverInterface):
         # transform objective
         obj, decomp_cons = decompose_objective(expr, csemap=self._csemap,
                                                supported={"min", "max", "abs", "element", "nvalue", "count"})
-        obj_var, obj_cons = get_or_make_var(obj, csemap=self._csemap)
+        obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
         self.add(decomp_cons + obj_cons)
 
         self.objective_var = obj_var

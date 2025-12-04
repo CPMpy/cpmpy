@@ -357,6 +357,7 @@ class CPM_choco(SolverInterface):
 
         # save user vars
         get_variables(expr, self.user_vars)
+
         # transform objective
         supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
@@ -364,7 +365,7 @@ class CPM_choco(SolverInterface):
         obj, decomp_cons = decompose_objective(expr, supported=supported, csemap=self._csemap)
 
         # make objective function non-nested
-        obj_var, obj_cons = get_or_make_var(obj, csemap=self._csemap)
+        obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
 
         self.add(decomp_cons + obj_cons)
 
