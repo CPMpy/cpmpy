@@ -60,13 +60,15 @@ from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_b
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, \
+    only_positive_bv_wsum_const
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
+
 
 class CPM_cplex(SolverInterface):
     """
@@ -148,6 +150,7 @@ class CPM_cplex(SolverInterface):
 
         from docplex.mp.model import Model
         self.cplex_model = Model()
+        self._obj_offset = 0
         super().__init__(name="cplex", cpm_model=cpm_model)
 
     @property
@@ -299,18 +302,23 @@ class CPM_cplex(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
-        self.add(flat_cons)
+        # save user vars
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj, supported={"min", "max", "abs"}, csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
+
+        self.add(safe_cons + decomp_cons + flat_cons)
 
         # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        cplex_obj = self._make_numexpr(obj)
         if minimize:
-            self.cplex_model.set_objective('min',obj)
+            self.cplex_model.set_objective('min', cplex_obj)
         else:
-            self.cplex_model.set_objective('max', obj)
+            self.cplex_model.set_objective('max', cplex_obj)
 
     def has_objective(self):
         return self.cplex_model.is_optimized()
@@ -600,7 +608,7 @@ class CPM_cplex(SolverInterface):
 
                 # Translate objective
                 if self.has_objective():
-                    self.objective_value_ = sol_obj_val
+                    self.objective_value_ = sol_obj_val + self._obj_offset
 
                 if display is not None:
                     if isinstance(display, Expression):
