@@ -1,5 +1,15 @@
 # Change log
 
+## 0.9.28
+
+This is a very small release with a hotfix for multi-dimensional indexing where the index is a decision variable.
+
+### Fixed
+
+* Hotfix for single expression in multi-dimensional indexing [#772](https://github.com/CPMpy/cpmpy/pull/772)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.27...v0.9.28
+
 ## 0.9.27
 
 ### Added

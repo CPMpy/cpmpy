@@ -663,7 +663,19 @@ class TestGlobal(unittest.TestCase):
         cons = iv[idx, 2] == 8
         self.assertEqual(str(cons), "[iv[0,2] iv[1,2] iv[2,2]][idx] == 8")
 
+    def test_multid_1expr(self):
 
+        x = cp.intvar(1,5, shape=(3,4,5),name="x")
+        a,b = cp.intvar(0,2, shape=2, name=tuple("ab")) # idx is always safe
+
+        expr = x[a,1,3]
+        self.assertEqual(str(expr), "[x[0,1,3] x[1,1,3] x[2,1,3]][a]")
+
+        expr = x[1,a,3]
+        self.assertEqual(str(expr), "[x[1,0,3] x[1,1,3] x[1,2,3] x[1,3,3]][a]")
+
+        expr = x[1,2,a]
+        self.assertEqual(str(expr), "[x[1,2,0] x[1,2,1] x[1,2,2] x[1,2,3] x[1,2,4]][a]")
 
     def test_element_onearg(self):
 
