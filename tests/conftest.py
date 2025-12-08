@@ -2,6 +2,9 @@ import pytest
 import cpmpy as cp
 import importlib
 import warnings
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _parse_solver_option(solver_option: str | None, filter_not_installed: bool = True) -> list[str] | None:
     """
@@ -104,6 +107,12 @@ def solver(request):
     return solver_value
 
 def pytest_configure(config):
+    # Configure logging for test filtering information
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s: %(message)s'
+    )
+    
     # Register custom marker for documentation and linting
     config.addinivalue_line(
         "markers",
@@ -182,10 +191,28 @@ def pytest_collection_modifyitems(config, items):
 
     For now, only solver-based filtering gets applied.
     """
+    initial_count = len(items)
+    logger.info(f"Test suite size before filtering: {initial_count} tests")
+    
     cmd_solver_option = config.getoption("--solver") # get cli `--solver`` arg
     cmd_solvers = _parse_solver_option(cmd_solver_option)  # parse into list
+    
+    if cmd_solver_option:
+        if cmd_solvers is None:
+            logger.info(f"Solver option '{cmd_solver_option}' parsed to None (using default solver)")
+        elif len(cmd_solvers) == 0:
+            logger.info(f"Solver option '{cmd_solver_option}' resulted in empty list (all solvers filtered out)")
+        else:
+            logger.info(f"Solver option '{cmd_solver_option}' parsed to: {cmd_solvers}")
+    else:
+        logger.info("No --solver option provided (using default behavior)")
 
     filtered = []
+    skipped_dependency = 0
+    skipped_solver_specific = 0
+    skipped_parametrized = 0
+    skipped_solver_fixture = 0
+    
     for item in items:
         required_solver_marker = item.get_closest_marker("requires_solver")
         required_dependency_marker = item.get_closest_marker("requires_dependency")
@@ -195,6 +222,7 @@ def pytest_collection_modifyitems(config, items):
             if not all(importlib.util.find_spec(dependency) is not None for dependency in required_dependency_marker.args):
                 skip = pytest.mark.skip(reason=f"Dependency {required_dependency_marker.args} not installed")
                 item.add_marker(skip)
+                skipped_dependency += 1
                 continue
 
         # --------------------------------- Solver filtering --------------------------------- #
@@ -208,10 +236,12 @@ def pytest_collection_modifyitems(config, items):
             if cmd_solvers is not None:
                 # If cmd_solvers is empty (all filtered out), skip solver-specific tests
                 if len(cmd_solvers) == 0:
+                    skipped_solver_specific += 1
                     continue
                 if any(cmd_solver in required_solvers for cmd_solver in cmd_solvers):
                     filtered.append(item)
                 else:
+                    skipped_solver_specific += 1
                     continue
             # instance has survived filtering
             else:
@@ -239,23 +269,46 @@ def pytest_collection_modifyitems(config, items):
                     # Skip tests parametrized with solver, but keep others that don't depend on solver
                     if "solver" not in item.callspec.params and "solver_name" not in item.callspec.params:
                         filtered.append(item)
+                    else:
+                        skipped_parametrized += 1
                     continue
                 if "solver" in item.callspec.params:
                     solver = item.callspec.params["solver"]
                     if solver in cmd_solvers:
                         filtered.append(item)
-                if "solver_name" in item.callspec.params:
+                    else:
+                        skipped_parametrized += 1
+                elif "solver_name" in item.callspec.params:
                     solver = item.callspec.params["solver_name"]
                     if solver in cmd_solvers:
                         filtered.append(item)
+                    else:
+                        skipped_parametrized += 1
+                else:
+                    # Parametrized but not with solver - keep it
+                    filtered.append(item)
             else:
                 filtered.append(item)
         else:
             # Non-parametrized tests: filter out if they use solver fixture and cmd_solvers is empty
             if cmd_solvers is not None and len(cmd_solvers) == 0:
                 if uses_solver_fixture:
+                    skipped_solver_fixture += 1
                     continue  # Skip tests that use solver fixture when no solvers available
             # keep non-parametrized tests that don't depend on solver
             filtered.append(item)
 
+    final_count = len(filtered)
+    logger.info(f"Test suite filtering summary:")
+    logger.info(f"  Initial tests: {initial_count}")
+    if skipped_dependency > 0:
+        logger.info(f"  Skipped (missing dependency): {skipped_dependency}")
+    if skipped_solver_specific > 0:
+        logger.info(f"  Skipped (solver-specific, not matching): {skipped_solver_specific}")
+    if skipped_parametrized > 0:
+        logger.info(f"  Skipped (parametrized solver, not matching): {skipped_parametrized}")
+    if skipped_solver_fixture > 0:
+        logger.info(f"  Skipped (solver fixture, no solvers): {skipped_solver_fixture}")
+    logger.info(f"  Final tests: {final_count} ({final_count - initial_count:+d})")
+    
     items[:] = filtered
