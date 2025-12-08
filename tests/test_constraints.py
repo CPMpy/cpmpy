@@ -40,7 +40,8 @@ EXCLUDE_GLOBAL = {"pysat": {"Modulo"},  # with int2bool,
                   "ortools":{},
                   "exact": {},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
-                  "gcs": {}
+                  "gcs": {},
+                  "cplex": {"Modulo"}
                   }
 
 # Exclude certain operators for solvers.
@@ -50,7 +51,7 @@ EXCLUDE_OPERATORS = {"gurobi": {},
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
                      "pindakaas": {"mul", "div", "pow", "mod"},
                      "exact": {},
-                     "cplex": {"mul", "div", "mod", "pow"},
+                     "cplex": {"mul", "div", "pow"},
                      "pumpkin": {"pow", "mod"},
                      }
 
