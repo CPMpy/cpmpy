@@ -117,21 +117,22 @@ class TestTransLinearize(unittest.TestCase):
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
 
-    def test_linearize_modulo(self):
-        x, z = cp.intvar(-2,2, shape=2, name=["x","z"])
-        y = cp.intvar(1,5, name="y")
-        vars = [x,y,z]
-
-        constraint = [x % y  == z]
-        lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
-
-        all_sols = set()
-        lin_all_sols = set()
-        count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
-        lin_count = cp.Model(lin_cons).solveAll(solver="ortools", display=lambda: lin_all_sols.add(tuple(argvals(vars))))
-
-        self.assertSetEqual(all_sols, lin_all_sols) # same on decision vars
-        self.assertEqual(count,lin_count) # same on all vars
+    # def test_linearize_modulo(self): -> Modulo is now a global constraint
+    #
+    #     x, z = cp.intvar(-2,2, shape=2, name=["x","z"])
+    #     y = cp.intvar(1,5, name="y")
+    #     vars = [x,y,z]
+    #
+    #     constraint = [x % y  == z]
+    #     lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
+    #
+    #     all_sols = set()
+    #     lin_all_sols = set()
+    #     count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
+    #     lin_count = cp.Model(lin_cons).solveAll(solver="ortools", display=lambda: lin_all_sols.add(tuple(argvals(vars))))
+    #
+    #     self.assertSetEqual(all_sols, lin_all_sols) # same on decision vars
+    #     self.assertEqual(count,lin_count) # same on all vars
 
     def test_linearize_division(self):
         x, z = cp.intvar(-2, 2, shape=2, name=["x", "z"])
@@ -188,21 +189,20 @@ class TestTransLinearize(unittest.TestCase):
         n_sols = cp.Model(lincons).solveAll(display=cb)
         self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
 
-    def test_issue_580(self):
-        x = cp.intvar(1, 5, name='x')
-        lin_mod = linearize_constraint([x % 2 == 0], supported={"mul","sum", "wsum"})
-        self.assertTrue(cp.Model(lin_mod).solve())
-        self.assertIn(x.value(),{2,4})
-
-
-        lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
-        self.assertEqual(str(lin_mod), '[IV7 <= 0, sum([2, -1] * [IV8, IV9]) == 0, sum([1, 1, -1] * [IV9, IV7, x]) == 0]')
-        self.assertTrue(cp.Model(lin_mod).solve())
-        self.assertIn(x.value(), {2, 4}) # can never be < 0
-
-        lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
-        self.assertTrue(cp.Model(lin_mod).solve())
-        self.assertIn(x.value(), {1,3,5})
+    # def test_issue_580(self): -> Modulo is now a global constraint
+    #     x = cp.intvar(1, 5, name='x')
+    #     lin_mod = linearize_constraint([x % 2 == 0], supported={"mul","sum", "wsum"})
+    #     self.assertTrue(cp.Model(lin_mod).solve())
+    #     self.assertIn(x.value(),{2,4})
+    #
+    #     lin_mod = linearize_constraint([x % 2 <= 0], supported={"mul", "sum", "wsum"})
+    #     self.assertEqual(str(lin_mod), '[IV7 <= 0, sum([2, -1] * [IV8, IV9]) == 0, sum([1, 1, -1] * [IV9, IV7, x]) == 0]')
+    #     self.assertTrue(cp.Model(lin_mod).solve())
+    #     self.assertIn(x.value(), {2, 4}) # can never be < 0
+    #
+    #     lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
+    #     self.assertTrue(cp.Model(lin_mod).solve())
+    #     self.assertIn(x.value(), {1,3,5})
 
     def test_issue_546(self):
         # https://github.com/CPMpy/cpmpy/issues/546
@@ -377,61 +377,6 @@ class TestVarsLhs(unittest.TestCase):
         self.assertRaises(NotImplementedError,
                           lambda :  linearize_constraint([cons], supported={"sum", "wsum"}))
 
-
-    def test_mod_triv(self):
-        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
-        # x mod y <= 2 is trivially true for x,y in 1..3
-        self.assertEqual(str([]), str(linearize_constraint([(x % y) <= 2], supported={"mod"})))
-
-    def test_mod(self):
-
-        x,y = cp.intvar(1,3, name="x"), cp.intvar(1,3,name="y")
-
-        # disallows 2 mod 3 = 2
-        cons = (x % y) <= 1
-        sols = set()
-        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
-        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
-
-        linsols = set()
-        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
-        self.assertSetEqual(sols, linsols)
-
-        # check special cases of supported sets
-        self.assertRaises(NotImplementedError,
-                          lambda : linearize_constraint([cons], supported={"sum", "wsum"}),
-                          )
-
-        cons = (x % 2) == 1
-        sols = set()
-        cp.Model(cons).solveAll(display=lambda : sols.add((x.value(), y.value())))
-
-        lincons = linearize_constraint([cons], supported={"sum", "wsum"})
-        linsols = set()
-        cp.Model(lincons).solveAll(display=lambda : linsols.add((x.value(), y.value())))
-
-        self.assertSetEqual(sols, linsols)
-
-        # check for full support of mod
-        same_cons = linearize_constraint([cons], supported={"mod"})
-        self.assertEqual(str(same_cons[0]), str(cons))
-
-        # test unsafe modulo
-        z = cp.intvar(0, 10, name="z")
-        cons = (x % z) == 1
-        with self.assertRaises(ValueError):
-            linearize_constraint([cons], supported={"sum", "wsum", "mul"})
-
-        # what about half-reified?
-        bv = cp.boolvar(name="bv")
-        cons = bv.implies((x % y) <= 1)
-        sols = set()
-        cp.Model(cons).solveAll(display=lambda: sols.add((bv.value(), x.value(), y.value())))
-        lincons = linearize_constraint([cons], supported={"sum", "wsum", "mod"})
-
-        linsols = set()
-        cp.Model(lincons).solveAll(display=lambda: linsols.add((bv.value(), x.value(), y.value())))
-        self.assertSetEqual(sols, linsols)
 
     def test_others(self):
 

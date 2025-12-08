@@ -1033,7 +1033,7 @@ class TestSupportedSolvers:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
             assert (Operator('div', [xv, yv])).value() == dv
-            assert (Operator('mod', [xv, yv])).value() == rv
+            assert (cp.Modulo(xv, yv)).value() == rv
 
 
     def test_status(self, solver):
