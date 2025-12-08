@@ -26,15 +26,15 @@ NUM_GLOBAL = {
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Modulo"
 }
 
 # Solvers not supporting arithmetic constraints (numeric comparisons)
 SAT_SOLVERS = {"pysdd"}
 
-EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
-                  "pysdd": NUM_GLOBAL | {"Xor"},
-                  "pindakaas": {},
+EXCLUDE_GLOBAL = {"pysat": {"Modulo"},  # with int2bool,
+                  "pysdd": NUM_GLOBAL | {"Xor","Modulo"},
+                  "pindakaas": {"Modulo"},
                   "z3": {},
                   "choco": {},
                   "ortools":{},
@@ -119,6 +119,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, 3)
         elif name == "Among":
             expr = cls(NUM_ARGS, [1,2])
+        elif name == "Modulo":
+            expr = cls(*NUM_ARGS[:2])
         else:
             expr = cls(NUM_ARGS)
 
