@@ -168,9 +168,11 @@ def pytest_generate_tests(metafunc):
     solver_option = metafunc.config.getoption("--solver")
     parsed_solvers = _parse_solver_option(solver_option)
     
-    # Only parametrize if multiple solvers are provided
-    # Skip if empty list (all solvers filtered out) or None (no solver specified)
-    if parsed_solvers and len(parsed_solvers) > 1:
+    # Only parametrize if multiple solvers are explicitly provided
+    # When parsed_solvers is None (no --solver specified), don't parametrize - use default solver
+    # When parsed_solvers is empty list (all filtered out), don't parametrize
+    # Only parametrize when we have 2+ solvers explicitly specified
+    if parsed_solvers is not None and len(parsed_solvers) > 1:
         metafunc.parametrize("solver", parsed_solvers)
 
 
