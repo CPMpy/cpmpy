@@ -1,11 +1,12 @@
 import unittest
 import pytest
+import importlib
 import cpmpy as cp 
 from cpmpy import *
 from cpmpy.solvers.pysat import CPM_pysat
 
 @pytest.mark.requires_solver("pysat")
-@pytest.mark.requires_dependency("pypblib")
+@pytest.mark.skipif(importlib.util.find_spec("pypblib") is not None, reason="Test requires pypblib to be NOT installed")
 def test_pypblib_error():
     # NOTE if you want to run this but pypblib is already installed, run `pip uninstall pypblib && pip install -e .[pysat]`
     unittest.TestCase().assertRaises(
