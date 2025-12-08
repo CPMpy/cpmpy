@@ -234,6 +234,53 @@ class Abs(GlobalFunction):
             return -ub, -lb
         return 0, max(-lb, ub)
 
+class Modulo(GlobalFunction):
+
+    def __init__(self, x, y):
+        super().__init__("mod", [x, y])
+
+    def decompose(self):
+        """
+            mod != remainder after division because defined on integer div (rounding towards 0)
+            e.g., 7 % -5 = 2 and -7 % 5 = -2
+            implement x % y == z as k * y + z == x with |z| < |y| and sign(x) = sign(z)
+            https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+        """
+        x,y = self.args
+        _mod = intvar(*self.get_bounds())
+        k = intvar(*get_bounds((x - _mod) // y))
+        cons = [
+            k * y + _mod == x,   # module is remainder of division
+            abs(_mod) < abs(y),  # remainder is smaller than divisor
+            x * _mod >= 0        # remainder is negative iff x is negative
+        ]
+
+        return _mod, cons
+
+    def value(self):
+        x,y = argvals(self.args)
+        try:  # modulo defined with integer division
+            return x- y * int(x / y)
+        except ZeroDivisionError:
+            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                          + "\n Use argval(expr) to get the value of expr with relational "
+                                            "semantics.")
+
+    def get_bounds(self):
+        lb1, ub1 = get_bounds(self.args[0])
+        lb2, ub2 = get_bounds(self.args[1])
+        if lb2 == ub2 == 0:
+            raise ZeroDivisionError("Domain of {} only contains 0".format(self.args[1]))
+        # the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
+        lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
+        ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
+        if lb1 >= 0:  # result will be positive if first argument is positive
+            return 0, max(-lb, ub, 0)  # lb = 0
+        elif ub1 <= 0:  # result will be negative if first argument is negative
+            return min(-ub, lb, 0), 0  # ub = 0
+        return min(-ub, lb, 0), max(-lb, ub, 0)  # 0 should always be in the domain
+
+
 
 def element(arg_list):
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
