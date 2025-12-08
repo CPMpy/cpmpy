@@ -54,7 +54,6 @@
 from threading import Timer
 from typing import Optional
 import warnings
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -162,9 +161,10 @@ class CPM_pysat(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('python-sat').version
-        except pkg_resources.DistributionNotFound:
+            return version('python-sat')
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):

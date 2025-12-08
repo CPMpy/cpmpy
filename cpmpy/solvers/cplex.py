@@ -125,12 +125,13 @@ class CPM_cplex(SolverInterface):
         
         Two version numbers get returned: ``<docplex version>/<solver version>``
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            import pkg_resources
             import cplex
-            cpx = cplex.Cplex()
-            return f"{pkg_resources.get_distribution('docplex').version}/{cpx.get_version()}"
-        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            cplex_version = cplex.Cplex().get_version()
+            docplex_version = version("docplex")
+            return f"{docplex_version}/{cplex_version}"
+        except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):

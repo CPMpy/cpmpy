@@ -43,7 +43,6 @@
 """
 
 from typing import Optional
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -117,9 +116,10 @@ class CPM_gurobi(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('gurobipy').version
-        except pkg_resources.DistributionNotFound:
+            return version("gurobipy")
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
