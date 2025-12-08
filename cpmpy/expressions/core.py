@@ -36,8 +36,7 @@
     `x - y`                      `Operator("sum", [x, -y])`                    
     `x * y`                      `Operator("mul", [x, y])`                     
     `x // y`                     `Operator("div", [x, y])` (integer division)
-    `x % y`                      `Operator("mod", [x, y])` (modulo)                    
-    `x ** y`                     `Operator("pow", [x, y])` (power)  
+    `x ** y`                     `Operator("pow", [x, y])` (power)
     ===========================  ===============================================                   
 
     
@@ -380,10 +379,10 @@ class Expression(object):
         return Operator("div", [other, self])
 
     def __mod__(self, other):
-        return Operator("mod", [self, other])
+        return cp.Modulo(self, other)
 
     def __rmod__(self, other):
-        return Operator("mod", [other, self])
+        return cp.Modulo(other, self)
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
@@ -585,7 +584,6 @@ class Operator(Expression):
         'sub': (2, False), # x - y
         'mul': (2, False),
         'div': (2, False),
-        'mod': (2, False),
         'pow': (2, False),
         '-':   (1, False), # -x
     }
@@ -716,15 +714,6 @@ class Operator(Expression):
                 raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
                                               + "\n Use argval(expr) to get the value of expr with relational "
                                                 "semantics.")
-        elif self.name == "mod":
-            try:# modulo defined with integer division
-                return arg_vals[0] - arg_vals[1] * int(arg_vals[0] / arg_vals[1])
-            except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                              + "\n Use argval(expr) to get the value of expr with relational "
-                                                "semantics.")
-
-
         # boolean
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
@@ -784,19 +773,6 @@ class Operator(Expression):
             else:
                 bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)]
             lowerbound, upperbound = min(bounds), max(bounds)
-        elif self.name == 'mod':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 == ub2 == 0:
-                raise ZeroDivisionError("Domain of {} only contains 0".format(self.args[1]))
-            # the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
-            lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
-            ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
-            if lb1 >= 0:  # result will be positive if first argument is positive
-                return 0, max(-lb, ub, 0)  # lb = 0
-            elif ub1 <= 0:  # result will be negative if first argument is negative
-                return min(-ub, lb, 0), 0  # ub = 0
-            return min(-ub, lb, 0), max(-lb, ub, 0)  # 0 should always be in the domain
         elif self.name == 'pow':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
