@@ -611,23 +611,23 @@ class CPM_cpo(SolverInterface):
             return None, [False]
         else:
             new_dur = intvar(0, ub)
-            extra_cons += [self.solver_var(new_dur) == self.solver_var(dur)]
+            extra_cons += [self.solver_var(new_dur) == self._cpo_expr(dur)]
             dur = new_dur
             lb = 0 # update lb for next check below
 
         if lb == 0 == ub:
             if end is None: # nothing to enforce
                 return None, []
-            cpo_s, cpo_e = self.solver_vars([start, end])
+            cpo_s, cpo_e = self._cpo_expr([start, end])
             return None, extra_cons + [cpo_s == cpo_e] # no task, just enforce 0 duration
             
         # Normal setting
         if end is None: # no end provided by user
-            cpo_s, cpo_d = self.solver_vars([start, dur])
+            cpo_s, cpo_d = self._cpo_expr([start, dur])
             task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur))
             return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
         else:
-            cpo_s, cpo_d, cpo_e = self.solver_vars([start, dur, end])                
+            cpo_s, cpo_d, cpo_e = self._cpo_expr([start, dur, end])
             task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end))
             return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
 
