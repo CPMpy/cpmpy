@@ -346,7 +346,7 @@ class CPM_z3(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-        supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
+        supported = {"alldifferent", "xor", "ite", "mod"}  # z3 accepts these reified too
         cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap)
         return cpm_cons
 
@@ -458,10 +458,6 @@ class CPM_z3(SolverInterface):
                         # raise error to be consistent with other solvers
                         raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
                     return x ** y
-                elif cpm_con.name == "mod":
-                    # minimic modulo with integer division (round towards o)
-                    return z3.If(z3.And(x >= 0), x % y,-(-x % y))
-
             # '-'/1
             elif cpm_con.name == "-":
                 if is_boolexpr(cpm_con.args[0]):
@@ -498,6 +494,13 @@ class CPM_z3(SolverInterface):
 
             # post the comparison
             return eval_comparison(cpm_con.name, lhs, rhs)
+
+        elif isinstance(cpm_con, GlobalFunction):
+            if cpm_con.name == "mod":
+                # minimic modulo with integer division (round towards o)
+                x,y = self._z3_expr(*cpm_con.args)
+                return z3.If(z3.And(x >= 0), x % y, -(-x % y))
+            raise NotImplementedError(f"Global function {cpm_con} not (yet) implemented for Z3, ")
 
         # rest: base (Boolean) global constraints
         elif isinstance(cpm_con, GlobalConstraint):
