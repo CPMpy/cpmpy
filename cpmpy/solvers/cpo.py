@@ -420,7 +420,7 @@ class CPM_cpo(SolverInterface):
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
         # count is only supported with a constant to be counted, so we decompose
         supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'no_overlap'}
+                     "negative_table", "gcc", 'max', 'min', 'abs', 'mod', 'cumulative', 'no_overlap'}
         supported_reified = {"alldifferent", 'table', 'indomain', "negative_table"} # global functions by default here
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified, csemap=self._csemap)
         # no flattening required
@@ -511,8 +511,6 @@ class CPM_cpo(SolverInterface):
                     return x // y
                 elif cpm_con.name == "pow":
                     return x ** y
-                elif cpm_con.name == "mod":
-                    return x % y
             # '-'/1
             elif cpm_con.name == "-":
                 return -self._cpo_expr(cpm_con.args[0])
@@ -605,6 +603,9 @@ class CPM_cpo(SolverInterface):
                 return dom.abs(self._cpo_expr(cpm_con.args)[0])
             elif cpm_con.name == "nvalue":
                 return dom.count_different(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == "mod":
+                x,y = self._cpo_expr(cpm_con.args)
+                return x % y
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
 
