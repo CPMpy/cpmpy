@@ -248,6 +248,9 @@ class CPM_hexaly(SolverInterface):
             are permanently posted to the solver)
         """
         from hexaly.optimizer import HxObjectiveDirection
+
+        get_variables(expr, collect=self.user_vars)
+
         # make objective function or variable and post
         while self.has_objective(): # remove prev objective(s)
             self.hex_model.remove_objective(0)
