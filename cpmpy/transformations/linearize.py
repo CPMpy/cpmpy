@@ -128,12 +128,13 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                             continue
                         elif is_false_cst(lin):
                             indicator_constraints=[] # do not add any constraints
-                            newlist+=linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified) # post linear version of unary constraint
+                            newlist += linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified) # post linear version of unary constraint
                             break # do not need to add other
                         elif "->" in supported and not reified:
                             indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
-                        else: # Nested -> or implication constraints are not supported
-                            assert isinstance(lin, Comparison)
+                        else: # need to linearize the implication constraint itself
+                            # either -> is not supported, or we are in a reified context (nested -> constraints are not linear)
+                            assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
                             if lin.args[0].name not in {"sum", "wsum"}:
                                 assert lin.args[0].name in supported, f"Unexpected rhs of implication: {lin}, it is not supported ({supported})"
                                 indicator_constraints.append(cond.implies(lin))
