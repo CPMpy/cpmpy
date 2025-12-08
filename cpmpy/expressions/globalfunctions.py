@@ -239,6 +239,13 @@ class Modulo(GlobalFunction):
     def __init__(self, x, y):
         super().__init__("mod", [x, y])
 
+    def __repr__(self):
+        x,y = self.args
+        return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
+                                  f"({y})" if isinstance(y, Expression) else y)
+
+        return
+
     def decompose(self):
         """
             mod != remainder after division because defined on integer div (rounding towards 0)
