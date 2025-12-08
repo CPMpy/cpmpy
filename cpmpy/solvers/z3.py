@@ -498,7 +498,7 @@ class CPM_z3(SolverInterface):
         elif isinstance(cpm_con, GlobalFunction):
             if cpm_con.name == "mod":
                 # minimic modulo with integer division (round towards o)
-                x,y = self._z3_expr(*cpm_con.args)
+                x,y = self._z3_expr(cpm_con.args)
                 return z3.If(z3.And(x >= 0), x % y, -(-x % y))
             raise NotImplementedError(f"Global function {cpm_con} not (yet) implemented for Z3, ")
 
