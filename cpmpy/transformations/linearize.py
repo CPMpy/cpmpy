@@ -175,57 +175,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                         newlist.extend(new_cons)
                     cpm_expr = eval_comparison(cpm_expr.name, new_lhs, rhs)
 
-
-                elif lhs.name == "mod" and "mod" not in supported:
-                    if "mul" not in supported and not is_num(lhs.args[1]):
-                        raise NotImplementedError("Cannot linearize modulo without multiplication")
-
-
-                    if cpm_expr.name != "==":
-                        new_rhs, newcons = get_or_make_var(lhs, csemap=csemap)
-                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
-                        newlist += linearize_constraint(newcons, supported=supported, reified=reified, csemap=csemap)
-                        continue
-                    else:
-                        # mod != remainder after division because defined on integer div (rounding towards 0)
-                        #   e.g., 7 % -5 = 2 and -7 % 5 = -2
-                        # implement x % y == z as k * y + z == x with |z| < |y| and sign(x) = sign(z)
-                        # https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
-                        x, y = lhs.args
-                        lby, uby = get_bounds(y)
-                        if lby <= 0 <= uby:
-                            raise ValueError("Attempting linearization of unsafe modulo, safen expression first (cpmpy/transformations/safen.py)")
-
-                        # k * y + z == x
-                        k = intvar(*get_bounds((x - rhs) // y))
-                        mult_res, side_cons = get_or_make_var(k * y, csemap=csemap)
-                        cpm_expr = (mult_res + rhs) == x
-                        # |z| < |y|
-                        abs_of_z, new_cons = get_or_make_var(abs(rhs), csemap=csemap)
-                        side_cons += new_cons
-                        # TODO: do the following in constructor of abs instead?
-                        # we know y is strictly positive or negative due to safening.
-                        if lby >= 0:
-                            side_cons.append(abs_of_z < y)
-                        if uby <= 0:
-                            side_cons.append(abs_of_z < -y)
-                        # sign(x) = sign(z)
-                        lbx, ubx = get_bounds(x)
-                        if lbx >= 0:
-                            side_cons.append(rhs >= 0)
-                        elif ubx <= 0:
-                            side_cons.append(rhs <= 0)
-                        else: # x can be pos or neg
-                            x_is_pos = cp.boolvar()
-                            x_is_neg = ~x_is_pos
-                            side_cons += [
-                                x_is_pos.implies(x >= 0), x_is_neg.implies(x < 0),
-                                x_is_pos.implies(rhs >= 0), x_is_neg.implies(rhs <= 0)
-                            ]
-
-                        side_cons = toplevel_list(side_cons) # get rid of bools that may result from the above
-                        newlist += linearize_constraint(side_cons, supported, reified=reified, csemap=csemap)
-
                 elif lhs.name == 'div' and 'div' not in supported:
                     if "mul" not in supported:
                         raise NotImplementedError("Cannot linearize division without multiplication")
