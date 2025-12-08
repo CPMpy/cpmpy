@@ -420,7 +420,8 @@ class CPM_gcs(SolverInterface):
         supported = {
             "min", 
             "max", 
-            "abs", 
+            "abs",
+            "mod",
             "alldifferent", 
             "element", 
             'table', 
