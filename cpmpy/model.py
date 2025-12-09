@@ -195,7 +195,8 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solve(time_limit=time_limit - (time.time() - start_time), **kwargs)
+        remaining_time_limit = None if time_limit is None else time_limit - (time.time() - start_time)
+        ret = s.solve(time_limit=remaining_time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret
