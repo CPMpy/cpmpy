@@ -59,12 +59,14 @@ def show_assignment(X):
 
 
 def check_model(model, env=None):
-    is_sat = model.deepcopy().solve()
+    expected_sat = model.deepcopy().solve()
 
     slv = CPM_lazy_gurobi(cpm_model=model, env=env)
-    assert slv.solve() == is_sat, "Expected equisat"
+    actual_sat = slv.solve()
+    slv.stats()
+    assert expected_sat == actual_sat, "Expected equisat"
 
-    if is_sat:
+    if expected_sat:
         X = cp.transformations.get_variables.get_variables_model(model)
         assert all(x.value() is not None for x in X), (
             f"Expected all variables to be assigned, but found: {show_assignment(X)}"
@@ -96,7 +98,7 @@ def with_constraints(model, with_alldiff=False, with_min=False):
 
 @pytest.fixture()
 def env():
-    yield {"verbosity": 3, "debug": True, "max_iterations": 100}
+    yield {"verbosity": 4, "debug": True, "max_iterations": 1000}
 
 
 class TestTables:
@@ -118,16 +120,24 @@ class TestTables:
     @pytest.mark.parametrize(
         "model",
         (
-            cp.Model(cp.AllDifferent(cp.intvar(1, 3, shape=3))),
-            generate_table_from_data([(1, 1), (2, 2)], 3),  # Feasible
-            with_constraints(generate_table_from_data([(1, 1), (2, 2)], 3), with_alldiff=True),  # Infeasible
-            with_constraints(generate_table_from_data([(1, 2), (2, 1)], 3), with_alldiff=True, with_min=True),
-            generate_table_from_example(),
-            generate_two_tables(),
-            with_constraints(generate_table(2, 2, 3), with_alldiff=True, with_min=True),
-            with_constraints(generate_table(3, 10, 5), with_alldiff=True, with_min=True),
-            with_constraints(generate_table(6, 10, 10), with_alldiff=True, with_min=True),
-            with_constraints(generate_table(2, 2, 3, k=2)),
+            t
+            for i in range(1)
+            for t in (
+                cp.Model(cp.AllDifferent(cp.intvar(1, 3, shape=3))),
+                generate_table_from_data([(1, 1), (2, 2)], 3),  # Feasible
+                with_constraints(
+                    generate_table_from_data([(1, 1), (2, 2)], 3), with_alldiff=True
+                ),  # Infeasible
+                with_constraints(
+                    generate_table_from_data([(1, 2), (2, 1)], 3), with_alldiff=True, with_min=True
+                ),
+                generate_table_from_example(),
+                generate_two_tables(),
+                with_constraints(generate_table(2, 2, 3), with_alldiff=True, with_min=True),
+                with_constraints(generate_table(3, 10, 5), with_alldiff=True, with_min=True),
+                with_constraints(generate_table(6, 10, 10), with_alldiff=True, with_min=True),
+                with_constraints(generate_table(2, 2, 3, k=2)),
+            )
         ),
     )
     def test_models(self, model, env):

@@ -16,6 +16,12 @@ from cpmpy.solvers.gurobi import CPM_gurobi
 
 INDEX = 1
 
+DEBUG_NP_PRINTOPTIONS = {
+    "threshold": sys.maxsize,
+    "linewidth": np.inf,
+    "formatter": {"float_kind": "{:.2f}".format},
+}
+
 
 def show_set(S, index=INDEX):
     return f"{{{', '.join(str(s + index) for s in sorted(S))}}}"
@@ -79,12 +85,12 @@ class CPM_lazy_gurobi(CPM_gurobi):
             "cuts": [],
             "max_iterations": None,
             "seed": 42,
-            **({} if env is None else self.env),
+            **({} if env is None else env),
         }
         self.indent = 0
 
         if self.env["verbosity"] >= 3:
-            np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
+            np.set_printoptions(**DEBUG_NP_PRINTOPTIONS)
             pprint.pprint(env)
 
         self.ivarmap = {}
@@ -104,15 +110,24 @@ class CPM_lazy_gurobi(CPM_gurobi):
             indent = self.indent if indent is None else indent
             print(" " * indent * 2, *mess, end=end, flush=self.env["debug"])
 
+    def print_cuts(self):
+        cuts_df = pd.DataFrame.from_dict(self.env["cuts"])
+        if self.env["verbosity"] >= 4:
+            pd.set_option("display.max_rows", None)
+            pd.set_option("display.max_colwidth", None)
+            pd.set_option("display.max_columns", None)
+            pd.set_option("display.width", None)
+        drop = ["failure", "cut", "size"]
+        show_df = cuts_df.drop(drop, axis=1, errors="ignore")
+        self.log(show_df, verbosity=2)
+
     def stats(self):
         self.log(
             ", ".join(f"{k}={self.env[k]}" for k in ["shrink", "heuristic", "explain_fractional"]),
             verbosity=0,
         )
+        self.print_cuts()
 
-        cuts_df = pd.DataFrame.from_dict(self.env["cuts"])
-        self.log(cuts_df.drop(["failure"], axis=1, errors="ignore"), verbosity=2)
-        # self.log(pprint.pformat(self.env["cuts"]), verbosity=2)
         cuts = [c for c in self.env["cuts"] if "size" in c]
         cuts_mipsol = [c for c in cuts if c["from"] == "MIPSOL"]
         assert all(c["size"] > 0 for c in cuts_mipsol)
@@ -173,14 +188,12 @@ class CPM_lazy_gurobi(CPM_gurobi):
         # TODO convert T_enc to set of tuples?
         self.log("Explain", end="\n")
 
-        self.log("", np.array(A_enc), verbosity=1)
-        self.log(np.array(T_enc), verbosity=2)
-        self.log("")
+        self.log("", np.array(A_enc), verbosity=2, indent=0)
+        self.log(np.array(T_enc), verbosity=2, indent=0)
+        self.log("", indent=0)
         assert len(A_enc) == len(T_enc.T)
 
         self.env["cuts"].append({"from": frm})
-        if self.env["debug"]:
-            self.env["cuts"][-1]["failure"] = A_enc
 
         m = len(T_enc)  # number of cols
         W = set(i for i, a in enumerate(A_enc) if a == 1.0)  #
@@ -299,10 +312,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     case _:
                         return
 
-                if frm == "MIPSOL":
-                    # Recommended way to convert fractional integer solution into Boolean, then using `int` to convert to 01
-                    x_enc_a = {x_enc_i: int(a_enc_i > 0.5) for x_enc_i, a_enc_i in x_enc_a.items()}
-
                 self.log(frm, x_enc_a, verbosity=2)
 
                 # If fully integer, we can check if the tables are feasible yet
@@ -316,24 +325,37 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
                     # encode assignment
                     explanation = self.explain(A_enc, T_enc, parts, frm=frm)
+                    if self.env["debug"]:
+                        self.env["cuts"][-1]["failure"] = A_enc
+                        self.env["cuts"][-1]["failure_"] = [
+                            f"{self.names[x.name]}={a}" if hasattr(self, "names") else f"{x}={a}"
+                            for x, a in zip(X_enc, A_enc)
+                            if a > 0.0
+                        ]
 
                     if explanation:
                         self.log(
                             f"  cons == {' + '.join(X_enc[c].name for c in explanation)} < {len(explanation)}",
                         )
                         grbs = [self.solver_var(X_enc[c]) for c in explanation]
-                        what.cbLazy(gp.quicksum(grbs) <= len(grbs) - 1.0)
+                        cut = gp.quicksum(grbs) <= len(grbs) - 1.0
+                        what.cbLazy(cut)
+
+                        if self.env["debug"]:
+                            self.env["cuts"][-1]["cut_"] = str(cut).split(": ")[1].split(">")[0]
                     elif frm == "MIPSOL":  # unsat
                         self.log("INFEASIBLE")
                         raise Infeasible
 
-                    cb_time = time.time() - cb_time
-                    self.log(f"end callback, time = {cb_time}")
-                    self.env["cb_time"] += cb_time
                     self.check_max_iterations(len(self.env["cuts"]))
+                    self.log(f"end callback, time = {cb_time}")
             except Exception as e:
                 what._callback_exception = e
                 what.terminate()
+            finally:
+                cb_time = time.time() - cb_time
+                self.env["cb_time"] += cb_time
+                assert cb_time < 1.0
 
         return solution_callback
 
@@ -353,12 +375,13 @@ class CPM_lazy_gurobi(CPM_gurobi):
             hassol = super().solve(
                 solution_callback=self.get_solution_callback(), time_limit=time_limit, **kwargs
             )
+            self.stats()
 
         except Infeasible:
             hassol = False
         except Exception as e:
             self.log("Exception")
-            np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
+            self.env["verbosity"] = 4
             self.stats()
             raise e
 
@@ -404,10 +427,16 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 self.tables.append((X_enc, T_enc, parts))
             else:
                 cpm_cons.append(cpm_expr)
+
+        # self.names = {
+        #     x.name: f"x{i}"
+        #     for i, x in enumerate(cp.transformations.get_variables.get_variables(cpm_cons), start=1)
+        # }
+
         return cpm_cons
 
     def _check_repeat_failure(self):
-        if self.env["debug"] and False:
+        if self.env["debug"]:
             prev = next(
                 (c for c in self.env["cuts"][:-1] if self.env["cuts"][-1]["failure"] == c["failure"]),
                 None,
