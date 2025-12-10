@@ -161,7 +161,7 @@ class Minimum(GlobalFunction):
          while at the same time not being larger then all (e.g. it needs to be (smaller or) equal to one of them)
         """
         _min = intvar(*self.get_bounds())
-        return _min, [cp.all(x >= _min for x in self.args), cp.any(x <= _min for x in self.args)]
+        return _min, [cp.all(_min <= a for a in self.args), cp.any(_min >= a for a in self.args)]
 
     def get_bounds(self):
         """
@@ -194,7 +194,7 @@ class Maximum(GlobalFunction):
          while at the same time not being smaller then all (e.g. it needs to be (larger or) equal to one of them)
         """
         _max = intvar(*self.get_bounds())
-        return _max, [cp.all(x <= _max for x in self.args), cp.any(x >= _max for x in self.args)]
+        return _max, [cp.all(_max >= a  for a in self.args), cp.any(_max <= a for a in self.args)]
 
     def get_bounds(self):
         """
