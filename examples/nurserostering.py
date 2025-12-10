@@ -16,12 +16,14 @@ import pandas as pd
 
 try:
     from faker import Faker
-except ImportError:
+except ImportError as e:
     print("Install `faker` package using `pip install faker`")
+    raise e
 try:
     from natsort import natsorted
-except ImportError:
+except ImportError as e:
     print("Install `natsort` package using `pip install natsort`")
+    raise e
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 5000)
