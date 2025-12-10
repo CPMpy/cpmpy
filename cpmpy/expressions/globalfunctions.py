@@ -156,6 +156,9 @@ class Minimum(GlobalFunction):
     def decompose(self):
         """
         Decomposition of Minimum constraint
+
+        Can only be decomposed by introducing an auxiliary variable and enforcing it to be larger than each variable,
+         while at the same time not being larger then all (e.g. it needs to be (smaller or) equal to one of them)
         """
         _min = intvar(*self.get_bounds())
         return _min, [cp.all(x >= _min for x in self.args), cp.any(x <= _min for x in self.args)]
@@ -186,6 +189,9 @@ class Maximum(GlobalFunction):
     def decompose(self):
         """
         Decomposition of Maximum constraint.
+
+        Can only be decomposed by introducing an auxiliary variable and enforcing it to be smaller than each variable,
+         while at the same time not being smaller then all (e.g. it needs to be (larger or) equal to one of them)
         """
         _max = intvar(*self.get_bounds())
         return _max, [cp.all(x <= _max for x in self.args), cp.any(x >= _max for x in self.args)]
@@ -200,6 +206,10 @@ class Maximum(GlobalFunction):
 class Abs(GlobalFunction):
     """
         Computes the absolute value of the argument
+
+        Can only be decomposed by introducing an auxiliary variable and enforcing it's value to be positive,
+            based on the value of the given argument to the global function. I.e., if the argument is negative,
+            the auxiliary variable will take the negated value of the argument, and otherwise it will take the argument itself.
     """
 
     def __init__(self, expr):
@@ -316,6 +326,7 @@ class Count(GlobalFunction):
     def decompose(self):
         """
         Decomposition of the Count constraint.
+        Does not require the use of auxiliary variables, simply count the number of variables that take the given value.
         """
         arr, val = self.args
         return cp.sum(a == val for a in arr), []
@@ -349,6 +360,7 @@ class Among(GlobalFunction):
     def decompose(self):
         """
          Decomposition of the Among constraint.
+         Decomposed using several Count constraints, one for each value in values.
         """
         arr, values = self.args
         return cp.sum(Count(arr, val) for val in values), []
