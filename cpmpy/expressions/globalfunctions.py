@@ -396,11 +396,7 @@ class NValue(GlobalFunction):
         lbs, ubs = get_bounds(self.args)
         lb, ub = min(lbs), max(ubs)
 
-        n_values = 0
-        for v in range(lb, ub+1):
-            n_values += cp.any(a == v for a in self.args)
-
-        return n_values, []
+        return cp.sum(cp.any(a == v for a in self.args) for v in range(lb,ub+1)), []
 
     def value(self):
         return len(set(argval(a) for a in self.args))
