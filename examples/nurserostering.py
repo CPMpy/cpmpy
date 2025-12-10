@@ -97,10 +97,10 @@ class NurseRosteringDataset(object):  # torch.utils.data.Dataset compatible
                 - The filename of the instance
                 - Metadata dictionary with file name, track, year etc.
         """
-        if isinstance(index, int) and (index < 0 or index >= len(self)):
+        if isinstance(index, int) and not (0 <= index < len(self)):
             raise IndexError("Index out of range")
 
-        # Get all instance files and sort for deterministic behavior # TODO: use natsort instead?
+        # Get all instance files and sort for deterministic behavior
         files = natsorted(list(self.instance_dir.glob("*.txt"))) # use .txt files instead of xml files
         file_path = files[index]
 
