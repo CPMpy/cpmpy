@@ -103,6 +103,10 @@ class GlobalFunction(Expression):
             The decomposition might create auxiliary variables
             and use other global constraints as long as
             it does not create a circular dependency.
+
+            Returns
+            1) a numerical value to replace the constraint, and
+            2) a list of defining constraints, which should be enforced toplevel
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
@@ -151,10 +155,7 @@ class Minimum(GlobalFunction):
 
     def decompose(self):
         """
-        Decomposition of Minimum constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
+        Decomposition of Minimum constraint
         """
         _min = intvar(*self.get_bounds())
         return _min, [cp.all(x >= _min for x in self.args), cp.any(x <= _min for x in self.args)]
@@ -185,9 +186,6 @@ class Maximum(GlobalFunction):
     def decompose(self):
         """
         Decomposition of Maximum constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
         """
         _max = intvar(*self.get_bounds())
         return _max, [cp.all(x <= _max for x in self.args), cp.any(x >= _max for x in self.args)]
@@ -213,9 +211,6 @@ class Abs(GlobalFunction):
     def decompose(self):
         """
         Decomposition of Abs constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
         """
         arg = self.args[0]
         lb, ub = get_bounds(arg)
@@ -285,9 +280,6 @@ class Element(GlobalFunction):
     def decompose(self):
         """
         Decomposition of Abs constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
         """
         arr, idx = self.args
 
@@ -324,9 +316,6 @@ class Count(GlobalFunction):
     def decompose(self):
         """
         Decomposition of the Count constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
         """
         arr, val = self.args
         return cp.sum(a == val for a in arr), []
@@ -359,11 +348,7 @@ class Among(GlobalFunction):
 
     def decompose(self):
         """
-             Decomposition of the Among constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
-
+         Decomposition of the Among constraint.
         """
         arr, values = self.args
         return cp.sum(Count(arr, val) for val in values), []
@@ -390,9 +375,6 @@ class NValue(GlobalFunction):
     def decompose(self):
         """
         Decomposition of the Count constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
 
         Based on "simple decomposition" from:
 
@@ -436,9 +418,6 @@ class NValueExcept(GlobalFunction):
     def decompose(self):
         """
         Decomposition of the Count constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
 
         Based on "simple decomposition" from:
 
