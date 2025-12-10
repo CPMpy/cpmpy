@@ -106,7 +106,7 @@ class NurseRosteringDataset(object):  # torch.utils.data.Dataset compatible
 
         filename = str(file_path)
         if self.transform:
-            # does not need to remain a filename...
+            # user might want to process the filename to something else
             filename = self.transform(filename)
 
         metadata = dict(name=file_path.stem)
