@@ -269,6 +269,7 @@ if __name__ == "__main__":
     assert model.solve()
 
     print(f"Found optimal solution with penalty of {model.objective_value()}")
+    assert model.objective_value() == 607 # optimal solution for the first instance
 
     # pretty print solution
     names = ["-"] + data['shifts'].index.tolist()
