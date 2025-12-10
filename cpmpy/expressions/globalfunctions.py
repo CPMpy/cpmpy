@@ -12,7 +12,7 @@
     If a solver does not support such a global function (see solvers/), then it will be automatically
     decomposed by calling its `.decompose()` function.
 
-    CPMpy GlobalFunctions does not exactly match what is implemented in the solvers.
+    CPMpy GlobalFunctions do not exactly match what is implemented in the solvers.
     Solvers can have specialised implementations for global functions, when used in a comparison, as global constraints.
     These global functions will be treated as global constraints in such cases.
 
@@ -33,17 +33,24 @@
     ----------------------------
 
     If you do wish to add a GlobalFunction, because it is supported by solvers or because you will do
-    advanced analysis and rewriting on it, then preferably define it with a standard comparison decomposition,
+    advanced analysis and rewriting on it, then impelement a decompose function that returns a tuple of two arguments:
+        1. A single CPMpy expression representing the numerical value represented by the global function
+                this is often an auxiliary variable, a sum of auxiliary variables or a sum over nested expressions.
+        2. A list of CPMpy constraints that define the auxiliary variables used in the first argument.
+
+    To make maximum use of simplification and common subexpression elimination, we recommend that you use
+        nested expression as much as possible and avoid creating auxiliary variables unless really needed
+
     e.g.:
 
     .. code-block:: python
 
-        class my_global(GlobalFunction):
+        class MySum(GlobalFunction):
             def __init__(self, args):
-                super().__init__("my_global", args)
+                super().__init__("my_sum", args)
 
             def decompose(self):
-                return [self.args[0] + self.args[1]], [] # your decomposition
+                return self.args[0] + self.args[1], [] # your decomposition
 
     Also, implement `.value()` accordingly.
 
