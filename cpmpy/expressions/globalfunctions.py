@@ -230,9 +230,8 @@ class Abs(GlobalFunction):
             return -arg, []
 
         _abs = intvar(*self.get_bounds())
-        assert _abs.lb == 0
 
-        is_pos = arg >= 0
+        is_pos = arg >= 0 # CPMpy expression that checks whether the argument is positive
         return _abs, [is_pos.implies(arg == _abs), (~is_pos).implies(arg == -_abs)]
 
     def get_bounds(self):
