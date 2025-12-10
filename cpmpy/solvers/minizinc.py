@@ -62,7 +62,6 @@ import json
 from datetime import timedelta  # for mzn's timeout
 
 import numpy as np
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import MinizincNameException, MinizincBoundsException
@@ -225,10 +224,13 @@ class CPM_minizinc(SolverInterface):
 
         For Minizinc, two version numbers get returned: ``<minizinc python API version>/<minizinc driver version>``
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
             from minizinc import default_driver
-            return f"{pkg_resources.get_distribution('minizinc').version}/{'.'.join(str(a) for a in default_driver.parsed_version)}"
-        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            mzn_version = version("minizinc")
+            solver_version = '.'.join(str(a) for a in default_driver.parsed_version)
+            return f"{mzn_version}/{solver_version}"
+        except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
     # variable name can not be any of these keywords

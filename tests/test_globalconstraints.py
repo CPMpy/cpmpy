@@ -1466,3 +1466,31 @@ class TestTypeChecks(unittest.TestCase):
     #         '(IV0 == 2) -> (IV1 == 2)',
     #         '(IV1) <= (y)'
     #     })
+
+solvers = [name for name, cls in cp.SolverLookup.base_solvers() if cls.supported()]
+@pytest.mark.parametrize("solver", solvers)
+def test_issue801_expr_in_cumulative(solver):
+
+    if solver in ("pysat", "pysdd", "pindakaas"):
+        pytest.skip(f"{solver} does not support integer variables")
+    if solver == "cplex":
+        pytest.skip(f"waiting for PR #769 to be merged.")
+
+    start = cp.intvar(0,5,shape=3,name="start")
+    dur = [1,2,3]
+    end = cp.intvar(0,10,shape=3,name="end")
+    bv = cp.boolvar(shape=3,name="bv")
+
+    assert cp.Model(cp.NoOverlap(bv * start, dur, end)).solve(solver=solver)
+    if solver != "pumpkin": # Pumpkin does not support variables as duration
+        assert cp.Model(cp.NoOverlap(bv * start,bv * dur, end)).solve(solver=solver)
+    assert cp.Model(cp.NoOverlap(bv * start, dur, bv * end)).solve(solver=solver)
+
+    # also for cumulative
+    assert cp.Model(cp.Cumulative(bv * start, dur, end,1, 3)).solve(solver=solver)
+    assert cp.Model(cp.Cumulative(bv * start, dur, bv * end, 1, 3)).solve(solver=solver)
+    if solver != "pumpkin": # Pumpkin does not support variables as duration, demand or capacity
+        assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
+        assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
+        assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)
+
