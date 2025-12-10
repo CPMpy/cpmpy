@@ -12,10 +12,16 @@ from typing import Tuple, Any
 from urllib.request import urlretrieve
 from urllib.error import HTTPError, URLError
 import zipfile
-
-from faker import Faker
 import pandas as pd
-from natsort import natsorted
+
+try:
+    from faker import Faker
+except ImportError:
+    print("Install `faker` package using `pip install faker`")
+try:
+    from natsort import natsorted
+except ImportError:
+    print("Install `natsort` package using `pip install natsort`")
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 5000)
