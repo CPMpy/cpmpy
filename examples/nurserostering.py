@@ -227,19 +227,19 @@ def nurserostering_model(horizon, shifts:pd.DataFrame, staff, days_off, shift_on
 
     # Days off
     for _, holiday in days_off.iterrows(): # could also do this vectorized... TODO?
-        i = staff.index[staff['ID'] == holiday['EmployeeID']][0]
+        i = (staff['ID'] == holiday['EmployeeID']).argmax() # index of employee
         model += nurse_view[i,holiday['DayIndex']] == FREE
 
     # Shift requests, encode in linear objective
     objective = 0
     for _, request in shift_on.iterrows():
-        i = staff.index[staff['ID'] == request['EmployeeID']][0]
+        i = (staff['ID'] == request['EmployeeID']).argmax() # index of employee
         cpm_request = nurse_view[i, request['Day']] == SHIFTS.index(request['ShiftID'])
         objective += request['Weight'] * ~cpm_request
 
     # Shift off requests, encode in linear objective
     for _, request in shift_off.iterrows():
-        i = staff.index[staff['ID'] == request['EmployeeID']][0]
+        i = (staff['ID'] == request['EmployeeID']).argmax() # index of employee
         cpm_request = nurse_view[i, request['Day']] != SHIFTS.index(request['ShiftID'])
         objective += request['Weight'] * ~cpm_request
 
