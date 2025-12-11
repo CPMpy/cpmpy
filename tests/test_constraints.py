@@ -46,11 +46,11 @@ EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {},
-                     "pysat": {"mul", "div", "pow", "mod"},  # int2bool but mul, and friends, not linearized
+                     "pysat": {"mul-int", "div", "pow", "mod"},  # int2bool but integer-multiplication, and friends, not linearized
                      "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "pindakaas": {"mul", "div", "pow", "mod"},
+                     "pindakaas": {"mul-int", "div", "pow", "mod"},
                      "exact": {},
-                     "cplex": {"mul", "div", "mod", "pow"},
+                     "cplex": {"mul-int", "div", "mod", "pow"},
                      "pumpkin": {"pow", "mod"},
                      }
 
@@ -87,13 +87,21 @@ def numexprs(solver):
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
         elif name == "div" or name == "pow":
-            operator_args = [NN_VAR,3]
-        elif arity != 0:
-            operator_args = NUM_ARGS[:arity]
-        else:
-            operator_args = NUM_ARGS
+            yield Operator(name, [NN_VAR,3])
+        elif name == "mul" and "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
+            yield Operator(name, [3, NUM_ARGS[0]])
+            yield Operator(name, NUM_ARGS[:arity])
+            yield Operator(name, NUM_ARGS[:2])
+            if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
+                yield Operator(name, [3, BOOL_ARGS[0]])
 
-        yield Operator(name, operator_args)
+        elif name == "mul" and "mul-bool" not in EXCLUDE_OPERATORS.get(solver, {}):
+            yield Operator(name, BOOL_ARGS[:arity])
+        elif arity != 0:
+            yield Operator(name, NUM_ARGS[:arity])
+        else:
+            yield Operator(name, NUM_ARGS)
+
 
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
@@ -200,7 +208,8 @@ def global_constraints(solver):
         elif name == "Inverse":
             expr = cls(NUM_ARGS, [1,0,2])
         elif name == "Table":
-            expr = cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+            yield cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+            yield cls(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
         elif name == "Regular":
             expr = Regular(intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
