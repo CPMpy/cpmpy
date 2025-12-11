@@ -41,8 +41,6 @@
 
 from typing import Optional
 
-from importlib.metadata import version, PackageNotFoundError
-
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction, DirectConstraint
@@ -81,6 +79,7 @@ class CPM_hexaly(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
             return version('hexaly')
         except PackageNotFoundError:

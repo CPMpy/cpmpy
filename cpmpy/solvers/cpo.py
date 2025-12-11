@@ -42,10 +42,8 @@
         CPM_cpo
 """
 
-import time
 from typing import Optional
 import warnings
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from .. import DirectConstraint
@@ -117,11 +115,13 @@ class CPM_cpo(SolverInterface):
 
         For CPO, two version numbers get returned: ``<docplex version>/<solver version>``
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
             import docplex.cp as docp
-            s = docp.solver.solver.CpoSolver(docp.model.CpoModel())
-            return f"{pkg_resources.get_distribution('docplex').version}/{s.get_solver_version()}"
-        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            cpo_version = docp.solver.solver.CpoSolver(docp.model.CpoModel()).get_solver_version()
+            docplex_version = version("docplex")
+            return f"{docplex_version}/{cpo_version}"
+        except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -553,11 +553,11 @@ class CPM_cpo(SolverInterface):
                     cons += task_cons
                     if task is None: # can happen with 0 duration tasks
                         continue
-                    else:                
+                    else:
                         task_height = dom.pulse(task, get_bounds(h))
-                        cons += [self.solver_var(h) == dom.height_at_start(task, task_height)]
+                        cons += [self._cpo_expr(h) == dom.height_at_start(task, task_height)]
                         total_usage.append(task_height)
-                cons += [dom.sum(total_usage) <= self.solver_var(capacity)]
+                cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
             elif cpm_con.name == "no_overlap":
                 start, dur, end  = cpm_con.args
@@ -620,7 +620,7 @@ class CPM_cpo(SolverInterface):
                 return None, []
             cpo_s, cpo_e = self._cpo_expr([start, end])
             return None, extra_cons + [cpo_s == cpo_e] # no task, just enforce 0 duration
-            
+
         # Normal setting
         if end is None: # no end provided by user
             cpo_s, cpo_d = self._cpo_expr([start, dur])
