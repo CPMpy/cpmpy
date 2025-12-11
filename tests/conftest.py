@@ -3,10 +3,11 @@ import cpmpy as cp
 import importlib
 import warnings
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-def _parse_solver_option(solver_option: str | None, filter_not_installed: bool = True) -> list[str] | None:
+def _parse_solver_option(solver_option: Optional[str] , filter_not_installed: bool = True) -> Optional[list[str]]:
     """
     Parse the --solver option into a list of solvers.
     Returns 'None' if no solver was specified, otherwise returns a list of solver names.
