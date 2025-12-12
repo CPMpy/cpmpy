@@ -251,7 +251,7 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def solveAll(self, time_limit:Optional[float]=None, display=None, solution_limit=None, call_from_model=False,
+    def solveAll(self, time_limit:Optional[float]=None, display=None, solution_limit:Optional[int]=None, call_from_model=False,
                  prove=False, proof_name=None, proof_location=".", verify=False, verify_time_limit=None, veripb_args = [], 
                  display_verifier_output=True, **kwargs):
         """
