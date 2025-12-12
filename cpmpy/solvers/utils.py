@@ -88,7 +88,7 @@ class SolverLookup():
                 ("cpo", CPM_cpo),
                 ("cplex", CPM_cplex),
                 ("pindakaas", CPM_pindakaas),
-                ("hexaly", CPM_hexaly)
+                ("hexaly", CPM_hexaly),
                 ("rc2", CPM_rc2),
                ]
 
