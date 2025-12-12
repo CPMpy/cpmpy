@@ -223,26 +223,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
                                                             f"Please report on github")
 
-            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and "abs" not in supported:
-                if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
-                    newvar, newcons = get_or_make_var(lhs, csemap=csemap)
-                    newlist += linearize_constraint(newcons, supported=supported, reified=reified, csemap=csemap)
-                    cpm_expr = eval_comparison(cpm_expr.name, newvar, rhs)
-                else:
-                    x = lhs.args[0]
-                    lb, ub = get_bounds(x)
-                    if lb >= 0:  # always positive
-                        newlist.append(x == rhs)
-                    elif ub <= 0:  # always negative
-                        newlist.append(x + rhs == 0)
-                    else:
-                        lhs_is_pos = cp.boolvar()
-                        newcons = [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x <= -1),
-                                   lhs_is_pos.implies(x == rhs), (~lhs_is_pos).implies(x + rhs == 0)]
-                        newlist += linearize_constraint(newcons, supported=supported, reified=reified, csemap=csemap)
-                    continue # all should be linear now
-
-
             elif isinstance(lhs, GlobalFunction) and lhs.name not in supported:
                 raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
                                  "`cpmpy.transformations.decompose_global.decompose_global() first")
