@@ -4,55 +4,51 @@
 ## globalfunctions.py
 ##
 """
-    Global functions conveniently express numerical global constraints.
+    Global functions conveniently express numerical global constraints in function form.
 
-    Using global functions
-    ------------------------
+    For example `cp.Maximum(iv1, iv2, iv3) == iv4`, or `cp.Abs(iv1) > iv2` or `m.minimize(cp.Count(IVS, 0))`,
+    or other nested numeric expressions.
 
-    If a solver does not support such a global function (see solvers/), then it will be automatically
-    decomposed by calling its `.decompose()` function.
+    Global functions are implemented as classes that inherit from `GlobalFunction`.
 
-    CPMpy GlobalFunctions do not exactly match what is implemented in the solvers.
-    Solvers can have specialised implementations for global functions, when used in a comparison, as global constraints.
-    These global functions will be treated as global constraints in such cases.
+    Solver perspective
+    ------------------
 
-    For example solvers may implement the global constraint `Minimum(iv1, iv2, iv3) == iv4` through an API
-    call `addMinimumEquals([iv1,iv2,iv3], iv4)`.
+    * Native support: some solvers natively support the function form of global functions,
+    such as other CP languages, SMT solvers, Cplex, Hexaly etc.
 
-    However, CPMpy also wishes to support the expressions `Minimum(iv1, iv2, iv3) > iv4` as well as
-    `iv4 + Minimum(iv1, iv2, iv3)`.
+    * Predicate form: CP solvers and MINLP solvers only support the predicate form of global functions.
+    For example, `cp.Maximum(iv1, iv2, iv3) == iv4` has to be posted to the solver API
+    as `addMaximumEquals([iv1,iv2,iv3], iv4)`, and expressions like `cp.Abs(iv1) > iv2` have to be flattened
+    and posted as `addAbsEquals(iv1, aux)` and `aux > iv2`. This is automatically done by the flattening
+    transformation in the `flatten_model` transformation.
 
-    Hence, the CPMpy global functions only capture the `Minimum(iv1, iv2, iv3)` part, whose return type
-    is numeric and can be used in any other CPMpy expression. Only at the time of transforming the CPMpy
-    model to the solver API, will the expressions be decomposed and auxiliary variables introduced as needed
-    such that the solver only receives `Minimum(iv1, iv2, iv3) == ivX` expressions.
-    This is the burden of the CPMpy framework, not of the user who wants to express a problem formulation.
+    * Decomposition: if a solver does not support a global function, then it will be automatically
+    decomposed by calling its `.decompose()` function in the `decompose_global` transformation.
+
+    The `.decompose()` function returns two arguments:
+        1. A single CPMpy expression representing the numerical value of the global function,
+            this is often an auxiliary variable, a sum of auxiliary variables or a sum over
+            nested expressions.
+        2. If the decomposition introduces new *auxiliary variables*, then the second argument
+            has to be a list of constraints that (totally) define those new variables.
+
+    To make maximum use of simplification and common subexpression elimination, we recommend that decompositions
+        use nested expression as much as possible and avoid creating auxiliary variables unless not expressible
+        in a more direct way.
 
 
-    Subclassing GlobalFunction
-    ----------------------------
-
-    If you do wish to add a GlobalFunction, because it is supported by solvers or because you will do
-    advanced analysis and rewriting on it, then impelement a decompose function that returns a tuple of two arguments:
-        1. A single CPMpy expression representing the numerical value represented by the global function
-                this is often an auxiliary variable, a sum of auxiliary variables or a sum over nested expressions.
-        2. A list of CPMpy constraints that define the auxiliary variables used in the first argument.
-
-    To make maximum use of simplification and common subexpression elimination, we recommend that you use
-        nested expression as much as possible and avoid creating auxiliary variables unless really needed
-
-    e.g.:
+    Example:
 
     .. code-block:: python
 
         class MySum(GlobalFunction):
             def __init__(self, args):
+                assert len(args) == 2, "MySum takes 2 arguments"
                 super().__init__("my_sum", args)
 
             def decompose(self):
-                return self.args[0] + self.args[1], [] # your decomposition
-
-    Also, implement `.value()` accordingly.
+                return (self.args[0] + self.args[1]), []  # the decomposition
 
     ===============
     List of classes
@@ -72,7 +68,7 @@
 
 """
 import warnings  # for deprecation warning
-
+from typing import Optional, Union
 import numpy as np
 import cpmpy as cp
 
@@ -87,53 +83,56 @@ class GlobalFunction(Expression):
         Abstract superclass of GlobalFunction
 
         Like all expressions it has a `.name` and `.args` property.
-        Overwrites the `.is_bool()` method.
+        It overwrites the `.is_bool()` method to return False, as global functions are numeric.
     """
 
-    def is_bool(self):
+    def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator? No
         """
         return False
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-            Returns a decomposition into smaller constraints.
-            Returns a numerical expression and a list of defining constraints.
+            Returns a decomposition into smaller constraints as a tuple of
+            (numerical expression, list of constraints defining auxiliary variables)
+
+            The first one will replace the GlobalFunction expression in-place,
+            the second one will be added to the list of top-level constraints.
 
             The decomposition might create auxiliary variables
             and use other global constraints as long as
             it does not create a circular dependency.
-
-            Returns
-            1) a numerical value to replace the constraint, and
-            2) a list of defining constraints, which should be enforced toplevel
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
-    def decompose_comparison(self, cmp_op, cmp_rhs):
+    def decompose_comparison(self, cmp_op: str, cmp_rhs: Expression) -> tuple[list[Expression], list[Expression]]:
         """
-            Returns a decomposition into smaller constraints.
+            DEPRECATED: returns a list of constraints representing the decomposed
+            comparison of the global function (and any auxiliary variables intorduced).
 
-            The decomposition might create auxiliary variables
-            and use other global constraints as long as
-            it does not create a circular dependency.
+            Returns two lists of constraints:
+            1) constraints representing the comparison
+            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
+               they should be enforced toplevel.
         """
         warnings.warn(f"Deprecated, use {self}.decompose() instead, will be removed in "
                       "stable version", DeprecationWarning)
-        val, tl = self.decompose()
-        return eval_comparison(cmp_op, val, cmp_rhs), tl
+        valexpr, cons = self.decompose()
+        return eval_comparison(cmp_op, valexpr, cmp_rhs), cons
 
-
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the global function
+        Returns the bounds of the global function as a tuple of (lower bound, upper bound)
         """
         return NotImplementedError("Bounds calculation for", self, "not available")
 
-    def is_total(self):
+    def is_total(self) -> bool:
         """
             Returns whether it is a total function.
             If true, its value is defined for all arguments
+
+            TODO: I do not find anywhere where we set it dynamically to False?
+            TODO: REMOVE??
         """
         return True
 
@@ -143,17 +142,17 @@ class Minimum(GlobalFunction):
         Computes the minimum value of the arguments
     """
 
-    def __init__(self, arg_list):
+    def __init__(self, arg_list: list[Expression]):
         super().__init__("min", flatlist(arg_list))
 
-    def value(self):
+    def value(self) -> Optional[int]:
         argvals = [argval(a) for a in self.args]
         if any(val is None for val in argvals):
             return None
         else:
             return min(argvals)
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Minimum constraint
 
@@ -163,7 +162,7 @@ class Minimum(GlobalFunction):
         _min = intvar(*self.get_bounds())
         return _min, [cp.all(_min <= a for a in self.args), cp.any(_min >= a for a in self.args)]
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
         """
@@ -176,17 +175,17 @@ class Maximum(GlobalFunction):
         Computes the maximum value of the arguments
     """
 
-    def __init__(self, arg_list):
+    def __init__(self, arg_list: list[Expression]):
         super().__init__("max", flatlist(arg_list))
 
-    def value(self):
+    def value(self) -> Optional[int]:
         argvals = [argval(a) for a in self.args]
         if any(val is None for val in argvals):
             return None
         else:
             return max(argvals)
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Maximum constraint.
 
@@ -196,31 +195,35 @@ class Maximum(GlobalFunction):
         _max = intvar(*self.get_bounds())
         return _max, [cp.all(_max >= a  for a in self.args), cp.any(_max <= a for a in self.args)]
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
         """
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
+
 class Abs(GlobalFunction):
     """
         Computes the absolute value of the argument
+    """
+
+    def __init__(self, expr: Expression):
+        super().__init__("abs", [expr])
+
+    def value(self) -> Optional[int]:
+        argval = argval(self.args[0])
+        if argval is not None:
+            return abs(argval)
+        return None
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
+        """
+        Decomposition of Abs constraint.
 
         Can only be decomposed by introducing an auxiliary variable and enforcing it's value to be positive,
             based on the value of the given argument to the global function. I.e., if the argument is negative,
             the auxiliary variable will take the negated value of the argument, and otherwise it will take the argument itself.
-    """
-
-    def __init__(self, expr):
-        super().__init__("abs", [expr])
-
-    def value(self):
-        return abs(argval(self.args[0]))
-
-    def decompose(self):
-        """
-        Decomposition of Abs constraint.
         """
         arg = self.args[0]
         lb, ub = get_bounds(arg)
@@ -230,11 +233,9 @@ class Abs(GlobalFunction):
             return -arg, []
 
         _abs = intvar(*self.get_bounds())
+        return _abs, [(arg >= 0).implies(_abs == arg), (arg < 0).implies(_abs == -arg)]
 
-        is_pos = arg >= 0 # CPMpy expression that checks whether the argument is positive
-        return _abs, [is_pos.implies(arg == _abs), (~is_pos).implies(arg == -_abs)]
-
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
         """
@@ -246,7 +247,7 @@ class Abs(GlobalFunction):
         return 0, max(-lb, ub)
 
 
-def element(arg_list):
+def element(arg_list: list[Expression]) -> Element:
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
