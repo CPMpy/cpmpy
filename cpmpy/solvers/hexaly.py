@@ -39,7 +39,7 @@
         CPM_hexaly
 """
 
-from typing import Optional
+from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -396,7 +396,7 @@ class CPM_hexaly(SolverInterface):
         raise NotImplementedError(f"Unexpected expression {cpm_expr}")
 
     
-    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -419,7 +419,7 @@ class CPM_hexaly(SolverInterface):
         return super(CPM_hexaly, self).solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
 
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         from hexaly.optimizer import HxObjectiveDirection
         if self.is_satisfaction: # set dummy objective, otherwise cannot close model
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
