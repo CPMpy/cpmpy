@@ -156,7 +156,8 @@ class CPM_gurobi(SolverInterface):
             Call the gurobi solver
 
             Arguments:
-                time_limit (float, optional):  maximum solve time in seconds 
+                time_limit (float, optional):  maximum solve time in seconds
+                solution_callback:             Gurobi callback function
                 **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
