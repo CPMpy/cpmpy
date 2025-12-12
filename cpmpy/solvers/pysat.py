@@ -52,7 +52,7 @@
     ==============
 """
 from threading import Timer
-from typing import Optional
+from typing import Optional, List
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -212,7 +212,7 @@ class CPM_pysat(SolverInterface):
         return self.pysat_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions=None):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
         """
             Call the PySAT solver
 
@@ -478,7 +478,7 @@ class CPM_pysat(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_BoolVarImpl], vals:List[bool]):
         """
         PySAT supports warmstarting the solver with a feasible solution
 
@@ -491,6 +491,7 @@ class CPM_pysat(SolverInterface):
         cpm_vars = flatlist(cpm_vars)
         vals = flatlist(vals)
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
+        assert all(var.is_bool() for var in cpm_vars), "PySAT interface currently only supports Boolean variables in solution hint"
 
         literals = []
         for (cpm_var, val) in zip(cpm_vars, vals):
