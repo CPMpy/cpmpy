@@ -302,8 +302,6 @@ class Modulo(GlobalFunction):
         return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
                                   f"({y})" if isinstance(y, Expression) else y)
 
-        return
-
     def decompose(self):
         """
             mod != remainder after division because defined on integer div (rounding towards 0)
@@ -312,6 +310,10 @@ class Modulo(GlobalFunction):
             https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
         """
         x,y = self.args
+        y_lb, y_ub = get_bounds(y)
+        assert not y_lb <= 0 <= y_ub, "Modulo constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
+
+
         _mod = intvar(*self.get_bounds())
         k = intvar(*get_bounds((x - _mod) // y))
         cons = [
