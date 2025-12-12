@@ -363,21 +363,21 @@ class TestBounds(unittest.TestCase):
         x = intvar(-8, 8)
         y = intvar(-7,-1)
         z = intvar(3,9)
-        op1 = Operator('div',[x,y])
+        op1 = cp.Division(x,y)
         lb1,ub1 = op1.get_bounds()
         self.assertEqual(lb1,-8)
         self.assertEqual(ub1,8)
-        op2 = Operator('div',[x,z])
+        op2 = cp.Division(x,z)
         lb2,ub2 = op2.get_bounds()
         self.assertEqual(lb2,-2)
         self.assertEqual(ub2,2)
         for lhs in inclusive_range(*x.get_bounds()):
             for rhs in inclusive_range(*y.get_bounds()):
-                val = Operator('div',[lhs,rhs]).value()
+                val = Division(lhs,rhs).value()
                 self.assertGreaterEqual(val,lb1)
                 self.assertLessEqual(val,ub1)
             for rhs in inclusive_range(*z.get_bounds()):
-                val = Operator('div', [lhs, rhs]).value()
+                val = cp.Division(lhs, rhs).value()
                 self.assertGreaterEqual(val,lb2)
                 self.assertLessEqual(val,ub2)
 
