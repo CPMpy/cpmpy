@@ -291,7 +291,7 @@ class CPM_minizinc(SolverInterface):
         return self.mzn_model
 
 
-    def _pre_solve(self, time_limit=None, **kwargs):
+    def _pre_solve(self, time_limit:Optional[float]=None, **kwargs):
         """ shared by solve() and solveAll() """
         import minizinc
 
@@ -308,7 +308,7 @@ class CPM_minizinc(SolverInterface):
         kwargs['output-time'] = True  # required for time getting
         return (kwargs, mzn_inst)
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, **kwargs):
         """
             Call the MiniZinc solver
             
@@ -441,7 +441,7 @@ class CPM_minizinc(SolverInterface):
         else:
             raise NotImplementedError  # unexpected type for time
 
-    async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    async def _solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """ Special 'async' function because mzn.solutions() is async """
 
         # ensure all vars are known to solver
@@ -815,7 +815,7 @@ class CPM_minizinc(SolverInterface):
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 

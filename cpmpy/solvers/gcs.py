@@ -50,7 +50,10 @@
 
         CPM_gcs
 """
+import warnings
 from typing import Optional
+
+from packaging.version import Version
 
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
@@ -95,6 +98,11 @@ class CPM_gcs(SolverInterface):
         # try to import the package
         try:
             import gcspy
+            gcs_version = CPM_gcs.version()
+            if Version(gcs_version) < Version("0.1.8"):
+                warnings.warn(f"CPMpy requires GCS version >=0.1.8 but you have version "
+                              f"{gcs_version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
+                return False
             return True
         except ModuleNotFoundError:
             return False
@@ -148,7 +156,7 @@ class CPM_gcs(SolverInterface):
     def has_objective(self):
         return self.objective_var is not None
     
-    def solve(self, time_limit=None, prove=False, proof_name=None, proof_location=".", 
+    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name=None, proof_location=".",
               verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
@@ -250,7 +258,7 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def solveAll(self, time_limit=None, display=None, solution_limit=None, call_from_model=False, 
+    def solveAll(self, time_limit:Optional[float]=None, display=None, solution_limit:Optional[int]=None, call_from_model=False,
                  prove=False, proof_name=None, proof_location=".", verify=False, verify_time_limit=None, veripb_args = [], 
                  display_verifier_output=True, **kwargs):
         """

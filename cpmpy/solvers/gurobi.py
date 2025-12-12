@@ -42,7 +42,7 @@
     ==============
 """
 
-from typing import Optional
+from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -151,12 +151,13 @@ class CPM_gurobi(SolverInterface):
         return self.grb_model
 
 
-    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
             Call the gurobi solver
 
             Arguments:
-                time_limit (float, optional):  maximum solve time in seconds 
+                time_limit (float, optional):  maximum solve time in seconds
+                solution_callback:             Gurobi callback function
                 **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -479,7 +480,7 @@ class CPM_gurobi(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         Gurobi supports warmstarting the solver with a (in)feasible solution.
         The provided value will affect branching heurstics during solving, making it more likely the final solution will contain the provided assignment.
@@ -499,7 +500,7 @@ class CPM_gurobi(SolverInterface):
         for cpm_var, val in zip(cpm_vars, vals):
             self.solver_var(cpm_var).setAttr("VarHintVal", val)
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
