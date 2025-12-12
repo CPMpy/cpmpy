@@ -484,6 +484,8 @@ class CPM_pysat(SolverInterface):
 
         In PySAT, this is called setting the 'phases' or the 'polarities' of literals
 
+        Note: our PySAT interface currently does not support solution hinting for integer variables
+
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
