@@ -329,8 +329,8 @@ class CPM_pumpkin(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         supported = {"alldifferent", "cumulative", "table", "negative_table", "InDomain"
-                     "min", "max", "element", "abs"}
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"}) # safen toplevel elements, assume total decomposition for partial functions
+                     "min", "max", "element", "abs", "div"}
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element", "div", "mod"}) # safen toplevel elements, assume total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons, supported=supported, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
