@@ -12,7 +12,7 @@
     If a solver does not support such a global function (see solvers/), then it will be automatically
     decomposed by calling its `.decompose()` function.
 
-    CPMpy GlobalFunctions does not exactly match what is implemented in the solvers.
+    CPMpy GlobalFunctions do not exactly match what is implemented in the solvers.
     Solvers can have specialised implementations for global functions, when used in a comparison, as global constraints.
     These global functions will be treated as global constraints in such cases.
 
@@ -33,17 +33,24 @@
     ----------------------------
 
     If you do wish to add a GlobalFunction, because it is supported by solvers or because you will do
-    advanced analysis and rewriting on it, then preferably define it with a standard comparison decomposition,
+    advanced analysis and rewriting on it, then impelement a decompose function that returns a tuple of two arguments:
+        1. A single CPMpy expression representing the numerical value represented by the global function
+                this is often an auxiliary variable, a sum of auxiliary variables or a sum over nested expressions.
+        2. A list of CPMpy constraints that define the auxiliary variables used in the first argument.
+
+    To make maximum use of simplification and common subexpression elimination, we recommend that you use
+        nested expression as much as possible and avoid creating auxiliary variables unless really needed
+
     e.g.:
 
     .. code-block:: python
 
-        class my_global(GlobalFunction):
+        class MySum(GlobalFunction):
             def __init__(self, args):
-                super().__init__("my_global", args)
+                super().__init__("my_sum", args)
 
             def decompose(self):
-                return [self.args[0] + self.args[1]], [] # your decomposition
+                return self.args[0] + self.args[1], [] # your decomposition
 
     Also, implement `.value()` accordingly.
 
@@ -96,6 +103,10 @@ class GlobalFunction(Expression):
             The decomposition might create auxiliary variables
             and use other global constraints as long as
             it does not create a circular dependency.
+
+            Returns
+            1) a numerical value to replace the constraint, and
+            2) a list of defining constraints, which should be enforced toplevel
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
@@ -144,13 +155,13 @@ class Minimum(GlobalFunction):
 
     def decompose(self):
         """
-        Decomposition of Minimum constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
+        Decomposition of Minimum constraint
+
+        Can only be decomposed by introducing an auxiliary variable and enforcing it to be larger than each variable,
+         while at the same time not being larger then all (e.g. it needs to be (smaller or) equal to one of them)
         """
         _min = intvar(*self.get_bounds())
-        return _min, [cp.all(x >= _min for x in self.args), cp.any(x <= _min for x in self.args)]
+        return _min, [cp.all(_min <= a for a in self.args), cp.any(_min >= a for a in self.args)]
 
     def get_bounds(self):
         """
@@ -178,12 +189,12 @@ class Maximum(GlobalFunction):
     def decompose(self):
         """
         Decomposition of Maximum constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
+
+        Can only be decomposed by introducing an auxiliary variable and enforcing it to be smaller than each variable,
+         while at the same time not being smaller then all (e.g. it needs to be (larger or) equal to one of them)
         """
         _max = intvar(*self.get_bounds())
-        return _max, [cp.all(x <= _max for x in self.args), cp.any(x >= _max for x in self.args)]
+        return _max, [cp.all(_max >= a  for a in self.args), cp.any(_max <= a for a in self.args)]
 
     def get_bounds(self):
         """
@@ -195,6 +206,10 @@ class Maximum(GlobalFunction):
 class Abs(GlobalFunction):
     """
         Computes the absolute value of the argument
+
+        Can only be decomposed by introducing an auxiliary variable and enforcing it's value to be positive,
+            based on the value of the given argument to the global function. I.e., if the argument is negative,
+            the auxiliary variable will take the negated value of the argument, and otherwise it will take the argument itself.
     """
 
     def __init__(self, expr):
@@ -206,9 +221,6 @@ class Abs(GlobalFunction):
     def decompose(self):
         """
         Decomposition of Abs constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
         """
         arg = self.args[0]
         lb, ub = get_bounds(arg)
@@ -218,9 +230,8 @@ class Abs(GlobalFunction):
             return -arg, []
 
         _abs = intvar(*self.get_bounds())
-        assert _abs.lb == 0
 
-        is_pos = arg >= 0
+        is_pos = arg >= 0 # CPMpy expression that checks whether the argument is positive
         return _abs, [is_pos.implies(arg == _abs), (~is_pos).implies(arg == -_abs)]
 
     def get_bounds(self):
@@ -392,19 +403,13 @@ class Element(GlobalFunction):
     def decompose(self):
         """
         Decomposition of Abs constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
         """
         arr, idx = self.args
 
         idx_lb, idx_ub = get_bounds(idx)
         assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
 
-        _elem = intvar(*self.get_bounds())
-
-        return _elem, [implies(idx == i, _elem == arr[i]) for i in range(len(arr))]
-
+        return cp.sum(arr[i] * (i == idx) for i in range(len(arr))), []
 
     def __repr__(self):
         return "{}[{}]".format(self.args[0], self.args[1])
@@ -431,9 +436,7 @@ class Count(GlobalFunction):
     def decompose(self):
         """
         Decomposition of the Count constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
+        Does not require the use of auxiliary variables, simply count the number of variables that take the given value.
         """
         arr, val = self.args
         return cp.sum(a == val for a in arr), []
@@ -466,11 +469,8 @@ class Among(GlobalFunction):
 
     def decompose(self):
         """
-             Decomposition of the Among constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
-
+         Decomposition of the Among constraint.
+         Decomposed using several Count constraints, one for each value in values.
         """
         arr, values = self.args
         return cp.sum(Count(arr, val) for val in values), []
@@ -497,9 +497,6 @@ class NValue(GlobalFunction):
     def decompose(self):
         """
         Decomposition of the Count constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
 
         Based on "simple decomposition" from:
 
@@ -510,11 +507,7 @@ class NValue(GlobalFunction):
         lbs, ubs = get_bounds(self.args)
         lb, ub = min(lbs), max(ubs)
 
-        n_values = 0
-        for v in range(lb, ub+1):
-            n_values += cp.any(a == v for a in self.args)
-
-        return n_values, []
+        return cp.sum(cp.any(a == v for a in self.args) for v in range(lb,ub+1)), []
 
     def value(self):
         return len(set(argval(a) for a in self.args))
@@ -543,9 +536,6 @@ class NValueExcept(GlobalFunction):
     def decompose(self):
         """
         Decomposition of the Count constraint.
-        Returns
-        1) a numerical value to replace the constraint, and
-        2) a list of defining constraints, which should be enforced toplevel
 
         Based on "simple decomposition" from:
 

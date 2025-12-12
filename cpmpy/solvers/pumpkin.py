@@ -37,11 +37,13 @@
     Module details
     ==============
 """
+import warnings
 from typing import Optional
 from importlib.metadata import version, PackageNotFoundError
 from os.path import join
 
 import numpy as np
+from packaging.version import Version
 
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -75,6 +77,11 @@ class CPM_pumpkin(SolverInterface):
         # try to import the package
         try:
             import pumpkin_solver as psp
+            pum_version = CPM_pumpkin.version()
+            if Version(pum_version) < Version("0.2.2"):
+                warnings.warn(f"CPMpy uses features only available from Pumpkin version >=0.2.2 "
+                              f"but you have version {pum_version}")
+                return False
             return True
         except ModuleNotFoundError:
             return False
@@ -87,6 +94,7 @@ class CPM_pumpkin(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
             return version('pumpkin-solver')
         except PackageNotFoundError:

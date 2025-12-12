@@ -72,10 +72,10 @@ class TestCSE(unittest.TestCase):
     
         self.assertEqual(len(decomp), 5)
         self.assertEqual(str(decomp[0]), "(b) == ((IV0) + (q) <= 10)")
-        self.assertEqual(str(decomp[1]), "(x) <= (IV0)")
-        self.assertEqual(str(decomp[2]), "(y) <= (IV0)")
-        self.assertEqual(str(decomp[3]), "(z) <= (IV0)")
-        self.assertEqual(str(decomp[4]), "or([(x) >= (IV0), (y) >= (IV0), (z) >= (IV0)])")
+        self.assertEqual(str(decomp[1]), "(IV0) >= (x)")
+        self.assertEqual(str(decomp[2]), "(IV0) >= (y)")
+        self.assertEqual(str(decomp[3]), "(IV0) >= (z)")
+        self.assertEqual(str(decomp[4]), "or([(IV0) <= (x), (IV0) <= (y), (IV0) <= (z)])")
 
 
         # next time we use max([x,y,z]) it should replace the max-constraint with IV0

@@ -45,10 +45,9 @@ import time
 from typing import Optional
 
 import numpy as np
+from packaging.version import Version
 
 import warnings
-import pkg_resources
-from pkg_resources import VersionConflict
 
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -89,15 +88,15 @@ class CPM_choco(SolverInterface):
         try:
             # check if pychoco is installed
             import pychoco as chc
+            chc_version = CPM_choco.version()
             # check it's the correct version
             # CPMPy uses features only available from 0.2.1
-            pkg_resources.require("pychoco>=0.2.1")
+            if Version(chc_version) < Version("0.2.1"):
+                warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
+                              f"but you have version {chc_version}.")
+                return False
             return True
         except ModuleNotFoundError:
-            return False
-        except VersionConflict: # unsupported version of pychoco
-            warnings.warn(f"CPMpy uses features only available from Pychoco version 0.2.1, "
-                          f"but you have version {pkg_resources.get_distribution('pychoco').version}.")
             return False
         except Exception as e:
             raise e
@@ -107,9 +106,10 @@ class CPM_choco(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('pychoco').version
-        except pkg_resources.DistributionNotFound:
+            return version('pychoco')
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):

@@ -127,12 +127,13 @@ class CPM_cplex(SolverInterface):
         
         Two version numbers get returned: ``<docplex version>/<solver version>``
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            import pkg_resources
             import cplex
-            cpx = cplex.Cplex()
-            return f"{pkg_resources.get_distribution('docplex').version}/{cpx.get_version()}"
-        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            cplex_version = cplex.Cplex().get_version()
+            docplex_version = version("docplex")
+            return f"{docplex_version}/{cplex_version}"
+        except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -349,6 +350,10 @@ class CPM_cplex(SolverInterface):
         if cpm_expr.name == "sub":
             a,b = self.solver_vars(cpm_expr.args)
             return a - b
+
+        if cpm_expr.name == "mul":
+            a,b = self.solver_vars(cpm_expr.args)
+            return a * b
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
@@ -374,10 +379,10 @@ class CPM_cplex(SolverInterface):
         cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub", "mul"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs", "mul"}), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub", "min", "max", "abs"}), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -424,10 +429,6 @@ class CPM_cplex(SolverInterface):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     cplexlhs = self._make_numexpr(lhs)
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
-
-                elif lhs.name == 'mul':
-                    raise NotImplementedError(f'CPLEX only supports quadratic constraints that define a convex region, i.e. quadratic equalities are not supported: {cpm_expr}')
-
                 else:
                     # Global functions
                     if lhs.name == 'min':

@@ -70,7 +70,7 @@ from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
-def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, csemap=None):
+def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -128,14 +128,40 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                             continue
                         elif is_false_cst(lin):
                             indicator_constraints=[] # do not add any constraints
-                            newlist+=linearize_constraint([~cond], supported=supported, csemap=csemap) # post linear version of unary constraint
+                            newlist += linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified) # post linear version of unary constraint
                             break # do not need to add other
-                        else:
+                        elif "->" in supported and not reified:
                             indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
+                        else: # need to linearize the implication constraint itself
+                            # either -> is not supported, or we are in a reified context (nested -> constraints are not linear)
+                            assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
+                            if lin.args[0].name not in {"sum", "wsum"}:
+                                assert lin.args[0].name in supported, f"Unexpected rhs of implication: {lin}, it is not supported ({supported})"
+                                indicator_constraints.append(cond.implies(lin))
+                                continue
+
+                            # need to write as big-M
+                            assert lin.args[0].name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as rhs of implication constraint, but got {lin}"
+                            assert is_num(lin.args[1])
+                            lb, ub = get_bounds(lin.args[0])
+                            if lin.name == "<=":
+                                M = lin.args[1] - ub # subtracting M from lhs will always satisfy the implied constraint
+                                lin.args[0] += M * ~cond
+                                indicator_constraints.append(lin)
+                            elif lin.name == ">=":
+                                M = lin.args[1] - lb # adding M to lhs will always satisfy the implied constraint
+                                lin.args[0] += M * ~cond
+                                indicator_constraints.append(lin)
+                            elif lin.name == "==":
+                                indicator_constraints += linearize_constraint([cond.implies(lin.args[0] <= lin.args[1]),
+                                                                               cond.implies(lin.args[0] >= lin.args[1])],
+                                                                              supported=supported, reified=reified, csemap=csemap)
+                            else:
+                                raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
                     newlist+=indicator_constraints
 
                     # ensure no new solutions are created
-                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
+                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr)) - {cond, ~cond}
                     newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified, csemap=csemap)
 
             else: # supported operator
@@ -158,9 +184,26 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
             # linearize unsupported operators
             elif isinstance(lhs, Operator) and lhs.name not in supported:
 
-                if lhs.name == "mul" and is_num(lhs.args[0]):
-                    lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
-                    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+                if lhs.name == "mul":
+                    bv_idx = None
+                    if is_num(lhs.args[0]): # const * iv <comp> rhs
+                        lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
+                        newlist += linearize_constraint([eval_comparison(cpm_expr.name, lhs, rhs)], supported=supported, reified=reified, csemap=csemap)
+                        continue
+                    elif isinstance(lhs.args[0], _BoolVarImpl):
+                        bv_idx = 0
+                    elif isinstance(lhs.args[1], _BoolVarImpl):
+                        bv_idx = 1
+
+                    if bv_idx is not None:
+                        # bv * iv <comp> rhs, rewrite to (bv -> iv <comp> rhs) & (~bv -> 0 <comp> rhs)
+                        bv, iv = lhs.args[bv_idx], lhs.args[1-bv_idx]
+                        bv_true = bv.implies(eval_comparison(cpm_expr.name, iv, rhs))
+                        bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
+                        newlist += linearize_constraint(simplify_boolean([bv_true, bv_false]), supported=supported, reified=reified, csemap=csemap)
+                        continue
+                    else:
+                        raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
 
                 elif lhs.name == "pow" and "pow" not in supported:
                     if "mul" not in supported:
