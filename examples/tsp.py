@@ -48,15 +48,19 @@ model.minimize(travel_distance)
 
 # print(model)
 
-model.solve()
-print(model.status())
+if model.solve():
+    print(model.status())
 
-print("Total Cost of solution", travel_distance.value())
-def display(sol):
-    x = 0
-    msg = "0"
-    while sol[x] != 0:
-        x = sol[x]
-        msg += f" --> {x}"
-    print(msg + " --> 0")
-display(x.value())
+    print("Total Cost of solution", travel_distance.value())
+    def display(sol):
+        x = 0
+        msg = "0"
+        while sol[x] != 0:
+            x = sol[x]
+            msg += f" --> {x}"
+        print(msg + " --> 0")
+    display(x.value())
+else:
+    print(model.status())
+    print("No solution found")
+

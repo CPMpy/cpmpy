@@ -42,6 +42,7 @@
         pumpkin
         cplex
         hexaly
+        rc2
 
     =========================
     List of helper submodules
@@ -76,3 +77,4 @@ from .pindakaas import CPM_pindakaas
 from .pumpkin import CPM_pumpkin
 from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
+from .rc2 import CPM_rc2
