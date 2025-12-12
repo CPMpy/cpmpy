@@ -51,7 +51,7 @@
     ==============
 """
 import warnings
-from typing import Optional
+from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -473,7 +473,7 @@ class CPM_cplex(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         CPLEX supports warmstarting the solver with a (in)feasible solution.
         This is done using MIP starts which provide the solver with a starting point
@@ -510,7 +510,7 @@ class CPM_cplex(SolverInterface):
 
             self.cplex_model.add_mip_start(warmstart)
 
-    def solveAll(self, display=None, time_limit: Optional[float]=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit: Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
