@@ -70,7 +70,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
-from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, IntVarEncDirect
+from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, IntVarEncDirect, get_user_vars
 
 
 class CPM_rc2(CPM_pysat):
@@ -163,6 +163,9 @@ class CPM_rc2(CPM_pysat):
         # initialise everything else and post the constraints/objective (skip PySAT itself)
         super(CPM_pysat, self).__init__(name="rc2", cpm_model=cpm_model)
 
+    def has_objective(self):
+        return self.objective_ is not None
+
     @property
     def native_model(self):
         """
@@ -193,14 +196,9 @@ class CPM_rc2(CPM_pysat):
         self.solver_vars(list(self.user_vars))
 
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        user_vars = set()
-        for x in self.user_vars:
-            if isinstance(x, _BoolVarImpl):
-                user_vars.add(x)
-            else:
-                # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
-        self.user_vars = user_vars
+        self.user_vars = get_user_vars(self.user_vars, self.ivarmap)
+        
+        # TODO I believe assumptions can be added in the WCNF as `soft`
 
         # TODO: set time limit
         if time_limit is not None:
@@ -215,7 +213,7 @@ class CPM_rc2(CPM_pysat):
             slv = rc2.RC2(self.pysat_solver, adapt=adapt, exhaust=exhaust, minz=minz, **kwargs)
 
         sol = slv.compute()  # return one solution
-        
+
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = slv.oracle_time()
@@ -225,6 +223,9 @@ class CPM_rc2(CPM_pysat):
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         else:
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+
+        return self._process_solution(sol)
+        
 
         # translate solution values (of user specified variables only)
         if sol is not None:

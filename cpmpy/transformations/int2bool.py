@@ -431,3 +431,14 @@ class IntVarEncLog(IntVarEnc):
 
 def _dom_size(x):
     return x.ub + 1 - x.lb
+
+def get_user_vars(user_vars, ivarmap):
+    """Convert user vars to Booleans. This to ensure solveAll behaves consistently."""
+    bool_user_vars = set()
+    for x in user_vars:
+        if isinstance(x, _BoolVarImpl):
+            bool_user_vars.add(x)
+        else:
+            # extends set with encoding variables of `x`
+            bool_user_vars.update(ivarmap[x.name].vars())
+    return bool_user_vars
