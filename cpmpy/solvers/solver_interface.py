@@ -145,6 +145,8 @@ class SolverInterface(object):
 
             Overwrites self.cpm_status
 
+            :param time_limit: optional, time limit in seconds
+
             :return: Bool:
                 - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
                 - False     if no solution is found
