@@ -234,6 +234,64 @@ class Abs(GlobalFunction):
             return -ub, -lb
         return 0, max(-lb, ub)
 
+class Division(GlobalFunction):
+
+    def __init__(self, x,y,):
+        super().__init__("div", [x,y])
+
+    def __repr__(self):
+        x,y = self.args
+        return "{} // {}".format(f"({x})" if isinstance(x, Expression) else x,
+                                  f"({y})" if isinstance(y, Expression) else y)
+
+    def decompose(self):
+        # integer division, rounding towards zero
+        # x / y = z implemented as x = y * z + r with r the remainder and |r| < |y|
+        #      r can be positive or negative, so also ensure that |y| * |z| <= |x|
+
+        x,y = self.args
+        y_lb, y_ub = get_bounds(y)
+        assert not y_lb <= 0 <= y_ub, "Division constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
+
+        _div = intvar(*self.get_bounds())
+        r = intvar(*get_bounds(x % y)) # remainder
+
+        return _div, [((_div * y) + r) == x, abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
+
+    def value(self):
+
+        x,y = argvals(self.args)
+        try:
+            return int(x / y)  # integer division
+        except ZeroDivisionError:
+            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
+                                          + "\n Use argval(expr) to get the value of expr with relational "
+                                            "semantics.")
+
+    def get_bounds(self):
+
+        x,y = self.args
+        x_lb, x_ub = get_bounds(x)
+        y_lb, y_ub = get_bounds(y)
+
+        if y_lb <= 0 <= y_ub:
+            if y_lb == y_ub:
+                raise ZeroDivisionError(f"Domain of {self.args[1]} only contains 0")
+            if y_lb == 0:
+                y_lb = 1
+            if y_ub == 0:
+                y_ub = -1
+            bounds = [
+                int(x_lb / y_lb), int(x_lb / -1), int(x_lb / 1), int(x_lb / y_ub),
+                int(x_ub / y_lb), int(x_ub / -1), int(x_ub / 1), int(x_ub / y_ub)
+            ]
+        else:
+            bounds = [int(x_lb / y_lb), int(x_lb / y_ub), int(x_ub / y_lb), int(x_ub / y_ub)]
+
+        return min(bounds), max(bounds)
+
+
+
 class Modulo(GlobalFunction):
 
     def __init__(self, x, y):
