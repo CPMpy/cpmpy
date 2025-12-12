@@ -61,7 +61,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
-from ..transformations.linearize import canonical_comparison, only_positive_coefficients
+from ..transformations.linearize import canonical_comparison, only_positive_coefficients_
 from ..expressions.utils import is_int, flatlist
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.decompose_global import decompose_in_tree
@@ -70,7 +70,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
-from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, IntVarEncDirect, get_user_vars
+from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, IntVarEncDirect, get_user_vars, _encode_lin_expr
 
 
 class CPM_rc2(CPM_pysat):
@@ -283,39 +283,19 @@ class CPM_rc2(CPM_pysat):
             weights, xs = flat_obj.args
         else:
             raise NotImplementedError(f"CPM_rc2: Non supported objective {flat_obj} (yet?)")
-        
-        # transform weighted integers to weighted sum of Booleans
-        new_weights, new_xs = [], []
-        for w, x in zip(weights, xs):
-            if isinstance(x, _BoolVarImpl):
-                if w != 0:
-                    new_weights.append(w)
-                    new_xs.append(x)
-            elif isinstance(x, _IntVarImpl):
-                # replace the intvar with its linear encoding
-                # ensure encoding is created
-                self.solver_var(x)
-                enc = self.ivarmap[x.name]
-                tlst, tconst = enc.encode_term(w)
-                const += tconst
-                for encw, encx in tlst:
-                    if encw != 0:
-                        new_weights.append(encw)
-                        new_xs.append(encx)
-            elif isinstance(x, int):
-                const += w*x
-            else:
-                raise NotImplementedError(f"CPM_rc2: Non supported term {w,x} in objective {flat_obj} (yet?)")
 
-        # positive weights only, flip negative
-        for i in range(len(new_weights)):  # inline replace
-            assert new_weights[i] != 0, f"CPM_rc2: positive weights only, got {new_weights[i],new_xs[i]}"
-            if new_weights[i] < 0:  # negative weight
-                # wi*vi == wi*(1-(~vi)) == wi + -wi*~vi  # where wi is negative
-                const += new_weights[i]
-                new_weights[i] = -new_weights[i]
-                new_xs[i] = ~new_xs[i]
-        
+        try:
+            terms, cons, k = _encode_lin_expr(self.ivarmap, xs, weights, self.encoding)
+        except TypeError:
+            raise NotImplementedError(f"CPM_rc2: Unsupported objective: {flat_obj}")
+
+        self += cons
+        const += k
+
+        ws, xs = zip(*terms)  # unzip
+        new_weights, new_xs, k = only_positive_coefficients_(ws, xs)
+        const += k
+
         return new_weights, new_xs, const
 
 

@@ -546,6 +546,12 @@ def canonical_comparison(lst_of_expr):
 
     return newlist
 
+def only_positive_coefficients_(ws, xs):
+    indices = {i for i, (w, x) in enumerate(zip(ws, xs)) if w < 0 and isinstance(x, _BoolVarImpl)}
+    nw, na = zip(*[(-w, ~x) if i in indices else (w, x) for i, (w, x) in enumerate(zip(ws, xs))])
+    cons = sum(ws[i] for i in indices)
+    return nw, na, cons
+
 def only_positive_coefficients(lst_of_expr):
     """
         Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
@@ -566,9 +572,8 @@ def only_positive_coefficients(lst_of_expr):
             # :: ... + c*~b + ... <= k+c
             if lhs.name == "wsum":
                 weights, args = lhs.args
-                idxes = {i for i, (w, a) in enumerate(zip(weights, args)) if w < 0 and isinstance(a, _BoolVarImpl)}
-                nw, na = zip(*[(-w, ~a) if i in idxes else (w, a) for i, (w, a) in enumerate(zip(weights, args))])
-                rhs += sum(-weights[i] for i in idxes)
+                nw, na, k = only_positive_coefficients_(weights, args)
+                rhs -= k
 
                 # Simplify wsum to sum if all weights are 1
                 if all(w == 1 for w in nw):
