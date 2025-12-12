@@ -19,13 +19,14 @@
         ExitStatus
 
 """
-from typing import Optional
+from typing import Optional, List
 import warnings
 import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
+from ..expressions.variables import _NumVarImpl
 from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import any
@@ -229,7 +230,7 @@ class SolverInterface(object):
 
     # OPTIONAL functions
 
-    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -297,7 +298,7 @@ class SolverInterface(object):
 
         return solution_count
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         For warmstarting the solver with a variable assignment
 
