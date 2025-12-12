@@ -306,10 +306,12 @@ class CPM_rc2(CPM_pysat):
                 if x.name not in self.ivarmap:
                     self.solver_var(expr)  # make sure its known
                 # replace the intvar with its linear encoding
-                enc = self.ivarmap[expr.name]
-                assert enc.name == "wsum", "CPM_rc2: expected encoding to be wsum, got {enc}"
-                new_weights.extend(enc.args[0])
-                new_xs.extend(enc.args[1])
+                enc = self.ivarmap[x.name]
+                terms, const = enc.encode_term(w)
+                self.objective_const_ += const
+                encw, encx = zip(*terms)
+                new_weights.extend(encw)
+                new_xs.extend(encx)
             else:
                 raise NotImplementedError(f"CPM_rc2: Non supported objective {expr} (yet?)")
 

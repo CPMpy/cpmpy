@@ -41,6 +41,7 @@ SOLVERS = [
     "ortools",
     "gurobi",
     "minizinc",
+    "rc2",
 ]
 
 
