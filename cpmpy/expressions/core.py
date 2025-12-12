@@ -35,7 +35,6 @@
     `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
     `x - y`                      `Operator("sum", [x, -y])`                    
     `x * y`                      `Operator("mul", [x, y])`                     
-    `x // y`                     `Operator("div", [x, y])` (integer division)
     `x ** y`                     `Operator("pow", [x, y])` (power)
     ===========================  ===============================================                   
 
@@ -373,10 +372,10 @@ class Expression(object):
     def __floordiv__(self, other):
         if is_num(other) and other == 1:
             return self
-        return Operator("div", [self, other])
+        return cp.Division(self, other)
 
     def __rfloordiv__(self, other):
-        return Operator("div", [other, self])
+        return cp.Division(other, self)
 
     def __mod__(self, other):
         return cp.Modulo(self, other)
@@ -583,11 +582,10 @@ class Operator(Expression):
         'wsum': (2, False),
         'sub': (2, False), # x - y
         'mul': (2, False),
-        'div': (2, False),
         'pow': (2, False),
         '-':   (1, False), # -x
     }
-    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -707,13 +705,7 @@ class Operator(Expression):
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
         elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
-        elif self.name == "div":
-            try:
-                return int(arg_vals[0] / arg_vals[1])  # integer division
-            except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                              + "\n Use argval(expr) to get the value of expr with relational "
-                                                "semantics.")
+
         # boolean
         elif self.name == "and": return all(arg_vals)
         elif self.name == "or" : return any(arg_vals)
@@ -756,23 +748,6 @@ class Operator(Expression):
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             lowerbound, upperbound = lb1-ub2, ub1-lb2
-        elif self.name == 'div':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 <= 0 <= ub2:
-                if lb2 == ub2:
-                    raise ZeroDivisionError(f"Domain of {self.args[1]} only contains 0")
-                if lb2 == 0:
-                    lb2 = 1
-                if ub2 == 0:
-                    ub2 = -1
-                bounds = [
-                    int(lb1 / lb2), int(lb1 / -1), int(lb1 / 1), int(lb1 / ub2),
-                    int(ub1 / lb2), int(ub1 / -1), int(ub1 / 1), int(ub1 / ub2)
-                ]
-            else:
-                bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)]
-            lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'pow':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
