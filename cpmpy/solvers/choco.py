@@ -359,7 +359,7 @@ class CPM_choco(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
-        supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
+        supported = {"min", "max", "abs", "div", "mod", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
                      "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
         obj, decomp_cons = decompose_objective(expr, supported=supported, csemap=self._csemap)
@@ -414,7 +414,7 @@ class CPM_choco(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "count", "element", "mod", "alldifferent", "alldifferent_except0", "allequal",
+        supported = {"min", "max", "abs", "count", "element","div", "mod", "alldifferent", "alldifferent_except0", "allequal",
                      "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
 
