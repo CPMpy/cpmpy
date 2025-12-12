@@ -282,7 +282,7 @@ class CPM_hexaly(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         # no flattening, so also no safening required
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element", "mod"})
+        cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element", "mod", "div"})
         return cpm_cons
 
     def add(self, cpm_expr_orig):
@@ -353,14 +353,6 @@ class CPM_hexaly(SolverInterface):
             if cpm_expr.name == "mul":
                 a,b = self._hex_expr(cpm_expr.args)
                 return a * b
-            if cpm_expr.name == "div":
-                a, b = self._hex_expr(cpm_expr.args)
-                # ensure we are rounding towards zero
-                return self.hex_model.iif((a >= 0) & (b >= 0), self.hex_model.floor(a / b), # result is positive
-                       self.hex_model.iif((a <= 0) & (b <= 0), self.hex_model.floor(a / b), # result is positive
-                       self.hex_model.iif((a >= 0) & (b <= 0), self.hex_model.ceil(a / b), # result is negative
-                       self.hex_model.iif((a <= 0) & (b >= 0), self.hex_model.ceil(a / b), 0)))) # result is negative
-
             if cpm_expr.name == "pow":
                 a, b = self._hex_expr(cpm_expr.args)
                 return a ** b
@@ -389,6 +381,13 @@ class CPM_hexaly(SolverInterface):
                 return self.hex_model.min(*self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "max":
                 return self.hex_model.max(*self._hex_expr(cpm_expr.args))
+            if cpm_expr.name == "div":
+                a, b = self._hex_expr(cpm_expr.args)
+                # ensure we are rounding towards zero
+                return self.hex_model.iif((a >= 0) & (b >= 0), self.hex_model.floor(a / b), # result is positive
+                       self.hex_model.iif((a <= 0) & (b <= 0), self.hex_model.floor(a / b), # result is positive
+                       self.hex_model.iif((a >= 0) & (b <= 0), self.hex_model.ceil(a / b), # result is negative
+                       self.hex_model.iif((a <= 0) & (b >= 0), self.hex_model.ceil(a / b), 0)))) # result is negative
             if cpm_expr.name == "mod":
                 a, b = self._hex_expr(cpm_expr.args)
                 return a % b
