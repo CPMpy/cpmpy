@@ -121,6 +121,20 @@ class CPM_pindakaas(SolverInterface):
     def native_model(self):
         return self.pdk_solver
 
+    def _int2bool_user_vars(self):
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
+        user_vars = set()
+        for x in self.user_vars:
+            if isinstance(x, _BoolVarImpl):
+                user_vars.add(x)
+            else:
+                # extends set with encoding variables of `x`
+                user_vars.update(self.ivarmap[x.name].vars())
+        return user_vars
+
     def solve(self, time_limit=None, assumptions=None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
@@ -135,19 +149,7 @@ class CPM_pindakaas(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
-
-        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        user_vars = set()
-        for x in self.user_vars:
-            if isinstance(x, _BoolVarImpl):
-                user_vars.add(x)
-            else:
-                # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
-
-        self.user_vars = user_vars
+        self.user_vars = self._int2bool_user_vars()
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -263,22 +265,33 @@ class CPM_pindakaas(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
+    def _add_clause(self, cpm_expr):
+        if not isinstance(cpm_expr, list):
+            raise TypeError
+
+        self.pdk_solver.add_clause(self.solver_vars(cpm_expr))
+
     def _post_constraint(self, cpm_expr, conditions=[]):
+        if not isinstance(conditions, list):
+            raise TypeError
+
         """Add a single, *transformed* constraint, implied by conditions."""
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                self.pdk_solver.add_clause(conditions)
+                self._add_clause(conditions)
 
         elif isinstance(cpm_expr, _BoolVarImpl):  # (implied) literal
-            self.pdk_solver.add_clause(conditions + [self.solver_var(cpm_expr)])
+            self._add_clause(conditions + [cpm_expr])
 
         elif cpm_expr.name == "or":  # (implied) clause
-            self.pdk_solver.add_clause(conditions + self.solver_vars(cpm_expr.args))
+            self._add_clause(conditions + cpm_expr.args)
 
         elif cpm_expr.name == "->":  # implication
             a0, a1 = cpm_expr.args
-            self._post_constraint(a1, conditions=conditions + [~self.solver_var(a0)])
+            if not isinstance(a0, _BoolVarImpl):
+                raise TypeError
+            self._post_constraint(a1, conditions=conditions + [~a0])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
             assert cpm_expr.name in {"<=", ">=", "=="}, (
@@ -300,7 +313,9 @@ class CPM_pindakaas(SolverInterface):
 
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=conditions)
+            self.pdk_solver.add_encoding(
+                eval_comparison(cpm_expr.name, lhs, rhs), conditions=self.solver_vars(conditions)
+            )
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 
