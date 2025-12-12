@@ -230,7 +230,7 @@ class CPM_choco(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
