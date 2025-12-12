@@ -48,7 +48,8 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+
 
 class CPM_hexaly(SolverInterface):
     """
@@ -247,11 +248,19 @@ class CPM_hexaly(SolverInterface):
             are permanently posted to the solver)
         """
         from hexaly.optimizer import HxObjectiveDirection
+
+        # save user vars
+        get_variables(expr, collect=self.user_vars)
+
+        # transform objective
+        obj, decomp_cons = decompose_objective(expr, supported={"min", "max", "abs", "element", "div", "mod"}, csemap=self._csemap)
+        self.add(decomp_cons)
+
         # make objective function or variable and post
         while self.has_objective(): # remove prev objective(s)
             self.hex_model.remove_objective(0)
         self.is_satisfaction = False
-        hex_obj = self._hex_expr(expr)
+        hex_obj = self._hex_expr(obj)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
         else:
@@ -278,7 +287,7 @@ class CPM_hexaly(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         # no flattening, so also no safening required
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element", "mod", "div"})
         return cpm_cons
 
     def add(self, cpm_expr_orig):
@@ -349,17 +358,6 @@ class CPM_hexaly(SolverInterface):
             if cpm_expr.name == "mul":
                 a,b = self._hex_expr(cpm_expr.args)
                 return a * b
-            if cpm_expr.name == "div":
-                a, b = self._hex_expr(cpm_expr.args)
-                # ensure we are rounding towards zero
-                return self.hex_model.iif((a >= 0) & (b >= 0), self.hex_model.floor(a / b), # result is positive
-                       self.hex_model.iif((a <= 0) & (b <= 0), self.hex_model.floor(a / b), # result is positive
-                       self.hex_model.iif((a >= 0) & (b <= 0), self.hex_model.ceil(a / b), # result is negative
-                       self.hex_model.iif((a <= 0) & (b >= 0), self.hex_model.ceil(a / b), 0)))) # result is negative
-
-            if cpm_expr.name == "mod":
-                a, b = self._hex_expr(cpm_expr.args)
-                return a % b
             if cpm_expr.name == "pow":
                 a, b = self._hex_expr(cpm_expr.args)
                 return a ** b
@@ -388,6 +386,16 @@ class CPM_hexaly(SolverInterface):
                 return self.hex_model.min(*self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "max":
                 return self.hex_model.max(*self._hex_expr(cpm_expr.args))
+            if cpm_expr.name == "div":
+                a, b = self._hex_expr(cpm_expr.args)
+                # ensure we are rounding towards zero
+                return self.hex_model.iif((a >= 0) & (b >= 0), self.hex_model.floor(a / b), # result is positive
+                       self.hex_model.iif((a <= 0) & (b <= 0), self.hex_model.floor(a / b), # result is positive
+                       self.hex_model.iif((a >= 0) & (b <= 0), self.hex_model.ceil(a / b), # result is negative
+                       self.hex_model.iif((a <= 0) & (b >= 0), self.hex_model.ceil(a / b), 0)))) # result is negative
+            if cpm_expr.name == "mod":
+                a, b = self._hex_expr(cpm_expr.args)
+                return a % b
             raise ValueError(f"Global function {cpm_expr} is not supported by hexaly")
 
         elif isinstance(cpm_expr, DirectConstraint):

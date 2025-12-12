@@ -56,9 +56,9 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
@@ -351,13 +351,23 @@ class CPM_choco(SolverInterface):
 
             .. note::
                 technical side note: constraints created during conversion of the objective
-                are premanently posted to the solver. Choco accepts variables to maximize or minimize
+                are permanently posted to the solver. Choco accepts variables to maximize or minimize
                 so it is needed to post constraints and create auxiliary variables
         """
 
+        # save user vars
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        supported = {"min", "max", "abs", "div", "mod", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
+                     "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
+                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
+        obj, decomp_cons = decompose_objective(expr, supported=supported, csemap=self._csemap)
+
         # make objective function non-nested
-        obj_var = intvar(*get_bounds(expr))
-        self += obj_var == expr
+        obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
+
+        self.add(decomp_cons + obj_cons)
 
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
@@ -404,7 +414,7 @@ class CPM_choco(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
+        supported = {"min", "max", "abs", "count", "element","div", "mod", "alldifferent", "alldifferent_except0", "allequal",
                      "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
                      "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
 

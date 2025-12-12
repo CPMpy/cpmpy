@@ -6,7 +6,7 @@ from copy import copy
 
 from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray, cpm_array
 from ..expressions.core import Expression, Operator, BoolVal
-from ..expressions.utils import get_bounds, is_num
+from ..expressions.utils import get_bounds, is_num, is_any_list
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.python_builtins import all as cpm_all
@@ -248,4 +248,13 @@ def _safen_hole(cpm_expr, exclude, idx_to_safen):
 
     return is_defined, output_var, toplevel
 
+
+def safen_objective(expr):
+    if is_any_list(expr):
+        raise ValueError(f"Expected numerical expression as objective but got a list {expr}")
+
+    toplevel, nbc = [],[]
+    safe_expr = no_partial_functions([expr], _toplevel=toplevel, _nbc=nbc)
+    assert len(safe_expr) == 1
+    return safe_expr[0], toplevel + nbc
 
