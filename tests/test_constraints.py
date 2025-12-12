@@ -26,33 +26,33 @@ NUM_GLOBAL = {
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Modulo"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo"
 }
 
 # Solvers not supporting arithmetic constraints (numeric comparisons)
 SAT_SOLVERS = {"pysdd"}
 
-EXCLUDE_GLOBAL = {"pysat": {"Modulo"},  # with int2bool,
-                  "pysdd": NUM_GLOBAL | {"Xor","Modulo"},
-                  "pindakaas": {"Modulo"},
+EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo"},  # with int2bool,
+                  "pysdd": NUM_GLOBAL | {"Xor"},
+                  "pindakaas": {"Division", "Modulo"},
                   "z3": {},
                   "choco": {},
                   "ortools":{},
                   "exact": {},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
                   "gcs": {},
-                  "cplex": {"Modulo"}
+                  "cplex": {"Division", "Modulo"}
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {},
-                     "pysat": {"mul", "div", "pow", "mod"},  # int2bool but mul, and friends, not linearized
-                     "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "pindakaas": {"mul", "div", "pow", "mod"},
+                     "pysat": {"mul", "pow", "mod"},  # int2bool but mul, and friends, not linearized
+                     "pysdd": {"sum", "wsum", "sub" "pow", "abs", "mul","-"},
+                     "pindakaas": {"mul", "pow"},
                      "exact": {},
                      "cplex": {"mul", "div", "pow"},
-                     "pumpkin": {"pow", "mod"},
+                     "pumpkin": {"pow"},
                      }
 
 # Variables to use in the rest of the test script
@@ -92,7 +92,7 @@ def numexprs(solver):
             yield Operator(name, NUM_ARGS[:2])
             if solver != "minizinc": # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
                 yield Operator(name, [3,BOOL_ARGS[0]])
-        elif name == "div" or name == "pow":
+        elif name == "pow":
             yield Operator(name, [NN_VAR,3])
         elif arity != 0:
             yield Operator(name, NUM_ARGS[:arity])
@@ -120,6 +120,8 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, 3)
         elif name == "Among":
             expr = cls(NUM_ARGS, [1,2])
+        elif name == "Division":
+            expr = cls(*NUM_ARGS[:2])
         elif name == "Modulo":
             expr = cls(*NUM_ARGS[:2])
         else:
