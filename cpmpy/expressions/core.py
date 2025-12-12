@@ -566,6 +566,28 @@ class Comparison(Expression):
         elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
         return None # default
 
+    def get_bounds(self):
+        (lb1, ub1), (lb2, ub2) = get_bounds(self.args[0]), get_bounds(self.args[1])
+        if self.name == "==":
+            if lb1 == ub1 == lb2 == ub2: return (1,1)   # equal domains, trivially true
+            if ub1 < lb2 or ub2 < lb1: return (0,0)     # disjoint, trivially false
+        if self.name == "!=":
+            if ub1 < lb2 or ub2 < lb1: return (1,1)    # disjoint, trivially true
+            if lb1 == ub1 == lb2 == ub2: return (0,0)     # equal domains, trivially false
+        if self.name == "<=":
+            if ub1 <= lb2: return (1,1) # domain of lhs is leq domain of rhs
+            if lb1 > ub2: return (0,0)  # domain of lhs is gt domain of rhs
+        if self.name == "<":
+            if ub1 < lb2: return (1,1)  # domain of lhs is lt domain of rhs
+            if lb1 >= ub2: return (0,0) # domain of lhs is geq domain of rhs
+        if self.name == ">=":
+            if lb1 >= ub2: return (1,1)  # domain of lhs is geq domain of rhs
+            if ub1 < lb2: return (0,0)  # domain of lhs is lt domain of rhs
+        if self.name == ">":
+            if lb1 > ub2: return (1,1)  # domain of lhs is gt domain of rhs
+            if ub1 <= lb2: return (0,0) # domain of lhs is leq domain of rhs
+        return (0,1)
+
 
 class Operator(Expression):
     """
@@ -751,18 +773,10 @@ class Operator(Expression):
             lowerbound, upperbound = sum(lbs), sum(ubs)
         elif self.name == 'wsum':
             weights, vars = self.args
-            bounds = []
-            lowerbound, upperbound = 0,0
-            #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
-            for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]):
-                x,y = int(w) * lb, int(w) * ub
-                if x <= y: # x is the lb of this arg
-                    lowerbound += x
-                    upperbound += y
-                else:
-                    lowerbound += y
-                    upperbound += x
-
+            lbs, ubs = get_bounds(vars)
+            lbs, ubs = [w * lb for w,lb in zip(weights,lbs)], [w * ub for w, ub in zip(weights,ubs)]
+            lowerbound = sum(lb if lb <= ub else ub for lb,ub in zip(lbs,ubs))
+            upperbound = sum(ub if ub >= lb else lb for lb, ub in zip(lbs, ubs))
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])

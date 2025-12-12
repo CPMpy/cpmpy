@@ -167,18 +167,18 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(flatten_constraint( x&y&~z )), "[BV0, BV1, ~BV2]" )
         self.assertEqual( str(flatten_constraint( x.implies(y) )), "[(BV0) -> (BV1)]" )
         self.assertEqual( str(flatten_constraint( x|(y.implies(z)) )), "[or([BV0, ~BV1, BV2])]" )
-        self.assertEqual( str(flatten_constraint( (a > 10)&x )), "[IV0 > 10, BV0]" )
+        self.assertEqual( str(flatten_constraint( (a > 8)&x )), "[IV0 > 8, BV0]" )
         cp.boolvar() # increase counter
-        self.assertEqual( str(flatten_constraint( (a > 10).implies(x) )), "[(IV0 > 10) -> (BV0)]" )
+        self.assertEqual( str(flatten_constraint( (a > 8).implies(x) )), "[(IV0 > 8) -> (BV0)]" )
         cp.boolvar() # increase counter
-        self.assertEqual( str(flatten_constraint( (a > 10) )), "[IV0 > 10]" )
-        self.assertEqual( str(flatten_constraint( (a > 10) == 1 )), "[IV0 > 10]" )
-        self.assertEqual( str(flatten_constraint( (a > 10) == 0 )), "[IV0 <= 10]" )
-        self.assertEqual( str(flatten_constraint( (a > 10) == x )), "[(IV0 > 10) == (BV0)]" )
+        self.assertEqual( str(flatten_constraint( (a > 8) )), "[IV0 > 8]" )
+        self.assertEqual( str(flatten_constraint( (a > 8) == 1 )), "[IV0 > 8]" )
+        self.assertEqual( str(flatten_constraint( (a > 8) == 0 )), "[IV0 <= 8]" )
+        self.assertEqual( str(flatten_constraint( (a > 8) == x )), "[(IV0 > 8) == (BV0)]" )
         #self.assertEqual( str(flatten_constraint( x == (a > 10) )), "[(IV0 > 10) == (BV0)]" ) # TODO, make it do the swap (again)
-        self.assertEqual( str(flatten_constraint( (a > 10) | (b + c > 2) )), "[(BV5) or (BV6), (IV0 > 10) == (BV5), ((IV1) + (IV2) > 2) == (BV6)]" )
-        self.assertEqual( str(flatten_constraint( a > 10 )), "[IV0 > 10]" )
-        self.assertEqual( str(flatten_constraint( 10 > a )), "[IV0 < 10]" ) # surprising
+        self.assertEqual( str(flatten_constraint( (a > 8) | (b + c > 2) )), "[(BV5) or (BV6), (IV0 > 8) == (BV5), ((IV1) + (IV2) > 2) == (BV6)]" )
+        self.assertEqual( str(flatten_constraint( a > 8 )), "[IV0 > 8]" )
+        self.assertEqual( str(flatten_constraint( 8 > a )), "[IV0 < 8]" ) # surprising
         self.assertEqual( str(flatten_constraint( a+b > c )), "[((IV0) + (IV1)) > (IV2)]" )
         #self.assertEqual( str(flatten_constraint( c < a+b )), "[((IV0) + (IV1)) > (IV2)]" ) # TODO, make it do the swap (again)
         self.assertEqual( str(flatten_constraint( (a+b > c) == x|y )), "[(((IV0) + (IV1)) > (IV2)) == (BV7), ((BV0) or (BV1)) == (BV7)]" )
@@ -213,7 +213,7 @@ class TestFlattenExpr(unittest.TestCase):
         self.assertEqual( str(a % 1 == 0), "(IV0) mod 1 == 0" )
 
         # boolexpr as numexpr
-        self.assertEqual( str(flatten_constraint((a + b == 2) <= c)), "[(BV11) <= (IV2), ((IV0) + (IV1) == 2) == (BV11)]" )
+        self.assertEqual( str(flatten_constraint((a + b == 2) < c)), "[(BV11) < (IV2), ((IV0) + (IV1) == 2) == (BV11)]" )
 
         # != in boolexpr, bug #170
         self.assertEqual( str(normalized_boolexpr(x != (a == 1))), "((BV12) == (~BV0), [(IV0 == 1) == (BV12)])" )

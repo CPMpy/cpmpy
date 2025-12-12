@@ -9,7 +9,7 @@ class TransSimplify(unittest.TestCase):
 
     def setUp(self) -> None:
         self.bvs = cp.boolvar(shape=3, name="bv")
-        self.ivs = cp.intvar(0, 5, shape=3, name="iv")
+        self.ivs = cp.intvar(-1, 5, shape=3, name="iv")
 
         self.transform = lambda x: simplify_boolean(toplevel_list(x))
 
@@ -19,10 +19,10 @@ class TransSimplify(unittest.TestCase):
         expr = Operator("or", self.bvs.tolist() + [True])
         self.assertEqual(str(self.transform(expr)), "[boolval(True)]")
 
-        expr = Operator("and", self.bvs.tolist() + [False]) + self.ivs[0] >= 10
-        self.assertEqual(str(self.transform(expr)), "[0 + (iv[0]) >= 10]")
-        expr = Operator("and", self.bvs.tolist() + [True]) + self.ivs[0] >= 10
-        self.assertEqual(str(self.transform(expr)), "[(and([bv[0], bv[1], bv[2]])) + (iv[0]) >= 10]")
+        expr = Operator("and", self.bvs.tolist() + [False]) + self.ivs[0] >= 3
+        self.assertEqual(str(self.transform(expr)), "[0 + (iv[0]) >= 3]")
+        expr = Operator("and", self.bvs.tolist() + [True]) + self.ivs[0] >= 3
+        self.assertEqual(str(self.transform(expr)), "[(and([bv[0], bv[1], bv[2]])) + (iv[0]) >= 3]")
 
 
         expr = Operator("->", [self.bvs[0], True])
@@ -35,16 +35,16 @@ class TransSimplify(unittest.TestCase):
         self.assertEqual(str(self.transform(expr)), "[boolval(True)]")
 
     def test_bool_in_comp(self):
-        expr = self.ivs[0] >= False
-        self.assertEqual(str(self.transform(expr)), '[iv[0] >= 0]')
+        expr = self.ivs[0] > False
+        self.assertEqual(str(self.transform(expr)), '[iv[0] > 0]')
         expr = self.ivs[0] >= True
         self.assertEqual(str(self.transform(expr)), '[iv[0] >= 1]')
 
         expr = (cp.sum(self.ivs) + True) >= 10
         self.assertEqual(str(self.transform(expr)), '[sum([iv[0], iv[1], iv[2], 1]) >= 10]')
 
-        expr = True + self.ivs[0] >= False
-        self.assertEqual(str(self.transform(expr)), '[1 + (iv[0]) >= 0]')
+        expr = True + self.ivs[0] > False
+        self.assertEqual(str(self.transform(expr)), '[1 + (iv[0]) > 0]')
 
     def test_boolvar_comps(self):
         num_args = {"<0": -1, "0": 0, "]0..1[": 0.5, "1": 1, ">0": 2}
@@ -87,8 +87,8 @@ class TransSimplify(unittest.TestCase):
         # with constant, does not change (surprisingly? but we cannot check what the res type is...)
         expr = cp.max(self.ivs.tolist() + [False]) == 0
         self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2],boolval(False)) == 0]')
-        expr = 0 == cp.max(self.ivs.tolist() + [True])
-        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2],boolval(True)) == 0]')
+        expr = 1 == cp.max(self.ivs.tolist() + [True])
+        self.assertEqual(str(self.transform(expr)), '[max(iv[0],iv[1],iv[2],boolval(True)) == 1]')
 
         expr = (self.ivs[0] <= self.ivs[1]) == 0
         self.assertEqual(str(self.transform(expr)), '[not([(iv[0]) <= (iv[1])])]')

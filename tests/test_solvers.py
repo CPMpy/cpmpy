@@ -840,7 +840,7 @@ class TestSupportedSolvers:
         model.solve(solver=solver)
         assert [int(a) for a in v.value()] == [0, 1, 0]
 
-        s = cp.SolverLookup.get(solver)
+        s = cp.SolverLookup.get(solver, model)
         s.solve()
         assert [int(a) for a in v.value()] == [0, 1, 0]
 

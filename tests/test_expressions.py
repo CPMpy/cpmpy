@@ -6,7 +6,8 @@ from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
-from cpmpy.expressions.utils import eval_comparison, get_bounds, argval
+from cpmpy.expressions.utils import eval_comparison, get_bounds, argval, all_pairs
+
 
 class TestComparison(unittest.TestCase):
     def test_comps(self):
@@ -450,6 +451,29 @@ class TestBounds(unittest.TestCase):
                 self.assertGreaterEqual(val,lb)
                 self.assertLessEqual(val,ub)
 
+    def test_bounds_comparison(self):
+
+        x_00 = intvar(0,0, name="x00")
+        x_01 = intvar(0,1, name="x01")
+        x_12= intvar(1,2, name="x12")
+        x_23 = intvar(2,3, name="x23")
+
+        for x,y in all_pairs([0, x_00, x_01, x_12, x_23]):
+            for comp in ['==','!=','<=','<','>=','>']:
+                x_bounds = get_bounds(x)
+                y_bounds = get_bounds(y)
+
+                total_vals = len(range(x_bounds[0],x_bounds[1]+1)) * len(range(y_bounds[0],y_bounds[1]+1))
+
+                for expr in [Comparison(comp, x,y), Comparison(comp, y,x)]:
+                    lb, ub = expr.get_bounds()
+
+                    if lb == 0 == ub:
+                        self.assertEqual(cp.Model(expr).solveAll(), 0)
+                    elif lb == 1 == ub:
+                        self.assertEqual(cp.Model(expr).solveAll(), total_vals)
+                    else:
+                        self.assertNotEqual(cp.Model(expr).solveAll(), total_vals)
 
     def test_incomplete_func(self):
         # element constraint
