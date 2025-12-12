@@ -43,7 +43,6 @@
 """
 
 from typing import Optional
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -117,9 +116,10 @@ class CPM_gurobi(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('gurobipy').version
-        except pkg_resources.DistributionNotFound:
+            return version("gurobipy")
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -356,7 +356,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","->","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 

@@ -50,8 +50,7 @@
 
 from typing import Optional
 import warnings
-import pkg_resources
-from pkg_resources import VersionConflict
+from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator
@@ -81,13 +80,13 @@ class CPM_template(SolverInterface):
         try:
             import TEMPLATEpy as gp
             # optionally enforce a specific version
-            pkg_resources.require("TEMPLATEpy>=2.1.0")
+            tpl_version = CPM_template.version()
+            if Version(tpl_version) < Version("2.1.0"):
+                warnings.warn(f"CPMpy uses features only available from TEMPLATEpy version 0.2.1, "
+                              f"but you have version {tpl_version}.")
+                return False
             return True
         except ModuleNotFoundError: # if solver's Python package is not installed
-            return False
-        except VersionConflict: # unsupported version of TEMPLATEpy (optional)
-            warnings.warn(f"CPMpy uses features only available from TEMPLATEpy version 0.2.1, "
-                          f"but you have version {pkg_resources.get_distribution('TEMPLATEpy').version}.")
             return False
         except Exception as e:
             raise e
@@ -97,9 +96,10 @@ class CPM_template(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('TEMPLATEpy').version
-        except pkg_resources.DistributionNotFound:
+            return version('TEMPLATEpy')
+        except PackageNotFoundError:
             return None
         
     # [GUIDELINE] If your solver supports different subsolvers, implement below method to return a list of subsolver names

@@ -51,7 +51,6 @@
         CPM_gcs
 """
 from typing import Optional
-import pkg_resources
 
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
@@ -108,9 +107,10 @@ class CPM_gcs(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('gcspy').version
-        except pkg_resources.DistributionNotFound:
+            return version('gcspy')
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):

@@ -46,7 +46,6 @@
 import sys
 from typing import Optional  # for stdout checking
 import numpy as np
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -96,9 +95,10 @@ class CPM_ortools(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('ortools').version
-        except pkg_resources.DistributionNotFound:
+            return version('ortools')
+        except PackageNotFoundError:
             return None
 
 

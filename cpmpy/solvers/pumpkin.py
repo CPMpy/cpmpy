@@ -37,11 +37,13 @@
     Module details
     ==============
 """
+import warnings
 from typing import Optional
 from importlib.metadata import version, PackageNotFoundError
 from os.path import join
 
 import numpy as np
+from packaging.version import Version
 
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -75,6 +77,11 @@ class CPM_pumpkin(SolverInterface):
         # try to import the package
         try:
             import pumpkin_solver as psp
+            pum_version = CPM_pumpkin.version()
+            if Version(pum_version) < Version("0.2.2"):
+                warnings.warn(f"CPMpy uses features only available from Pumpkin version >=0.2.2 "
+                              f"but you have version {pum_version}")
+                return False
             return True
         except ModuleNotFoundError:
             return False
@@ -87,6 +94,7 @@ class CPM_pumpkin(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
             return version('pumpkin-solver')
         except PackageNotFoundError:
@@ -272,13 +280,6 @@ class CPM_pumpkin(SolverInterface):
             # return from cache
             return self._varmap[cpm_var]
         
-        # can also be a scaled variable (multiplication view)
-        elif isinstance(cpm_var, Operator) and cpm_var.name == "mul":
-            const, cpm_var = cpm_var.args
-            if not is_num(const):
-                raise ValueError(f"Cannot create view from non-constant multiplier {const} * {cpm_var}")
-            return self.solver_var(cpm_var).scaled(const)
-        
         raise ValueError(f"Not a known var {cpm_var}")
 
 
@@ -396,6 +397,12 @@ class CPM_pumpkin(SolverInterface):
             return self.pum_solver.boolean_as_integer(self.solver_var(cpm_var), tag=tag)
         elif is_num(cpm_var):
             return self.solver_var(intvar(cpm_var, cpm_var))
+        # can also be a scaled variable (multiplication view)
+        elif isinstance(cpm_var, Operator) and cpm_var.name == "mul":
+            const, cpm_var = cpm_var.args
+            if not is_num(const):
+                raise ValueError(f"Cannot create view from non-constant multiplier {const} * {cpm_var}")
+            return self.to_pum_ivar(cpm_var, tag=tag).scaled(const)
         else:
             return self.solver_var(cpm_var)
 
@@ -529,21 +536,21 @@ class CPM_pumpkin(SolverInterface):
 
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args
-                return [constraints.Table(self.to_pum_ivar(arr), 
+                return [constraints.Table(self.to_pum_ivar(arr, tag=tag), 
                                           np.array(table).tolist(), # ensure Python list
                                           constraint_tag=tag)
                         ]
             
             elif cpm_expr.name == "negative_table":
                 arr, table = cpm_expr.args
-                return [constraints.NegativeTable(self.to_pum_ivar(arr), 
+                return [constraints.NegativeTable(self.to_pum_ivar(arr, tag=tag), 
                                                   np.array(table).tolist(),# ensure Python list
                                                   constraint_tag=tag)  
                         ]
             
             elif cpm_expr.name == "InDomain":
                 val, domain = cpm_expr.args
-                return [constraints.Table([self.to_pum_ivar(val)], 
+                return [constraints.Table([self.to_pum_ivar(val, tag=tag)], 
                                           np.array(domain).tolist(), # ensure Python list
                                           constraint_tag=tag)
                         ] 
@@ -556,9 +563,9 @@ class CPM_pumpkin(SolverInterface):
         elif isinstance(cpm_expr, BoolVal): # unlikely base case
             a = boolvar() # dummy variable
             if cpm_expr.value() is True:
-                return self._get_constraint(Operator("sum", [a]) >= 1)
+                return self._get_constraint(Operator("sum", [a]) >= 1, tag=tag)
             else:
-                return self._get_constraint(Operator("sum", [a]) <= -1)
+                return self._get_constraint(Operator("sum", [a]) <= -1, tag=tag)
 
         else:
             raise ValueError("Unexpected constraint:", cpm_expr)

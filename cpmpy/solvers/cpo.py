@@ -42,10 +42,8 @@
         CPM_cpo
 """
 
-import time
 from typing import Optional
 import warnings
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from .. import DirectConstraint
@@ -117,11 +115,13 @@ class CPM_cpo(SolverInterface):
 
         For CPO, two version numbers get returned: ``<docplex version>/<solver version>``
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
             import docplex.cp as docp
-            s = docp.solver.solver.CpoSolver(docp.model.CpoModel())
-            return f"{pkg_resources.get_distribution('docplex').version}/{s.get_solver_version()}"
-        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            cpo_version = docp.solver.solver.CpoSolver(docp.model.CpoModel()).get_solver_version()
+            docplex_version = version("docplex")
+            return f"{docplex_version}/{cpo_version}"
+        except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -550,18 +550,18 @@ class CPM_cpo(SolverInterface):
                     # Special case for tasks with duration 0
                     # -> cpo immediately returns UNSAT if done through tasks
                     if bounds_d[1] == bounds_d[0] == 0:
-                        cpo_s, cpo_e = self.solver_vars([s, e])
+                        cpo_s, cpo_e = self._cpo_expr([s, e])
                         cons += [cpo_s == cpo_e] # enforce 0 duration
                         # no restrictions on height due to zero duration and thus no contribution to capacity
                         continue
                     # Normal setting
-                    cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s, d, e, h])                   
+                    cpo_s, cpo_d, cpo_e, cpo_h = self._cpo_expr([s, d, e, h])
                     task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
                     task_height = dom.pulse(task, get_bounds(h))
                     cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
                     cons += [cpo_h == dom.height_at_start(task, task_height)]
                     total_usage.append(task_height)
-                cons += [dom.sum(total_usage) <= self.solver_var(capacity)]
+                cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
             elif cpm_con.name == "no_overlap":
                 start, dur, end  = cpm_con.args
@@ -569,7 +569,7 @@ class CPM_cpo(SolverInterface):
                 cons = []
                 tasks = []
                 for s, d, e in zip(start, dur, end):
-                    cpo_s, cpo_d, cpo_e = self.solver_vars([s, d, e])
+                    cpo_s, cpo_d, cpo_e = self._cpo_expr([s, d, e])
                     task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
                     tasks.append(task)
                     cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
