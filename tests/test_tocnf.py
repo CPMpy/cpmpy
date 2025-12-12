@@ -1,4 +1,5 @@
 import unittest
+import pytest
 import numpy as np
 from cpmpy import *
 from cpmpy.solvers import CPM_ortools
@@ -60,6 +61,7 @@ class TestToCnf(unittest.TestCase):
             # Expressions should not be decomposed at the to_cnf level!
             self.assertEqual(len(cnf), 1)
 
+    @pytest.mark.requires_solver("ortools")
     def allsols(self, cons, vs):
         sols = []
 
