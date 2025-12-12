@@ -32,6 +32,7 @@ from .cpo   import CPM_cpo
 from .cplex import CPM_cplex
 from .pindakaas import CPM_pindakaas
 from .hexaly import CPM_hexaly
+from .cvc5 import CPM_cvc5
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -87,7 +88,8 @@ class SolverLookup():
                 ("cpo", CPM_cpo),
                 ("cplex", CPM_cplex),
                 ("pindakaas", CPM_pindakaas),
-                ("hexaly", CPM_hexaly)
+                ("hexaly", CPM_hexaly),
+                ("cvc5", CPM_cvc5)
                ]
 
     @classmethod
