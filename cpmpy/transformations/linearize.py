@@ -175,43 +175,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                         newlist.extend(new_cons)
                     cpm_expr = eval_comparison(cpm_expr.name, new_lhs, rhs)
 
-                elif lhs.name == 'div' and 'div' not in supported:
-                    if "mul" not in supported:
-                        raise NotImplementedError("Cannot linearize division without multiplication")
-
-                    if cpm_expr.name != "==":
-                        new_rhs, newcons = get_or_make_var(lhs, csemap=csemap)
-                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
-                        newlist += linearize_constraint(newcons, supported=supported, reified=reified, csemap=csemap)
-                        continue
-
-                    else:
-                        # integer division, rounding towards zero
-                        # x / y = z implemented as x = y * z + r with r the remainder and |r| < |y|
-                        #      r can be positive or negative, so also ensure that |y| * |z| <= |x|
-                        a, b = lhs.args
-                        lb, ub = get_bounds(b)
-                        if lb <= 0 <= ub:
-                            raise ValueError("Attempting linearization of unsafe division, safen expression first (cpmpy/transformations/safen.py)")
-
-                        r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
-                        mult_res, side_cons = get_or_make_var(b * rhs, csemap=csemap)
-                        cpm_expr = eval_comparison(cpm_expr.name, a, mult_res + r)
-
-                        # need absolute values of variables later
-                        abs_of_a, side_cons_a = get_or_make_var(abs(a), csemap=csemap)
-                        abs_of_b, side_cons_b = get_or_make_var(abs(b), csemap=csemap)
-                        abs_of_rhs, side_cons_rhs = get_or_make_var(abs(rhs), csemap=csemap)
-                        abs_of_r, side_cons_r = get_or_make_var(abs(r), csemap=csemap)
-                        side_cons += side_cons_a + side_cons_b + side_cons_rhs + side_cons_r
-                        # |r| < |b|
-                        side_cons.append(abs_of_r < abs_of_b)
-
-                        # ensure we round towards zero
-                        mul_abs, extra_cons = get_or_make_var(abs_of_b * abs_of_rhs, csemap=csemap)
-                        side_cons += extra_cons + [mul_abs <= abs_of_a]
-                        newlist += linearize_constraint(side_cons, supported=supported, reified=reified, csemap=csemap)
-
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
