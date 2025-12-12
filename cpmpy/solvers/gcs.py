@@ -422,6 +422,7 @@ class CPM_gcs(SolverInterface):
             "max", 
             "abs",
             "mod",
+            "div",
             "alldifferent", 
             "element", 
             'table', 
