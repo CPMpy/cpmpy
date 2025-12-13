@@ -89,7 +89,7 @@ class GlobalFunction(Expression):
     def is_bool(self) -> bool:
         """
         Returns:
-            bool: False, as global functions are numeric
+            bool: False, global functions are numeric
         """
         return False
 
@@ -129,7 +129,7 @@ class GlobalFunction(Expression):
 
     def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the global function as a tuple of (lower bound, upper bound)
+        Returns the bounds of the global function
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound)
@@ -143,9 +143,6 @@ class GlobalFunction(Expression):
 
             TODO: I do not find anywhere where we set it dynamically to False?
             TODO: REMOVE??
-
-        Returns:
-            bool: True if the function is total (value defined for all arguments)
         """
         return True
 
@@ -158,7 +155,7 @@ class Minimum(GlobalFunction):
     def __init__(self, arg_list: list[Expression]):
         """
         Arguments:
-            arg_list (list[Expression]): List of expressions to compute the minimum of
+            arg_list (list[Expression]): List of expressions of which to compute the minimum
         """
         super().__init__("min", flatlist(arg_list))
 
@@ -188,7 +185,7 @@ class Minimum(GlobalFunction):
 
     def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the (numerical) global constraint
+        Returns the lowest and highest possible minimum value
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the minimum value
@@ -205,7 +202,7 @@ class Maximum(GlobalFunction):
     def __init__(self, arg_list: list[Expression]):
         """
         Arguments:
-            arg_list (list[Expression]): List of expressions to compute the maximum of
+            arg_list (list[Expression]): List of expressions of which to compute the maximum
         """
         super().__init__("max", flatlist(arg_list))
 
@@ -224,8 +221,8 @@ class Maximum(GlobalFunction):
         """
         Decomposition of Maximum constraint.
 
-        Can only be decomposed by introducing an auxiliary variable and enforcing it to be smaller than each variable,
-         while at the same time not being smaller then all (e.g. it needs to be (larger or) equal to one of them)
+        Can only be decomposed by introducing an auxiliary variable and enforcing it to be larger than each variable,
+         while at the same time not being larger then all (e.g. it needs to be (smaller or) equal to one of them)
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the maximum value, and a list of constraints defining it
@@ -235,7 +232,7 @@ class Maximum(GlobalFunction):
 
     def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the (numerical) global constraint
+        Returns the lowest and highest possible maximum value
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the maximum value
@@ -252,7 +249,7 @@ class Abs(GlobalFunction):
     def __init__(self, expr: Expression):
         """
         Arguments:
-            expr (Expression): Expression to compute the absolute value of
+            expr (Expression): Expression of which to compute the absolute value
         """
         super().__init__("abs", [expr])
 
@@ -289,7 +286,7 @@ class Abs(GlobalFunction):
 
     def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the (numerical) global constraint
+        Returns the lowest and highest possible absolute value
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the absolute value
@@ -301,11 +298,6 @@ class Abs(GlobalFunction):
             return -ub, -lb
         return 0, max(-lb, ub)
 
-
-def element(arg_list: list[Expression]) -> Element:
-    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
-    assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
-    return Element(arg_list[0], arg_list[1])
 
 class Element(GlobalFunction):
     """
@@ -378,6 +370,11 @@ class Element(GlobalFunction):
         arr, idx = self.args
         bnds = [get_bounds(x) for x in arr]
         return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
+
+def element(arg_list: list[Expression]) -> Element:
+    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
+    assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
+    return Element(arg_list[0], arg_list[1])
 
 
 class Count(GlobalFunction):

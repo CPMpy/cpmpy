@@ -148,7 +148,7 @@ def argvals(arr):
     return argval(arr)
 
 
-def eval_comparison(str_op: str, lhs: Union[Expression, int], rhs: Union[Expression, int]) -> bool:
+def eval_comparison(str_op: str, lhs: object, rhs: object) -> bool:
     """
         Internal function: evaluates the textual `str_op` comparison operator
         lhs <str_op> rhs
