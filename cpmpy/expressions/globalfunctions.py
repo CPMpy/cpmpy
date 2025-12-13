@@ -87,7 +87,9 @@ class GlobalFunction(Expression):
     """
 
     def is_bool(self) -> bool:
-        """ is it a Boolean (return type) Operator? No
+        """
+        Returns:
+            bool: False, as global functions are numeric
         """
         return False
 
@@ -102,6 +104,9 @@ class GlobalFunction(Expression):
             The decomposition might create auxiliary variables
             and use other global constraints as long as
             it does not create a circular dependency.
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the numerical expression and a list of constraints defining auxiliary variables
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
@@ -110,10 +115,12 @@ class GlobalFunction(Expression):
             DEPRECATED: returns a list of constraints representing the decomposed
             comparison of the global function (and any auxiliary variables intorduced).
 
-            Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+        Arguments:
+            cmp_op (str): Comparison operator
+            cmp_rhs (Expression): Right-hand side expression for the comparison
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing two lists: constraints representing the comparison, and constraints defining auxiliary variables
         """
         warnings.warn(f"Deprecated, use {self}.decompose() instead, will be removed in "
                       "stable version", DeprecationWarning)
@@ -123,6 +130,9 @@ class GlobalFunction(Expression):
     def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the global function as a tuple of (lower bound, upper bound)
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound)
         """
         return NotImplementedError("Bounds calculation for", self, "not available")
 
@@ -133,6 +143,9 @@ class GlobalFunction(Expression):
 
             TODO: I do not find anywhere where we set it dynamically to False?
             TODO: REMOVE??
+
+        Returns:
+            bool: True if the function is total (value defined for all arguments)
         """
         return True
 
@@ -143,9 +156,17 @@ class Minimum(GlobalFunction):
     """
 
     def __init__(self, arg_list: list[Expression]):
+        """
+        Arguments:
+            arg_list (list[Expression]): List of expressions to compute the minimum of
+        """
         super().__init__("min", flatlist(arg_list))
 
     def value(self) -> Optional[int]:
+        """
+        Returns:
+            Optional[int]: The minimum value of the arguments, or None if any argument is not assigned
+        """
         argvals = [argval(a) for a in self.args]
         if any(val is None for val in argvals):
             return None
@@ -158,6 +179,9 @@ class Minimum(GlobalFunction):
 
         Can only be decomposed by introducing an auxiliary variable and enforcing it to be larger than each variable,
          while at the same time not being larger then all (e.g. it needs to be (smaller or) equal to one of them)
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the minimum value, and a list of constraints defining it
         """
         _min = intvar(*self.get_bounds())
         return _min, [cp.all(_min <= a for a in self.args), cp.any(_min >= a for a in self.args)]
@@ -165,6 +189,9 @@ class Minimum(GlobalFunction):
     def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the minimum value
         """
         bnds = [get_bounds(x) for x in self.args]
         return min(lb for lb, ub in bnds), min(ub for lb, ub in bnds)
@@ -176,9 +203,17 @@ class Maximum(GlobalFunction):
     """
 
     def __init__(self, arg_list: list[Expression]):
+        """
+        Arguments:
+            arg_list (list[Expression]): List of expressions to compute the maximum of
+        """
         super().__init__("max", flatlist(arg_list))
 
     def value(self) -> Optional[int]:
+        """
+        Returns:
+            Optional[int]: The maximum value of the arguments, or None if any argument is not assigned
+        """
         argvals = [argval(a) for a in self.args]
         if any(val is None for val in argvals):
             return None
@@ -191,6 +226,9 @@ class Maximum(GlobalFunction):
 
         Can only be decomposed by introducing an auxiliary variable and enforcing it to be smaller than each variable,
          while at the same time not being smaller then all (e.g. it needs to be (larger or) equal to one of them)
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the maximum value, and a list of constraints defining it
         """
         _max = intvar(*self.get_bounds())
         return _max, [cp.all(_max >= a  for a in self.args), cp.any(_max <= a for a in self.args)]
@@ -198,6 +236,9 @@ class Maximum(GlobalFunction):
     def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the maximum value
         """
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
@@ -209,9 +250,17 @@ class Abs(GlobalFunction):
     """
 
     def __init__(self, expr: Expression):
+        """
+        Arguments:
+            expr (Expression): Expression to compute the absolute value of
+        """
         super().__init__("abs", [expr])
 
     def value(self) -> Optional[int]:
+        """
+        Returns:
+            Optional[int]: The absolute value of the argument, or None if the argument is not assigned
+        """
         argval = argval(self.args[0])
         if argval is not None:
             return abs(argval)
@@ -224,6 +273,9 @@ class Abs(GlobalFunction):
         Can only be decomposed by introducing an auxiliary variable and enforcing it's value to be positive,
             based on the value of the given argument to the global function. I.e., if the argument is negative,
             the auxiliary variable will take the negated value of the argument, and otherwise it will take the argument itself.
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the expression representing the absolute value (may be the argument itself, its negation, or an auxiliary variable), and a list of constraints defining it (empty if no auxiliary variable is needed)
         """
         arg = self.args[0]
         lb, ub = get_bounds(arg)
@@ -238,6 +290,9 @@ class Abs(GlobalFunction):
     def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the absolute value
         """
         lb,ub = get_bounds(self.args[0])
         if lb >= 0:
@@ -268,6 +323,11 @@ class Element(GlobalFunction):
     """
 
     def __init__(self, arr, idx):
+        """
+        Arguments:
+            arr: Array of constants or variables to index into
+            idx: Integer decision variable representing the index into the array
+        """
         if is_boolexpr(idx):
             raise TypeError("index cannot be a boolean expression: {}".format(idx))
         if is_any_list(idx):
@@ -278,6 +338,10 @@ class Element(GlobalFunction):
         raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
 
     def value(self):
+        """
+        Returns:
+            The value of the array element at the given index, or None if the index is not assigned
+        """
         arr, idx = self.args
         idxval = argval(idx)
         if idxval is not None:
@@ -289,7 +353,10 @@ class Element(GlobalFunction):
 
     def decompose(self):
         """
-        Decomposition of Abs constraint.
+        Decomposition of Element constraint.
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the expression representing the element value, and an empty list of constraints (no auxiliary variables needed)
         """
         arr, idx = self.args
 
@@ -304,6 +371,9 @@ class Element(GlobalFunction):
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the element value
         """
         arr, idx = self.args
         bnds = [get_bounds(x) for x in arr]
@@ -316,6 +386,11 @@ class Count(GlobalFunction):
     """
 
     def __init__(self,arr,val):
+        """
+        Arguments:
+            arr: Array of expressions to count in
+            val: Value to count occurrences of
+        """
         if is_any_list(val) or not is_any_list(arr):
             raise TypeError("count takes an array and a value as input, not: {} and {}".format(arr,val))
         super().__init__("count", [arr,val])
@@ -324,11 +399,18 @@ class Count(GlobalFunction):
         """
         Decomposition of the Count constraint.
         Does not require the use of auxiliary variables, simply count the number of variables that take the given value.
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the count, and an empty list of constraints (no auxiliary variables needed)
         """
         arr, val = self.args
         return cp.sum(a == val for a in arr), []
 
     def value(self):
+        """
+        Returns:
+            int: The number of occurrences of val in arr
+        """
         arr, val = self.args
         val = argval(val)
         return sum([argval(a) == val for a in arr])
@@ -336,6 +418,9 @@ class Count(GlobalFunction):
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the count value
         """
         arr, val = self.args
         return 0, len(arr)
@@ -348,6 +433,11 @@ class Among(GlobalFunction):
     """
 
     def __init__(self,arr,vals):
+        """
+        Arguments:
+            arr: Array of expressions to count in
+            vals: Array of values to count occurrences of
+        """
         if not is_any_list(arr) or not is_any_list(vals):
             raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
         if any(isinstance(val, Expression) for val in vals):
@@ -358,15 +448,26 @@ class Among(GlobalFunction):
         """
          Decomposition of the Among constraint.
          Decomposed using several Count constraints, one for each value in values.
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the count, and an empty list of constraints (no auxiliary variables needed)
         """
         arr, values = self.args
         return cp.sum(Count(arr, val) for val in values), []
 
 
     def value(self):
+        """
+        Returns:
+            int: The number of variables in arr that take values among the values in vals
+        """
         return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
 
     def get_bounds(self):
+        """
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the among count value
+        """
         return 0, len(self.args[0])
 
 
@@ -377,6 +478,10 @@ class NValue(GlobalFunction):
     """
 
     def __init__(self, arr):
+        """
+        Arguments:
+            arr: Array of expressions to count distinct values in
+        """
         if not is_any_list(arr):
             raise ValueError("NValue takes an array as input")
         super().__init__("nvalue", arr)
@@ -397,11 +502,18 @@ class NValue(GlobalFunction):
         return cp.sum(cp.any(a == v for a in self.args) for v in range(lb,ub+1)), []
 
     def value(self):
+        """
+        Returns:
+            int: The number of distinct values in the array
+        """
         return len(set(argval(a) for a in self.args))
 
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the number of distinct values
         """
         return 1, len(self.args)
 
@@ -414,6 +526,11 @@ class NValueExcept(GlobalFunction):
     """
 
     def __init__(self, arr, n):
+        """
+        Arguments:
+            arr: Array of expressions to count distinct values in
+            n: Integer value to exclude from the count
+        """
         if not is_any_list(arr):
             raise ValueError("NValueExcept takes an array as input")
         if not is_num(n):
@@ -445,10 +562,17 @@ class NValueExcept(GlobalFunction):
         return n_values, []
 
     def value(self):
+        """
+        Returns:
+            int: The number of distinct values in the array, excluding value n
+        """
         return len(set(argval(a) for a in self.args[0]) - {self.args[1]})
 
     def get_bounds(self):
         """
         Returns the bounds of the (numerical) global constraint
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the number of distinct values (excluding n)
         """
         return 0, len(self.args)
