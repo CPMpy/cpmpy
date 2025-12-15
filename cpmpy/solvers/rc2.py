@@ -50,27 +50,14 @@
     Module details
     ==============
 """
-from threading import Timer
-from typing import Optional
-import warnings
-import pkg_resources
-
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverStatus, ExitStatus
 from .pysat import CPM_pysat
 from ..exceptions import NotSupportedError
-from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
-from ..expressions.globalconstraints import DirectConstraint
-from ..transformations.linearize import canonical_comparison, only_positive_coefficients_
-from ..expressions.utils import is_int, flatlist
-from ..transformations.comparison import only_numexpr_equality
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.linearize import only_positive_coefficients_
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
-from ..transformations.linearize import linearize_constraint
-from ..transformations.normalize import toplevel_list, simplify_boolean
-from ..transformations.reification import only_implies, only_bv_reifies, reify_rewrite
-from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, IntVarEncDirect, get_user_vars, _encode_lin_expr
+from ..transformations.flatten_model import flatten_objective
+from ..transformations.int2bool import get_user_vars, _encode_lin_expr
 
 
 class CPM_rc2(CPM_pysat):
@@ -94,35 +81,6 @@ class CPM_rc2(CPM_pysat):
         the PySAT docs use 'model' to refer to a solution.
 
     """
-
-    @staticmethod
-    def supported():
-        # try to import the package
-        try:
-            import pysat
-            # there is actually a non-related 'pysat' package
-            # while we need the 'python-sat' package, some more checks:
-            from pysat.formula import IDPool
-            from pysat.solvers import Solver
-            from pysat.examples import rc2
-
-            from pysat import card
-            CPM_rc2._card = card  # native
-
-            # try to import pypblib and avoid ever re-import by setting `_pb`
-            if not hasattr(CPM_rc2, ("_pb")):
-                try:
-                    from pysat import pb  # require pypblib
-                    """The `pysat.pb` module if its dependency `pypblib` installed, `None` if we have not checked it yet, or `False` if we checked and it is *not* installed"""
-                    CPM_rc2._pb = pb
-                except (ModuleNotFoundError, NameError):  # pysat returns the wrong error type (latter i/o former)
-                    CPM_rc2._pb = None  # not installed, avoid reimporting
-
-            return True
-        except ModuleNotFoundError:
-            return False
-        except Exception as e:
-            raise e
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -151,7 +109,7 @@ class CPM_rc2(CPM_pysat):
         # TODO: accepts native cardinality constraints, not sure how to make clear...
 
         # objective value related
-        self.objective_ = None  # pysat returns the 'cost' of unsatisfied soft clauses, we want the value of the satisfied ones
+        self.objective_ = None
 
         # initialise the native solver object
         self.pysat_vpool = IDPool()
@@ -322,7 +280,7 @@ class CPM_rc2(CPM_pysat):
         # post weighted literals
         for wi,vi in zip(weights, xs):
             assert wi > 0, f"CPM_rc2 objective: strictly positive weights only, got {wi,vi}"
-            self.pysat_solver.append([self.solver_var(vi)], weight=wi)
+            self.pysat_solver.add_clause([self.solver_var(vi)], weight=wi)
 
 
     def objective_value(self):
