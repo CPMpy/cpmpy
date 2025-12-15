@@ -75,7 +75,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, get_bounds, implies
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
 
 class GlobalFunction(Expression):
@@ -325,9 +325,9 @@ class Element(GlobalFunction):
             idx (Expression): Integer decision variable or expression, representing the index into the array
         """
         if is_boolexpr(idx):
-            raise TypeError("The second argument (idx) cannot be a boolean expression: {}".format(idx))
+            raise TypeError("Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {}".format(idx))
         if is_any_list(idx):
-            raise TypeError("The second argument (idx) has to be a single expression/one-dimensional, not a list: {}".format(idx))
+            raise TypeError("Element(arr, idx) takes an integer expression as second argument, not a list: {}".format(idx))
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
@@ -387,7 +387,7 @@ class Element(GlobalFunction):
 
     def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the (numerical) global constraint
+        Returns the bounds of the global function
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the element value
@@ -422,17 +422,19 @@ def element(arg_list: list[Expression]) -> Element:
 
 class Count(GlobalFunction):
     """
-    The Count (numerical) global function represents the number of occurrences of a value in an array
+    The Count global function represents the number of occurrences of a value in an array
     """
 
-    def __init__(self, arr, val):
+    def __init__(self, arr: list[Expression], val: Union[int, Expression]):
         """
         Arguments:
-            arr: Array of expressions to count in
-            val: Value to count occurrences of
+            arr (list[Expression]): Array of expressions to count in
+            val (Union[int, Expression]): 'Value' to count occurrences of (can also be an expression)
         """
-        if is_any_list(val) or not is_any_list(arr):
-            raise TypeError("count takes an array and a value as input, not: {} and {}".format(arr,val))
+        if not is_any_list(arr):
+            raise TypeError("Count(arr, val) takes an array of expressions as first argument, not: {}".format(arr))
+        if is_any_list(val):
+            raise TypeError("Count(arr, val) takes a numeric expression as second argument, not a list: {}".format(val))
         super().__init__("count", [arr,val])
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -444,7 +446,7 @@ class Count(GlobalFunction):
             tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the count, and an empty list of constraints (no auxiliary variables needed)
         """
         arr, val = self.args
-        return cp.sum(a == val for a in arr), []
+        return cp.sum((a == val) for a in arr), []
 
     def value(self) -> Optional[int]:
         """
@@ -460,11 +462,11 @@ class Count(GlobalFunction):
         if any(v is None for v in varr):
             return None
 
-        return sum([a == vval for a in varr])
+        return sum((a == vval) for a in varr)
 
     def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the (numerical) global constraint
+        Returns the bounds of the global function
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the count value
@@ -476,71 +478,83 @@ class Count(GlobalFunction):
 
 class Among(GlobalFunction):
     """
-        The Among (numerical) global constraint represents the number of variable that take values among the values in arr
+        The Among global function counts how many variables in an array take values that are in a given set of values.
+        
+        This is similar to Count, but instead of counting occurrences of a single value,
+        it counts occurrences of any value in a set. For example, `Among([x1, x2, x3, x4], [1, 2])`
+        returns the number of variables among x1, x2, x3, x4 that take the value 1 or 2.
     """
 
-    def __init__(self, arr, vals):
+    def __init__(self, arr: list[Expression], vals: list[int]):
         """
         Arguments:
-            arr: Array of expressions to count in
-            vals: Array of values to count occurrences of
+            arr (list[Expression]): Array of expressions to count occurrences in
+            vals (list[int]): Array of integer values to count the total number of occurrences of
         """
         if not is_any_list(arr) or not is_any_list(vals):
             raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
         if any(isinstance(val, Expression) for val in vals):
-            raise TypeError(f"Among takes a set of values as input, not {vals}")
+            raise TypeError(f"Among takes a set of integer values as input, not {vals}")
         super().__init__("among", [arr,vals])
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-         Decomposition of the Among constraint.
-         Decomposed using several Count constraints, one for each value in values.
+        Decomposition of the Among global function.
+        
+        Among is decomposed into a sum of Count global functions, one for each value in the set.
+        For example, `Among(arr, [1, 2, 3])` is decomposed as `Count(arr, 1) + Count(arr, 2) + Count(arr, 3)`.
 
         Returns:
-            tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the count, and an empty list of constraints (no auxiliary variables needed)
+            tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the total number of occurrences, and an empty list of constraints (no auxiliary variables needed)
         """
-        arr, values = self.args
-        return cp.sum(Count(arr, val) for val in values), []
-
+        arr, vals = self.args
+        return cp.sum(Count(arr, val) for val in vals), []
 
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The number of variables in arr that take values among the values in vals, or None if any element in arr is not assigned
+            Optional[int]: The number of variables in arr that take a value present in vals, or None if any element in arr is not assigned
         """
-        arr, values = self.args
+        arr, vals = self.args
         varr = argvals(arr)  # recursive handling of nested structures
         if any(v is None for v in varr):
             return None
 
-        return int(sum(np.isin(varr, values)))
+        return int(sum(np.isin(varr, vals)))
 
     def get_bounds(self) -> tuple[int, int]:
         """
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the among count value
         """
-        return 0, len(self.args[0])
+        arr, vals = self.args
+        return 0, len(arr)
 
 
 class NValue(GlobalFunction):
-
     """
-    The NValue constraint counts the number of distinct values in a given set of variables.
+    The NValue global function counts the number of distinct values in an array.
+    
+    For example, if variables [x1, x2, x3, x4] take values [1, 2, 1, 3] respectively,
+    then `NValue([x1, x2, x3, x4])` returns 3 (the distinct values are 1, 2, and 3).
     """
 
-    def __init__(self, arr):
+    def __init__(self, arr: list[Expression]):
         """
         Arguments:
-            arr: Array of expressions to count distinct values in
+            arr (list[Expression]): Array of expressions to count distinct values in
         """
         if not is_any_list(arr):
-            raise ValueError("NValue takes an array as input")
+            raise ValueError("NValue(arr) takes an array as input, not: {}".format(arr))
         super().__init__("nvalue", arr)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-        Decomposition of the NValue constraint.
+        Decomposition of the NValue global function.
+
+        NValue is decomposed by checking, for each possible value in the domain range,
+        whether at least one variable takes that value. The sum of these Boolean checks
+        gives the number of distinct values.
 
         Based on "simple decomposition" from:
 
@@ -569,7 +583,7 @@ class NValue(GlobalFunction):
 
     def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the (numerical) global constraint
+        Returns the bounds of the global function
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the number of distinct values
@@ -578,17 +592,20 @@ class NValue(GlobalFunction):
 
 
 class NValueExcept(GlobalFunction):
-
     """
-        The NValueExceptN constraint counts the number of distinct values,
-            not including value N, if any argument is assigned to it.
+    The NValueExcept global function counts the number of distinct values in an array,
+    excluding a specified value.
+    
+    For example, if variables [x1, x2, x3, x4] take values [1, 2, 1, 0] respectively,
+    then `NValueExcept([x1, x2, x3, x4], 0)` returns 2 (the distinct values are 1 and 2,
+    excluding 0).
     """
 
-    def __init__(self, arr, n):
+    def __init__(self, arr: list[Expression], n: int):
         """
         Arguments:
-            arr: Array of expressions to count distinct values in
-            n: Integer value to exclude from the count
+            arr (list[Expression]): Array of expressions to count distinct values in
+            n (int): Integer value to exclude from the count
         """
         if not is_any_list(arr):
             raise ValueError("NValueExcept takes an array as input")
@@ -598,30 +615,21 @@ class NValueExcept(GlobalFunction):
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-        Decomposition of the NValueExcept constraint.
+        Decomposition of the NValueExcept global function.
 
-        Based on "simple decomposition" from:
-
-            Bessiere, Christian, et al. "Decomposition of the NValue constraint."
-            International Conference on Principles and Practice of Constraint Programming.
-            Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
+        NValueExcept is decomposed similarly to NValue, by checking for each possible value
+        in the domain range (except the excluded value n) whether at least one variable
+        takes that value, and counting for how many values that was the case.
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the number of distinct values (excluding n), and an empty list of constraints (no auxiliary variables needed)
         """
         arr, n = self.args
-        assert is_num(n)
 
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
 
-        n_values = 0
-        for v in range(lb, ub+1):
-            if v == n:
-                continue
-            n_values += cp.any(a == v for a in arr)
-
-        return n_values, []
+        return cp.sum([cp.any(a == v for a in arr) for v in range(lb,ub+1) if v != n]), []
 
     def value(self) -> Optional[int]:
         """
@@ -633,13 +641,17 @@ class NValueExcept(GlobalFunction):
         if any(v is None for v in varr):
             return None
 
-        return len(set(varr) - {n})
+        if n in varr:
+            return len(set(varr))-1  # don't count 'n'
+        else:
+            return len(set(varr))
 
     def get_bounds(self) -> tuple[int, int]:
         """
-        Returns the bounds of the (numerical) global constraint
+        Returns the bounds of the global function
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the number of distinct values (excluding n)
         """
-        return 0, len(self.args)
+        arr, n = self.args
+        return 0, len(arr)
