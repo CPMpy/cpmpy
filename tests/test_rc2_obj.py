@@ -32,7 +32,7 @@ class TestRC2Objective(unittest.TestCase):
         self.assertEqual(weights, [1])
         self.assertEqual(xs, [self.xs[0]])
         self.assertEqual(const, 0)
-    
+
     def test_transform_objective_sum_bool(self):
         """Test objective transformation with sum of boolean variables"""
         # Test sum(xs) -> flat_obj sum([BV0, BV1, BV2])

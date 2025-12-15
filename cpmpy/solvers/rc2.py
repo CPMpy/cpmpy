@@ -304,7 +304,7 @@ class CPM_rc2(CPM_pysat):
                 minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
         """
-        # XXX WARNING, not incremental! Can NOT overwrite the objective.... only append to it!
+        # XXX RC2 is incremental, except for its objective is non-incremental; while (soft) clauses can be added, they cannot be removed, so we cannot replace the objective. Adding soft clauses is now also not supported.
         if self.objective_ is not None:
             raise NotSupportedError("CPM_rc2: objective can only be set once")
         self.objective_ = expr

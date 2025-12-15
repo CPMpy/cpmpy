@@ -939,9 +939,6 @@ class TestSupportedSolvers:
         assert s.objective_value() == 25
 
     def test_incremental(self, solver):
-        if solver == "rc2":
-            pytest.skip("not incremental")
-            
         x, y, z = cp.boolvar(shape=3, name="x")
         s = cp.SolverLookup.get(solver)
         s += [x]
