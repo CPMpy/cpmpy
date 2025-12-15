@@ -365,7 +365,7 @@ class Element(GlobalFunction):
         assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
 
         aux = intvar(*self.get_bounds())
-        return aux, [(idx == i).implies(aux == arr[i]) for i in range(len(arr))]
+        return aux, [implies(idx == i, aux == arr[i]) for i in range(idx_lb, idx_ub+1)]
 
     def decompose_linear(self) -> tuple[Expression, list[Expression]]:
         """
