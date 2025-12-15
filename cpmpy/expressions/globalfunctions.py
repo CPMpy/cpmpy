@@ -344,7 +344,7 @@ class Element(GlobalFunction):
             return None
 
         if vidx < 0 or vidx >= len(arr):
-            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
+            raise IncompleteFunctionError(f"Index {vidx} out of range for array of length {len(arr)} while calculating value for expression {self}"
                                             + "\n Use argval(expr) to get the value of expr with relational semantics.")
         return argval(arr[vidx])  # can be None
 
