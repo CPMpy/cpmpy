@@ -125,7 +125,7 @@ class GlobalFunction(Expression):
         warnings.warn(f"Deprecated, use {self}.decompose() instead, will be removed in "
                       "stable version", DeprecationWarning)
         valexpr, cons = self.decompose()
-        return eval_comparison(cmp_op, valexpr, cmp_rhs), cons
+        return [eval_comparison(cmp_op, valexpr, cmp_rhs)], cons
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -134,7 +134,7 @@ class GlobalFunction(Expression):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound)
         """
-        return NotImplementedError("Bounds calculation for", self, "not available")
+        raise NotImplementedError("Bounds calculation for", self, "not available")
 
     def is_total(self) -> bool:
         """
@@ -164,18 +164,19 @@ class Minimum(GlobalFunction):
         Returns:
             Optional[int]: The minimum value of the arguments, or None if any argument is not assigned
         """
-        argvals = [argval(a) for a in self.args]
-        if any(val is None for val in argvals):
+        vargs = [argval(a) for a in self.args]
+        if any(val is None for val in vargs):
             return None
-        else:
-            return min(argvals)
+
+        return min(vargs)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Minimum constraint
 
-        Can only be decomposed by introducing an auxiliary variable and enforcing it to be larger than each variable,
-         while at the same time not being larger then all (e.g. it needs to be (smaller or) equal to one of them)
+        Can only be decomposed by introducing an auxiliary variable and enforcing it to be smaller or equal than
+        each variable, while at the same time not being smaller than all (e.g. it needs to be (larger or)
+        equal to one of them)
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the minimum value, and a list of constraints defining it
@@ -211,18 +212,19 @@ class Maximum(GlobalFunction):
         Returns:
             Optional[int]: The maximum value of the arguments, or None if any argument is not assigned
         """
-        argvals = [argval(a) for a in self.args]
-        if any(val is None for val in argvals):
+        vargs = [argval(a) for a in self.args]
+        if any(val is None for val in vargs):
             return None
-        else:
-            return max(argvals)
+
+        return max(vargs)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Maximum constraint.
 
-        Can only be decomposed by introducing an auxiliary variable and enforcing it to be larger than each variable,
-         while at the same time not being larger then all (e.g. it needs to be (smaller or) equal to one of them)
+        Can only be decomposed by introducing an auxiliary variable and enforcing it to be larger or equal than
+        each variable, while at the same time not being larger than all (e.g. it needs to be (smaller or)
+        equal to one of them)
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the maximum value, and a list of constraints defining it
@@ -258,10 +260,11 @@ class Abs(GlobalFunction):
         Returns:
             Optional[int]: The absolute value of the argument, or None if the argument is not assigned
         """
-        argval = argval(self.args[0])
-        if argval is not None:
-            return abs(argval)
-        return None
+        varg = argval(self.args[0])
+        if varg is None:
+            return None
+
+        return abs(varg)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -301,51 +304,57 @@ class Abs(GlobalFunction):
 
 class Element(GlobalFunction):
     """
-        The `Element` global constraint enforces that the result equals `Arr[Idx]`
-        with `Arr` an array of constants or variables (the first argument)
-        and `Idx` an integer decision variable, representing the index into the array.
+        The `Element(Arr, Idx)` global function allows indexing into an array with a decision variable.
 
-        Solvers implement it as `Arr[Idx] == Y`, but CPMpy will automatically derive or create
-        an appropriate `Y`. Hence, you can write expressions like `Arr[Idx] + 3 <= Y`.
+        Its return value will be the value of the array element at the index specified by the decision
+        variable's value.
 
-        Element is a CPMpy built-in global constraint, so the class implements a few more
-        extra things for convenience (`.value()` and `.__repr__()`). It is also an example of
-        a 'numeric' global constraint. Consequently, the return expression of the
-        `Element` function is also numeric, even if `Arr` only contains Boolean variables.
+        When you index into a `NDVarArray` (e.g. when creating a `Arr=boolvar(shape=...)` or
+        `Arr=intvar(lb,ub, shape=...)`), or index into a list wrapped as `Arr = cpm_array(lst)`,
+        then using standard Python indexing, e.g. `Arr[Idx]` with `Idx` an integer decision variable,
+        will automatically create this `Element(Arr, Idx)` object.
+
+        Note: because Element is a numeric global function, the return type of the `Element` function
+        is always numeric, even if `Arr` only contains Boolean variables.
     """
 
-    def __init__(self, arr, idx):
+    def __init__(self, arr: list[Union[int, Expression]], idx: Expression):
         """
         Arguments:
-            arr: Array of constants or variables to index into
-            idx: Integer decision variable representing the index into the array
+            arr (list[Union[int, Expression]]): list (including NDVarArray) of integers or expressions to index into
+            idx (Expression): Integer decision variable or expression, representing the index into the array
         """
         if is_boolexpr(idx):
-            raise TypeError("index cannot be a boolean expression: {}".format(idx))
+            raise TypeError("The second argument (idx) cannot be a boolean expression: {}".format(idx))
         if is_any_list(idx):
-            raise TypeError("For using multiple dimensions in the Element constraint, use comma-separated indices")
+            raise TypeError("The second argument (idx) has to be a single expression/one-dimensional, not a list: {}".format(idx))
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
-        raise CPMpyException("For using multiple dimensions in the Element constraint use comma-separated indices")
+        raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array, e.g. instead of Arr[Idx1][Idx2], do Arr[Idx1, Idx2].")
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
-            The value of the array element at the given index, or None if the index is not assigned
+            Optional[int]: The value of the array element at the given index, or None if the index is not assigned or the array element is not assigned
         """
         arr, idx = self.args
-        idxval = argval(idx)
-        if idxval is not None:
-            if idxval >= 0 and idxval < len(arr):
-                return argval(arr[idxval])
-            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
-                                          + "\n Use argval(expr) to get the value of expr with relational semantics.")
-        return None # default
+        vidx = argval(idx)
+        if vidx is None:
+            return None
 
-    def decompose(self):
+        if vidx < 0 or vidx >= len(arr):
+            raise IncompleteFunctionError(f"Index {idxval} out of range for array of length {len(arr)} while calculating value for expression {self}"
+                                            + "\n Use argval(expr) to get the value of expr with relational semantics.")
+        return argval(arr[vidx])  # can be None
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Element constraint.
+        
+        The index variable must be within the bounds of the array.
+
+        This decomposition uses an auxiliary variable and implication constraints.
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the expression representing the element value, and an empty list of constraints (no auxiliary variables needed)
@@ -355,12 +364,28 @@ class Element(GlobalFunction):
         idx_lb, idx_ub = get_bounds(idx)
         assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
 
-        return cp.sum(arr[i] * (i == idx) for i in range(len(arr))), []
+        aux = intvar(*self.get_bounds())
+        return aux, [(idx == i).implies(aux == arr[i]) for i in range(len(arr))]
 
-    def __repr__(self):
-        return "{}[{}]".format(self.args[0], self.args[1])
+    def decompose_linear(self) -> tuple[Expression, list[Expression]]:
+        """
+        Decomposition of Element constraint.
+        
+        The index variable must be within the bounds of the array.
 
-    def get_bounds(self):
+        This decomposition uses a weighted sum over the array elements times Boolean indicator for the index.
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the expression representing the element value, and an empty list of constraints (no auxiliary variables needed)
+        """
+        arr, idx = self.args
+
+        idx_lb, idx_ub = get_bounds(idx)
+        assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
+
+        return cp.sum((idx == i)*arr[i] for i in range(len(arr))), []
+
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
 
@@ -371,7 +396,25 @@ class Element(GlobalFunction):
         bnds = [get_bounds(x) for x in arr]
         return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
+    def __repr__(self) -> str:
+        """
+        Custom string representation of the Element constraint in 'Arr[Idx]' format.
+
+        Returns:
+            str: String representation of the Element constraint.
+        """
+        return "{}[{}]".format(self.args[0], self.args[1])
+
 def element(arg_list: list[Expression]) -> Element:
+    """
+    DEPRECATED: Use Element(arr,idx) instead of element([arr,idx]).
+
+    Arguments:
+        arg_list (list[Expression]): List containing array and index (2 elements)
+
+    Returns:
+        Element: An Element global function instance
+    """
     warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
     assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
@@ -379,10 +422,10 @@ def element(arg_list: list[Expression]) -> Element:
 
 class Count(GlobalFunction):
     """
-    The Count (numerical) global constraint represents the number of occurrences of val in arr
+    The Count (numerical) global function represents the number of occurrences of a value in an array
     """
 
-    def __init__(self,arr,val):
+    def __init__(self, arr, val):
         """
         Arguments:
             arr: Array of expressions to count in
@@ -392,7 +435,7 @@ class Count(GlobalFunction):
             raise TypeError("count takes an array and a value as input, not: {} and {}".format(arr,val))
         super().__init__("count", [arr,val])
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of the Count constraint.
         Does not require the use of auxiliary variables, simply count the number of variables that take the given value.
@@ -403,16 +446,23 @@ class Count(GlobalFunction):
         arr, val = self.args
         return cp.sum(a == val for a in arr), []
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
-            int: The number of occurrences of val in arr
+            Optional[int]: The number of occurrences of val in arr, or None if val or any element in arr is not assigned
         """
         arr, val = self.args
-        val = argval(val)
-        return sum([argval(a) == val for a in arr])
+        vval = argval(val)
+        if vval is None:
+            return None
 
-    def get_bounds(self):
+        varr = [argval(a) for a in arr]
+        if any(v is None for v in varr):
+            return None
+
+        return sum([a == vval for a in varr])
+
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
 
@@ -429,7 +479,7 @@ class Among(GlobalFunction):
         The Among (numerical) global constraint represents the number of variable that take values among the values in arr
     """
 
-    def __init__(self,arr,vals):
+    def __init__(self, arr, vals):
         """
         Arguments:
             arr: Array of expressions to count in
@@ -441,7 +491,7 @@ class Among(GlobalFunction):
             raise TypeError(f"Among takes a set of values as input, not {vals}")
         super().__init__("among", [arr,vals])
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
          Decomposition of the Among constraint.
          Decomposed using several Count constraints, one for each value in values.
@@ -453,14 +503,19 @@ class Among(GlobalFunction):
         return cp.sum(Count(arr, val) for val in values), []
 
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
-            int: The number of variables in arr that take values among the values in vals
+            Optional[int]: The number of variables in arr that take values among the values in vals, or None if any element in arr is not assigned
         """
-        return int(sum(np.isin(argvals(self.args[0]), self.args[1])))
+        arr, values = self.args
+        varr = argvals(arr)  # recursive handling of nested structures
+        if any(v is None for v in varr):
+            return None
 
-    def get_bounds(self):
+        return int(sum(np.isin(varr, values)))
+
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the among count value
@@ -483,29 +538,36 @@ class NValue(GlobalFunction):
             raise ValueError("NValue takes an array as input")
         super().__init__("nvalue", arr)
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-        Decomposition of the Count constraint.
+        Decomposition of the NValue constraint.
 
         Based on "simple decomposition" from:
 
             Bessiere, Christian, et al. "Decomposition of the NValue constraint."
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the number of distinct values, and an empty list of constraints (no auxiliary variables needed)
         """
         lbs, ubs = get_bounds(self.args)
         lb, ub = min(lbs), max(ubs)
 
         return cp.sum(cp.any(a == v for a in self.args) for v in range(lb,ub+1)), []
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
-            int: The number of distinct values in the array
+            Optional[int]: The number of distinct values in the array, or None if any element in arr is not assigned
         """
-        return len(set(argval(a) for a in self.args))
+        vargs = [argval(a) for a in self.args]
+        if any(v is None for v in vargs):
+            return None
 
-    def get_bounds(self):
+        return len(set(vargs))
+
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
 
@@ -534,15 +596,18 @@ class NValueExcept(GlobalFunction):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
         super().__init__("nvalue_except",[arr, n])
 
-    def decompose(self):
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-        Decomposition of the Count constraint.
+        Decomposition of the NValueExcept constraint.
 
         Based on "simple decomposition" from:
 
             Bessiere, Christian, et al. "Decomposition of the NValue constraint."
             International Conference on Principles and Practice of Constraint Programming.
             Berlin, Heidelberg: Springer Berlin Heidelberg, 2010.
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the number of distinct values (excluding n), and an empty list of constraints (no auxiliary variables needed)
         """
         arr, n = self.args
         assert is_num(n)
@@ -558,14 +623,19 @@ class NValueExcept(GlobalFunction):
 
         return n_values, []
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """
         Returns:
-            int: The number of distinct values in the array, excluding value n
+            Optional[int]: The number of distinct values in the array, excluding value n, or None if any element in arr is not assigned
         """
-        return len(set(argval(a) for a in self.args[0]) - {self.args[1]})
+        arr, n = self.args
+        varr = [argval(a) for a in arr]
+        if any(v is None for v in varr):
+            return None
 
-    def get_bounds(self):
+        return len(set(varr) - {n})
+
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the (numerical) global constraint
 

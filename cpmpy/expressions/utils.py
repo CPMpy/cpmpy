@@ -34,7 +34,6 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import Union
 from cpmpy.exceptions import IncompleteFunctionError
 
 
@@ -148,7 +147,7 @@ def argvals(arr):
     return argval(arr)
 
 
-def eval_comparison(str_op: str, lhs: object, rhs: object) -> bool:
+def eval_comparison(str_op, lhs, rhs):
     """
         Internal function: evaluates the textual `str_op` comparison operator
         lhs <str_op> rhs
