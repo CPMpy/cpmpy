@@ -182,7 +182,8 @@ class TestRC2Objective(unittest.TestCase):
         model = cp.Model()
         x = cp.boolvar(2)
         y = cp.intvar(0, 3, shape=2)
-        model.maximize(cp.sum(x) + cp.sum(y))
+        z = cp.intvar(0, 3)
+        model.maximize(cp.sum(x) + cp.sum(y) + 0 * z)
         # Add constraints
         model += (x[0] != x[1])  # both must be different
         model += (y[0] < y[1])  # y[0] must be less than y[1]

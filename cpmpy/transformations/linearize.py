@@ -547,6 +547,7 @@ def canonical_comparison(lst_of_expr):
     return newlist
 
 def only_positive_coefficients_(ws, xs):
+    """ Helper function which weight """
     indices = {i for i, (w, x) in enumerate(zip(ws, xs)) if w < 0 and isinstance(x, _BoolVarImpl)}
     nw, na = zip(*[(-w, ~x) if i in indices else (w, x) for i, (w, x) in enumerate(zip(ws, xs))])
     cons = sum(ws[i] for i in indices)
@@ -561,6 +562,7 @@ def only_positive_coefficients(lst_of_expr):
 
         Resulting expression is linear.
     """
+    # TODO this should be renamed to only_non_negative_coefficients, because it does not remove terms with coefficient 0. I think it does not, because it risks removing user variables.
     newlist = []
     for cpm_expr in lst_of_expr:
         if isinstance(cpm_expr, Comparison):

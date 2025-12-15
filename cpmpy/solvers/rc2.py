@@ -195,8 +195,6 @@ class CPM_rc2(CPM_pysat):
 
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         self.user_vars = get_user_vars(self.user_vars, self.ivarmap)
-        
-        # TODO I believe assumptions can be added in the WCNF as `soft`
 
         # TODO: set time limit
         if time_limit is not None:
@@ -284,19 +282,17 @@ class CPM_rc2(CPM_pysat):
         else:
             raise NotImplementedError(f"CPM_rc2: Non supported objective {flat_obj} (yet?)")
 
-        try:
-            terms, cons, k = _encode_lin_expr(self.ivarmap, xs, weights, self.encoding)
-        except TypeError:
-            raise NotImplementedError(f"CPM_rc2: Unsupported objective: {flat_obj}")
+        terms, cons, k = _encode_lin_expr(self.ivarmap, xs, weights, self.encoding)
 
         self += cons
         const += k
 
+        terms = [(w, x) for w,x in terms if w != 0]  # positive coefficients only
         ws, xs = zip(*terms)  # unzip
-        new_weights, new_xs, k = only_positive_coefficients_(ws, xs)
+        new_weights, new_xs, k = only_positive_coefficients_(ws, xs) # this is actually only_non_negative_coefficients
         const += k
 
-        return new_weights, new_xs, const
+        return list(new_weights), list(new_xs), const
 
 
     def objective(self, expr, minimize):

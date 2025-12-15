@@ -10,6 +10,7 @@ import cpmpy as cp
 from ..expressions.core import BoolVal, Comparison, Expression, Operator
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar
+from ..expressions.utils import is_int
 
 UNKNOWN_COMPARATOR_ERROR = ValueError("Comparator is not known or should have been simplified by linearize.")
 EMPTY_DOMAIN_ERROR = ValueError("Attempted to encode variable with empty domain (which is unsat)")
@@ -101,7 +102,9 @@ def _encode_lin_expr(ivarmap, xs, weights, encoding, cmp=None):
     k = 0
     for w, x in zip(weights, xs):
         # the linear may contain Boolean as well as integer variables
-        if isinstance(x, _BoolVarImpl):
+        if is_int(x):
+            k += w * x
+        elif isinstance(x, _BoolVarImpl):
             terms += [(w, x)]
         elif isinstance(x, _IntVarImpl):
             x_enc, x_cons = _encode_int_var(ivarmap, x, _decide_encoding(x, cmp, encoding))
@@ -111,7 +114,7 @@ def _encode_lin_expr(ivarmap, xs, weights, encoding, cmp=None):
             terms += new_terms
             k += k_
         else:
-            raise TypeError
+            raise TypeError(f"Term {w} * {x} for {type(x)}")
     return terms, domain_constraints, k
 
 
