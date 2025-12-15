@@ -9,7 +9,7 @@
     For example `cp.Maximum(iv1, iv2, iv3) == iv4`, or `cp.Abs(iv1) > iv2` or `m.minimize(cp.Count(IVS, 0))`,
     or other nested numeric expressions.
 
-    Global functions are implemented as classes that inherit from `GlobalFunction`.
+    Global functions are implemented as classes that inherit from :class:`GlobalFunction <cpmpy.expressions.globalfunctions.GlobalFunction>`.
 
 
     Solver perspective
@@ -25,7 +25,7 @@
     transformation in the `flatten_model` transformation.
 
     * Decomposition: if a solver does not support a global function, then it will be automatically
-    decomposed by calling its `.decompose()` function in the `decompose_global` transformation.
+    decomposed by the :func:`decompose_in_tree() <cpmpy.transformations.decompose_global.decompose_in_tree>` transformation, which will call its :meth:`decompose() <cpmpy.expressions.globalfunctions.GlobalFunction.decompose>` method.
 
     The `.decompose()` function returns two arguments:
         1. A single CPMpy expression representing the numerical value of the global function,
@@ -81,10 +81,10 @@ from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_bo
 
 class GlobalFunction(Expression):
     """
-        Abstract superclass of GlobalFunction
+    Abstract superclass of GlobalFunction
 
-        Like all expressions it has a `.name` and `.args` property.
-        It overwrites the `.is_bool()` method to return False, as global functions are numeric.
+    Like all expressions it has a `.name` and `.args` property.
+    It overwrites the :meth:`is_bool() <cpmpy.expressions.core.Expression.is_bool>` method to return False, as global functions are numeric.
     """
 
     def is_bool(self) -> bool:
@@ -310,8 +310,8 @@ class Element(GlobalFunction):
     Its return value will be the value of the array element at the index specified by the decision
     variable's value.
 
-    When you index into a `NDVarArray` (e.g. when creating a `Arr=boolvar(shape=...)` or
-    `Arr=intvar(lb,ub, shape=...)`), or index into a list wrapped as `Arr = cpm_array(lst)`,
+    When you index into a :class:`NDVarArray <cpmpy.expressions.variables.NDVarArray>` (e.g. when creating a `Arr=boolvar(shape=...)` or
+    `Arr=intvar(lb,ub, shape=...)` using :func:`boolvar() <cpmpy.expressions.variables.boolvar>` or :func:`intvar() <cpmpy.expressions.variables.intvar>`), or index into a list wrapped as `Arr = cpm_array(lst)` using :func:`cpm_array() <cpmpy.expressions.variables.cpm_array>`,
     then using standard Python indexing, e.g. `Arr[Idx]` with `Idx` an integer decision variable,
     will automatically create this `Element(Arr, Idx)` object.
 
@@ -326,9 +326,9 @@ class Element(GlobalFunction):
             idx (Expression): Integer decision variable or expression, representing the index into the array
         """
         if is_boolexpr(idx):
-            raise TypeError("Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {}".format(idx))
+            raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
-            raise TypeError("Element(arr, idx) takes an integer expression as second argument, not a list: {}".format(idx))
+            raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
@@ -404,7 +404,7 @@ class Element(GlobalFunction):
         Returns:
             str: String representation of the Element global function.
         """
-        return "{}[{}]".format(self.args[0], self.args[1])
+        return f"{self.args[0]}[{self.args[1]}]"
 
 def element(arg_list: list[Expression]) -> Element:
     """
@@ -433,9 +433,9 @@ class Count(GlobalFunction):
             val (Union[int, Expression]): 'Value' to count occurrences of (can also be an expression)
         """
         if not is_any_list(arr):
-            raise TypeError("Count(arr, val) takes an array of expressions as first argument, not: {}".format(arr))
+            raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
-            raise TypeError("Count(arr, val) takes a numeric expression as second argument, not a list: {}".format(val))
+            raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
         super().__init__("count", [arr, val])
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -482,7 +482,7 @@ class Among(GlobalFunction):
     """
     The Among global function counts how many variables in an array take values that are in a given set of values.
     
-    This is similar to Count, but instead of counting occurrences of a single value,
+    This is similar to :class:`Count <cpmpy.expressions.globalfunctions.Count>`, but instead of counting occurrences of a single value,
     it counts occurrences of any value in a set. For example, `Among([x1, x2, x3, x4], [1, 2])`
     returns the number of variables among x1, x2, x3, x4 that take the value 1 or 2.
     """
@@ -494,7 +494,7 @@ class Among(GlobalFunction):
             vals (list[int]): Array of integer values to count the total number of occurrences of
         """
         if not is_any_list(arr) or not is_any_list(vals):
-            raise TypeError("Among takes as input two arrays, not: {} and {}".format(arr,vals))
+            raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
         super().__init__("among", [arr, vals])
@@ -503,7 +503,7 @@ class Among(GlobalFunction):
         """
         Decomposition of the Among global function.
         
-        Among is decomposed into a sum of Count global functions, one for each value in the set.
+        Among is decomposed into a sum of :class:`Count <cpmpy.expressions.globalfunctions.Count>` global functions, one for each value in the set.
         For example, `Among(arr, [1, 2, 3])` is decomposed as `Count(arr, 1) + Count(arr, 2) + Count(arr, 3)`.
 
         Returns:
@@ -549,7 +549,7 @@ class NValue(GlobalFunction):
             arr (list[Expression]): Array of expressions to count distinct values in
         """
         if not is_any_list(arr):
-            raise ValueError("NValue(arr) takes an array as input, not: {}".format(arr))
+            raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
         super().__init__("nvalue", arr)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -621,7 +621,7 @@ class NValueExcept(GlobalFunction):
         """
         Decomposition of the NValueExcept global function.
 
-        NValueExcept is decomposed similarly to NValue, by checking for each possible value
+        NValueExcept is decomposed similarly to :class:`NValue <cpmpy.expressions.globalfunctions.NValue>`, by checking for each possible value
         in the domain range (except the excluded value n) whether at least one variable
         takes that value, and counting for how many values that was the case.
 
