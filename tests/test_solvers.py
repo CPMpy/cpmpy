@@ -974,7 +974,8 @@ class TestSupportedSolvers:
         assert not s.solve(assumptions=[~x, ~y])
 
         core = s.get_core()
-        assert ~y in set([~x,~y])
+        assert len(core) > 0
+        assert ~y in core
         assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat
 
         assert s.solve(assumptions=[])
