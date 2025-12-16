@@ -279,6 +279,10 @@ class CPM_pysdd(SolverInterface):
 
         return self._varmap[cpm_var]
 
+    supported_global_constraints = {"xor"}
+    supported_reified_global_constraints = {"xor"}
+    supported_global_functions = set()
+
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -298,7 +302,10 @@ class CPM_pysdd(SolverInterface):
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}, csemap=self._csemap) #keep unsupported xor for error message purposes.
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | self.supported_global_functions,
+                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 

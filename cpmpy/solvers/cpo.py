@@ -383,8 +383,9 @@ class CPM_cpo(SolverInterface):
         # save user variables
         get_variables(expr, self.user_vars)
 
-        supported = {'max', 'min', 'abs', 'element', 'nvalue', 'alldifferent', 'table', 'indomain', 'negative_table'}
-        obj, decomp_cons = decompose_objective(expr, supported=supported)
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               csemap=self._csemap)
         self.add(decomp_cons)
 
         dom = self.get_docp().modeler
@@ -399,6 +400,10 @@ class CPM_cpo(SolverInterface):
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
+
+    supported_global_constraints = {"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",'cumulative', 'no_overlap'}
+    supported_reified_global_constraints = {"alldifferent", "table", "indomain", "negative_table"}
+    supported_global_functions = {"min", "max", "abs", "nvalue", "element"}
 
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
@@ -418,11 +423,10 @@ class CPM_cpo(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
-        # count is only supported with a constant to be counted, so we decompose
-        supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'no_overlap'}
-        supported_reified = {"alldifferent", 'table', 'indomain', "negative_table"} # global functions by default here
-        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | self.supported_global_functions,
+                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     csemap=self._csemap)
         # no flattening required
         return cpm_cons
 

@@ -303,7 +303,9 @@ class CPM_pumpkin(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
-        obj, decomp_cons = decompose_objective(expr, supported={"min", "max", "element", "abs"}, csemap=self._csemap)
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               csemap=self._csemap)
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
         if expr.is_bool():
             ivar = intvar(0,1)
@@ -318,6 +320,10 @@ class CPM_pumpkin(SolverInterface):
 
     def has_objective(self):
         return self._objective is not None
+
+    supported_global_constraints = {"alldifferent", "cumulative", "table", "negative_table", "InDomain"}
+    supported_reified_global_constraints = set()
+    supported_global_functions = {"min", "max", "abs", "element"}
 
     # `__add__()` first calls `transform()`
     def transform(self, cpm_expr):
@@ -336,10 +342,12 @@ class CPM_pumpkin(SolverInterface):
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"alldifferent", "cumulative", "table", "negative_table", "InDomain"
-                     "min", "max", "element", "abs"}
+
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"}) # safen toplevel elements, assume total decomposition for partial functions
-        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | self.supported_global_functions,
+                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)

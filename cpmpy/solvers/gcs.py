@@ -390,8 +390,9 @@ class CPM_gcs(SolverInterface):
         get_variables(expr, collect=self.user_vars)
 
         # transform objective
-        obj, decomp_cons = decompose_objective(expr, csemap=self._csemap,
-                                               supported={"min", "max", "abs", "element", "nvalue", "count"})
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               csemap=self._csemap)
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
         self.add(decomp_cons + obj_cons)
 
@@ -401,6 +402,10 @@ class CPM_gcs(SolverInterface):
             self.gcs.minimise(self.solver_var(obj_var))
         else:
             self.gcs.maximise(self.solver_var(obj_var))
+
+    supported_global_constraints = {"alldifferent", "table", "negative_table", "inverse", "circuit", "xor"}
+    supported_reified_global_constraints = set()
+    supported_global_functions = {"min", "max", "abs", "element", "nvalue", "count"}
 
     def transform(self, cpm_expr):
         """
@@ -417,21 +422,11 @@ class CPM_gcs(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {
-            "min", 
-            "max", 
-            "abs", 
-            "alldifferent", 
-            "element", 
-            'table', 
-            'negative_table', 
-            'count', 
-            'nvalue',
-            'inverse', 
-            'circuit', 
-            'xor'}
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | self.supported_global_functions,
+                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints

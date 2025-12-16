@@ -345,6 +345,11 @@ class CPM_pysat(SolverInterface):
         else:
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
+    supported_global_constraints = {"alldifferent"}
+    supported_reified_global_constraints = set()
+    supported_global_functions = set()
+
+
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -368,8 +373,11 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({"alldifferent"}), csemap=self._csemap)
-        cpm_cons = simplify_boolean(cpm_cons)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | self.supported_global_functions,
+                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     csemap=self._csemap)
+        # cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)

@@ -561,13 +561,9 @@ class CPM_minizinc(SolverInterface):
         # save user variables
         get_variables(expr, collect=self.user_vars) # add objvars to vars
 
-        supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "gcc", "increasing", "decreasing",
-                     "no_overlap", "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
-                     "lex_chain_lesseq", "among"}
-
-        # transform objective
-        obj, decomp_cons = decompose_objective(expr, supported=supported)
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               csemap=self._csemap)
         self.add(decomp_cons)
 
         # make objective function or variable and post
@@ -582,6 +578,14 @@ class CPM_minizinc(SolverInterface):
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
 
+    supported_global_constraints = { "alldifferent", "alldifferent_except0", "allequal",
+                                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
+                                     "precedence", "no_overlap",
+                                     "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
+                                     "lex_chain_lesseq"}
+    supported_nested_global_constraints = supported_global_constraints - {"circuit", "precedence"}
+    supported_global_functions = {"min", "max", "abs", "element", "count", "nvalue", "among"}
+
     def transform(self, cpm_expr):
         """
             Decompose globals not supported (and flatten globalfunctions)
@@ -593,12 +597,11 @@ class CPM_minizinc(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
-                     "precedence", "no_overlap",
-                     "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
-                     "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"}, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | self.supported_global_functions,
+                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     csemap=self._csemap)
+        return cpm_cons
 
     def add(self, cpm_expr):
         """

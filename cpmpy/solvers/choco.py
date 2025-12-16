@@ -359,10 +359,9 @@ class CPM_choco(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
-        supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
-        obj, decomp_cons = decompose_objective(expr, supported=supported, csemap=self._csemap)
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               csemap=self._csemap)
 
         # make objective function non-nested
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
@@ -398,6 +397,13 @@ class CPM_choco(SolverInterface):
             return [self._to_vars(v) for v in vals]
         return self._to_var(vals)
 
+    supported_global_constraints = {"alldifferent", "alldifferent_except0", "allequal",
+                                    "table", 'negative_table', "short_table", "regular", "InDomain",
+                                    "cumulative", "circuit", "gcc", "inverse","precedence",
+                                    "increasing", "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less",}
+    supported_reified_global_constraints = supported_global_constraints # choco supports everything reified
+    supported_global_functions = {"min", "max", "abs", "count", "element",  "nvalue",  "among", }
+
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -414,15 +420,16 @@ class CPM_choco(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence"}
-
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap) # choco supports any global also (half-) reified
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | self.supported_global_functions,
+                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons, supported = supported | {"sum", "wsum"}, csemap=self._csemap)  # constraints that support reification
+        cpm_cons = reify_rewrite(cpm_cons,
+                                 supported = self.supported_global_constraints | self.supported_global_functions | {"sum", "wsum"},
+                                 csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # support >, <, !=
 
         return cpm_cons
