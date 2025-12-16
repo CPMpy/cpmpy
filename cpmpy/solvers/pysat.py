@@ -377,7 +377,7 @@ class CPM_pysat(SolverInterface):
                                      supported=self.supported_global_constraints | self.supported_global_functions,
                                      supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
                                      csemap=self._csemap)
-        # cpm_cons = simplify_boolean(cpm_cons)
+        cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
