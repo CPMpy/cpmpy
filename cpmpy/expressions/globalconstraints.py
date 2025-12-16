@@ -134,7 +134,7 @@ import cpmpy as cp
 
 from .core import BoolVal
 from .utils import all_pairs, is_int, is_bool, STAR
-from .variables import _IntVarImpl, cpm_array
+from .variables import _IntVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 
 

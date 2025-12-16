@@ -74,8 +74,8 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression
-from .variables import boolvar, intvar
+from .core import Expression, Operator
+from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
 
