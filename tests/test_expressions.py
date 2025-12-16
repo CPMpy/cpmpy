@@ -638,7 +638,7 @@ class TestBuildIns(unittest.TestCase):
         self.x[0]._value = 0
         self.assertEqual(gt.value(), 0)
         self.x[0]._value = None
-        self.assertEqual(gt.value(), None)
+        self.assertIsNone(gt.value())
 
 from cpmpy.transformations.get_variables import get_variables
 class TestNullifyingArguments(unittest.TestCase):
