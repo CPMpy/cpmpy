@@ -403,10 +403,9 @@ class Inverse(GlobalConstraint):
         fwd = argvals(self.args[0])
         rev = argvals(self.args[1])
         # args are fine, now evaluate actual inverse cons
-        try:
-            return all(rev[x] == i for i, x in enumerate(fwd))
-        except IndexError: # partiality of Element constraint
+        if any(not 0 <= x < len(rev) for x in fwd):
             return False
+        return all(rev[x] == i for i, x in enumerate(fwd))
 
 
 class Table(GlobalConstraint):
