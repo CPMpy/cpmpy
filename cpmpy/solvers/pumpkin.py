@@ -570,7 +570,7 @@ class CPM_pumpkin(SolverInterface):
             elif cpm_expr.name == "InDomain":
                 val, domain = cpm_expr.args
                 return [constraints.Table(self.to_pum_ivar([val], tag=tag),
-                                          [np.array(domain).tolist()], # ensure Python list
+                                          [[d] for d in domain], # each domain value is its own row
                                           constraint_tag=tag)
                         ] 
             
