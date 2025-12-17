@@ -402,9 +402,16 @@ class Inverse(GlobalConstraint):
     def value(self):
         fwd = argvals(self.args[0])
         rev = argvals(self.args[1])
+
+        if any(x is None for x in fwd):
+            return None
+        if any(x is None for x in rev):
+            return None
+
         # args are fine, now evaluate actual inverse cons
         if any(not 0 <= x < len(rev) for x in fwd):
-            return False
+            return False  # partiality of Element (index out of bounds)
+
         return all(rev[x] == i for i, x in enumerate(fwd))
 
 
