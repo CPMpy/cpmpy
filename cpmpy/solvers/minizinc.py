@@ -94,7 +94,7 @@ class CPM_minizinc(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc",
+                                              "inverse", "ite", "xor", "table", "cumulative", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
