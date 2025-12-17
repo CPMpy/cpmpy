@@ -829,6 +829,37 @@ class CPM_minizinc(SolverInterface):
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
 
+        elif expr.name == "InDomain":
+            # InDomain(expr, domain_list) - convert domain_list to a set
+            expr_str = self._convert_expression(expr.args[0])
+            domain = expr.args[1]
+            # Convert domain list to set format
+            if is_any_list(domain):
+                domain_str = "{" + ",".join(self._convert_expression(d) for d in domain) + "}"
+            else:
+                domain_str = self._convert_expression(domain)
+            return "({} in {})".format(expr_str, domain_str)
+
+        elif expr.name == "regular":
+            # regular(array, transitions, start, accepting)
+            # MiniZinc regular constraint expects: regular(array, transitions_table, start, accepting)
+            # where transitions_table is a 2D array
+            array, transitions, start, accepting = expr.args
+            array_str = self._convert_expression(array)
+            # Convert transitions to a 2D array format for MiniZinc
+            # transitions is a list of (src, value, dst) tuples
+            transitions_list = []
+            for src, val, dst in transitions:
+                transitions_list.append("[{}, {}, {}]".format(
+                    self._convert_expression(src),
+                    self._convert_expression(val),
+                    self._convert_expression(dst)
+                ))
+            transitions_str = "[{}]".format(",".join(transitions_list))
+            start_str = self._convert_expression(start)
+            accepting_str = self._convert_expression(accepting)
+            return "regular({}, {}, {}, {})".format(array_str, transitions_str, start_str, accepting_str)
+
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
         elif isinstance(expr, DirectConstraint):
