@@ -80,8 +80,7 @@ class CPM_gurobi(SolverInterface):
     https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
 
-    supported_global_constraints = frozenset({"alldifferent",# alldiff has a specialized MIP decomp in linearize
-                                             "min", "max", "abs"})
+    supported_global_constraints = frozenset({"min", "max", "abs"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -360,7 +359,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints,
+                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized MIP decomp in linearize
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form

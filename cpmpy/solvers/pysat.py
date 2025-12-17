@@ -94,7 +94,7 @@ class CPM_pysat(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({"alldifferent"}) # alldiff has a specialized MIP decomp in linearize
+    supported_global_constraints = frozenset()
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -372,7 +372,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints,
+                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized MIP decomp in linearize
                                      supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?

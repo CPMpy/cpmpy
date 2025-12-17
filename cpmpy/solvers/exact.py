@@ -83,7 +83,7 @@ class CPM_exact(SolverInterface):
     https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
-    supported_global_constraints = frozenset({"alldifferent"})  # alldiff has a specialized linear decomp
+    supported_global_constraints = frozenset()
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -514,7 +514,7 @@ class CPM_exact(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"}) # linearize and decompose expects safe exprs
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints,
+                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized linear decomp
                                      supported_reified = self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
