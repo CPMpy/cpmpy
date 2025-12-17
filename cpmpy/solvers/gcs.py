@@ -90,6 +90,10 @@ class CPM_gcs(SolverInterface):
     https://github.com/ciaranm/glasgow-constraint-solver/blob/main/python/python_test.py
     """
 
+    supported_global_constraints = frozenset({"alldifferent", "table", "negative_table", "inverse", "circuit", "xor",
+                                              "min", "max", "abs", "element", "nvalue", "count"})
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         # try to import the package
@@ -391,7 +395,8 @@ class CPM_gcs(SolverInterface):
 
         # transform objective
         obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
         self.add(decomp_cons + obj_cons)
@@ -402,10 +407,6 @@ class CPM_gcs(SolverInterface):
             self.gcs.minimise(self.solver_var(obj_var))
         else:
             self.gcs.maximise(self.solver_var(obj_var))
-
-    supported_global_constraints = {"alldifferent", "table", "negative_table", "inverse", "circuit", "xor"}
-    supported_reified_global_constraints = set()
-    supported_global_functions = {"min", "max", "abs", "element", "nvalue", "count"}
 
     def transform(self, cpm_expr):
         """
@@ -424,8 +425,8 @@ class CPM_gcs(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | self.supported_global_functions,
-                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
 

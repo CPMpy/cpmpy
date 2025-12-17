@@ -72,6 +72,11 @@ class CPM_cpo(SolverInterface):
 
     """
 
+    supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",
+                                              'cumulative', 'no_overlap',
+                                              "min", "max", "abs", "nvalue", "element"})
+    supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
+
     _docp = None  # Static attribute to hold the docplex.cp module
 
     @classmethod
@@ -384,7 +389,8 @@ class CPM_cpo(SolverInterface):
         get_variables(expr, self.user_vars)
 
         obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
         self.add(decomp_cons)
 
@@ -400,10 +406,6 @@ class CPM_cpo(SolverInterface):
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
-
-    supported_global_constraints = {"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",'cumulative', 'no_overlap'}
-    supported_reified_global_constraints = {"alldifferent", "table", "indomain", "negative_table"}
-    supported_global_functions = {"min", "max", "abs", "nvalue", "element"}
 
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
@@ -424,8 +426,8 @@ class CPM_cpo(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | self.supported_global_functions,
-                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         # no flattening required
         return cpm_cons

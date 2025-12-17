@@ -93,6 +93,15 @@ class CPM_minizinc(SolverInterface):
     https://minizinc-python.readthedocs.io/
     """
 
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
+                                              "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc",
+                                              "increasing", "decreasing",
+                                              "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
+                                              "lex_chain_less","lex_chain_lesseq",
+                                              "precedence", "no_overlap",
+                                              "min", "max", "abs", "element", "count", "nvalue", "among"})
+    supported_nested_global_constraints = supported_global_constraints - {"circuit", "precedence"}
+
     required_version = (2, 8, 2)
 
     @staticmethod
@@ -562,7 +571,8 @@ class CPM_minizinc(SolverInterface):
         get_variables(expr, collect=self.user_vars) # add objvars to vars
 
         obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
         self.add(decomp_cons)
 
@@ -578,14 +588,6 @@ class CPM_minizinc(SolverInterface):
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
 
-    supported_global_constraints = { "alldifferent", "alldifferent_except0", "allequal",
-                                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
-                                     "precedence", "no_overlap",
-                                     "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less",
-                                     "lex_chain_lesseq"}
-    supported_nested_global_constraints = supported_global_constraints - {"circuit", "precedence"}
-    supported_global_functions = {"min", "max", "abs", "element", "count", "nvalue", "among"}
-
     def transform(self, cpm_expr):
         """
             Decompose globals not supported (and flatten globalfunctions)
@@ -598,8 +600,8 @@ class CPM_minizinc(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | self.supported_global_functions,
-                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 

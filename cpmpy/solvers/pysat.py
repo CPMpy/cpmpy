@@ -94,6 +94,9 @@ class CPM_pysat(SolverInterface):
 
     """
 
+    supported_global_constraints = frozenset({"alldifferent"}) # alldiff has a specialized MIP decomp in linearize
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         # try to import the package
@@ -345,11 +348,6 @@ class CPM_pysat(SolverInterface):
         else:
             raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
-    supported_global_constraints = {"alldifferent"}
-    supported_reified_global_constraints = set()
-    supported_global_functions = set()
-
-
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -374,8 +372,8 @@ class CPM_pysat(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | self.supported_global_functions,
-                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form

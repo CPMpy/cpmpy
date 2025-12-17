@@ -84,6 +84,8 @@ class CPM_cplex(SolverInterface):
     Documentation of the solver's own Python API:
     https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
     """
+    supported_global_constraints = frozenset({"alldifferent", # alldiff has a specialized MIP decomp in linearize
+                                              "min", "max", "abs"})
 
     @staticmethod
     def supported():
@@ -309,7 +311,8 @@ class CPM_cplex(SolverInterface):
         # transform objective
         obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_objective(obj,
-                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
@@ -358,8 +361,6 @@ class CPM_cplex(SolverInterface):
             return a * b
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
-    supported_global_constraints = {"alldifferent"}  # alldiff has a specialized MIP decomp in linearize
-    supported_global_functions = {"min", "max", "abs"}
 
     def transform(self, cpm_expr):
         """
@@ -380,8 +381,8 @@ class CPM_cplex(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | self.supported_global_functions,
-                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)  # constraints that support reification

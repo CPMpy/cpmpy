@@ -77,6 +77,9 @@ class CPM_z3(SolverInterface):
         Terminology note: a 'model' for z3 is a solution!
     """
 
+    supported_global_constraints = frozenset({"alldifferent", "xor", "ite"})
+    supported_reified_global_constraints = supported_global_constraints
+
     @staticmethod
     def supported():
         # try to import the package
@@ -315,7 +318,8 @@ class CPM_z3(SolverInterface):
         # transform objective
         obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_objective(obj,
-                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
 
         self.add(safe_cons + decomp_cons)
@@ -329,10 +333,6 @@ class CPM_z3(SolverInterface):
         else:
             self.obj_handle = self.z3_solver.maximize(z3_obj)
             self._minimize = False # record direction of optimisation
-
-    supported_global_constraints = {"alldifferent", "xor", "ite"}
-    supported_reified_global_constraints = supported_global_constraints
-    supported_global_functions = set()
 
     def transform(self, cpm_expr):
         """
@@ -352,8 +352,8 @@ class CPM_z3(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | self.supported_global_functions,
-                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         return cpm_cons
 

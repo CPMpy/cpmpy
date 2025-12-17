@@ -72,6 +72,10 @@ class CPM_pumpkin(SolverInterface):
     - ``pum_solver``: the pumpkin.Model() object
     """
 
+    supported_global_constraints = frozenset({"alldifferent", "cumulative", "table", "negative_table", "InDomain",
+                                              "min", "max", "abs", "element"})
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         # try to import the package
@@ -303,8 +307,9 @@ class CPM_pumpkin(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
-        obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+        obj, decomp_cons = decompose_objective(obj,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
         if expr.is_bool():
@@ -320,10 +325,6 @@ class CPM_pumpkin(SolverInterface):
 
     def has_objective(self):
         return self._objective is not None
-
-    supported_global_constraints = {"alldifferent", "cumulative", "table", "negative_table", "InDomain"}
-    supported_reified_global_constraints = set()
-    supported_global_functions = {"min", "max", "abs", "element"}
 
     # `__add__()` first calls `transform()`
     def transform(self, cpm_expr):
@@ -345,8 +346,8 @@ class CPM_pumpkin(SolverInterface):
 
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"}) # safen toplevel elements, assume total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | self.supported_global_functions,
-                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
