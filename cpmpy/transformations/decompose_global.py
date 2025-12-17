@@ -139,12 +139,13 @@ def decompose_in_tree(lst_of_expr, supported=set(), supported_reified=set(), _to
         return toplevel_list(newlist) + decompose_in_tree(toplevel_list(_toplevel), supported, supported_reified, nested=False, csemap=csemap)
 
 
-def decompose_objective(expr, supported=set(), csemap=None):
+def decompose_objective(expr, supported=set(), supported_reified=set(), csemap=None):
     if is_any_list(expr):
         raise ValueError(f"Expected a numerical expression as objective but got a list {expr}")
 
     toplevel = []
-    decomp_expr = decompose_in_tree([expr], supported=supported, _toplevel=toplevel, nested=True, csemap=csemap)
+    decomp_expr = decompose_in_tree([expr], supported=supported, supported_reified=supported_reified,
+                                    _toplevel=toplevel, nested=True, csemap=csemap)
     assert len(decomp_expr) == 1, f"Expected {expr} to be decomposed into a single expression, but got {decomp_expr}.\nPlease report on github."
     return decomp_expr[0], toplevel
 
