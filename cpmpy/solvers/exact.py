@@ -249,7 +249,7 @@ class CPM_exact(SolverInterface):
         elif my_status == "INCONSISTENT": # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "TIMEOUT": # found timeout
-            if self.xct_solver.hasSolution(): # found a (sub-)optimal solution
+            if self.has_objective() and self.xct_solver.hasSolution(): # found a (sub-)optimal solution
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else: # no solution found
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
