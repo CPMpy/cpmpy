@@ -384,7 +384,7 @@ class Element(GlobalFunction):
         idx_lb, idx_ub = get_bounds(idx)
         assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
 
-        return cp.sum((idx == i)*arr[i] for i in range(len(arr))), []
+        return cp.sum((idx == i)*arr[i] for i in range(idx_lb, idx_ub+1)), []
 
     def get_bounds(self) -> tuple[int, int]:
         """
