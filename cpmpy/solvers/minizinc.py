@@ -672,6 +672,15 @@ class CPM_minizinc(SolverInterface):
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
 
+        # negative_table(vars, tbl): use not table(...) for forbidden assignments
+        if expr.name == "negative_table":
+            str_vars = self._convert_expression(expr.args[0])
+            str_tbl = "[|\n"  # opening
+            for row in expr.args[1]:
+                str_tbl += ",".join(map(str, row)) + " |"  # rows
+            str_tbl += "\n|]"  # closing
+            return "not table({}, {})".format(str_vars, str_tbl)
+
         # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
         if expr.name == "inverse":
             def zero_based(array):

@@ -855,6 +855,32 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(m.solve(solver="ortools"))
         self.assertTrue(m.solve(solver="minizinc"))
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_negative_table_minizinc(self):
+        """Test negative_table constraint with minizinc solver"""
+        iv = cp.intvar(-8, 8, 3)
+
+        # Test basic negative_table
+        constraints = [cp.NegativeTable([iv[0], iv[1], iv[2]], [(5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve(solver="minizinc"))
+        # Verify the solution doesn't match the forbidden tuple
+        self.assertNotEqual((iv[0].value(), iv[1].value(), iv[2].value()), (5, 2, 2))
+
+        # Test with multiple forbidden tuples
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve(solver="minizinc"))
+        sol = tuple(iv.value())
+        self.assertNotIn(sol, [(10, 8, 2), (5, 2, 2)])
+
+        # Test that negative_table and table are contradictory when they have the same tuples
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), 
+                       cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve(solver="minizinc"))
+
 
 
     def test_cumulative_no_np(self):
