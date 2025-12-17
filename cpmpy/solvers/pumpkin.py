@@ -307,7 +307,7 @@ class CPM_pumpkin(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
-        obj, decomp_cons = decompose_objective(obj,
+        obj, decomp_cons = decompose_objective(expr,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
