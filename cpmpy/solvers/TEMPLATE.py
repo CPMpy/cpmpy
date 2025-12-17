@@ -76,6 +76,12 @@ class CPM_template(SolverInterface):
     <URL to docs or source code>
     """
 
+    # [GUIDELINE] list all supported global constraints and global functions
+    #           (e.g., alldifferent, max, element, sum, wsum, ...)
+    supported_global_constraints = frozenset({"alldifferent", "max", "element"})
+    # [GUIDELINE] list all global constraints supported in a reified context by your solver (e.g., bv <=> AllDifferent)
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         # try to import the package
@@ -305,7 +311,8 @@ class CPM_template(SolverInterface):
         obj, safe_cons = safen_objective(expr)
         # [GUIDELINE] all globals which unsupported in a nested context should be decomposed here.
         obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_reified_global_constraints | self.supported_global_functions,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 
@@ -358,14 +365,6 @@ class CPM_template(SolverInterface):
            # ...
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
-    # [GUIDELINE] list all supported global constraints
-    supported_global_constraints = {"alldifferent"}
-    # [GUIDELINE] list all global constraints supported in a reified context by your solver (e.g., bv <=> AllDifferent)
-    supported_reified_global_constraints = set()
-    # [GUIDELINE] list all supported global functions (e.g., max, element, nvalue, count...)
-    supported_global_functions = {"max", "element"}
-
-
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
         """
@@ -385,8 +384,8 @@ class CPM_template(SolverInterface):
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | self.supported_global_functions,
-                                     supported_reified=self.supported_reified_global_constraints | self.supported_global_functions,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
