@@ -315,6 +315,9 @@ class CPM_z3(SolverInterface):
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
+        # save user variables
+        get_variables(expr, self.user_vars)
+
         # transform objective
         obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_objective(obj,
