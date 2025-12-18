@@ -99,7 +99,7 @@ class CPM_minizinc(SolverInterface):
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
                                               "precedence", "no_overlap",
-                                              "min", "max", "abs", "element", "count", "nvalue", "among"})
+                                              "min", "max", "abs", "div", "mod", "pow", "element", "count", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
 
     required_version = (2, 8, 2)
@@ -753,7 +753,7 @@ class CPM_minizinc(SolverInterface):
             # some names differently (the infix names!)
             printmap = {'and': '/\\', 'or': '\\/',
                         'sum': '+', 'sub': '-',
-                        'mul': '*', 'pow': '^'}
+                        'mul': '*'}
             op_str = expr.name
             expr_bounds = expr.get_bounds()
             if expr_bounds[0] < -2147483646 or expr_bounds[1] > 2147483646:
@@ -831,6 +831,15 @@ class CPM_minizinc(SolverInterface):
             else:
                 name = "global_cardinality_closed"
             return "{}({},{},{})".format(name, vars, vals, occ)
+
+        elif expr.name == "div":
+            return "{} div {}".format(*args_str)
+
+        elif expr.name == "mod":
+            return "{} mod {}".format(*args_str)
+
+        elif expr.name == "pow":
+            return "{}^{}".format(*args_str)
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
