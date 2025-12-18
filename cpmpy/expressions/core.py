@@ -35,8 +35,7 @@
     `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
     `x - y`                      `Operator("sum", [x, -y])`                    
     `x * y`                      `Operator("mul", [x, y])`                     
-    `x ** y`                     `Operator("pow", [x, y])` (power)
-    ===========================  ===============================================                   
+    ===========================  ===============================================
 
     
     Logical Operators
@@ -385,14 +384,13 @@ class Expression(object):
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        if is_num(other):
-            if other == 1:
-                return self
-        return Operator("pow", [self, other])
+        if is_num(other) and other == 1:
+            return self
+        return cp.Power(self, other)
 
     def __rpow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        return Operator("pow", [other, self])
+        return cp.Power(other, self)
 
     # Not implemented: (yet?)
     #object.__divmod__(self, other)
@@ -582,7 +580,6 @@ class Operator(Expression):
         'wsum': (2, False),
         'sub': (2, False), # x - y
         'mul': (2, False),
-        'pow': (2, False),
         '-':   (1, False), # -x
     }
     printmap = {'sum': '+', 'sub': '-', 'mul': '*'}
@@ -703,7 +700,6 @@ class Operator(Expression):
             return val # can be a float
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
 
         # boolean
@@ -748,19 +744,6 @@ class Operator(Expression):
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             lowerbound, upperbound = lb1-ub2, ub1-lb2
-        elif self.name == 'pow':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 < 0:
-                raise NotImplementedError(f"Power operator: For integer values, exponent must be non-negative: {self}")
-            bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
-            if lb1 < 0 and 0 < ub2:  
-                # The lower and upper bounds depend on either the largest or the second largest exponent 
-                # value when the base term can be negative. 
-                # E.g., (-2)^2 is positive, but (-2)^1 is negative, so for (-2)^[0,2] we also need to add (-2)^1.
-                bounds += [lb1 ** (ub2 - 1), ub1 ** (ub2 - 1)] 
-                # This approach is safe but not tight (e.g., [-2,-1]^2 will give (-2,4) as range instead of [1,4]).
-            lowerbound, upperbound = min(bounds), max(bounds)
 
         elif self.name == '-':
             lb1, ub1 = get_bounds(self.args[0])
