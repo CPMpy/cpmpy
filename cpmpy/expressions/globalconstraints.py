@@ -717,8 +717,9 @@ class Cumulative(GlobalConstraint):
 
     def decompose(self, how="auto"):
         """
-           Decompose the Cumulative constraint
-
+            Decompose the Cumulative constraint
+            Support time-based decomposition or task-based decomposition.
+            By default, we heuristically select the best decomposition based on the number of tasks and the horizon.
             Arguments:
                 how (str): how the cumulative constraint should be decomposed, can be "time", "task", or "auto" (default)
         """
