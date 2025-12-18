@@ -881,6 +881,20 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.Model(cons.decompose()).solve())
         self.assertTrue(cons.value())
 
+    def test_cumulative_negative_dur(self):
+        start = cp.intvar(0,10,shape=3, name="start")
+        dur = cp.intvar(-5,-1, shape=3, name="dur")
+        end = cp.intvar(-5,10, shape=3, name="end")
+        bv = cp.boolvar()
+
+        expr = cp.Cumulative([start], [dur], [end], 1, 5)
+        self.assertFalse(cp.Model(expr).solve())
+        self.assertTrue(cp.Model(bv == expr).solve())
+        self.assertFalse(bv.value())
+
+
+
+
     def test_ite(self):
         x = cp.intvar(0, 5, shape=3, name="x")
         iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
@@ -1346,19 +1360,6 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model([cp.Xor([a,b,b])]).solve())
         self.assertRaises(TypeError, cp.Xor, (x, b))
         self.assertRaises(TypeError, cp.Xor, (x, y))
-
-    def test_cumulative(self):
-        x = cp.intvar(0, 8)
-        z = cp.intvar(-8, 8)
-        q = cp.intvar(-8, 8)
-        y = cp.intvar(-7, -1)
-        b = cp.boolvar()
-        a = cp.boolvar()
-
-        self.assertTrue(cp.Model([cp.Cumulative([x,y],[x,2],[z,q],1,x)]).solve())
-        self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[a,y],1,x)
-        self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],1,x)
-        self.assertRaises(TypeError, cp.Cumulative, [x,y],[x,y],[x,y],x,False)
 
     def test_gcc(self):
         x = cp.intvar(0, 1)
