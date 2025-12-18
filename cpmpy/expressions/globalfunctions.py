@@ -416,6 +416,38 @@ class Modulo(GlobalFunction):
         return min(-ub, lb, 0), max(-lb, ub, 0)  # 0 should always be in the domain
 
 
+class Power(GlobalFunction):
+
+    def __init__(self, base:Expression, exponent:int):
+        if not is_num(exponent):
+            raise TypeError(f"Power constraint takes a numeric expression as second argument, not: {exponent}")
+        if exponent < 0:
+            raise ValueError(f"Power constraint only supports non-negative integer exponents, not: {exponent}")
+        super().__init__("pow", [base, exponent])
+
+    def decompose(self):
+
+        base, exp = self.args
+        if exp == 0:
+            return 1,[]
+        _pow = base
+        for _ in range(1,exp):
+            _pow *= base
+        return _pow,[]
+
+    def value(self):
+        base, exp = argvals(self.args)
+        return base**exp
+
+
+    def get_bounds(self):
+
+        base, exp = self.args
+        lb_base, ub_base = get_bounds(base)
+
+        bounds = [lb_base ** exp, ub_base ** exp]
+        return min(bounds), max(bounds)
+
 
 class Element(GlobalFunction):
     """
