@@ -423,17 +423,15 @@ class TestBounds(unittest.TestCase):
 
     def test_bounds_pow(self):
         x = intvar(-8, 5)
-        z = intvar(1, 9)
-        # only nonnegative exponents allowed
-        op = Operator('pow',[x,z])
+        op = cp.Power(x,3)
         lb, ub = op.get_bounds()
-        self.assertEqual(lb,-134217728)
-        self.assertEqual(ub,16777216)
-        for lhs in inclusive_range(*x.get_bounds()):
-            for rhs in inclusive_range(*z.get_bounds()):
-                val = Operator('pow',[lhs,rhs]).value()
-                self.assertGreaterEqual(val,lb)
-                self.assertLessEqual(val,ub)
+        self.assertEqual(lb,-8 ** 3)
+        self.assertEqual(ub,5 ** 3)
+
+        op = cp.Power(x, 4)
+        lb, ub = op.get_bounds()
+        self.assertEqual(lb, 5 ** 4)
+        self.assertEqual(ub, 8 ** 4)
 
     def test_bounds_unary(self):
         x = intvar(-8, 5)
@@ -578,7 +576,7 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type((a - b).value()))
         self.assertEqual(int, type((a * b).value()))
         self.assertEqual(int, type((a // b).value()))
-        self.assertEqual(int, type((a ** b).value()))
+        # self.assertEqual(int, type((a ** b).value())) -> We don't allow variables as exponent anymore
         self.assertEqual(int, type((a % b).value()))
 
         # test binary operators with numpy constants
