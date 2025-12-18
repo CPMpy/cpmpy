@@ -6,7 +6,7 @@ import pytest
 from cpmpy import *
 from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact, CPM_choco, CPM_hexaly
 
-
+@pytest.mark.requires_solver("ortools")
 class TestDirectORTools(unittest.TestCase):
 
     def test_direct_automaton(self):
@@ -26,8 +26,7 @@ class TestDirectORTools(unittest.TestCase):
 
         self.assertEqual(model.solveAll(), 6)
 
-
-@pytest.mark.skipif(not CPM_exact.supported(), reason="Exact not installed")
+@pytest.mark.requires_solver("exact")
 class TestDirectExact(unittest.TestCase):
 
     def test_direct_left_reif(self):
@@ -40,9 +39,7 @@ class TestDirectExact(unittest.TestCase):
         print(model)
         self.assertEqual(model.solveAll(), 3)
 
-
-@pytest.mark.skipif(not CPM_pysat.supported(),
-                    reason="PySAT not installed")
+@pytest.mark.requires_solver("pysat")
 class TestDirectPySAT(unittest.TestCase):
 
     def test_direct_clause(self):
@@ -55,8 +52,7 @@ class TestDirectPySAT(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(x.value() or y.value())
 
-@pytest.mark.skipif(not CPM_pysdd.supported(),
-                    reason="PySDD not installed")
+@pytest.mark.requires_solver("pysdd")
 class TestDirectPySDD(unittest.TestCase):
 
     def test_direct_clause(self):
@@ -69,8 +65,7 @@ class TestDirectPySDD(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(x.value() or y.value())
 
-@pytest.mark.skipif(not CPM_z3.supported(),
-                    reason="Z3py not installed")
+@pytest.mark.requires_solver("z3")
 class TestDirectZ3(unittest.TestCase):
 
     def test_direct_clause(self):
@@ -83,8 +78,7 @@ class TestDirectZ3(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(AllDifferent(iv).value())
 
-@pytest.mark.skipif(not CPM_minizinc.supported(),
-                    reason="MinZinc not installed")
+@pytest.mark.requires_solver("minizinc")
 class TestDirectMiniZinc(unittest.TestCase):
 
     def test_direct_clause(self):
@@ -102,9 +96,7 @@ class TestDirectMiniZinc(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(AllDifferent(iv).value())
 
-
-@pytest.mark.skipif(not CPM_gurobi.supported(),
-                    reason="Gurobi not installed")
+@pytest.mark.requires_solver("gurobi")
 class TestDirectGurobi(unittest.TestCase):
 
     def test_direct_poly(self):
@@ -127,8 +119,7 @@ class TestDirectGurobi(unittest.TestCase):
 
         self.assertEqual(y.value(), poly_val)
 
-@pytest.mark.skipif(not CPM_choco.supported(),
-                    reason="pychoco not installed")
+@pytest.mark.requires_solver("choco")
 class TestDirectChoco(unittest.TestCase):
 
     def test_direct_global(self):
@@ -142,8 +133,7 @@ class TestDirectChoco(unittest.TestCase):
         self.assertFalse(model.solve())
 
 
-@pytest.mark.skipif(not CPM_hexaly.supported(),
-                    reason="hexaly is not installed")
+@pytest.mark.requires_solver("hexaly")
 class TestDirectHexaly(unittest.TestCase):
 
     def test_direct_distance(self):

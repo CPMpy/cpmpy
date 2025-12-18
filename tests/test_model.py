@@ -9,7 +9,7 @@ import cpmpy as cp
 from cpmpy.expressions.utils import flatlist
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
 
-
+@pytest.mark.usefixtures("solver")
 class TestModel(unittest.TestCase):
     
     def setUp(self) -> None:
@@ -25,7 +25,7 @@ class TestModel(unittest.TestCase):
         iv = cp.intvar(1,9, shape=3)
         m = cp.Model( iv > 3 )
         m += (iv[0] == 5)
-        self.assertTrue(m.solve())
+        self.assertTrue(m.solve(solver=self.solver))
 
     def test_empty(self):
         m = cp.Model()
@@ -41,7 +41,7 @@ class TestModel(unittest.TestCase):
 
         with pytest.warns(UserWarning):
             loaded = cp.Model.from_file(fname)
-            self.assertTrue(loaded.solve())
+            self.assertTrue(loaded.solve(solver=self.solver))
         os.remove(fname)
 
     def test_io_counters(self):
@@ -73,12 +73,12 @@ class TestModel(unittest.TestCase):
         memodict = dict()
         m_dcopy = m.copy()
         print(memodict)
-        m_dcopy.solve()
+        m_dcopy.solve(solver=self.solver)
 
         self.assertTrue(cons1.value())
         self.assertTrue(cons2.value())
 
-        m.solve()
+        m.solve(solver=self.solver)
 
         m2 = m.copy()
 
@@ -97,13 +97,13 @@ class TestModel(unittest.TestCase):
 
         memodict = dict()
         m_dcopy = copy.deepcopy(m, memodict)
-        m_dcopy.solve()
+        m_dcopy.solve(solver=self.solver)
 
         self.assertIsNone(cons1.value())
         self.assertIsNone(cons2.value())
         self.assertIsNone(cons3.value())
 
-        m.solve()
+        m.solve(solver=self.solver)
 
         m2 = copy.deepcopy(m)
 

@@ -1,8 +1,10 @@
 import unittest
+import pytest
 import cpmpy as cp
 from cpmpy.transformations.flatten_model import *
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
+@pytest.mark.usefixtures("solver")
 class TestFlattenModel(unittest.TestCase):
     def setUp(self):
         self.ivars = cp.intvar(1, 10, (5,))
@@ -27,14 +29,14 @@ class TestFlattenModel(unittest.TestCase):
     def test_abs(self):
         l = cp.intvar(0,9, shape=3)
         # bounds used to be computed wrong, making both unsat
-        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) < 0).solve() )
-        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) > 0).solve() )
+        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) < 0).solve(solver=self.solver) )
+        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) > 0).solve(solver=self.solver) )
 
     def test_mod(self):
         iv1 = cp.intvar(2,9)
         iv2 = cp.intvar(5,9)
         m = cp.Model([(iv1+iv2) % 2 >= 0, (iv1+iv2) % 2 <= 1])
-        self.assertTrue( m.solve() )
+        self.assertTrue( m.solve(solver=self.solver) )
 
 
 class TestFlattenConstraint(unittest.TestCase):
