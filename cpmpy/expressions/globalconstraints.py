@@ -762,7 +762,7 @@ class Cumulative(GlobalConstraint):
                 if t != j:
                     demand_at_start_of_t += [demand[j] * ((start[j] <= start[t]) & (end[j] > start[t]))]
 
-            cons += [demand[t] + sum(demand_at_start_of_t) <= capacity]
+            cons += [(demand[t] + sum(demand_at_start_of_t)) <= capacity]
 
         return cons, []
 
@@ -788,7 +788,7 @@ class Cumulative(GlobalConstraint):
         lbs, ubs = get_bounds(start)
         lb, ub = min(lbs), max(ubs)
         for t in range(lb,ub+1):
-            cons += [cp.sum(d * ((s <= t) & (e > t)) <= capacity for s,e,d in zip(start, end, demand))]
+            cons += [cp.sum(d * ((s <= t) & (e > t)) for s,e,d in zip(start, end, demand)) <= capacity]
 
         return cons, []
 
