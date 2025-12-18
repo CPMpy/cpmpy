@@ -99,14 +99,35 @@ class CPM_rc2(CPM_pysat):
         if not self.supported():
             raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
 
-        from pysat.formula import IDPool, WCNF
+        from pysat.formula import IDPool, WCNFPlus, CNFPlus
 
-        self.pysat_solver = WCNF()  # not actually the solver...
-        # fix an inconsistent API
-        self.pysat_solver.add_clause = self.pysat_solver.append
-        self.pysat_solver.append_formula = self.pysat_solver.extend
-        self.pysat_solver.supports_atmost = lambda: False
-        # TODO: accepts native cardinality constraints, not sure how to make clear...
+        # In order for all features to work (e.g. `process` option), RC2 should be bootstrapped from a formula
+        self.pysat_solver = WCNFPlus()
+
+        def append_formula(cnf, weight=None):
+            """Some RC2 oracles/solvers support AtMostK constraints in the form of CNFPlus objects, which can be passed through this function in addition to regular clauses."""
+            clauses = []
+            atmosts = []
+            if isinstance(cnf, list):
+                clauses = cnf
+            elif isinstance(cnf, tuple):
+                atmosts = cnf
+            else:  # CNFPlus
+                assert isinstance(cnf, CNFPlus)
+                clauses = cnf.clauses
+                atmosts = cnf.atmosts
+
+            for c in clauses:
+                self.pysat_solver.append(c, weight=weight)
+            for c in atmosts:
+                self.pysat_solver.append(c, weight=weight, is_atmost=True)
+
+        self.pysat_solver.append_formula = append_formula
+        self.pysat_solver.add_clause = lambda c, weight=None: self.pysat_solver.append(c, weight=weight)
+        # Note: in case it becomes neccessary in the future to support CNFPlus objects for `add_clause`, this function should be replaced by: `lambda c, weight=None: append_formula([c], weight=weight)`
+
+        # We collect all AtMostK constraints in the WCNFPlus object, then encode them if the solver (set at `solve`) does not accept them
+        self.pysat_solver.supports_atmost = lambda: True
 
         # objective value related
         self.objective_ = None
@@ -147,6 +168,8 @@ class CPM_rc2(CPM_pysat):
             The last 4 parameters default values were recommended by the PySAT authors, based on their MaxSAT Evaluation 2018 submission.
         """
         from pysat.examples import rc2
+        from pysat.solvers import Solver
+        from pysat.formula import WCNF
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -165,10 +188,18 @@ class CPM_rc2(CPM_pysat):
             self.pysat_solver.add_clause([self.pysat_solver.nv + 1], weight=1)
 
         # determine subsolver
-        if stratified:
-            slv = rc2.RC2Stratified(self.pysat_solver, adapt=adapt, exhaust=exhaust, minz=minz, **kwargs)
-        else:
-            slv = rc2.RC2(self.pysat_solver, adapt=adapt, exhaust=exhaust, minz=minz, **kwargs)
+        slv_kwargs = {"adapt": adapt, "exhaust": exhaust, "minz": minz, **kwargs}
+
+        #
+        sub_solver = slv_kwargs.get("solver", "g3")
+        if sub_solver and not Solver(name=sub_solver).supports_atmost():
+            atmosts = self.pysat_solver.atms
+            self.pysat_solver.__class__ = WCNF
+            for atmost in atmosts:
+                lits, k = atmost
+                self.pysat_solver.extend(self._card.CardEnc.atmost(lits=lits, bound=k, vpool=self.pysat_vpool))
+
+        slv = rc2.RC2Stratified(self.pysat_solver, **slv_kwargs) if stratified else rc2.RC2(self.pysat_solver, **slv_kwargs)
 
         sol = slv.compute()  # return one solution
 
