@@ -26,7 +26,7 @@ NUM_GLOBAL = {
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
 }
 
 # Solvers not supporting arithmetic constraints (numeric comparisons)
