@@ -891,8 +891,8 @@ class TestGlobal(unittest.TestCase):
         bv = cp.boolvar()
 
         expr = cp.Cumulative([start], [dur], [end], 1, 5)
-        self.assertFalse(cp.Model(expr).solve())
-        self.assertTrue(cp.Model(bv == expr).solve())
+        self.assertFalse(cp.Model(expr).solve(solver=self.solver))
+        self.assertTrue(cp.Model(bv == expr).solve(solver=self.solver))
         self.assertFalse(bv.value())
 
 
