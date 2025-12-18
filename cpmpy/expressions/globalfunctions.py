@@ -363,10 +363,15 @@ class Element(GlobalFunction):
         arr, idx = self.args
 
         idx_lb, idx_ub = get_bounds(idx)
-        assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
+        defining = []
+        if not (idx_lb >= 0 and idx_ub < len(arr)):
+            defining += [idx >= 0, idx < len(arr)]
+            warnings.warn(f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         aux = intvar(*self.get_bounds())
-        return aux, [implies(idx == i, aux == arr[i]) for i in range(idx_lb, idx_ub+1)]
+
+        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)
+        return aux, [implies(idx == i, aux == arr[i]) for i in range(lb, ub+1)] + defining
 
     def decompose_linear(self) -> tuple[Expression, list[Expression]]:
         """
@@ -382,9 +387,13 @@ class Element(GlobalFunction):
         arr, idx = self.args
 
         idx_lb, idx_ub = get_bounds(idx)
-        assert idx_lb >= 0 and idx_ub < len(arr), "Element constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
+        defining = []
+        if not (idx_lb >= 0 and idx_ub < len(arr)):
+            defining += [idx >= 0, idx < len(arr)]
+            warnings.warn(f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
-        return cp.sum((idx == i)*arr[i] for i in range(idx_lb, idx_ub+1)), []
+        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)
+        return cp.sum((idx == i)*arr[i] for i in range(lb, ub+1)), defining
 
     def get_bounds(self) -> tuple[int, int]:
         """
