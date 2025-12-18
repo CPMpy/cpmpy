@@ -319,12 +319,15 @@ class Division(GlobalFunction):
 
         x,y = self.args
         y_lb, y_ub = get_bounds(y)
-        assert not y_lb <= 0 <= y_ub, "Division constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
+        safen = []
+        if y_lb <= 0 <= y_ub:
+            safen = [y != 0]
+            warnings.warn(f"Division constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         _div = intvar(*self.get_bounds())
         r = intvar(*get_bounds(x % y)) # remainder
 
-        return _div, [((_div * y) + r) == x, abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
+        return _div, safen + [((_div * y) + r) == x, abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
 
     def value(self):
 
@@ -379,8 +382,10 @@ class Modulo(GlobalFunction):
         """
         x,y = self.args
         y_lb, y_ub = get_bounds(y)
-        assert not y_lb <= 0 <= y_ub, "Modulo constraint is unsafe to decompose as it can be partial. Safen first using `cpmpy.transformations.safening.no_partial_functions`"
-
+        safen = []
+        if y_lb <= 0 <= y_ub:
+            safen = []
+            warnings.warn(f"Modulo constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         _mod = intvar(*self.get_bounds())
         k = intvar(*get_bounds((x - _mod) // y))
@@ -390,7 +395,7 @@ class Modulo(GlobalFunction):
             x * _mod >= 0        # remainder is negative iff x is negative
         ]
 
-        return _mod, cons
+        return _mod, safen + cons
 
     def value(self):
         x,y = argvals(self.args)
