@@ -19,7 +19,7 @@
         ExitStatus
 
 """
-from typing import Optional, List
+from typing import Optional, List, Callable, TypeAlias
 import warnings
 import time
 from enum import Enum
@@ -32,6 +32,7 @@ from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
 
+Callback: TypeAlias = Expression | List[Expression] | Callable # type alias to use in solveAll
 
 class SolverInterface(object):
     """
@@ -232,7 +233,7 @@ class SolverInterface(object):
 
     # OPTIONAL functions
 
-    def solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
