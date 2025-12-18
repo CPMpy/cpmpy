@@ -101,7 +101,7 @@ def solver(request):
         # Handle empty list (all solvers filtered out) same as None
         solver_value = parsed_solvers[0] if parsed_solvers else None
     
-    # Set on class if available (for tests using self.solver)
+    # Set solver value on class if available (for tests using self.solver)
     if hasattr(request, "cls") and request.cls:
         request.cls.solver = solver_value
     
@@ -114,7 +114,7 @@ def pytest_configure(config):
         format='%(levelname)s: %(message)s'
     )
     
-    # Register custom marker for documentation and linting
+    # Register custom marker for pytest test collecting
     config.addinivalue_line(
         "markers",
         "requires_solver(name): mark test as requiring a specific solver", # to filter tests when required solver is not installed
@@ -158,6 +158,7 @@ def pytest_generate_tests(metafunc):
         return
     
     # Check parametrize markers (for tests parametrized via @pytest.mark.parametrize)
+    #  i.e. test that have already been explicitly parametrized with solver
     for marker in metafunc.definition.iter_markers("parametrize"):
         # marker.args[0] is the argnames (can be string or tuple/list)
         argnames = marker.args[0] if marker.args else None
@@ -198,15 +199,16 @@ def pytest_collection_modifyitems(config, items):
     cmd_solver_option = config.getoption("--solver") # get cli `--solver`` arg
     cmd_solvers = _parse_solver_option(cmd_solver_option)  # parse into list
     
-    if cmd_solver_option:
-        if cmd_solvers is None:
-            logger.info(f"Solver option '{cmd_solver_option}' parsed to None (using default solver)")
-        elif len(cmd_solvers) == 0:
-            logger.info(f"Solver option '{cmd_solver_option}' resulted in empty list (all solvers filtered out)")
-        else:
-            logger.info(f"Solver option '{cmd_solver_option}' parsed to: {cmd_solvers}")
-    else:
-        logger.info("No --solver option provided (using default behavior)")
+    # Uncomment for debugging
+    # if cmd_solver_option:
+    #     if cmd_solvers is None:
+    #         logger.info(f"Solver option '{cmd_solver_option}' parsed to None (using default solver)")
+    #     elif len(cmd_solvers) == 0:
+    #         logger.info(f"Solver option '{cmd_solver_option}' resulted in empty list (all solvers filtered out)")
+    #     else:
+    #         logger.info(f"Solver option '{cmd_solver_option}' parsed to: {cmd_solvers}")
+    # else:
+    #     logger.info("No --solver option provided (using default behavior)")
 
     filtered = []
     skipped_dependency = 0
@@ -219,6 +221,8 @@ def pytest_collection_modifyitems(config, items):
         required_dependency_marker = item.get_closest_marker("requires_dependency")
 
         # --------------------------------- Dependency filtering --------------------------------- #
+
+        # Skip test if the required dependency is not installed
         if required_dependency_marker:
             if not all(importlib.util.find_spec(dependency) is not None for dependency in required_dependency_marker.args):
                 skip = pytest.mark.skip(reason=f"Dependency {required_dependency_marker.args} not installed")
@@ -227,6 +231,8 @@ def pytest_collection_modifyitems(config, items):
                 continue
 
         # --------------------------------- Solver filtering --------------------------------- #
+
+        # Skip test if the required solver is not installed (for solver-specific tests)
         if required_solver_marker:
             required_solvers = required_solver_marker.args
 
@@ -239,8 +245,10 @@ def pytest_collection_modifyitems(config, items):
                 if len(cmd_solvers) == 0:
                     skipped_solver_specific += 1
                     continue
+                # If required solver is in the list of specified solvers on the command line, run the test
                 if any(cmd_solver in required_solvers for cmd_solver in cmd_solvers):
                     filtered.append(item)
+                # If required solver is not in the list of specified solvers on the command line, filter the test to be skipped
                 else:
                     skipped_solver_specific += 1
                     continue
@@ -263,6 +271,7 @@ def pytest_collection_modifyitems(config, items):
         uses_solver_fixture = hasattr(item, "_fixtureinfo") and "solver" in getattr(item._fixtureinfo, "names_closure", [])
         
         # Only filter tests that are parameterized with a 'solver' (through `_generate_inputs`)
+        #   i.e. filter externally parametrized tests
         if hasattr(item, "callspec"):
             if cmd_solvers is not None:
                 # If cmd_solvers is empty (all filtered out), skip solver-dependent tests
@@ -273,25 +282,29 @@ def pytest_collection_modifyitems(config, items):
                     else:
                         skipped_parametrized += 1
                     continue
+                # If test is parametrized with solver, filter it if it is not in the list of specified solvers on the command line
                 if "solver" in item.callspec.params:
                     solver = item.callspec.params["solver"]
                     if solver in cmd_solvers:
                         filtered.append(item)
                     else:
                         skipped_parametrized += 1
+                # If test is parametrized with solver_name, filter it if it is not in the list of specified solvers on the command line
                 elif "solver_name" in item.callspec.params:
                     solver = item.callspec.params["solver_name"]
                     if solver in cmd_solvers:
                         filtered.append(item)
                     else:
                         skipped_parametrized += 1
+                # If test is not parametrized with solver or solver_name, keep it
                 else:
                     # Parametrized but not with solver - keep it
                     filtered.append(item)
             else:
                 filtered.append(item)
+        # Non-parametrized tests:
         else:
-            # Non-parametrized tests: filter out if they use solver fixture and cmd_solvers is empty
+            # Filter out test if it uses solver fixture and cmd_solvers is empty
             if cmd_solvers is not None and len(cmd_solvers) == 0:
                 if uses_solver_fixture:
                     skipped_solver_fixture += 1
@@ -299,17 +312,18 @@ def pytest_collection_modifyitems(config, items):
             # keep non-parametrized tests that don't depend on solver
             filtered.append(item)
 
-    final_count = len(filtered)
-    logger.info(f"Test suite filtering summary:")
-    logger.info(f"  Initial tests: {initial_count}")
-    if skipped_dependency > 0:
-        logger.info(f"  Skipped (missing dependency): {skipped_dependency}")
-    if skipped_solver_specific > 0:
-        logger.info(f"  Skipped (solver-specific, not matching): {skipped_solver_specific}")
-    if skipped_parametrized > 0:
-        logger.info(f"  Skipped (parametrized solver, not matching): {skipped_parametrized}")
-    if skipped_solver_fixture > 0:
-        logger.info(f"  Skipped (solver fixture, no solvers): {skipped_solver_fixture}")
-    logger.info(f"  Final tests: {final_count} ({final_count - initial_count:+d})")
+    # Uncomment for debugging
+    # final_count = len(filtered)
+    # logger.info(f"Test suite filtering summary:")
+    # logger.info(f"  Initial tests: {initial_count}")
+    # if skipped_dependency > 0:
+    #     logger.info(f"  Skipped (missing dependency): {skipped_dependency}")
+    # if skipped_solver_specific > 0:
+    #     logger.info(f"  Skipped (solver-specific, not matching): {skipped_solver_specific}")
+    # if skipped_parametrized > 0:
+    #     logger.info(f"  Skipped (parametrized solver, not matching): {skipped_parametrized}")
+    # if skipped_solver_fixture > 0:
+    #     logger.info(f"  Skipped (solver fixture, no solvers): {skipped_solver_fixture}")
+    # logger.info(f"  Final tests: {final_count} ({final_count - initial_count:+d})")
     
-    items[:] = filtered
+    items[:] = filtered # replace the original list with the filtered list

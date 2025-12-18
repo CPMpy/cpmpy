@@ -1,6 +1,6 @@
 # CPMpy Test Suite
 
-This directory contains the comprehensive test suite for CPMpy, covering all major components including variables, constraints, models, solvers, transformations, and tools.
+This directory contains the test suite for CPMpy, covering all major components including variables, constraints, models, solvers, transformations, and tools.
 
 ## Running Tests
 
@@ -91,7 +91,7 @@ If no `--solver` option is provided:
 - **`test_pysat_*.py`** - PySAT-specific tests (cardinality, interrupt, weighted sum)
 - **`test_solveAll.py`** - solveAll functionality across solvers
 - **`test_solvers_solhint.py`** - Solver hints functionality
-- **`test_tocnf.py`** - Conversion to CNF (conjunctive normal form)
+- **`test_tocnf.py`** - Conversion to CNF (Conjunctive Normal Form)
 - **`test_tool_dimacs.py`** - DIMACS format tools
 - **`test_trans_*.py`** - Transformation tests (linearize, safen, simplify)
 - **`test_transf_*.py`** - Additional transformation tests (comp, decompose, reif)
@@ -145,7 +145,7 @@ When multiple solvers are provided via `--solver`, these tests will automaticall
 
 ### Solver-Parametrised Tests
 
-For tests that explicitly parametrise with solvers:
+For tests that are explicitly parametrised with a selection of solvers:
 
 ```python
 @pytest.mark.parametrise("solver", ["ortools", "cplex", "gurobi"])

@@ -87,6 +87,10 @@ def test_example(solver, example):
     except ModuleNotFoundError as e:
         pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))
     except Exception as e:
+        # Check if the exception indicates a missing solver installation (or other optional dependencies)
+        # TODO: this is a hack to skip tests when the solver is not installed, 
+        #       for now no better way to do this without having to manually label all 
+        #       examples with the required solvers / dependencies
         error_msg = str(e).lower()
         if ("install" in error_msg and ("package" in error_msg or "solver" in error_msg)) or \
            ("not installed" in error_msg) or \
