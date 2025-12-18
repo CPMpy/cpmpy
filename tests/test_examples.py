@@ -85,6 +85,14 @@ def test_example(solver, example):
             raise e
     except ModuleNotFoundError as e:
         pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))
+    except Exception as e:
+        error_msg = str(e).lower()
+        if ("install" in error_msg and ("package" in error_msg or "solver" in error_msg)) or \
+           ("not installed" in error_msg) or \
+           ("not available" in error_msg):
+            pytest.skip(f"Skipped, solver not installed: {e}")
+        else:
+            raise e
     finally:
         SolverLookup.base_solvers = base_solvers
 
