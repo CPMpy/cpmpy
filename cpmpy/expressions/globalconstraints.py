@@ -880,7 +880,6 @@ class NoOverlap(GlobalConstraint):
     Global no-overlap constraint. Used for scheduling problems
     Ensures no tasks overlap and enforces:
             duration >= 0
-            demand >= 0
             start + duration == end
 
     Equivalent to :class:`~cpmpy.expressions.globalconstraints.Cumulative` with demand and capacity 1
