@@ -32,27 +32,27 @@ NUM_GLOBAL = {
 # Solvers not supporting arithmetic constraints (numeric comparisons)
 SAT_SOLVERS = {"pysdd"}
 
-EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo"},  # with int2bool,
+EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo", "Power"},  # with int2bool,
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "pindakaas": {"Division", "Modulo"},
+                  "pindakaas": {"Division", "Modulo", "Power"},
                   "z3": {},
                   "choco": {},
                   "ortools":{},
                   "exact": {},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
                   "gcs": {},
-                  "cplex": {"Division", "Modulo"}
+                  "cplex": {"Division", "Modulo", "Power"}
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"gurobi": {},
-                     "pysat": {"mul-int", "pow", "mod"},  # int2bool but mul, and friends, not linearized
-                     "pysdd": {"sum", "wsum", "sub" "pow", "abs", "mul","-"},
-                     "pindakaas": {"mul-int", "pow"},
+                     "pysat": {"mul-int"},  # int2bool but mul, and friends, not linearized
+                     "pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
+                     "pindakaas": {"mul-int"},
                      "exact": {},
-                     "cplex": {"mul-int", "div", "pow"},
-                     "pumpkin": {"pow"},
+                     "cplex": {"mul-int", "div"},
+                     "pumpkin": {},
                      }
 
 # Variables to use in the rest of the test script
@@ -87,8 +87,6 @@ def numexprs(solver):
             yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
-        elif name == "pow":
-            yield Operator(name, [NN_VAR,3])
         elif name == "mul" and "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
             yield Operator(name, [3, NUM_ARGS[0]])
             yield Operator(name, NUM_ARGS[:arity])
@@ -128,6 +126,8 @@ def numexprs(solver):
             expr = cls(*NUM_ARGS[:2])
         elif name == "Modulo":
             expr = cls(*NUM_ARGS[:2])
+        elif name == "Power":
+            expr = cls(NUM_ARGS[0], 3)
         else:
             expr = cls(NUM_ARGS)
 
