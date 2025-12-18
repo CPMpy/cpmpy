@@ -974,7 +974,8 @@ class TestSupportedSolvers:
         assert not s.solve(assumptions=[~x, ~y])
 
         core = s.get_core()
-        assert ~y in set([~x,~y])
+        assert len(core) > 0
+        assert ~y in core
         assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat
 
         assert s.solve(assumptions=[])
@@ -1200,8 +1201,6 @@ class TestSupportedSolvers:
 
 @pytest.mark.parametrize(("solver", "expr"), [(s, expr) for s in solvers for expr in numexprs(s)], ids=str)
 def test_objective_numexprs(solver, expr):
-
-    if solver == "z3": pytest.skip("Optimization in z3 is too slow for testing here.")
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     try:

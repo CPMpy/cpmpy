@@ -58,6 +58,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
+from ..transformations.safening import no_partial_functions
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
@@ -75,6 +76,13 @@ class CPM_template(SolverInterface):
     Documentation of the solver's own Python API:
     <URL to docs or source code>
     """
+
+    # [GUIDELINE] list all supported global constraints and global functions
+    #           (e.g., 'alldifferent', 'max', 'element', ...)
+    supported_global_constraints = frozenset({'alldifferent', 'max', 'element'})
+    # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
+    #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
+    supported_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -299,17 +307,24 @@ class CPM_template(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
+
+        # [GUIDELINE] solvers typically can not handle partial functions (e.g. element, div, mod)
+        #             this transformation makes all partial functions total following the relational semantics
         obj, safe_cons = safen_objective(expr)
-        # [GUIDELINE] all globals which unsupported in a nested context should be decomposed here.
-        obj, decomp_cons = decompose_objective(obj, supported={"min", "max", "element"}, csemap=self._csemap)
+        # [GUIDELINE] all unsupported global functions and (reified) global constraints are decomposed here
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        # [GUIDELINE] after this, the objective will be a variable, sum, wsum or supported global function
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 
         self.add(safe_cons + decomp_cons + flat_cons)
 
-        # make objective function or variable and post
+        # make native objective expression and post
         tpl_obj = self._make_numexpr(obj)
         # [GUIDELINE] if the solver interface does not provide a solver native "numeric expression" object,
-        #         _make_numexpr may be removed and an objective can be posted as:
+        #         _make_numexpr may be removed and an objective for wsum can be posted as:
         #           self.TPL_solver.MinimizeWeightedSum(obj.args[0], self.solver_vars(obj.args[1]) or similar
 
         if minimize:
@@ -353,7 +368,6 @@ class CPM_template(SolverInterface):
            # ...
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
-
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
         """
@@ -372,7 +386,11 @@ class CPM_template(SolverInterface):
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"alldifferent"})
+        cpm_cons = no_partial_functions(cpm_cons)  # to also safen at toplevel, add: `, safen_toplevel={"element", "div", "mod"})`
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_bv_reifies(cpm_cons)

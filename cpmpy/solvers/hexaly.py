@@ -64,6 +64,10 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
+    supported_global_constraints = frozenset({"min", "max","div", "mod", "abs", "element"})
+    supported_reified_global_constraints = frozenset()
+
+
     @staticmethod
     def supported():
         # try to import the package
@@ -253,7 +257,10 @@ class CPM_hexaly(SolverInterface):
         get_variables(expr, collect=self.user_vars)
 
         # transform objective
-        obj, decomp_cons = decompose_objective(expr, supported={"min", "max", "abs", "element", "div", "mod"}, csemap=self._csemap)
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
         self.add(decomp_cons)
 
         # make objective function or variable and post
@@ -268,6 +275,7 @@ class CPM_hexaly(SolverInterface):
 
     def has_objective(self):
         return self.hex_model.nb_objectives > 0
+
 
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
@@ -287,7 +295,10 @@ class CPM_hexaly(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         # no flattening, so also no safening required
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element", "mod", "div"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         return cpm_cons
 
     def add(self, cpm_expr_orig):

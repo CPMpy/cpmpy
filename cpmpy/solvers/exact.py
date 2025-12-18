@@ -83,6 +83,9 @@ class CPM_exact(SolverInterface):
     https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
+    supported_global_constraints = frozenset()
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         # try to import the package
@@ -246,7 +249,7 @@ class CPM_exact(SolverInterface):
         elif my_status == "INCONSISTENT": # found inconsistency over assumptions
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status == "TIMEOUT": # found timeout
-            if self.xct_solver.hasSolution(): # found a (sub-)optimal solution
+            if self.has_objective() and self.xct_solver.hasSolution(): # found a (sub-)optimal solution
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else: # no solution found
                 self.cpm_status.exitstatus = ExitStatus.UNKNOWN
@@ -439,7 +442,10 @@ class CPM_exact(SolverInterface):
 
         # transform objective
         obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(obj, csemap=self._csemap)
+        obj, decomp_cons = decompose_objective(obj,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
@@ -490,7 +496,6 @@ class CPM_exact(SolverInterface):
 
         return xcfvars, self.fix(xrhs)
 
-
     def transform(self, cpm_expr):
         """
         Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -508,7 +513,10 @@ class CPM_exact(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"}) # linearize and decompose expects safe exprs
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'}), csemap=self._csemap) # Abs and Alldiff have a specialized MIP decomp
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized linear decomp
+                                     supported_reified = self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
