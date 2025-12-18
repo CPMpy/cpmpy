@@ -1010,7 +1010,7 @@ class TestGlobal(unittest.TestCase):
 
         def check_true():
             self.assertTrue(cons.value())
-        cp.Model(cons).solveAll(solver=self.solver, display=check_true)
+        cp.Model(cons).solveAll(display=check_true) # no solver parametrisation due to large performance impact
 
         # test not contiguous
         iv = cp.intvar(0, 10, shape=(3, 3))
@@ -1042,7 +1042,7 @@ class TestGlobal(unittest.TestCase):
         def check_true():
             self.assertTrue(cons.value())
 
-        cp.Model(cons).solveAll(solver=self.solver, display=check_true)
+        cp.Model(cons).solveAll(display=check_true) # no solver parametrisation due to large performance impact
 
         # test not contiguous
         iv = cp.intvar(0, 10, shape=(3, 3))
@@ -1106,7 +1106,7 @@ class TestGlobal(unittest.TestCase):
         def check_val():
             assert cons.value() is False
 
-        cp.Model(~cons).solveAll(solver=self.solver, display=check_val)
+        cp.Model(~cons).solveAll(display=check_val) # no solver parametrisation due to large performance impact
 
 @pytest.mark.usefixtures("solver")
 class TestBounds(unittest.TestCase):
