@@ -8,7 +8,7 @@ from cpmpy.solvers.rc2 import CPM_rc2
 rc2_available = CPM_rc2.supported()
 
 @pytest.mark.skipif(not rc2_available, reason="RC2 solver not available")
-class TestRC2Objective(unittest.TestCase):
+class TestRC2Transform(unittest.TestCase):
     """
     Test cases for RC2 solver objective transformation functionality
     Based on the test cases from rc2.ipynb
@@ -136,7 +136,14 @@ class TestRC2Objective(unittest.TestCase):
         self.assertGreater(len(weights), 0)  # Should have some weights
         self.assertGreater(len(xs), 0)  # Should have some variables
     
-    def test_rc2_solve_simple_maximization(self):
+@pytest.mark.skipif(not rc2_available, reason="RC2 solver not available")
+@pytest.mark.parametrize("solve_kwargs", (
+    {"solver": "mc"},
+    {"solver": "g3"},
+    # {"solver": "cadical195", "native_card": True},  # TODO if solver args become supported for RC2
+))
+class TestRC2Solve:
+    def test_rc2_solve_simple_maximization(self, solve_kwargs):
         """Test actual solving with RC2 for a simple maximization problem"""
         # Create a simple model: maximize sum of boolean variables
         model = cp.Model()
@@ -147,19 +154,19 @@ class TestRC2Objective(unittest.TestCase):
         model += x[1].implies(x[2])  # if x[1] is true, then x[2] must be true
         
         # Solve with RC2
-        solver = CPM_rc2(model)
-        solved = solver.solve()
+        rc2 = CPM_rc2(model)
+        solved = rc2.solve(**solve_kwargs)
         
-        self.assertTrue(solved)
-        self.assertIsNotNone(solver.objective_value())
+        assert solved
+        assert rc2.objective_value() is not None
         # The optimal solution should have x[0]=True, x[1]=True, x[2]=True for objective value 3
         # But RC2 might find a different solution due to the constraints
         # At least one of x[0], x[1] must be true, and if x[1] is true, then x[2] must be true
         # So the maximum possible is 3, but RC2 might find a solution with value 0
-        self.assertGreaterEqual(solver.objective_value(), 0)
-        self.assertLessEqual(solver.objective_value(), 3)
+        assert rc2.objective_value() >= 0
+        assert rc2.objective_value() <= 3
     
-    def test_rc2_solve_minimization(self):
+    def test_rc2_solve_minimization(self, solve_kwargs):
         """Test actual solving with RC2 for a minimization problem"""
         # Create a simple model: minimize sum of boolean variables
         model = cp.Model()
@@ -170,13 +177,13 @@ class TestRC2Objective(unittest.TestCase):
         model += x[1] | x[2]  # at least one of x[1] or x[2] must be true
         
         # Solve with RC2
-        solver = CPM_rc2(model)
-        solved = solver.solve()
+        rc2 = CPM_rc2(model)
+        solved = rc2.solve(**solve_kwargs)
         
-        self.assertTrue(solved)
-        self.assertEqual(solver.objective_value(), 2)
+        assert solved is True
+        assert rc2.objective_value() == 2
     
-    def test_rc2_solve_with_integer_variables(self):
+    def test_rc2_solve_with_integer_variables(self, solve_kwargs):
         """Test solving with integer variables in the objective"""
         # Create a model with integer variables
         model = cp.Model()
@@ -189,13 +196,13 @@ class TestRC2Objective(unittest.TestCase):
         model += (y[0] < y[1])  # y[0] must be less than y[1]
         
         # Solve with RC2
-        solver = CPM_rc2(model)
-        solved = solver.solve()
+        rc2 = CPM_rc2(model)
+        solved = rc2.solve(**solve_kwargs)
         
-        self.assertTrue(solved)
-        self.assertEqual(solver.objective_value(), 1+2+3) # 1 from bool, 2+3 from int
+        assert solved is True
+        assert rc2.objective_value() == 1+2+3 # 1 from bool, 2+3 from int
     
-    def test_rc2_unsatisfiable(self):
+    def test_rc2_unsatisfiable(self, solve_kwargs):
         """Test RC2 with an unsatisfiable model"""
         # Create an unsatisfiable model
         model = cp.Model()
@@ -206,13 +213,13 @@ class TestRC2Objective(unittest.TestCase):
         model += x[0] == 0
         
         # Solve with RC2
-        solver = CPM_rc2(model)
-        solved = solver.solve()
+        rc2 = CPM_rc2(model)
+        solved = rc2.solve(**solve_kwargs)
         
-        self.assertFalse(solved)
-        self.assertIsNone(solver.objective_value())
+        assert solved is False
+        assert rc2.objective_value() is None
     
-    def test_rc2_solve_negative_positive_combination(self):
+    def test_rc2_solve_negative_positive_combination(self, solve_kwargs):
         """Test RC2 solving with negative and positive coefficients in objective"""
         # Create model: m = cp.Model()
         m = cp.Model()
@@ -220,12 +227,28 @@ class TestRC2Objective(unittest.TestCase):
         m.maximize(-4*x[0] + 3*x[1])
         
         # Solve with RC2
-        solver = CPM_rc2(m)
-        solved = solver.solve()
+        rc2 = CPM_rc2(m)
+        solved = rc2.solve(**solve_kwargs)
         
-        self.assertTrue(solved)
-        self.assertEqual(solver.objective_value(), 3)
-        self.assertEqual(list(x.value()), [False, True])
+        assert solved is True
+        assert rc2.objective_value() == 3
+        assert list(x.value()) == [False, True]
+    
+    def test_rc2_atmostk(self, solve_kwargs):
+        """Test RC2 solving with AtMostK"""
+        m = cp.Model()
+        x = cp.boolvar(5)
+        m += cp.sum(x) <= 3
+        m += cp.sum(x) >= 2
+        m.minimize(cp.sum(x * [1,2,3,4,5]))
+        
+        # Solve with RC2
+        rc2 = CPM_rc2(m)
+        solved = rc2.solve(**solve_kwargs)
+        
+        assert solved is True
+        assert rc2.objective_value() == 3
+        assert list(x.value()) == [True, True, False, False, False]
     
 
 if __name__ == '__main__':

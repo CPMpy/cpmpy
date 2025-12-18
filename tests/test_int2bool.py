@@ -22,6 +22,7 @@ c = intvar(2, 2, name="c")
 SOLVERS = [
     "pindakaas",
     "pysat",
+    "rc2",
 ]
 SOLVERS = [
     (name, solver) for name, solver in SolverLookup.base_solvers() if name in SOLVERS and solver.supported()

@@ -150,7 +150,7 @@ class CPM_rc2(CPM_pysat):
         """
         return self.pysat_solver
 
-    def solve(self, time_limit=None, stratified=True, adapt=True, exhaust=True, minz=True, **kwargs):
+    def solve(self, time_limit=None, **kwargs):
         """
             Call the RC2 MaxSAT solver
 
@@ -160,12 +160,17 @@ class CPM_rc2(CPM_pysat):
                                                 
                                                 .. warning::
                                                     Warning: the time_limit is not very accurate at subsecond level
+
+            The following `**kwargs` are supported for RC2:
+
                 stratified (bool, optional): use the stratified solver for weighted maxsat (default: True)
                 adapt (bool, optional): detect and adapt intrinsic AtMost1 constraint (default: True)
                 exhaust (bool, optional): do core exhaustion (default: True)
                 minz (bool, optional): do heuristic core reduction (default: True)
 
-            The last 4 parameters default values were recommended by the PySAT authors, based on their MaxSAT Evaluation 2018 submission.
+            If no `**kwargs` are given, the default values are used as recommended by the PySAT authors, based on their MaxSAT Evaluation 2018 submission, i.e.: `{"solver": "glucose3", "adapt": True, "exhaust": True, "minz": True}`.
+            If `**kwargs` are given, these are passed to RC2.
+            Note that currently, no args are passed to the underlying oracle.
         """
         from pysat.examples import rc2
         from pysat.solvers import Solver
@@ -177,10 +182,8 @@ class CPM_rc2(CPM_pysat):
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         self.user_vars = get_user_vars(self.user_vars, self.ivarmap)
 
-        # TODO: set time limit
+        # TODO: set time limit (awaiting upstream PR https://github.com/pysathq/pysat/pull/211)
         if time_limit is not None:
-            # rc2 does not support it, also not interrupts like pysat does
-            # we will have to manage it externally, e.g in a subprocess or so
             raise NotImplementedError("CPM_rc2: time limit not yet supported")
 
         # hack to support decision problems
@@ -188,17 +191,21 @@ class CPM_rc2(CPM_pysat):
             self.pysat_solver.add_clause([self.pysat_solver.nv + 1], weight=1)
 
         # determine subsolver
-        slv_kwargs = {"adapt": adapt, "exhaust": exhaust, "minz": minz, **kwargs}
+        default_kwargs = {"solver": "glucose3", "adapt": True, "exhaust": True, "minz": True}
+        stratified = kwargs.get("stratified", True)
+        slv_kwargs = kwargs if kwargs else default_kwargs
 
-        #
-        sub_solver = slv_kwargs.get("solver", "g3")
+        # get subsolver kwarg or default, then check if it supports AtMostK constrains
+        sub_solver = slv_kwargs.get("solver", default_kwargs["solver"])
         if sub_solver and not Solver(name=sub_solver).supports_atmost():
+            # encode AtMostK constraints since they are unsupported by sub-solver oracle
             atmosts = self.pysat_solver.atms
             self.pysat_solver.__class__ = WCNF
             for atmost in atmosts:
                 lits, k = atmost
                 self.pysat_solver.extend(self._card.CardEnc.atmost(lits=lits, bound=k, vpool=self.pysat_vpool))
 
+        # instantiate and configure RC2
         slv = rc2.RC2Stratified(self.pysat_solver, **slv_kwargs) if stratified else rc2.RC2(self.pysat_solver, **slv_kwargs)
 
         sol = slv.compute()  # return one solution
@@ -217,36 +224,6 @@ class CPM_rc2(CPM_pysat):
 
         return self._process_solution(sol)
         
-
-        # translate solution values (of user specified variables only)
-        if sol is not None:
-            # fill in variable values
-            for cpm_var in self.user_vars:
-                if isinstance(cpm_var, _BoolVarImpl):
-                    lit = self.solver_var(cpm_var)
-                    if lit in sol:
-                        cpm_var._value = True
-                    else:  # -lit in sol (=False) or not specified (=False)
-                        cpm_var._value = False
-                elif isinstance(cpm_var, _IntVarImpl):
-                    raise TypeError("user_vars should only contain Booleans")
-                else:
-                    raise NotImplementedError(f"CPM_rc2: variable {cpm_var} not supported")
-
-            # Now assign the user integer variables using their encodings
-            # `ivarmap` also contains auxiliary variable, but they will be assigned 'None' as their encoding variables are assigned `None`
-            for enc in self.ivarmap.values():
-                enc._x._value = enc.decode()
-
-        else: # clear values of variables
-            for cpm_var in self.user_vars:
-                cpm_var._value = None
-            for enc in self.ivarmap.values():
-                enc._x._value = None
-
-        return sol is not None
-
-
     def transform_objective(self, expr):
         """
             Transform the objective to a list of (w,x) and a constant
