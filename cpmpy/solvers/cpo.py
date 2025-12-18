@@ -51,7 +51,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
+from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree
@@ -542,37 +542,36 @@ class CPM_cpo(SolverInterface):
                 return dom.forbidden_assignments(arr, table)
             elif cpm_con.name == "cumulative":
                 start, dur, end, height, capacity = cpm_con.args
+                if end is None:
+                    end = [None for _ in range(len(start))] # easier to handle the task-making below
+                height, height_cons = get_nonneg_args(height)
+                cons = self._cpo_expr(height_cons)
                 docp = self.get_docp()
                 total_usage = []
-                cons = []
                 for s, d, e, h in zip(start, dur, end, height):
-                    bounds_d = get_bounds(d)
-                    # Special case for tasks with duration 0
-                    # -> cpo immediately returns UNSAT if done through tasks
-                    if bounds_d[1] == bounds_d[0] == 0:
-                        cpo_s, cpo_e = self._cpo_expr([s, e])
-                        cons += [cpo_s == cpo_e] # enforce 0 duration
-                        # no restrictions on height due to zero duration and thus no contribution to capacity
+                    task, task_cons = self._make_task(s, d, e)
+                    cons += task_cons
+                    if task is None: # can happen with 0 duration tasks
                         continue
-                    # Normal setting
-                    cpo_s, cpo_d, cpo_e, cpo_h = self._cpo_expr([s, d, e, h])
-                    task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
-                    task_height = dom.pulse(task, get_bounds(h))
-                    cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
-                    cons += [cpo_h == dom.height_at_start(task, task_height)]
-                    total_usage.append(task_height)
+                    else:
+                        task_height = dom.pulse(task, get_bounds(h))
+                        cons += [self._cpo_expr(h) == dom.height_at_start(task, task_height)]
+                        total_usage.append(task_height)
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
             elif cpm_con.name == "no_overlap":
                 start, dur, end  = cpm_con.args
-                docp = self.get_docp()
+                if end is None:
+                    end = [None for _ in range(len(start))] # easier to handle the task-making below
                 cons = []
                 tasks = []
                 for s, d, e in zip(start, dur, end):
-                    cpo_s, cpo_d, cpo_e = self._cpo_expr([s, d, e])
-                    task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
-                    tasks.append(task)
-                    cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
+                    task, task_cons = self._make_task(s, d, e)
+                    cons += task_cons
+                    if task is None: # can happen with 0 duration tasks
+                        continue
+                    else:
+                        tasks.append(task)
                 return cons + [dom.no_overlap(tasks)]
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
@@ -598,6 +597,39 @@ class CPM_cpo(SolverInterface):
                 return dom.count_different(self._cpo_expr(cpm_con.args))
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
+
+    def _make_task(self, start, dur, end):
+        """
+            Helper function to create task objects and additional constraints enforcing task-relation
+        """
+        dom = self.get_docp().modeler
+        docp = self.get_docp()
+
+        lb, ub = get_bounds(dur)
+        extra_cons = []
+        if lb < 0 and ub < 0: # duration is always negative
+            return None, [False]
+        else:
+            new_dur = intvar(0, ub)
+            extra_cons += [self.solver_var(new_dur) == self._cpo_expr(dur)]
+            dur = new_dur
+            lb = 0 # update lb for next check below
+
+        if lb == 0 == ub:
+            if end is None: # nothing to enforce
+                return None, []
+            cpo_s, cpo_e = self._cpo_expr([start, end])
+            return None, extra_cons + [cpo_s == cpo_e] # no task, just enforce 0 duration
+
+        # Normal setting
+        if end is None: # no end provided by user
+            cpo_s, cpo_d = self._cpo_expr([start, dur])
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur))
+            return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
+        else:
+            cpo_s, cpo_d, cpo_e = self._cpo_expr([start, dur, end])
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end))
+            return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
 
 
 # solvers are optional, so this file should be interpretable
