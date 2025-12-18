@@ -1472,26 +1472,7 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], [3,0]).decompose()).solve())
 
 
-    # disabled after #793, unsafe element can no longer be decomposed
-    # def test_element_index_dom_mismatched(self):
-    #     """
-    #         Check transform of `[0,1,2][x in -1..1] == y in 1..5`
-    #         Note the index variable has a lower bound *outside* the indexable range, and an upper bound inside AND lower than the indexable range upper bound
-    #     """
-    #     constraint=cp.Element([0,1,2], cp.intvar(-1,1, name="x")) <= cp.intvar(1,5, name="y")
-    #     decomposed = decompose_in_tree(no_partial_functions([constraint], safen_toplevel={"element"}))
-    #     self.assertSetEqual(set(map(str, decomposed)), {
-    #         # safening constraints
-    #         "(BV0) == ((x >= 0) and (x <= 2))",
-    #         "(BV0) -> ((IV0) == (x))",
-    #         "(~BV0) -> (IV0 == 0)",
-    #         "BV0",
-    #         # actual decomposition
-    #         '(IV0 == 0) -> (IV1 == 0)',
-    #         '(IV0 == 1) -> (IV1 == 1)',
-    #         '(IV0 == 2) -> (IV1 == 2)',
-    #         '(IV1) <= (y)'
-    #     })
+
 
 solvers = [name for name, cls in cp.SolverLookup.base_solvers() if cls.supported()]
 @pytest.mark.parametrize("solver", solvers)
@@ -1519,4 +1500,48 @@ def test_issue801_expr_in_cumulative(solver):
         assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)
+
+def test_element_index_dom_mismatched():
+    """
+        Check transform of `[0,1,2][x in -1..1] == y in 1..5`
+        Note the index variable has a lower bound *outside* the indexable range, and an upper bound inside AND lower than the indexable range upper bound
+    """
+    elem = cp.Element([0,1,2], cp.intvar(-1,1, name="x"))
+    constraint= elem <= cp.intvar(1,5, name="y")
+    decomposed = decompose_in_tree(no_partial_functions([constraint], safen_toplevel={"element"}))
+
+    expected = {
+        # safening constraints
+        "(BV0) == ((x >= 0) and (x <= 2))",
+        "(BV0) -> ((IV0) == (x))",
+        "(~BV0) -> (IV0 == 0)",
+        "BV0",
+        # actual decomposition
+        '(IV0 == 0) -> (IV1 == 0)',
+        '(IV0 == 1) -> (IV1 == 1)',
+        '(IV0 == 2) -> (IV1 == 2)',
+        '(IV1) <= (y)'
+    }
+    assert set(map(str, decomposed)) == expected
+
+    # should raise a warning if we don't safen first
+    with pytest.warns(UserWarning, match=".*unsafe.*"):
+        val, decomp = elem.decompose()
+        expected = {
+            # actual decomposition
+            '(x == 0) -> (IV2 == 0)',
+            '(x == 1) -> (IV2 == 1)',
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
+
+    # also for linear decomp
+    with pytest.warns(UserWarning, match=".*unsafe.*"):
+        val, decomp = elem.decompose_linear()
+        expected = {
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
+        assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+
 
