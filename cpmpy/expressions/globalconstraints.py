@@ -784,14 +784,11 @@ class Cumulative(GlobalConstraint):
             cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
 
         # demand doesn't exceed capacity
+        # for each time-step, we check if the running demand does not exceed the capacity
         lbs, ubs = get_bounds(start)
         lb, ub = min(lbs), max(ubs)
         for t in range(lb,ub+1):
-            demand_at_t = 0
-            for job in range(len(start)):
-                demand_at_t += demand[job] * ((start[job] <= t) & (end[job] > t))
-
-            cons += [demand_at_t <= capacity]
+            cons += [cp.sum(d * ((s <= t) & (e > t)) <= capacity for s,e,d in zip(start, end, demand))]
 
         return cons, []
 
