@@ -754,13 +754,15 @@ class Cumulative(GlobalConstraint):
             cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
 
         # demand doesn't exceed capacity
-        for i in range(len(start)):
-            demand_at_i = demand[i]
+        # tasks are uninterruptible, so we only need to check each starting point of each task
+        # I.e., for each task, we check if it can be started, given the tasks that are already running.
+        for t in range(len(start)):
+            demand_at_start_of_t = []
             for j in range(len(start)):
-                if i != j:
-                    demand_at_i += demand[j] * ((start[j] <= start[i]) & (end[j] > start[i]))
+                if t != j:
+                    demand_at_start_of_t += [demand[j] * ((start[j] <= start[t]) & (end[j] > start[t]))]
 
-            cons += [demand_at_i <= capacity]
+            cons += [demand[t] + sum(demand_at_start_of_t) <= capacity]
 
         return cons, []
 
