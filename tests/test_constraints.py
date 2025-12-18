@@ -226,7 +226,16 @@ def global_constraints(solver):
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
-            expr = Cumulative(s, dur, e, demand, cap)
+            yield Cumulative(s, dur, e, demand, cap)
+            yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="time")[0])
+            yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="task")[0])
+
+            yield Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
+            if solver != "pumpkin": # only supports with fixed durations
+                yield Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
+                if solver not in ("pysat", "pindakaas"): # results in unsupported int2bool integer multiplication
+                    yield Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
+            continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
@@ -242,7 +251,11 @@ def global_constraints(solver):
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
-            expr = cls(s, dur, e)
+            yield NoOverlap(s, dur, e)
+            yield NoOverlap(s, dur)
+            if solver != "pumpkin": # only supports with fixed durations
+                yield NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
+            continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)

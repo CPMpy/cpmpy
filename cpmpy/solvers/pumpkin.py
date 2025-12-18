@@ -19,7 +19,7 @@
     Requires that the 'pumpkin-solver' python package is installed:
 
     .. code-block:: console
-    
+
         $ pip install pumpkin-solver
 
     The rest of this documentation is for advanced users
@@ -48,7 +48,7 @@ from packaging.version import Version
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import Cumulative, GlobalConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.utils import is_num, is_any_list, get_bounds
 from ..transformations.get_variables import get_variables
@@ -72,7 +72,7 @@ class CPM_pumpkin(SolverInterface):
     - ``pum_solver``: the pumpkin.Model() object
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "cumulative", "table", "negative_table", "InDomain",
+    supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "InDomain",
                                               "min", "max", "abs", "element"})
     supported_reified_global_constraints = frozenset()
 
@@ -547,11 +547,14 @@ class CPM_pumpkin(SolverInterface):
                 assert all(is_num(d) for d in demand), "Pumpkin only accepts Cumulative with fixed demand"
                 assert is_num(cap), "Pumpkin only accepts Cumulative with fixed capacity"
 
-                dur_cons = []
-                for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)]):
-                    dur_cons += self._get_constraint(c, tag=tag)
+                pum_cons = [constraints.Cumulative(self.solver_vars(start),dur, demand, cap, constraint_tag=tag)]
+                if end is not None:
+                    pum_cons += [self._get_constraint(c, tag=tag)[0] for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)])]
+                return pum_cons
 
-                return [constraints.Cumulative(self.solver_vars(start),dur, demand, cap, constraint_tag=tag)] + dur_cons
+            elif cpm_expr.name == "no_overlap":
+                start, dur, end = cpm_expr.args
+                return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1), tag=tag)
 
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args
@@ -564,7 +567,7 @@ class CPM_pumpkin(SolverInterface):
                 arr, table = cpm_expr.args
                 return [constraints.NegativeTable(self.to_pum_ivar(arr, tag=tag), 
                                                   np.array(table).tolist(),# ensure Python list
-                                                  constraint_tag=tag)  
+                                                  constraint_tag=tag)
                         ]
             
             elif cpm_expr.name == "InDomain":
@@ -572,7 +575,7 @@ class CPM_pumpkin(SolverInterface):
                 return [constraints.Table(self.to_pum_ivar([val], tag=tag),
                                           [[d] for d in domain], # each domain value is its own row
                                           constraint_tag=tag)
-                        ] 
+                        ]
             
             
             else:

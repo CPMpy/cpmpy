@@ -69,7 +69,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_num, is_any_list, argvals, argval
+from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -707,6 +707,38 @@ class CPM_minizinc(SolverInterface):
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)
 
+        elif expr.name == "cumulative":
+            start, dur, end, demand, capacity = expr.args
+
+            global_str = "cumulative({},{},{},{})"
+            # ensure duration is non-negative
+            dur, extra_cons = get_nonneg_args(dur)
+            # ensure demand is non-negative
+            demand, demand_cons = get_nonneg_args(demand)
+            extra_cons += demand_cons
+
+            if end is not None:
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format(self._convert_expression(start),
+                                     self._convert_expression(dur),
+                                     self._convert_expression(demand),
+                                     self._convert_expression(capacity))
+
+        elif expr.name == "no_overlap":
+            start, dur, end = expr.args
+            global_str = "disjunctive({},{})"
+            # ensure duration is non-negative
+            dur, extra_cons = get_nonneg_args(dur)
+            if end is not None:
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
@@ -781,22 +813,8 @@ class CPM_minizinc(SolverInterface):
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
 
-        elif expr.name == "cumulative":
-            start, dur, end, _, _ = expr.args
-
-            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
-            format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
-
-            return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
-
         elif expr.name == "precedence":
             return "value_precede_chain({},{})".format(args_str[1], args_str[0])
-
-        elif expr.name == "no_overlap":
-            start, dur, end = expr.args
-            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
-            format_str = "forall(" + durstr + " ++ [disjunctive({},{})])"
-            return format_str.format(args_str[0], args_str[1])
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args
