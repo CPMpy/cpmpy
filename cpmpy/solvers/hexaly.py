@@ -64,7 +64,7 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max","div", "mod", "abs", "element"})
+    supported_global_constraints = frozenset({"min", "max","div", "mod", "pow", "abs", "element"})
     supported_reified_global_constraints = frozenset()
 
 
@@ -369,9 +369,6 @@ class CPM_hexaly(SolverInterface):
             if cpm_expr.name == "mul":
                 a,b = self._hex_expr(cpm_expr.args)
                 return a * b
-            if cpm_expr.name == "pow":
-                a, b = self._hex_expr(cpm_expr.args)
-                return a ** b
             raise ValueError(f"Unknown operator {cpm_expr}")
 
         elif isinstance(cpm_expr, Comparison):
@@ -407,6 +404,9 @@ class CPM_hexaly(SolverInterface):
             if cpm_expr.name == "mod":
                 a, b = self._hex_expr(cpm_expr.args)
                 return a % b
+            if cpm_expr.name == "pow":
+                a, b = self._hex_expr(cpm_expr.args)
+                return a ** b
             raise ValueError(f"Global function {cpm_expr} is not supported by hexaly")
 
         elif isinstance(cpm_expr, DirectConstraint):

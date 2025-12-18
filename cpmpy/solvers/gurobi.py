@@ -80,7 +80,7 @@ class CPM_gurobi(SolverInterface):
     https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs"})
+    supported_global_constraints = frozenset({"min", "max", "pow" "abs"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
