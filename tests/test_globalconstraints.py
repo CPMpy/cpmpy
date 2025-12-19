@@ -572,9 +572,13 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertEqual(str(min(iv.value())), '-1')
 
-        model = cp.Model(cp.Minimum(iv).decompose_comparison('==', 4))
+        _min, define = cp.Minimum(iv).decompose()
+        model = cp.Model(_min == 4, define)
+
         self.assertTrue(model.solve())
-        self.assertEqual(str(min(iv.value())), '4')
+        self.assertEqual(min(iv.value()), 4)
+        self.assertEqual(cp.Minimum(iv).value(), 4)
+
 
     def test_minimum_onearg(self):
 
@@ -594,9 +598,12 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(max(iv.value()) <= -1)
 
-        model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
+        _max, define = cp.Maximum(iv).decompose()
+        model = cp.Model(_max == 4, define)
+
         self.assertTrue(model.solve())
-        self.assertNotEqual(str(max(iv.value())), '4')
+        self.assertEqual(max(iv.value()), 4)
+        self.assertEqual(cp.Maximum(iv).value(), 4)
 
     def test_maximum_onearg(self):
 
@@ -621,10 +628,14 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.Model(decompose_in_tree(constraints)).solve()) #test with decomposition
 
-        model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
+        _abs, define = cp.Abs(iv).decompose()
+        model = cp.Model(_abs == 4, define)
+
         self.assertTrue(model.solve())
-        self.assertNotEqual(str(abs(iv.value())), '4')
-        self.assertEqual(model.solveAll(display=iv), 15)
+        self.assertIn(iv.value(), [-4,4])
+        self.assertEqual(_abs.value(), 4)
+        self.assertEqual(cp.Abs(iv).value(), 4)
+        self.assertEqual(model.solveAll(), 2)
 
         pos = cp.intvar(0,8, name="x")
         constraints = [cp.Abs(pos) != 4]
