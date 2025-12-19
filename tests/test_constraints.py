@@ -35,24 +35,16 @@ SAT_SOLVERS = {"pysdd"}
 EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo", "Power"},  # with int2bool,
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "pindakaas": {"Division", "Modulo", "Power"},
-                  "z3": {},
-                  "choco": {},
-                  "ortools":{},
-                  "exact": {},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
-                  "gcs": {},
                   "cplex": {"Division", "Modulo", "Power"}
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"gurobi": {},
-                     "pysat": {"mul-int"},  # int2bool but mul, and friends, not linearized
+EXCLUDE_OPERATORS = {"pysat": {"mul-int"},  # int2bool but mul, and friends, not linearized
                      "pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
                      "pindakaas": {"mul-int"},
-                     "exact": {},
                      "cplex": {"mul-int", "div"},
-                     "pumpkin": {},
                      }
 
 # Variables to use in the rest of the test script
