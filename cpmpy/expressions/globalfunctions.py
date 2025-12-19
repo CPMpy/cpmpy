@@ -61,6 +61,9 @@
         Minimum
         Maximum
         Abs
+        Division
+        Modulo
+        Power
         Element
         Count
         Among
@@ -303,44 +306,78 @@ class Abs(GlobalFunction):
         return 0, max(-lb, ub)
 
 class Division(GlobalFunction):
+    """
+    Computes the integer division of the arguments, rounding towards zero: `int(x/y)`
 
-    def __init__(self, x,y,):
-        super().__init__("div", [x,y])
+    Warning: this is different from the Python's floor division operator `//`, which floors the result: `floor(x/y)`
+
+    The difference exposes itself with negative numbers: -7/3 = -2.333..;
+        * integer division (ours): `-7 div 3` = `int(-7/3)` = -2 (truncation)
+        * floor division (Python): `-7 // 3` = `math.floor(-7/3)` = -3
+    """
+
+    def __init__(self, x: Expression, y: Expression):
+        """
+        Arguments:
+            x (Expression): Expression to divide
+            y (Expression): Expression to divide by
+        """
+        super().__init__("div", [x, y])
 
     def __repr__(self):
+        """
+        Returns:
+            str: String representation of integer division as 'x div y'
+        """
         x,y = self.args
-        return "{} // {}".format(f"({x})" if isinstance(x, Expression) else x,
+        return "{} div {}".format(f"({x})" if isinstance(x, Expression) else x,
                                   f"({y})" if isinstance(y, Expression) else y)
 
     def decompose(self):
-        # integer division, rounding towards zero
-        # x / y = z implemented as x = y * z + r with r the remainder and |r| < |y|
-        #      r can be positive or negative, so also ensure that |y| * |z| <= |x|
+        """
+        Decomposition of Integer Division global function, rounding towards zero.
 
+        `x div y = q` implemented as `x = y * q + r` with `r` the remainder and `|r| < |y|`
+        `r` can be positive or negative, so also ensure that `|y| * |q| <= |x|`
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the integer division, and a list of constraints defining it
+        """
         x,y = self.args
-        y_lb, y_ub = get_bounds(y)
         safen = []
+
+        y_lb, y_ub = get_bounds(y)
         if y_lb <= 0 <= y_ub:
             safen = [y != 0]
             warnings.warn(f"Division constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
+        r = intvar(*get_bounds(x % y))  # remainder
         _div = intvar(*self.get_bounds())
-        r = intvar(*get_bounds(x % y)) # remainder
-
-        return _div, safen + [((_div * y) + r) == x, abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
+        return _div, safen + [(x == (y * _div) + r), abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
 
     def value(self):
-
+        """
+        Returns:
+            int: The integer division of the arguments, or None if the arguments are not assigned
+        """
         x,y = argvals(self.args)
+        if x is None or y is None:
+            return None
+
         try:
-            return int(x / y)  # integer division
+            return int(x / y)  # integer division, rounding towards zero
         except ZeroDivisionError:
             raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
                                           + "\n Use argval(expr) to get the value of expr with relational "
                                             "semantics.")
 
     def get_bounds(self):
+        """
+        Returns the bounds of the Division global function
 
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the integer division
+        """
         x,y = self.args
         x_lb, x_ub = get_bounds(x)
         y_lb, y_ub = get_bounds(y)
@@ -362,55 +399,87 @@ class Division(GlobalFunction):
         return min(bounds), max(bounds)
 
 
-
 class Modulo(GlobalFunction):
+    """
+    Computes the modulo of the arguments, the remainder with integer division (rounding towards zero): `x - (y * (x div y))`
+
+
+    Warning: this is different from the Python's modulo operator `%`, which gives the remainder of the float division `x / y`
+
+    There is also a difference in sign when using negative numbers:
+        * modulo (ours): `7 mod -5` = 2 because `7 div -5` = -1 and `7 - (-5*-1)` = 2. Note how the sign of x is preserved.
+        * modulo (Python): `7 % -5` = -3 because `7 // -5` = -2 and `7 - (-5*-2)` = -3. Note how the sign of y is preserved.
+    """
 
     def __init__(self, x, y):
+        """
+        Arguments:
+            x (Expression): Expression to modulo
+            y (Expression): Expression to modulo by
+        """
         super().__init__("mod", [x, y])
 
     def __repr__(self):
+        """
+        Returns:
+            str: String representation with 'mod' as notation
+        """
         x,y = self.args
         return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
                                   f"({y})" if isinstance(y, Expression) else y)
 
     def decompose(self):
         """
-            mod != remainder after division because defined on integer div (rounding towards 0)
-            e.g., 7 % -5 = 2 and -7 % 5 = -2
-            implement x % y == z as k * y + z == x with |z| < |y| and sign(x) = sign(z)
-            https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
+        Decomposition of Modulo global function, using integer division (rounding towards zero)
+        
+        Decomposes `x mod y = z` as `x = k * y + z` with `|z| < |y|` and `sign(x) = sign(z)`
+        https://en.wikipedia.org/wiki/Modulo
+        https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
         """
         x,y = self.args
-        y_lb, y_ub = get_bounds(y)
         safen = []
+
+        y_lb, y_ub = get_bounds(y)
         if y_lb <= 0 <= y_ub:
-            safen = []
+            safen = [y != 0]
             warnings.warn(f"Modulo constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         _mod = intvar(*self.get_bounds())
-        k = intvar(*get_bounds((x - _mod) // y))
-        cons = [
-            k * y + _mod == x,   # module is remainder of division
+        k = intvar(*get_bounds((x - _mod) // y))  # integer quotient (multiplier)
+        return _mod, safen + [
+            k * y + _mod == x,   # module is remainder of integer division
             abs(_mod) < abs(y),  # remainder is smaller than divisor
             x * _mod >= 0        # remainder is negative iff x is negative
         ]
 
-        return _mod, safen + cons
-
     def value(self):
+        """
+        Returns:
+            int: The modulo of the arguments, or None if the arguments are not assigned
+        """
         x,y = argvals(self.args)
+        if x is None or y is None:
+            return None
+
         try:  # modulo defined with integer division
-            return x- y * int(x / y)
+            return x - (y * int(x / y))
         except ZeroDivisionError:
             raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
                                           + "\n Use argval(expr) to get the value of expr with relational "
                                             "semantics.")
 
     def get_bounds(self):
+        """
+        Returns the bounds of the Modulo global function
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the modulo
+        """
         lb1, ub1 = get_bounds(self.args[0])
         lb2, ub2 = get_bounds(self.args[1])
         if lb2 == ub2 == 0:
             raise ZeroDivisionError("Domain of {} only contains 0".format(self.args[1]))
+
         # the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
         lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
         ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
@@ -422,31 +491,60 @@ class Modulo(GlobalFunction):
 
 
 class Power(GlobalFunction):
+    """
+    Computes the power of the arguments, the base raised to the exponent: `base ** exponent`
+
+    Only non-negative constant integer exponents are supported.
+    """
 
     def __init__(self, base:Expression, exponent:int):
+        """
+        Arguments:
+            base (Expression): Expression to raise to the power
+            exponent (int): non-negative integer exponent (no variable allowed)
+        """
         if not is_num(exponent):
-            raise TypeError(f"Power constraint takes a numeric expression as second argument, not: {exponent}")
+            raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
         if exponent < 0:
             raise ValueError(f"Power constraint only supports non-negative integer exponents, not: {exponent}")
         super().__init__("pow", [base, exponent])
 
     def decompose(self):
+        """
+        Decomposition of Power global function, using integer multiplication.
 
+        Decomposes `base ** exp = _pow` as `_pow = base * base * ... * base` (exp times)
+
+        Returns:
+            tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the power, and a list of constraints defining it
+        """
         base, exp = self.args
         if exp == 0:
             return 1,[]
+
         _pow = base
         for _ in range(1,exp):
             _pow *= base
         return _pow,[]
 
     def value(self):
+        """
+        Returns:
+            int: The power of the arguments, or None if the arguments are not assigned
+        """
         base, exp = argvals(self.args)
+        if base is None or exp is None:
+            return None
+
         return base**exp
 
-
     def get_bounds(self):
+        """
+        Returns the bounds of the Power global function
 
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the power
+        """
         base, exp = self.args
         lb_base, ub_base = get_bounds(base)
 

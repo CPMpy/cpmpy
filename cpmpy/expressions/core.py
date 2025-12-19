@@ -35,6 +35,9 @@
     `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
     `x - y`                      `Operator("sum", [x, -y])`                    
     `x * y`                      `Operator("mul", [x, y])`                     
+    `x // y`                     `globalfunctions.Division([x, y])` (integer division)
+    `x % y`                      `globalfunctions.Modulo([x, y])` (modulo)
+    `x ** y`                     `globalfunctions.Power([x, y])` (power)
     ===========================  ===============================================
 
     
@@ -46,7 +49,7 @@
     `x & y`              `Operator("and", [x, y])`                             
     `x | y`              `Operator("or", [x, y])`                              
     `~x`                 `Operator("not", [x])` or `NegBoolView(x)` if Boolean 
-    `x ^ y`              `Xor([x, y])`                                         
+    `x ^ y`              `globalconstraints.Xor([x, y])`
     ===================  =======================================================
 
     Python has no built-in operator for `implication` that can be overloaded.

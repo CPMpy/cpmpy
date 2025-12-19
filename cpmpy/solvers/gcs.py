@@ -91,7 +91,7 @@ class CPM_gcs(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "table", "negative_table", "inverse", "circuit", "xor",
-                                              "min", "max","div", "mod", "pow", "abs", "element", "nvalue", "count"})
+                                              "min", "max", "abs", "div", "mod", "pow", "element", "count", "nvalue"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod

@@ -73,7 +73,7 @@ class CPM_pumpkin(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "InDomain",
-                                              "min", "max", "div", "abs", "element"})
+                                              "min", "max", "abs", "div", "element"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod

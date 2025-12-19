@@ -481,7 +481,7 @@ class testCanonical_comparison(unittest.TestCase):
         rhs = 5
 
         cons = canonical_comparison([ a / b <= rhs])[0]
-        self.assertEqual("(a) // (b) <= 5", str(cons))
+        self.assertEqual("(a) div (b) <= 5", str(cons))
 
         #when adding division
         #cons = canonical_comparison([a / b <= c / rhs])[0]

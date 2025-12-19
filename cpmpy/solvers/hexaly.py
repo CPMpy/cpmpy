@@ -64,7 +64,7 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max","div", "mod", "pow", "abs", "element"})
+    supported_global_constraints = frozenset({"min", "max", "abs", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
 
