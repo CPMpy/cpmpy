@@ -53,14 +53,8 @@ import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
-from cpmpy.transformations.reification import only_implies
-
-
-from .decompose_global import decompose_in_tree
-
 from .flatten_model import flatten_constraint, get_or_make_var
 from .normalize import toplevel_list, simplify_boolean
-from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
@@ -68,7 +62,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
     """
@@ -205,19 +199,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                     else:
                         raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
 
-                elif lhs.name == "pow" and "pow" not in supported:
-                    if "mul" not in supported:
-                        raise NotImplementedError("Cannot linearize power without multiplication")
-                    if not is_int(lhs.args[1]) or lhs.args[1] < 0:
-                        raise NotImplementedError("Cannot linearize power with non-integer or negative exponent")
-                    # only `POW(b,n) == IV` supported, with n being a non-negative integer, post as b*b*...*b (n times) == IV
-                    x, n = lhs.args
-                    new_lhs = 1
-                    for exp in range(n):
-                        new_lhs, new_cons = get_or_make_var(x * new_lhs, csemap=csemap)
-                        newlist.extend(new_cons)
-                    cpm_expr = eval_comparison(cpm_expr.name, new_lhs, rhs)
-
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
@@ -225,7 +206,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
             elif isinstance(lhs, GlobalFunction) and lhs.name not in supported:
                 raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
-                                 "`cpmpy.transformations.decompose_global.decompose_global() first")
+                                 "`cpmpy.transformations.decompose_global.decompose_in_tree() first")
 
             [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
             lhs, rhs = cpm_expr.args
