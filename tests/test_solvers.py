@@ -21,6 +21,7 @@ from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
+from test_constraints import numexprs
 from utils import skip_on_missing_pblib
 
 pysat_available = CPM_pysat.supported()
@@ -821,10 +822,9 @@ class TestSolvers(unittest.TestCase):
         m = cp.Model([x + y == 2, wsum == 9])
         self.assertTrue(m.solve(solver="minizinc"))
 
-@pytest.mark.parametrize(
-        "solver",
-        [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-)
+
+solvers = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+@pytest.mark.parametrize("solver", solvers)
 class TestSupportedSolvers:
     def test_installed_solvers(self, solver):
         # basic model
@@ -974,7 +974,8 @@ class TestSupportedSolvers:
         assert not s.solve(assumptions=[~x, ~y])
 
         core = s.get_core()
-        assert ~y in set([~x,~y])
+        assert len(core) > 0
+        assert ~y in core
         assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat
 
         assert s.solve(assumptions=[])
@@ -1195,3 +1196,19 @@ class TestSupportedSolvers:
         s = cp.SolverLookup.get(solver, m)
         assert s.solve()
         assert s.objective_value() == 5
+
+
+
+@pytest.mark.parametrize(("solver", "expr"), [(s, expr) for s in solvers for expr in numexprs(s)], ids=str)
+def test_objective_numexprs(solver, expr):
+
+    model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
+    try:
+        model.minimize(expr)
+        assert model.solve(solver=solver, time_limit=3)
+        assert expr.value() < expr.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
+        model.maximize(expr)
+        assert model.solve(solver=solver)
+        assert expr.value() > expr.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
+    except NotSupportedError:
+        pytest.skip(reason=f"{solver} does not support optimisation")

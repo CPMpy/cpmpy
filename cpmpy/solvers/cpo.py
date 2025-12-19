@@ -54,7 +54,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.safening import no_partial_functions
 
 
@@ -71,6 +71,11 @@ class CPM_cpo(SolverInterface):
     https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
 
     """
+
+    supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",
+                                              'cumulative', 'no_overlap',
+                                              "min", "max", "abs", "nvalue", "element"})
+    supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
 
     _docp = None  # Static attribute to hold the docplex.cp module
 
@@ -379,14 +384,25 @@ class CPM_cpo(SolverInterface):
             
                 technical side note: any constraints created during conversion of the objective are permanently posted to the solver
         """
+
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        self.add(decomp_cons)
+
         dom = self.get_docp().modeler
         if self.has_objective():
             self.cpo_model.remove(self.cpo_model.get_objective_expression())
-        expr = self._cpo_expr(expr)
+
+        cpo_obj = self._cpo_expr(obj)
         if minimize:
-            self.cpo_model.add(dom.minimize(expr))
+            self.cpo_model.add(dom.minimize(cpo_obj))
         else:
-            self.cpo_model.add(dom.maximize(expr))
+            self.cpo_model.add(dom.maximize(cpo_obj))
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
@@ -409,11 +425,10 @@ class CPM_cpo(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
-        # count is only supported with a constant to be counted, so we decompose
-        supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'no_overlap'}
-        supported_reified = {"alldifferent", 'table', 'indomain', "negative_table"} # global functions by default here
-        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         # no flattening required
         return cpm_cons
 

@@ -55,13 +55,13 @@ from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegB
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import get_nonneg_args, is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds, is_true_cst, \
     is_false_cst
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 
 
 class CPM_ortools(SolverInterface):
@@ -78,6 +78,11 @@ class CPM_ortools(SolverInterface):
     Documentation of the solver's own Python API:
     https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
+
+    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
+                                              "inverse", "no_overlap", "regular",
+                                              "min", "max", "abs", "element"})
+    supported_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -339,17 +344,26 @@ class CPM_ortools(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
-        self += flat_cons  # add potentially created constraints
-        get_variables(flat_obj, collect=self.user_vars)  # add objvars to vars
+
+        # save user varables
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+
+        self.add(safe_cons+decomp_cons+flat_cons)
 
         # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        ort_obj = self._make_numexpr(obj)
         if minimize:
-            self.ort_model.Minimize(obj)
+            self.ort_model.Minimize(ort_obj)
         else:
-            self.ort_model.Maximize(obj)
+            self.ort_model.Maximize(ort_obj)
 
     def has_objective(self):
         return self.ort_model.HasObjective()
@@ -403,9 +417,11 @@ class CPM_ortools(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "alldifferent", "xor", "table", "negative_table", "cumulative", "circuit", "inverse", "no_overlap", "regular"}
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
-        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=

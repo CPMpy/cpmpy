@@ -48,7 +48,8 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+
 
 class CPM_hexaly(SolverInterface):
     """
@@ -62,6 +63,10 @@ class CPM_hexaly(SolverInterface):
     Documentation of the solver's own Python API:
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
+
+    supported_global_constraints = frozenset({"min", "max", "abs", "element"})
+    supported_reified_global_constraints = frozenset()
+
 
     @staticmethod
     def supported():
@@ -247,11 +252,22 @@ class CPM_hexaly(SolverInterface):
             are permanently posted to the solver)
         """
         from hexaly.optimizer import HxObjectiveDirection
+
+        # save user vars
+        get_variables(expr, collect=self.user_vars)
+
+        # transform objective
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        self.add(decomp_cons)
+
         # make objective function or variable and post
         while self.has_objective(): # remove prev objective(s)
             self.hex_model.remove_objective(0)
         self.is_satisfaction = False
-        hex_obj = self._hex_expr(expr)
+        hex_obj = self._hex_expr(obj)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
         else:
@@ -259,6 +275,7 @@ class CPM_hexaly(SolverInterface):
 
     def has_objective(self):
         return self.hex_model.nb_objectives > 0
+
 
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
@@ -278,7 +295,10 @@ class CPM_hexaly(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         # no flattening, so also no safening required
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"min", "max", "abs", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         return cpm_cons
 
     def add(self, cpm_expr_orig):

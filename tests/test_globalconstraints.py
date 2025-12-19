@@ -4,16 +4,24 @@ import unittest
 import pytest
 
 import cpmpy as cp
+from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError
 from cpmpy.expressions.utils import STAR, argvals
 from cpmpy.solvers import CPM_minizinc
+from cpmpy.transformations.decompose_global import decompose_in_tree
+from cpmpy.transformations.safening import no_partial_functions
 
 from utils import skip_on_missing_pblib
 
 
 @skip_on_missing_pblib(skip_on_exception_only=True)
 class TestGlobal(unittest.TestCase):
+
+    def setUp(self):
+        _BoolVarImpl.counter = 0
+        _IntVarImpl.counter = 0
+
     def test_alldifferent(self):
         """Test all different constraint with a set of
         unit cases.
@@ -564,9 +572,13 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertEqual(str(min(iv.value())), '-1')
 
-        model = cp.Model(cp.Minimum(iv).decompose_comparison('==', 4))
+        _min, define = cp.Minimum(iv).decompose()
+        model = cp.Model(_min == 4, define)
+
         self.assertTrue(model.solve())
-        self.assertEqual(str(min(iv.value())), '4')
+        self.assertEqual(min(iv.value()), 4)
+        self.assertEqual(cp.Minimum(iv).value(), 4)
+
 
     def test_minimum_onearg(self):
 
@@ -586,9 +598,12 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(max(iv.value()) <= -1)
 
-        model = cp.Model(cp.Maximum(iv).decompose_comparison('!=', 4))
+        _max, define = cp.Maximum(iv).decompose()
+        model = cp.Model(_max == 4, define)
+
         self.assertTrue(model.solve())
-        self.assertNotEqual(str(max(iv.value())), '4')
+        self.assertEqual(max(iv.value()), 4)
+        self.assertEqual(cp.Maximum(iv).value(), 4)
 
     def test_maximum_onearg(self):
 
@@ -613,10 +628,14 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.Model(decompose_in_tree(constraints)).solve()) #test with decomposition
 
-        model = cp.Model(cp.Abs(iv).decompose_comparison('!=', 4))
+        _abs, define = cp.Abs(iv).decompose()
+        model = cp.Model(_abs == 4, define)
+
         self.assertTrue(model.solve())
-        self.assertNotEqual(str(abs(iv.value())), '4')
-        self.assertEqual(model.solveAll(display=iv), 15)
+        self.assertIn(iv.value(), [-4,4])
+        self.assertEqual(_abs.value(), 4)
+        self.assertEqual(cp.Abs(iv).value(), 4)
+        self.assertEqual(model.solveAll(), 2)
 
         pos = cp.intvar(0,8, name="x")
         constraints = [cp.Abs(pos) != 4]
@@ -688,6 +707,49 @@ class TestGlobal(unittest.TestCase):
                     self.assertTrue(cp.Model(cp.Element([iv],idx) == 0).solve(solver=s))
                 except (NotImplementedError, NotSupportedError):
                     pass
+
+    def test_element_index_dom_mismatched(self):
+        """
+            Check transform of `[0,1,2][x in -1..1] == y in 1..5`
+            Note the index variable has a lower bound *outside* the indexable range, and an upper bound inside AND lower than the indexable range upper bound
+        """
+        elem = cp.Element([0, 1, 2], cp.intvar(-1, 1, name="x"))
+        constraint = elem <= cp.intvar(1, 5, name="y")
+        decomposed = decompose_in_tree(no_partial_functions([constraint], safen_toplevel={"element"}))
+
+        expected = {
+            # safening constraints
+            "(BV0) == ((x >= 0) and (x <= 2))",
+            "(BV0) -> ((IV0) == (x))",
+            "(~BV0) -> (IV0 == 0)",
+            "BV0",
+            # actual decomposition
+            '(IV0 == 0) -> (IV1 == 0)',
+            '(IV0 == 1) -> (IV1 == 1)',
+            '(IV0 == 2) -> (IV1 == 2)',
+            '(IV1) <= (y)'
+        }
+        self.assertSetEqual(set(map(str, decomposed)), expected)
+
+        # should raise a warning if we don't safen first
+        with pytest.warns(UserWarning, match=".*unsafe.*"):
+            val, decomp = elem.decompose()
+            expected = {
+                # actual decomposition
+                '(x == 0) -> (IV2 == 0)',
+                '(x == 1) -> (IV2 == 1)',
+                'x >= 0', 'x < 3'
+            }
+            self.assertSetEqual(set(map(str, decomp)), expected)
+
+        # also for linear decomp
+        with pytest.warns(UserWarning, match=".*unsafe.*"):
+            val, decomp = elem.decompose_linear()
+            expected = {
+                'x >= 0', 'x < 3'
+            }
+            assert set(map(str, decomp)) == expected
+            assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
 
     def test_xor(self):
         bv = cp.boolvar(5)
@@ -852,6 +914,32 @@ class TestGlobal(unittest.TestCase):
 
         self.assertTrue(m.solve(solver="ortools"))
         self.assertTrue(m.solve(solver="minizinc"))
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_negative_table_minizinc(self):
+        """Test negative_table constraint with minizinc solver"""
+        iv = cp.intvar(-8, 8, 3)
+
+        # Test basic negative_table
+        constraints = [cp.NegativeTable([iv[0], iv[1], iv[2]], [(5, 2, 2)])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve(solver="minizinc"))
+        # Verify the solution doesn't match the forbidden tuple
+        self.assertNotEqual((iv[0].value(), iv[1].value(), iv[2].value()), (5, 2, 2))
+
+        # Test with multiple forbidden tuples
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 2, 2]])]
+        model = cp.Model(constraints)
+        self.assertTrue(model.solve(solver="minizinc"))
+        sol = tuple(iv.value())
+        self.assertNotIn(sol, [(10, 8, 2), (5, 2, 2)])
+
+        # Test that negative_table and table are contradictory when they have the same tuples
+        constraints = [cp.NegativeTable(iv, [[10, 8, 2], [5, 9, 2]]), 
+                       cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
+        model = cp.Model(constraints)
+        self.assertFalse(model.solve(solver="minizinc"))
 
 
 
@@ -1445,16 +1533,7 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], [3,0]).decompose()).solve())
 
 
-    def test_element_index_dom_mismatched(self):
-        """
-            Check transform of `[0,1,2][x in -1..1] == y in 1..5`
-            Note the index variable has a lower bound *outside* the indexable range, and an upper bound inside AND lower than the indexable range upper bound
-        """
-        constraint=cp.Element([0,1,2], cp.intvar(-1,1, name="x"))
-        self.assertEqual(
-            str(constraint.decompose_comparison("==", cp.intvar(1,5, name="y"))),
-            "([(x == 0) -> (y == 0), (x == 1) -> (y == 1), x >= 0, x <= 1], [])"
-        )
+
 
 solvers = [name for name, cls in cp.SolverLookup.base_solvers() if cls.supported()]
 @pytest.mark.parametrize("solver", solvers)
@@ -1482,4 +1561,7 @@ def test_issue801_expr_in_cumulative(solver):
         assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)
+
+
+
 
