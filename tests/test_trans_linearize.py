@@ -400,49 +400,49 @@ class TestVarsLhs(unittest.TestCase):
         cons = linearize_constraint(cons)[0]
         self.assertEqual("(~bv) -> (sum([1, 2, 3] * [a, b, c]) <= 15)", str(cons))
 
-    def test_pow(self):
-
-        a,b = cp.intvar(0,32, name=tuple("ab"), shape=2)
-
-        cons = a ** 3 == b
-        lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
-
-        self.assertEqual(str(lin_cons[0]), "((a) * (a)) == (IV0)")
-        self.assertEqual(str(lin_cons[1]), "((a) * (IV0)) == (IV1)")
-        self.assertEqual(str(lin_cons[2]), "sum([1, -1] * [IV1, b]) == 0")
-
-        cons = a ** 5 == b
-        lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
-        model = cp.Model(lin_cons + [a == 2])
-        self.assertTrue(model.solve())
-        self.assertEqual(b.value(), 32)  # 2^5 = 32
-
-        # Test x^0 == y (should equal 1)
-        cons = a ** 0 == b
-        lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
-        model = cp.Model(lin_cons + [a == 3])
-        self.assertTrue(model.solve())
-        self.assertEqual(b.value(), 1)
-
-        # not supported pow with exponent being a variable
-        cons = a ** b == 3
-        self.assertRaises(NotImplementedError,
-                          lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
-
-        # not supported pow with exponent being a float
-        cons = a ** 3.5 == b
-        self.assertRaises(NotImplementedError,
-                          lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
-
-        # not supported pow with exponent being a negative integer
-        cons = a ** -3 == b
-        self.assertRaises(NotImplementedError,
-                          lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
-        
-        # not supported pow when mul is not supported
-        cons = a ** 3 == b
-        self.assertRaises(NotImplementedError,
-                          lambda :  linearize_constraint([cons], supported={"sum", "wsum"}))
+    # def test_pow(self): -> pow is a global constraint now
+    #
+    #     a,b = cp.intvar(0,32, name=tuple("ab"), shape=2)
+    #
+    #     cons = a ** 3 == b
+    #     lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+    #
+    #     self.assertEqual(str(lin_cons[0]), "((a) * (a)) == (IV0)")
+    #     self.assertEqual(str(lin_cons[1]), "((a) * (IV0)) == (IV1)")
+    #     self.assertEqual(str(lin_cons[2]), "sum([1, -1] * [IV1, b]) == 0")
+    #
+    #     cons = a ** 5 == b
+    #     lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+    #     model = cp.Model(lin_cons + [a == 2])
+    #     self.assertTrue(model.solve())
+    #     self.assertEqual(b.value(), 32)  # 2^5 = 32
+    #
+    #     # Test x^0 == y (should equal 1)
+    #     cons = a ** 0 == b
+    #     lin_cons = linearize_constraint([cons], supported={"sum", "wsum", "mul"})
+    #     model = cp.Model(lin_cons + [a == 3])
+    #     self.assertTrue(model.solve())
+    #     self.assertEqual(b.value(), 1)
+    #
+    #     # not supported pow with exponent being a variable
+    #     cons = a ** b == 3
+    #     self.assertRaises(NotImplementedError,
+    #                       lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
+    #
+    #     # not supported pow with exponent being a float
+    #     cons = a ** 3.5 == b
+    #     self.assertRaises(NotImplementedError,
+    #                       lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
+    #
+    #     # not supported pow with exponent being a negative integer
+    #     cons = a ** -3 == b
+    #     self.assertRaises(NotImplementedError,
+    #                       lambda :  linearize_constraint([cons], supported={"sum", "wsum", "mul"}))
+    #
+    #     # not supported pow when mul is not supported
+    #     cons = a ** 3 == b
+    #     self.assertRaises(NotImplementedError,
+    #                       lambda :  linearize_constraint([cons], supported={"sum", "wsum"}))
 
 
     def test_others(self):
