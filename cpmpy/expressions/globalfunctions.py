@@ -503,7 +503,7 @@ class Element(GlobalFunction):
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Element global function.
-        
+
         The index variable must be within the bounds of the array.
 
         This decomposition uses an auxiliary variable and implication constraints.
@@ -527,7 +527,7 @@ class Element(GlobalFunction):
     def decompose_linear(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Element global function.
-        
+
         The index variable must be within the bounds of the array.
 
         This decomposition uses a weighted sum over the array elements times Boolean indicator for the index.
@@ -601,7 +601,7 @@ class Count(GlobalFunction):
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of the Count global function.
-        
+
         Does not require the use of auxiliary variables, simply count the number of variables that take the given value.
 
         Returns:
@@ -641,7 +641,7 @@ class Count(GlobalFunction):
 class Among(GlobalFunction):
     """
     The Among global function counts how many variables in an array take values that are in a given set of values.
-    
+
     This is similar to :class:`Count <cpmpy.expressions.globalfunctions.Count>`, but instead of counting occurrences of a single value,
     it counts occurrences of any value in a set. For example, `Among([x1, x2, x3, x4], [1, 2])`
     returns the number of variables among x1, x2, x3, x4 that take the value 1 or 2.
@@ -662,7 +662,7 @@ class Among(GlobalFunction):
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of the Among global function.
-        
+
         Among is decomposed into a sum of :class:`Count <cpmpy.expressions.globalfunctions.Count>` global functions, one for each value in the set.
         For example, `Among(arr, [1, 2, 3])` is decomposed as `Count(arr, 1) + Count(arr, 2) + Count(arr, 3)`.
 
@@ -698,7 +698,7 @@ class Among(GlobalFunction):
 class NValue(GlobalFunction):
     """
     The NValue global function counts the number of distinct values in an array.
-    
+
     For example, if variables [x1, x2, x3, x4] take values [1, 2, 1, 3] respectively,
     then `NValue([x1, x2, x3, x4])` returns 3 (the distinct values are 1, 2, and 3).
     """
@@ -759,7 +759,7 @@ class NValueExcept(GlobalFunction):
     """
     The NValueExcept global function counts the number of distinct values in an array,
     excluding a specified value.
-    
+
     For example, if variables [x1, x2, x3, x4] take values [1, 2, 1, 0] respectively,
     then `NValueExcept([x1, x2, x3, x4], 0)` returns 2 (the distinct values are 1 and 2,
     excluding 0).

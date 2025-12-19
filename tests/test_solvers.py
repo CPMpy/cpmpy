@@ -1205,7 +1205,7 @@ def test_objective_numexprs(solver, expr):
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     try:
         model.minimize(expr)
-        assert model.solve(solver=solver)
+        assert model.solve(solver=solver, time_limit=3)
         assert expr.value() < expr.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
         model.maximize(expr)
         assert model.solve(solver=solver)
