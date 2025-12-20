@@ -35,9 +35,9 @@
     `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
     `x - y`                      `Operator("sum", [x, -y])`                    
     `x * y`                      `Operator("mul", [x, y])`                     
-    `x // y`                     `globalfunctions.Division([x, y])` (integer division)
-    `x % y`                      `globalfunctions.Modulo([x, y])` (modulo)
-    `x ** y`                     `globalfunctions.Power([x, y])` (power)
+    `x // y`                     `globalfunctions.Division([x, y])` (integer division, rounding towards zero)
+    `x % y`                      `globalfunctions.Modulo([x, y])` (remainder after integer division)
+    `x ** y`                     `globalfunctions.Power([x, y])`
     ===========================  ===============================================
 
     
