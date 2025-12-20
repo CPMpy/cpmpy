@@ -1,55 +1,55 @@
 """
-Transforms flat constraints into linear constraints.
+Transform constraints to a linear form.
 
-Linearized constraints have one of the following forms:
+This transformation is necessary for Integer Linear Programming (ILP) solvers, and also
+for translating to Pseudo-Boolean or CNF formats.
 
-Linear comparison:
-------------------
-- ``LinExpr == Constant``
-- ``LinExpr >= Constant``
-- ``LinExpr <= Constant``
+There are a number of components to getting a good linearisation:
+- **Decomposing** global constraints in a 'linear friendly' way.
+  A common pattern is that constraints that enforce domain consistency on integer variables,
+  that they should be decomposed over a Boolean representation of the domain. This is the
+  case for :class:`~cpmpy.expressions.globalconstraints.AllDifferent`, :class:`~cpmpy.expressions.globalfunctions.Element`
+  and possibly others.
+  Their default decomposition might not do it this way, in which case we want to use different
+  decompositions.
 
-LinExpr can be any of:
+- **Disequalities** e.g. `sum(X) != 5` should be rewritten as `(sum(X) < 5) | (sum(X) > 5)`
+  and further flattened into implications and linearised.
 
-- `NumVar`
-- `sum`
-- `wsum`
+- **Implications** e.g. `B -> sum(X) <= 4` should be linearised with the Big-M method.
 
-Indicator constraints:
-----------------------
+- **Domain encodings** e.g. of `A=cp.intvar(0,4)` would create binary variables and constraints
+  like `B0 -> A=0`, `B1 -> A=1`, `B2 -> A=2`, etc and `sum(B0..4) = 1`.
+  However each `B0 -> A=0` would require 2 Big-M constraints. Instead we can linearise the entire
+  domain encoding with two constraints: `sum(B0..4) = 1` and `A = sum(B0..4 * [0,1,2,3,4])`.
+  We could even go as far as eliminate the original integer decision variable.
 
-+------------------------------------+
-| ``BoolVar -> LinExpr == Constant`` |
-+------------------------------------+
-| ``BoolVar -> LinExpr >= Constant`` |
-+------------------------------------+
-| ``BoolVar -> LinExpr <= Constant`` |
-+------------------------------------+
+After linearisation, the output can be further transformed:
+- Remove negated boolean variables (:class:`~cpmpy.expressions.variables.NegBoolView`) so only
+  positive boolean variables (:class:`~cpmpy.expressions.variables.BoolVar`) appear
+- Ensure only positive coefficients appear in linear constraints
 
-========================================   ==============================================
-``BoolVar -> GenExpr``                     (GenExpr.name in supported, GenExpr.is_bool()) 
-``BoolVar -> GenExpr >= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-``BoolVar -> GenExpr <= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-``BoolVar -> GenExpr == Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-========================================   ==============================================
+Module functions
+----------------
 
-Where ``BoolVar`` is a boolean variable or its negation.
+Main transformations:
+- :func:`linearize_constraint`: Transforms a list of constraints to a linear form.
 
-General comparisons or expressions
------------------------------------
+Canonicalization:
+- :func:`canonical_comparison`: Canonicalizes comparison expressions by moving variables to the
+  left-hand side and constants to the right-hand side.
 
-============================  ==============================================
-``GenExpr``                   (GenExpr.name in supported, GenExpr.is_bool())  
-``GenExpr == Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
-``GenExpr <= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
-``GenExpr >= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num()) 
-============================  ============================================== 
-
-
-
+Post-linearisation transformations:
+- :func:`only_positive_bv`: Transforms constraints so only boolean variables appear positively
+  (no :class:`~cpmpy.expressions.variables.NegBoolView`).
+- :func:`only_positive_bv_wsum`: Helper function that replaces :class:`~cpmpy.expressions.variables.NegBoolView`
+  in var/sum/wsum expressions with equivalent expressions using only :class:`~cpmpy.expressions.variables.BoolVar`.
+- :func:`only_positive_bv_wsum_const`: Same as :func:`only_positive_bv_wsum` but returns the constant
+  term separately.
+- :func:`only_positive_coefficients`: Transforms constraints so only positive coefficients appear
+  in linear constraints.
 """
-import copy
-import numpy as np
+
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
@@ -69,6 +69,46 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
     Only apply after :func:'cpmpy.transformations.flatten_model.flatten_constraint()' and :func:'cpmpy.transformations.reification.only_implies()'.
+
+    After linearize, the following constraints remain:
+
+    **Linear comparisons:**
+        Equality and non-strict inequality comparison where the left-hand side is
+        a linear expression and the right-hand side is a constant:
+
+        - ``LinExpr == Constant``
+        - ``LinExpr >= Constant``
+        - ``LinExpr <= Constant``
+
+        The linear expression (LinExpr) can be:
+        - A numeric variable (``NumVar``)
+        - A sum expression (``sum([...])``)
+        - A weighted sum expression (``wsum([weights], [vars])``)
+
+    **General comparisons or expressions, if their name is in `supported`:**
+
+        * Boolean expressions:
+          - ``GenExpr`` (when :func:`~cpmpy.expressions.core.Expression.is_bool()`)
+
+        * Numeric comparisons:
+          - ``GenExpr == Var/Constant`` (when GenExpr is numeric)
+          - ``GenExpr <= Var/Constant`` (when GenExpr is numeric)
+          - ``GenExpr >= Var/Constant`` (when GenExpr is numeric) 
+
+    **Indicator constraints, if '->' is in 'supported':**
+        The left-hand side is always a boolean variable or its negation, and
+        the right-hand side can be a linear comparison or a general expression.
+
+        * Linear comparisons:
+          - ``BoolVar -> LinExpr == Constant``
+          - ``BoolVar -> LinExpr >= Constant``
+          - ``BoolVar -> LinExpr <= Constant``
+
+        * General expressions (when the expression name is in `supported`):
+          - ``BoolVar -> GenExpr`` (when GenExpr is boolean)
+          - ``BoolVar -> GenExpr == Var/Constant`` (when GenExpr is numeric)
+          - ``BoolVar -> GenExpr >= Var/Constant`` (when GenExpr is numeric)
+          - ``BoolVar -> GenExpr <= Var/Constant`` (when GenExpr is numeric)
 
     Arguments:
         supported: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
