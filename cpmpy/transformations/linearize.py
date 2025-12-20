@@ -50,7 +50,9 @@ Post-linearisation transformations:
   in linear constraints.
 """
 
+import copy
 import cpmpy as cp
+from typing import List, Set, Optional, Dict, Any, Tuple, Union
 from cpmpy.transformations.get_variables import get_variables
 
 from .flatten_model import flatten_constraint, get_or_make_var
@@ -64,7 +66,7 @@ from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
-def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
+def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"sum","wsum","->"}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -111,10 +113,23 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
           - ``BoolVar -> GenExpr <= Var/Constant`` (when GenExpr is numeric)
 
     Arguments:
-        supported: which constraint and variable types are supported, i.e. `sum`, `and`, `or`, `alldifferent`
-            :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
-            Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
-        reified: whether the constraint is fully reified
+        lst_of_expr: List of CPMpy expressions to linearize. Must be in 'flat normal form'
+            with only boolean variables on the left-hand side of implications.
+        supported: Set of constraint and variable type names that are supported by the target
+            solver, e.g. `{"sum", "wsum", "->", "and", "or", "alldifferent"}`.
+            :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization
+            and is decomposed as such if not in `supported`.
+            Any other unsupported global constraint should be decomposed using
+            :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`.
+        reified: Whether the constraint is fully reified. When True, nested implications
+            are linearized using Big-M method instead of indicator constraints.
+        csemap: Optional dictionary for common subexpression elimination, mapping expressions
+            to their flattened variable representations. Used to avoid creating duplicate
+            variables for the same subexpression.
+
+    Returns:
+        List of linearized CPMpy expressions. The constraints are in one of the forms
+        described above (linear comparisons, general expressions, or indicator constraints).
     """
 
     newlist = []
@@ -349,12 +364,21 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
     return newlist
 
-def only_positive_bv(lst_of_expr, csemap=None):
+def only_positive_bv(lst_of_expr: List[Expression], csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
     """
-        Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
-        Comparisons are expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
+    Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView`
+    with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
+    
+    Comparisons are expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
+    The resulting expression is linear if the original expression was linear.
 
-        Resulting expression is linear if the original expression was linear.
+    Arguments:
+        lst_of_expr: List of linearized CPMpy expressions that may contain NegBoolView.
+        csemap: Optional dictionary for common subexpression elimination, mapping expressions
+            to an equivalent decision variable.
+
+    Returns:
+        List of CPMpy expressions where all boolean variables appear positively (no NegBoolView).
     """
     newlist = []
     for cpm_expr in lst_of_expr:
@@ -407,18 +431,20 @@ def only_positive_bv(lst_of_expr, csemap=None):
 
     return newlist
 
-def only_positive_bv_wsum(expr):
+def only_positive_bv_wsum(expr: Expression) -> Expression:
     """
-        Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
-        using only :class:`~cpmpy.expressions.variables.BoolVar`. 
+    Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView`
+    with an equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
+    
+    It might add a constant term to the expression. If you want the constant separately,
+    use :func:`only_positive_bv_wsum_const`.
 
-        It might add a constant term to the expression, if you want the constant separately, use :func:`only_positive_bv_wsum_const`.
-        
-        Arguments:
-        - `cpm_expr`: linear expression (sum, wsum, var)
-        
-        Returns tuple of:
-        - `pos_expr`: linear expression (sum, wsum, var) without NegBoolView
+    Arguments:
+        expr: Linear expression (NumVar, sum, or wsum) that may contain NegBoolView.
+
+    Returns:
+        Linear expression (NumVar, sum, or wsum) without NegBoolView. The constant term
+        (if any) is incorporated into the expression.
     """
     if isinstance(expr, _NumVarImpl) or expr.name in {"sum","wsum"}:
         pos_expr, const = only_positive_bv_wsum_const(expr)
@@ -431,20 +457,23 @@ def only_positive_bv_wsum(expr):
     else:
         return expr
 
-def only_positive_bv_wsum_const(cpm_expr):
+def only_positive_bv_wsum_const(cpm_expr: Expression) -> Tuple[Expression, int]:
     """
-        Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView` with an equivalent expression 
-        using only :class:`~cpmpy.expressions.variables.BoolVar` as well as a constant term that must be added to the new expression to be equivalent.
+    Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView`
+    with an equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`,
+    and returns the constant term separately.
+    
+    If you want the expression where the constant term is part of the wsum returned,
+    use :func:`only_positive_bv_wsum`.
 
-        If you want the expression where the constant term is part of the wsum returned, use :func:`only_positive_bv_wsum`.
-        
-        Arguments:
-        - `cpm_expr`: linear expression (sum, wsum, var)
-        
-        Returns tuple of:
-        - `pos_expr`: linear expression (sum, wsum, var) without NegBoolView
-        - `const`: The difference between the original expression and the new expression, 
-                   i.e. a constant term that must be added to pos_expr to be an equivalent linear expression.
+    Arguments:
+        cpm_expr: Linear expression (NumVar, sum, or wsum) that may contain NegBoolView.
+
+    Returns:
+        Tuple of:
+        - pos_expr: Linear expression (NumVar, sum, or wsum) without NegBoolView.
+        - const: The constant term that must be added to pos_expr to make it equivalent
+                 to the original expression.
     """
     if isinstance(cpm_expr, _NumVarImpl):
         if isinstance(cpm_expr,NegBoolView):
@@ -492,14 +521,23 @@ def only_positive_bv_wsum_const(cpm_expr):
         raise ValueError(f"unexpected expression, should be sum, wsum or var but got {cpm_expr}")
 
 
-def canonical_comparison(lst_of_expr):
+def canonical_comparison(lst_of_expr: Union[Expression, List[Expression]]) -> List[Expression]:
     """
-        Canonicalize a comparison expression.
-        Transforms linear expressions, or a reification thereof into canonical form by:
-            - moving all variables to the left-hand side
-            - moving constants to the right-hand side
+    Canonicalize comparison expressions.
+    
+    Transforms linear expressions, or a reification thereof, into canonical form by:
+    - moving all variables to the left-hand side
+    - moving constants to the right-hand side
 
-        Expects the input constraints to be flat. Only apply after applying :func:`flatten_constraint`
+    Expects the input constraints to be flat. Only apply after applying :func:`flatten_constraint`.
+
+    Arguments:
+        lst_of_expr: Single expression or list of CPMpy expressions to canonicalize.
+                     Can be a single :class:`~cpmpy.expressions.core.Expression` or a list.
+
+    Returns:
+        List of canonicalized CPMpy expressions. All variables are on the left-hand side
+        and all constants are on the right-hand side of comparisons.
     """
 
     lst_of_expr = toplevel_list(lst_of_expr) # ensure it is a list
@@ -586,14 +624,22 @@ def canonical_comparison(lst_of_expr):
 
     return newlist
 
-def only_positive_coefficients(lst_of_expr):
+def only_positive_coefficients(lst_of_expr: List[Expression]) -> List[Expression]:
     """
-        Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
-        This can simplify a `wsum` into `sum`.
-        `cpm_expr` is expected to be a canonical comparison.
-        Only apply after applying :func:`canonical_comparison(cpm_expr) <canonical_comparison>`
+    Replaces Boolean terms with negative coefficients in linear constraints with terms
+    with positive coefficients by negating the literal.
+    
+    This can simplify a `wsum` into `sum` when all coefficients become 1.
+    Input expressions are expected to be canonical comparisons. Only apply after
+    applying :func:`canonical_comparison(cpm_expr) <canonical_comparison>`.
 
-        Resulting expression is linear.
+    Arguments:
+        lst_of_expr: List of canonical CPMpy expressions (comparisons) that may contain
+                     boolean variables with negative coefficients.
+
+    Returns:
+        List of CPMpy expressions where all boolean variables have positive coefficients.
+        The resulting expression is linear if the original expression was linear.
     """
     newlist = []
     for cpm_expr in lst_of_expr:
