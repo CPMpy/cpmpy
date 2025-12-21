@@ -5,8 +5,9 @@ from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 from cpmpy.transformations.decompose_global import decompose_global
-from cpmpy.transformations.flatten_model import flatten_objective
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
+from cpmpy.transformations.flatten_model import flatten_objective, flatten_constraint
+from cpmpy.transformations.reification import only_implies
+from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum, decompose_mul_linear, decompose_mul_linear
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -249,36 +250,112 @@ class TestTransLinearize(unittest.TestCase):
             return lambda : self.assertTrue(cons.value())
 
         cons = b * x == y
-        bt,bf = linearize_constraint([cons])
-        self.assertEqual(str(bt), "(b) -> (sum([1, -1] * [x, y]) == 0)")
-        self.assertEqual(str(bf), "(~b) -> (sum([y]) == 0)")
+        res = linearize_constraint([cons])
+        # while we still did decompose_comparison-like:
+        #self.assertEqual(str(res[0]), "(b) -> (sum([1, -1] * [x, y]) == 0)")
+        #self.assertEqual(str(res[1]), "(~b) -> (sum([y]) == 0)")
+        self.assertEqual(len(res), 3)
+        self.assertEqual(str(res[0]), "(b) -> (sum([1, -1] * [IV5, x]) == 0)")
+        self.assertEqual(str(res[1]), "(~b) -> (sum([IV5]) == 0)")
+        self.assertEqual(str(res[2]), "sum([1, -1] * [IV5, y]) == 0")
 
-        cp.Model([bt,bf]).solveAll(display=assert_cons_is_true(cons))
+        cp.Model(res).solveAll(display=assert_cons_is_true(cons))
 
         cons = x * b == y
-        bt,bf = linearize_constraint([cons])
-        self.assertEqual(str(bt), "(b) -> (sum([1, -1] * [x, y]) == 0)")
-        self.assertEqual(str(bf), "(~b) -> (sum([y]) == 0)")
+        res = linearize_constraint([cons])
+        self.assertEqual(len(res), 3)
+        self.assertEqual(str(res[0]), "(b) -> (sum([1, -1] * [IV6, x]) == 0)")
+        self.assertEqual(str(res[1]), "(~b) -> (sum([IV6]) == 0)")
+        self.assertEqual(str(res[2]), "sum([1, -1] * [IV6, y]) == 0")
 
-        cp.Model([bt,bf]).solveAll(display=assert_cons_is_true(cons))
+        cp.Model(res).solveAll(display=assert_cons_is_true(cons))
 
         cons = a.implies(b * x <= y)
-        lin_cons = linearize_constraint([cons])
-        self.assertEqual(str(lin_cons[0]), "(a) -> (sum([1, -1, -15] * [x, y, ~b]) <= 0)")
-        self.assertEqual(str(lin_cons[1]), "(a) -> (sum([1, 5] * [y, b]) >= 0)")
+        res = linearize_constraint([cons])
+        self.assertEqual(len(res), 6)  # was 2 when we still did decompose_comparison-like
+        # TODO: the defining constraints do not have to be reified... but linearize doesn't separate them
+        self.assertEqual(str(res[0]), "(a) -> (sum([1, -1, -15] * [IV7, x, ~b]) <= 0)")
+        self.assertEqual(str(res[1]), "(a) -> (sum([1, -1, 15] * [IV7, x, ~b]) >= 0)")
+        self.assertEqual(str(res[2]), "(a) -> (sum([1, -10] * [IV7, b]) <= 0)")
+        self.assertEqual(str(res[3]), "(a) -> (sum([1, 5] * [IV7, b]) >= 0)")
+        self.assertEqual(str(res[4]), "(a) -> (sum([1, -1] * [IV7, y]) <= 0)")
+        self.assertEqual(str(res[5]), "(~a) -> (sum([IV7]) == -5)")
 
-        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
-        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cp.all(lin_cons)))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
+        lin_cnt = cp.Model(res).solveAll(display=assert_cons_is_true(cons))
         self.assertEqual(lin_cnt, cons_cnt)
 
         cons = a.implies(b * x >= y)
-        lin_cons = linearize_constraint([cons])
-        self.assertEqual(str(lin_cons[0]), "(a) -> (sum([1, -1, 15] * [x, y, ~b]) >= 0)")
-        self.assertEqual(str(lin_cons[1]), "(a) -> (sum([1, -10] * [y, b]) <= 0)")
+        res = linearize_constraint([cons])
+        #self.assertEqual(str(lin_cons[0]), "(a) -> (sum([1, -1, 15] * [x, y, ~b]) >= 0)")
+        #self.assertEqual(str(lin_cons[1]), "(a) -> (sum([1, -10] * [y, b]) <= 0)")
+        self.assertEqual(len(res), 6)  # was 2 when we still did decompose_comparison-like
+        # TODO: the defining constraints do not have to be reified... but linearize doesn't separate them
+        self.assertEqual(str(res[0]), "(a) -> (sum([1, -1, -15] * [IV9, x, ~b]) <= 0)")
+        self.assertEqual(str(res[1]), "(a) -> (sum([1, -1, 15] * [IV9, x, ~b]) >= 0)")
+        self.assertEqual(str(res[2]), "(a) -> (sum([1, -10] * [IV9, b]) <= 0)")
+        self.assertEqual(str(res[3]), "(a) -> (sum([1, 5] * [IV9, b]) >= 0)")
+        self.assertEqual(str(res[4]), "(a) -> (sum([1, -1] * [IV9, y]) >= 0)")
+        self.assertEqual(str(res[5]), "(~a) -> (sum([IV9]) == -5)")
 
-        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
-        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cp.all(lin_cons)))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
+        lin_cnt = cp.Model(res).solveAll(display=assert_cons_is_true(cons))
         self.assertEqual(lin_cnt, cons_cnt)
+
+    def test_decompose_mul_linear(self):
+        """Test the decompose_mul_linear function directly"""
+        from cpmpy.expressions.core import Operator
+        from cpmpy.solvers import CPM_ortools
+        
+        supported = {"sum", "wsum", "->"}
+        csemap = {}
+        
+        # Test case 1: const * iv
+        iv = cp.intvar(0, 10, name="iv")
+        mul = 3*iv
+        expr, cons = decompose_mul_linear(mul, supported=supported, csemap=csemap)
+        self.assertEqual(str(expr), "sum([3] * [iv])")
+        self.assertEqual(len(cons), 0)
+        # check model count consistency
+        self.assertEqual(cp.Model(mul > 0).solveAll(), cp.Model(expr > 0, cons).solveAll())
+        
+        # Test case 2: b1 * b2
+        b1 = cp.boolvar(name="b1")
+        b2 = cp.boolvar(name="b2")
+        mul = b1*b2
+        expr, cons = decompose_mul_linear(mul, supported=supported, csemap=csemap)
+        self.assertIsInstance(expr, _BoolVarImpl)
+        self.assertEqual(str(cons), "[(BV3) -> ((b1) + (b2) >= 2), (~BV3) -> ((~b1) + (~b2) >= 1)]")
+        # check model count consistency
+        self.assertEqual(cp.Model(mul > 0).solveAll(), cp.Model(expr > 0, cons).solveAll())
+        
+        # Test case 3: b * i
+        b = cp.boolvar(name="b")
+        i = cp.intvar(1, 5, name="i")
+        mul = b*i
+        expr, cons = decompose_mul_linear(mul, supported=supported, csemap=csemap)
+        self.assertIsInstance(expr, _IntVarImpl)
+        self.assertEqual(str(cons), "[(b) -> (sum([1, -1] * [IV6, i]) == 0), (~b) -> (sum([IV6]) == 0)]")
+        # check model count consistency
+        self.assertEqual(cp.Model(mul > 0).solveAll(), cp.Model(expr > 0, cons).solveAll())
+        
+        # Test case 3b: Common subexpression elimination
+        mul_bis = Operator("mul", [b, i])
+        expr_bis, cons_bis = decompose_mul_linear(mul_bis, supported=supported, csemap=csemap)
+        # Should return the same expression from csemap
+        self.assertEqual(expr_bis, expr)
+        self.assertEqual(len(cons_bis), 0)  # No new constraints needed
+        
+        # Test case 4: i1 * i2 (int * int)
+        i1 = cp.intvar(0, 3, name="i1")  # smaller domain (should be encoded)
+        i2 = cp.intvar(1, 2, name="i2")  # larger domain
+        mul = i1*i2
+        expr, cons = decompose_mul_linear(mul, supported=supported, csemap=csemap)
+        self.assertEqual(expr.name, "wsum")  # returns the wsum of terms
+        # well... here you go
+        self.assertEqual(str(cons), "[(EncDir(i2)[0]) + (EncDir(i2)[1]) == 1, (EncDir(i2)[0]) -> (sum([1, -1] * [IV8, i1]) == 0), (~EncDir(i2)[0]) -> (sum([IV8]) == 0), (EncDir(i2)[1]) -> (sum([1, -1] * [IV9, i1]) == 0), (~EncDir(i2)[1]) -> (sum([IV9]) == 0)]")
+        # check model count consistency
+        self.assertEqual(cp.Model(mul > 0).solveAll(), cp.Model(expr > 0, cons).solveAll())
 
 
     def test_implies(self):

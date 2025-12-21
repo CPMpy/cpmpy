@@ -5,13 +5,16 @@ This transformation is necessary for Integer Linear Programming (ILP) solvers, a
 for translating to Pseudo-Boolean or CNF formats.
 
 There are a number of components to getting a good linearisation:
-- **Decomposing** global constraints in a 'linear friendly' way.
+- **Decomposing global constraints/functions** in a 'linear friendly' way.
   A common pattern is that constraints that enforce domain consistency on integer variables,
   that they should be decomposed over a Boolean representation of the domain. This is the
   case for :class:`~cpmpy.expressions.globalconstraints.AllDifferent`, :class:`~cpmpy.expressions.globalfunctions.Element`
   and possibly others.
   Their default decomposition might not do it this way, in which case we want to use different
   decompositions.
+
+- **Linearising multiplication** of variables, e.g. bool*bool, bool*int and int*int.
+  Because '*' is a core Operator and not a global constraint, we need to do it with a helper function here.
 
 - **Disequalities** e.g. `sum(X) != 5` should be rewritten as `(sum(X) < 5) | (sum(X) > 5)`
   and further flattened into implications and linearised.
@@ -35,9 +38,10 @@ Module functions
 Main transformations:
 - :func:`linearize_constraint`: Transforms a list of constraints to a linear form.
 
-Canonicalization:
+Helper functions:
 - :func:`canonical_comparison`: Canonicalizes comparison expressions by moving variables to the
   left-hand side and constants to the right-hand side.
+- :func:`decompose_mul_linear`: Decomposes multiplication operations (const*v, bool*bool, bool*int, int*int) into linear form.
 
 Post-linearisation transformations:
 - :func:`only_positive_bv`: Transforms constraints so only boolean variables appear positively
@@ -51,6 +55,7 @@ Post-linearisation transformations:
 """
 
 import copy
+import numpy as np
 import cpmpy as cp
 from typing import List, Set, Optional, Dict, Any, Tuple, Union
 from cpmpy.transformations.get_variables import get_variables
@@ -62,9 +67,96 @@ from ..exceptions import TransformationNotImplementedError
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
+from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import intvar, _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, _IntVarImpl
+from ..transformations.int2bool import _encode_int_var
+
+def decompose_mul_linear(mul: Operator, supported: Set[str], reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> Tuple[Expression, List[Expression]]:
+    """
+    Linearize a multiplication operation.
+
+    Acts like a decomposition function: returns an expression and a list of defining constraints.
+
+    Handles the following cases:
+    - `c * v` with a constant  (rewritten to `wsum([c], [v])`)
+    - `b1 * b2`  (rewritten to the linearisation of `b1 & b2`)
+    - `b * i` or `i * b`  (rewritten to the linearisation of `aux, [b -> aux=i, ~b -> aux=0]`)
+    - `i1 * i2`  (rewritten with Boolean expansion of the smallest integer, resulting in a sum of `b*i` cases)
+
+    Arguments:
+        mul: Multiplication operator to linearize.
+        supported: Set of supported constraint names.
+        csemap: Optional dictionary for common subexpression elimination.
+
+    Returns:
+        Tuple containing an expression representing the multiplication, and a list of defining constraints
+    """
+    assert mul.name == "mul", "Expected a multiplication operator, got {mul}"
+
+    mul0,mul1 = mul.args
+
+    if is_num(mul0):
+        return Operator("wsum",[[mul0], [mul1]]), []
+
+    # check if common subexpression
+    if csemap is not None and mul in csemap:
+        return csemap[mul], []
+
+    bv_mul0 = isinstance(mul0, _BoolVarImpl)
+    bv_mul1 = isinstance(mul1, _BoolVarImpl)
+
+    if bv_mul0 and bv_mul1:
+        # Boolean mul0 * mul1 = (mul0 & mul1)
+        # equiv: aux, [aux -> (mul0 & mul1), ~aux -> (~mul0 | ~mul1)]
+        # equiv: aux, [aux >= mul0+mul1-1, aux + ~mul0 + ~mul1 >= 1]
+        aux = boolvar()
+        if csemap is not None:
+            csemap[mul] = aux
+
+        return aux, linearize_constraint([aux.implies(mul0 & mul1), (~aux).implies(~mul0 | ~mul1)], supported=supported, reified=reified, csemap=csemap)
+
+    if bv_mul0 or bv_mul1:
+        # b * i
+        # equiv: aux, [b -> aux=i, ~b -> aux=0]
+        bv_idx = 0 if bv_mul0 else 1
+        bv, iv = mul.args[bv_idx], mul.args[1-bv_idx]
+
+        aux = intvar(*mul.get_bounds())
+        if csemap is not None:
+            csemap[mul] = aux
+
+        return aux, linearize_constraint([bv.implies(aux == iv), (~bv).implies(aux == 0)], supported=supported, reified=reified, csemap=csemap)
+
+    else:
+        # i1 * i2
+        # equiv: aux, [aux = sum(v*(b*i2) for v,b in int2bool(i1))]
+        # choose smallest integer as i1 (to minimize the number of boolean variables)
+        leni1 = (mul0.ub - mul0.lb + 1)
+        leni2 = (mul1.ub - mul1.lb + 1)
+        i1 = mul0 if leni1 <= leni2 else mul1
+        i2 = mul1 if leni1 <= leni2 else mul0
+
+        # Encode i1 with temporary ivarmap
+        ivarmap = {}
+        encoding = "direct"
+        if min(leni1, leni2) >= 8:  # arbitrary heuristic
+            encoding = "binary"
+        i1_enc, cons = _encode_int_var(ivarmap, i1, encoding)
+
+        # Build the sum: aux = sum(v * (b_v * i2) for v,bv in encoding)
+        (encpairs, offset) = i1_enc.encode_term()
+        terms = []
+        for v, b_v in encpairs:
+            # Create b_v * i2, which we can handle recursively
+            bv_i2_expr, bv_i2_cons = decompose_mul_linear(b_v*i2, supported=supported, reified=reified, csemap=csemap)
+            cons += bv_i2_cons
+            terms.append((offset + v) * bv_i2_expr)
+        assert len(terms) > 0, f"Expected at least one term, got {terms} for {mul} with encoding {i1_encoding} of {i1}"
+
+        # the multiplication value is the sum of the terms, other are defining constraints
+        return sum(terms), cons
+
 
 def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"sum","wsum","->"}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
     """
@@ -234,25 +326,10 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"
             elif isinstance(lhs, Operator) and lhs.name not in supported:
 
                 if lhs.name == "mul":
-                    bv_idx = None
-                    if is_num(lhs.args[0]): # const * iv <comp> rhs
-                        lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
-                        newlist += linearize_constraint([eval_comparison(cpm_expr.name, lhs, rhs)], supported=supported, reified=reified, csemap=csemap)
-                        continue
-                    elif isinstance(lhs.args[0], _BoolVarImpl):
-                        bv_idx = 0
-                    elif isinstance(lhs.args[1], _BoolVarImpl):
-                        bv_idx = 1
-
-                    if bv_idx is not None:
-                        # bv * iv <comp> rhs, rewrite to (bv -> iv <comp> rhs) & (~bv -> 0 <comp> rhs)
-                        bv, iv = lhs.args[bv_idx], lhs.args[1-bv_idx]
-                        bv_true = bv.implies(eval_comparison(cpm_expr.name, iv, rhs))
-                        bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
-                        newlist += linearize_constraint(simplify_boolean([bv_true, bv_false]), supported=supported, reified=reified, csemap=csemap)
-                        continue
-                    else:
-                        raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
+                    # use the specialized linearization for multiplication
+                    mul_expr, mul_cons = decompose_mul_linear(lhs, supported=supported, reified=reified, csemap=csemap)
+                    newlist += mul_cons
+                    cpm_expr = eval_comparison(cpm_expr.name, mul_expr, rhs)
 
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
