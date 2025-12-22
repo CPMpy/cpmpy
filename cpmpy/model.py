@@ -27,6 +27,7 @@
 """
 import copy
 import warnings
+from typing import Optional
 
 import numpy as np
 
@@ -35,7 +36,7 @@ from .expressions.core import Expression
 from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
-from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 
 import pickle
 
@@ -166,7 +167,7 @@ class Model(object):
         """
         return self.objective_.value()
 
-    def solve(self, solver=None, time_limit=None, **kwargs):
+    def solve(self, solver:Optional[str]=None, time_limit:Optional[int|float]=None, **kwargs):
         """ Send the model to a solver and get the result.
 
             Run :func:`SolverLookup.solvernames() <cpmpy.solvers.SolverLookup.solvernames>` to find out the valid solver names on your system. (default: None = first available solver)
@@ -198,7 +199,7 @@ class Model(object):
         self.cpm_status = s.status()
         return ret
 
-    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 

@@ -38,8 +38,7 @@
     ==============
 """
 import warnings
-from typing import Optional
-from importlib.metadata import version, PackageNotFoundError
+from typing import Optional, List
 from os.path import join
 
 import numpy as np
@@ -138,7 +137,7 @@ class CPM_pumpkin(SolverInterface):
         return self.pum_solver
 
 
-    def solve(self, time_limit=None, prove=False, proof_name="proof.drcp", proof_location=".", assumptions=None):
+    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name="proof.drcp", proof_location=".", assumptions:Optional[List[_BoolVarImpl]]=None):
         """
         Call the Pumpkin solver
 
