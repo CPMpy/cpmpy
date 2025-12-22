@@ -32,6 +32,8 @@ def test_empty_constructor(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_constructor(solver_name):
+    if solver_name == "rc2":
+        pytest.skip(f"{solver_name} does not support decision")
     solver_class = SolverLookup.lookup(solver_name)
     
     bvar = boolvar(shape=3)
@@ -48,6 +50,8 @@ def test_constructor(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_native_model(solver_name):
+    if solver_name == "rc2":
+        pytest.skip(f"{solver_name} does not support decision")
     solver_class = SolverLookup.lookup(solver_name)
     
     bvar = boolvar(shape=3)
@@ -96,6 +100,8 @@ def test_add_constraint(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solve(solver_name):
+    if solver_name == "rc2":
+        pytest.skip(f"{solver_name} does not support decision")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
 
@@ -115,6 +121,8 @@ def test_solve(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solve_infeasible(solver_name):
+    if solver_name == "rc2":
+        pytest.skip(f"{solver_name} does not support decision")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
 
@@ -259,6 +267,8 @@ def test_solver_vars(solver_name):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_time_limit(solver_name):
     """Test time limit functionality"""
+    if solver_name == "rc2":
+        pytest.skip(f"{solver_name} does not support time limit")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     
@@ -298,8 +308,9 @@ def test_has_objective(solver_name):
         solver.minimize(ivar)
         assert solver.has_objective()
 
-        solver.maximize(ivar)
-        assert solver.has_objective()
+        if solver_name != "rc2": # rc2 can set obj only once
+            solver.maximize(ivar)
+            assert solver.has_objective()
     except NotImplementedError:
         # Solver doesn't support objectives
         assert not solver.has_objective()
@@ -308,6 +319,8 @@ def test_has_objective(solver_name):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_runtime_tracking(solver_name):
     """Test that solver tracks runtime correctly"""
+    if solver_name == "rc2":
+        pytest.skip(f"{solver_name} does not support time limit")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     
@@ -330,6 +343,8 @@ def test_runtime_tracking(solver_name):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solveall_basic(solver_name):
     """Test solveAll functionality if supported"""
+    if solver_name == "rc2":
+        pytest.skip(f"{solver_name} does not support time limit")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     

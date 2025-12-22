@@ -1675,7 +1675,7 @@ solvers = [name for name, cls in cp.SolverLookup.base_solvers() if cls.supported
 @pytest.mark.parametrize("solver", solvers)
 def test_issue801_expr_in_cumulative(solver):
 
-    if solver in ("pysat", "pysdd", "pindakaas"):
+    if solver in ("pysat", "pysdd", "pindakaas", "rc2"):
         pytest.skip(f"{solver} does not support integer variables")
     if solver == "cplex":
         pytest.skip(f"waiting for PR #769 to be merged.")

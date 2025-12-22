@@ -68,8 +68,8 @@ from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
-from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
 from ..transformations.safening import no_partial_functions
+from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, get_user_vars
 
 
 class CPM_pysat(SolverInterface):
@@ -233,17 +233,7 @@ class CPM_pysat(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-
-        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        user_vars = set()
-        for x in self.user_vars:
-            if isinstance(x, _BoolVarImpl):
-                user_vars.add(x)
-            else:
-                # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
-
-        self.user_vars = user_vars
+        self.user_vars = get_user_vars(self.user_vars, self.ivarmap)
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
@@ -258,35 +248,38 @@ class CPM_pysat(SolverInterface):
             
             t = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
             t.start()
-            my_status = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
+            feasible = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
             # ensure timer is stopped if early stopping
             t.cancel()
             ## this part cannot be added to timer otherwhise it "interrups" the timeout timer too soon
             self.pysat_solver.clear_interrupt()
         else:
-            my_status = self.pysat_solver.solve(assumptions=pysat_assum_vars)
+            feasible = self.pysat_solver.solve(assumptions=pysat_assum_vars)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.pysat_solver.time()
 
         # translate exit status
-        if my_status is True:
+        if feasible is True:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif my_status is False:
+        elif feasible is False:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif my_status is None:
+        elif feasible is None:
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:  # another?
-            raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
+            raise NotImplementedError(feasible)  # a new status type was introduced, please report on github
 
+        return self._process_solution(self.pysat_solver.get_model())
+
+    def _process_solution(self, sol):
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
 
         # translate solution values (of user specified variables only)
         if has_sol:
-            sol = frozenset(self.pysat_solver.get_model())  # to speed up lookup
+            sol = frozenset(sol)
             # fill in variable values
             for cpm_var in self.user_vars:
                 if isinstance(cpm_var, _BoolVarImpl):
@@ -298,7 +291,7 @@ class CPM_pysat(SolverInterface):
                 elif isinstance(cpm_var, _IntVarImpl):
                     raise TypeError("user_vars should only contain Booleans")
                 else:
-                    raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
+                    raise NotImplementedError(f"{self.__class__.__name__}: variable {cpm_var} not supported")
 
             # Now assign the user integer variables using their encodings
             # `ivarmap` also contains auxiliary variable, but they will be assigned 'None' as their encoding variables are assigned `None`

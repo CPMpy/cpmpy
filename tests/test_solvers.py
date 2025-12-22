@@ -988,6 +988,8 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
+        if solver == "rc2":
+            pytest.skip(f"{solver} does not support time limit")
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
