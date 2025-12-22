@@ -69,7 +69,7 @@ from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
 from ..transformations.safening import no_partial_functions
-from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, get_user_vars
+from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding, encode_user_vars
 
 
 class CPM_pysat(SolverInterface):
@@ -233,7 +233,7 @@ class CPM_pysat(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-        self.user_vars = get_user_vars(self.user_vars, self.ivarmap)
+        self.user_vars = encode_user_vars(self.user_vars, self.ivarmap)
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions

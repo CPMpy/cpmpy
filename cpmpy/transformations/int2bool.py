@@ -305,7 +305,6 @@ class IntVarEncDirect(IntVarEnc):
             return [self.eq(d)]
         elif op == "!=":
             return [~self.eq(d)]
-        # return _not_and([self.eq(d)])
         elif op == "<=":
             # all higher values are False
             return list(~self._xs[self._offset(d + 1) :])
@@ -344,7 +343,6 @@ class IntVarEncOrder(IntVarEnc):
         """Return a conjunction whether x==d."""
         if self._x.lb <= d <= self._x.ub:
             return [self.geq(d), ~self.geq(d + 1)]
-            # return cp.all([self.geq(d), ~self.geq(d + 1)])
         else:
             return [BoolVal(False)]
 
@@ -424,7 +422,6 @@ class IntVarEncLog(IntVarEnc):
             return self.eq(d)
         elif cmp == "!=":  # x<d or x>=d+1
             return [cp.any(~lit for lit in self.eq(d))]
-            # return [cp.any(~x for x in self.eq(d))]
         elif cmp in (">=", "<="):
             # TODO lexicographic encoding might be more effective, but currently we just use the PB encoding
             constraint, domain_constraints = _encode_linear(
@@ -445,7 +442,7 @@ def _dom_size(x):
     return x.ub + 1 - x.lb
 
 
-def get_user_vars(user_vars, ivarmap):
+def encode_user_vars(user_vars, ivarmap):
     """Convert user vars to Booleans. This to ensure solveAll behaves consistently."""
     bool_user_vars = set()
     for x in user_vars:

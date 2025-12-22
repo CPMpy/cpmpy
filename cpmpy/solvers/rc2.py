@@ -58,7 +58,7 @@ from ..expressions.variables import _IntVarImpl, NegBoolView
 from ..transformations.linearize import only_positive_coefficients_
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_objective
-from ..transformations.int2bool import get_user_vars, _encode_lin_expr
+from ..transformations.int2bool import encode_user_vars, _encode_lin_expr
 
 
 class CPM_rc2(CPM_pysat):
@@ -181,7 +181,7 @@ class CPM_rc2(CPM_pysat):
         self.solver_vars(list(self.user_vars))
 
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        self.user_vars = get_user_vars(self.user_vars, self.ivarmap)
+        self.user_vars = encode_user_vars(self.user_vars, self.ivarmap)
 
         # hack to support decision problems
         if not self.has_objective():
