@@ -40,8 +40,10 @@ class SolverInterface(object):
         the ``SolverInterface``
     """
 
-    # REQUIRED functions:
+    supported_global_constraints: frozenset[str] = frozenset()  # global constraints supported by the solver (e.g., AllDifferent...)
+    supported_reified_global_constraints: frozenset[str] = frozenset()  # global constraints supported in reified context
 
+    # REQUIRED functions:
     @staticmethod
     def supported():
         """
@@ -182,6 +184,7 @@ class SolverInterface(object):
         if is_any_list(cpm_vars):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
+
 
     def transform(self, cpm_expr):
         """

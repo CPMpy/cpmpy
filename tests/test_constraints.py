@@ -26,32 +26,25 @@ NUM_GLOBAL = {
     "Precedence", "Cumulative", "NoOverlap",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept"
+    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
 }
 
 # Solvers not supporting arithmetic constraints (numeric comparisons)
 SAT_SOLVERS = {"pysdd"}
 
-EXCLUDE_GLOBAL = {"pysat": {},  # with int2bool,
+EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo", "Power"},  # with int2bool,
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "pindakaas": {},
-                  "z3": {},
-                  "choco": {},
-                  "ortools":{},
-                  "exact": {},
+                  "pindakaas": {"Division", "Modulo", "Power"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
-                  "gcs": {}
+                  "cplex": {"Division", "Modulo", "Power"}
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"gurobi": {},
-                     "pysat": {"mul-int", "div", "pow", "mod"},  # int2bool but integer-multiplication, and friends, not linearized
-                     "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "pindakaas": {"mul-int", "div", "pow", "mod"},
-                     "exact": {},
-                     "cplex": {"mul-int", "div", "mod", "pow"},
-                     "pumpkin": {"pow", "mod"},
+EXCLUDE_OPERATORS = {"pysat": {"mul-int"},  # int2bool but mul, and friends, not linearized
+                     "pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
+                     "pindakaas": {"mul-int"},
+                     "cplex": {"mul-int", "div"},
                      }
 
 # Variables to use in the rest of the test script
@@ -86,8 +79,6 @@ def numexprs(solver):
             yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
-        elif name == "div" or name == "pow":
-            yield Operator(name, [NN_VAR,3])
         elif name == "mul" and "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
             yield Operator(name, [3, NUM_ARGS[0]])
             yield Operator(name, NUM_ARGS[:arity])
@@ -123,6 +114,12 @@ def numexprs(solver):
             expr = cls(NUM_ARGS, 3)
         elif name == "Among":
             expr = cls(NUM_ARGS, [1,2])
+        elif name == "Division":
+            expr = cls(*NUM_ARGS[:2])
+        elif name == "Modulo":
+            expr = cls(*NUM_ARGS[:2])
+        elif name == "Power":
+            expr = cls(NUM_ARGS[0], 3)
         else:
             expr = cls(NUM_ARGS)
 
@@ -226,7 +223,16 @@ def global_constraints(solver):
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
-            expr = Cumulative(s, dur, e, demand, cap)
+            yield Cumulative(s, dur, e, demand, cap)
+            yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="time")[0])
+            yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="task")[0])
+
+            yield Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
+            if solver != "pumpkin": # only supports with fixed durations
+                yield Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
+                if solver not in ("pysat", "pindakaas"): # results in unsupported int2bool integer multiplication
+                    yield Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
+            continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
@@ -242,7 +248,11 @@ def global_constraints(solver):
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
-            expr = cls(s, dur, e)
+            yield NoOverlap(s, dur, e)
+            yield NoOverlap(s, dur)
+            if solver != "pumpkin": # only supports with fixed durations
+                yield NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
+            continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)

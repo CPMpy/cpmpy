@@ -69,6 +69,7 @@ from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
 from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
+from ..transformations.safening import no_partial_functions
 
 
 class CPM_pysat(SolverInterface):
@@ -92,6 +93,9 @@ class CPM_pysat(SolverInterface):
         the PySAT docs use 'model' to refer to a solution.
 
     """
+
+    supported_global_constraints = frozenset()
+    supported_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -366,8 +370,12 @@ class CPM_pysat(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({"alldifferent"}), csemap=self._csemap)
-        cpm_cons = simplify_boolean(cpm_cons)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized MIP decomp in linearize
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
+        cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
