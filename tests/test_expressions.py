@@ -6,7 +6,8 @@ from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
-from tests.utils import inclusive_range
+
+from utils import inclusive_range
 
 
 class TestComparison(unittest.TestCase):
