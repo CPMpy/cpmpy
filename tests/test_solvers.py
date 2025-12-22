@@ -837,15 +837,12 @@ class TestSupportedSolvers:
                     ~ z
                 )
 
-        try:
-            model.solve(solver=solver)
-            assert [int(a) for a in v.value()] == [0, 1, 0]
+        model.solve(solver=solver)
+        assert [int(a) for a in v.value()] == [0, 1, 0]
 
-            s = cp.SolverLookup.get(solver)
-            s.solve()
-            assert [int(a) for a in v.value()] == [0, 1, 0]
-        except (NotImplementedError, NotSupportedError):
-            pass
+        s = cp.SolverLookup.get(solver)
+        s.solve()
+        assert [int(a) for a in v.value()] == [0, 1, 0]
 
     def test_time_limit(self, solver):
         if solver == "pysdd": # pysdd does not support time limit
@@ -908,21 +905,26 @@ class TestSupportedSolvers:
         sat_model = cp.Model(cp.any([x,y,z]))
         unsat_model = cp.Model([x | y | z, ~x, ~y,~z])
 
-        try:
-            assert sat_model.solve(solver=solver)
-            for v in (x,y,z):
-                assert v.value() is not None
-            assert not unsat_model.solve(solver=solver)
-            for v in (x,y,z):
-                assert v.value() is None
-        except (NotImplementedError, NotSupportedError):
-            pass
+        assert sat_model.solve(solver=solver)
+        for v in (x,y,z):
+            assert v.value() is not None
+        assert not unsat_model.solve(solver=solver)
+        for v in (x,y,z):
+            assert v.value() is None
 
     def test_incremental_objective(self, solver):
-        if solver in ("choco", "gcs", "rc2"):
-            pytest.skip("does not support incremental objective")
-
         x = cp.intvar(0,10,shape=3)
+
+        if solver == "choco":
+            """
+            Choco does not support first optimizing and then adding a constraint.
+            During optimization, additional constraints get added to the solver,
+            which removes feasible solutions.
+            No straightforward way to resolve this for now.
+            """
+            return
+        if solver == "gcs":
+            return
         s = cp.SolverLookup.get(solver)
         try:
             s.minimize(cp.sum(x))
@@ -982,6 +984,7 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
+
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
@@ -1009,10 +1012,7 @@ class TestSupportedSolvers:
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
     def test_false(self, solver):
-        try:
-            assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
-        except (NotImplementedError, NotSupportedError):
-            pass
+        assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
         if solver in ("pysdd", "pysat", "pindakaas", "pumpkin", "rc2"):  # don't support div or mod with vars
@@ -1041,6 +1041,7 @@ class TestSupportedSolvers:
 
 
     def test_status(self, solver):
+
         bv = cp.boolvar(shape=3, name="bv")
         m = cp.Model(cp.any(bv))
 
