@@ -45,7 +45,6 @@
 """
 from functools import reduce
 from typing import Optional
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -56,6 +55,8 @@ from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.safening import no_partial_functions
+
 
 class CPM_pysdd(SolverInterface):
     """
@@ -73,6 +74,9 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
     """
 
+    supported_global_constraints = frozenset({"xor"})
+    supported_reified_global_constraints = frozenset({"xor"})
+
     @staticmethod
     def supported():
         # try to import the package
@@ -89,9 +93,10 @@ class CPM_pysdd(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('pysdd').version
-        except pkg_resources.DistributionNotFound:
+            return version('pysdd')
+        except PackageNotFoundError:
             return None
 
 
@@ -295,7 +300,11 @@ class CPM_pysdd(SolverInterface):
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}, csemap=self._csemap) #keep unsupported xor for error message purposes.
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 

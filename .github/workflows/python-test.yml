@@ -20,4 +20,4 @@ jobs:
 
       - name: Test with pytest
         run: |
-          python -m pytest -n 4 tests/
+          python -m pytest -n auto tests/

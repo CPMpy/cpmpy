@@ -22,6 +22,7 @@ from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
+from test_constraints import numexprs
 from utils import skip_on_missing_pblib
 
 pysat_available = CPM_pysat.supported()
@@ -854,10 +855,9 @@ class TestSolvers(unittest.TestCase):
         m = cp.Model([x + y == 2, wsum == 9])
         self.assertTrue(m.solve(solver="minizinc"))
 
-@pytest.mark.parametrize(
-        "solver",
-        [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-)
+
+solvers = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+@pytest.mark.parametrize("solver", solvers)
 class TestSupportedSolvers:
     def test_installed_solvers(self, solver):
         # basic model
@@ -1007,7 +1007,8 @@ class TestSupportedSolvers:
         assert not s.solve(assumptions=[~x, ~y])
 
         core = s.get_core()
-        assert ~y in set([~x,~y])
+        assert len(core) > 0
+        assert ~y in core
         assert cp.Model([x | y, ~x | z, y | ~z] + core).solve() is False # ensure it is indeed unsat
 
         assert s.solve(assumptions=[])
@@ -1065,8 +1066,8 @@ class TestSupportedSolvers:
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
-            assert (Operator('div', [xv, yv])).value() == dv
-            assert (Operator('mod', [xv, yv])).value() == rv
+            assert (cp.Division(xv, yv)).value() == dv
+            assert (cp.Modulo(xv, yv)).value() == rv
 
 
     def test_status(self, solver):
@@ -1196,4 +1197,51 @@ class TestSupportedSolvers:
         assert num_sols == 0
 
     def test_version(self, solver):
-        assert SolverLookup.lookup(solver).version() is not None
+        solver_version = SolverLookup.lookup(solver).version()
+        assert solver_version is not None
+        assert isinstance(solver_version, str)
+
+    def test_optimisation_direction(self, solver):
+        x = cp.intvar(0, 10, shape=1)
+        m = cp.Model(x >= 5)
+
+        # TODO: in the future this might be simplified to a filter using pytest markers, first #780 needs to be merged
+        # 1) Maximisation - model
+        try: # one try-except to detect if the solver supports optimisation
+            m.maximize(x)
+            assert m.solve(solver=solver)
+        except (NotImplementedError, NotSupportedError):
+            pytest.skip(reason=f"{solver} does not support optimisation")
+            return
+        assert m.objective_value() == 10
+
+        # 2) Maximisation - solver
+        s = cp.SolverLookup.get(solver, m)
+        assert s.solve()
+        assert s.objective_value() == 10
+
+        # 3) Minimisation - model
+        m.minimize(x)
+        assert m.solve(solver=solver)
+        assert m.objective_value() == 5
+
+        # 4) Minimisation - solver
+        s = cp.SolverLookup.get(solver, m)
+        assert s.solve()
+        assert s.objective_value() == 5
+
+
+
+@pytest.mark.parametrize(("solver", "expr"), [(s, expr) for s in solvers for expr in numexprs(s)], ids=str)
+def test_objective_numexprs(solver, expr):
+
+    model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
+    try:
+        model.minimize(expr)
+        assert model.solve(solver=solver, time_limit=3)
+        assert expr.value() < expr.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
+        model.maximize(expr)
+        assert model.solve(solver=solver)
+        assert expr.value() > expr.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
+    except NotSupportedError:
+        pytest.skip(reason=f"{solver} does not support optimisation")
