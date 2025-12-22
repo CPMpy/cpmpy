@@ -225,7 +225,8 @@ class CPM_rc2(CPM_pysat):
 
         # translate exit status
         if solution is None:
-            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            # `None` for either unsat or unknown!
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN if solver.interrupted else ExitStatus.UNSATISFIABLE
         elif self.has_objective():
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         else:

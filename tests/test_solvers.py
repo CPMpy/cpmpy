@@ -933,6 +933,8 @@ class TestSupportedSolvers:
 
         assert s.solve()
         assert s.objective_value() == 0
+        if solver == "rc2":
+            return # RC2 only supports setting obj once
         s += x[0] == 5
         s.solve()
         assert s.objective_value() == 5
@@ -1067,7 +1069,7 @@ class TestSupportedSolvers:
         m.minimize(cp.max(end))
         m.solve(solver=solver, time_limit=1)
         # normally, should not be able to solve within 1s...
-        assert m.status().exitstatus == ExitStatus.FEASIBLE or m.status().exitstatus == ExitStatus.UNKNOWN
+        assert m.status().exitstatus in (ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
         # now trivally unsat
         m += cp.sum(bv) <= 0
