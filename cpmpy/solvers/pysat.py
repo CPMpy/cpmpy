@@ -274,6 +274,7 @@ class CPM_pysat(SolverInterface):
         return self._process_solution(self.pysat_solver.get_model())
 
     def _process_solution(self, sol):
+        """Process solution `sol` from PySAT, and handles post-processing int2bool. Used in subclass e.g. RC2."""
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
 
