@@ -751,6 +751,40 @@ class TestGlobal(unittest.TestCase):
             assert set(map(str, decomp)) == expected
             assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
 
+    def test_modulo(self):
+
+        x, z = cp.intvar(-2,2, shape=2, name=["x","z"])
+        y = cp.intvar(1,5, name="y")
+        vars = [x,y,z]
+
+        constraint = [x % y  == z]
+        decomp = decompose_in_tree(constraint)
+
+        all_sols = set()
+        lin_all_sols = set()
+        count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
+        decomp_count = cp.Model(decomp).solveAll(solver="ortools", display=lambda: lin_all_sols.add(tuple(argvals(vars))))
+
+        self.assertSetEqual(all_sols, lin_all_sols) # same on decision vars
+        self.assertEqual(count,decomp_count) # same on all vars
+
+    def test_div(self):
+        x, z = cp.intvar(-2, 2, shape=2, name=["x", "z"])
+        y = cp.intvar(1, 5, name="y")
+        vars = [x, y, z]
+
+        constraint = [x // y == z]
+        decomp = decompose_in_tree(constraint)
+
+        all_sols = set()
+        decomp_sols = set()
+        count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
+        decomp_count = cp.Model(decomp).solveAll(solver="ortools",
+                                                display=lambda: decomp_sols.add(tuple(argvals(vars))))
+
+        self.assertSetEqual(all_sols, decomp_sols)  # same on decision vars
+        self.assertEqual(count, decomp_count)  # same on all vars
+
     def test_xor(self):
         bv = cp.boolvar(5)
         self.assertTrue(cp.Model(cp.Xor(bv)).solve())

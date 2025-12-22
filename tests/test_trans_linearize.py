@@ -114,56 +114,7 @@ class TestTransLinearize(unittest.TestCase):
         cp.Model(lin_cons).solveAll(solver="ortools", display=lambda : cons_vals.append(cons[0].value()))
         print(len(cons_vals))
         self.assertTrue(all(cons_vals))
-        # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
-
-
-    # def test_linearize_modulo(self): -> Modulo is now a global constraint
-    #
-    #     x, z = cp.intvar(-2,2, shape=2, name=["x","z"])
-    #     y = cp.intvar(1,5, name="y")
-    #     vars = [x,y,z]
-    #
-    #     constraint = [x % y  == z]
-    #     lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
-    #
-    #     all_sols = set()
-    #     lin_all_sols = set()
-    #     count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
-    #     lin_count = cp.Model(lin_cons).solveAll(solver="ortools", display=lambda: lin_all_sols.add(tuple(argvals(vars))))
-    #
-    #     self.assertSetEqual(all_sols, lin_all_sols) # same on decision vars
-    #     self.assertEqual(count,lin_count) # same on all vars
-
-    # def test_linearize_division(self): -> div is a global function now
-    #     x, z = cp.intvar(-2, 2, shape=2, name=["x", "z"])
-    #     y = cp.intvar(1, 5, name="y")
-    #     vars = [x, y, z]
-    #
-    #     constraint = [x // y == z]
-    #     lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
-    #
-    #     all_sols = set()
-    #     lin_all_sols = set()
-    #     count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
-    #     lin_count = cp.Model(lin_cons).solveAll(solver="ortools",
-    #                                             display=lambda: lin_all_sols.add(tuple(argvals(vars))))
-    #
-    #     self.assertSetEqual(all_sols, lin_all_sols)  # same on decision vars
-    #     self.assertEqual(count, lin_count)  # same on all vars
-
-    # def test_abs(self): -> abs is a global function now
-    #
-    #     pos = cp.intvar(0,5,name="pos")
-    #     neg = cp.intvar(-5,0,name="neg")
-    #     x = cp.intvar(-5,5,name="x")
-    #     y = cp.intvar(-5,5)
-    #
-    #     for lhs in (pos,neg,x):
-    #         cons = cp.Abs(lhs) == y
-    #         cnt = cp.Model(cons).solveAll()
-    #         lcnt = cp.Model(linearize_constraint([cons])).solveAll(display=self.assertTrue(cons.value()))
-    #         self.assertEqual(cnt, lcnt)
-
+        self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
     def test_alldiff(self):
         # alldiff has a specialized linearization
