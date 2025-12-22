@@ -783,6 +783,23 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Model(cp.Xor([False, False])).solve())
         self.assertFalse(cp.Model(cp.Xor([False, False, False])).solve())
 
+    def test_issue_620(self):
+        a = cp.boolvar()
+        b = cp.boolvar()
+        c = cp.boolvar()
+
+        model = cp.Model(cp.Xor([(cp.Xor([a, b, c])) <= True, ~((cp.Xor([a, b, c])) <= True)]))
+
+        self.assertTrue(model.solve(solver='ortools'))
+        if "minizinc" in cp.SolverLookup.supported():
+            self.assertTrue(model.solve(solver='minizinc'))
+        if "z3" in cp.SolverLookup.supported():
+            self.assertTrue(model.solve(solver='z3'))
+        if "choco" in cp.SolverLookup.supported():
+            self.assertTrue(model.solve(solver='choco'))
+        if "gurobi" in cp.SolverLookup.supported():
+            self.assertTrue(model.solve(solver='gurobi'))
+
     def test_ite_with_constants(self):
         x,y,z = cp.boolvar(shape=3)
         expr = cp.IfThenElse(True, y, z)
