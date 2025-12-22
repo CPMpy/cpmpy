@@ -231,6 +231,47 @@ class TestTransLinearize(unittest.TestCase):
         cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cp.all(lin_cons)))
         self.assertEqual(lin_cnt, cons_cnt)
 
+    def test_int_mult(self):
+        """Test linearization of int*int multiplication constraints"""
+        x = cp.intvar(0, 3, name="x")
+        y = cp.intvar(0, 5, name="y")
+        z = cp.intvar(0, 20, name="z")
+
+        def assert_cons_is_true(cons):
+            return lambda : self.assertTrue(cons.value())
+
+        # Test equality: x * y == z
+        cons = x * y == z
+        print(cons)
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum"})
+        print(lin_cons)
+        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
+        self.assertEqual(lin_cnt, cons_cnt)
+
+        # Test inequality: x * y <= z
+        cons = x * y <= z
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum"})
+        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
+        self.assertEqual(lin_cnt, cons_cnt)
+
+        # Test inequality: x * y >= z
+        cons = x * y >= z
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum"})
+        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
+        self.assertEqual(lin_cnt, cons_cnt)
+
+        # Test with larger domain (to trigger binary encoding)
+        x = cp.intvar(0, 10, name="x")
+        y = cp.intvar(0, 5, name="y")
+        cons = x * y == z
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum"})
+        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
+        self.assertEqual(lin_cnt, cons_cnt)
+
 
     def test_implies(self):
 

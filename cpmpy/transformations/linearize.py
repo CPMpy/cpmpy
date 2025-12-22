@@ -70,6 +70,7 @@ from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..transformations.int2bool import _encode_int_var
 
 def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
     lhs, rhs = cpm_expr.args
@@ -79,8 +80,6 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
         lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
         return linearize_constraint([eval_comparison(cpm_expr.name, lhs, rhs)], supported=supported, reified=reified, csemap=csemap)
     
-    mul0, mul1 = lhs.args
-
     bv_idx = None
     if isinstance(lhs.args[0], _BoolVarImpl):
         bv_idx = 0
@@ -95,8 +94,41 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
         bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
         return linearize_constraint(simplify_boolean([bv_true, bv_false]), supported=supported, reified=reified, csemap=csemap)
     else:
-        # iv1 * iv2 <comp> rhs, do Boolean expansion of smallest integer, resulting in a sum of `bv*iv` cases)
-        raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
+        # iv1 * iv2 <comp> rhs, do Boolean expansion of smallest integer
+        # resulting in sum([v*b*i2 for v,b in int2bool(i1)]) <comp> rhs
+
+        # choose smallest integer as i1 (to minimize the number of Boolean variables)
+        i1,i2 = lhs.args
+        leni1 = (i1.ub - i1.lb) + 1
+        leni2 = (i2.ub - i2.lb) + 1
+        if leni2 < leni1:
+            # swap, call i1 the smallest integer
+            i1,i2 = i2,i1
+
+        # encode i1 with Booleans (with temproary ivarmap)
+        encoding = "direct"
+        if min(leni1,leni2) >= 8:  # arbitrary heuristic
+            encoding = "binary"  # results in fewer Bools
+        i1_enc, cons = _encode_int_var({}, i1, encoding)  # {}: no ivarmap used
+
+        # channel i1 to the Bools
+        (encpairs, offset) = i1_enc.encode_term()
+        cons += [i1 - cp.sum(v*bv for v,bv in encpairs) == offset]
+
+        # Build the sum: aux = sum(v * (b_v * i2) for v,bv in encoding)
+        aux_cons_to_linearize = []
+        terms = []
+        for v, b_v in encpairs:
+            mymul = b_v * i2
+            myaux = cp.intvar(*mymul.get_bounds())
+
+            # the definition of myaux, to linearize
+            cons += linearize_mul_comparison(mymul == myaux, supported=supported, reified=reified, csemap=csemap)
+            # the term for in the multiplication
+            terms.append((offset + v) * myaux)
+        assert len(terms) > 0, f"Expected at least one term, got {terms} for {cpm_expr} with encoding {encoding}"
+
+        return linearize_constraint([eval_comparison(cpm_expr.name, cp.sum(terms), rhs)]+cons, supported=supported, reified=reified, csemap=csemap)
 
 def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"sum","wsum","->"}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
     """
