@@ -196,14 +196,17 @@ class CPM_rc2(CPM_pysat):
         sub_solver = slv_kwargs.get("solver", default_kwargs["solver"])
         if sub_solver and not Solver(name=sub_solver).supports_atmost():
             # encode AtMostK constraints since they are unsupported by sub-solver oracle
-            atmosts = self.pysat_solver.atms
-            self.pysat_solver.__class__ = WCNF
-            for atmost in atmosts:
+            wcnf = WCNF()
+            wcnf.extend(self.pysat_solver.hard)
+            wcnf.extend(self.pysat_solver.soft, weights=self.pysat_solver.wght)
+            for atmost in self.pysat_solver.atms:
                 lits, k = atmost
-                self.pysat_solver.extend(self._card.CardEnc.atmost(lits=lits, bound=k, vpool=self.pysat_vpool))
+                wcnf.extend(self._card.CardEnc.atmost(lits=lits, bound=k, vpool=self.pysat_vpool))
+        else:
+            wcnf = self.pysat_solver
 
         # instantiate and configure RC2
-        solver = rc2.RC2Stratified(self.pysat_solver, **slv_kwargs) if stratified else rc2.RC2(self.pysat_solver, **slv_kwargs)
+        solver = rc2.RC2Stratified(wcnf, **slv_kwargs) if stratified else rc2.RC2(self.pysat_solver, **slv_kwargs)
 
         # set time limit
         if time_limit is None:
