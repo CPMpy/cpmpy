@@ -159,12 +159,7 @@ class TestRC2Solve:
         
         assert solved
         assert rc2.objective_value() is not None
-        # The optimal solution should have x[0]=True, x[1]=True, x[2]=True for objective value 3
-        # But RC2 might find a different solution due to the constraints
-        # At least one of x[0], x[1] must be true, and if x[1] is true, then x[2] must be true
-        # So the maximum possible is 3, but RC2 might find a solution with value 0
-        assert rc2.objective_value() >= 0
-        assert rc2.objective_value() <= 3
+        assert rc2.objective_value() == 3
     
     def test_rc2_solve_minimization(self, solve_kwargs):
         """Test actual solving with RC2 for a minimization problem"""
