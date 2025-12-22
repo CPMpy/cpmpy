@@ -1209,11 +1209,12 @@ def test_objective_numexprs(solver, expr):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     try:
+        time_limit = 3
         model.minimize(expr)
-        assert model.solve(solver=solver, time_limit=3)
+        assert model.solve(solver=solver, time_limit=time_limit)
         assert expr.value() < expr.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
         model.maximize(expr)
-        assert model.solve(solver=solver)
+        assert model.solve(solver=solver, time_limit=time_limit)
         assert expr.value() > expr.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
