@@ -109,12 +109,13 @@ def decompose_mul_linear(mul: Operator, supported: Set[str], reified: bool = Fal
     if bv_mul0 and bv_mul1:
         # Boolean mul0 * mul1 = (mul0 & mul1)
         # equiv: aux, [aux -> (mul0 & mul1), ~aux -> (~mul0 | ~mul1)]
-        # equiv: aux, [aux >= mul0+mul1-1, aux + ~mul0 + ~mul1 >= 1]
+        # equiv: aux, [aux <= mul0, aux <= mul1, aux + ~mul0 + ~mul1 >= 1]
         aux = boolvar()
         if csemap is not None:
             csemap[mul] = aux
 
-        return aux, linearize_constraint([aux.implies(mul0 & mul1), (~aux).implies(~mul0 | ~mul1)], supported=supported, reified=reified, csemap=csemap)
+        #return aux, linearize_constraint([aux.implies(mul0), aux.implies(mul1), (~aux).implies(~mul0 | ~mul1)], supported=supported, reified=reified, csemap=csemap)
+        return aux, linearize_constraint([aux <= mul0, aux <= mul1, (aux + ~mul0 + ~mul1 >= 1)], supported=supported, reified=reified, csemap=csemap)
 
     if bv_mul0 or bv_mul1:
         # b * i
@@ -330,6 +331,10 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"
                     mul_expr, mul_cons = decompose_mul_linear(lhs, supported=supported, reified=reified, csemap=csemap)
                     newlist += mul_cons
                     cpm_expr = eval_comparison(cpm_expr.name, mul_expr, rhs)
+                    if isinstance(cpm_expr, _BoolVarImpl):
+                        # can happen for bool*bool CMP const
+                        newlist.append(cpm_expr)
+                        continue
 
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
@@ -347,7 +352,8 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"
                 # very special case, avoid writing as sum of 1 argument
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
-                newlist.append(Operator("or", new_expr))
+                if not new_expr[0].value():
+                    newlist.append(Operator("or", new_expr))
                 continue
 
 
