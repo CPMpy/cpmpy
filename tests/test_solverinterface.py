@@ -298,8 +298,9 @@ def test_has_objective(solver_name):
         solver.minimize(ivar)
         assert solver.has_objective()
 
-        solver.maximize(ivar)
-        assert solver.has_objective()
+        if solver_name != "rc2": # rc2 can set obj only once
+            solver.maximize(ivar)
+            assert solver.has_objective()
     except NotImplementedError:
         # Solver doesn't support objectives
         assert not solver.has_objective()
