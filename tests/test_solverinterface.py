@@ -259,8 +259,6 @@ def test_solver_vars(solver_name):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_time_limit(solver_name):
     """Test time limit functionality"""
-    if solver_name == "rc2":
-        pytest.skip(f"{solver_name} does not support time limit")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     
@@ -311,8 +309,6 @@ def test_has_objective(solver_name):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_runtime_tracking(solver_name):
     """Test that solver tracks runtime correctly"""
-    if solver_name == "rc2":
-        pytest.skip(f"{solver_name} does not support time limit")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     
@@ -335,8 +331,6 @@ def test_runtime_tracking(solver_name):
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solveall_basic(solver_name):
     """Test solveAll functionality if supported"""
-    if solver_name == "rc2":
-        pytest.skip(f"{solver_name} does not support time limit")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
     

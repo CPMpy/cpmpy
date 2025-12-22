@@ -848,7 +848,7 @@ class TestSupportedSolvers:
             pass
 
     def test_time_limit(self, solver):
-        if solver == "pysdd" or solver == "rc2": # pysdd and rc2 do not support time limit
+        if solver == "pysdd": # pysdd does not support time limit
             pytest.skip("time limit not supported")
         
         x = cp.boolvar(shape=3)
@@ -982,8 +982,6 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
-        if solver == "rc2":
-            pytest.skip(f"{solver} does not support time limit")
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
@@ -1056,9 +1054,6 @@ class TestSupportedSolvers:
             assert m.status().exitstatus == ExitStatus.OPTIMAL
         except NotSupportedError:
             return
-
-        if solver == "rc2":
-            return  # rc2 does not support time limit
 
         # now making a tricky problem to solve
         np.random.seed(0)
