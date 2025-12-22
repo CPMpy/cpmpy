@@ -6,13 +6,13 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.expressions.globalfunctions import GlobalFunction
-from cpmpy.exceptions import TypeError, NotSupportedError
-from cpmpy.expressions.utils import STAR, argvals
+from cpmpy.exceptions import TypeError, NotSupportedError, IncompleteFunctionError
+from cpmpy.expressions.utils import STAR, argvals, argval
 from cpmpy.solvers import CPM_minizinc
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.safening import no_partial_functions
 
-from utils import skip_on_missing_pblib
+from utils import skip_on_missing_pblib, inclusive_range
 
 
 @skip_on_missing_pblib(skip_on_exception_only=True)
@@ -1226,6 +1226,80 @@ class TestBounds(unittest.TestCase):
             self.assertEqual(test_lb,lb)
             self.assertEqual(test_ub,ub)
 
+    def test_bounds_div(self):
+        x = cp.intvar(-8, 8)
+        y = cp.intvar(-7,-1)
+        z = cp.intvar(3,9)
+        op1 = cp.Division(x,y)
+        lb1,ub1 = op1.get_bounds()
+        self.assertEqual(lb1,-8)
+        self.assertEqual(ub1,8)
+        op2 = cp.Division(x,z)
+        lb2,ub2 = op2.get_bounds()
+        self.assertEqual(lb2,-2)
+        self.assertEqual(ub2,2)
+        for lhs in inclusive_range(*x.get_bounds()):
+            for rhs in inclusive_range(*y.get_bounds()):
+                val = cp.Division(lhs,rhs).value()
+                self.assertGreaterEqual(val,lb1)
+                self.assertLessEqual(val,ub1)
+            for rhs in inclusive_range(*z.get_bounds()):
+                val = cp.Division(lhs, rhs).value()
+                self.assertGreaterEqual(val,lb2)
+                self.assertLessEqual(val,ub2)
+
+    def test_bounds_mod(self):
+        x = cp.intvar(-8, 8)
+        xneg = cp.intvar(-8, 0)
+        xpos = cp.intvar(0, 8)
+        y = cp.intvar(-5, -1)
+        z = cp.intvar(1, 4)
+        op1 = cp.Modulo(xneg,y)
+        lb1, ub1 = op1.get_bounds()
+        self.assertEqual(lb1,-4)
+        self.assertEqual(ub1,0)
+        op2 = cp.Modulo(xpos,z)
+        lb2, ub2 = op2.get_bounds()
+        self.assertEqual(lb2,0)
+        self.assertEqual(ub2,3)
+        op3 = cp.Modulo(xneg,z)
+        lb3, ub3 = op3.get_bounds()
+        self.assertEqual(lb3,-3)
+        self.assertEqual(ub3,0)
+        op4 = cp.Modulo(xpos,y)
+        lb4, ub4 = op4.get_bounds()
+        self.assertEqual(lb4,0)
+        self.assertEqual(ub4,4)
+        op5 = cp.Modulo(x,y)
+        lb5, ub5 = op5.get_bounds()
+        self.assertEqual(lb5,-4)
+        self.assertEqual(ub5,4)
+        op6 = cp.Modulo(x,z)
+        lb6, ub6 = op6.get_bounds()
+        self.assertEqual(lb6,-3)
+        self.assertEqual(ub6,3)
+        for lhs in inclusive_range(*x.get_bounds()):
+            for rhs in inclusive_range(*y.get_bounds()):
+                val = cp.Modulo(lhs,rhs).value()
+                self.assertGreaterEqual(val,lb5)
+                self.assertLessEqual(val,ub5)
+            for rhs in inclusive_range(*z.get_bounds()):
+                val = cp.Modulo(lhs, rhs).value()
+                self.assertGreaterEqual(val,lb6)
+                self.assertLessEqual(val,ub6)
+
+    def test_bounds_pow(self):
+        x = cp.intvar(-8, 5)
+        op = cp.Power(x,3)
+        lb, ub = op.get_bounds()
+        self.assertEqual(lb,-8 ** 3)
+        self.assertEqual(ub,5 ** 3)
+
+        op = cp.Power(x, 4)
+        lb, ub = op.get_bounds()
+        self.assertEqual(lb, 5 ** 4)
+        self.assertEqual(ub, 8 ** 4)
+
     def test_bounds_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
@@ -1236,6 +1310,33 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(ub,9)
         self.assertFalse(cp.Model(expr < lb).solve())
         self.assertFalse(cp.Model(expr > ub).solve())
+
+    def test_incomplete_func(self):
+        # element constraint
+        arr = cp.cpm_array([1,2,3])
+        i = cp.intvar(0,5,name="i")
+        p = cp.boolvar()
+
+        cons = (arr[i] == 1).implies(p)
+        m = cp.Model([cons, i == 5])
+        self.assertTrue(m.solve())
+        self.assertTrue(cons.value())
+
+        # div constraint
+        a,b = cp.intvar(1,2,shape=2)
+        cons = (42 // (a - b)) >= 3
+        m = cp.Model([p.implies(cons), a == b])
+        if cp.SolverLookup.lookup("z3").supported():
+            self.assertTrue(m.solve(solver="z3")) # ortools does not support divisor spanning 0 work here
+            self.assertRaises(IncompleteFunctionError, cons.value)
+            self.assertFalse(argval(cons))
+
+        # mayhem
+        cons = (arr[10 // (a - b)] == 1).implies(p)
+        m = cp.Model([cons, a == b])
+        if cp.SolverLookup.lookup("z3").supported():
+            self.assertTrue(m.solve(solver="z3"))
+            self.assertTrue(cons.value())
 
     def test_bounds_count(self):
         x = cp.intvar(-8, 8)
