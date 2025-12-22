@@ -12,7 +12,7 @@ from cpmpy.solvers import CPM_minizinc
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.safening import no_partial_functions
 
-from utils import skip_on_missing_pblib, inclusive_range
+from .utils import skip_on_missing_pblib, inclusive_range
 
 
 @skip_on_missing_pblib(skip_on_exception_only=True)
