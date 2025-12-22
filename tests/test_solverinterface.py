@@ -32,8 +32,6 @@ def test_empty_constructor(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_constructor(solver_name):
-    if solver_name == "rc2":
-        pytest.skip(f"{solver_name} does not support decision")
     solver_class = SolverLookup.lookup(solver_name)
     
     bvar = boolvar(shape=3)
@@ -50,8 +48,6 @@ def test_constructor(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_native_model(solver_name):
-    if solver_name == "rc2":
-        pytest.skip(f"{solver_name} does not support decision")
     solver_class = SolverLookup.lookup(solver_name)
     
     bvar = boolvar(shape=3)
@@ -100,8 +96,6 @@ def test_add_constraint(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solve(solver_name):
-    if solver_name == "rc2":
-        pytest.skip(f"{solver_name} does not support decision")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
 
@@ -121,8 +115,6 @@ def test_solve(solver_name):
 @pytest.mark.parametrize("solver_name", SOLVERNAMES)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_solve_infeasible(solver_name):
-    if solver_name == "rc2":
-        pytest.skip(f"{solver_name} does not support decision")
     solver_class = SolverLookup.lookup(solver_name)
     solver = solver_class()
 

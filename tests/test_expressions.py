@@ -430,8 +430,6 @@ class TestBounds(unittest.TestCase):
         for solver,cls in cp.SolverLookup.base_solvers():
             if not cls.supported():
                 continue
-            if solver == "rc2":
-                continue  # only supports optimisation
             print("Testing", solver)
             self.assertTrue(cp.Model(cons).solve(solver=solver))
 

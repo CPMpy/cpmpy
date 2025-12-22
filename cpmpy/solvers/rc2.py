@@ -140,8 +140,6 @@ class CPM_rc2(CPM_pysat):
         """
         if not self.supported():
             raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
-        if cpm_model and cpm_model.objective_ is None:
-            raise NotSupportedError("CPM_rc2: only optimisation, does not support satisfaction")
 
         from pysat.formula import IDPool, WCNF
 
@@ -206,6 +204,10 @@ class CPM_rc2(CPM_pysat):
             # we will have to manage it externally, e.g in a subprocess or so
             raise NotImplementedError("CPM_rc2: time limit not yet supported")
 
+        # hack to support decision problems
+        if not self.has_objective():
+            self.pysat_solver.add_clause([self.pysat_solver.nv + 1], weight=1)
+
         # determine subsolver
         if stratified:
             slv = rc2.RC2Stratified(self.pysat_solver, adapt=adapt, exhaust=exhaust, minz=minz, **kwargs)
@@ -221,8 +223,10 @@ class CPM_rc2(CPM_pysat):
         # translate exit status
         if sol is None:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        else:
+        elif self.has_objective():
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        else:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
 
         return self._process_solution(sol)
         

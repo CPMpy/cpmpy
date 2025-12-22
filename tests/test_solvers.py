@@ -862,9 +862,6 @@ class TestSupportedSolvers:
             pass
 
     def test_installed_solvers_solveAll(self, solver):
-        if solver == "rc2":
-            pytest.skip("does not support solveAll")
-            
         # basic model
         v = cp.boolvar(3)
         x, y, z = v
@@ -1049,9 +1046,6 @@ class TestSupportedSolvers:
 
 
     def test_status(self, solver):
-        if solver == "rc2":
-            pytest.skip("RC2 only supports optimization")
-
         bv = cp.boolvar(shape=3, name="bv")
         m = cp.Model(cp.any(bv))
 
@@ -1065,6 +1059,9 @@ class TestSupportedSolvers:
             assert m.status().exitstatus == ExitStatus.OPTIMAL
         except NotSupportedError:
             return
+
+        if solver == "rc2":
+            return  # rc2 does not support time limit
 
         # now making a tricky problem to solve
         np.random.seed(0)
@@ -1089,8 +1086,6 @@ class TestSupportedSolvers:
     def test_status_solveall(self, solver):
         if solver == "hexaly":
             pytest.skip("hexaly cannot proveably find all solutions, so status is never OPTIMAL")
-        if solver == "rc2":
-            pytest.skip("RC2 only supports optimization")
 
         bv = cp.boolvar(shape=3, name="bv")
         m = cp.Model(cp.any(bv))
@@ -1139,8 +1134,6 @@ class TestSupportedSolvers:
         """
         if solver == 'pysdd':
             pytest.skip(reason=f"{solver} does not support integer decision variables")
-        if solver == "rc2":
-            pytest.skip("rc2 solver only supports optimization, not satisfaction")
         
         x = cp.intvar(1, 4, shape=1)
         # Dubious constraint which enforces nothing, gets decomposed to empty list
@@ -1163,8 +1156,6 @@ class TestSupportedSolvers:
             kwargs['solution_limit'] = 10
         elif solver == "hexaly":
             kwargs['time_limit'] = 2
-        elif solver == "rc2":
-            pytest.skip("rc2 solver only supports optimization, not satisfaction")
 
         # empty model
         num_sols = cp.Model().solveAll(solver=solver, **kwargs)
