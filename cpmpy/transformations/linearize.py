@@ -71,6 +71,33 @@ from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
+def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
+    lhs, rhs = cpm_expr.args
+    assert lhs.name == "mul", f"linearize_mul_comparison expects a multiplication comparison, got {lhs}"
+
+    if is_num(lhs.args[0]): # const * iv <comp> rhs
+        lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
+        return linearize_constraint([eval_comparison(cpm_expr.name, lhs, rhs)], supported=supported, reified=reified, csemap=csemap)
+    
+    mul0, mul1 = lhs.args
+
+    bv_idx = None
+    if isinstance(lhs.args[0], _BoolVarImpl):
+        bv_idx = 0
+    elif isinstance(lhs.args[1], _BoolVarImpl):
+        bv_idx = 1
+
+    if bv_idx is not None:
+        # bv * iv <comp> rhs, rewrite to (bv -> iv <comp> rhs) & (~bv -> 0 <comp> rhs)
+        # (also works for bv1*bv2 <comp> rhs)
+        bv, iv = lhs.args[bv_idx], lhs.args[1-bv_idx]
+        bv_true = bv.implies(eval_comparison(cpm_expr.name, iv, rhs))
+        bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
+        return linearize_constraint(simplify_boolean([bv_true, bv_false]), supported=supported, reified=reified, csemap=csemap)
+    else:
+        # iv1 * iv2 <comp> rhs, do Boolean expansion of smallest integer, resulting in a sum of `bv*iv` cases)
+        raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
+
 def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"sum","wsum","->"}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
     """
     Transforms all constraints to a linear form.
@@ -239,26 +266,8 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"
             elif isinstance(lhs, Operator) and lhs.name not in supported:
 
                 if lhs.name == "mul":
-                    bv_idx = None
-                    if is_num(lhs.args[0]): # const * iv <comp> rhs
-                        lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
-                        newlist += linearize_constraint([eval_comparison(cpm_expr.name, lhs, rhs)], supported=supported, reified=reified, csemap=csemap)
-                        continue
-                    elif isinstance(lhs.args[0], _BoolVarImpl):
-                        bv_idx = 0
-                    elif isinstance(lhs.args[1], _BoolVarImpl):
-                        bv_idx = 1
-
-                    if bv_idx is not None:
-                        # bv * iv <comp> rhs, rewrite to (bv -> iv <comp> rhs) & (~bv -> 0 <comp> rhs)
-                        bv, iv = lhs.args[bv_idx], lhs.args[1-bv_idx]
-                        bv_true = bv.implies(eval_comparison(cpm_expr.name, iv, rhs))
-                        bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
-                        newlist += linearize_constraint(simplify_boolean([bv_true, bv_false]), supported=supported, reified=reified, csemap=csemap)
-                        continue
-                    else:
-                        raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
-
+                    newlist += linearize_mul_comparison(cpm_expr, supported=supported, reified=reified, csemap=csemap)
+                    continue
                 else:
                     raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
                                                             f" be any of {supported | {'sub'} } but is {lhs}. "
