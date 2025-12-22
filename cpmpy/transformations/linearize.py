@@ -188,7 +188,7 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"
         * Numeric comparisons:
           - ``GenExpr == Var/Constant`` (when GenExpr is numeric)
           - ``GenExpr <= Var/Constant`` (when GenExpr is numeric)
-          - ``GenExpr >= Var/Constant`` (when GenExpr is numeric) 
+          - ``GenExpr >= Var/Constant`` (when GenExpr is numeric)
 
     **Indicator constraints, if '->' is in 'supported':**
         The left-hand side is always a boolean variable or its negation, and
@@ -451,7 +451,7 @@ def only_positive_bv(lst_of_expr: List[Expression], csemap: Optional[Dict[Any, A
     """
     Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView`
     with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
-    
+
     Comparisons are expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
     The resulting expression is linear if the original expression was linear.
 
@@ -518,7 +518,7 @@ def only_positive_bv_wsum(expr: Expression) -> Expression:
     """
     Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView`
     with an equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
-    
+
     It might add a constant term to the expression. If you want the constant separately,
     use :func:`only_positive_bv_wsum_const`.
 
@@ -545,7 +545,7 @@ def only_positive_bv_wsum_const(cpm_expr: Expression) -> Tuple[Expression, int]:
     Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView`
     with an equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`,
     and returns the constant term separately.
-    
+
     If you want the expression where the constant term is part of the wsum returned,
     use :func:`only_positive_bv_wsum`.
 
@@ -607,7 +607,7 @@ def only_positive_bv_wsum_const(cpm_expr: Expression) -> Tuple[Expression, int]:
 def canonical_comparison(lst_of_expr: Union[Expression, List[Expression]]) -> List[Expression]:
     """
     Canonicalize comparison expressions.
-    
+
     Transforms linear expressions, or a reification thereof, into canonical form by:
     - moving all variables to the left-hand side
     - moving constants to the right-hand side
@@ -711,7 +711,7 @@ def only_positive_coefficients(lst_of_expr: List[Expression]) -> List[Expression
     """
     Replaces Boolean terms with negative coefficients in linear constraints with terms
     with positive coefficients by negating the literal.
-    
+
     This can simplify a `wsum` into `sum` when all coefficients become 1.
     Input expressions are expected to be canonical comparisons. Only apply after
     applying :func:`canonical_comparison(cpm_expr) <canonical_comparison>`.

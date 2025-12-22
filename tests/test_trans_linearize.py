@@ -117,55 +117,6 @@ class TestTransLinearize(unittest.TestCase):
         self.assertTrue(all(cons_vals))
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
-
-    # def test_linearize_modulo(self): -> Modulo is now a global constraint
-    #
-    #     x, z = cp.intvar(-2,2, shape=2, name=["x","z"])
-    #     y = cp.intvar(1,5, name="y")
-    #     vars = [x,y,z]
-    #
-    #     constraint = [x % y  == z]
-    #     lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
-    #
-    #     all_sols = set()
-    #     lin_all_sols = set()
-    #     count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
-    #     lin_count = cp.Model(lin_cons).solveAll(solver="ortools", display=lambda: lin_all_sols.add(tuple(argvals(vars))))
-    #
-    #     self.assertSetEqual(all_sols, lin_all_sols) # same on decision vars
-    #     self.assertEqual(count,lin_count) # same on all vars
-
-    # def test_linearize_division(self): -> div is a global function now
-    #     x, z = cp.intvar(-2, 2, shape=2, name=["x", "z"])
-    #     y = cp.intvar(1, 5, name="y")
-    #     vars = [x, y, z]
-    #
-    #     constraint = [x // y == z]
-    #     lin_cons = linearize_constraint(constraint, supported={'sum', 'wsum', 'mul'})
-    #
-    #     all_sols = set()
-    #     lin_all_sols = set()
-    #     count = cp.Model(constraint).solveAll(solver="ortools", display=lambda: all_sols.add(tuple(argvals(vars))))
-    #     lin_count = cp.Model(lin_cons).solveAll(solver="ortools",
-    #                                             display=lambda: lin_all_sols.add(tuple(argvals(vars))))
-    #
-    #     self.assertSetEqual(all_sols, lin_all_sols)  # same on decision vars
-    #     self.assertEqual(count, lin_count)  # same on all vars
-
-    # def test_abs(self): -> abs is a global function now
-    #
-    #     pos = cp.intvar(0,5,name="pos")
-    #     neg = cp.intvar(-5,0,name="neg")
-    #     x = cp.intvar(-5,5,name="x")
-    #     y = cp.intvar(-5,5)
-    #
-    #     for lhs in (pos,neg,x):
-    #         cons = cp.Abs(lhs) == y
-    #         cnt = cp.Model(cons).solveAll()
-    #         lcnt = cp.Model(linearize_constraint([cons])).solveAll(display=self.assertTrue(cons.value()))
-    #         self.assertEqual(cnt, lcnt)
-
-
     def test_alldiff(self):
         # alldiff has a specialized linearization
 
@@ -306,10 +257,10 @@ class TestTransLinearize(unittest.TestCase):
         """Test the decompose_mul_linear function directly"""
         from cpmpy.expressions.core import Operator
         from cpmpy.solvers import CPM_ortools
-        
+
         supported = {"sum", "wsum", "->"}
         csemap = {}
-        
+
         # Test case 1: const * iv
         iv = cp.intvar(0, 10, name="iv")
         mul = 3*iv
@@ -318,7 +269,7 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(len(cons), 0)
         # check model count consistency
         self.assertEqual(cp.Model(mul > 0).solveAll(), cp.Model(expr > 0, cons).solveAll())
-        
+
         # Test case 2: b1 * b2
         b1 = cp.boolvar(name="b1")
         b2 = cp.boolvar(name="b2")
@@ -328,7 +279,7 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(cons), "[(BV3) -> ((b1) + (b2) >= 2), (~BV3) -> ((~b1) + (~b2) >= 1)]")
         # check model count consistency
         self.assertEqual(cp.Model(mul > 0).solveAll(), cp.Model(expr > 0, cons).solveAll())
-        
+
         # Test case 3: b * i
         b = cp.boolvar(name="b")
         i = cp.intvar(1, 5, name="i")
@@ -338,14 +289,14 @@ class TestTransLinearize(unittest.TestCase):
         self.assertEqual(str(cons), "[(b) -> (sum([1, -1] * [IV6, i]) == 0), (~b) -> (sum([IV6]) == 0)]")
         # check model count consistency
         self.assertEqual(cp.Model(mul > 0).solveAll(), cp.Model(expr > 0, cons).solveAll())
-        
+
         # Test case 3b: Common subexpression elimination
         mul_bis = Operator("mul", [b, i])
         expr_bis, cons_bis = decompose_mul_linear(mul_bis, supported=supported, csemap=csemap)
         # Should return the same expression from csemap
         self.assertEqual(expr_bis, expr)
         self.assertEqual(len(cons_bis), 0)  # No new constraints needed
-        
+
         # Test case 4: i1 * i2 (int * int)
         i1 = cp.intvar(0, 3, name="i1")  # smaller domain (should be encoded)
         i2 = cp.intvar(1, 2, name="i2")  # larger domain
