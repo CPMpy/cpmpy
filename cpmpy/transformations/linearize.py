@@ -41,7 +41,7 @@ Main transformations:
 Helper functions:
 - :func:`canonical_comparison`: Canonicalizes comparison expressions by moving variables to the
   left-hand side and constants to the right-hand side.
-- :func:`decompose_mul_linear`: Decomposes multiplication operations (const*v, bool*bool, bool*int, int*int) into linear form.
+- :func:`linearize_mul_comparison`: Linearizes multiplication comparisons (bool*bool | bool*int | int*int) <cmp> rhs.
 
 Post-linearisation transformations:
 - :func:`only_positive_bv`: Transforms constraints so only boolean variables appear positively
@@ -73,6 +73,19 @@ from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarI
 from ..transformations.int2bool import _encode_int_var
 
 def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
+    """
+    Linearizes multiplication comparisons (bool*bool | bool*int | int*int) <cmp> rhs.
+
+    Arguments:
+        cpm_expr (Comparison): Comparison to linearize, e.g. `bool*bool <cmp> rhs` or `bool*int <cmp> rhs` or `int*int <cmp> rhs`.
+        supported (Set[str]): Set of constraint and variable type names that are supported by the target
+            solver, e.g. `{"sum", "wsum", "->", "and", "or", "alldifferent"}`.
+        reified (bool): Whether the constraint is fully reified. When True, nested implications are linearized using Big-M method instead of indicator constraints.
+        csemap (Optional[Dict[Any, Any]]): Optional dictionary for common subexpression elimination, mapping expressions to their flattened variable representations. Used to avoid creating duplicate variables for the same subexpression.
+
+    Returns:
+        List of linearized CPMpy expressions.
+    """
     lhs, rhs = cpm_expr.args
     assert lhs.name == "mul", f"linearize_mul_comparison expects a multiplication comparison, got {lhs}"
 
