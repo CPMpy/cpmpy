@@ -183,9 +183,6 @@ class CPM_rc2(CPM_pysat):
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         self.user_vars = get_user_vars(self.user_vars, self.ivarmap)
 
-        if time_limit is not None:
-            raise NotImplementedError("CPM_rc2: time limit not yet supported")
-
         # hack to support decision problems
         if not self.has_objective():
             self.pysat_solver.add_clause([self.pysat_solver.nv + 1], weight=1)
