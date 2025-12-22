@@ -248,28 +248,28 @@ class CPM_pysat(SolverInterface):
             
             t = Timer(time_limit, lambda s: s.interrupt(), [self.pysat_solver])
             t.start()
-            feasible = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
+            has_sol = self.pysat_solver.solve_limited(assumptions=pysat_assum_vars, expect_interrupt=True)
             # ensure timer is stopped if early stopping
             t.cancel()
             ## this part cannot be added to timer otherwhise it "interrups" the timeout timer too soon
             self.pysat_solver.clear_interrupt()
         else:
-            feasible = self.pysat_solver.solve(assumptions=pysat_assum_vars)
+            has_sol = self.pysat_solver.solve(assumptions=pysat_assum_vars)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.pysat_solver.time()
 
         # translate exit status
-        if feasible is True:
+        if has_sol is True:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif feasible is False:
+        elif has_sol is False:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif feasible is None:
+        elif has_sol is None:
             # can happen when timeout is reached...
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:  # another?
-            raise NotImplementedError(feasible)  # a new status type was introduced, please report on github
+            raise NotImplementedError(has_sol)  # a new status type was introduced, please report on github
 
         return self._process_solution(self.pysat_solver.get_model())
 
@@ -435,11 +435,9 @@ class CPM_pysat(SolverInterface):
         elif isinstance(cpm_expr, Comparison): # root-level comparisons have been linearized
             if isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
                 c = self._pysat_cardinality(cpm_expr)
-                print("C", c)
                 self.pysat_solver.append_formula(c)
             elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "wsum":
                 c = self._pysat_pseudoboolean(cpm_expr)
-                print("PB", c)
                 self.pysat_solver.append_formula(c)
             else:
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")

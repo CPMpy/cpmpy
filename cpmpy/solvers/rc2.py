@@ -50,10 +50,11 @@
     Module details
     ==============
 """
+from threading import Timer
 from .solver_interface import SolverStatus, ExitStatus
 from .pysat import CPM_pysat
 from ..exceptions import NotSupportedError
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
+from ..expressions.variables import _IntVarImpl, NegBoolView
 from ..transformations.linearize import only_positive_coefficients_
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_objective
@@ -182,7 +183,6 @@ class CPM_rc2(CPM_pysat):
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         self.user_vars = get_user_vars(self.user_vars, self.ivarmap)
 
-        # TODO: set time limit (awaiting upstream PR https://github.com/pysathq/pysat/pull/211)
         if time_limit is not None:
             raise NotImplementedError("CPM_rc2: time limit not yet supported")
 
@@ -206,23 +206,41 @@ class CPM_rc2(CPM_pysat):
                 self.pysat_solver.extend(self._card.CardEnc.atmost(lits=lits, bound=k, vpool=self.pysat_vpool))
 
         # instantiate and configure RC2
-        slv = rc2.RC2Stratified(self.pysat_solver, **slv_kwargs) if stratified else rc2.RC2(self.pysat_solver, **slv_kwargs)
+        solver = rc2.RC2Stratified(self.pysat_solver, **slv_kwargs) if stratified else rc2.RC2(self.pysat_solver, **slv_kwargs)
 
-        sol = slv.compute()  # return one solution
+        # set time limit
+        if time_limit is None:
+            solution = solver.compute()
+        else:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
+            timer = Timer(time_limit, lambda: solver.interrupt())
+            timer.start()
+            solution = solver.compute(expect_interrupt=True)
+            # ensure timer is stopped
+            timer.cancel()
+            # this part cannot be added to timer otherwhise it "interrups" the timeout timer too soon
+            solver.clear_interrupt()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = slv.oracle_time()
+        self.cpm_status.runtime = solver.oracle_time()
 
         # translate exit status
-        if sol is None:
+        if solution is None:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif self.has_objective():
             self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         else:
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
 
-        return self._process_solution(sol)
+        return self._process_solution(solution)
+
+    def _process_solution(self, sol):
+        has_sol = super()._process_solution(sol)
+        if self.has_objective():
+            self.objective_value_ = self.objective_.value()
+        return has_sol
         
     def transform_objective(self, expr):
         """
@@ -289,10 +307,3 @@ class CPM_rc2(CPM_pysat):
         for wi,vi in zip(weights, xs):
             assert wi > 0, f"CPM_rc2 objective: strictly positive weights only, got {wi,vi}"
             self.pysat_solver.add_clause([self.solver_var(vi)], weight=wi)
-
-
-    def objective_value(self):
-        """
-            Get the objective value of the last optimisation problem
-        """
-        return self.objective_.value()
