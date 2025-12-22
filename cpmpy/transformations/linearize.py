@@ -74,7 +74,7 @@ from ..transformations.int2bool import _encode_int_var
 
 def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
     """
-    Linearizes multiplication comparisons (bool*bool | bool*int | int*int) <cmp> rhs.
+    Linearizes multiplication comparisons (const*var | bool*bool | bool*int | int*int) <cmp> rhs.
 
     Arguments:
         cpm_expr (Comparison): Comparison to linearize, e.g. `bool*bool <cmp> rhs` or `bool*int <cmp> rhs` or `int*int <cmp> rhs`.
