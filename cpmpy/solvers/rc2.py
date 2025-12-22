@@ -53,6 +53,8 @@
 from threading import Timer
 from .solver_interface import SolverStatus, ExitStatus
 from .pysat import CPM_pysat
+from ..transformations.decompose_global import decompose_objective
+from ..transformations.safening import safen_objective
 from ..exceptions import NotSupportedError
 from ..expressions.variables import _IntVarImpl, NegBoolView
 from ..transformations.linearize import only_positive_coefficients_
@@ -194,6 +196,7 @@ class CPM_rc2(CPM_pysat):
 
         # get subsolver kwarg or default, then check if it supports AtMostK constrains
         sub_solver = slv_kwargs.get("solver", default_kwargs["solver"])
+
         if sub_solver and not Solver(name=sub_solver).supports_atmost():
             # encode AtMostK constraints since they are unsupported by sub-solver oracle
             wcnf = WCNF()
@@ -250,22 +253,29 @@ class CPM_rc2(CPM_pysat):
         # add new user vars to the set
         get_variables(expr, collect=self.user_vars)
 
-        # try to flatten the objective
-        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
-        self.add(flat_cons)
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(
+            obj,
+            supported=self.supported_global_constraints,
+            supported_reified=self.supported_reified_global_constraints,
+            csemap=self._csemap
+        )
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        self.add(safe_cons + decomp_cons + flat_cons)
 
         weights, xs, const = [], [], 0
-        # we assume flat_obj is a var, a sum or a wsum (over int and bool vars)
-        if isinstance(flat_obj, _IntVarImpl) or isinstance(flat_obj, NegBoolView):  # includes _BoolVarImpl
+        # we assume obj is a var, a sum or a wsum (over int and bool vars)
+        if isinstance(obj, _IntVarImpl) or isinstance(obj, NegBoolView):  # includes _BoolVarImpl
             weights = [1]
-            xs = [flat_obj]
-        elif flat_obj.name == "sum":
-            xs = flat_obj.args
+            xs = [obj]
+        elif obj.name == "sum":
+            xs = obj.args
             weights = [1] * len(xs)
-        elif flat_obj.name == "wsum":
-            weights, xs = flat_obj.args
+        elif obj.name == "wsum":
+            weights, xs = obj.args
         else:
-            raise NotImplementedError(f"CPM_rc2: Non supported objective {flat_obj} (yet?)")
+            raise NotImplementedError(f"CPM_rc2: Non supported objective {obj} (yet?)")
 
         terms, cons, k = _encode_lin_expr(self.ivarmap, xs, weights, self.encoding)
 
