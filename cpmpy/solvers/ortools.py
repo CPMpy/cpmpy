@@ -81,7 +81,7 @@ class CPM_ortools(SolverInterface):
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
                                               "inverse", "no_overlap", "regular",
-                                              "min", "max", "abs", "element"})
+                                              "min", "max", "abs", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -590,31 +590,31 @@ class CPM_ortools(SolverInterface):
                 # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur)
                 self.add(dur_cons)
-                
+
                 if end is None: # need to make the end-variables ourself
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
                     self.add([s + d == e for s,d,e in zip(start, dur, end)])
-                
+
                 # ensure demand is non-negative
                 demand, demand_cons = get_nonneg_args(demand)
                 self.add(demand_cons)
 
                 start, dur, end, demand, cap = self.solver_vars([start, dur, end, demand, cap])
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
-                                
+
                 return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "no_overlap":
                 start, dur, end  = cpm_expr.args
                 dur, dur_cons = get_nonneg_args(dur)
                 self.add(dur_cons)
-                
+
                 if end is None: # need to make the end-variables ourself
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
                     self.add([s + d == e for s,d,e in zip(start, dur, end)])
-                
+
                 start, dur, end = self.solver_vars([start, dur, end])
                 intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, dur, end)]
-                
+
                 return self.ort_model.AddNoOverlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these

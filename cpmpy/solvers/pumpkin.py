@@ -58,7 +58,7 @@ from ..transformations.decompose_global import decompose_in_tree, decompose_obje
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 
 import time
 
@@ -73,7 +73,7 @@ class CPM_pumpkin(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "InDomain",
-                                              "min", "max", "abs", "element"})
+                                              "min", "max", "abs", "div", "element"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -307,7 +307,8 @@ class CPM_pumpkin(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
-        obj, decomp_cons = decompose_objective(expr,
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
@@ -344,7 +345,7 @@ class CPM_pumpkin(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
 
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element"}) # safen toplevel elements, assume total decomposition for partial functions
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element", "div", "mod"}) # safen toplevel elements, assume total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,

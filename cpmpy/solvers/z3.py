@@ -77,7 +77,7 @@ class CPM_z3(SolverInterface):
         Terminology note: a 'model' for z3 is a solution!
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "ite"})
+    supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mod"})
     supported_reified_global_constraints = supported_global_constraints
 
     @staticmethod
@@ -440,7 +440,7 @@ class CPM_z3(SolverInterface):
                 x = self._z3_expr(cpm_con.args[1])
                 return z3.Sum([wi*xi for wi,xi in zip(w,x)])
 
-            # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
+            # 'sub'/2, 'mul'/2
             elif arity == 2 or cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
                 x, y = self._z3_expr(cpm_con.args)
@@ -453,25 +453,6 @@ class CPM_z3(SolverInterface):
                     return x - y
                 elif cpm_con.name == "mul":
                     return x * y
-                elif cpm_con.name == "div":
-                    # z3 rounds towards negative infinity, need this hack when result is negative
-                    return z3.If(z3.And(x >= 0, y >= 0), x / y,
-                           z3.If(z3.And(x <= 0, y <= 0), -x / -y,
-                           z3.If(z3.And(x >= 0, y <= 0), -(x / -y),
-                           z3.If(z3.And(x <= 0, y >= 0), -(-x / y), 0))))
-
-                elif cpm_con.name == "pow":
-                    if not is_num(cpm_con.args[1]):
-                        # tricky in Z3 not all power constraints are decidable
-                        # solver will return 'unknown', even if theory is satisfiable.
-                        # https://stackoverflow.com/questions/70289335/power-and-logarithm-in-z3
-                        # raise error to be consistent with other solvers
-                        raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
-                    return x ** y
-                elif cpm_con.name == "mod":
-                    # minimic modulo with integer division (round towards o)
-                    return z3.If(z3.And(x >= 0), x % y,-(-x % y))
-
             # '-'/1
             elif cpm_con.name == "-":
                 if is_boolexpr(cpm_con.args[0]):
@@ -508,6 +489,32 @@ class CPM_z3(SolverInterface):
 
             # post the comparison
             return eval_comparison(cpm_con.name, lhs, rhs)
+
+        elif isinstance(cpm_con, GlobalFunction):
+            if cpm_con.name == "mod":
+                # minimic modulo with integer division (round towards o)
+                x,y = self._z3_expr(cpm_con.args)
+                return z3.If(z3.And(x >= 0), x % y, -(-x % y))
+
+            elif cpm_con.name == "div":
+                # z3 rounds towards negative infinity, need this hack when result is negative
+                x,y = self._z3_expr(cpm_con.args)
+                return z3.If(z3.And(x >= 0, y >= 0), x / y,
+                       z3.If(z3.And(x <= 0, y <= 0), -x / -y,
+                       z3.If(z3.And(x >= 0, y <= 0), -(x / -y),
+                       z3.If(z3.And(x <= 0, y >= 0), -(-x / y), 0))))
+
+            elif cpm_con.name == "pow":
+                x,y = self._z3_expr(cpm_con.args)
+                if not is_num(cpm_con.args[1]):
+                    # tricky in Z3 not all power constraints are decidable
+                    # solver will return 'unknown', even if theory is satisfiable.
+                    # https://stackoverflow.com/questions/70289335/power-and-logarithm-in-z3
+                    # raise error to be consistent with other solvers
+                    raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
+                return x ** y
+
+            raise NotImplementedError(f"Global function {cpm_con} not (yet) implemented for Z3, ")
 
         # rest: base (Boolean) global constraints
         elif isinstance(cpm_con, GlobalConstraint):
