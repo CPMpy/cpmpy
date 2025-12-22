@@ -116,7 +116,6 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
         cons += [i1 - cp.sum(v*bv for v,bv in encpairs) == offset]
 
         # Build the sum: aux = sum(v * (b_v * i2) for v,bv in encoding)
-        aux_cons_to_linearize = []
         terms = []
         for v, b_v in encpairs:
             mymul = b_v * i2
