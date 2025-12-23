@@ -1,4 +1,4 @@
-# CPMpy Test Suite
+# Test Suite
 
 This directory contains the test suite for CPMpy, covering all major components including variables, constraints, models, solvers, transformations, and tools.
 
