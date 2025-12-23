@@ -122,4 +122,4 @@ def test_advanced_example(example):
            ("not available" in error_msg):
             pytest.skip(f"Skipped, solver not installed: {e}")
         # Re-raise other exceptions
-        raise
+        raise e
