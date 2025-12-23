@@ -443,7 +443,8 @@ class CPM_hexaly(SolverInterface):
 
     def __del__(self):
         # release lock on licence file
-        self.hex_solver.delete()
+        if hasattr(self, "hex_solver"):
+            self.hex_solver.delete()
 
 
 
