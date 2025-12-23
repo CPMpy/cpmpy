@@ -161,6 +161,9 @@ def pytest_configure(config):
 
 def generate_inputs(generator, solvers):
     result = []
+    if solvers is None:
+        installed_solvers = cp.SolverLookup.supported() 
+        solvers = [installed_solvers[0]]
     for solver in solvers:
         result += [(solver, expr) for expr in generator(solver)]
     return result
