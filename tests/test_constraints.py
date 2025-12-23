@@ -307,8 +307,7 @@ def verify(cons):
     assert argval(cons)
     assert cons.value()
 
-
-@pytest.mark.parametrize(("solver","constraint"),list(_generate_inputs(bool_exprs)), ids=str)
+@pytest.mark.generate_constraints.with_args(bool_exprs)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_bool_constraints(solver, constraint):
     """
@@ -322,8 +321,7 @@ def test_bool_constraints(solver, constraint):
         assert argval(constraint)
         assert constraint.value()
 
-
-@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(comp_constraints)),  ids=str)
+@pytest.mark.generate_constraints.with_args(comp_constraints)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_comparison_constraints(solver, constraint):
     """
@@ -338,7 +336,7 @@ def test_comparison_constraints(solver, constraint):
         assert constraint.value()
 
 
-@pytest.mark.parametrize(("solver","constraint"), list(_generate_inputs(reify_imply_exprs)),  ids=str)
+@pytest.mark.generate_constraints.with_args(reify_imply_exprs)
 @skip_on_missing_pblib(skip_on_exception_only=True)
 def test_reify_imply_constraints(solver, constraint):
     """
