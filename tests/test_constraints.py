@@ -1,6 +1,6 @@
 import inspect
 
-import cpmpy
+import cpmpy as cp
 from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.expressions.globalconstraints import *
 from cpmpy.expressions.globalfunctions import *
@@ -106,30 +106,9 @@ def numexprs(solver):
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
         yield expr
-
-    # also global functions
-    classes = inspect.getmembers(cpmpy.expressions.globalfunctions, inspect.isclass)
-    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalFunction) and name != "GlobalFunction"]
-    classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
-
-    for name, cls in classes:
-        if name == "Abs":
-            expr = cls(NUM_ARGS[0])
-        elif name == "Count":
-            expr = cls(NUM_ARGS, NUM_VAR)
-        elif name == "Element":
-            expr = cls(NUM_ARGS, POS_VAR)
-        elif name == "NValueExcept":
-            expr = cls(NUM_ARGS, 3)
-        elif name == "Among":
-            expr = cls(NUM_ARGS, [1,2])
-        else:
-            expr = cls(NUM_ARGS)
-
-        if solver in EXCLUDE_GLOBAL and expr.name in EXCLUDE_GLOBAL[solver]:
-            continue
-        else:
-            yield expr
+    
+    for expr in global_functions(solver):
+        yield expr
 
 
 
@@ -193,7 +172,7 @@ def global_constraints(solver):
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
            Xor, Cumulative, NValue, Count, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess
     """
-    classes = inspect.getmembers(cpmpy.expressions.globalconstraints, inspect.isclass)
+    classes = inspect.getmembers(cp.expressions.globalconstraints, inspect.isclass)
     classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
@@ -206,81 +185,104 @@ def global_constraints(solver):
             yield Xor(BOOL_ARGS + [True,False])
             continue
         elif name == "Inverse":
-            expr = cls(NUM_ARGS, [1,0,2])
+            yield cp.Inverse(NUM_ARGS, [1,0,2])
         elif name == "Table":
-            yield cls(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
-            yield cls(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
+            yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+            yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
         elif name == "Regular":
-            expr = Regular(intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
+            yield cp.Regular(intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
-            expr = cls(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
+            yield cp.NegativeTable(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":
-            expr = cls(NUM_ARGS, [[0,"*",2], ["*","*",1]])
+            yield cp.ShortTable(NUM_ARGS, [[0,"*",2], ["*","*",1]])
         elif name == "IfThenElse":
-            expr = cls(*BOOL_ARGS)
+            yield cp.IfThenElse(*BOOL_ARGS)
         elif name == "InDomain":
-            expr = cls(NUM_VAR, [0,1,6])
+            yield cp.InDomain(NUM_VAR, [0,1,6])
         elif name == "Cumulative":
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
-            yield Cumulative(s, dur, e, demand, cap)
+            yield cp.Cumulative(s, dur, e, demand, cap)
             yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="time")[0])
-            yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="task")[0])
+            yield cp.all(cp.Cumulative(s, dur, e, demand, cap).decompose(how="task")[0])
 
-            yield Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
+            yield cp.Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
             if solver != "pumpkin": # only supports with fixed durations
-                yield Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
+                yield cp.Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
                 if solver not in ("pysat", "pindakaas"): # results in unsupported int2bool integer multiplication
-                    yield Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
+                    yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
             continue
+
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
-            expr = cls(NUM_ARGS, vals, cnts)
+            yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
         elif name == "AllDifferentExceptN":
-            expr = cls(NUM_ARGS, NUM_VAR)
+            yield cp.AllDifferentExceptN(NUM_ARGS, NUM_VAR)
         elif name == "AllEqualExceptN":
-            expr = cls(NUM_ARGS, NUM_VAR)
+            yield cp.AllEqualExceptN(NUM_ARGS, NUM_VAR)
         elif name == "Precedence":
             x = intvar(0,5, shape=3, name="x")
-            expr = cls(x, [3,1,0])
+            yield cp.Precedence(x, [3,1,0])
         elif name == "NoOverlap":
             s = intvar(0, 10, shape=3, name="start")
             e = intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
-            yield NoOverlap(s, dur, e)
-            yield NoOverlap(s, dur)
+            yield cp.NoOverlap(s, dur, e)
+            yield cp.NoOverlap(s, dur)
             if solver != "pumpkin": # only supports with fixed durations
-                yield NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
+                yield cp.NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
             continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = intvar(0,10,shape=3)
-            expr = cls(NUM_ARGS, vals, cnts)
+            yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
         elif name == "LexLessEq":
             X = intvar(0, 3, shape=3)
             Y = intvar(0, 3, shape=3)
-            expr = LexLessEq(X, Y)
+            yield cp.LexLessEq(X, Y)
         elif name == "LexLess":
             X = intvar(0, 3, shape=3)
             Y = intvar(0, 3, shape=3)
-            expr = LexLess(X, Y)
+            yield cp.LexLess(X, Y)
         elif name == "LexChainLess":
             X = intvar(0, 3, shape=(3,3))
-            expr = LexChainLess(X)
+            yield cp.LexChainLess(X)
         elif name == "LexChainLessEq":
             X = intvar(0, 3, shape=(3,3))
-            expr = LexChainLess(X)
+            yield cp.LexChainLess(X)
         else: # default constructor, list of numvars
-            expr= cls(NUM_ARGS)            
+            yield cls(NUM_ARGS)            
 
+
+# also global functions
+def global_functions(solver):
+    """
+        Generate all global functions
+    """
+    classes = inspect.getmembers(cp.expressions.globalfunctions, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalFunction) and name != "GlobalFunction"]
+    classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
+
+    for name, cls in classes:
         if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
             continue
+        
+        if name == "Abs":
+            yield cp.Abs(NUM_ARGS[0])
+        elif name == "Count":
+            yield cp.Count(NUM_ARGS, NUM_VAR)
+        elif name == "Element":
+            yield cp.Element(NUM_ARGS, POS_VAR)
+        elif name == "NValueExcept":
+            yield cp.NValueExcept(NUM_ARGS, 3)
+        elif name == "Among":
+            yield cp.Among(NUM_ARGS, [1,2])
         else:
-            yield expr
+            yield cls(NUM_ARGS)
 
 
 def reify_imply_exprs(solver):
