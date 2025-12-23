@@ -107,6 +107,14 @@ def solver(request):
     
     return solver_value
 
+@pytest.fixture
+def constraint(request):
+    if not hasattr(request, "param"):
+        raise RuntimeError(
+            "The 'constraint' fixture must be parametrized via pytest_generate_tests"
+        )
+    return request.param
+
 def pytest_configure(config):
     # Configure logging for test filtering information
     logging.basicConfig(
@@ -122,6 +130,10 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "requires_dependency(name): mark test as requiring a specific dependency", # to filter tests when required solver is not installed
+    )
+    config.addinivalue_line(
+        "markers",
+        "generate_constraints(generator): something", 
     )
     
     # Check for non-installed solvers and issue warnings
@@ -140,6 +152,11 @@ def pytest_configure(config):
                     stacklevel=2
                 )
 
+def generate_inputs(generator, solvers):
+    result = []
+    for solver in solvers:
+        result += [(solver, expr) for expr in generator(solver)]
+    return result
 
 def pytest_generate_tests(metafunc):
     """
@@ -148,25 +165,41 @@ def pytest_generate_tests(metafunc):
     When multiple solvers are provided via --solver, tests that use the 'solver' fixture
     but are not already parametrized will be parametrized to run against all provided solvers.
     """
-    # Check if this test uses the 'solver' fixture
+
+    # Early exists
+    # 1) Check if this test uses the 'solver' fixture
     if "solver" not in metafunc.fixturenames:
         return
-    
-    # Check if test is already parametrized with solver
-    # Check callspec (for tests parametrized programmatically)
+    # 2) Check if test is already parametrized with solver
+    #    Check callspec (for tests parametrized programmatically)
     if hasattr(metafunc, "callspec") and metafunc.callspec and "solver" in metafunc.callspec.params:
         return
+
+    # Get solvers from command line option
+    solver_option = metafunc.config.getoption("--solver")
+    parsed_solvers = _parse_solver_option(solver_option)
+
+    # Handle 'generate_constraints' marker
+    constraint_generator_marker = metafunc.definition.get_closest_marker("generate_constraints")
+    if constraint_generator_marker:
+        generator = constraint_generator_marker.args[0]
+        metafunc.parametrize(("solver","constraint"), list(generate_inputs(generator, parsed_solvers)),  ids=str)
+        return   
     
     # Check parametrize markers (for tests parametrized via @pytest.mark.parametrize)
     #  i.e. test that have already been explicitly parametrized with solver
     for marker in metafunc.definition.iter_markers("parametrize"):
         # marker.args[0] is the argnames (can be string or tuple/list)
-        argnames = marker.args[0] if marker.args else None
+        argnames, argvalues = marker.args if marker.args else None
         if argnames:
             # Handle both string "solver" and tuple ("solver", ...) cases
             if isinstance(argnames, str):
-                if argnames == "solver" or "solver" in argnames.split(","):
-                    return
+                # if argnames == "solver" or "solver" in argnames.split(","):
+                #     return
+                if argnames == "generator":
+                    generator = argvalues
+                    print(list(generate_inputs(generator)))
+                    metafunc.parametrize(("solver","constraint"), list(generate_inputs(generator)),  ids=str)
             elif isinstance(argnames, (tuple, list)):
                 if "solver" in argnames:
                     return
@@ -174,10 +207,6 @@ def pytest_generate_tests(metafunc):
     # Check if test has requires_solver marker (solver-specific tests)
     if metafunc.definition.get_closest_marker("requires_solver"):
         return
-    
-    # Get solvers from command line option
-    solver_option = metafunc.config.getoption("--solver")
-    parsed_solvers = _parse_solver_option(solver_option)
     
     # Only parametrize if multiple solvers are explicitly provided
     # When parsed_solvers is None (no --solver specified), don't parametrize - use default solver
