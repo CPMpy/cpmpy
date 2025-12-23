@@ -66,7 +66,8 @@ pytest --solver=all
 This automatically detects all installed solvers from `SolverLookup` and parametrises non-solver-specific tests to run against each one.
 
 #### Skip Solver Tests
-Skip all solver-parametrised tests (only run tests that don't depend on solver parametrisation):
+Skip all solver-parametrised tests (only run tests that don't depend on solver parametrisation).
+I.e., tests that do not rely on solving a model. Examples are tests that evaluate constructors of expressions.
 ```bash
 pytest --solver=None
 ```
