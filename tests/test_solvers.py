@@ -282,7 +282,7 @@ class TestSolvers(unittest.TestCase):
         # this works in OR-Tools
         x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
         m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
-        assert m.solve()
+        assert m.solve(solver="ortools")
         assert m.objective_value() == 1.4
         # this does not
         m += 0.7 * x + 0.8 * y >= 1
