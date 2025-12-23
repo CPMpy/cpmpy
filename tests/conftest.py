@@ -151,6 +151,13 @@ def pytest_configure(config):
                     UserWarning,
                     stacklevel=2
                 )
+            logger.info(f"Using solvers: {', '.join(parsed_solvers_unfiltered)}")
+        else:
+            if parsed_solvers_unfiltered is None:
+                logger.info("No solvers specified, using default behavior (parametrised using OR-Tools and solver-specific tests).")
+            else:
+                logger.info("No solvers available to run tests with. Install some solvers or choose different solvers.")
+
 
 def generate_inputs(generator, solvers):
     result = []
