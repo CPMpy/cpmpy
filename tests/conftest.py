@@ -192,6 +192,7 @@ def pytest_generate_tests(metafunc):
     # Handle 'generate_constraints' marker
     constraint_generator_marker = metafunc.definition.get_closest_marker("generate_constraints")
     if constraint_generator_marker:
+        # take generator callable from marker, generate input expressions, and parameterise test with result
         generator = constraint_generator_marker.args[0]
         metafunc.parametrize(("solver","constraint"), list(generate_inputs(generator, parsed_solvers)),  ids=str)
         return   
