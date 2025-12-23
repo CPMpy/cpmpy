@@ -1,6 +1,6 @@
 # Test Suite
 
-This directory contains the test suite for CPMpy, covering all major components including variables, constraints, models, solvers, transformations, and tools.
+CPMpy has an extensive test suite, covering all major components including variables, constraints, models, solvers, transformations, and tools.
 
 ## Running Tests
 
@@ -110,14 +110,26 @@ Tests can be marked with special markers:
 
 - **`@pytest.mark.requires_solver("solver_name")`** - Test requires a specific solver
 - **`@pytest.mark.requires_dependency("package_name")`** - Test requires a specific Python package
+- **`@pytest.mark.generate_constraints.with_args(generator_function)`** - Parametrise test's "constraint" argument using the provided generator
 
-Example:
+
+Examples:
 ```python
 @pytest.mark.requires_solver("cplex")
 def test_cplex_specific_feature():
     # This test only runs if cplex is available
     pass
 ```
+
+```python
+def randomly_sample_expressions(solver)
+    return [...]
+
+@pytest.mark.generate_constraints.with_args(randomly_sample_expressions)
+def test_bool_constraints(solver, constraint):
+    ...
+```
+(for a complete example, have a look at `/tests/test_constraints.py`)
 
 ## Writing Tests
 
