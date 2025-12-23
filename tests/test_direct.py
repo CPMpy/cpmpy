@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from cpmpy import *
-from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact, CPM_choco, CPM_hexaly
 
 @pytest.mark.requires_solver("ortools")
 class TestDirectORTools(unittest.TestCase):
@@ -33,7 +32,6 @@ class TestDirectExact(unittest.TestCase):
         x,y = boolvar(2)
 
         model = SolverLookup.get("exact")
-        print(model)
         # add x -> y>=1
         model += DirectConstraint("addRightReification", (x, 1, [(1, y)], 1), novar=[1,3])
         print(model)
