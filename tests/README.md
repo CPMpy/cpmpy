@@ -29,6 +29,11 @@ E.g. running with 40 workers:
 pytest -n 40 tests/test_model.py
 ```
 
+Or letting pytest decide how many workers to use:
+```console
+pytest -n auto tests/test_model.py
+```
+
 Install using:
 ```console
 pip install pytest-xdist
