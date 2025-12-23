@@ -519,6 +519,9 @@ class HexSolutionPrinter:
                     else:
                         hex_var = self._solver.solver_var(cpm_var)
                         cpm_var._value = int(hex_sol.get_value(hex_var))
+                # populate objective value
+                if self._solver.has_objective():
+                    self._solver.objective_value_ = int(hex_sol.get_objective_bound(0))
 
                 # display
                 if isinstance(self._display, Expression):
