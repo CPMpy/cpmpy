@@ -6,8 +6,7 @@
 """
     Interface to Hexaly's API
 
-
-    Hexaly is a local search solver with support for  global constraints.
+    Hexaly is a global optimization solver that supports nonlinear and a few global constraints.
 
     Always use :func:`cp.SolverLookup.get("hexaly") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
@@ -21,7 +20,7 @@
 
         $ pip install hexaly -i https://pip.hexaly.com                
     
-    The Hexaly local solver requires an active licence (for example a free academic license)
+    It also requires to install the Hexaly Optimizer with a Hexaly license (for example a free academic license)
     You can read more about available licences at https://www.hexaly.com/
 
     See detailed installation instructions at:
