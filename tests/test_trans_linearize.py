@@ -263,6 +263,13 @@ class TestTransLinearize(unittest.TestCase):
         cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
         self.assertEqual(lin_cnt, cons_cnt)
 
+        # Test inequality: x * y != z
+        cons = x * y != z
+        lin_cons = linearize_constraint([cons], supported={"sum", "wsum"})
+        lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
+        self.assertEqual(lin_cnt, cons_cnt)
+
         # Test with larger domain (to trigger binary encoding, > 8)
         x = cp.intvar(0, 10, name="x")
         y = cp.intvar(0, 20, name="y")

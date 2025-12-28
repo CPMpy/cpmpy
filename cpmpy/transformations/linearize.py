@@ -7,9 +7,9 @@ for translating to Pseudo-Boolean or CNF formats.
 There are a number of components to getting a good linearisation:
 - **Decomposing global constraints/functions** in a 'linear friendly' way.
   A common pattern is that constraints that enforce domain consistency on integer variables,
-  that they should be decomposed over a Boolean representation of the domain. This is the
+  that these constraints should be decomposed over a Boolean representation of the domain. This is the
   case for :class:`~cpmpy.expressions.globalconstraints.AllDifferent`, :class:`~cpmpy.expressions.globalfunctions.Element`
-  and possibly others.
+  and possibly others (for now, only done for AllDifferent in this module).
   Their default decomposition might not do it this way, in which case we want to use different
   decompositions.
 
@@ -21,16 +21,12 @@ There are a number of components to getting a good linearisation:
 
 - **Implications** e.g. `B -> sum(X) <= 4` should be linearised with the Big-M method.
 
+In principle, but not actually currently implemented:
 - **Domain encodings** e.g. of `A=cp.intvar(0,4)` would create binary variables and constraints
-  like `B0 -> A=0`, `B1 -> A=1`, `B2 -> A=2`, etc and `sum(B0..4) = 1`.
+  like `B0 -> A=0`, `B1 -> A=1`, `B2 -> A=2`, etc and `sum(B0..B4) = 1`.
   However each `B0 -> A=0` would require 2 Big-M constraints. Instead we can linearise the entire
   domain encoding with two constraints: `sum(B0..4) = 1` and `A = sum(B0..4 * [0,1,2,3,4])`.
   We could even go as far as eliminate the original integer decision variable.
-
-After linearisation, the output can be further transformed:
-- Remove negated boolean variables (:class:`~cpmpy.expressions.variables.NegBoolView`) so only
-  positive boolean variables (:class:`~cpmpy.expressions.variables.BoolVar`) appear
-- Ensure only positive coefficients appear in linear constraints
 
 Module functions
 ----------------
@@ -47,7 +43,7 @@ Post-linearisation transformations:
 - :func:`only_positive_bv`: Transforms constraints so only boolean variables appear positively
   (no :class:`~cpmpy.expressions.variables.NegBoolView`).
 - :func:`only_positive_bv_wsum`: Helper function that replaces :class:`~cpmpy.expressions.variables.NegBoolView`
-  in var/sum/wsum expressions with equivalent expressions using only :class:`~cpmpy.expressions.variables.BoolVar`.
+  in var/sum/wsum expressions with equivalent expressions using only :class:`~cpmpy.expressions.variables._BoolVarImpl`.
 - :func:`only_positive_bv_wsum_const`: Same as :func:`only_positive_bv_wsum` but returns the constant
   term separately.
 - :func:`only_positive_coefficients`: Transforms constraints so only positive coefficients appear
@@ -69,10 +65,10 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import boolvar, _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..transformations.int2bool import _encode_int_var
 
-def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
+def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, reified: bool = False, csemap: Optional[Dict[Expression, _NumVarImpl]] = None) -> List[Expression]:
     """
     Linearizes multiplication comparisons (const*var | bool*bool | bool*int | int*int) <cmp> rhs.
 
@@ -118,7 +114,9 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
             # swap, call i1 the smallest integer
             i1,i2 = i2,i1
 
-        # encode i1 with Booleans (with temproary ivarmap)
+        # encode i1 with Booleans
+        # (with temproary ivarmap: no sharing of integer encodings... where would we store ivarmap?)
+        # (TODO: int2bool should support csemap... then it could still reuse the encoding Bools)
         encoding = "direct"
         if min(leni1,leni2) >= 8:  # arbitrary heuristic
             encoding = "binary"  # results in fewer Bools
@@ -132,10 +130,15 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
         terms = []
         for v, b_v in encpairs:
             mymul = b_v * i2
-            myaux = cp.intvar(*mymul.get_bounds())
+            if csemap is not None and mymul in csemap:
+                myaux = csemap[mymul]
+            else:
+                myaux = cp.intvar(*mymul.get_bounds())
+                if csemap is not None:
+                    csemap[mymul] = myaux
 
-            # the definition of myaux, to linearize
-            cons += linearize_mul_comparison(mymul == myaux, supported=supported, reified=reified, csemap=csemap)
+                # the definition of myaux, to linearize
+                cons += linearize_mul_comparison(mymul == myaux, supported=supported, reified=reified, csemap=csemap)
             # the term for in the multiplication
             terms.append((offset + v) * myaux)
         assert len(terms) > 0, f"Expected at least one term, got {terms} for {cpm_expr} with encoding {encoding}"
@@ -174,7 +177,7 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"
           - ``GenExpr >= Var/Constant`` (when GenExpr is numeric)
 
     **Indicator constraints, if '->' is in 'supported':**
-        The left-hand side is always a boolean variable or its negation, and
+        The left-hand side is always a Boolean variable or its negation, and
         the right-hand side can be a linear comparison or a general expression.
 
         * Linear comparisons:
@@ -197,7 +200,7 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"
             and is decomposed as such if not in `supported`.
             Any other unsupported global constraint should be decomposed using
             :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`.
-        reified: Whether the constraint is fully reified. When True, nested implications
+        reified: Whether the constraint is half-reified (e.g. `b -> expr`). When True, nested implications
             are linearized using Big-M method instead of indicator constraints.
         csemap: Optional dictionary for common subexpression elimination, mapping expressions
             to their flattened variable representations. Used to avoid creating duplicate
@@ -492,10 +495,10 @@ def only_positive_bv(lst_of_expr: List[Expression], csemap: Optional[Dict[Any, A
 def only_positive_bv_wsum(expr: Expression) -> Expression:
     """
     Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView`
-    with an equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
+    with an equivalent expression using only :class:`~cpmpy.expressions.variables._BoolVarImpl`.
 
-    It might add a constant term to the expression. If you want the constant separately,
-    use :func:`only_positive_bv_wsum_const`.
+    It might add a constant term to the expression, e.g. `3*~b + 2*c` is transfromed to `3 + -3*b + 2*c`.
+    If you want the constant separately, use :func:`only_positive_bv_wsum_const`.
 
     Arguments:
         expr: Linear expression (NumVar, sum, or wsum) that may contain NegBoolView.
@@ -518,7 +521,7 @@ def only_positive_bv_wsum(expr: Expression) -> Expression:
 def only_positive_bv_wsum_const(cpm_expr: Expression) -> Tuple[Expression, int]:
     """
     Replaces a var/sum/wsum expression containing :class:`~cpmpy.expressions.variables.NegBoolView`
-    with an equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`,
+    with an equivalent expression using only :class:`~cpmpy.expressions.variables._BoolVarImpl`,
     and returns the constant term separately.
 
     If you want the expression where the constant term is part of the wsum returned,
