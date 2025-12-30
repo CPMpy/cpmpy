@@ -32,7 +32,7 @@ from ..expressions.python_builtins import all as cpm_all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
 
-def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set(), supported_reified: Set[str] = set(), csemap: Optional[Dict[Expression, Expression]] = None) -> List[Expression]:
+def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set(), supported_reified: Set[str] = set(), csemap: Optional[Dict[Expression, Expression]] = None, _nested=False) -> List[Expression]:
     """
         Decomposes any global constraint not supported by the solver.
         Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions.
@@ -40,6 +40,7 @@ def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set()
         :param supported: a set of supported global constraints or global functions
         :param supported_reified: a set of supported reified global constraints (globals with Boolean return type only)
         :param csemap: a dictionary of CSE-mapped expressions, used to re-use expressions that have already been decomposed
+        :param _nested: whether to treat the root-level as nested, false by default. For internal use only.
         
         Special care is taken for unsupported global constraints in reified (nested) contexts
 
@@ -66,7 +67,7 @@ def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set()
                 if isinstance(expr, NDVarArray): # NDVarArray is also an expression,
                                                  # so we can call has_subexpr on it for a possible early-exit
                     if expr.has_subexpr():
-                        newexpr = decompose_in_tree(expr, supported, supported_reified, _toplevel, nested=True, csemap=csemap)
+                        newexpr = decompose_helper(expr, nested=True)
                         newlist.append(cpm_array(newexpr))
                     else:
                         newlist.append(expr)
@@ -114,15 +115,15 @@ def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set()
         assert len(newlist) == len(lst_of_expr), f"Decomposition should not change the number of expressions\n{lst_of_expr}\n{newlist}"
         return newlist
         
-    newlist = decompose_helper(lst_of_expr, nested=False)
+    newlist = decompose_helper(lst_of_expr, nested=_nested)
     if len(toplevel):
-        toplevel = decompose_in_tree(toplevel_list(toplevel), supported, supported_reified, csemap=csemap)
-    return toplevel_list(newlist) + toplevel
+        toplevel = decompose_in_tree(toplevel, supported, supported_reified, csemap=csemap, _nested=_nested)
+    return newlist + toplevel
 
 
 def decompose_objective(expr, supported=set(), supported_reified=set(), csemap=None):
     if is_any_list(expr):
         raise ValueError(f"Expected a numerical expression as objective but got a list {expr}")
 
-    decomp_expr, *toplevel = decompose_in_tree([expr], supported=supported, supported_reified=supported_reified, csemap=csemap)
+    decomp_expr, *toplevel = decompose_in_tree([expr], supported=supported, supported_reified=supported_reified, csemap=csemap, _nested=True)
     return decomp_expr, toplevel
