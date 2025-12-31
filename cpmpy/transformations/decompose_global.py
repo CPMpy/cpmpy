@@ -117,7 +117,7 @@ def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set()
         
     newlist = decompose_helper(lst_of_expr, nested=_nested)
     if len(toplevel):
-        toplevel = decompose_in_tree(toplevel, supported, supported_reified, csemap=csemap, _nested=_nested)
+        toplevel = decompose_in_tree(toplevel_list(toplevel), supported, supported_reified, csemap=csemap, _nested=_nested)
     return newlist + toplevel
 
 
