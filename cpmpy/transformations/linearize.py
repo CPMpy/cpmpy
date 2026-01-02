@@ -68,7 +68,7 @@ from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is
 from ..expressions.variables import boolvar, _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..transformations.int2bool import _encode_int_var
 
-def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, reified: bool = False, csemap: Optional[Dict[Expression, _NumVarImpl]] = None) -> List[Expression]:
+def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, reified: bool = False, csemap: Optional[Dict[Expression, _NumVarImpl]] = None) -> Tuple[Expression, List[Expression]]:
     """
     Linearizes multiplication comparisons (const*var | bool*bool | bool*int | int*int) <cmp> rhs.
 
@@ -80,14 +80,16 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
         csemap (Optional[Dict[Any, Any]]): Optional dictionary for common subexpression elimination, mapping expressions to their flattened variable representations. Used to avoid creating duplicate variables for the same subexpression.
 
     Returns:
-        List of linearized CPMpy expressions.
+        Tuple of (return expression, list of toplevel constraints)
+        Warning: the return expression is either a linearized comparison, or an 'and' of linearized comparisons
     """
+    assert isinstance(cpm_expr, Comparison), f"linearize_mul_comparison expects a comparison, got {cpm_expr}"
     lhs, rhs = cpm_expr.args
     assert lhs.name == "mul", f"linearize_mul_comparison expects a multiplication comparison, got {lhs}"
 
     if is_num(lhs.args[0]): # const * iv <comp> rhs
-        lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
-        return linearize_constraint([eval_comparison(cpm_expr.name, lhs, rhs)], supported=supported, reified=reified, csemap=csemap)
+        newlhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
+        return eval_comparison(cpm_expr.name, newlhs, rhs), []
     
     bv_idx = None
     if isinstance(lhs.args[0], _BoolVarImpl):
@@ -99,12 +101,25 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
         # bv * iv <comp> rhs, rewrite to (bv -> iv <comp> rhs) & (~bv -> 0 <comp> rhs)
         # (also works for bv1*bv2 <comp> rhs)
         bv, iv = lhs.args[bv_idx], lhs.args[1-bv_idx]
-        bv_true = bv.implies(eval_comparison(cpm_expr.name, iv, rhs))
-        bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
-        return linearize_constraint(simplify_boolean([bv_true, bv_false]), supported=supported, reified=reified, csemap=csemap)
+        tmp_supported = supported
+        if reified and "->" in supported:
+            # when inside a '->', we have to force Big-M instead of a nested '->'
+            tmp_supported = supported - {"->"}
+        iftrue = linearize_constraint([eval_comparison(cpm_expr.name, iv, rhs)], supported=tmp_supported, implication_literal=bv, csemap=csemap)
+        iffalse = linearize_constraint([eval_comparison(cpm_expr.name, 0, rhs)], supported=tmp_supported, implication_literal=~bv, csemap=csemap)
+        # all of this will be cleaner when Mul is a global function...
+        # lets put some checks for not having toplevel constraints in iftrue/iffalse
+        if cpm_expr.name == '!=' or cpm_expr.name == '==':
+            assert len(iftrue) <= 2 and len(iffalse) <= 2, f"Expected at most 2 constraints for != in bv*iv, got {iftrue} and {iffalse}"
+        else:
+            assert len(iftrue) <= 1 and len(iffalse) <= 1, f"Expected at most 1 constraint in bv*iv, got {iftrue} and {iffalse}"
+        # this is the case that returns an 'and'... at least if both are non-trivial expressions
+        simplified = simplify_boolean([cp.all(iftrue + iffalse)])[0]
+        return simplified, []
     else:
         # iv1 * iv2 <comp> rhs, do Boolean expansion of smallest integer
         # resulting in sum([v*b*i2 for v,b in int2bool(i1)]) <comp> rhs
+        # Note that this is a straightforward implementation, one could do more by knowing <comp> rhs and deriving bounds on i1/i2 from that...
 
         # choose smallest integer as i1 (to minimize the number of Boolean variables)
         i1,i2 = lhs.args
@@ -118,13 +133,18 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
         # (with temproary ivarmap: no sharing of integer encodings... where would we store ivarmap?)
         # (TODO: int2bool should support csemap... then it could still reuse the encoding Bools)
         encoding = "direct"
-        if min(leni1,leni2) >= 8:  # arbitrary heuristic
-            encoding = "binary"  # results in fewer Bools
+        # XXX I have not figured out how to get it right for the binary encoding... esp if i1 has negative and positive values
+        #if min(leni1,leni2) >= 8:  # arbitrary heuristic
+        #    encoding = "binary"  # results in fewer Bools
         i1_enc, cons = _encode_int_var({}, i1, encoding)  # {}: no ivarmap used
 
         # channel i1 to the Bools
         (encpairs, offset) = i1_enc.encode_term()
-        cons += [i1 - cp.sum(v*bv for v,bv in encpairs) == offset]
+        # i1 = sum(ws * bs) + offset :: 1*i1 - sum(ws*bs) == offset :: i1 + sum(-ws*bs) == offset
+        ws,bs = zip(*encpairs)
+        ws = [1] + [-1*w for w in ws]
+        bs = [i1] + list(bs)
+        cons += [Operator("wsum", [ws, bs]) == offset]
 
         # Build the sum: aux = sum(v * (b_v * i2) for v,bv in encoding)
         terms = []
@@ -138,20 +158,30 @@ def linearize_mul_comparison(cpm_expr: Comparison, supported: Set[str] = {}, rei
                     csemap[mymul] = myaux
 
                 # the definition of myaux, to linearize
-                cons += linearize_mul_comparison(mymul == myaux, supported=supported, reified=reified, csemap=csemap)
+                res, subcons = linearize_mul_comparison(mymul == myaux, supported=supported, reified=reified, csemap=csemap)
+                if res.name == "and":
+                    # to be exepected, will return 2 constraints, both are linear
+                    cons += res.args
+                else:  # just a single linear constraint
+                    cons.append(res)
+                cons += subcons
             # the term for in the multiplication
             terms.append((offset + v) * myaux)
         assert len(terms) > 0, f"Expected at least one term, got {terms} for {cpm_expr} with encoding {encoding}"
 
-        return linearize_constraint([eval_comparison(cpm_expr.name, cp.sum(terms), rhs)]+cons, supported=supported, reified=reified, csemap=csemap)
+        # I think everything is linear here...
+        return eval_comparison(cpm_expr.name, cp.sum(terms), rhs), cons
 
-def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"sum","wsum","->"}, reified: bool = False, csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
+def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {}, csemap: Optional[Dict[Expression, _NumVarImpl]] = None, implication_literal: Optional[Union[_BoolVarImpl, NegBoolView]] = None, reified: bool = False) -> List[Expression]:
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
     Only apply after :func:'cpmpy.transformations.flatten_model.flatten_constraint()' and :func:'cpmpy.transformations.reification.only_implies()'.
 
     After linearize, the following constraints remain:
+
+    **Trivial:**
+        - ``BoolVal``
 
     **Linear comparisons:**
         Equality and non-strict inequality comparison where the left-hand side is
@@ -194,236 +224,339 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {"
     Arguments:
         lst_of_expr: List of CPMpy expressions to linearize. Must be in 'flat normal form'
             with only boolean variables on the left-hand side of implications.
-        supported: Set of constraint and variable type names that are supported by the target
-            solver, e.g. `{"sum", "wsum", "->", "and", "or", "alldifferent"}`.
-            :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization
-            and is decomposed as such if not in `supported`.
-            Any other unsupported global constraint should be decomposed using
-            :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`.
-        reified: Whether the constraint is half-reified (e.g. `b -> expr`). When True, nested implications
-            are linearized using Big-M method instead of indicator constraints.
+        supported: Set of *primitive* constraint that should not be linearized (e.g. '->', 'and', 'or', 'mul', 'alldifferent').
+            '->' in case the solver supports implication constraints
+            'and', 'or' in case of e.g. a SAT solver
+            'mul' if the solver supports multiplication of two variables (otherwise it is linearized)
+            'alldifferent' if the solver supports it natively (otherwise this function uses a linear-friendly decomposition)
         csemap: Optional dictionary for common subexpression elimination, mapping expressions
             to their flattened variable representations. Used to avoid creating duplicate
             variables for the same subexpression.
+        implication_literal: when set to, e.g. 'b' this means we should linearize `b -> lst_of_expr`.
+            This is typically done in a recursive call, e.g. this function will call it when encountering a 'b -> expr' if '->' is not in supported.
+            When an implication literal is given, a '->' inside it will always be linearized using Big-M even if '->' is in 'supported'.
+        reified: DEPRECATED, should always be False (use 'implication_literal' instead)
 
     Returns:
         List of linearized CPMpy expressions. The constraints are in one of the forms
         described above (linear comparisons, general expressions, or indicator constraints).
     """
+    if reified:
+        raise DeprecationWarning("linearize_constraint: 'reified' argument is deprecated, use 'implication_literal' instead")
+    if csemap is None:
+        csemap = dict()
 
+    toplevel = []  # constraints that define auxiliaries
+                   # not part of the 'implication_literal -> lst_of_expr' implication
+                   # should be linear
     newlist = []
     for cpm_expr in lst_of_expr:
-        # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
-        if isinstance(cpm_expr, _BoolVarImpl):
-            if "or" in supported:
-                # post clause explicitly (don't use cp.any, which will just return the BoolVar)
-                newlist.append(Operator("or", [cpm_expr]))
-            elif isinstance(cpm_expr, NegBoolView):
-                # might as well remove the negation
-                newlist.append(sum([~cpm_expr]) <= 0)
-            else: # positive literal
-                newlist.append(sum([cpm_expr]) >= 1)
 
-        # Boolean operators
-        elif isinstance(cpm_expr, Operator) and cpm_expr.is_bool():
-            # conjunction
-            if cpm_expr.name == "and" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= len(cpm_expr.args))
-
-            # disjunction
-            elif cpm_expr.name == "or" and cpm_expr.name not in supported:
-                newlist.append(sum(cpm_expr.args) >= 1)
-
-            # reification
-            elif cpm_expr.name == "->":
-                # determine direction of implication
-                cond, sub_expr = cpm_expr.args
-                assert isinstance(cond, _BoolVarImpl), f"Linearization of {cpm_expr} is not supported, lhs of " \
-                                                       f"implication must be boolvar. Apply `only_implies` before " \
-                                                       f"calling `linearize_constraint`"
-
-                if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
-                    # shortcut for BV -> BV, convert to disjunction and apply linearize on it
-                    newlist.append(1 * cond + -1 * sub_expr <= 0)
-
-                # BV -> LinExpr
-                elif isinstance(cond, _BoolVarImpl):
-                    lin_sub = linearize_constraint([sub_expr], supported=supported, reified=True, csemap=csemap)
-                    # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
-                    indicator_constraints=[]
-                    for lin in lin_sub:
-                        if is_true_cst(lin):
-                            continue
-                        elif is_false_cst(lin):
-                            indicator_constraints=[] # do not add any constraints
-                            newlist += linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified) # post linear version of unary constraint
-                            break # do not need to add other
-                        elif "->" in supported and not reified:
-                            indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
-                        else: # need to linearize the implication constraint itself
-                            # either -> is not supported, or we are in a reified context (nested -> constraints are not linear)
-                            assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
-                            if lin.args[0].name not in {"sum", "wsum"}:
-                                assert lin.args[0].name in supported, f"Unexpected rhs of implication: {lin}, it is not supported ({supported})"
-                                indicator_constraints.append(cond.implies(lin))
-                                continue
-
-                            # need to write as big-M
-                            assert lin.args[0].name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as rhs of implication constraint, but got {lin}"
-                            assert is_num(lin.args[1])
-                            lb, ub = get_bounds(lin.args[0])
-                            if lin.name == "<=":
-                                M = lin.args[1] - ub # subtracting M from lhs will always satisfy the implied constraint
-                                lin.args[0] += M * ~cond
-                                indicator_constraints.append(lin)
-                            elif lin.name == ">=":
-                                M = lin.args[1] - lb # adding M to lhs will always satisfy the implied constraint
-                                lin.args[0] += M * ~cond
-                                indicator_constraints.append(lin)
-                            elif lin.name == "==":
-                                indicator_constraints += linearize_constraint([cond.implies(lin.args[0] <= lin.args[1]),
-                                                                               cond.implies(lin.args[0] >= lin.args[1])],
-                                                                              supported=supported, reified=reified, csemap=csemap)
-                            else:
-                                raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
-                    newlist+=indicator_constraints
-
-                    # ensure no new solutions are created
-                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr)) - {cond, ~cond}
-                    newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified, csemap=csemap)
-
-            else: # supported operator
-                newlist.append(cpm_expr)
-
-
-        # comparisons
-        elif isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
-
-            if lhs.name == "sub":
-                # convert to wsum
-                lhs = Operator("wsum", [[1, -1], [lhs.args[0], lhs.args[1]]])
-                cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
-
-            if lhs.name == "-":
-                lhs = Operator("wsum", [[-1], [lhs.args[0]]])
-                cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
-
-            # linearize unsupported operators
-            elif isinstance(lhs, Operator) and lhs.name not in supported:
-
-                if lhs.name == "mul":
-                    newlist += linearize_mul_comparison(cpm_expr, supported=supported, reified=reified, csemap=csemap)
-                    continue
+        # pre-process non-comparisons
+        if not isinstance(cpm_expr, Comparison):
+            if is_bool(cpm_expr):  # constant true/false
+                if is_true_cst(cpm_expr):
+                    continue  # trivially true, skip
+                elif is_false_cst(cpm_expr):
+                    if implication_literal is not None:
+                        # needs further processing below until we accept a BoolVar as response
+                        toplevel.extend(linearize_constraint([~implication_literal], supported=supported, csemap=csemap))
+                        continue
+                    else:
+                        return [BoolVal(False)]
                 else:
-                    raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
-                                                            f" be any of {supported | {'sub'} } but is {lhs}. "
-                                                            f"Please report on github")
+                    raise ValueError(f"Unexpected numeric expression {cpm_expr} in {lst_of_expr}")
 
-            elif isinstance(lhs, GlobalFunction) and lhs.name not in supported:
-                raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
-                                 "`cpmpy.transformations.decompose_global.decompose_in_tree() first")
+            if isinstance(cpm_expr, Operator):
+                # pre-process Boolean operators: 'and', 'or', '->'
+                op_name = cpm_expr.name
 
-            [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
-            lhs, rhs = cpm_expr.args
+                if op_name == "->":
+                    cond, sub_expr = cpm_expr.args
+                    # verify cond is a Boolean literal, always when `only_implies` has been called
+                    assert isinstance(cond, _BoolVarImpl), f"Linearize of {cpm_expr} expects a Boolean literal left of the implication"
 
-            if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
-                # very special case, avoid writing as sum of 1 argument
-                new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
-                assert len(new_expr) == 1
-                newlist.append(Operator("or", new_expr))
+                    # even if -> is supported, the sub_expr must get the recursive call
+                    newlist.extend(linearize_constraint([sub_expr], supported=supported, implication_literal=cond, csemap=csemap))
+                    continue
+                elif op_name in supported:
+                    # operator is supported, do nothing
+                    newlist.append(cpm_expr)
+                    continue
+                elif op_name == "or":
+                    # rewrite to linear constraint and process that one further
+                    cpm_expr = Operator("sum", cpm_expr.args) >= 1
+                elif op_name == "and":
+                    # rewrite to linear constraint and process that one further
+                    cpm_expr = Operator("sum", cpm_expr.args) >= len(cpm_expr.args)
+                else:
+                    raise ValueError(f"Unexpected operator {op_name} in {cpm_expr}")
+
+            elif cpm_expr.name in supported or isinstance(cpm_expr, (DirectConstraint, BoolVal)):
+                newlist.append(cpm_expr)
                 continue
 
+            # pre-process alldifferent in linear-friendly way (ideally done before flattening)
+            elif cpm_expr.name == "alldifferent": 
+                """
+                    Flow-based decomposition. Introduces n^2 new boolean variables.
+                    Decomposes through bi-partite matching
 
+                    More efficient implementations possible?
+                    http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
+                """
+                # In some future:
+                #value, cons = cpm_expr.decompose_linear()
+                #assert value.name == "and", f"Linearize alldiff: expected an 'and' of constraints, got {value}"
+                # recurse on arguments, with implication literal, then these are fully handled
+                #toplevel.extend(linearize_constraint(value.args, supported=supported, csemap=csemap, implication_literal=implication_literal))
+                # recurse on the defining constraints, toplevel so no implication literal
+                #toplevel.extend(linearize_constraint(cons, supported=supported, csemap=csemap))
+                #continue
+
+                # make a boolvar array for each variable, define the encoding variables
+                # lets go through all the manual steps to keep everything nicely linear ourselfs
+                args_encoded = []
+                for var in cpm_expr.args:
+                    if is_num(var):
+                        args_encoded.append(var)
+                    else:
+                        # use int2bool to make a direct encoding (it should really have a csemap...)
+                        var_enc, cons = _encode_int_var({}, var, "direct")  # {}: no ivarmap used
+                        # channel int to bools:
+                        (encpairs, offset) = var_enc.encode_term()
+                        # i1 = sum(vs * bs) + offset :: 1*i1 - sum(vs*bs) == offset
+                        ws,vs = zip(*encpairs)
+                        ws = [1] + [-1*w for w in ws]
+                        vs = [var] + list(vs)
+                        cons.append(Operator("wsum", [ws, vs]) == offset)
+
+                        # enforce domain and channel constraints:
+                        toplevel.extend(linearize_constraint(cons, supported=supported, csemap=csemap))
+                        args_encoded.append(var_enc)
+
+                # each value can be taken at most once
+                value_cons = []  # replaces alldifferent by the conjunction of the constraint for each value
+                lbs, ubs = get_bounds(cpm_expr.args)
+                for i in range(min(lbs), max(ubs)+1):
+                    var_eq_i = []
+                    for var_enc in args_encoded:
+                        if is_num(var_enc):
+                            if var_enc == i:
+                                var_eq_i.append(BoolVal(True))
+                            # else: skip, False anyway
+                        else:
+                            var_eq_i.append(var_enc.eq(i))
+                    value_cons.append(cp.sum(var_eq_i) <= 1)
+                # Now... we have a list, and we could be reified; so handled recursevly and add to toplevel
+                toplevel += linearize_constraint(value_cons, supported=supported, csemap=csemap, implication_literal=implication_literal)
+                continue
+
+            # pre-process Boolean literals, handled as trivial linears or unit clauses depending on 'supported'
+            # TODO: I think we should accept that it returns BoolVar? easy to support in solver?
+            elif isinstance(cpm_expr, _BoolVarImpl):
+                if "or" in supported:
+                    # for SAT solvers: post a clause explicitly
+                    # (don't use cp.any, which will just return the BoolVar)
+                    newlist.append(Operator("or", [cpm_expr]))
+                    continue
+                elif isinstance(cpm_expr, NegBoolView):
+                    # negative literal: might as well remove the negation
+                    cpm_expr = Operator("sum", [~cpm_expr]) <= 0
+                else: # positive literal
+                    cpm_expr = Operator("sum", [cpm_expr]) >= 1
+            
+            else:
+                raise ValueError(f"Unexpected non-comparison expression {cpm_expr} in {lst_of_expr}")
+
+            # if you are still here, the expr must be rewritten to a comparison
+            assert isinstance(cpm_expr, Comparison), f"Linearize, after pre-process: expected a comparison, got {cpm_expr}"
+
+        # comparisons (including ones created during pre-processing)
+        cmp_name = cpm_expr.name
+        lhs, rhs = cpm_expr.args
+        lhs_name = lhs.name
+
+        if lhs_name in supported:  # TODO, should we discriminate between reified and non-reified?
+            # e.g. gurobi's generalized constraints
+            # only accepts <=, >= and ==, so transform <, > and !=
+            if cmp_name == "<" or cmp_name == ">":
+                delta = -1 if cmp_name == "<" else 1
+                cmp_name = "<=" if cmp_name == "<" else ">="
+                if is_int(rhs):
+                    new_rhs = rhs + delta
+                else:
+                    # need to introduce a new variable for rhs+delta
+                    new_rhs, cons = get_or_make_var(rhs + delta, csemap=csemap)
+                    toplevel += linearize_constraint(cons, csemap=csemap)
+
+                # the new inequality
+                newlist.append(eval_comparison(cmp_name, lhs, new_rhs))
+            elif cmp_name == "!=":
+                # TODO should we use csemap here? These are implications, not equalities...
+                if implication_literal is None:
+                    # lhs != rhs :: (lhs < rhs) xor (lhs > rhs)
+                    #            :: z -> lhs < rhs, ~z -> lhs > rhs
+                    z = boolvar()
+                    toplevel += linearize_constraint([lhs < rhs], supported=supported, implication_literal=z, csemap=csemap)
+                    toplevel += linearize_constraint([lhs > rhs], supported=supported, implication_literal=~z, csemap=csemap)
+                    continue  # this entry fully handled
+                else:
+                    # b -> lhs != rhs :: b -> z1 + z2 == 1, toplevel: z1 -> lhs < rhs, z2 -> lhs > rhs
+                    # we are inside a '->', so we have to force Big-M instead of a nested '->'
+                    tmp_supported = supported if '->' not in supported else supported - {"->"}
+                    z1 = boolvar()
+                    toplevel += linearize_constraint([lhs < rhs], supported=tmp_supported, implication_literal=z1, csemap=csemap)
+                    z2 = boolvar()
+                    toplevel += linearize_constraint([lhs > rhs], supported=tmp_supported, implication_literal=z2, csemap=csemap)
+                    newlist.append(z1 + z2 == 1)
+            else:
+                # just post the original
+                newlist.append(cpm_expr)
+
+        else:
+            # lets make the comparison a canonical linear comparison
+
+            # some LHS rewrites before canonicalization
+            if lhs_name == "mul":
+                # convert x * y to wsum
+                reified = implication_literal is not None
+                cpm_expr, cons = linearize_mul_comparison(cpm_expr, supported=supported, reified=reified, csemap=csemap)
+                toplevel += cons
+                if cpm_expr.name == "and":
+                    # special case!! our `bv*iv CMP x` is now two constraints...
+                    # we need to recurse on cpm_expr.args with our optional implication literal,
+                    # and make sure it is not treated further: add to toplevel
+                    toplevel += linearize_constraint(cpm_expr.args, supported=supported, csemap=csemap, implication_literal=implication_literal)
+                    continue
+                elif not isinstance(cpm_expr, Comparison):
+                    # for example it can be a b -> linexpr
+                    toplevel += linearize_constraint([cpm_expr], supported=supported, csemap=csemap, implication_literal=implication_literal)
+                    continue
+                # else cpm_expr is a single linear constraint, continue as expected
+
+            # TODO: make this inline?
+            [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
+            if is_bool(cpm_expr):
+                if is_false_cst(cpm_expr):
+                    if implication_literal is None:
+                        return [BoolVal(False)]
+                    else:
+                        toplevel.extend(linearize_constraint([~implication_literal], supported=supported, csemap=csemap))
+                        continue
+                # else: trivially true, skip
+                continue
+            # SHOULD INCLUDE THE OLD:
+            #if lhs_name == "sub": # convert x - y to wsum
+            #    lhs = Operator("wsum", [[1, -1], [lhs.args[0], lhs.args[1]]])
+            #    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+            #elif lhs_name == "-": # convert -x to wsum
+            #    lhs = Operator("wsum", [[-1], [lhs.args[0]]])
+            #    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
+            # update the helper variables after canonicalization
+            cmp_name = cpm_expr.name
+            lhs, rhs = cpm_expr.args
+            lhs_name = lhs.name
+            assert is_int(rhs), f"Linearize canonical comparison: expected integer rhs, got {rhs} from {cpm_expr}"
+
+            # Should be fixed elsewhere
+            #if "or" in supported and lhs_name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl):
+            #    # very special case, avoid writing as sum of 1 argument
+            #    newlist.append(Operator("or", [lhs.args[0]]))
+            #    continue
 
             # check trivially true/false (not allowed by PySAT Card/PB)
-            if cpm_expr.name in ('<', '<=', '>', '>=') and is_num(rhs):
+            if cpm_expr.name in ('<', '<=', '>', '>='):
                 lb,ub = lhs.get_bounds()
                 t_lb = eval_comparison(cpm_expr.name, lb, rhs)
                 t_ub = eval_comparison(cpm_expr.name, ub, rhs)
                 if t_lb and t_ub:
                     continue
                 elif not t_lb and not t_ub:
-                    newlist += linearize_constraint([BoolVal(False)], supported=supported, csemap=csemap) # post the linear version of False
-                    break
+                    if implication_literal is None:
+                        return [BoolVal(False)]
+                    else:
+                        toplevel.extend(linearize_constraint([~implication_literal], supported=supported, csemap=csemap))
+                        continue
 
-            # now fix the comparisons themselves
+            # fix the comparisons if needed
             if cpm_expr.name == "<":
-                new_rhs, cons = get_or_make_var(rhs - 1, csemap=csemap) # if rhs is constant, will return new constant
-                newlist.append(lhs <= new_rhs)
-                newlist += linearize_constraint(cons, csemap=csemap)
+                #cmp_name = "<="
+                #rhs = rhs - 1
+                newlist.append(lhs <= rhs - 1)
             elif cpm_expr.name == ">":
-                new_rhs, cons = get_or_make_var(rhs + 1, csemap=csemap) # if rhs is constant, will return new constant
-                newlist.append(lhs >= new_rhs)
-                newlist += linearize_constraint(cons, csemap=csemap)
+                #cmp_name = ">="
+                #rhs = rhs + 1
+                newlist.append(lhs >= rhs + 1)
             elif cpm_expr.name == "!=":
                 # Special case: BV != BV
                 if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
                     newlist.append(lhs + rhs == 1)
-
-                if reified or (isinstance(lhs, (Operator, GlobalConstraint)) and lhs.name not in {"sum","wsum"}):
-                    # lhs is sum/wsum and rhs is constant OR
-                    # lhs is GenExpr and rhs is constant or var
-                    #  ... what requires less new variables?
-                    # Big M implementation
-                    # M is chosen so that
-                    # lhs - rhs + 1 <= M*z
-                    # rhs - lhs + 1 <= M*~z
-                    # holds
-                    z = boolvar()
-                    # Calculate bounds of M = |lhs - rhs| + 1
-                    _, M1 = (lhs - rhs + 1).get_bounds()
-                    _, M2 = (rhs - lhs + 1).get_bounds()
-                    cons = [lhs + -M1*z <= rhs-1, lhs  + -M2*z >= rhs-M2+1]
-                    newlist += linearize_constraint(flatten_constraint(cons, csemap=csemap), supported=supported, reified=reified, csemap=csemap)
-
                 else:
-                    # introduce new indicator constraints
+                    # TODO should we use csemap here? These are implications, not equalities...
                     z = boolvar()
-                    constraints = [z.implies(lhs < rhs), (~z).implies(lhs > rhs)]
-                    newlist += linearize_constraint(constraints, supported=supported, reified=reified, csemap=csemap)
+                    tmp_supported = supported
+                    if implication_literal is not None and '->' in supported:
+                        tmp_supported = supported - {"->"}
+                    ztrue = linearize_constraint([lhs < rhs], supported=tmp_supported, implication_literal=z, csemap=csemap)
+                    zfalse = linearize_constraint([lhs > rhs], supported=tmp_supported, implication_literal=~z, csemap=csemap)
+                    toplevel += linearize_constraint(ztrue + zfalse, supported=supported, implication_literal=implication_literal, csemap=csemap)
+                    continue  # this entry fully handled
             else:
-                # supported comparison
-                newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
-
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name in supported:
-            newlist.append(cpm_expr)
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name not in supported:
-            """
-                More efficient implementations possible
-                http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
-                Introduces n^2 new boolean variables
-                Decomposes through bi-partite matching
-            """
-            # TODO check performance of implementation
-            if reified is True:
-                raise ValueError("Linear decomposition of AllDifferent does not work reified. "
-                                 "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
-
-            lbs, ubs = get_bounds(cpm_expr.args)
-            lb, ub = min(lbs), max(ubs)
-            n_vals = (ub-lb) + 1
-
-            x = boolvar(shape=(len(cpm_expr.args), n_vals))
-
-            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
-            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
-
-            # link Boolean matrix and integer variable
-            for arg, row in zip(cpm_expr.args, x):
-                if is_num(arg): # constant, fix directly
-                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
-                else: # ensure result is canonical
-                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
-
-        elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
-            newlist.append(cpm_expr)
-
-        elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
-            raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
-                             f"`cpmpy.transformations.decompose_global.decompose_global() first")
-
-    return newlist
+                newlist.append(cpm_expr)
+        
+    # we now have canonical comparisons (var|sum|wsum (=|<=|>=) int) in 'newlist'
+    # handle the implication part if present
+    if implication_literal is not None:
+        if '->' in supported:
+            # implications natively suppported
+            newlist = [implication_literal.implies(cpm_expr) for cpm_expr in newlist]
+        else:
+            # linearize with Big-M
+            # BV -> (C1 and ... and Cn) == (BV -> C1) and ... and (BV -> Cn)
+            linlist = []
+            # first replace each '==' by two '<=' and '>='
+            for lin in newlist:
+                if lin.name == '==':
+                    linlist.append(lin.args[0] <= lin.args[1])
+                    linlist.append(lin.args[0] >= lin.args[1])
+                else:
+                    linlist.append(lin)
+            # new overwrite newlist with the Big-Md constraints
+            newlist = []
+            for lin in linlist:
+                if is_num(lin):
+                    if is_false_cst(lin):
+                        # cond must be false... (TODO: until we decide to accept boolvar, recurse)
+                        return linearize_constraint([~cond], supported=supported, csemap=csemap)
+                    # else: trivially true, skip this one
+                elif isinstance(lin, _BoolVarImpl):
+                    # shortcut for (impl -> expr) :: (~impl | expr) :: (~impl + expr >= 1) :: (1-impl + expr >= 1) :: wsum([-1,1], [impl, expr]) >= 0
+                    newlist.append(Operator("wsum", [[-1,1], [implication_literal, lin]]) >= 0)
+                else:
+                    # need to linearize the implication constraint itself
+                    if lin.name == "or":
+                        # Argh, stupid special cases... this could happen for other supported constraints too, if '->' is not supported
+                        newlist.append(Operator("or", [~implication_literal]+lin.args))
+                        continue
+                    assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
+                    lhs,rhs = lin.args
+                    assert lhs.name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as lhs of implication constraint, but got {lhs}"
+                    assert is_num(rhs)  # unnecessary assert
+                    lb, ub = get_bounds(lhs)
+                    if lin.name == "<=":
+                        M = rhs - ub # subtracting M from lhs will always satisfy the implied constraint
+                        newlist.append(lhs + M*~implication_literal <= rhs)
+                    elif lin.name == ">=":
+                        M = rhs - lb # adding M to lhs will always satisfy the implied constraint
+                        newlist.append(lhs + M*~implication_literal >= rhs)
+                    else:
+                        raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
+    
+    if len(newlist) == 0 and len(toplevel) == 0:
+        # all constraints are trivially true
+        return [BoolVal(True)]
+    return newlist + toplevel
 
 def only_positive_bv(lst_of_expr: List[Expression], csemap: Optional[Dict[Any, Any]] = None) -> List[Expression]:
     """
@@ -659,7 +792,7 @@ def canonical_comparison(lst_of_expr: Union[Expression, List[Expression]]) -> Li
                         new_args = []
                         for i, arg in enumerate(lhs.args):
                             if is_num(arg):
-                                rhs -= arg
+                                rhs -= int(arg)
                             else:
                                 new_args.append(arg)
                         lhs = Operator("sum", new_args)
@@ -668,7 +801,7 @@ def canonical_comparison(lst_of_expr: Union[Expression, List[Expression]]) -> Li
                         new_weights, new_args = [], []
                         for i, (w, arg) in enumerate(zip(*lhs.args)):
                             if is_num(arg):
-                                rhs -= w * arg
+                                rhs -= w * int(arg)
                             else:
                                 new_weights.append(w)
                                 new_args.append(arg)

@@ -7,8 +7,8 @@ import cpmpy as cp
 from abc import ABC, abstractmethod
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.core import Comparison, Operator, BoolVal
-from ..expressions.core import Expression
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.utils import is_int
 
 UNKNOWN_COMPARATOR_ERROR = ValueError("Comparator is not known or should have been simplified by linearize.")
 EMPTY_DOMAIN_ERROR = ValueError("Attempted to encode variable with empty domain (which is unsat)")
@@ -54,12 +54,13 @@ def _encode_expr(ivarmap, expr, encoding):
         elif type(lhs) is _IntVarImpl:
             return _encode_comparison(ivarmap, lhs, expr.name, rhs, encoding)
         elif lhs.name == "sum":
-            if len(lhs.args) == 1:
-                return _encode_expr(
-                    ivarmap, Comparison(expr.name, lhs.args[0], rhs), encoding
-                )  # even though it seems trivial (to call `_encode_comparison`), using recursion avoids bugs
-            else:
-                return _encode_linear(ivarmap, lhs.args, expr.name, rhs, encoding)
+            # No longer remove the sum if only one arg... pysat expects to keep it this way
+            #if len(lhs.args) == 1:
+            #    return _encode_expr(
+            #        ivarmap, Comparison(expr.name, lhs.args[0], rhs), encoding
+            #    )  # even though it seems trivial (to call `_encode_comparison`), using recursion avoids bugs
+            #else:
+            return _encode_linear(ivarmap, lhs.args, expr.name, rhs, encoding)
         elif lhs.name == "wsum":
             return _encode_linear(
                 ivarmap,
@@ -101,6 +102,7 @@ def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None, check_bounds=T
 
     Returns (newexpr, newcons)
     """
+    assert is_int(rhs), f"_encode_linear: expected integer rhs, got {rhs}"
     if weights is None:
         weights = len(xs) * [1]
 
