@@ -42,8 +42,8 @@ from datetime import timedelta
 from typing import Optional
 
 from ..exceptions import NotSupportedError
-from ..expressions.utils import eval_comparison
 from ..expressions.core import BoolVal, Comparison
+from ..expressions.utils import eval_comparison
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
@@ -91,9 +91,10 @@ class CPM_pindakaas(SolverInterface):
     @staticmethod
     def version() -> Optional[str]:
         """Return the installed version of the solver's Python API."""
-        from importlib.metadata import version, PackageNotFoundError
+        from importlib.metadata import PackageNotFoundError, version
+
         try:
-            return version('pindakaas')
+            return version("pindakaas")
         except PackageNotFoundError:
             return None
 
@@ -235,10 +236,13 @@ class CPM_pindakaas(SolverInterface):
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-        cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized MIP decomp in linearize
-                                     supported_reified=self.supported_reified_global_constraints,
-                                     csemap=self._csemap)
+        cpm_cons = decompose_in_tree(
+            cpm_cons,
+            supported=self.supported_global_constraints
+            | {"alldifferent"},  # alldiff has a specialized MIP decomp in linearize
+            supported_reified=self.supported_reified_global_constraints,
+            csemap=self._csemap,
+        )
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
