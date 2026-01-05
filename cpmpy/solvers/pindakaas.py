@@ -230,7 +230,7 @@ class CPM_pindakaas(SolverInterface):
                 enc = self.ivarmap[cpm_var.name]
             return self.solver_vars(enc.vars())
         else:
-            raise TypeError
+            raise TypeError(f"Unexpected type: {cpm_var}")
 
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)
@@ -273,20 +273,24 @@ class CPM_pindakaas(SolverInterface):
         """Add a single, *transformed* constraint, implied by conditions."""
         import pindakaas as pdk
 
+        def add_clause(clause, conditions):
+            """Add a clause implied by conditions; both arguments are lists of CPMpy literals."""
+            self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + clause))
+
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                self.pdk_solver.add_clause(conditions)
+                add_clause([], conditions)
 
         elif isinstance(cpm_expr, _BoolVarImpl):  # (implied) literal
-            self.pdk_solver.add_clause(conditions + [self.solver_var(cpm_expr)])
+            add_clause([cpm_expr], conditions)
 
         elif cpm_expr.name == "or":  # (implied) clause
-            self.pdk_solver.add_clause(conditions + self.solver_vars(cpm_expr.args))
+            add_clause(cpm_expr.args, conditions)
 
         elif cpm_expr.name == "->":  # implication
             a0, a1 = cpm_expr.args
-            self._post_constraint(a1, conditions=conditions + [~self.solver_var(a0)])
+            self._post_constraint(a1, conditions=conditions + [a0])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
             assert cpm_expr.name in {"<=", ">=", "=="}, (
@@ -309,13 +313,17 @@ class CPM_pindakaas(SolverInterface):
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
             try:
-                # normalization may raise `pd.Unsatisfiable`
-                # `add_clause` may too, but the conditions are added to the clause, so no need to handle
-                self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=conditions)
+                # normalization may raise `pdk.Unsatisfiable`
+                self.pdk_solver.add_encoding(
+                    eval_comparison(cpm_expr.name, lhs, rhs),
+                    # seems pindakaas conditions are the wrong way around
+                    conditions=self.solver_vars([~c for c in conditions]),
+                )
             except pdk.Unsatisfiable as e:
                 if conditions:
-                    # trivial unsat found means `conditions -> False`, so post `~conditions`
-                    self.pdk_solver.add_clause(c for c in conditions)
+                    # trivial unsat with conditions does not count; posts ~conditions
+                    # `add_clause` may raise `pdk.Unsatisfiable` too, but the conditions are added to the clause, so no need to catch
+                    add_clause([], conditions)
                 else:
                     # no condtions means truly unsatisfiable
                     raise e
