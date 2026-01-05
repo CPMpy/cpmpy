@@ -1197,6 +1197,10 @@ class TestSupportedSolvers:
         assert s.solve()
         assert s.objective_value() == 5
 
+    def test_bug810(self, solver):
+        model = cp.Model(cp.boolvar(name="p").implies(3 * cp.boolvar(name="q") == 2))
+        assert model.solve(solver)  # 810 incorrect
+        # assert model.solveAll(solver) == 1  # TODO incorrect for OR-Tools/PySAT
 
 
 @pytest.mark.parametrize(("solver", "expr"), [(s, expr) for s in solvers for expr in numexprs(s)], ids=str)

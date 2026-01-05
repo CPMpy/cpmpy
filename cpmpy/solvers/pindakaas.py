@@ -269,6 +269,8 @@ class CPM_pindakaas(SolverInterface):
 
     def _post_constraint(self, cpm_expr, conditions=[]):
         """Add a single, *transformed* constraint, implied by conditions."""
+        import pindakaas as pdk
+
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
@@ -304,7 +306,18 @@ class CPM_pindakaas(SolverInterface):
 
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=conditions)
+            try:
+                # normalization may raise `pd.Unsatisfiable`
+                # `add_clause` may too, but the conditions are added to the clause, so no need to handle
+                self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=conditions)
+            except pdk.Unsatisfiable as e:
+                if conditions:
+                    # trivial unsat found means `conditions -> False`, so post `~conditions`
+                    self.pdk_solver.add_clause(~c for c in conditions)
+                else:
+                    # no condtions means truly unsatisfiable
+                    raise e
+
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 
