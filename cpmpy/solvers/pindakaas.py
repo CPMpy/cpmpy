@@ -313,7 +313,7 @@ class CPM_pindakaas(SolverInterface):
             except pdk.Unsatisfiable as e:
                 if conditions:
                     # trivial unsat found means `conditions -> False`, so post `~conditions`
-                    self.pdk_solver.add_clause(~c for c in conditions)
+                    self.pdk_solver.add_clause(c for c in conditions)
                 else:
                     # no condtions means truly unsatisfiable
                     raise e
