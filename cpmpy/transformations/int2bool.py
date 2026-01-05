@@ -113,11 +113,13 @@ def _encode_linear(ivarmap, xs, cmp, rhs, encoding, weights=None, check_bounds=T
         lb = sum(w * x.lb if w >= 0 else w * x.ub for w, x in zip(weights, xs))
         ub = sum(w * x.ub if w >= 0 else w * x.lb for w, x in zip(weights, xs))
 
-        if cmp in ("==", "!="):
+        if cmp == "==" or cmp == "!=":
+            # check for '=='
             if lb == rhs == ub:
                 value = BoolVal(True)
             elif rhs not in range(lb, ub + 1):
                 value = BoolVal(False)
+            # inverse result if '!='
             if cmp == "!=" and value is not None:
                 value = ~value
         elif cmp == "<=":
