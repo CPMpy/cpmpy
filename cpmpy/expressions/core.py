@@ -692,11 +692,15 @@ class Operator(Expression):
         else:
             arg_vals = argvals(self.args)
 
+        # before argval check
+        if self.name == "->" and arg_vals[0] is False:
+            return True
 
         if any(a is None for a in arg_vals): return None
         # non-boolean
         elif self.name == "sum": return sum(arg_vals)
         elif self.name == "wsum":
+            if any(a is None for a in arg_vals[1]): return None
             val = np.dot(arg_vals[0], arg_vals[1]).item()
             if round(val) == val: # it is an integer
                 return int(val)
