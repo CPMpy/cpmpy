@@ -446,38 +446,38 @@ def linearize_constraint(lst_of_expr: List[Expression], supported: Set[str] = {}
                         continue
                 # else: trivially true, skip
                 continue
-            # SHOULD INCLUDE THE OLD:
-            #if lhs_name == "sub": # convert x - y to wsum
-            #    lhs = Operator("wsum", [[1, -1], [lhs.args[0], lhs.args[1]]])
-            #    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
-            #elif lhs_name == "-": # convert -x to wsum
-            #    lhs = Operator("wsum", [[-1], [lhs.args[0]]])
-            #    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
             # update the helper variables after canonicalization
             cmp_name = cpm_expr.name
             lhs, rhs = cpm_expr.args
             lhs_name = lhs.name
             assert is_int(rhs), f"Linearize canonical comparison: expected integer rhs, got {rhs} from {cpm_expr}"
 
-            # Should be fixed elsewhere
-            #if "or" in supported and lhs_name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl):
-            #    # very special case, avoid writing as sum of 1 argument
-            #    newlist.append(Operator("or", [lhs.args[0]]))
-            #    continue
-
             # check trivially true/false (not allowed by PySAT Card/PB)
+            lb,ub = lhs.get_bounds()
+            always_false = False
             if cpm_expr.name in ('<', '<=', '>', '>='):
-                lb,ub = lhs.get_bounds()
                 t_lb = eval_comparison(cpm_expr.name, lb, rhs)
                 t_ub = eval_comparison(cpm_expr.name, ub, rhs)
-                if t_lb and t_ub:
+                if t_lb and t_ub:  # always true
                     continue
                 elif not t_lb and not t_ub:
-                    if implication_literal is None:
-                        return [BoolVal(False)]
-                    else:
-                        toplevel.extend(linearize_constraint([~implication_literal], supported=supported, csemap=csemap))
-                        continue
+                    always_false = True
+            elif cpm_expr.name == "==":
+                if lb == rhs == ub:  # always true
+                    continue
+                elif not (lb <= rhs <= ub):  # always false
+                    always_false = True
+            elif cpm_expr.name == "!=":
+                if not (lb <= rhs <= ub):  # always true
+                    continue
+                elif lb == rhs == ub:  # always false
+                    always_false = True
+            if always_false:
+                if implication_literal is None:
+                    return [BoolVal(False)]
+                else:
+                    toplevel.extend(linearize_constraint([~implication_literal], supported=supported, csemap=csemap))
+                    continue
 
             # fix the comparisons if needed
             if cpm_expr.name == "<":
