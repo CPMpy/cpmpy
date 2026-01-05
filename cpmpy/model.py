@@ -27,6 +27,7 @@
 """
 import copy
 import warnings
+import time
 
 import numpy as np
 
@@ -183,6 +184,7 @@ class Model(object):
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
         """
+        start_time = time.time()
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
 
@@ -193,7 +195,8 @@ class Model(object):
             s = SolverLookup.get(solver, self)
 
         # call solver
-        ret = s.solve(time_limit=time_limit, **kwargs)
+        remaining_time_limit = None if time_limit is None else time_limit - (time.time() - start_time)
+        ret = s.solve(time_limit=remaining_time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
         return ret
