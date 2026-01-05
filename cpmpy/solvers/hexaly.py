@@ -154,8 +154,9 @@ class CPM_hexaly(SolverInterface):
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # register solution callback
-        from hexaly.optimizer import HxCallbackType
-        self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        if solution_callback is not None:
+            from hexaly.optimizer import HxCallbackType
+            self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
         
         # new status, translate runtime
         self.hex_model.close() # model must be closed
@@ -165,7 +166,8 @@ class CPM_hexaly(SolverInterface):
         self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
 
         # unregister solution callback
-        self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        if solution_callback is not None:
+            self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
