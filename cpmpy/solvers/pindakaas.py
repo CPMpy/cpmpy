@@ -39,7 +39,7 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, List
 
 from ..exceptions import NotSupportedError
 from ..expressions.utils import eval_comparison
@@ -124,7 +124,7 @@ class CPM_pindakaas(SolverInterface):
     def native_model(self):
         return self.pdk_solver
 
-    def solve(self, time_limit=None, assumptions=None):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
 
