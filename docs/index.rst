@@ -67,6 +67,7 @@ Supported solvers
      - 
    * - :doc:`CPLEX <api/solvers/cplex>`
      - ILP
+     - SAT - OPT - PAR -- ?ISAT? ?IOPT?
      - pip + local + (aca.) license
      - No
      - 
