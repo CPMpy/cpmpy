@@ -128,7 +128,8 @@
 
 """
 import copy
-
+import warnings
+from typing import cast, Union, Optional
 
 import cpmpy as cp
 
@@ -144,15 +145,19 @@ class GlobalConstraint(Expression):
         Abstract superclass of GlobalConstraints
 
         Like all expressions it has a ``.name`` and ``.args`` property.
-        Overwrites the ``.is_bool()`` method.
+        Overwrites the ``.is_bool()`` method as all global constraints are Boolean.
     """
 
-    def is_bool(self):
-        """ is it a Boolean (return type) Operator?
+    def is_bool(self) -> bool:
+        """ 
+        Returns whether the global constraint is a Boolean (return type) Operator.
+
+        Returns:
+            bool: True, global constraints are Boolean
         """
         return True
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
             Returns a decomposition into smaller constraints.
 
@@ -160,22 +165,16 @@ class GlobalConstraint(Expression):
             and use other global constraints as long as
             it does not create a circular dependency.
 
-            To ensure equivalence of decomposition, we split into contraining and defining constraints.
-            Defining constraints (totally) define new auxiliary variables needed for the decomposition,
-            they can always be enforced top-level.
+            To ensure equivalence of decomposition, we split into constraints determining the value of the global constraint, and defining-constraints.
+            Defining constraints (totally) define new auxiliary variables needed for the decomposition, and can always be enforced at top-level.
+
+            Returns:
+                tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
-    def get_bounds(self):
-        """
-        Returns the bounds of a Boolean global constraint.
-        Numerical global constraints should reimplement this.
-        """
-        return 0, 1
-
-
 # Global Constraints (with Boolean return type)
-def alldifferent(args):
+def alldifferent(args: list[Expression]):
     """
     .. deprecated:: 0.9.0
           Please use :class:`AllDifferent` instead.
@@ -186,49 +185,96 @@ def alldifferent(args):
 
 
 class AllDifferent(GlobalConstraint):
-    """All arguments have a different (distinct) value
     """
-    def __init__(self, *args):
+    Enforces that all arguments have a different (distinct) value
+    """
+
+    def __init__(self, *args: Expression):
+        """
+        Arguments:
+            args (list[Expression]): List of expressions to be different from each other
+        """
         super().__init__("alldifferent", flatlist(args))
 
-    def decompose(self):
-        """Returns the decomposition
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the AllDifferent global constraint using pairwise disequality constraints.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
-    def value(self):
-        return len(set(argvals(self.args))) == len(self.args)
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        vals = argvals(self.args)
+        if any(v is None for v in vals):
+            return None
+        return len(set(vals)) == len(self.args)
+
 
 class AllDifferentExceptN(GlobalConstraint):
     """
-        All arguments except those equal to a value in n have a distinct value.
+    Enforces that all arguments, except those equal to a value in n, have a different (distinct) value.
+
+    Arguments:
+        arr (list[Expression]): List of expressions to be different from each other, except those equal to a value in n
+        n (int or list[int]): Value or list of values that are excluded from satisfying the alldifferent condition
     """
-    def __init__(self, arr, n):
+
+    def __init__(self, arr: list[Expression], n: Union[int, list[int]]):
+        """
+        Arguments:
+            arr (list[Expression]): List of expressions to be different from each other, except those equal to a value in n
+            n (int or list[int]): Value or list of values that are excluded from the distinctness constraint
+        """
         flatarr = flatlist(arr)
         if not is_any_list(n):
-            n = [n]
+            n = cast(int, n)
+            n = [n] # ensure n is a list of ints
         super().__init__("alldifferent_except_n", [flatarr, n])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the AllDifferentExceptN global constraint using pairwise constraints.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
         cons = []
         arr, n = self.args
         for x,y in all_pairs(arr):
             cond = x == y
             if is_bool(cond):
                 cond = cp.BoolVal(cond)
-            cons.append(cond.implies(cp.any(x == a for a in n))) # equivalent to (var1 in n) | (var2 in n) | (var1 != var2)
+            cons.append(cond.implies(cp.any(x == a for a in n))) # equivalent to (x in n) | (y in n) | (x != y)
         return cons, []
 
-    def value(self):
-        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        vals, exclude_vals = argvals(self.args)
+        if any(v is None for v in vals) or any(v is None for v in exclude_vals):
+            return None
+
+        vals = [v for v in vals if v not in frozenset(exclude_vals)]
         return len(set(vals)) == len(vals)
 
 
 class AllDifferentExcept0(AllDifferentExceptN):
     """
-        All nonzero arguments have a distinct value
+    Enforces that all arguments, except those equal to 0, have a different (distinct) value.
     """
     def __init__(self, *arr):
+        """
+        Arguments:
+            arr (list[Expression]): List of expressions to be different from each other, except those equal to 0
+        """
         super().__init__(arr, 0)
 
 
@@ -243,39 +289,79 @@ def allequal(args):
 
 
 class AllEqual(GlobalConstraint):
-    """All arguments have the same value
     """
-    def __init__(self, *args):
+    Enforces that all arguments have the same value
+    """
+    def __init__(self, *args: Expression):
+        """
+        Arguments:
+            args (list[Expression]): List of expressions to have the same value
+        """
         super().__init__("allequal", flatlist(args))
 
-    def decompose(self):
-        """Returns the decomposition
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the AllEqual global constraint using cascaded equality constraints.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
-        return [var1 == var2 for var1, var2 in zip(self.args[:-1], self.args[1:])], []
+        return [x == y for x, y in zip(self.args[:-1], self.args[1:])], []
 
-    def value(self):
-        return len(set(argvals(self.args))) == 1
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        vals = argvals(self.args)
+        if any(v is None for v in vals):
+            return None
+        return len(set(vals)) == 1
 
 
 class AllEqualExceptN(GlobalConstraint):
     """
-    All arguments except those equal to a value in n have the same value.
+    Enforces that all arguments, except those equal to a value in n, have the same value.
     """
 
-    def __init__(self, arr, n):
+    def __init__(self, arr: list[Expression], n: Union[int, list[int]]):
+        """
+        Arguments:
+            arr (list[Expression]): List of expressions to have the same value, except those equal to a value in n
+            n (int or list[int]): Value or list of values that are excluded from the equality constraint
+        """
         flatarr = flatlist(arr)
         if not is_any_list(n):
-            n = [n]
+            n = cast(int, n)
+            n = [n] # ensure n is a list of ints
         super().__init__("allequal_except_n", [flatarr, n])
 
-    def decompose(self):
-        return [(cp.any(var1 == a for a in self.args[1]) | (var1 == var2) | cp.any(var2 == a for a in self.args[1]))
-                for var1, var2 in all_pairs(self.args[0])], []
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the AllEqualExceptN global constraint using pairwise constraints.
 
-    def value(self):
-        vals = [argval(a) for a in self.args[0] if argval(a) not in argvals(self.args[1])]
-        return len(set(vals)) == 1 or len(set(vals)) == 0
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+
+        arr, n = self.args
+        constraints = []
+        for x, y in all_pairs(arr):
+            # x and y are equal, or one of them is equal to an excluded value
+            constraints += [cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n)]
+        return constraints, []
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        vals, exclude_vals = argvals(self.args)
+        if any(v is None for v in vals) or any(v is None for v in exclude_vals):
+            return None
+        vals = [v for v in vals if v not in frozenset(exclude_vals)]
+        return len(set(vals)) <= 1
 
 
 def circuit(args):
@@ -289,30 +375,32 @@ def circuit(args):
 
 
 class Circuit(GlobalConstraint):
-    """The sequence of variables form a circuit, where x[i] = j means that j is the successor of i.
+    """
+    Enforces that the sequence of variables form a circuit, where x[i] = j means that node j is the successor of node i.
     """
     def __init__(self, *args):
+        """
+        Arguments:
+            args (list[Expression]): List of expressions representing the successors of the nodes to form the circuit
+        """
         flatargs = flatlist(args)
-        if any(is_boolexpr(arg) for arg in flatargs):
-            raise TypeError("Circuit global constraint only takes arithmetic arguments: {}".format(flatargs))
-        super().__init__("circuit", flatargs)
         if len(flatargs) < 2:
             raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
+        super().__init__("circuit", flatargs)
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-            Decomposition for Circuit
+            Decomposition of the Circuit global constraint using auxiliary variables to reprsent the order in which we visit all the nodes.
+            Auxiliary variables are defined in the defining part of the decomposition, which is alwasy enforced top-level.
 
-            ..
-                Not sure where we got it from,
-                MiniZinc has slightly different one:
-                https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_circuit.mzn
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         succ = cpm_array(self.args)
         n = len(succ)
         order = intvar(0,n-1, shape=n)
-        defining = []
-        constraining = []
+        defining: list[Expression] = []
+        value: list[Expression] = []
 
         # We define the auxiliary order variables to represent the order we visit all the nodes.
         # `order[i] == succ[order[i - 1]]`
@@ -322,6 +410,13 @@ class Circuit(GlobalConstraint):
         # This happens when the variables in succ don't take values in the domain of 'order',
         # i.e. for succ = [9,-1,0], there is no valid ordering, but we satisfy ~circuit(succ)
         # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
+        # TODO at some point: do not introduce these auxiliary variables ourselves, rely on cse instead. 
+        # Blocking factor: need safening and decomposing of global constraints to be integrated.
+        # accumulator = 0
+        # for i = 0..n-1:
+        #    accumulator = succ[accumulator]  # creates an element global function
+        # return [0 == accumulator, cp.AllDiff(succ), cp.all(succ >= 0), cp.all(succ <= n)], []
+
 
         lbs, ubs = get_bounds(succ)
         if min(lbs) > 0 or max(ubs) < n - 1:
@@ -337,49 +432,60 @@ class Circuit(GlobalConstraint):
             for i in range(n):
                 defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
 
-        constraining += [AllDifferent(succ)]  # different successors
-        constraining += [AllDifferent(order)]  # different orders
-        constraining += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
+        value += [AllDifferent(succ)]  # different successors
+        value += [AllDifferent(order)]  # different orders
+        value += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
         defining += [a.implies(order[0] == succ[0])]
         for i in range(1, n):
             defining += [a.implies(
                 order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
-        return constraining, defining
+        
+        return value, defining
 
-    def value(self):
-        pathlen = 0
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         idx = 0
         visited = set()
         arr = argvals(self.args)
 
         while idx not in visited:
             if idx is None:
-                return False
+                return None # not assigned
             if not (0 <= idx < len(arr)):
-                break
+                return False # out of bounds
             visited.add(idx)
-            pathlen += 1
             idx = arr[idx]
 
-        return pathlen == len(self.args) and idx == 0
+        return len(visited) == len(self.args) and idx == 0
 
 
 class Inverse(GlobalConstraint):
     """
-       Inverse (aka channeling / assignment) constraint. 'fwd' and
-       'rev' represent inverse functions; that is,
+    Enforces that the forward and reverse arrays represent the inverse function of one another.
+    I.e., fwd[i] == x <==> rev[x] == i
 
-           fwd[i] == x  <==>  rev[x] == i
-
+    Also known as channeling / assignment constraint.
     """
-    def __init__(self, fwd, rev):
-        flatargs = flatlist([fwd,rev])
-        if any(is_boolexpr(arg) for arg in flatargs):
-            raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
-        assert len(fwd) == len(rev)
+    def __init__(self, fwd: list[Expression], rev: list[Expression]):
+        """
+        Arguments:
+            fwd (list[Expression]): List of expressions representing the forward function
+            rev (list[Expression]): List of expressions representing the reverse function
+        """
+        if len(fwd) != len(rev):
+            raise ValueError("Length of fwd and rev must be equal for Inverse constraint")
         super().__init__("inverse", [fwd, rev])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the Inverse global constraint using Element global function constraints, and explicit safening.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
 
         fwd, rev = self.args
         rev = cpm_array(rev)
@@ -399,41 +505,56 @@ class Inverse(GlobalConstraint):
         
         return constraining, defining
 
-    def value(self):
-        fwd = argvals(self.args[0])
-        rev = argvals(self.args[1])
-
-        if any(x is None for x in fwd):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        fwd, rev = argvals(self.args)
+        if any(x is None for x in fwd) or any(y is None for y in rev):
             return None
-        if any(x is None for x in rev):
-            return None
-
-        # args are fine, now evaluate actual inverse cons
-        if any(not 0 <= x < len(rev) for x in fwd):
-            return False  # partiality of Element (index out of bounds)
-
+        # explicit check for partial element constraints
+        if any(not (0 <= x < len(rev)) for x in fwd):
+            return False
+        if any(not (0 <= y < len(fwd)) for y in rev):
+            return False
         return all(rev[x] == i for i, x in enumerate(fwd))
 
 
 class Table(GlobalConstraint):
-    """The values of the variables in 'array' correspond to a row in 'table'
     """
-    def __init__(self, array, table):
+    Enforces that the values of the variables in 'array' correspond to a row in 'table'
+    """
+    def __init__(self, array: list[Expression], table: list[list[int]]):
+        """
+        Arguments:
+            array (list[Expression]): List of expressions representing the array of variables
+            table (list[list[int]]): List of lists of integers representing the table
+        """
         array = flatlist(array)
-        if isinstance(table, np.ndarray): # Ensure it is a list
-            table = table.tolist()
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
-                            f"{array}")
+            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: {array}")
         super().__init__("table", [array, table])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the Table global constraint. Enforces at least one row of the table is assigned to the array.
+        "
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
         arr, tab = self.args
         return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         arr, tab = self.args
         arrval = argvals(arr)
+        if any(x is None for x in arrval):
+            return None
         return arrval in tab
 
 class ShortTable(GlobalConstraint):
@@ -441,7 +562,12 @@ class ShortTable(GlobalConstraint):
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
         no restrictions for the corresponding variable in that tuple.
     """
-    def __init__(self, array, table):
+    def __init__(self, array: list[Expression], table: list[list[int]]):
+        """
+        Arguments:
+            array (list[Expression]): List of expressions representing the array of variables
+            table (list[list[int]]): List of lists of integers representing the table
+        """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
@@ -451,14 +577,26 @@ class ShortTable(GlobalConstraint):
             table = table.tolist()
         super().__init__("short_table", [array, table])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the ShortTable global constraint. Enforces at least one row of the table is assigned to the array.
+        "
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
         arr, tab = self.args
         return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         arr, tab = self.args
         tab = np.array(tab)
         arrval = np.array(argvals(arr))
+        if any(x is None for x in arrval):
+            return None
         for row in tab:
             num_row = row[row != STAR].astype(int)
             num_vals = arrval[row != STAR].astype(int)
@@ -469,7 +607,12 @@ class ShortTable(GlobalConstraint):
 class NegativeTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
-    def __init__(self, array, table):
+    def __init__(self, array: list[Expression], table: list[list[int]]):
+        """
+        Arguments:
+            array (list[Expression]): List of expressions representing the array of variables
+            table (list[list[int]]): List of lists of integers representing the table
+        """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
@@ -477,14 +620,26 @@ class NegativeTable(GlobalConstraint):
         super().__init__("negative_table", [array, table])
 
     def decompose(self):
+        """
+        Decomposition of the NegativeTable global constraint. 
+        Enforces that the values of the variables in 'array' do not correspond to any row in 'table'.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
         arr, tab = self.args
         return [cp.all(cp.any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         arr, tab = self.args
         arrval = argvals(arr)
-        tabval = argvals(tab)
-        return arrval not in tabval
+        if any(x is None for x in arrval):
+            return None
+        return arrval not in tab
     
 
 class Regular(GlobalConstraint):
@@ -505,7 +660,7 @@ class Regular(GlobalConstraint):
                    start = "A",
                    accepting = ["C"])
     """
-    def __init__(self, array, transitions, start, accepting):
+    def __init__(self, array: list[Expression], transitions: list[tuple[int|str, int, int|str]], start: int|str, accepting: list[int|str]):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
@@ -522,16 +677,24 @@ class Regular(GlobalConstraint):
             raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
         super().__init__("regular", [array, transitions, start, list(accepting)])
 
-        self.nodes = set()
+        node_set = set()
         self.trans_dict = {}
         for s, v, e in transitions:
-            self.nodes.update([s,e])
+            node_set.update([s,e])
             self.trans_dict[(s, v)] = e
-        self.nodes = sorted(self.nodes)
+        self.nodes = sorted(node_set)
         # normalize node_ids to be 0..n-1, allows for smaller domains
         self.node_map = {n: i for i, n in enumerate(self.nodes)}
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the Regular global constraint. 
+        Encodes the automaton by encoding the transition table into `class:cpmpy.expressions.globalconstraints.Table` constraints.
+        Then enforces that the last state is accepting.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
         # Decompose to transition table using Table constraints
         
         arr, transitions, start, accepting = self.args
@@ -556,9 +719,15 @@ class Regular(GlobalConstraint):
         # constraint is satisfied iff last state is accepting
         return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         arr, transitions, start, accepting = self.args
-        arrval = [argval(a) for a in arr]
+        arrval = argvals(arr)
+        if any(x is None for x in arrval):
+            return None
         curr_node = start
         for v in arrval:
             if (curr_node, v) in self.trans_dict:
@@ -572,27 +741,36 @@ class Regular(GlobalConstraint):
 # https://www.ibm.com/docs/en/icos/12.9.0?topic=methods-ifthenelse-method
 class IfThenElse(GlobalConstraint):
     """
-        The IfThenElse constraint, defining a conditional expression
-        of the form: if condition then if_true else if_false
-        where condition, if_true and if_false are all boolean expressions.
+    Enforces a conditional expression of the form: if condition then if_true else if_false.
+    `condition`, `if_true` and `if_false` are be boolean expressions.
     """
-    def __init__(self, condition, if_true, if_false):
+    def __init__(self, condition: Expression, if_true: Expression, if_false: Expression):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
                             f"{condition, if_true, if_false}")
         super().__init__("ite", [condition, if_true, if_false])
 
-    def value(self):
-        condition, if_true, if_false = self.args
-        try:
-            if argval(condition):
-                return argval(if_true)
-            else:
-                return argval(if_false)
-        except IncompleteFunctionError:
-            return False
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        condition, if_true, if_false = argvals(self.args)
+        if condition is None or if_true is None or if_false is None:
+            return None
+        if condition:
+            return if_true
+        else:
+            return if_false
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the IfThenElse global constraint.
+        Enforces that the condition is satisfied.
+        "
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
         condition, if_true, if_false = self.args
         if is_bool(condition):
             condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
@@ -606,18 +784,26 @@ class IfThenElse(GlobalConstraint):
 
 class InDomain(GlobalConstraint):
     """
-        The "InDomain" constraint, defining non-interval domains for an expression
+    Enforces the expression is assigned to a value in the given domain.
     """
 
-    def __init__(self, expr, arr):
+    def __init__(self, expr: Expression, arr: list[int]):
+        """
+        Arguments:
+            expr (Expression): Expression to be assigned to a value in the given domain
+            arr (list[int]): List of integers representing the domain
+        """
+        if not all(is_int(x) for x in arr):
+            raise TypeError("The second argument of an InDomain constraint should be a list of integer constants")
         super().__init__("InDomain", [expr, arr])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Returns two lists of constraints:
-            1) constraints representing the comparison
-            2) constraints that (totally) define new auxiliary variables needed in the decomposition,
-               they should be enforced toplevel.
+        Decomposition of the InDomain global constraint.
+        Enforces that the expression is assigned to a value in the given domain.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         expr, arr = self.args
         lb, ub = get_bounds(expr)
@@ -629,15 +815,18 @@ class InDomain(GlobalConstraint):
             defining.append(aux == expr)
             expr = aux
 
-        expressions = any(isinstance(a, Expression) for a in arr)
-        if expressions:
-            return [cp.any(expr == a for a in arr)], defining
-        else:
-            return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+        return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
 
-
-    def value(self):
-        return argval(self.args[0]) in argvals(self.args[1])
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        expr, arr = self.args
+        exprval = argvals(expr)
+        if exprval is None:
+            return None
+        return exprval in arr
 
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
