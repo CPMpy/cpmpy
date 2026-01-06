@@ -206,6 +206,9 @@ def parse_scheduling_period(filename: str):
     """
     Parse a nurserostering instance file.
     
+    Args:
+        filename: Path to the nurserostering instance file.
+    
     Returns a dictionary with native Python data structures (lists of dicts).
     Use to_dataframes() transform to convert to pandas DataFrames if needed.
     Use add_fake_names() transform to add randomly generated names to staff.
