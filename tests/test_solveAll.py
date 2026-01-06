@@ -22,11 +22,14 @@ class TestSolveAll(unittest.TestCase):
 
             solver = cp.SolverLookup.get(name,model=m)
 
-            # pysdd not supporting solution limit
-            if name == "pysdd":
-                count = solver.solveAll(display=add_sol)
-            else:
-                count = solver.solveAll(solution_limit=1000, display=add_sol)
+            # special case for some solvers
+            kwargs = dict(display=add_sol)
+            if name in ("gurobi", "cplex"):
+                kwargs['solution_limit'] =  1000
+            elif name == "hexaly":
+                kwargs['time_limit'] = 5
+
+            count = solver.solveAll(**kwargs)
             self.assertEqual(3, count)
             self.assertSetEqual(sols,
                                 {"[True, True]", "[True, False]", "[False, True]"})
@@ -41,7 +44,13 @@ class TestSolveAll(unittest.TestCase):
                 sols = set()
                 add_sol = lambda: sols.add(str(x.value().tolist()))
 
-                count = m.solveAll(solver=name, solution_limit=1000, display=add_sol)
+                kwargs = dict(display=add_sol)
+                if name in ("gurobi", "cplex"):
+                    kwargs['solution_limit'] = 1000
+                elif name == "hexaly":
+                    kwargs['time_limit'] = 5
+
+                count = m.solveAll(solver=name,**kwargs)
                 self.assertEqual(3, count)
                 self.assertSetEqual(sols,
                                     {"[1, 0, 0]","[0, 1, 0]","[0, 0, 1]"})

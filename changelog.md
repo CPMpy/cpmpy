@@ -1,5 +1,52 @@
 # Change log
 
+## 0.9.28
+
+This is a very small release with a hotfix for multi-dimensional indexing where the index is a decision variable.
+
+### Fixed
+
+* Hotfix for single expression in multi-dimensional indexing [#772](https://github.com/CPMpy/cpmpy/pull/772)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.27...v0.9.28
+
+## 0.9.27
+
+### Added
+
+* **New solver**: CPLEX ILP solver [#583](https://github.com/CPMpy/cpmpy/pull/583), [#762](https://github.com/CPMpy/cpmpy/pull/762), [#763](https://github.com/CPMpy/cpmpy/pull/763)
+* **New solver**: Hexaly local search solver [#718](https://github.com/CPMpy/cpmpy/pull/718)
+* **New tool**: CPMpy cli (get version information on all subsolvers) [#693](https://github.com/CPMpy/cpmpy/pull/693)
+* Use of CSE in `flatten_objective` [#730](https://github.com/CPMpy/cpmpy/pull/730)
+* Constraint tagging for `pumpkin` [#720](https://github.com/CPMpy/cpmpy/pull/720)
+* Solver capability overview in docs [d8d3a2d](https://github.com/CPMpy/cpmpy/commit/d8d3a2d0f78438aa0f0da6909d74b5a505b5f8a5)
+* PSP-lib dataset and loader [#701](https://github.com/CPMpy/cpmpy/pull/701)
+* Safen name collision between user and aux variables [#731](https://github.com/CPMpy/cpmpy/pull/731)
+
+### Changed
+
+* Update `pindakaas` to version 0.2.1 [#753](https://github.com/CPMpy/cpmpy/pull/753)
+* Exclude slow examples from testset [#746](https://github.com/CPMpy/cpmpy/pull/746)
+* Safe variable names [#731](https://github.com/CPMpy/cpmpy/pull/731)
+* SolverInterface consistency improvements and added tests [#726](https://github.com/CPMpy/cpmpy/pull/726)
+* Improve testing of examples [#651](https://github.com/CPMpy/cpmpy/pull/651)
+* Modernize shebangs of examples [#644](https://github.com/CPMpy/cpmpy/pull/644)
+* Linearize improvements [e721b0a](https://github.com/CPMpy/cpmpy/commit/e721b0ab960be632c525bfbbf493876031ca9d98)
+* Update waterfall (added automated int-to-bool) [710ec42](https://github.com/CPMpy/cpmpy/commit/710ec42fc34a014084e0f6bbe8d1e5eed72c3dcf)
+* Collection of improvements to GitHub README
+
+### Fixed
+
+* `Precedence` global decomposition [#742](https://github.com/CPMpy/cpmpy/pull/742)
+* Minor bugs in examples [#739](https://github.com/CPMpy/cpmpy/pull/739)
+* `gnureadline` typo in `setup.py` [#722](https://github.com/CPMpy/cpmpy/pull/722)
+* Non-contiguous array handling in `cpm_array` [#738](https://github.com/CPMpy/cpmpy/pull/738)
+* Remove simplification of nullifying arguments from constructors [#725](https://github.com/CPMpy/cpmpy/pull/725)
+* Skip psplib in testset due to random failure on GitHub actions [7a15d07](https://github.com/CPMpy/cpmpy/commit/7a15d07962610e3844d358a05c7c419e110f110c)
+* (Pin Pumpkin solver git commit [#719](https://github.com/CPMpy/cpmpy/pull/719)) outdated by [#720](https://github.com/CPMpy/cpmpy/pull/720)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.26...v0.9.27
+
 ## 0.9.26
 
 ### Added

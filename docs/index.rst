@@ -65,6 +65,11 @@ Supported solvers
      - SAT - OPT IOPT - PAR -- ?ISAT?
      - pip + (aca.) license
      - 
+   * - :doc:`CPLEX <api/solvers/cplex>`
+     - ILP
+     - pip + local + (aca.) license
+     - No
+     - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
@@ -85,6 +90,12 @@ Supported solvers
      - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
+
+   * - :doc:`Hexaly <api/solvers/hexaly>`
+     - Local search
+     - SAT ALLSAT - OPT IOPT
+     - pip + local + (aca.) licence
+     -
 
 Native capability abbreviations:
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
