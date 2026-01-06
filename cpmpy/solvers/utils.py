@@ -253,3 +253,88 @@ def get_supported_solvers():
     """
     warnings.warn("Deprecated, use Model.solvernames() instead, will be removed in stable version", DeprecationWarning)
     return [sv for sv in builtin_solvers if sv.supported()]
+
+def solutions(P, X=None, projected_solution_limit=None, time_limit=None, verbosity=1, diverse=False):
+    """Return all solutions of `P` as values of the projected variables, `X`, within the time limit, or `False` iff `P` is determined to be unsatisfiable."""
+    P = P.copy()
+    sols = []
+    dt = time.time()
+
+    if X is None:
+        X = get_variables_model(P)
+
+    P.objective_ = None
+
+    P += cp.all([x == x for x in X])
+
+    def value(x):
+        def get_normalized_value(x):
+            v = x.value()
+            if v is None:
+                return v
+                # return x.lb  # TODO coerce correct type ..
+            elif is_boolexpr(v):
+                return bool(v)
+            elif is_int(v):
+                return int(v)
+            else:
+                raise TypeError("Unkown value type:", x, v, type(v))
+
+        if isinstance(x, np.ndarray):
+            return tuple(get_normalized_value(x_i) for x_i in x.flat)
+        else:
+            return get_normalized_value(x)
+
+    class SolutionLimitReached(Exception):
+        pass
+
+    def store_sol():
+        if all(x.value() is None for x in X):
+            assert False
+            return
+
+        class Hashabledict(dict):
+            def __hash__(self):
+                return hash(frozenset(self))
+
+            def __repr__(self):
+                return (
+                    f"{{{', '.join(f'{k}: {v}' for k, v in sorted(self.items(), key=lambda k: k[0].name))}}}"
+                )
+
+        sol = Hashabledict((x, value(x)) for x in X if x.value() is not None)
+
+        if sol not in sols:
+            sols.append(sol)
+            if verbosity >= 2:
+                print(len(sols), end=" ", flush=True)
+
+        if projected_solution_limit is not None and len(sols) == projected_solution_limit:
+            if verbosity >= 2:
+                print("\n", flush=True)
+            raise SolutionLimitReached
+
+        return sol
+
+    try:
+        if P.has_objective():
+            raise NotImplementedError
+            if P.solve(time_limit=time_limit):
+                store_sol()
+        elif True:
+            while P.solve(time_limit=time_limit):
+                sol = store_sol()
+                if sol:
+                    yield sol
+
+                    P += cp.any(x != a for x, a in sol.items())
+                if time_limit is not None:
+                    time_limit -= time.time() - dt
+        else:
+            P.solveAll(display=store_sol, time_limit=time_limit)
+    except SolutionLimitReached:
+        pass
+
+    if verbosity >= 2:
+        print("")
+    return sols

@@ -1,5 +1,8 @@
 import itertools
+import json
+import logging
 import math
+import pathlib
 import pprint
 import sys
 import time
@@ -11,8 +14,21 @@ import pandas as pd
 from gurobipy import GRB
 
 import cpmpy as cp
-from cpmpy.expressions.variables import NegBoolView
+from cpmpy.expressions.core import Comparison, Operator
+from cpmpy.expressions.variables import NegBoolView, _BoolVarImpl
 from cpmpy.solvers.gurobi import CPM_gurobi
+
+
+class SetEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, set):
+            return list(sorted(obj))
+        elif isinstance(obj, Comparison):
+            return str(obj)
+        elif isinstance(obj, _BoolVarImpl):
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
+
 
 INDEX = 1
 
@@ -75,40 +91,60 @@ class Heuristic(Enum):
 
 
 class CPM_lazy_gurobi(CPM_gurobi):
-    def __init__(self, env=None, **kwargs):
+    def __init__(self, env=None, cpm_model=None, **kwargs):
         self.env = {
             "debug": False,
             "verbosity": 0,
+            "log": pathlib.Path("lazy.log"),
             "heuristic": Heuristic.INPUT,
-            "shrink": False,
+            "shrink": True,
             "explain_fractional": True,
             "cuts": [],
             "max_iterations": None,
             "seed": 42,
+            "checker": cp.Model(),
+            "tables": [],
             **({} if env is None else env),
         }
         self.indent = 0
 
-        if self.env["verbosity"] >= 3:
+        if self.env["verbosity"] >= 4:
             np.set_printoptions(**DEBUG_NP_PRINTOPTIONS)
             pprint.pprint(env)
+
+        self.logger = logging.getLogger(__name__)
+        logging.basicConfig(
+            filename=self.env["log"], level=logging.DEBUG, filemode="w", force=True, format="%(message)s"
+        )
 
         self.ivarmap = {}
 
         self.tables = []
 
-        super().__init__(lazy=True, **kwargs)
+        if self.env["debug"]:
+            self.env["solutions"] = frozenset(
+                cp.solvers.utils.solutions(cpm_model, projected_solution_limit=None)
+            )
+
+        super().__init__(lazy=True, cpm_model=cpm_model, **kwargs)
         self.native_model.Params.LazyConstraints = 1
-        self.native_model.Params.Seed = self.env["seed"]
+        if self.env["seed"] is not None:
+            self.native_model.Params.Seed = self.env["seed"]
         if self.env["verbosity"] >= 4:
             self.native_model.Params.LogFile = "/tmp/gurobi.log"
             self.native_model.Params.OutputFlag = 1
             self.native_model.write("/tmp/gurobi.lp")
 
+        if self.env["debug"] and cpm_model is not None:
+            self.env["feasible"] = cpm_model.solve()
+
     def log(self, *mess, verbosity=1, end="\n", indent=None):
         if verbosity <= self.env["verbosity"]:
             indent = self.indent if indent is None else indent
-            print(" " * indent * 2, *mess, end=end, flush=self.env["debug"])
+            mess = " " * indent * 2 + " ".join(str(m) for m in mess) + end
+            self.logger.debug(mess)
+            print(mess, end="")
+            # print(mess, end="", flush=self.env["debug"])
 
     def print_cuts(self):
         cuts_df = pd.DataFrame.from_dict(self.env["cuts"])
@@ -118,8 +154,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
             pd.set_option("display.max_columns", None)
             pd.set_option("display.width", None)
         drop = ["failure", "cut", "size"]
-        show_df = cuts_df.drop(drop, axis=1, errors="ignore")
+        show_df = cuts_df.drop(drop, axis=1, errors="ignore").to_string()
         self.log(show_df, verbosity=2)
+
+        with open("cuts.json", mode="w") as f:
+            json.dump(self.env["cuts"], f, cls=SetEncoder, ensure_ascii=False, indent=2)
 
     def stats(self):
         self.log(
@@ -278,7 +317,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
             assert i <= self.env["max_iterations"]
 
     def get_solution_callback(self):
-        all_xs = {x_enc_i for x_enc, _, _ in self.tables for x_enc_i in x_enc}
+        all_xs = {x_enc_i for x_enc, _, _, _ in self.tables for x_enc_i in x_enc}
 
         def solution_callback(what, where):
             cb_time = time.time()
@@ -313,51 +352,131 @@ class CPM_lazy_gurobi(CPM_gurobi):
                         return
 
                 self.log(frm, x_enc_a, verbosity=2)
+                for explanation in self._explain_assignment(x_enc_a, frm=frm):
+                    expr = self.transform(explanation)
+                    assert len(expr) == 1
+                    expr = expr[0]
 
-                # If fully integer, we can check if the tables are feasible yet
-                for X_enc, T_enc, parts in self.tables:
-                    A_enc = [x_enc_a[x_enc_i] for x_enc_i in X_enc]
-
-                    # TODO figure out when can be skipped
-                    # if frm == "MIPNODE-OPT" and is_integer_solution(A_enc) and
-                    if A_enc in T_enc.tolist():
-                        continue
-
-                    # encode assignment
-                    explanation = self.explain(A_enc, T_enc, parts, frm=frm)
-                    if self.env["debug"]:
-                        self.env["cuts"][-1]["failure"] = A_enc
-                        self.env["cuts"][-1]["failure_"] = [
-                            f"{self.names[x.name]}={a}" if hasattr(self, "names") else f"{x}={a}"
-                            for x, a in zip(X_enc, A_enc)
-                            if a > 0.0
-                        ]
-
-                    if explanation:
-                        self.log(
-                            f"  cons == {' + '.join(X_enc[c].name for c in explanation)} < {len(explanation)}",
+                    if isinstance(expr, Comparison) and expr.name == "<=":
+                        assert isinstance(expr.args[0], Operator)
+                        cut = (
+                            gp.quicksum([self.solver_var(x) for x in expr.args[0].args])
+                            <= explanation.args[1] - 1.0
                         )
-                        grbs = [self.solver_var(X_enc[c]) for c in explanation]
-                        cut = gp.quicksum(grbs) <= len(grbs) - 1.0
                         what.cbLazy(cut)
-
-                        if self.env["debug"]:
-                            self.env["cuts"][-1]["cut_"] = str(cut).split(": ")[1].split(">")[0]
-                    elif frm == "MIPSOL":  # unsat
-                        self.log("INFEASIBLE")
+                    elif expr is False:
                         raise Infeasible
+                    else:
+                        assert False, f"Unsupported expl: {expr}"
 
-                    self.check_max_iterations(len(self.env["cuts"]))
-                    self.log(f"end callback, time = {cb_time}")
+                    # if explanation:
+                    #     # grbs = [self.solver_var(X_enc[c]) for c in explanation]
+                    #     # cut = gp.quicksum(grbs) <= len(grbs) - 1.0
+                    #     # what.cbLazy(cut)
+                    # elif explanation is False:
+                    #     raise Infeasible
+
+                self.check_max_iterations(len(self.env["cuts"]))
             except Exception as e:
                 what._callback_exception = e
                 what.terminate()
             finally:
                 cb_time = time.time() - cb_time
+                if frm:
+                    self.log(f"end callback, dt = {cb_time}", verbosity=2)
                 self.env["cb_time"] += cb_time
                 assert cb_time < 1.0
 
         return solution_callback
+
+    def _explain_assignment(self, x_enc_a, frm=None):
+        # If fully integer, we can check if the tables are feasible yet
+        for X_enc, T_enc, parts, table in self.tables:
+            A_enc = [x_enc_a[x_enc_i] for x_enc_i in X_enc]
+
+            # TODO figure out when can be skipped
+            # if frm == "MIPNODE-OPT" and is_integer_solution(A_enc) and
+            if A_enc in T_enc.tolist():
+                continue
+
+            # encode assignment
+            explanation = self.explain(A_enc, T_enc, parts, frm=frm)
+            if self.env["debug"]:
+                # self.check_explanation(explanation, X_enc, A_enc, T_enc)
+                self.env["cuts"][-1]["x"] = str(X_enc)
+                self.env["cuts"][-1]["table"] = str(T_enc)
+                # self.env["cuts"][-1]["explanation"] = explanation_expr
+                self.env["cuts"][-1]["failure"] = list(zip(X_enc, A_enc))
+                self.env["cuts"][-1]["failure_"] = [
+                    f"{x}={a}"
+                    for x, a in [
+                        (f"{self.names[x.name]}" if hasattr(self, "names") else f"{x}", f"{a:.2f}")
+                        for x, a in zip(X_enc, A_enc)
+                        if a > 0.0
+                    ]
+                ]
+
+            if explanation:
+                self.log(
+                    f"  cons == {' + '.join(X_enc[c].name for c in explanation)} < {len(explanation)}",
+                )
+                expr = cp.sum(X_enc[c] for c in explanation) < len(explanation)
+                self.env["cuts"][-1]["expr"] = expr
+
+                if self.env["debug"]:
+                    self.check_explanation(expr, X_enc, A_enc, T_enc, table)
+                yield expr
+
+                # if self.env["debug"]:
+                #     self.env["cuts"][-1]["cut_"] = str(cut).split(": ")[1].split(">")[0]
+            elif frm == "MIPSOL":  # unsat
+                self.log("INFEASIBLE")
+                return False
+                # raise Infeasible
+
+    def add(self, cons):
+        if self.env["debug"]:
+            self.env["checker"] += [con for con in cons if con.name != "table"]
+        return super().add(cons)
+
+    __add__ = add  # avoid redirect in superclass
+
+    def check_explanation(self, explanation, X_enc, A_enc, T_enc, table):
+        self.env["checker"] += explanation
+        actual_solutions = frozenset(
+            cp.solvers.utils.solutions(self.env["checker"], X=self.user_vars, projected_solution_limit=None)
+        )
+        expected_solutions = self.env["solutions"]
+        self.env["cuts"][-1]["n_sols"] = len(actual_solutions)
+        assert expected_solutions.issubset(actual_solutions), f"{expected_solutions} </= {actual_solutions}"
+
+        # m = cp.Model(explanation, [x == a for x, a in zip(X_enc, A_enc)])
+        # assert not m.solve(), f"Explanation {explanation} did not remove failure {A_enc}"
+
+        # sols = []
+        # for sol in solutions(self.user_vars, self.env["checker"], verbosity=1, projected_solution_limit=None):
+        #     for x, a in sol.items():
+        #         x._value = a
+        #     # for c in self.env["tables"]:
+        #     #     print("C", c)
+        #     #     # for c in self.env["checker"].constraints:
+        #     #     assert c.value(), f"Fail on {sol}: {c}"
+        #     sols.append(sol)
+        # print("SOLS", len(sols), sols)
+
+        # check that each row in the table is still allowed
+
+        # for row in table.args[1]:
+        # P = self.env["checker"].copy()
+        # P += cp.all(x == v for x, v in zip(table.args[0], row))
+        # assert P.solve() or not self.env["feasible"], (
+        #     f"Explanation {explanation} removed row, but feasible={self.env['feasible']}: {row}\n\n{P}"
+        # )
+
+        # for table in self.env["tables"]:
+        #     assert frozenset(tuple(sol[k] for k in table.args[0])).issubset(table.args[0])
+
+        # assert len(sols) >= len(T_enc), f"{sols} != {len(T_enc)} for checker {self.env['checker']}"
 
     def solve(self, time_limit=None, solution_callback=None, **kwargs):
         """
@@ -419,12 +538,18 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     )
                     expr, k = x_enc.encode_term()
                     # TODO if only BV, then need to assign (but no need to assign if decoding constraint present)
-                    cpm_cons += self.transform([*exactly_one_con, cp.sum(c * b for c, b in expr) + k == x])
+                    # Note: do not use self += [..] to avoid poluting user_vars
+                    cons = self.transform([*exactly_one_con, cp.sum(c * b for c, b in expr) + k == x])
+                    cpm_cons += cons
+
+                    if self.env["debug"]:
+                        for c in cons:
+                            self.env["checker"] += c
 
                 x_encs = [self.ivarmap[x.name]._xs for x in X]
                 parts = [len(x_enc) for x_enc in x_encs]
                 X_enc = [x_enc_i for x_enc in x_encs for x_enc_i in x_enc]
-                self.tables.append((X_enc, T_enc, parts))
+                self.tables.append((X_enc, T_enc, parts, cpm_expr))
             else:
                 cpm_cons.append(cpm_expr)
 

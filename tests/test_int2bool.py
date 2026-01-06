@@ -4,7 +4,6 @@ import cpmpy as cp
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.core import Comparison, Operator, BoolVal
-from cpmpy.expressions.utils import argvals
 from cpmpy.model import Model
 from cpmpy import SolverLookup
 

@@ -49,18 +49,20 @@ OPT = 'OPTIMUM FOUND'
 UNS = 'UNSATISFIABLE'
 SAT = 'SATISFIABLE'
 
-def xcsp3_plot(df, time_limit=None, metric="time_total"):
+def xcsp3_plot(df, time_limit=None, metric="time_solve", filter="solved"):
     # Get unique solvers
     solvers = df['solver'].unique()
 
     # Determine the status to plot (Opt if at least one opt, otherwise sat)
-    statuses = df['status'].unique()
-    if OPT in statuses:
-        # status_filter = ('OPTIMUM FOUND', 'SATISFIABLE')
-        status_filter = (OPT,)
+    if filter == "solved":
+        status_filter = (OPT, UNS)
+    elif filter == "feasible":
+        status_filter = (OPT, UNS, SAT)
     else:
-        status_filter = 'SATISFIABLE'
-    df = df[(df['status'].isin((*status_filter, 'UNSATISFIABLE')))]  # only those that reached the desired status
+        raise Exception
+
+    df = df[(df['status'].isin(status_filter))]  # only those that reached the desired status
+    # print(df[["solver", "instance", "status", metric]])
 
     # Count how many instances each solver solved (with correct status)
     solver_counts = df['solver'].value_counts()
@@ -194,34 +196,40 @@ def xcsp3_stats(df):
     pd.set_option('display.float_format', '{:0.1f}'.format)
 
 
+    df["feasible"] = df["status"].isin((OPT, SAT, UNS))
+    df["solved"] = df["status"].isin((OPT, UNS))
     df["posted"] = ~df["time_post"].isna()
     df["time_cb"] = df["cb_time"].fillna(value=0.0)
     df["cb_rel"] = 100 * (df["time_cb"] / df["time_solve"])
+
     df = df[df["solver"].isin(("gurobi", "lazy_gurobi"))]
     print(df[["instance", "solver", "time_solve", "area", "cb_rel"]])
 
     TO = 600
-    for t in ("post", "solve", "total"):
-        df[f"time_{t}"] = df[f"time_{t}"].fillna(value=TO*2)
+    TIMES = ("post", "solve")
 
-    groupings = ['problem', 'solver']
-    groups = df.groupby(groupings).agg(
-            area = ('area', 'sum'),
-            t_post_p2 = ('time_post', 'sum'),
-            t_solv_p2 = ('time_solve', 'sum'),
-            t_totl_p2 = ('time_total', 'sum'),
-            insts = ('status', 'count'),
-            posted = ('posted', 'sum'),
-            feasib = ('status', lambda x: x[x.isin((OPT, UNS, SAT))].count()),
-            solved = ('status', lambda x: x[x.isin((OPT, UNS))].count()),
-            cb_rel = ('cb_rel', 'mean'),
-            )
+    for t in TIMES:
+        df[f"time_{t}_p2"] = df[f"time_{t}"].fillna(value=TO*2)
 
-    # groups = groups.sort_index(level=["problem"], by="area")
-    # groups = groups.sort_values(by="area", ascending=False)
-    groups["area"] = groups["area"].map(lambda x: f"{x:.1e}")
+    for grouping in (['problem', 'solver'], ['solver']):
+        groups = df.groupby(grouping).agg(
+                area = ('area', 'mean'),
+                t_post_p2 = ('time_post_p2', 'sum'),
+                t_solv_p2 = ('time_solve_p2', 'sum'),
+                # t_totl_p2 = ('time_total', 'sum'),
+                insts = ('status', 'count'),
+                posted = ('posted', 'sum'),
+                feasib = ('feasible', 'sum'),
+                solved = ('solved', 'sum'),
+                cb_rel = ('cb_rel', 'mean'),
+                )
 
-    print(groups)
+        # groups = groups.sort_index(level=["problem"], by="area")
+        # groups = groups.sort_values(by="area", ascending=False)
+        groups["area"] = groups["area"].map(lambda x: f"{x:.1e}")
+        # groups.loc[('Total')] = groups.sum(numeric_only=True)
+
+        print(groups)
 
     
     
@@ -265,7 +273,7 @@ def main():
     # df[cb_time] = df[f"time_{t}"].fillna(value=TO*2)
     # df["t_solve_wo_cb"] = df["time_solve"] - df["cb_time"].fillna(value=0)
     # fig = xcsp3_plot(df, args.time_limit, metric="t_solve_wo_cb")
-    fig = xcsp3_plot(df, args.time_limit)
+    fig = xcsp3_plot(df, args.time_limit, filter="feasible")
     # fig = xcsp3_objective_performance_profile(merged_df)
 
     # Save or show plot

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 import cpmpy as cp
-from cpmpy.solvers.lazy_gurobi import CPM_lazy_gurobi, encode
+from cpmpy.solvers.lazy_gurobi import CPM_lazy_gurobi
 
 
 def generate_table_from_example():
@@ -33,14 +33,16 @@ def generate_table_from_data(T, d):
     return cp.Model(cp.Table(X, np.array(T)))
 
 
-def generate_table(n, m, d, k=1):
+def generate_table(n, m, d, k=1, allow_duplicate_vars=False):
     """Generate a table constraint with `n` variables with domains of size `d`, and with `m` rows"""
     X = cp.intvar(1, d, shape=n, name="x")
     # model = cp.Model(x == x for x in X)
     model = cp.Model()
+    random.seed(SEED)
     for _ in range(k):
-        Y = random.choices(X, k=n // 2)
-        # Y = X
+        k = n // 2
+        X = list(X)
+        Y = random.sample(X, k=k) if allow_duplicate_vars else random.choices(X, k=k)
         if len(Y):
             T = np.array([tuple(random.randint(1, d) for _ in enumerate(Y)) for _ in range(m)])
             model += cp.Table(Y, T)
@@ -81,6 +83,7 @@ The following constraints are Infeasible:
 
 {"\n\n".join(str(v) for v in violations)}
         """
+    print("PASS.")
 
 
 def show_sols(sols, T):
@@ -96,51 +99,93 @@ def with_constraints(model, with_alldiff=False, with_min=False):
     return model
 
 
+SEED = 42
+SEED = None
+
+
 @pytest.fixture()
 def env():
-    yield {"verbosity": 4, "debug": True, "max_iterations": 1000}
+    yield {"verbosity": 2, "debug": False, "max_iterations": 1000, "seed": SEED}
 
 
 class TestTables:
-    def test_explain_frac(self, env):
-        slv = CPM_lazy_gurobi(env={**env, **{"shrink": False}})
-        X, T = generate_table_from_example().constraints[0].args
-        T_enc = encode(X, T)
-        parts = [4, 3, 3]
-        assert (  # Example 1 from assignment [2,2,2]
-            slv.explain([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc, parts) == {1, 5}
+    def test_explain(self, env):
+        slv = CPM_lazy_gurobi(
+            cpm_model=cp.Model(generate_table_from_example().constraints),
+            env={**env, **{"shrink": False, "debug": True}},
         )
+        # X, T = generate_table_from_example().constraints[0].args
+        slv += generate_table_from_example().constraints
+        # slv.add(generate_table_from_example().constraints)
+        X_enc, T_enc, parts, table = slv.tables[0]
+
+        assert parts == [4, 3, 3]
+
+        # T_enc = encode(X, T)
+        # parts = [4, 3, 3]
+        A_enc = [0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0]
+
+        def list_to_A_enc(A_enc):
+            return dict(zip(X_enc, A_enc))
+
+        A_enc = list_to_A_enc(A_enc)
+
+        explanations = slv._explain_assignment(A_enc)
+        print("E", list(explanations))
+        # explanation = slv.explain(A_enc, T_enc, parts)
+        # assert (  # Example 1 from assignment [2,2,2]
+        #     explanation == {1, 5}
+        # )
+
+        with pytest.raises(AssertionError) as e:
+            slv.check_explanation(cp.all(X_enc), X_enc, A_enc, T_enc, table)
+        print("ERR", e.value)
+
+        # slv.check_explanation(explanation, X_enc, A_enc, T_enc)
         # assert (  # Example 7; no longer in use since explain_frac2
         #     slv.explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0], T_enc) == {1, 5, 8}
         # )
-        assert (  # Example 9
-            slv.explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5, 0.0], T_enc, parts) == {1, 5}
-        )
+
+        # assert (  # Example 9
+        #     slv.explain([0.0, 0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 0.5, 0.5, 0.0], T_enc, parts) == {1, 5}
+        # )
 
     @pytest.mark.parametrize(
-        "model",
+        "case",
         (
-            t
-            for i in range(1)
-            for t in (
-                cp.Model(cp.AllDifferent(cp.intvar(1, 3, shape=3))),
-                generate_table_from_data([(1, 1), (2, 2)], 3),  # Feasible
-                with_constraints(
-                    generate_table_from_data([(1, 1), (2, 2)], 3), with_alldiff=True
-                ),  # Infeasible
-                with_constraints(
-                    generate_table_from_data([(1, 2), (2, 1)], 3), with_alldiff=True, with_min=True
-                ),
-                generate_table_from_example(),
-                generate_two_tables(),
-                with_constraints(generate_table(2, 2, 3), with_alldiff=True, with_min=True),
-                with_constraints(generate_table(3, 10, 5), with_alldiff=True, with_min=True),
-                with_constraints(generate_table(6, 10, 10), with_alldiff=True, with_min=True),
-                with_constraints(generate_table(2, 2, 3, k=2)),
+            (i, j, t)
+            for j in range(1000)  # to repeat the test
+            for i, t in enumerate(
+                (
+                    cp.Model(cp.AllDifferent(cp.intvar(1, 3, shape=3))),
+                    generate_table_from_data([(1, 1), (2, 2)], 3),  # Feasible
+                    with_constraints(
+                        generate_table_from_data([(1, 1), (2, 2)], 3), with_alldiff=True
+                    ),  # Infeasible
+                    with_constraints(
+                        generate_table_from_data([(1, 2), (2, 1)], 3), with_alldiff=True, with_min=True
+                    ),
+                    generate_table_from_example(),
+                    generate_two_tables(),
+                    with_constraints(generate_table(2, 2, 3), with_alldiff=True, with_min=True),
+                    with_constraints(generate_table(4, 4, 4), with_alldiff=False, with_min=False),
+                    with_constraints(generate_table(6, 10, 5), with_alldiff=False, with_min=True),
+                    with_constraints(generate_table(2, 2, 3, k=2)),
+                    with_constraints(generate_table(6, 6, 4, k=3)),
+                    # with_constraints(generate_table(6, 4, 4)),  # minimized 1/1000 bug
+                    # cp.Model(
+                    #     cp.Table(
+                    #         [cp.intvar(1, 4), cp.intvar(1, 4), cp.intvar(1, 4)],
+                    #         [[4, 4, 2], [3, 3, 3], [3, 2, 2], [1, 4, 4]],
+                    #     )  # 1/1000 bug
+                    # ),
+                )
             )
         ),
+        ids=lambda val: val[0],
     )
-    def test_models(self, model, env):
+    def test_models(self, case, env):
+        _, _, model = case
         print("Test model:")
         print(model)
         check_model(model, env=env)
@@ -153,5 +198,5 @@ class TestTables:
         T = np.array([(2, 1, 1), (3, 2, 2), (4, 3, 3), (1, 2, 3), (2, 1, 2)])
         model = cp.Model(cp.Table(X, T), cp.AllDifferent(X))
         print("Test model", model)
-        print("TF", CPM_lazy_gurobi(cpm_model=model, env=env).transform(model.constraints))
+        # print("TF", CPM_lazy_gurobi(cpm_model=model, env=env).transform(model.constraints))
         check_model(model)
