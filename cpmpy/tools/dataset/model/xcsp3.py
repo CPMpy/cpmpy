@@ -84,6 +84,7 @@ class XCSP3Dataset(_Dataset):
         year_suffix = str(self.year)[2:]  # Drop the starting '20'
         url_path = url + f"instancesXCSP{year_suffix}.zip"
         zip_path = self.root / f"instancesXCSP{year_suffix}.zip"
+        pathlib.Path(self.root).mkdir(parents=True, exist_ok=True)
 
         try:
             urlretrieve(url_path, str(zip_path))
