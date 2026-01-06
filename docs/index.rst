@@ -32,7 +32,7 @@ Supported solvers
      - The default solver
    * - :doc:`Pumpkin <api/solvers/pumpkin>`
      - CP (LCG)
-     - SAT ASAT ALLSAT - OPT - PROOF -- ?ISAT IOPT?
+     - SAT ASAT ISAT ALLSAT - OPT - PROOF
      - local install (maturin)
      - 
    * - :doc:`GCS <api/solvers/gcs>`
@@ -42,7 +42,7 @@ Supported solvers
      -
    * - :doc:`Choco <api/solvers/choco>`
      - CP
-     - SAT ALLSAT - OPT -- ?ISAT IOPT?
+     - SAT ISAT ALLSAT - OPT
      - pip
      - 
    * - :doc:`CP Optimizer <api/solvers/cpo>`
@@ -57,7 +57,7 @@ Supported solvers
      - Communicates through textfiles
    * - :doc:`Z3 <api/solvers/z3>`
      - SMT
-     - SAT ASAT ISAT - OPT IOPT
+     - SAT ASAT ISAT - OPT
      - pip
      - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
@@ -71,10 +71,10 @@ Supported solvers
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
-     - Pseudo-Boolean
-     - SAT -- ?ISAT?
-     - local install (git + pip > 3.10)
-     - Encodes to SAT
+     - SAT
+     - SAT ISAT
+     - pip
+     - Automatically encodes PB to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - SAT ASAT ISAT
