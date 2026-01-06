@@ -46,7 +46,6 @@ class JSPLibDataset(object):  # torch.utils.data.Dataset compatible
         # Create root directory if it doesn't exist
         self.root.mkdir(parents=True, exist_ok=True)
 
-        print(self.instance_dir, self.instance_dir.exists(), self.instance_dir.is_dir())
         if not self.instance_dir.exists():
             if not download:
                 raise ValueError(f"Dataset not found in local file system. Please set download=True to download the dataset.")
