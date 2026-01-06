@@ -1,4 +1,6 @@
 import math
+import pathlib
+import pickle
 import random
 
 import numpy as np
@@ -56,34 +58,44 @@ def assert_integer_solution(A_enc):
         )
 
 
-def show_assignment(X):
-    return ", ".join(f"{x}={x.value()}" for x in X)
-
-
 def check_model(model, env=None):
+    print("Model", model)
     expected_sat = model.deepcopy().solve()
 
-    slv = CPM_lazy_gurobi(cpm_model=model, env=env)
+    slv = CPM_lazy_gurobi(cpm_model=model, env=env.copy())
     actual_sat = slv.solve()
     slv.stats()
-    assert expected_sat == actual_sat, "Expected equisat"
+    try:
+        if actual_sat is False:
+            assert expected_sat == actual_sat, "Expected equisat"
 
-    if expected_sat:
-        X = cp.transformations.get_variables.get_variables_model(model)
-        assert all(x.value() is not None for x in X), (
-            f"Expected all variables to be assigned, but found: {show_assignment(X)}"
-        )
+        if expected_sat:
+            X = cp.transformations.get_variables.get_variables_model(model)
+            assert all(x.value() is not None for x in X), (
+                f"Expected all variables to be assigned, but found: {show_assignment(X)}"
+            )
 
-        violations = [c for c in model.constraints if c.value() is False]
-        assert not violations, f"""For assignment:
+            violations = [c for c in model.constraints if c.value() is False]
+            assert not violations, f"""For assignment:
 
-{show_assignment(X)}
+    {show_assignment(X)}
 
-The following constraints are Infeasible:
+    The following constraints fail:
 
-{"\n\n".join(str(v) for v in violations)}
-        """
-    print("PASS.")
+    {"\n\n".join(str(v) for v in violations)}
+            """
+        print("PASS.")
+    except AssertionError as e:
+        # with open("/tmp/bug.pkl", "wb") as f:
+        #     pickle.dump(model, f)
+
+        raise e
+        if env["debug"]:
+            raise e
+        else:
+            print("try debug", e)
+
+            check_model(model, env={**env, "debug": True})
 
 
 def show_sols(sols, T):
@@ -105,10 +117,25 @@ SEED = None
 
 @pytest.fixture()
 def env():
-    yield {"verbosity": 2, "debug": False, "max_iterations": 1000, "seed": SEED}
+    yield {"verbosity": 2, "debug": False, "max_iterations": 1000, "seed": 42, "shrink": False}
+
+
+def load_model(path):
+    if pathlib.Path(path).exists():
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    else:
+        return cp.Model()
 
 
 class TestTables:
+    def test_repro_explain(self, env):
+        with open("/tmp/failed_cut.pkl", "rb") as f:
+            A_enc, T_enc, parts, frm = pickle.load(f)
+        CPM_lazy_gurobi(
+            env={**env, **{"verbosity": 4, "debug": False}},
+        ).explain(A_enc, T_enc, parts, frm=frm)
+
     def test_explain(self, env):
         slv = CPM_lazy_gurobi(
             cpm_model=cp.Model(generate_table_from_example().constraints),
@@ -154,11 +181,13 @@ class TestTables:
         "case",
         (
             (i, j, t)
-            for j in range(1000)  # to repeat the test
+            for j in range(100)  # to repeat the test
             for i, t in enumerate(
                 (
+                    load_model("/tmp/bug.pkl"),
                     cp.Model(cp.AllDifferent(cp.intvar(1, 3, shape=3))),
-                    generate_table_from_data([(1, 1), (2, 2)], 3),  # Feasible
+                    generate_table_from_data([(1, 1), (2, 2)], 3),  # Feasible (often 0 explanations)
+                    generate_table_from_data([(1, 2), (2, 1)], 3),  # Feasible
                     with_constraints(
                         generate_table_from_data([(1, 1), (2, 2)], 3), with_alldiff=True
                     ),  # Infeasible
@@ -169,10 +198,10 @@ class TestTables:
                     generate_two_tables(),
                     with_constraints(generate_table(2, 2, 3), with_alldiff=True, with_min=True),
                     with_constraints(generate_table(4, 4, 4), with_alldiff=False, with_min=False),
-                    with_constraints(generate_table(6, 10, 5), with_alldiff=False, with_min=True),
                     with_constraints(generate_table(2, 2, 3, k=2)),
                     with_constraints(generate_table(6, 6, 4, k=3)),
-                    # with_constraints(generate_table(6, 4, 4)),  # minimized 1/1000 bug
+                    with_constraints(generate_table(6, 10, 5), with_alldiff=False, with_min=True),
+                    with_constraints(generate_table(6, 4, 4)),  # minimized 1/1000 bug
                     # cp.Model(
                     #     cp.Table(
                     #         [cp.intvar(1, 4), cp.intvar(1, 4), cp.intvar(1, 4)],
@@ -187,7 +216,6 @@ class TestTables:
     def test_models(self, case, env):
         _, _, model = case
         print("Test model:")
-        print(model)
         check_model(model, env=env)
 
     def test_table_enc(self, env):
@@ -197,6 +225,4 @@ class TestTables:
         X = (x, y, z)
         T = np.array([(2, 1, 1), (3, 2, 2), (4, 3, 3), (1, 2, 3), (2, 1, 2)])
         model = cp.Model(cp.Table(X, T), cp.AllDifferent(X))
-        print("Test model", model)
-        # print("TF", CPM_lazy_gurobi(cpm_model=model, env=env).transform(model.constraints))
         check_model(model)

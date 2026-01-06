@@ -2,7 +2,9 @@ import itertools
 import json
 import logging
 import math
+import os
 import pathlib
+import pickle
 import pprint
 import sys
 import time
@@ -17,6 +19,58 @@ import cpmpy as cp
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.variables import NegBoolView, _BoolVarImpl
 from cpmpy.solvers.gurobi import CPM_gurobi
+
+# https://github.com/ed-lam/cpaior2025-master-class/blob/5c727db2a103ded7971bb89693fe5bb69d509c76/common.py#L9
+# Functions for approximate comparison of floating point numbers
+EPS = 1e-6
+
+
+def is_eq(x, y):
+    return abs(x - y) <= EPS
+
+
+def is_lt(x, y):
+    return x - y < -EPS
+
+
+def is_le(x, y):
+    return x - y <= EPS
+
+
+def is_gt(x, y):
+    return x - y > EPS
+
+
+def is_ge(x, y):
+    return x - y >= -EPS
+
+
+def eps_floor(x):
+    return math.floor(x + EPS)
+
+
+def eps_ceil(x):
+    return math.ceil(x - EPS)
+
+
+def eps_round(x):
+    return math.ceil(x - 0.5 + EPS)
+
+
+def eps_frac(x):
+    return x - eps_floor(x)
+
+
+def is_integral(x):
+    return eps_frac(x) <= EPS
+
+
+def show_assignment(X):
+    return ", ".join(f"{x}={x.value()}" for x in X)
+
+
+def assign_mipsol(A_enc):
+    return [1 if a > 0.5 else 0 for a in A_enc]
 
 
 class SetEncoder(json.JSONEncoder):
@@ -57,8 +111,12 @@ def cols(T, i, j=1):
     return set(int(i) for i in np.where(T[i, :] == j)[0].flatten())
 
 
+def is_integer(v):
+    return math.isclose(v, v > 0.5, abs_tol=1e-5)
+
+
 def is_integer_solution(A_enc):
-    return all(math.isclose(a_enc_i, a_enc_i > 0.5, abs_tol=1e-5) for a_enc_i in A_enc)
+    return all(is_integer(a) for a in A_enc)
 
 
 def encode_x(a, lb, ub):
@@ -104,6 +162,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
             "seed": 42,
             "checker": cp.Model(),
             "tables": [],
+            "found_feasible": False,
             **({} if env is None else env),
         }
         self.indent = 0
@@ -128,6 +187,8 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
         super().__init__(lazy=True, cpm_model=cpm_model, **kwargs)
         self.native_model.Params.LazyConstraints = 1
+        # self.native_model.Params.Threads = 1
+        # self.native_model.Params.PreCrush = 1
         if self.env["seed"] is not None:
             self.native_model.Params.Seed = self.env["seed"]
         if self.env["verbosity"] >= 4:
@@ -214,7 +275,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         return C
 
     def explain(self, A_enc, T_enc, parts, frm=None):
-        """The `explain_frac` alg."""
+        """The `explain_frac2` alg."""
 
         parts_ = [0]
         for p in parts:
@@ -227,16 +288,34 @@ class CPM_lazy_gurobi(CPM_gurobi):
         # TODO convert T_enc to set of tuples?
         self.log("Explain", end="\n")
 
-        self.log("", np.array(A_enc), verbosity=2, indent=0)
+        self.log(" ", np.array(A_enc), verbosity=2, indent=0)
+        if frm == "MIPSOL":
+            self.log("", np.array(assign_mipsol(A_enc)), verbosity=2, indent=0)
         self.log(np.array(T_enc), verbosity=2, indent=0)
+        self.log(
+            "",
+            np.array(
+                [
+                    i + 1
+                    for i, p in enumerate([0] + parts)
+                    for _ in range(p, parts[i] if i < len(parts) else p)
+                ]
+            ),
+            verbosity=2,
+            indent=0,
+        )
+        self.log(np.array(parts), verbosity=2, indent=0)
+
         self.log("", indent=0)
         assert len(A_enc) == len(T_enc.T)
 
         self.env["cuts"].append({"from": frm})
 
         m = len(T_enc)  # number of cols
-        W = set(i for i, a in enumerate(A_enc) if a == 1.0)  #
-        F = set(i for i, a in enumerate(A_enc) if 0.0 < a < 1.0)
+        W = set(i for i, a in enumerate(A_enc) if is_eq(a, 1.0))  #
+        # F = set(i for i, a in enumerate(A_enc) if is_gt(a, 0.0) and is_lt(a, 1.0))
+        F = set(i for i, a in enumerate(A_enc) if not is_integral(a))
+        # assert not is_integer_solution(A_enc[i] for i in F), f"F should hold only fractional, but was: {F}"
         X = set()  # columns added to cut
         R = set(range(len(T_enc)))  # remaining columns
         D = set(r for r in range(m) if cols(T_enc, r) <= W.union(F))  # difficult rows; either frac/whole
@@ -276,17 +355,23 @@ class CPM_lazy_gurobi(CPM_gurobi):
             self.log(f"s = {s}", verbosity=3)
             if not R:
                 break
-            l = next(l for l in set(range(len(parts))) - V)
-            self.log(f"Choose integer l = {INDEX + l}", verbosity=3)
+            choices = set(range(len(parts))) - V
+            if not choices:
+                raise Infeasible
+            l = next(l for l in choices)
+            self.log(f"choose integer l = {INDEX + l} in {show_set(choices)}", verbosity=3)
             V.add(l)
             s += 1
 
             def C(v, l):
-                self.log(f"C({v}, {l})", verbosity=3)
-                return set(i for i in range(len(v)) if v[i] > 0 and p(i) == l)
+                c = set(i for i in range(len(v)) if is_gt(v[i], 0.0) and p(i) == l)
+                self.log(f"C({v}, {l}) = {show_set(c)}", verbosity=3)
+                return c
 
             sets = [rows(T_enc, i) for i in C(A_enc, l)]
-            R.intersection_update(set.union(*sets) if sets else set())
+            sets = set.union(*sets) if sets else set()
+            self.log(f"Union = {show_set(sets)}", verbosity=3)
+            R.intersection_update(sets)
             X = X.union(C(A_enc, l))
 
         self.log(f"by explanation of size ({len(X)}): {show_set(X)}")
@@ -305,7 +390,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                         "pre_shrunk": self.env["cuts"][-1]["cut"],
                         "cut": X_shrunk,
                     }
-                self.env["cuts"][-1]["shrunk"] = shrunk
+            self.env["cuts"][-1]["shrunk"] = shrunk
 
         self.env["cuts"][-1]["size"] = len(X)
         self.log(f"  cut == {show_set(X)}")
@@ -348,11 +433,15 @@ class CPM_lazy_gurobi(CPM_gurobi):
                             assert is_integer_solution(x_enc_a.values()), (
                                 f"Expected integer solution for MIP, but got {x_enc_a}"
                             )
+                        for x, a in x_enc_a.items():
+                            x._value = 1 if a > 0.5 else 0
                     case _:
                         return
 
                 self.log(frm, x_enc_a, verbosity=2)
+                feasible = True  # assume feasible
                 for explanation in self._explain_assignment(x_enc_a, frm=frm):
+                    feasible = False  # any explanation means not feasible
                     expr = self.transform(explanation)
                     assert len(expr) == 1
                     expr = expr[0]
@@ -377,6 +466,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     #     raise Infeasible
 
                 self.check_max_iterations(len(self.env["cuts"]))
+                if feasible and frm == "MIPSOL":
+                    self.log("found feasible")
+                    self.env["found_feasible"] = feasible
+            except Infeasible:
+                what.cbLazy(1 < 0)
             except Exception as e:
                 what._callback_exception = e
                 what.terminate()
@@ -385,54 +479,70 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 if frm:
                     self.log(f"end callback, dt = {cb_time}", verbosity=2)
                 self.env["cb_time"] += cb_time
-                assert cb_time < 1.0
+                assert cb_time < 1.0 or self.env["debug"]
 
         return solution_callback
 
     def _explain_assignment(self, x_enc_a, frm=None):
         # If fully integer, we can check if the tables are feasible yet
-        for X_enc, T_enc, parts, table in self.tables:
+        for i, (X_enc, T_enc, parts, table) in enumerate(self.tables, start=INDEX):
             A_enc = [x_enc_a[x_enc_i] for x_enc_i in X_enc]
+            A_enc_ = assign_mipsol(A_enc)
 
             # TODO figure out when can be skipped
             # if frm == "MIPNODE-OPT" and is_integer_solution(A_enc) and
-            if A_enc in T_enc.tolist():
-                continue
+            if frm == "MIPSOL":
+                if A_enc_ in T_enc.tolist():
+                    self.log(f"table {i}/{len(self.tables)} feasible by {A_enc_}\n\n{T_enc}")
+                    # assert False
+                    # assert table.value() # TODO after assigning _value
+                    continue
+                else:
+                    self.log(f"table {i}/{len(self.tables)} INfeasible by {A_enc_}\n\n{T_enc}")
 
-            # encode assignment
-            explanation = self.explain(A_enc, T_enc, parts, frm=frm)
-            if self.env["debug"]:
-                # self.check_explanation(explanation, X_enc, A_enc, T_enc)
-                self.env["cuts"][-1]["x"] = str(X_enc)
-                self.env["cuts"][-1]["table"] = str(T_enc)
-                # self.env["cuts"][-1]["explanation"] = explanation_expr
-                self.env["cuts"][-1]["failure"] = list(zip(X_enc, A_enc))
-                self.env["cuts"][-1]["failure_"] = [
-                    f"{x}={a}"
-                    for x, a in [
-                        (f"{self.names[x.name]}" if hasattr(self, "names") else f"{x}", f"{a:.2f}")
-                        for x, a in zip(X_enc, A_enc)
-                        if a > 0.0
-                    ]
-                ]
-
-            if explanation:
-                self.log(
-                    f"  cons == {' + '.join(X_enc[c].name for c in explanation)} < {len(explanation)}",
-                )
-                expr = cp.sum(X_enc[c] for c in explanation) < len(explanation)
-                self.env["cuts"][-1]["expr"] = expr
-
+            try:
+                # encode assignment
+                explanation = self.explain(A_enc, T_enc, parts, frm=frm)
                 if self.env["debug"]:
-                    self.check_explanation(expr, X_enc, A_enc, T_enc, table)
-                yield expr
+                    # self.check_explanation(explanation, X_enc, A_enc, T_enc)
+                    self.env["cuts"][-1]["x"] = str(X_enc)
+                    self.env["cuts"][-1]["table"] = str(T_enc)
+                    # self.env["cuts"][-1]["explanation"] = explanation_expr
+                    self.env["cuts"][-1]["failure"] = list(zip(X_enc, A_enc))
+                    self.env["cuts"][-1]["failure_"] = [
+                        f"{x}={a}"
+                        for x, a in [
+                            (f"{self.names[x.name]}" if hasattr(self, "names") else f"{x}", f"{a:.2f}")
+                            for x, a in zip(X_enc, A_enc)
+                            if a > 0.0
+                        ]
+                    ]
 
-                # if self.env["debug"]:
-                #     self.env["cuts"][-1]["cut_"] = str(cut).split(": ")[1].split(">")[0]
-            elif frm == "MIPSOL":  # unsat
-                self.log("INFEASIBLE")
-                return False
-                # raise Infeasible
+                if explanation:
+                    self.log(
+                        f"  cons == {' + '.join(X_enc[c].name for c in explanation)} < {len(explanation)}",
+                    )
+                    expr = cp.sum(X_enc[c] for c in explanation) < len(explanation)
+                    self.env["cuts"][-1]["expr"] = expr
+
+                    if self.env["debug"]:
+                        self.check_explanation(expr, X_enc, A_enc, T_enc, table)
+
+                    if frm == "MIPSOL":
+                        assert expr.value() is False, (
+                            f"Did not cut off {show_assignment(X_enc)} with exp {expr} for table:\n\n {np.array(A_enc_)}\n{T_enc}"
+                        )
+
+                    yield expr
+                elif frm == "MIPSOL":  # unsat
+                    self.log("INFEASIBLE", explanation)
+                    raise Infeasible
+            except Infeasible:
+                raise Infeasible
+            except Exception as e:
+                with open("/tmp/failed_cut.pkl", "wb") as f:
+                    pickle.dump((A_enc, T_enc, parts, frm), f)
+                raise e
 
     def add(self, cons):
         if self.env["debug"]:
@@ -491,15 +601,20 @@ class CPM_lazy_gurobi(CPM_gurobi):
         self.log("Solving.. ")
 
         try:
-            hassol = super().solve(
-                solution_callback=self.get_solution_callback(), time_limit=time_limit, **kwargs
-            )
-            self.stats()
+            solution_callback = self.get_solution_callback()
+            hassol = super().solve(solution_callback=solution_callback, time_limit=time_limit, **kwargs)
+
+            if hassol:
+                if self.env["debug"]:
+                    assert self.env["feasible"]
+                if not self.env["found_feasible"]:
+                    print("WARN: not found feas")
+                # assert self.env["found_feasible"]
 
         except Infeasible:
             hassol = False
         except Exception as e:
-            self.log("Exception")
+            self.log("Exception", e)
             self.env["verbosity"] = 4
             self.stats()
             raise e
@@ -509,8 +624,9 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 "Gurobi was interrupted (perhaps the solution callback called model.terminate())"
             )
 
-        for field, stat in self.stats().items():
-            print(f"c Stat={field}={stat}")
+        if "PYTEST_CURRENT_TEST" not in os.environ:
+            for field, stat in self.stats().items():
+                print(f"c Stat={field}={stat}")
 
         # TODO recheck https://or.stackexchange.com/questions/12591/ensure-gurobi-uses-callback-on-all-feasible-solutions It looks like if the solution at the end of the root node is integer, gurobi doesn't pass through callbacks for fractional solutions.
 
