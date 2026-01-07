@@ -20,6 +20,7 @@ import warnings # for deprecation warning
 import time
 
 from cpmpy.transformations.get_variables import get_variables_model
+from cpmpy.expressions.utils import is_boolexpr, is_int
 from .gurobi import CPM_gurobi
 from .lazy_gurobi import CPM_lazy_gurobi
 from .ortools import CPM_ortools
@@ -266,6 +267,9 @@ def solutions(P, X=None, projected_solution_limit=None, time_limit=None, verbosi
         X = get_variables_model(P)
 
     P.objective_ = None
+
+    import cpmpy as cp
+    import numpy as np
 
     P += cp.all([x == x for x in X])
 
