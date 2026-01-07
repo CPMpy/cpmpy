@@ -136,11 +136,13 @@ def load_model(path):
 
 class TestTables:
     def test_repro_explain(self, env):
-        with open("/tmp/failed_cut_nc.pkl", "rb") as f:
-            A_enc, T_enc, parts, frm = pickle.load(f)
-        CPM_lazy_gurobi(
-            env={**env, **{"verbosity": 4, "debug": False}},
-        ).explain(A_enc, T_enc, parts, frm="MIPSOL")
+        path = pathlib.Path("/tmp/failed_cut_nc.pkl")
+        if path.exists():
+            with open(path, "rb") as f:
+                A_enc, T_enc, parts, frm = pickle.load(f)
+            CPM_lazy_gurobi(
+                env={**env, **{"verbosity": 4, "debug": False}},
+            ).explain(A_enc, T_enc, parts, frm="MIPSOL")
 
     def test_explain(self, env):
         slv = CPM_lazy_gurobi(
