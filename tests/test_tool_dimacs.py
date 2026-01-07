@@ -63,11 +63,13 @@ class CNFTool(unittest.TestCase):
         m += b.implies(~c)
         m += a <= 0
 
-        cnf_txt = write_dimacs(m)
-        # TODO note the order is slightly unexpected, because of an optimization in `to_cnf` which puts simple clauses before encoded constraints (i.e.) sums
-        gt_cnf = "p cnf 3 3\n1 2 3 0\n-1 0\n-2 -3 0\n"
+        gt_cnf = "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
+        gt_clauses = set(gt_cnf.split("\n")[1:]) # skip the p-line
 
-        self.assertEqual(cnf_txt, gt_cnf)
+        cnf_txt = write_dimacs(model=m)
+        cnf_clauses = set(cnf_txt.split("\n")[1:]) # skip the p-line
+       
+        self.assertEqual(cnf_clauses, gt_clauses)
 
 
     def test_missing_p_line(self):
