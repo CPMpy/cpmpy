@@ -223,3 +223,8 @@ def is_star(arg):
 
 def dom_size(x):
     return x.ub - x.lb + 1
+
+def show_assignment(X):
+    return ", ".join(f"{x}={x.value()}" for x in X)
+
+

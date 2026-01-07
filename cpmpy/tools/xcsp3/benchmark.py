@@ -137,8 +137,8 @@ def xcsp3_wrapper(conn, kwargs, verbose):
         sys.stdout = original_stdout
         conn.close()
 
-# exec_args = (filename, metadata, solver, time_limit, mem_limit, output_file, verbose) 
-def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool, str]) -> None:
+# exec_args = (filename, metadata, solver, time_limit, mem_limit, check_time_limit, output_file, verbose) 
+def execute_instance(args: Tuple[str, dict, str, int, int, int, int, str, bool, bool, str]) -> None:
     """
     Solve a single XCSP3 instance and write results to file immediately.
     
@@ -148,11 +148,12 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
         solver: Name of the solver to use
         time_limit: Time limit in seconds
         mem_limit: Memory limit in MB
+        check_time_limit: Check time limit in seconds
         output_file: Path to the output CSV file
         verbose: Whether to show solver output
     """
     
-    filename, metadata, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path = args
+    filename, metadata, solver, time_limit, mem_limit, check_time_limit, cores, output_file, verbose, intermediate, checker_path = args
 
     # Fieldnames for the CSV file
     fieldnames = ['year', 'track', 'instance', 'solver',
@@ -185,6 +186,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
                                                           "metadata": metadata,
                                                           "solver": solver, 
                                                           "time_limit": time_limit, 
+                                                          "check_time_limit": check_time_limit, 
                                                           "mem_limit": mem_limit, 
                                                           "intermediate": intermediate, 
                                                           "force_mem_limit": True,
@@ -193,7 +195,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
                                                         }, 
                                                     verbose))
     process.start()
-    process.join(timeout=time_limit)
+    process.join(timeout=time_limit + check_time_limit)
 
     # Replicate competition convention on how jobs get terminated
     if process.is_alive():
@@ -348,7 +350,8 @@ def get_table_metadata(model):
 
 def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1, 
                    time_limit: int = 300,
-                    mem_limit: Optional[int] = 4096, cores: int=1,
+                   mem_limit: Optional[int] = 4096, cores: int=1,
+                   check_time_limit: int = 10,
                    output_dir: str = 'results',
                    no_timestamp: bool = False,
                    verbose: bool = False, intermediate: bool = False,
@@ -362,6 +365,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
         solver (str): Solver name (e.g., ortools, exact, choco, ...)
         workers (int): Number of parallel workers
         time_limit (int): Time limit in seconds per instance
+        check_time_limit (int): Check time limit in seconds per instance
         glob (int): Filter instances
         mem_limit (int): Memory limit in MB per instance
         output_dir (str): Output directory for CSV files
@@ -400,7 +404,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     with ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks and track their futures
         futures = [executor.submit(execute_instance,  # below: args
-                                   (filename, metadata, solver, time_limit, mem_limit, cores, output_file, verbose, intermediate, checker_path))
+                                   (filename, metadata, solver, time_limit, mem_limit, check_time_limit, cores, output_file, verbose, intermediate, checker_path))
                    for filename, metadata in dataset]
         # Process results as they complete
         for i,future in enumerate(tqdm(futures, total=len(futures), desc=f"Running {solver}")):
@@ -425,6 +429,7 @@ if __name__ == "__main__":
     parser.add_argument('--solver', type=str, required=True, help='Solver name (e.g., ortools, exact, choco, ...)')
     parser.add_argument('--workers', type=int, default=4, help='Number of parallel workers')
     parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
+    parser.add_argument('--check-time-limit', type=int, default=10, help='Check time limit in seconds per instance')
     parser.add_argument('--glob', type=str, help='Filter instances according to glob expression')
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
     parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign to a single instance')

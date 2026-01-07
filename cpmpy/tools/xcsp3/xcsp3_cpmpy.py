@@ -67,11 +67,13 @@ from contextlib import contextmanager
 
 # CPMpy
 import cpmpy as cp
+from cpmpy.transformations.get_variables import get_variables
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.xcsp3 import _parse_xcsp3, _load_xcsp3
 from cpmpy.tools.xcsp3 import globals
 from cpmpy.solvers.ortools import CPM_ortools
 from cpmpy.expressions.variables import _BV_PREFIX, _IV_PREFIX
+from cpmpy.expressions.utils import show_assignment
 
 # PyCSP3
 from xml.etree.ElementTree import ParseError
@@ -600,6 +602,7 @@ def xcsp3_cpmpy(
         seed: Optional[int] = None,
         time_limit: Optional[int] = None,
         mem_limit: Optional[int] = None,  # MiB: 1024 * 1024 bytes
+        check_time_limit: Optional[int] = None,
         cores: int = 1,
         solver: str = None,
         time_buffer: int = 0,
@@ -743,12 +746,13 @@ def xcsp3_cpmpy(
         # ------------------------------------- - ------------------------------------ #
 
         if s.status().exitstatus in (CPMStatus.FEASIBLE, CPMStatus.OPTIMAL):
-            print_comment("Checking solution")
+            print_comment(f"Checking solution within check time limit {check_time_limit}")
             time_check = time.time()
             for c in model.constraints:
-                assert c.value()
-            time_check = time.time() - time_check
-            print(f"Checking passed in {time_check:.4f}")
+                assert c.value(), f"Constraint {c} failed for assignment {show_assignment(get_variables(c))}"
+                if check_time_limit - (time.time() - time_check) < 0.1:
+                    raise TimeoutError(f"Checking did not finish in time limit {check_time_limit}")
+            print_comment(f"Checking passed in {time.time() - time_check:.4f}")
         
     except MemoryError as e:
         print_comment(f"MemoryError raised. Reached limit of {mem_limit} MiB")
@@ -793,6 +797,8 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--time-limit", required=False, type=int, default=None, help="Time limit in seconds.") # TIMELIMIT
     # MEMLIMIT: Total amount of memory in MiB (mebibyte = 1024 * 1024 bytes)
     parser.add_argument("-m", "--mem-limit", required=False, type=int, default=None, help="Memory limit in MiB (1 MiB = 1024 x 1024 bytes). Gets passed on to the solver (if supported) and is also enforced on the Python/CPMpy side. Measured as Virtual Memory Size")
+    # CHECKTIMELIMIT: Total CPU time in seconds (before it gets killed)
+    parser.add_argument("-l", "--check-time-limit", required=False, type=int, default=None, help="Check time limit in seconds.") # TIMELIMIT
     # TMPDIR: Only location where temporary read/write is allowed
     parser.add_argument("-t","--tmpdir", required=False, type=dir_path, help="Directory for temporary read/write operations.")
     # NBCORE: Number of processing units (can by any of the following: a processor / a processor core / logical processor (hyper-threading))

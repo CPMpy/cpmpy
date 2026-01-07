@@ -16,6 +16,7 @@ import pandas as pd
 from gurobipy import GRB
 
 import cpmpy as cp
+from cpmpy.expressions.utils import show_assignment
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.variables import NegBoolView, _BoolVarImpl
 from cpmpy.solvers.gurobi import CPM_gurobi
@@ -63,10 +64,6 @@ def eps_frac(x):
 
 def is_integral(x):
     return eps_frac(x) <= EPS
-
-
-def show_assignment(X):
-    return ", ".join(f"{x}={x.value()}" for x in X)
 
 
 def assign_mipsol(A_enc):

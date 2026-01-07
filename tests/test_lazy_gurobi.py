@@ -7,7 +7,8 @@ import numpy as np
 import pytest
 
 import cpmpy as cp
-from cpmpy.solvers.lazy_gurobi import CPM_lazy_gurobi, show_assignment
+from cpmpy.solvers.lazy_gurobi import CPM_lazy_gurobi
+from cpmpy.expressions.utils import show_assignment
 
 
 def generate_table_from_example():
