@@ -53,6 +53,7 @@ setup(
         'ortools>=9.9',
         'numpy>=1.5',
         'setuptools',
+        'packaging', # to check solver versions
     ],
     extras_require={
         # Solvers
