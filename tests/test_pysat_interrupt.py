@@ -1,11 +1,11 @@
 import unittest
 import pytest
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.solvers import CPM_pysat
 
 def frietkot():
     # Construct the model.
-    (mayo, ketchup, curry, andalouse, samurai) = boolvar(5)
+    (mayo, ketchup, curry, andalouse, samurai) = cp.boolvar(5)
 
     # Pure CNF
     Nora = mayo | ketchup
@@ -21,11 +21,10 @@ def frietkot():
 
     allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
 
-    model = Model(allwishes)
+    model = cp.Model(allwishes)
     return model, [mayo, ketchup, curry, andalouse, samurai]
 
-@pytest.mark.skipif(not CPM_pysat.supported(),
-                    reason="PySAT not installed")
+@pytest.mark.requires_solver("pysat")
 class TestPySATInterrupt(unittest.TestCase):
     def test_small_isntance_no_interrupt(self):
         """Check if the instance still returns the expected results
@@ -42,8 +41,8 @@ class TestPySATInterrupt(unittest.TestCase):
         from pysat.examples.genhard import PHP
         from collections import defaultdict
         import time
-        lit_cpmvar = defaultdict(lambda: boolvar())
-        m  = Model()
+        lit_cpmvar = defaultdict(lambda: cp.boolvar())
+        m  = cp.Model()
 
         # Implementing pysat example for interrupt in cpmpy
         # https://pysathq.github.io/docs/html/api/solvers.html#pysat.solvers.Solver.interrupt

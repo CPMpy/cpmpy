@@ -113,6 +113,7 @@ class CPM_pysat(SolverInterface):
             # try to import pypblib and avoid ever re-import by setting `_pb`
             if not hasattr(CPM_pysat, ("_pb")):
                 try:
+                    import pypblib # first do import ourself, to ensure we have the right exception if not present
                     from pysat import pb  # require pypblib
                     """The `pysat.pb` module if its dependency `pypblib` installed, `None` if we have not checked it yet, or `False` if we checked and it is *not* installed"""
                     CPM_pysat._pb = pb

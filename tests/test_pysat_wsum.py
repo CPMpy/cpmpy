@@ -1,14 +1,11 @@
 import unittest
 import pytest
+import importlib
 import cpmpy as cp 
-from cpmpy import *
 from cpmpy.solvers.pysat import CPM_pysat
 
-import importlib # can check for modules *without* importing them
-pysat_available = CPM_pysat.supported()
-pblib_available = importlib.util.find_spec("pypblib") is not None
-
-@pytest.mark.skipif(not (pysat_available and not pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` is installed")
+@pytest.mark.requires_solver("pysat")
+@pytest.mark.skipif(importlib.util.find_spec("pypblib") is not None, reason="Test requires pypblib to be NOT installed")
 def test_pypblib_error():
     # NOTE if you want to run this but pypblib is already installed, run `pip uninstall pypblib && pip install -e .[pysat]`
     unittest.TestCase().assertRaises(
@@ -19,10 +16,11 @@ def test_pypblib_error():
     # this one should still work without `pypblib`
     assert CPM_pysat(cp.Model(1*cp.boolvar() + 1 * cp.boolvar() + 1 * cp.boolvar() <= 2)).solve()
 
-@pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
+@pytest.mark.requires_solver("pysat")
+@pytest.mark.requires_dependency("pypblib")
 class TestEncodePseudoBooleanConstraint(unittest.TestCase):
     def setUp(self):
-        self.bv = boolvar(shape=3)
+        self.bv = cp.boolvar(shape=3)
 
     def test_pysat_simple_atmost(self):
 
@@ -75,7 +73,7 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
 
         ## check all types of linear constraints are handled
         for expression in expressions:
-            Model(expression).solve("pysat")
+            cp.Model(expression).solve("pysat")
 
     def test_encode_pb_oob(self):
         # test out of bounds (meaningless) thresholds
@@ -92,7 +90,7 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
 
         ## check all types of linear constraints are handled
         for expression in expressions:
-            Model(expression).solve("pysat")
+            cp.Model(expression).solve("pysat")
 
 if __name__ == '__main__':
     unittest.main()

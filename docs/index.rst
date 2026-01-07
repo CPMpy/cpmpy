@@ -121,6 +121,7 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
    unsat_core_extraction
    developers
    adding_solver
+   testing
 
 Open Source
 -----------

@@ -1,15 +1,14 @@
 import unittest
+import pytest
 
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.expressions.utils import argvals
-from cpmpy.transformations.decompose_global import decompose_global
 from cpmpy.transformations.flatten_model import flatten_objective
 from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
-
+@pytest.mark.usefixtures("solver")
 class TestTransLinearize(unittest.TestCase):
 
     def setUp(self):
@@ -35,6 +34,7 @@ class TestTransLinearize(unittest.TestCase):
         cons = linearize_constraint([a.implies(b)])[0]
         self.assertEqual("sum([1, -1] * [a, b]) <= 0", str(cons))
     
+    @pytest.mark.requires_solver("gurobi")
     def test_bug_168(self):
         from cpmpy.solvers import CPM_gurobi
         if CPM_gurobi.supported():
@@ -44,7 +44,8 @@ class TestTransLinearize(unittest.TestCase):
             s1 = cp.Model(e1).solve("gurobi")
             self.assertTrue(s1)
             self.assertEqual([bv[0].value(), bv[1].value(), iv.value()],[True, True, 1])
-            
+    
+    @pytest.mark.requires_solver("gurobi", "exact")
     def test_bug_468(self):
         from cpmpy.solvers import CPM_exact, CPM_gurobi
         a, b, c = boolvar(shape=3)
@@ -126,7 +127,7 @@ class TestTransLinearize(unittest.TestCase):
         def cb():
             assert cons.value()
 
-        n_sols = cp.Model(lincons).solveAll(display=cb)
+        n_sols = cp.Model(lincons).solveAll(solver=self.solver, display=cb)
         self.assertEqual(n_sols, 5 * 4 * 3)
 
         # should also work with constants in arguments
@@ -137,7 +138,7 @@ class TestTransLinearize(unittest.TestCase):
         def cb():
             assert cons.value()
 
-        n_sols = cp.Model(lincons).solveAll(display=cb)
+        n_sols = cp.Model(lincons).solveAll(solver=self.solver, display=cb)
         self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
 
     # def test_issue_580(self): -> Modulo is now a global constraint
@@ -308,7 +309,7 @@ class TestConstRhs(unittest.TestCase):
         cons = linearize_constraint(cons, supported={"alldifferent"})[0]
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
-
+@pytest.mark.usefixtures("solver")
 class TestVarsLhs(unittest.TestCase):
 
     def setUp(self): # reset counters

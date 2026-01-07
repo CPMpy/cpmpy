@@ -1,7 +1,6 @@
 import importlib
 import pytest
 from functools import wraps
-import cpmpy as cp
 
 # ---------------------------------------------------------------------------- #
 #                              Generic Decorators                              #
@@ -74,7 +73,6 @@ def smart_decorator(method_decorator):
 #                              Specific Decorators                             #
 # ---------------------------------------------------------------------------- #
 
-from cpmpy.solvers.pysat import CPM_pysat
 pblib_available = importlib.util.find_spec("pypblib") is not None
 
 def skip_on_missing_pblib(skip_on_exception_only:bool=False):
