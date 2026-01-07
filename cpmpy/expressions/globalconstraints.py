@@ -402,11 +402,17 @@ class Inverse(GlobalConstraint):
     def value(self):
         fwd = argvals(self.args[0])
         rev = argvals(self.args[1])
+
+        if any(x is None for x in fwd):
+            return None
+        if any(x is None for x in rev):
+            return None
+
         # args are fine, now evaluate actual inverse cons
-        try:
-            return all(rev[x] == i for i, x in enumerate(fwd))
-        except IndexError: # partiality of Element constraint
-            return False
+        if any(not 0 <= x < len(rev) for x in fwd):
+            return False  # partiality of Element (index out of bounds)
+
+        return all(rev[x] == i for i, x in enumerate(fwd))
 
 
 class Table(GlobalConstraint):
@@ -672,83 +678,162 @@ class Xor(GlobalConstraint):
 class Cumulative(GlobalConstraint):
     """
         Global cumulative constraint. Used for resource aware scheduling.
-        Ensures that the capacity of the resource is never exceeded.
+        Ensures that the capacity of the resource is never exceeded and enforces:
+            duration >= 0
+            demand >= 0
+            start + duration == end
+
         Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
         Supports both varying demand across tasks or equal demand for all jobs.
     """
-    def __init__(self, start, duration, end, demand, capacity):
+    def __init__(self, start, duration, end=None, demand=None, capacity=None):
+        """
+            Arguments of constructor:
+
+            Arguments:
+                `start`: List of Expression objects representing the start times of the tasks
+                `duration`: List of Expression objects representing the durations of the tasks
+                `end`: optional, list of Expression objects representing the end times of the tasks
+                `demand`: List of Expression objects or single Expression to indicate constant demand for all tasks
+                `capacity`: Expression object representing the capacity of the resource
+        """
+                
         assert is_any_list(start), "start should be a list"
         assert is_any_list(duration), "duration should be a list"
-        assert is_any_list(end), "end should be a list"
+        if end is not None:
+            assert is_any_list(end), "end should be a list if it is provided"
+        
+        assert demand is not None, "demand should be provided but was None"
+        assert capacity is not None, "capacity should be provided but was None"
 
         start = flatlist(start)
         duration = flatlist(duration)
-        end = flatlist(end)
-        assert len(start) == len(duration) == len(end), "Start, duration and end should have equal length"
-        n_jobs = len(start)
-
-        for lb in get_bounds(duration)[0]:
-            if lb < 0:
-                raise TypeError("Durations should be non-negative")
+        assert len(start) == len(duration), "Start and duration should have equal length"
+        if end is not None:
+            end = flatlist(end)
+            assert len(start) == len(end), "Start and end should have equal length"
 
         if is_any_list(demand):
             demand = flatlist(demand)
-            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
+            assert len(demand) == len(start), "Demand should be supplied for each task or be single constant"
         else: # constant demand
-            demand = [demand] * n_jobs
+            demand = [demand] * len(start)
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
-    def decompose(self):
+    def decompose(self, how="auto"):
         """
-            Time-resource decomposition from:
+            Decompose the Cumulative constraint
+            Support time-based decomposition or task-based decomposition.
+            By default, we heuristically select the best decomposition based on the number of tasks and the horizon.
+            Arguments:
+                how (str): how the cumulative constraint should be decomposed, can be "time", "task", or "auto" (default)
+        """
+
+        assert how in ["time", "task", "auto"], "how can only be time, task, or auto (default), but got {}".format(how)
+
+        start, duration, end, demand, capacity = self.args
+
+        lbs, ubs = get_bounds(start)
+        horizon = max(ubs) - min(lbs)
+        if (how == "time") or (how == "auto" and len(start) <= horizon):
+            return self._time_decomposition()
+        elif (how == "task") or (how == "auto" and len(start) > horizon):
+            return self._task_decomposition()
+        raise Exception
+
+    def _task_decomposition(self):
+        """
+         Task-based decomposition of the cumulative constraint.
             Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
             International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         """
+        start, duration, end, demand, capacity = self.args
 
-        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
-        start, duration, end, demand, capacity = arr_args
+        cons = [d >= 0 for d in duration]  # enforce non-negative durations
+        cons += [h >= 0 for h in demand]  # enforce non-negative demand
 
-        cons = []
-
-        # set duration of tasks
-        for t in range(len(start)):
-            cons += [start[t] + duration[t] == end[t]]
+        # set duration of tasks, only if end is user-provided
+        if end is None:
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
 
         # demand doesn't exceed capacity
-        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
-        for t in range(lb,ub+1):
-            demand_at_t = 0
-            for job in range(len(start)):
-                if is_num(demand):
-                    demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
-                else:
-                    demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
+        # tasks are uninterruptible, so we only need to check each starting point of each task
+        # I.e., for each task, we check if it can be started, given the tasks that are already running.
+        for t in range(len(start)):
+            demand_at_start_of_t = []
+            for j in range(len(start)):
+                if t != j:
+                    demand_at_start_of_t += [demand[j] * ((start[j] <= start[t]) & (end[j] > start[t]))]
 
-            cons += [demand_at_t <= capacity]
+            cons += [(demand[t] + sum(demand_at_start_of_t)) <= capacity]
+
+        return cons, []
+
+    def _time_decomposition(self):
+        """
+         Time-resource decomposition of the cumulative constraint.
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        """
+        start, duration, end, demand, capacity = self.args
+
+        cons = [d >= 0 for d in duration] # enforce non-negative durations
+        cons += [h >= 0 for h in demand] # enforce non-negative demand
+
+        # set duration of tasks, only if end is user-provided
+        if end is None:
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
+
+        # demand doesn't exceed capacity
+        # for each time-step, we check if the running demand does not exceed the capacity
+        lbs, ubs = get_bounds(start)
+        lb, ub = min(lbs), max(ubs)
+        for t in range(lb,ub+1):
+            cons += [cp.sum(d * ((s <= t) & (e > t)) for s,e,d in zip(start, end, demand)) <= capacity]
 
         return cons, []
 
     def value(self):
-        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
-                   else argval(arg) for arg in self.args]
 
-        if any(a is None for a in arg_vals):
+        start, dur, end, demand, capacity = self.args
+        
+        start, dur, demand, capacity = argvals([start, dur, demand, capacity])
+        if end is None:
+            end = [s + d for s,d in zip(start, dur)]
+        else:
+            end = argvals(end)
+
+        if any(a is None for a in flatlist([start, dur, end, demand, capacity])):
             return None
-
-        # start, dur, end are np arrays
-        start, dur, end, demand, capacity = arg_vals
-        # start and end seperated by duration
-        if not (start + dur == end).all():
+                
+        if any(d < 0 for d in dur):
+            return False
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
             return False
 
-        # demand doesn't exceed capacity
+        if any(d < 0 for d in demand):
+            return False
+
+        # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
+        start, end = np.array(start), np.array(end) # eases check below
         for t in range(lb, ub+1):
-            if capacity < sum(demand * ((start <= t) & (t < end))):
+            if capacity < sum(demand * ((start <= t) & (end > t))):
                 return False
 
         return True
+    
+    def __repr__(self):
+        start, dur, end, demand, capacity = self.args
+        if end is None:
+            return f"Cumulative({start}, {dur}, {demand}, {capacity})"
+        else:
+            return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity})"
 
 
 class Precedence(GlobalConstraint):
@@ -798,37 +883,67 @@ class Precedence(GlobalConstraint):
 
 class NoOverlap(GlobalConstraint):
     """
-    NoOverlap constraint, enforcing that the intervals defined by start, duration and end do not overlap.
+    Global no-overlap constraint. Used for scheduling problems
+    Ensures no tasks overlap and enforces:
+            duration >= 0
+            start + duration == end
+
+    Equivalent to :class:`~cpmpy.expressions.globalconstraints.Cumulative` with demand and capacity 1
     """
 
-    def __init__(self, start, dur, end):
+    def __init__(self, start, dur, end=None):
+        """
+        Arguments:
+            `start`: List of Expression objects representing the start times of the tasks
+            `duration`: List of Expression objects representing the durations of the tasks
+            `end`: optional, list of Expression objects representing the end times of the tasks
+        """
+       
         assert is_any_list(start), "start should be a list"
         assert is_any_list(dur), "duration should be a list"
-        assert is_any_list(end), "end should be a list"
+        if end is not None:
+            assert is_any_list(end), "end should be a list if it is provided"
 
         start = flatlist(start)
         dur = flatlist(dur)
-        end = flatlist(end)
-        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length " \
-                                                   "in NoOverlap constraint"
-
+        assert len(start) == len(dur), "start and duration should have equal length"
+        if end is not None:
+            end = flatlist(end)
+            assert len(start) == len(end), "start and end should have equal length"
+        
         super().__init__("no_overlap", [start, dur, end])
 
     def decompose(self):
         start, dur, end = self.args
-        cons = [s + d == e for s,d,e in zip(start, dur, end)]
+        cons = [d >= 0 for d in dur]
+        
+        if end is None:
+            end = [s+d for s,d in zip(start, dur)]
+        else: # can use the expression directly below
+            cons += [s + d == e for s,d,e in zip(start, dur, end)]
+            
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons += [(e1 <= s2) | (e2 <= s1)]
         return cons, []
 
     def value(self):
         start, dur, end = argvals(self.args)
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
+        if any(d < 0 for d in dur):
             return False
-        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
-            if e1 > s2 and e2 > s1:
+        if end is not None and any(s + d != e for s,d,e in zip(start, dur, end)):
+            return False
+        for (s1,d1), (s2,d2) in all_pairs(zip(start,dur)):
+            if s1 + d1 > s2 and s2 + d2 > s1:
                 return False
         return True
+    
+    def __repr__(self):
+        start, dur, end = self.args
+        if end is None:
+            return f"NoOverlap({start}, {dur})"
+        else:
+            return f"NoOverlap({start}, {dur}, {end})"
+    
 
 
 class GlobalCardinalityCount(GlobalConstraint):

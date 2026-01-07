@@ -62,16 +62,15 @@ import json
 from datetime import timedelta  # for mzn's timeout
 
 import numpy as np
-import pkg_resources
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_num, is_any_list, argvals, argval
-from ..transformations.decompose_global import decompose_in_tree
+from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -93,6 +92,15 @@ class CPM_minizinc(SolverInterface):
     Documentation of the solver's own Python API:
     https://minizinc-python.readthedocs.io/
     """
+
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
+                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "cumulative", "circuit", "gcc",
+                                              "increasing", "decreasing",
+                                              "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
+                                              "lex_chain_less","lex_chain_lesseq",
+                                              "precedence", "no_overlap",
+                                              "min", "max", "abs", "div", "mod", "pow", "element", "count", "nvalue", "among"})
+    supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
 
     required_version = (2, 8, 2)
 
@@ -225,10 +233,13 @@ class CPM_minizinc(SolverInterface):
 
         For Minizinc, two version numbers get returned: ``<minizinc python API version>/<minizinc driver version>``
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
             from minizinc import default_driver
-            return f"{pkg_resources.get_distribution('minizinc').version}/{'.'.join(str(a) for a in default_driver.parsed_version)}"
-        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            mzn_version = version("minizinc")
+            solver_version = '.'.join(str(a) for a in default_driver.parsed_version)
+            return f"{mzn_version}/{solver_version}"
+        except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
     # variable name can not be any of these keywords
@@ -289,7 +300,7 @@ class CPM_minizinc(SolverInterface):
         return self.mzn_model
 
 
-    def _pre_solve(self, time_limit=None, **kwargs):
+    def _pre_solve(self, time_limit:Optional[float]=None, **kwargs):
         """ shared by solve() and solveAll() """
         import minizinc
 
@@ -306,7 +317,7 @@ class CPM_minizinc(SolverInterface):
         kwargs['output-time'] = True  # required for time getting
         return (kwargs, mzn_inst)
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, **kwargs):
         """
             Call the MiniZinc solver
             
@@ -439,7 +450,7 @@ class CPM_minizinc(SolverInterface):
         else:
             raise NotImplementedError  # unexpected type for time
 
-    async def _solveAll(self, display=None, time_limit=None, solution_limit=None, **kwargs):
+    async def _solveAll(self, display=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, **kwargs):
         """ Special 'async' function because mzn.solutions() is async """
 
         # ensure all vars are known to solver
@@ -555,15 +566,24 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
-        # get_variables(expr, collect=self.user_vars)  # add objvars to vars  # all are user vars
+
+        # save user variables
+        get_variables(expr, collect=self.user_vars) # add objvars to vars
+
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        self.add(decomp_cons)
 
         # make objective function or variable and post
-        obj = self._convert_expression(expr)
+
+        mzn_obj = self._convert_expression(obj)
         # do not add it to the mzn_model yet, supports only one 'solve' entry
         if minimize:
-            self.mzn_txt_solve = "solve minimize {};\n".format(obj)
+            self.mzn_txt_solve = "solve minimize {};\n".format(mzn_obj)
         else:
-            self.mzn_txt_solve = "solve maximize {};\n".format(obj)
+            self.mzn_txt_solve = "solve maximize {};\n".format(mzn_obj)
 
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
@@ -579,12 +599,11 @@ class CPM_minizinc(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "element", "count", "nvalue", "alldifferent", "alldifferent_except0", "allequal",
-                     "inverse", "ite" "xor", "table", "cumulative", "circuit", "gcc", "increasing", "decreasing",
-                     "precedence", "no_overlap",
-                     "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less", "lex_chain_less", 
-                     "lex_chain_lesseq", "among"}
-        return decompose_in_tree(cpm_cons, supported, supported_reified=supported - {"circuit", "precedence"}, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
+        return cpm_cons
 
     def add(self, cpm_expr):
         """
@@ -653,6 +672,15 @@ class CPM_minizinc(SolverInterface):
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
 
+        # negative_table(vars, tbl): use not table(...) for forbidden assignments
+        if expr.name == "negative_table":
+            str_vars = self._convert_expression(expr.args[0])
+            str_tbl = "[|\n"  # opening
+            for row in expr.args[1]:
+                str_tbl += ",".join(map(str, row)) + " |"  # rows
+            str_tbl += "\n|]"  # closing
+            return "not table({}, {})".format(str_vars, str_tbl)
+
         # inverse(fwd, rev): unpack args and work around MiniZinc's default 1-based indexing
         if expr.name == "inverse":
             def zero_based(array):
@@ -679,6 +707,38 @@ class CPM_minizinc(SolverInterface):
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)
 
+        elif expr.name == "cumulative":
+            start, dur, end, demand, capacity = expr.args
+
+            global_str = "cumulative({},{},{},{})"
+            # ensure duration is non-negative
+            dur, extra_cons = get_nonneg_args(dur)
+            # ensure demand is non-negative
+            demand, demand_cons = get_nonneg_args(demand)
+            extra_cons += demand_cons
+
+            if end is not None:
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format(self._convert_expression(start),
+                                     self._convert_expression(dur),
+                                     self._convert_expression(demand),
+                                     self._convert_expression(capacity))
+
+        elif expr.name == "no_overlap":
+            start, dur, end = expr.args
+            global_str = "disjunctive({},{})"
+            # ensure duration is non-negative
+            dur, extra_cons = get_nonneg_args(dur)
+            if end is not None:
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
@@ -693,7 +753,7 @@ class CPM_minizinc(SolverInterface):
             # some names differently (the infix names!)
             printmap = {'and': '/\\', 'or': '\\/',
                         'sum': '+', 'sub': '-',
-                        'mul': '*', 'pow': '^'}
+                        'mul': '*'}
             op_str = expr.name
             expr_bounds = expr.get_bounds()
             if expr_bounds[0] < -2147483646 or expr_bounds[1] > 2147483646:
@@ -753,22 +813,8 @@ class CPM_minizinc(SolverInterface):
             # minizinc is offset 1, which can be problematic here...
             args_str = ["{}+1".format(self._convert_expression(e)) for e in expr.args]
 
-        elif expr.name == "cumulative":
-            start, dur, end, _, _ = expr.args
-
-            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
-            format_str = "forall(" + durstr + " ++ [cumulative({},{},{},{})])"
-
-            return format_str.format(args_str[0], args_str[1], args_str[3], args_str[4])
-
         elif expr.name == "precedence":
             return "value_precede_chain({},{})".format(args_str[1], args_str[0])
-
-        elif expr.name == "no_overlap":
-            start, dur, end = expr.args
-            durstr = self._convert_expression([s + d == e for s, d, e in zip(start, dur, end)])
-            format_str = "forall(" + durstr + " ++ [disjunctive({},{})])"
-            return format_str.format(args_str[0], args_str[1])
 
         elif expr.name == 'ite':
             cond, tr, fal = expr.args
@@ -786,6 +832,15 @@ class CPM_minizinc(SolverInterface):
                 name = "global_cardinality_closed"
             return "{}({},{},{})".format(name, vars, vals, occ)
 
+        elif expr.name == "div":
+            return "{} div {}".format(*args_str)
+
+        elif expr.name == "mod":
+            return "{} mod {}".format(*args_str)
+
+        elif expr.name == "pow":
+            return "{}^{}".format(*args_str)
+
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
 
@@ -801,6 +856,37 @@ class CPM_minizinc(SolverInterface):
             vals = self._convert_expression(vals).replace("[", "{").replace("]", "}")  # convert to set
             return "among({},{})".format(vars, vals)
 
+        elif expr.name == "InDomain":
+            # InDomain(expr, domain_list) - convert domain_list to a set
+            expr_str = self._convert_expression(expr.args[0])
+            domain = expr.args[1]
+            # Convert domain list to set format
+            if is_any_list(domain):
+                domain_str = "{" + ",".join(self._convert_expression(d) for d in domain) + "}"
+            else:
+                domain_str = self._convert_expression(domain)
+            return "({} in {})".format(expr_str, domain_str)
+
+        elif expr.name == "regular":
+            # regular(array, transitions, start, accepting)
+            # MiniZinc regular constraint expects: regular(array, transitions_table, start, accepting)
+            # where transitions_table is a 2D array
+            array, transitions, start, accepting = expr.args
+            array_str = self._convert_expression(array)
+            # Convert transitions to a 2D array format for MiniZinc
+            # transitions is a list of (src, value, dst) tuples
+            transitions_list = []
+            for src, val, dst in transitions:
+                transitions_list.append("[{}, {}, {}]".format(
+                    self._convert_expression(src),
+                    self._convert_expression(val),
+                    self._convert_expression(dst)
+                ))
+            transitions_str = "[{}]".format(",".join(transitions_list))
+            start_str = self._convert_expression(start)
+            accepting_str = self._convert_expression(accepting)
+            return "regular({}, {}, {}, {})".format(array_str, transitions_str, start_str, accepting_str)
+
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
         elif isinstance(expr, DirectConstraint):
@@ -813,7 +899,7 @@ class CPM_minizinc(SolverInterface):
         # default (incl name-compatible global constraints...)
         return "{}([{}])".format(expr.name, ",".join(args_str))
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 

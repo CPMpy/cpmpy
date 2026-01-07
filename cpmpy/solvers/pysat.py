@@ -52,9 +52,8 @@
     ==============
 """
 from threading import Timer
-from typing import Optional
+from typing import Optional, List
 import warnings
-import pkg_resources
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -70,6 +69,7 @@ from ..transformations.linearize import linearize_constraint
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
 from ..transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
+from ..transformations.safening import no_partial_functions
 
 
 class CPM_pysat(SolverInterface):
@@ -93,6 +93,9 @@ class CPM_pysat(SolverInterface):
         the PySAT docs use 'model' to refer to a solution.
 
     """
+
+    supported_global_constraints = frozenset()
+    supported_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -162,9 +165,10 @@ class CPM_pysat(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('python-sat').version
-        except pkg_resources.DistributionNotFound:
+            return version('python-sat')
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -212,7 +216,7 @@ class CPM_pysat(SolverInterface):
         return self.pysat_solver
 
 
-    def solve(self, time_limit=None, assumptions=None):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
         """
             Call the PySAT solver
 
@@ -366,12 +370,16 @@ class CPM_pysat(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({"alldifferent"}), csemap=self._csemap)
-        cpm_cons = simplify_boolean(cpm_cons)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized MIP decomp in linearize
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
+        cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "and", "or"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "->", "and", "or"}), csemap=self._csemap)  # the core of the MIP-linearization
         cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
@@ -478,11 +486,13 @@ class CPM_pysat(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_BoolVarImpl], vals:List[bool]):
         """
         PySAT supports warmstarting the solver with a feasible solution
 
         In PySAT, this is called setting the 'phases' or the 'polarities' of literals
+
+        Note: our PySAT interface currently does not support solution hinting for integer variables
 
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
@@ -491,6 +501,7 @@ class CPM_pysat(SolverInterface):
         cpm_vars = flatlist(cpm_vars)
         vals = flatlist(vals)
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
+        assert all(var.is_bool() for var in cpm_vars), "PySAT interface currently only supports Boolean variables in solution hint"
 
         literals = []
         for (cpm_var, val) in zip(cpm_vars, vals):
