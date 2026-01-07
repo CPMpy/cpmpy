@@ -221,7 +221,6 @@ class ExitStatus(Enum):
     optimal:str = "OPTIMUM" + chr(32) + "FOUND" # optimal COP solution found
     unsat:str = "UNSATISFIABLE" # instance is unsatisfiable
     memory:str = "MEMORY" # memory out
-    memory:str = "" # memory out
     unknown:str = "UNKNOWN" # any other case
     
     def abbrev(self):
