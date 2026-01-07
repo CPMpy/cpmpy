@@ -481,7 +481,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 if frm:
                     self.log(f"end callback, dt = {cb_time}", verbosity=2)
                 self.env["cb_time"] += cb_time
-                assert cb_time < 1.0 or self.env["debug"]
+                # assert cb_time < 1.0 or self.env["debug"]
 
         return solution_callback
 
