@@ -39,7 +39,7 @@ def write_dimacs(model, fname=None, encoding="auto"):
     """
 
     constraints = toplevel_list(model.constraints)
-    constraints = to_cnf(constraints)
+    constraints = to_cnf(constraints, encoding=encoding)
 
     vars = get_variables(constraints)
     mapping = {v : i+1 for i, v in enumerate(vars)}
