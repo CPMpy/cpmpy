@@ -1,16 +1,15 @@
 import unittest
 import pytest
 import numpy as np
-from cpmpy import *
-from cpmpy.solvers import CPM_ortools
+import cpmpy as cp
+from cpmpy.solvers.ortools import CPM_ortools
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.expressions.core import Operator
 from cpmpy.expressions.globalconstraints import Xor
 
 class TestToCnf(unittest.TestCase):
     def test_tocnf(self):
-        a,b,c = boolvar(shape=3)
+        a,b,c = cp.boolvar(shape=3)
 
         cases = [a,
                  a|b,
@@ -33,7 +32,7 @@ class TestToCnf(unittest.TestCase):
 
         # test for equivalent solutions with/without to_cnf
         for case in cases:
-            vs = cpm_array(get_variables(case))
+            vs = cp.cpm_array(get_variables(case))
             s1 = self.allsols([case], vs)
             s1.sort(axis=0)
             s2 = self.allsols(to_cnf(case), vs)
@@ -42,8 +41,8 @@ class TestToCnf(unittest.TestCase):
                 self.assertTrue(np.all(ss1 == ss2), (case, s1, s2))
 
         # test for errors in edge cases of to_cnf
-        bvs = boolvar(shape=3)
-        ivs = intvar(lb=2, ub=3, shape=3)
+        bvs = cp.boolvar(shape=3)
+        ivs = cp.intvar(lb=2, ub=3, shape=3)
         edge_cases = [
             # do not consider object as a double implcation, but as a sum
             (a + b + c) == 1,
@@ -65,10 +64,10 @@ class TestToCnf(unittest.TestCase):
     def allsols(self, cons, vs):
         sols = []
 
-        m = CPM_ortools(Model(cons))
+        m = CPM_ortools(cp.Model(cons))
         while m.solve():
             sols.append(vs.value())
-            m += ~all(vs == vs.value())
+            m += ~cp.all(vs == vs.value())
 
         return np.array(sols)
 

@@ -4,10 +4,9 @@ import tempfile
 import os
 from os.path import join
 
-from numpy import logaddexp
 import cpmpy as cp
 from cpmpy.expressions.utils import flatlist
-from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
+from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 @pytest.mark.usefixtures("solver")
 class TestModel(unittest.TestCase):

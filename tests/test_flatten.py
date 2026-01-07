@@ -1,8 +1,9 @@
 import unittest
 import pytest
 import cpmpy as cp
-from cpmpy.transformations.flatten_model import *
+from cpmpy.transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, normalized_boolexpr
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
+from cpmpy.expressions.core import Operator
 
 @pytest.mark.usefixtures("solver")
 class TestFlattenModel(unittest.TestCase):

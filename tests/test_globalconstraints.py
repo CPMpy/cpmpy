@@ -4,6 +4,7 @@ import unittest
 import pytest
 
 import cpmpy as cp
+import numpy as np
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError, IncompleteFunctionError
@@ -45,7 +46,7 @@ class TestGlobal(unittest.TestCase):
                 vals = [x.value() for x in vars]
 
                 # ensure all different values
-                self.assertEqual(len(vals),len(set(vals)), msg=f"solver does provide solution validating given constraints.")
+                self.assertEqual(len(vals),len(set(vals)), msg="solver does provide solution validating given constraints.")
     
     def test_alldifferent2(self):
         # test known input/outputs
@@ -882,10 +883,21 @@ class TestGlobal(unittest.TestCase):
         self.assertEqual(repr(m), repr(m2))  # should be True
 
     def test_cumulative_single_demand(self):
-        import numpy
+        start = cp.intvar(0, 10, name="start")
+        dur = 5
+        end = cp.intvar(0, 10, name="end")
+        demand = 2
+        capacity = 10
+
+        m = cp.Model()
+        m += cp.Cumulative([start], [dur], [end], [demand], capacity)
+
+        self.assertTrue(m.solve(solver=self.solver))
+
+    def test_cumulative_single_demand_varying_duration(self):
         m = cp.Model()
         start = cp.intvar(0, 10, 4, "start")
-        duration = numpy.array([1, 2, 2, 1])
+        duration = np.array([1, 2, 2, 1])
         end = start + duration
         demand = 1
         capacity = 1
@@ -893,8 +905,6 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(m.solve(solver=self.solver))
 
     def test_cumulative_decomposition_capacity(self):
-        import numpy as np
-
         # before merging #435 there was an issue with capacity constraint
         start = cp.intvar(0, 10, 4, "start")
         duration = [1, 2, 2, 1]
@@ -907,8 +917,6 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Model(cons.decompose()).solve(solver=self.solver)) # capacity was not taken into account and this failed
 
     def test_cumulative_nested_expressions(self):
-        import numpy as np
-
         # before merging #435 there was an issue with capacity constraint
         start = cp.intvar(0, 10, 4, "start")
         duration = [1, 2, 2, 1]
@@ -919,21 +927,6 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Model(cons).solve(solver=self.solver)) # this worked fine
         # also test decomposition
         self.assertFalse(cp.Model(cons.decompose()).solve(solver=self.solver)) # capacity was not taken into account and this failed
-
-    @pytest.mark.skipif(not CPM_minizinc.supported(),
-                        reason="Minizinc not installed")
-    def test_cumulative_single_demand(self):
-        start = cp.intvar(0, 10, name="start")
-        dur = 5
-        end = cp.intvar(0, 10, name="end")
-        demand = 2
-        capacity = 10
-
-        m = cp.Model()
-        m += cp.Cumulative([start], [dur], [end], [demand], capacity)
-
-        self.assertTrue(m.solve(solver="ortools"))
-        self.assertTrue(m.solve(solver="minizinc"))
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
@@ -1681,8 +1674,6 @@ def test_issue801_expr_in_cumulative(solver):
 
     if solver in ("pysat", "pysdd", "pindakaas"):
         pytest.skip(f"{solver} does not support integer variables")
-    if solver == "cplex":
-        pytest.skip(f"waiting for PR #769 to be merged.")
 
     start = cp.intvar(0,5,shape=3,name="start")
     dur = [1,2,3]

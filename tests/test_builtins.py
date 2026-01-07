@@ -3,7 +3,6 @@ import pytest
 
 import cpmpy as cp
 from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any
-from cpmpy.exceptions import CPMpyException
 
 iv = cp.intvar(-8, 8, shape=5)
 

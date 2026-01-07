@@ -2,7 +2,6 @@ import unittest
 import pytest
 
 import cpmpy as cp
-from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.expressions.utils import argval
 

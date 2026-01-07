@@ -1,10 +1,12 @@
 import inspect
 
 import cpmpy as cp
+import numpy as np
 from cpmpy import Model, SolverLookup, BoolVal
-from cpmpy.expressions.globalconstraints import *
-from cpmpy.expressions.globalfunctions import *
-from cpmpy.expressions.core import Comparison
+from cpmpy.expressions.utils import argval, is_num, eval_comparison, get_bounds
+from cpmpy.expressions.core import Comparison, Operator
+from cpmpy.expressions.globalconstraints import GlobalConstraint
+from cpmpy.expressions.globalfunctions import GlobalFunction
 
 import pytest
 
@@ -48,13 +50,13 @@ EXCLUDE_OPERATORS = {"pysat": {"mul-int"},  # int2bool but mul, and friends, not
                      }
 
 # Variables to use in the rest of the test script
-NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
-NN_VAR = intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
-POS_VAR = intvar(1,10, name="s_pos")                # A strictly positive variable
-NUM_VAR = intvar(0, 10, name="l")                   # A numerical variable
+NUM_ARGS = [cp.intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
+NN_VAR = cp.intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
+POS_VAR = cp.intvar(1,10, name="s_pos")                # A strictly positive variable
+NUM_VAR = cp.intvar(0, 10, name="l")                   # A numerical variable
 
-BOOL_ARGS = [boolvar(name=n) for n in "abc"]        # Boolean variables
-BOOL_VAR = boolvar(name="p")                        # A boolean variable
+BOOL_ARGS = [cp.boolvar(name=n) for n in "abc"]        # Boolean variables
+BOOL_VAR = cp.boolvar(name="p")                        # A boolean variable
 
 def _generate_inputs(generator):
     exprs = []
@@ -171,8 +173,8 @@ def global_constraints(solver):
             continue
 
         if name == "Xor":
-            yield Xor(BOOL_ARGS)
-            yield Xor(BOOL_ARGS + [True,False])
+            yield cp.Xor(BOOL_ARGS)
+            yield cp.Xor(BOOL_ARGS + [True,False])
             continue
         elif name == "Inverse":
             yield cp.Inverse(NUM_ARGS, [1,0,2])
@@ -180,7 +182,7 @@ def global_constraints(solver):
             yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
             yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
         elif name == "Regular":
-            yield cp.Regular(intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
+            yield cp.Regular(cp.intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
             yield cp.NegativeTable(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":
@@ -190,13 +192,13 @@ def global_constraints(solver):
         elif name == "InDomain":
             yield cp.InDomain(NUM_VAR, [0,1,6])
         elif name == "Cumulative":
-            s = intvar(0, 10, shape=3, name="start")
-            e = intvar(0, 10, shape=3, name="end")
+            s = cp.intvar(0, 10, shape=3, name="start")
+            e = cp.intvar(0, 10, shape=3, name="end")
             dur = [1, 4, 3]
             demand = [4, 5, 7]
             cap = 10
             yield cp.Cumulative(s, dur, e, demand, cap)
-            yield cp.all(Cumulative(s, dur, e, demand, cap).decompose(how="time")[0])
+            yield cp.all(cp.Cumulative(s, dur, e, demand, cap).decompose(how="time")[0])
             yield cp.all(cp.Cumulative(s, dur, e, demand, cap).decompose(how="task")[0])
 
             yield cp.Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
@@ -208,18 +210,18 @@ def global_constraints(solver):
 
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
-            cnts = intvar(0,10,shape=3)
+            cnts = cp.intvar(0,10,shape=3)
             yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
         elif name == "AllDifferentExceptN":
             yield cp.AllDifferentExceptN(NUM_ARGS, NUM_VAR)
         elif name == "AllEqualExceptN":
             yield cp.AllEqualExceptN(NUM_ARGS, NUM_VAR)
         elif name == "Precedence":
-            x = intvar(0,5, shape=3, name="x")
+            x = cp.intvar(0,5, shape=3, name="x")
             yield cp.Precedence(x, [3,1,0])
         elif name == "NoOverlap":
-            s = intvar(0, 10, shape=3, name="start")
-            e = intvar(0, 10, shape=3, name="end")
+            s = cp.intvar(0, 10, shape=3, name="start")
+            e = cp.intvar(0, 10, shape=3, name="end")
             dur = [1,4,3]
             yield cp.NoOverlap(s, dur, e)
             yield cp.NoOverlap(s, dur)
@@ -228,21 +230,21 @@ def global_constraints(solver):
             continue
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
-            cnts = intvar(0,10,shape=3)
+            cnts = cp.intvar(0,10,shape=3)
             yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
         elif name == "LexLessEq":
-            X = intvar(0, 3, shape=3)
-            Y = intvar(0, 3, shape=3)
+            X = cp.intvar(0, 3, shape=3)
+            Y = cp.intvar(0, 3, shape=3)
             yield cp.LexLessEq(X, Y)
         elif name == "LexLess":
-            X = intvar(0, 3, shape=3)
-            Y = intvar(0, 3, shape=3)
+            X = cp.intvar(0, 3, shape=3)
+            Y = cp.intvar(0, 3, shape=3)
             yield cp.LexLess(X, Y)
         elif name == "LexChainLess":
-            X = intvar(0, 3, shape=(3,3))
+            X = cp.intvar(0, 3, shape=(3,3))
             yield cp.LexChainLess(X)
         elif name == "LexChainLessEq":
-            X = intvar(0, 3, shape=(3,3))
+            X = cp.intvar(0, 3, shape=(3,3))
             yield cp.LexChainLess(X)
         else: # default constructor, list of numvars
             yield cls(NUM_ARGS)            

@@ -1,10 +1,7 @@
 import unittest
 import pytest
 import cpmpy as cp 
-from cpmpy.expressions import *
-from cpmpy.expressions.core import Operator
 from cpmpy.solvers.pysat import CPM_pysat
-from cpmpy.transformations.linearize import only_positive_coefficients
 
 from utils import skip_on_missing_pblib
 
@@ -14,8 +11,8 @@ SOLVER = "pysat"
 class TestCardinality(unittest.TestCase):
         
     def setUp(self):
-        self.bv_before = boolvar(shape=7)
-        self.bvs = cpm_array(boolvar(shape=2).tolist() + [~boolvar()])
+        self.bv_before = cp.boolvar(shape=7)
+        self.bvs = cp.cpm_array(cp.boolvar(shape=2).tolist() + [~cp.boolvar()])
 
     def test_pysat_atmost(self):
 
@@ -170,7 +167,7 @@ class TestCardinality(unittest.TestCase):
         s += c
         self.assertTrue(s.solve())
 
-    def test_pysat_aggregate_sum_sub_expressions_implied(self):
+    def test_pysat_sum_inequality(self):
         bvs = cp.boolvar(3)
         c = bvs[0] > sum(bvs[1:])
         s = cp.SolverLookup.get(SOLVER)
@@ -193,11 +190,6 @@ class TestCardinality(unittest.TestCase):
             sum(bvs) >= 2, # followed by non-implied
         ])
         m.solve("pysat:minicard")
-
-    def test_pysat_minicard_impied_cardinality_constraint(self):
-        # Implied cardinality constraints are not handled natively
-        self.assertTrue(cp.Model(cp.boolvar().implies(sum(cp.boolvar(3)) <= 2)).solve("pysat:minicard"))
-
 
     def test_pysat_aggregate_sum_sub_expressions_implied(self):
         a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]

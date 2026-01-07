@@ -2,7 +2,6 @@ import unittest
 import pytest
 import importlib
 import cpmpy as cp 
-from cpmpy import *
 from cpmpy.solvers.pysat import CPM_pysat
 
 @pytest.mark.requires_solver("pysat")
@@ -21,7 +20,7 @@ def test_pypblib_error():
 @pytest.mark.requires_dependency("pypblib")
 class TestEncodePseudoBooleanConstraint(unittest.TestCase):
     def setUp(self):
-        self.bv = boolvar(shape=3)
+        self.bv = cp.boolvar(shape=3)
 
     def test_pysat_simple_atmost(self):
 
@@ -74,7 +73,7 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
 
         ## check all types of linear constraints are handled
         for expression in expressions:
-            Model(expression).solve("pysat")
+            cp.Model(expression).solve("pysat")
 
     def test_encode_pb_oob(self):
         # test out of bounds (meaningless) thresholds
@@ -91,7 +90,7 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
 
         ## check all types of linear constraints are handled
         for expression in expressions:
-            Model(expression).solve("pysat")
+            cp.Model(expression).solve("pysat")
 
 if __name__ == '__main__':
     unittest.main()

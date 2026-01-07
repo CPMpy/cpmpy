@@ -4,23 +4,15 @@ import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
-from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.solver_interface import ExitStatus
-from cpmpy.solvers.z3 import CPM_z3
-from cpmpy.solvers.minizinc import CPM_minizinc
-from cpmpy.solvers.gurobi import CPM_gurobi
-from cpmpy.solvers.exact import CPM_exact
-from cpmpy.solvers.choco import CPM_choco
-from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
 from test_constraints import numexprs
-from utils import skip_on_missing_pblib
 
 @pytest.mark.usefixtures("solver")
 class TestSolvers(unittest.TestCase):
@@ -61,7 +53,7 @@ class TestSolvers(unittest.TestCase):
 
     @pytest.mark.requires_solver("ortools")
     def test_ortools(self):
-        b = cp.boolvar()
+        # b = cp.boolvar()
         x = cp.intvar(1,13, shape=3)
 
         # reifiability (automatic handling in case of !=)
@@ -632,7 +624,6 @@ class TestSolvers(unittest.TestCase):
 
     @pytest.mark.requires_solver("choco")
     def test_choco_inverse(self):
-        from cpmpy.solvers.ortools import CPM_ortools
 
         fwd = cp.intvar(0, 9, shape=10)
         rev = cp.intvar(0, 9, shape=10)
@@ -1059,8 +1050,6 @@ class TestSupportedSolvers:
         num_sols = m.solveAll(solver=solver, solution_limit=limit)
         assert num_sols == 7
         assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
-
-
 
         # adding a bunch of variables to increase nb of sols
         try:
