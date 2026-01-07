@@ -635,7 +635,7 @@ def xcsp3_cpmpy(
 
         # Set time limit (if provided)
         if time_limit is not None:
-            set_time_limit(int(time_limit - wall_time(p) + time.process_time()), verbose=verbose) # set remaining process time != wall time
+            set_time_limit(int(time_limit - wall_time(p) + time.process_time() + check_time_limit), verbose=verbose) # set remaining process time != wall time
    
         sys.argv = ["-nocompile"] # Stop pyxcsp3 from complaining on exit
         
