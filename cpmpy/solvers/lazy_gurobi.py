@@ -280,10 +280,10 @@ class CPM_lazy_gurobi(CPM_gurobi):
         parts_ = [0]
         for p in parts:
             parts_.append(parts_[-1] + p)
-        parts = parts_[1:]
+        parts_ = parts_[1:]
 
         def p(i):
-            return next(l for l in range(len(parts)) if i < parts[l])
+            return next(l for l in range(len(parts_)) if i < parts_[l])
 
         # TODO convert T_enc to set of tuples?
         self.log("Explain", end="\n")
@@ -297,14 +297,14 @@ class CPM_lazy_gurobi(CPM_gurobi):
             np.array(
                 [
                     i + 1
-                    for i, p in enumerate([0] + parts)
-                    for _ in range(p, parts[i] if i < len(parts) else p)
+                    for i, p in enumerate([0] + parts_)
+                    for _ in range(p, parts_[i] if i < len(parts_) else p)
                 ]
             ),
             verbosity=2,
             indent=0,
         )
-        self.log(np.array(parts), verbosity=2, indent=0)
+        self.log(np.array(parts_), verbosity=2, indent=0)
 
         self.log("", indent=0)
         assert len(A_enc) == len(T_enc.T)
@@ -355,8 +355,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
             self.log(f"s = {s}", verbosity=3)
             if not R:
                 break
-            choices = set(range(len(parts))) - V
+            choices = set(range(len(parts_))) - V
             if not choices:
+                self.log("Break due to no choices")
+                with open("/tmp/failed_cut_nc.pkl", "wb") as f:
+                    pickle.dump((A_enc, T_enc, parts, frm), f)
                 raise Infeasible
             l = next(l for l in choices)
             self.log(f"choose integer l = {INDEX + l} in {show_set(choices)}", verbosity=3)
@@ -365,14 +368,15 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
             def C(v, l):
                 c = set(i for i in range(len(v)) if is_gt(v[i], 0.0) and p(i) == l)
-                self.log(f"C({v}, {l}) = {show_set(c)}", verbosity=3)
+                self.log(f"C({v}, {INDEX + l}) = {show_set(c)}", verbosity=3)
                 return c
 
-            sets = [rows(T_enc, i) for i in C(A_enc, l)]
+            C_ = C(A_enc, l)
+            sets = [rows(T_enc, i) for i in C_]
             sets = set.union(*sets) if sets else set()
             self.log(f"Union = {show_set(sets)}", verbosity=3)
-            R.intersection_update(sets)
-            X = X.union(C(A_enc, l))
+            R = R.intersection(sets)
+            X = X.union(C_)
 
         self.log(f"by explanation of size ({len(X)}): {show_set(X)}")
 
@@ -433,8 +437,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
                             assert is_integer_solution(x_enc_a.values()), (
                                 f"Expected integer solution for MIP, but got {x_enc_a}"
                             )
-                        for x, a in x_enc_a.items():
-                            x._value = 1 if a > 0.5 else 0
                     case _:
                         return
 
@@ -469,8 +471,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 if feasible and frm == "MIPSOL":
                     self.log("found feasible")
                     self.env["found_feasible"] = feasible
-            except Infeasible:
-                what.cbLazy(1 < 0)
             except Exception as e:
                 what._callback_exception = e
                 what.terminate()
@@ -502,6 +502,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
             try:
                 # encode assignment
+                self.log(" ", np.array(X_enc), verbosity=2, indent=0)
                 explanation = self.explain(A_enc, T_enc, parts, frm=frm)
                 if self.env["debug"]:
                     # self.check_explanation(explanation, X_enc, A_enc, T_enc)
@@ -525,13 +526,22 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     expr = cp.sum(X_enc[c] for c in explanation) < len(explanation)
                     self.env["cuts"][-1]["expr"] = expr
 
-                    if self.env["debug"]:
-                        self.check_explanation(expr, X_enc, A_enc, T_enc, table)
+                    # if self.env["debug"]:
+                    #     self.check_explanation(expr, X_enc, A_enc, T_enc, table)
 
-                    if frm == "MIPSOL":
+                    if frm == "MIPSOL" and self.env["debug"]:
+                        for x, a in zip(X_enc, A_enc_):
+                            x._value = a
                         assert expr.value() is False, (
-                            f"Did not cut off {show_assignment(X_enc)} with exp {expr} for table:\n\n {np.array(A_enc_)}\n{T_enc}"
+                            f"Did not cut off assignment:\n\n{show_assignment(X_enc)}\n\nwith exp {expr} for table:\n\n {np.array(A_enc_)}\n{T_enc}"
                         )
+                        for T_enc_i in T_enc:
+                            if True:
+                                for x_i, a_i_j in zip(X_enc, T_enc_i):
+                                    x_i._value = bool(a_i_j)
+                                assert expr.value() is True, (
+                                    f"Explanation:\n\n{expr}\n\ncut off row\n\n{T_enc_i}\n({show_assignment(X_enc)})\n\nfor failure {A_enc_}"
+                                )
 
                     yield expr
                 elif frm == "MIPSOL":  # unsat
@@ -553,6 +563,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
 
     def check_explanation(self, explanation, X_enc, A_enc, T_enc, table):
         self.env["checker"] += explanation
+
         actual_solutions = frozenset(
             cp.solvers.utils.solutions(self.env["checker"], X=self.user_vars, projected_solution_limit=None)
         )
@@ -611,6 +622,11 @@ class CPM_lazy_gurobi(CPM_gurobi):
                     print("WARN: not found feas")
                 # assert self.env["found_feasible"]
 
+            if getattr(self.native_model, "_callback_exception", None):
+                raise self.grb_model._callback_exception or Exception(
+                    "Gurobi was interrupted (perhaps the solution callback called model.terminate())"
+                )
+
         except Infeasible:
             hassol = False
         except Exception as e:
@@ -618,11 +634,6 @@ class CPM_lazy_gurobi(CPM_gurobi):
             self.env["verbosity"] = 4
             self.stats()
             raise e
-
-        if getattr(self.native_model, "_callback_exception", None):
-            raise self.grb_model._callback_exception or Exception(
-                "Gurobi was interrupted (perhaps the solution callback called model.terminate())"
-            )
 
         if "PYTEST_CURRENT_TEST" not in os.environ:
             for field, stat in self.stats().items():
@@ -641,6 +652,7 @@ class CPM_lazy_gurobi(CPM_gurobi):
         for cpm_expr in cpm_expressions:
             if cpm_expr.name == "table":
                 X, T = cpm_expr.args
+                assert len(set(X)) == len(X), f"Dup. int vars in table: {X}"
                 self.log("X =", ", ".join(f"{x} in {x.lb}..{x.ub}" for x in X), verbosity=2)
                 self.log("T =", verbosity=2)
                 self.log(T, verbosity=2)

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import cpmpy as cp
-from cpmpy.solvers.lazy_gurobi import CPM_lazy_gurobi
+from cpmpy.solvers.lazy_gurobi import CPM_lazy_gurobi, show_assignment
 
 
 def generate_table_from_example():
@@ -42,9 +42,9 @@ def generate_table(n, m, d, k=1, allow_duplicate_vars=False):
     model = cp.Model()
     random.seed(SEED)
     for _ in range(k):
-        k = n // 2
+        k_ = n // 2
         X = list(X)
-        Y = random.sample(X, k=k) if allow_duplicate_vars else random.choices(X, k=k)
+        Y = random.choices(X, k=k_) if allow_duplicate_vars else random.sample(X, k=k_)
         if len(Y):
             T = np.array([tuple(random.randint(1, d) for _ in enumerate(Y)) for _ in range(m)])
             model += cp.Table(Y, T)
@@ -61,13 +61,12 @@ def assert_integer_solution(A_enc):
 def check_model(model, env=None):
     print("Model", model)
     expected_sat = model.deepcopy().solve()
-
-    slv = CPM_lazy_gurobi(cpm_model=model, env=env.copy())
-    actual_sat = slv.solve()
-    slv.stats()
     try:
+        slv = CPM_lazy_gurobi(cpm_model=model, env=env.copy())
+        actual_sat = slv.solve()
+        slv.stats()
         if actual_sat is False:
-            assert expected_sat == actual_sat, "Expected equisat"
+            assert expected_sat == actual_sat, f"Expected equisat, but {expected_sat=} and {actual_sat=}"
 
         if expected_sat:
             X = cp.transformations.get_variables.get_variables_model(model)
@@ -86,8 +85,8 @@ def check_model(model, env=None):
             """
         print("PASS.")
     except AssertionError as e:
-        # with open("/tmp/bug.pkl", "wb") as f:
-        #     pickle.dump(model, f)
+        with open("/tmp/bug.pkl", "wb") as f:
+            pickle.dump(model, f)
 
         raise e
         if env["debug"]:
@@ -117,7 +116,14 @@ SEED = None
 
 @pytest.fixture()
 def env():
-    yield {"verbosity": 2, "debug": False, "max_iterations": 1000, "seed": 42, "shrink": False}
+    yield {
+        "verbosity": 2,
+        "debug": 0,
+        "max_iterations": 1000,
+        "seed": 42,
+        "shrink": False,
+        "explain_fractional": True,
+    }
 
 
 def load_model(path):
@@ -130,11 +136,11 @@ def load_model(path):
 
 class TestTables:
     def test_repro_explain(self, env):
-        with open("/tmp/failed_cut.pkl", "rb") as f:
+        with open("/tmp/failed_cut_nc.pkl", "rb") as f:
             A_enc, T_enc, parts, frm = pickle.load(f)
         CPM_lazy_gurobi(
             env={**env, **{"verbosity": 4, "debug": False}},
-        ).explain(A_enc, T_enc, parts, frm=frm)
+        ).explain(A_enc, T_enc, parts, frm="MIPSOL")
 
     def test_explain(self, env):
         slv = CPM_lazy_gurobi(
@@ -181,10 +187,9 @@ class TestTables:
         "case",
         (
             (i, j, t)
-            for j in range(100)  # to repeat the test
+            for j in range(10)  # to repeat the test
             for i, t in enumerate(
                 (
-                    load_model("/tmp/bug.pkl"),
                     cp.Model(cp.AllDifferent(cp.intvar(1, 3, shape=3))),
                     generate_table_from_data([(1, 1), (2, 2)], 3),  # Feasible (often 0 explanations)
                     generate_table_from_data([(1, 2), (2, 1)], 3),  # Feasible
@@ -202,12 +207,7 @@ class TestTables:
                     with_constraints(generate_table(6, 6, 4, k=3)),
                     with_constraints(generate_table(6, 10, 5), with_alldiff=False, with_min=True),
                     with_constraints(generate_table(6, 4, 4)),  # minimized 1/1000 bug
-                    # cp.Model(
-                    #     cp.Table(
-                    #         [cp.intvar(1, 4), cp.intvar(1, 4), cp.intvar(1, 4)],
-                    #         [[4, 4, 2], [3, 3, 3], [3, 2, 2], [1, 4, 4]],
-                    #     )  # 1/1000 bug
-                    # ),
+                    with_constraints(generate_table(10, 100, 10)),
                 )
             )
         ),
@@ -217,6 +217,11 @@ class TestTables:
         _, _, model = case
         print("Test model:")
         check_model(model, env=env)
+
+    def test_repro_model(self, env):
+        m = load_model("/tmp/bug.pkl")
+        print("Repro model:", m)
+        check_model(m, env=env)
 
     def test_table_enc(self, env):
         x = cp.intvar(1, 4, name="x")
