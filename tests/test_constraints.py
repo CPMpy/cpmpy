@@ -102,26 +102,6 @@ def numexprs(solver):
         yield expr
 
 
-    for name, cls in classes:
-        if name == "Abs":
-            expr = cls(NUM_ARGS[0])
-        elif name == "Count":
-            expr = cls(NUM_ARGS, NUM_VAR)
-        elif name == "Element":
-            expr = cls(NUM_ARGS, POS_VAR)
-        elif name == "NValueExcept":
-            expr = cls(NUM_ARGS, 3)
-        elif name == "Among":
-            expr = cls(NUM_ARGS, [1,2])
-        elif name == "Division":
-            expr = cls(*NUM_ARGS[:2])
-        elif name == "Modulo":
-            expr = cls(*NUM_ARGS[:2])
-        elif name == "Power":
-            expr = cls(NUM_ARGS[0], 3)
-        else:
-            expr = cls(NUM_ARGS)
-
 # Generate all possible comparison constraints
 def comp_constraints(solver):
     """
@@ -291,6 +271,12 @@ def global_functions(solver):
             yield cp.NValueExcept(NUM_ARGS, 3)
         elif name == "Among":
             yield cp.Among(NUM_ARGS, [1,2])
+        elif name == "Division":
+            yield cp.Division(NUM_ARGS[0], NUM_ARGS[1])
+        elif name == "Modulo":
+            yield cp.Modulo(NUM_ARGS[0], NUM_ARGS[1])
+        elif name == "Power":
+            yield cp.Power(NUM_ARGS[0], 3)
         else:
             yield cls(NUM_ARGS)
 
