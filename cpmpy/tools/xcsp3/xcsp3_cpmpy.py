@@ -741,6 +741,13 @@ def xcsp3_cpmpy(
             print_status(ExitStatus.unknown)
 
         # ------------------------------------- - ------------------------------------ #
+        print_comment("Checking")
+
+        time_check = time.time()
+        for c in model.constraints:
+            assert c.value()
+        time_check = time.time() - time_check
+        print(f"Checking passed in {time_check:.4f}")
 
         
     except MemoryError as e:
