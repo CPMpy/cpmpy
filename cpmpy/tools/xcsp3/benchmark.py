@@ -279,7 +279,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, int, str, bool, 
 
         # All other exceptions, put in solution field
         elif result['solution'] is None:
-            result["solution"] = f"{status['exception']}\n\n{status.get('traceback', 'No traceback.')}"
+            result["solution"] = status['exception']
 
     if checker_path is not None and complete_solution is not None:
         checker_output, checker_time = run_solution_checker(
