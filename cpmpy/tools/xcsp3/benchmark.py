@@ -387,8 +387,8 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     # Initialize dataset
     def update_metadata_table(metadata):
         if 'tables' not in metadata:
-            print("Updatng table metadata for metadata['name']")
-            metadata = { **metadata, **get_table_metadata(read_xcsp3(metadata['path']))}
+            print(f"Updating table metadata for {metadata['name']}")
+            metadata = { **metadata, **get_table_metadata(read_xcsp3(metadata['path'])) }
         return metadata
 
     dataset = XCSP3Dataset(year=year, track=track, download=True, target_transform=update_metadata_table)
