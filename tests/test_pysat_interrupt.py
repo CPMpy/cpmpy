@@ -47,7 +47,7 @@ class TestPySATInterrupt(unittest.TestCase):
         # Implementing pysat example for interrupt in cpmpy
         # https://pysathq.github.io/docs/html/api/solvers.html#pysat.solvers.Solver.interrupt
         for clause in PHP(nof_holes=20).clauses:
-            m +=any(~lit_cpmvar[abs(lit)] if lit < 0 else lit_cpmvar[abs(lit)] for lit in clause)
+            m +=cp.any(~lit_cpmvar[abs(lit)] if lit < 0 else lit_cpmvar[abs(lit)] for lit in clause)
 
         s = CPM_pysat(m)
 
