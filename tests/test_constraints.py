@@ -245,7 +245,7 @@ def global_constraints(solver):
             yield cp.LexChainLess(X)
         elif name == "LexChainLessEq":
             X = cp.intvar(0, 3, shape=(3,3))
-            yield cp.LexChainLess(X)
+            yield cp.LexChainLessEq(X)
         else: # default constructor, list of numvars
             yield cls(NUM_ARGS)            
 
