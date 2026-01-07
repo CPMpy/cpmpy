@@ -494,7 +494,7 @@ class TestSolvers(unittest.TestCase):
         # from test_sum_unary and #95
         v = cp.intvar(1,9)
         model = cp.Model(minimize=sum([v]))
-        self.assertTrue(model.solve())
+        self.assertTrue(model.solve(solver=self.solver))
         self.assertEqual(v.value(), 1)
 
     @pytest.mark.requires_solver("exact")

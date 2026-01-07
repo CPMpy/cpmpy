@@ -1357,7 +1357,7 @@ class TestBounds(unittest.TestCase):
 
         cons = (arr[i] == 1).implies(p)
         m = cp.Model([cons, i == 5])
-        self.assertTrue(m.solve())
+        self.assertTrue(m.solve(solver=self.solver))
         self.assertTrue(cons.value())
 
         # div constraint
