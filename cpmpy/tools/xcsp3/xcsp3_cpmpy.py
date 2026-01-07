@@ -219,14 +219,14 @@ def comment_line_start() -> str:
 
 class ExitStatus(Enum):
     unsupported:str = "UNSUPPORTED" # instance contains an unsupported feature (e.g. a unsupported global constraint)
+    unknown:str = "UNKNOWN" # no solution
     sat:str = "SATISFIABLE" # CSP : found a solution | COP : found a solution but couldn't prove optimality
     optimal:str = "OPTIMUM" + chr(32) + "FOUND" # optimal COP solution found
     unsat:str = "UNSATISFIABLE" # instance is unsatisfiable
     memory:str = "MEMORY" # memory out
-    unknown:str = "UNKNOWN" # any other case
+    error:str = "ERROR" # any other exception
     
     def abbrev(self):
-        print("S", self)
         match self:
             case ExitStatus.unsupported:
                 return "UNSUP"
@@ -756,15 +756,15 @@ def xcsp3_cpmpy(
         
     except MemoryError as e:
         print_comment(f"MemoryError raised. Reached limit of {mem_limit} MiB")
-        print_status(ExitStatus.unknown)
+        print_status(ExitStatus.memory)
         raise e
     except ParseError as e:
         if "out of memory" in e.msg:
             print_comment(f"MemoryError raised by parser. Reached limit of {mem_limit} MiB")
-            print_status(ExitStatus.unknown)
+            print_status(ExitStatus.memory)
         else:
             print_comment(f"An {type(e)} got raised: {e}")
-            print_status(ExitStatus.unknown)
+            print_status(ExitStatus.error)
         raise e
     except NotImplementedError as e:
         print_comment(str(e))
@@ -777,7 +777,7 @@ def xcsp3_cpmpy(
         for line in traceback.format_exc().split('\n'):
             if line.strip():
                 print_comment(line)
-        print_status(ExitStatus.unknown)
+        print_status(ExitStatus.error)
         raise e
 
 

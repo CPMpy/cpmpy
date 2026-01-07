@@ -276,10 +276,10 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, int, str, bool, 
         # Ignore timeouts
         if "TimeoutError" in repr(status["exception"]):
             pass
+
         # All other exceptions, put in solution field
         elif result['solution'] is None:
-            result['status'] = ExitStatus.unknown.value
-            result["solution"] = status["exception"]    
+            result["solution"] = f"{status['exception']}\n\n{status.get('traceback', 'No traceback.')}"
 
     if checker_path is not None and complete_solution is not None:
         checker_output, checker_time = run_solution_checker(
