@@ -8,7 +8,6 @@ import pytest
 class TestSolutionHinting:
 
     def test_hints(self):
-
         a,b = cp.boolvar(shape=2)
         model = cp.Model(a | b)
 
@@ -23,7 +22,7 @@ class TestSolutionHinting:
             pytest.skip("Gurobi supports solution hinting, but simple models are solved too fast to see the effect")
             return
         
-        if self.solver == "ortools":
+        if self.solver == "ortools" or self.solver is None:
             args = {"cp_model_presolve": False} # hints are not taken into account in presolve
         elif self.solver == "cplex":
             args = {"clean_before_solve": True} # will continue from previous solution otherwise
