@@ -355,7 +355,10 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                    output_dir: str = 'results',
                    no_timestamp: bool = False,
                    verbose: bool = False, intermediate: bool = False,
-                    checker_path: Optional[str] = None, glob: Optional[str] = None) -> str:
+                   checker_path: Optional[str] = None,
+                   glob: Optional[str] = None,
+                   first: Optional[bool] = False,
+                 ) -> str:
     """
     Benchmark a solver on XCSP3 instances.
     
@@ -393,11 +396,18 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
         if 'tables' not in metadata:
             print(f"Updating table metadata for {metadata['name']}")
             metadata = { **metadata, **get_table_metadata(read_xcsp3(metadata['path'])) }
+
+        metadata["problem"] = metadata["name"].split("-")[0]
         return metadata
 
     dataset = XCSP3Dataset(year=year, track=track, download=True, target_transform=update_metadata_table)
     if glob is not None:
         dataset = ((filename, metadata) for filename, metadata in dataset if glob in filename)
+    if first:
+        dataset_ = []
+        for k, g in itertools.groupby(dataset, key=lambda f_m: f_m[0].split("-")[0]):
+            dataset_.append(min(g, key=lambda g_:g_[0]))
+        dataset = dataset_
     dataset = ((filename, metadata) for filename, metadata in dataset if metadata['area'] > 0)
 
     # Process instances in parallel
@@ -431,6 +441,7 @@ if __name__ == "__main__":
     parser.add_argument('--time-limit', type=int, default=300, help='Time limit in seconds per instance')
     parser.add_argument('--check-time-limit', type=int, default=10, help='Check time limit in seconds per instance')
     parser.add_argument('--glob', type=str, help='Filter instances according to glob expression')
+    parser.add_argument('--first', action='store_true', help='Run only first instance of each problem')
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
     parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign to a single instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
