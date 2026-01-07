@@ -357,10 +357,12 @@ class CPM_lazy_gurobi(CPM_gurobi):
                 break
             choices = set(range(len(parts_))) - V
             if not choices:
-                self.log("Break due to no choices")
-                with open("/tmp/failed_cut_nc.pkl", "wb") as f:
-                    pickle.dump((A_enc, T_enc, parts, frm), f)
-                raise Infeasible
+                self.log("feasible explanation")
+                # with open("/tmp/failed_cut_nc.pkl", "wb") as f:
+                #     print("store", (A_enc, T_enc, parts, frm))
+                #     pickle.dump((A_enc, T_enc, parts, frm), f)
+                return  # TODO [peter]
+
             l = next(l for l in choices)
             self.log(f"choose integer l = {INDEX + l} in {show_set(choices)}", verbosity=3)
             V.add(l)

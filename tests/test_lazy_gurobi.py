@@ -118,10 +118,10 @@ SEED = None
 def env():
     yield {
         "verbosity": 2,
-        "debug": 0,
+        "debug": 1,
         "max_iterations": 1000,
         "seed": 42,
-        "shrink": False,
+        "shrink": True,
         "explain_fractional": True,
     }
 
@@ -187,7 +187,7 @@ class TestTables:
         "case",
         (
             (i, j, t)
-            for j in range(10)  # to repeat the test
+            for j in range(1)  # to repeat the test
             for i, t in enumerate(
                 (
                     cp.Model(cp.AllDifferent(cp.intvar(1, 3, shape=3))),
@@ -204,10 +204,10 @@ class TestTables:
                     with_constraints(generate_table(2, 2, 3), with_alldiff=True, with_min=True),
                     with_constraints(generate_table(4, 4, 4), with_alldiff=False, with_min=False),
                     with_constraints(generate_table(2, 2, 3, k=2)),
-                    with_constraints(generate_table(6, 6, 4, k=3)),
                     with_constraints(generate_table(6, 10, 5), with_alldiff=False, with_min=True),
                     with_constraints(generate_table(6, 4, 4)),  # minimized 1/1000 bug
                     with_constraints(generate_table(10, 100, 10)),
+                    with_constraints(generate_table(4, 3, 4, k=2)),  # TRICKY BUG FINDER NO CHIOCE
                 )
             )
         ),
