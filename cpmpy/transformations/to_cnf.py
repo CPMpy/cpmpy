@@ -7,7 +7,7 @@ from ..solvers.pindakaas import CPM_pindakaas
 from ..transformations.get_variables import get_variables
 
 
-def to_cnf(constraints, csemap=None, ivarmap=None):
+def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     """
     Converts all constraints into **Conjunctive Normal Form**
 
@@ -15,6 +15,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None):
         constraints:    list[Expression] or Operator
         csemap:         `dict()` used for CSE
         ivarmap:        `dict()` used to map integer variables to their encoding (usefull for finding the values of the now-encoded integer variables)
+        encoding:       the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     Returns:
         Equivalent CPMpy constraints in CNF, and the updated `ivarmap`
     """
@@ -26,6 +27,8 @@ def to_cnf(constraints, csemap=None, ivarmap=None):
     import pindakaas as pdk
 
     slv = CPM_pindakaas()
+    slv.encoding = encoding
+
     if ivarmap is not None:
         slv.ivarmap = ivarmap
     slv._csemap = csemap
