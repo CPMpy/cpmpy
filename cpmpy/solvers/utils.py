@@ -19,6 +19,7 @@
 import warnings # for deprecation warning
 import time
 
+from cpmpy.transformations.get_variables import get_variables_model
 from .gurobi import CPM_gurobi
 from .lazy_gurobi import CPM_lazy_gurobi
 from .ortools import CPM_ortools
