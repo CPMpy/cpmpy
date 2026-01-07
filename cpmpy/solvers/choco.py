@@ -50,16 +50,16 @@ from packaging.version import Version
 import warnings
 
 from ..transformations.normalize import toplevel_list
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import Cumulative, DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, is_int, is_boolexpr, is_any_list, get_bounds, argval, argvals, STAR, \
     get_nonneg_args
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
@@ -82,6 +82,14 @@ class CPM_choco(SolverInterface):
     - https://pychoco.readthedocs.io/en/latest/
 
     """
+
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
+                                    "table", 'negative_table', "short_table", "regular", "InDomain",
+                                    "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
+                                    "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
+                                    "lex_lesseq", "lex_less",
+                                    "min", "max", "div", "mod", "pow", "abs", "count", "element", "nvalue", "among"})
+    supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
 
     @staticmethod
     def supported():
@@ -153,7 +161,7 @@ class CPM_choco(SolverInterface):
         """
         return self.chc_model
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit: Optional[float]=None, **kwargs):
         """
             Call the Choco solver
 
@@ -231,7 +239,7 @@ class CPM_choco(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
@@ -352,13 +360,23 @@ class CPM_choco(SolverInterface):
 
             .. note::
                 technical side note: constraints created during conversion of the objective
-                are premanently posted to the solver. Choco accepts variables to maximize or minimize
+                are permanently posted to the solver. Choco accepts variables to maximize or minimize
                 so it is needed to post constraints and create auxiliary variables
         """
 
+        # save user vars
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+
         # make objective function non-nested
-        obj_var = intvar(*get_bounds(expr))
-        self += obj_var == expr
+        obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
+
+        self.add(decomp_cons + obj_cons)
 
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
@@ -389,6 +407,7 @@ class CPM_choco(SolverInterface):
             return [self._to_vars(v) for v in vals]
         return self._to_var(vals)
 
+
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -405,15 +424,16 @@ class CPM_choco(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"min", "max", "abs", "count", "element", "alldifferent", "alldifferent_except0", "allequal",
-                     "table", 'negative_table', "short_table", "regular", "InDomain", "cumulative", "circuit", "gcc", "inverse", "nvalue", "increasing",
-                     "decreasing","strictly_increasing","strictly_decreasing","lex_lesseq", "lex_less", "among", "precedence", "no_overlap"}
-
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap) # choco supports any global also (half-) reified
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = canonical_comparison(cpm_cons)
-        cpm_cons = reify_rewrite(cpm_cons, supported = supported | {"sum", "wsum"}, csemap=self._csemap)  # constraints that support reification
+        cpm_cons = reify_rewrite(cpm_cons,
+                                 supported = self.supported_global_constraints | {"sum", "wsum"},
+                                 csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # support >, <, !=
 
         return cpm_cons
@@ -654,7 +674,7 @@ class CPM_choco(SolverInterface):
                 return chc_cumulative
             elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
                 start, dur, end = cpm_expr.args
-                return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))                
+                return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
             elif cpm_expr.name == "precedence":
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":

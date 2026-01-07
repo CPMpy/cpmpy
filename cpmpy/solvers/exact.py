@@ -48,21 +48,21 @@
 """
 import sys  # for stdout checking
 import time
-from typing import Optional
+from typing import Optional, List
 
 from packaging.version import Version
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import flatlist, argvals, argval
 from ..exceptions import NotSupportedError
@@ -82,6 +82,9 @@ class CPM_exact(SolverInterface):
     Documentation of the solver's own Python API is sparse, but example usage can be found at:
     https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
+
+    supported_global_constraints = frozenset()
+    supported_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -170,7 +173,7 @@ class CPM_exact(SolverInterface):
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
-    def solve(self, time_limit=None, assumptions=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
         """
             Call Exact
 
@@ -272,7 +275,7 @@ class CPM_exact(SolverInterface):
             if timelim == 0: timelim = -1
         return timelim
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally, display the solutions.
 
@@ -434,14 +437,22 @@ class CPM_exact(SolverInterface):
         self.objective_ = expr
         self.objective_is_min_ = minimize
 
-        # make objective function non-nested and with positive BoolVars only
-        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
-        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
-        self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
-        self += flat_cons  # add potentially created constraints
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+
+        self.add(safe_cons + decomp_cons + flat_cons)
 
         # make objective function or variable and post
-        xct_cfvars,xct_rhs = self._make_numexpr(flat_obj,0)
+        xct_cfvars,xct_rhs = self._make_numexpr(obj,0)
 
         # TODO: make this a custom transformation?
         newcfvrs = []
@@ -485,7 +496,6 @@ class CPM_exact(SolverInterface):
 
         return xcfvars, self.fix(xrhs)
 
-
     def transform(self, cpm_expr):
         """
         Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -502,8 +512,11 @@ class CPM_exact(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"}) # linearize expects safe exprs
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent', 'abs'}), csemap=self._csemap) # Abs and Alldiff have a specialized MIP decomp
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"}) # linearize and decompose expects safe exprs
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized linear decomp
+                                     supported_reified = self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
@@ -639,7 +652,7 @@ class CPM_exact(SolverInterface):
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
 
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         Exact supports warmstarting the solver with a partial feasible assignment.
 

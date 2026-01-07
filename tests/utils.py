@@ -103,3 +103,7 @@ def skip_on_missing_pblib(skip_on_exception_only:bool=False):
             skip_message="`pypblib` not installed"
         )
     )
+
+
+def inclusive_range(lb,ub):
+    return range(lb,ub+1)

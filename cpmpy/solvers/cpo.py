@@ -45,7 +45,7 @@
 from typing import Optional
 import warnings
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
@@ -54,7 +54,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.safening import no_partial_functions
 
 
@@ -71,6 +71,11 @@ class CPM_cpo(SolverInterface):
     https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
 
     """
+
+    supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",
+                                              'cumulative', 'no_overlap',
+                                              "min", "max", "abs", "div", "mod", "pow", "element", "nvalue"})
+    supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
 
     _docp = None  # Static attribute to hold the docplex.cp module
 
@@ -151,7 +156,7 @@ class CPM_cpo(SolverInterface):
         """
         return self.cpo_model
     
-    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
             Call the CP Optimizer solver
 
@@ -253,7 +258,7 @@ class CPM_cpo(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
@@ -379,14 +384,25 @@ class CPM_cpo(SolverInterface):
             
                 technical side note: any constraints created during conversion of the objective are permanently posted to the solver
         """
+
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        self.add(decomp_cons)
+
         dom = self.get_docp().modeler
         if self.has_objective():
             self.cpo_model.remove(self.cpo_model.get_objective_expression())
-        expr = self._cpo_expr(expr)
+
+        cpo_obj = self._cpo_expr(obj)
         if minimize:
-            self.cpo_model.add(dom.minimize(expr))
+            self.cpo_model.add(dom.minimize(cpo_obj))
         else:
-            self.cpo_model.add(dom.maximize(expr))
+            self.cpo_model.add(dom.maximize(cpo_obj))
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
@@ -409,11 +425,10 @@ class CPM_cpo(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
-        # count is only supported with a constant to be counted, so we decompose
-        supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'no_overlap'}
-        supported_reified = {"alldifferent", 'table', 'indomain', "negative_table"} # global functions by default here
-        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         # no flattening required
         return cpm_cons
 
@@ -490,7 +505,7 @@ class CPM_cpo(SolverInterface):
                 x = self._cpo_expr(cpm_con.args[1])
                 return dom.scal_prod(w,x)
 
-            # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
+            # 'sub'/2, 'mul'/2
             elif arity == 2 or cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
                 x, y = self._cpo_expr(cpm_con.args)
@@ -498,12 +513,6 @@ class CPM_cpo(SolverInterface):
                     return x - y
                 elif cpm_con.name == "mul":
                     return x * y
-                elif cpm_con.name == "div":
-                    return x // y
-                elif cpm_con.name == "pow":
-                    return x ** y
-                elif cpm_con.name == "mod":
-                    return x % y
             # '-'/1
             elif cpm_con.name == "-":
                 return -self._cpo_expr(cpm_con.args[0])
@@ -595,6 +604,15 @@ class CPM_cpo(SolverInterface):
                 return dom.abs(self._cpo_expr(cpm_con.args)[0])
             elif cpm_con.name == "nvalue":
                 return dom.count_different(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == "div":
+                x,y = self._cpo_expr(cpm_con.args)
+                return x // y
+            elif cpm_con.name == "mod":
+                x,y = self._cpo_expr(cpm_con.args)
+                return x % y
+            elif cpm_con.name == "pow":
+                x,y = self._cpo_expr(cpm_con.args)
+                return x ** y
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
 

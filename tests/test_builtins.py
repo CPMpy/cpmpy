@@ -16,9 +16,12 @@ class TestBuiltin(unittest.TestCase):
         self.assertTrue(model.solve(solver=self.solver))
         self.assertTrue(cp.max(iv.value()) <= -1)
 
-        model = cp.Model(cp.max(iv).decompose_comparison('!=', 4))
+        _max, define = cp.max(iv).decompose()
+        model = cp.Model(_max != 4, define)
+
         self.assertTrue(model.solve(solver=self.solver))
-        self.assertNotEqual(str(cp.max(iv.value())), '4')
+        self.assertNotEqual(max(iv.value()), 4)
+        self.assertNotEqual(cp.max(iv).value(), 4)
 
     def test_min(self):
         constraints = [cp.min(iv) + 9 == 8]
@@ -26,9 +29,13 @@ class TestBuiltin(unittest.TestCase):
         self.assertTrue(model.solve(solver=self.solver))
         self.assertEqual(str(cp.min(iv.value())), '-1')
 
-        model = cp.Model(cp.min(iv).decompose_comparison('==', 4))
+        _min, define = cp.max(iv).decompose()
+        model = cp.Model(_min != 4, define)
+
         self.assertTrue(model.solve(solver=self.solver))
-        self.assertEqual(str(cp.min(iv.value())), '4')
+        self.assertNotEqual(min(iv.value()), 4)
+        self.assertNotEqual(cp.min(iv).value(), 4)
+
 
     def test_abs(self):
         constraints = [cp.abs(iv[0]) + 9 <= 8]
@@ -44,9 +51,12 @@ class TestBuiltin(unittest.TestCase):
         model = cp.Model(constraints)
         self.assertTrue(model.solve(solver=self.solver))
 
-        model = cp.Model(cp.abs(iv[0]).decompose_comparison('!=', 4))
+        _abs, define = cp.abs(iv[0]).decompose()
+        model = cp.Model(_abs != 4, define)
+
         self.assertTrue(model.solve(solver=self.solver))
-        self.assertNotEqual(str(cp.abs(iv[0].value())), '4')
+        self.assertNotEqual(abs(iv[0].value()), 4)
+        self.assertNotEqual(cp.abs(iv[0]).value(), 4)
 
     # Boolean builtins
     def test_all(self):

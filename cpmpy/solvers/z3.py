@@ -45,7 +45,7 @@
     Module details
     ==============
 """
-from typing import Optional
+from typing import Optional, List
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -55,9 +55,9 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.normalize import toplevel_list
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 
 
 class CPM_z3(SolverInterface):
@@ -76,6 +76,9 @@ class CPM_z3(SolverInterface):
     .. note::
         Terminology note: a 'model' for z3 is a solution!
     """
+
+    supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mod"})
+    supported_reified_global_constraints = supported_global_constraints
 
     @staticmethod
     def supported():
@@ -139,7 +142,7 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit=None, assumptions=[], **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
         """
             Call the z3 solver
 
@@ -183,6 +186,9 @@ class CPM_z3(SolverInterface):
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 
+
+        if assumptions is None:
+            assumptions = []
 
         z3_assum_vars = self.solver_vars(assumptions)
         self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
@@ -312,19 +318,27 @@ class CPM_z3(SolverInterface):
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
-        if isinstance(expr, GlobalFunction): # not supported by Z3
-            obj_var = intvar(*expr.get_bounds())
-            self += expr == obj_var
-            expr = obj_var
+        # save user variables
+        get_variables(expr, self.user_vars)
 
-        obj = self._z3_expr(expr)
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+
+        self.add(safe_cons + decomp_cons)
+
+        z3_obj = self._z3_expr(obj)
+        if isinstance(z3_obj, z3.BoolRef):
+            z3_obj = z3.If(z3_obj, 1, 0) # must be integer
         if minimize:
-            self.obj_handle = self.z3_solver.minimize(obj)
+            self.obj_handle = self.z3_solver.minimize(z3_obj)
             self._minimize = True # record direction of optimisation
         else:
-            self.obj_handle = self.z3_solver.maximize(obj)
+            self.obj_handle = self.z3_solver.maximize(z3_obj)
             self._minimize = False # record direction of optimisation
-
 
     def transform(self, cpm_expr):
         """
@@ -342,9 +356,11 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod"})
-        supported = {"alldifferent", "xor", "ite"}  # z3 accepts these reified too
-        cpm_cons = decompose_in_tree(cpm_cons, supported, supported, csemap=self._csemap)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         return cpm_cons
 
     def add(self, cpm_expr):
@@ -427,7 +443,7 @@ class CPM_z3(SolverInterface):
                 x = self._z3_expr(cpm_con.args[1])
                 return z3.Sum([wi*xi for wi,xi in zip(w,x)])
 
-            # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
+            # 'sub'/2, 'mul'/2
             elif arity == 2 or cpm_con.name == "mul":
                 assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
                 x, y = self._z3_expr(cpm_con.args)
@@ -440,25 +456,6 @@ class CPM_z3(SolverInterface):
                     return x - y
                 elif cpm_con.name == "mul":
                     return x * y
-                elif cpm_con.name == "div":
-                    # z3 rounds towards negative infinity, need this hack when result is negative
-                    return z3.If(z3.And(x >= 0, y >= 0), x / y,
-                           z3.If(z3.And(x <= 0, y <= 0), -x / -y,
-                           z3.If(z3.And(x >= 0, y <= 0), -(x / -y),
-                           z3.If(z3.And(x <= 0, y >= 0), -(-x / y), 0))))
-
-                elif cpm_con.name == "pow":
-                    if not is_num(cpm_con.args[1]):
-                        # tricky in Z3 not all power constraints are decidable
-                        # solver will return 'unknown', even if theory is satisfiable.
-                        # https://stackoverflow.com/questions/70289335/power-and-logarithm-in-z3
-                        # raise error to be consistent with other solvers
-                        raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
-                    return x ** y
-                elif cpm_con.name == "mod":
-                    # minimic modulo with integer division (round towards o)
-                    return z3.If(z3.And(x >= 0), x % y,-(-x % y))
-
             # '-'/1
             elif cpm_con.name == "-":
                 if is_boolexpr(cpm_con.args[0]):
@@ -495,6 +492,32 @@ class CPM_z3(SolverInterface):
 
             # post the comparison
             return eval_comparison(cpm_con.name, lhs, rhs)
+
+        elif isinstance(cpm_con, GlobalFunction):
+            if cpm_con.name == "mod":
+                # minimic modulo with integer division (round towards o)
+                x,y = self._z3_expr(cpm_con.args)
+                return z3.If(z3.And(x >= 0), x % y, -(-x % y))
+
+            elif cpm_con.name == "div":
+                # z3 rounds towards negative infinity, need this hack when result is negative
+                x,y = self._z3_expr(cpm_con.args)
+                return z3.If(z3.And(x >= 0, y >= 0), x / y,
+                       z3.If(z3.And(x <= 0, y <= 0), -x / -y,
+                       z3.If(z3.And(x >= 0, y <= 0), -(x / -y),
+                       z3.If(z3.And(x <= 0, y >= 0), -(-x / y), 0))))
+
+            elif cpm_con.name == "pow":
+                x,y = self._z3_expr(cpm_con.args)
+                if not is_num(cpm_con.args[1]):
+                    # tricky in Z3 not all power constraints are decidable
+                    # solver will return 'unknown', even if theory is satisfiable.
+                    # https://stackoverflow.com/questions/70289335/power-and-logarithm-in-z3
+                    # raise error to be consistent with other solvers
+                    raise NotSupportedError(f"Z3 only supports power constraint with constant exponent, got {cpm_con}")
+                return x ** y
+
+            raise NotImplementedError(f"Global function {cpm_con} not (yet) implemented for Z3, ")
 
         # rest: base (Boolean) global constraints
         elif isinstance(cpm_con, GlobalConstraint):
