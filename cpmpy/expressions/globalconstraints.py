@@ -676,7 +676,7 @@ class Regular(GlobalConstraint):
             raise TypeError("The third argument of a regular constraint should be a node id")
         if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
             raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
-        super().__init__("regular", [array, transitions, start, list(accepting)])
+        super().__init__("regular", [list(array), list(transitions), start, list(accepting)])
 
         node_set = set()
         self.trans_dict = {}
@@ -851,7 +851,7 @@ class Xor(GlobalConstraint):
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        super().__init__("xor", arg_list)
+        super().__init__("xor", list(arg_list))
 
     def decompose(self):
         """
@@ -864,7 +864,7 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
         decomp = [sum(self.args[:2]) == 1]
         if len(self.args) > 2:
-            decomp = Xor([decomp,self.args[2:]]).decompose()[0]
+            decomp = Xor(decomp + self.args[2:]).decompose()[0]
         return decomp, []
 
     def value(self):
@@ -918,8 +918,9 @@ class Cumulative(GlobalConstraint):
         else: # constant demand
             demand = [demand] * len(start)
 
-        super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
+        super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, list(demand), capacity])
 
+    
     def decompose(self, how="auto") -> tuple[list[Expression], list[Expression]]:
         """
         Decompose the Cumulative constraint
@@ -1079,7 +1080,7 @@ class NoOverlap(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap", [start, duration, end])
+        super().__init__("no_overlap", [list(start), list(duration), list(end) if end is not None else None])
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1155,7 +1156,7 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of variables, but got", vars)
         if not is_any_list(precedence) or not all(is_num(p) for p in precedence):
             raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
-        super().__init__("precedence", [cpm_array(vars), precedence])
+        super().__init__("precedence", [list(vars), list(precedence)])
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1168,6 +1169,7 @@ class Precedence(GlobalConstraint):
         """
 
         args, precedence = self.args
+        args = cpm_array(args)
         constraints = []
         for s,t in zip(precedence[:-1], precedence[1:]):
             # constraint 1 from paper
@@ -1217,9 +1219,9 @@ class GlobalCardinalityCount(GlobalConstraint):
             raise TypeError("GlobalCardinalityCount expects a list of values, but got", vals)
         if not is_any_list(occ):
             raise TypeError("GlobalCardinalityCount expects a list of variables as occurrences, but got", occ)
-        if len(vars) != len(occ):
-            raise ValueError(f"Number of variables and occurrences must be equal, but got {len(vars)} and {len(occ)}")
-        super().__init__("gcc", [vars, vals, occ])
+        if len(vals) != len(occ):
+            raise ValueError(f"Number of values and occurrences must be equal, but got {len(vals)} and {len(occ)}")
+        super().__init__("gcc", [list(vars), list(vals), list(occ)])
         self.closed = closed
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
