@@ -1191,7 +1191,8 @@ class Precedence(GlobalConstraint):
             return None
         vals = np.array(vals)
         for s,t in zip(precedence[:-1], precedence[1:]):
-            if vals[0] == t: return False
+            if vals[0] == t:
+                return False
             for j in range(len(args)):
                 if vals[j] == t and sum(vals[:j] == s) == 0:
                     return False
