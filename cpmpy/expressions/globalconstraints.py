@@ -1398,7 +1398,7 @@ class LexLess(GlobalConstraint):
         """ 
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLess must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
-        super().__init__("lex_less", [X, Y])
+        super().__init__("lex_less", [list1, list2])
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1536,7 +1536,7 @@ class LexChainLess(GlobalConstraint):
         X = argvals(self.args)
         if any(val is None for val in flatlist(X)):
             return None
-        return cp.all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
+        return all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class LexChainLessEq(GlobalConstraint):
@@ -1567,7 +1567,7 @@ class LexChainLessEq(GlobalConstraint):
         X = argvals(self.args)
         if any(val is None for val in flatlist(X)):
             return None
-        return cp.all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
+        return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class DirectConstraint(Expression):
