@@ -877,60 +877,63 @@ class Xor(GlobalConstraint):
 
 class Cumulative(GlobalConstraint):
     """
-        Global cumulative constraint. Used for resource aware scheduling.
-        Ensures that the capacity of the resource is never exceeded and enforces:
-            duration >= 0
-            demand >= 0
-            start + duration == end
+    Enforces that a set of tasks is scheduled such that the capacity of the resource is never exceeded and enforces:
+        - duration >= 0
+        - demand >= 0
+        - start + duration == end
 
-        Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
-        Supports both varying demand across tasks or equal demand for all jobs.
+    Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
+    Supports both varying demand across tasks or equal demand for all jobs.
     """
-    def __init__(self, start, duration, end=None, demand=None, capacity=None):
+    def __init__(self, start: list[Expression], duration: list[Expression], end: Optional[list[Expression]] = None, demand: list[Expression] | Expression = None, capacity: Expression = None):
         """
-            Arguments of constructor:
-
             Arguments:
-                `start`: List of Expression objects representing the start times of the tasks
-                `duration`: List of Expression objects representing the durations of the tasks
-                `end`: optional, list of Expression objects representing the end times of the tasks
-                `demand`: List of Expression objects or single Expression to indicate constant demand for all tasks
-                `capacity`: Expression object representing the capacity of the resource
+                start (list[Expression]): List of Expression objects representing the start times of the tasks
+                duration (list[Expression]): List of Expression objects representing the durations of the tasks
+                end (list[Expression] | None): optional, list of Expression objects representing the end times of the tasks
+                demand (list[Expression] | Expression | None): List of Expression objects or single Expression to indicate constant demand for all tasks
+                capacity (Expression | None): Expression object representing the capacity of the resource
         """
-                
-        assert is_any_list(start), "start should be a list"
-        assert is_any_list(duration), "duration should be a list"
-        if end is not None:
-            assert is_any_list(end), "end should be a list if it is provided"
-        
-        assert demand is not None, "demand should be provided but was None"
-        assert capacity is not None, "capacity should be provided but was None"
 
-        start = flatlist(start)
-        duration = flatlist(duration)
-        assert len(start) == len(duration), "Start and duration should have equal length"
-        if end is not None:
-            end = flatlist(end)
-            assert len(start) == len(end), "Start and end should have equal length"
+        if not is_any_list(start):
+            raise TypeError("start should be a list")
+        if not is_any_list(duration):
+            raise TypeError("duration should be a list")
+        if end is not None and not is_any_list(end):
+            raise TypeError("end should be a list if it is provided")
+        if demand is None:
+            raise TypeError("demand should be provided but was None")
+        if capacity is None:
+            raise TypeError("capacity should be a single Expression")
+        
+        if len(start) != len(duration):
+            raise ValueError("Start and duration should have equal length")
+        if end is not None and len(start) != len(end):
+            raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
 
         if is_any_list(demand):
-            demand = flatlist(demand)
-            assert len(demand) == len(start), "Demand should be supplied for each task or be single constant"
+            if len(demand) != len(start):
+                raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand)} and {len(start)}")
         else: # constant demand
             demand = [demand] * len(start)
 
         super(Cumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
 
-    def decompose(self, how="auto"):
+    def decompose(self, how="auto") -> tuple[list[Expression], list[Expression]]:
         """
-            Decompose the Cumulative constraint
-            Support time-based decomposition or task-based decomposition.
-            By default, we heuristically select the best decomposition based on the number of tasks and the horizon.
-            Arguments:
-                how (str): how the cumulative constraint should be decomposed, can be "time", "task", or "auto" (default)
+        Decompose the Cumulative constraint
+        Support time-based decomposition or task-based decomposition.
+        By default, we heuristically select the best decomposition based on the number of tasks and the horizon.
+
+        Arguments:
+            how (str): how the cumulative constraint should be decomposed, can be "time", "task", or "auto" (default)
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
-        assert how in ["time", "task", "auto"], "how can only be time, task, or auto (default), but got {}".format(how)
+        if how not in ["time", "task", "auto"]:
+            raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
 
         start, duration, end, demand, capacity = self.args
 
@@ -942,11 +945,14 @@ class Cumulative(GlobalConstraint):
             return self._task_decomposition()
         raise Exception
 
-    def _task_decomposition(self):
+    def _task_decomposition(self) -> tuple[list[Expression], list[Expression]]:
         """
-         Task-based decomposition of the cumulative constraint.
-            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
-            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        Task-based decomposition of the cumulative constraint.
+        Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+        International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, duration, end, demand, capacity = self.args
 
@@ -972,11 +978,14 @@ class Cumulative(GlobalConstraint):
 
         return cons, []
 
-    def _time_decomposition(self):
+    def _time_decomposition(self) -> tuple[list[Expression], list[Expression]]:
         """
-         Time-resource decomposition of the cumulative constraint.
-            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
-            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        Time-resource decomposition of the cumulative constraint.
+        Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+        International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, duration, end, demand, capacity = self.args
 
@@ -998,8 +1007,11 @@ class Cumulative(GlobalConstraint):
 
         return cons, []
 
-    def value(self):
-
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         start, dur, end, demand, capacity = self.args
         
         start, dur, demand, capacity = argvals([start, dur, demand, capacity])
@@ -1028,7 +1040,11 @@ class Cumulative(GlobalConstraint):
 
         return True
     
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """
+        Returns:
+            str: String representation of the cumulative constraint
+        """
         start, dur, end, demand, capacity = self.args
         if end is None:
             return f"Cumulative({start}, {dur}, {demand}, {capacity})"
