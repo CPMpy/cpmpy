@@ -16,7 +16,6 @@ class TestSolveAll(unittest.TestCase):
             if not solver.supported():
                 continue
 
-
             sols = set()
             add_sol = lambda: sols.add(str([a.value(), b.value()]))
 

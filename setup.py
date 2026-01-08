@@ -26,6 +26,7 @@ solver_dependencies = {
     "exact": ["exact>=2.1.0"],
     "minizinc": ["minizinc"],
     "pysat": ["python-sat"],
+    "rc2": ["python-sat"],
     "gurobi": ["gurobipy"],
     "pysdd": ["pysdd"],
     "gcs": ["gcspy"],
