@@ -201,11 +201,13 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, int, str, bool, 
     if process.is_alive():
         # Send sigterm to let process know it reached its time limit
         os.kill(process.pid, signal.SIGTERM)
+        print("SIGNAL SIGTERM")
         # 1 second grace period
         process.join(timeout=1)
         # Kill if still alive
         if process.is_alive():
             os.kill(process.pid, signal.SIGKILL)
+            print("SIGNAL SIGKILL")
             process.join()
 
     result['time_total'] = time.time() - total_start
