@@ -37,7 +37,7 @@ Supported solvers
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
-     - SAT ALLSAT - OPT - PROOF -- ?ISAT IOPT?
+     - SAT ISAT ALLSAT - OPT IOPT - PROOF
      - pip
      -
    * - :doc:`Choco <api/solvers/choco>`
@@ -47,7 +47,7 @@ Supported solvers
      - 
    * - :doc:`CP Optimizer <api/solvers/cpo>`
      - CP
-     - SAT - OPT - PAR -- ?ISAT, IOPT?
+     - SAT - OPT - PAR
      - pip + local + (aca.) license
      - 
    * - :doc:`MiniZinc <api/solvers/minizinc>`
@@ -62,12 +62,12 @@ Supported solvers
      - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
-     - SAT - OPT IOPT - PAR -- ?ISAT?
+     - SAT ISAT - OPT IOPT - PAR
      - pip + (aca.) license
      - 
    * - :doc:`CPLEX <api/solvers/cplex>`
      - ILP
-     - SAT - OPT - PAR -- ?ISAT? ?IOPT?
+     - SAT ISAT - OPT IOPT - PAR
      - pip + local + (aca.) license
      - No
      - 
