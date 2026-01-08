@@ -98,17 +98,6 @@ def _generate_inputs(generator, solvers):
         result += [(solver, expr) for expr in generator(solver)]
     return result
 
-# ---------------------------------------------------------------------------- #
-#                                  Pytest CLI                                  #
-# ---------------------------------------------------------------------------- #
-
-def pytest_addoption(parser):
-    """
-    Adds cli arguments to the pytest command
-    """
-    parser.addoption(
-        "--solver", type=str, action="store", default=None, help="Only run the tests on these solvers. Can be a single solver, a comma-separated list (e.g., 'ortools,cplex'), 'all' to use all installed solvers, or 'None' to skip all solver-parametrized tests."
-    )
 
 # ---------------------------------------------------------------------------- #
 #                                   Fixtures                                   #
@@ -188,6 +177,17 @@ MARKERS = {
     "generate_constraints": "mark test as generating constraints",          # to make multiple copies of the same test, based on a generated set of constraints
 }
 
+# ---------------------------------------------------------------------------- #
+#                                  Pytest CLI                                  #
+# ---------------------------------------------------------------------------- #
+
+def pytest_addoption(parser):
+    """
+    Adds cli arguments to the pytest command
+    """
+    parser.addoption(
+        "--solver", type=str, action="store", default=None, help="Only run the tests on these solvers. Can be a single solver, a comma-separated list (e.g., 'ortools,cplex'), 'all' to use all installed solvers, or 'None' to skip all solver-parametrized tests."
+    )
 
 # ---------------------------------------------------------------------------- #
 #                             Pytest configuration                             #
