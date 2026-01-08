@@ -61,7 +61,7 @@ def _parse_solver_option(solver_option: Optional[str] , filter_not_installed: bo
 
     # Expand "all" to all installed solvers
     if "all" in original_solvers:
-        solvers = cp.SolverLookup.supported() 
+        solvers = [name for name, _ in cp.SolverLookup.base_solvers()] 
         if filter_not_installed:
             warnings.warn('Option "all" already expands to all installed solvers. Ignoring filter for "filter_not_installed".')
 
@@ -70,7 +70,7 @@ def _parse_solver_option(solver_option: Optional[str] , filter_not_installed: bo
         solvers = original_solvers.copy()
         # Filter out non-installed solvers if requested
         if filter_not_installed:
-            solvers = [s for s in solvers if s in cp.SolverLookup.supported()]
+            solvers = [s for s in solvers if cp.SolverLookup.lookup(s).supported()]
     
     # If solver was provided but all were filtered out, return empty list (not None)
     # This distinguishes "no solver specified" from "solver specified but not available"
@@ -92,7 +92,7 @@ def _generate_inputs(generator, solvers):
     """
     result = []
     if solvers is None:
-        installed_solvers = cp.SolverLookup.supported() 
+        installed_solvers = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()]
         solvers = [installed_solvers[0]]
     for solver in solvers:
         result += [(solver, expr) for expr in generator(solver)]
@@ -216,8 +216,9 @@ def pytest_configure(config):
 
         # If any solvers have been specified
         if parsed_solvers_unfiltered:
-            installed_solvers = cp.SolverLookup.supported()        # installed base solvers
+            
             all_solvers = [name for name, solver in cp.SolverLookup.base_solvers()]
+            installed_solvers = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()] # installed base solvers
 
             # Check for solver argument typos
             non_existent_solvers = list(set(parsed_solvers_unfiltered) - set(all_solvers))
