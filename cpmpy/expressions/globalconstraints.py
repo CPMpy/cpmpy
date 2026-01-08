@@ -130,12 +130,13 @@
 import copy
 import warnings
 from typing import cast, Union, Optional
+import numpy as np
 
 import cpmpy as cp
 
-from .core import BoolVal
-from .utils import all_pairs, is_int, is_bool, STAR
-from .variables import _IntVarImpl
+from .core import Expression, BoolVal
+from .variables import cpm_array, intvar, boolvar
+from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -385,7 +386,7 @@ class Circuit(GlobalConstraint):
         """
         flatargs = flatlist(args)
         if len(flatargs) < 2:
-            raise CPMpyException('Circuit constraint must be given a minimum of 2 variables')
+            raise ValueError('Circuit constraint must be given a minimum of 2 variables')
         super().__init__("circuit", flatargs)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -428,7 +429,7 @@ class Circuit(GlobalConstraint):
         else:
             # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
             a = boolvar()
-            defining += [a == ((Minimum(succ) >= 0) & (Maximum(succ) < n))]
+            defining += [a == ((cp.Minimum(succ) >= 0) & (cp.Maximum(succ) < n))]
             for i in range(n):
                 defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
 
