@@ -905,7 +905,7 @@ class Cumulative(GlobalConstraint):
         if demand is None:
             raise TypeError("demand should be provided but was None")
         if capacity is None:
-            raise TypeError("capacity should be a single Expression")
+            raise TypeError("capacity should be provided but was None")
         
         if len(start) != len(duration):
             raise ValueError("Start and duration should have equal length")
