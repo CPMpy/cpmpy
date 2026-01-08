@@ -1051,85 +1051,42 @@ class Cumulative(GlobalConstraint):
         else:
             return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity})"
 
-
-class Precedence(GlobalConstraint):
-    """
-        Constraint enforcing some values have precedence over others.
-        Given an array of variables X and a list of precedences P:
-        Then in order to satisfy the constraint, if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
-    """
-    def __init__(self, vars, precedence):
-        if not is_any_list(vars):
-            raise TypeError("Precedence expects a list of variables, but got", vars)
-        if not is_any_list(precedence) or any(isinstance(x, Expression) for x in precedence):
-            raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
-        super().__init__("precedence", [cpm_array(vars), precedence])
-
-    def decompose(self):
-        """
-        Decomposition based on:
-        Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
-        Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
-        """
-
-        args, precedence = self.args
-        constraints = []
-        for s,t in zip(precedence[:-1], precedence[1:]):
-            # constraint 1 from paper
-            constraints.append(args[0] != t) 
-            # constraint 2 from paper
-            for j in range(1,len(args)):
-                lhs = args[j] == t
-                if is_bool(lhs):  # args[j] and t could both be constants
-                    lhs = BoolVal(lhs)
-                constraints += [lhs.implies(cp.any(args[:j] == s))]
-        return constraints, []
-
-    def value(self):
-
-        args, precedence = self.args
-        vals = np.array(argvals(args))
-        for s,t in zip(precedence[:-1], precedence[1:]):
-            if vals[0] == t: return False
-            for j in range(len(args)):
-                if vals[j] == t and sum(vals[:j] == s) == 0:
-                    return False
-        return True
-
-
 class NoOverlap(GlobalConstraint):
     """
-    Global no-overlap constraint. Used for scheduling problems
-    Ensures no tasks overlap and enforces:
-            duration >= 0
-            start + duration == end
-
-    Equivalent to :class:`~cpmpy.expressions.globalconstraints.Cumulative` with demand and capacity 1
+    Enforces that a set of tasks are scheduled without overlapping, and enforces:
+        - duration >= 0
+        - start + duration == end
     """
 
-    def __init__(self, start, dur, end=None):
+    def __init__(self, start: list[Expression], duration: list[Expression], end: Optional[list[Expression]] = None):
         """
         Arguments:
-            `start`: List of Expression objects representing the start times of the tasks
-            `duration`: List of Expression objects representing the durations of the tasks
-            `end`: optional, list of Expression objects representing the end times of the tasks
+            start (list[Expression]): List of Expression objects representing the start times of the tasks
+            duration (list[Expression]): List of Expression objects representing the durations of the tasks
+            end (list[Expression] | None): optional, list of Expression objects representing the end times of the tasks
         """
        
-        assert is_any_list(start), "start should be a list"
-        assert is_any_list(dur), "duration should be a list"
-        if end is not None:
-            assert is_any_list(end), "end should be a list if it is provided"
-
-        start = flatlist(start)
-        dur = flatlist(dur)
-        assert len(start) == len(dur), "start and duration should have equal length"
-        if end is not None:
-            end = flatlist(end)
-            assert len(start) == len(end), "start and end should have equal length"
+        if not is_any_list(start):
+            raise TypeError("start should be a list")
+        if not is_any_list(duration):
+            raise TypeError("duration should be a list")
+        if end is not None and not is_any_list(end):
+            raise TypeError("end should be a list if it is provided")
         
-        super().__init__("no_overlap", [start, dur, end])
+        if len(start) != len(duration):
+            raise ValueError("Start and duration should have equal length")
+        if end is not None and len(start) != len(end):
+            raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
+        
+        super().__init__("no_overlap", [start, duration, end])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
         start, dur, end = self.args
         cons = [d >= 0 for d in dur]
         
@@ -1142,18 +1099,34 @@ class NoOverlap(GlobalConstraint):
             cons += [(e1 <= s2) | (e2 <= s1)]
         return cons, []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         start, dur, end = argvals(self.args)
+        if end is None:
+            if any(s is None for s in start) or any(d is None for d in dur):
+                return None
+            end = [s + d for s,d in zip(start, dur)]
+        else:
+            if any(s is None for s in start) or any(d is None for d in dur) or any(e is None for e in end):
+                return None
+       
         if any(d < 0 for d in dur):
             return False
-        if end is not None and any(s + d != e for s,d,e in zip(start, dur, end)):
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
             return False
         for (s1,d1), (s2,d2) in all_pairs(zip(start,dur)):
             if s1 + d1 > s2 and s2 + d2 > s1:
                 return False
         return True
     
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """
+        Returns:
+            str: String representation of the NoOverlap constraint
+        """
         start, dur, end = self.args
         if end is None:
             return f"NoOverlap({start}, {dur})"
