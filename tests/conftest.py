@@ -1,3 +1,14 @@
+"""
+Configuration file for pytest.
+
+This config defines:
+- pytest cli arguments
+- pytest fixtures
+- pytest markers
+- test parametrisation logic
+- test filtering logic
+"""
+
 import pytest
 import cpmpy as cp
 import importlib
@@ -6,6 +17,10 @@ import logging
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------- #
+#                               Helper functions                               #
+# ---------------------------------------------------------------------------- #
 
 def _parse_solver_option(solver_option: Optional[str] , filter_not_installed: bool = True) -> Optional[list[str]]:
     """
@@ -49,6 +64,8 @@ def _parse_solver_option(solver_option: Optional[str] , filter_not_installed: bo
         solvers = cp.SolverLookup.supported() 
         if filter_not_installed:
             warnings.warn('Option "all" already expands to all installed solvers. Ignoring filter for "filter_not_installed".')
+
+    # Handle list of solver names
     else:            
         solvers = original_solvers.copy()
         # Filter out non-installed solvers if requested
@@ -62,6 +79,29 @@ def _parse_solver_option(solver_option: Optional[str] , filter_not_installed: bo
     
     return solvers if solvers else None
 
+def _generate_inputs(generator, solvers):
+    """
+    Generate inputs for a test based on a generator function and a list of solvers.
+
+    Arguments:
+        generator (callable): A function that generates constraints for a given solver
+        solvers (list[str]): A list of solver names to generate constraints for
+
+    Returns:
+        list[tuple[str, Any]]: A list of tuples, each containing a solver name and a constraint expression
+    """
+    result = []
+    if solvers is None:
+        installed_solvers = cp.SolverLookup.supported() 
+        solvers = [installed_solvers[0]]
+    for solver in solvers:
+        result += [(solver, expr) for expr in generator(solver)]
+    return result
+
+# ---------------------------------------------------------------------------- #
+#                                  Pytest CLI                                  #
+# ---------------------------------------------------------------------------- #
+
 def pytest_addoption(parser):
     """
     Adds cli arguments to the pytest command
@@ -70,6 +110,16 @@ def pytest_addoption(parser):
         "--solver", type=str, action="store", default=None, help="Only run the tests on these solvers. Can be a single solver, a comma-separated list (e.g., 'ortools,cplex'), 'all' to use all installed solvers, or 'None' to skip all solver-parametrized tests."
     )
 
+# ---------------------------------------------------------------------------- #
+#                                   Fixtures                                   #
+# ---------------------------------------------------------------------------- #
+
+"""
+Fixtures are parameters that pytest can auto-fill when running a test.
+Any test that has a method argument with a name that matches a fixture will be 
+automatically filled with the fixture's value.
+"""
+
 @pytest.fixture
 def solver(request):
     """
@@ -77,18 +127,18 @@ def solver(request):
 
     By providing the cli argument `--solver=<SOLVER_NAME>`, `--solver=<SOLVER1,SOLVER2,...>`, `--solver=all`, or `--solver=None`, two things will happen:
     - non-solver-specific tests which make a `.solve()` call will now run against all specified solvers (instead of just the default OR-Tools)
-    - solver-specific tests, like the ones produced through `_generate_inputs`, will be filtered if they don't match any of the specified solvers
+    - solver-specific tests will be filtered if they don't match any of the specified solvers
 
     Special values:
     - "all" expands to all installed solvers from SolverLookup
-    - "None" skips all solver-parametrized tests (no solver at all), only runs tests that don't depend on solver parametrization
+    - "None" skips all solver-parametrized tests (no solver at all), only runs tests that don't depend on solver parametrisation
 
-    By not providing a value for ``--solver`, the default behaviour will be to run non-solver-specific on the default solver (OR-Tools),
+    By not providing a value for `--solver`, the default behaviour will be to run non-solver-specific tests only on the default solver (OR-Tools),
     and to run all solver-specific tests for which the solver has been installed on the system.
     """
-    # Check if solver was parametrized for test (via pytest_generate_tests or explicit parametrization)
+    # Check if test has been parametrized with a solver (via pytest_generate_tests or explicit parametrisation)
     if hasattr(request, "param"):
-        solver_value = request.param
+        solver_value = request.param 
     else:
         # Not parametrized, use command line option
         # This branch is reached when:
@@ -107,13 +157,42 @@ def solver(request):
     
     return solver_value
 
+
 @pytest.fixture
 def constraint(request):
+    """
+    Fixture for tests having a 'constraint' parameter
+
+    Will be parametrised using a constraint generator function.
+    """
     if not hasattr(request, "param"):
         raise RuntimeError(
             "The 'constraint' fixture must be parametrized via pytest_generate_tests"
         )
     return request.param
+
+
+# ---------------------------------------------------------------------------- #
+#                                    Markers                                   #
+# ---------------------------------------------------------------------------- #
+
+"""
+Markers allow for additional customised control over test execution.
+Setting a marker on a tests tags that test with that marker, which can be accessed
+during test parametrisation and filtering.
+"""
+
+MARKERS = {
+    "requires_solver": "mark test as requiring a specific solver",          # to filter (not skip) tests when required solver is not installed
+    "requires_dependency": "mark test as requiring a specific dependency",  # to filter (not skip) tests when required dependency is not installed
+    "generate_constraints": "mark test as generating constraints",          # to make multiple copies of the same test, based on a generated set of constraints
+}
+
+
+# ---------------------------------------------------------------------------- #
+#                             Pytest configuration                             #
+# ---------------------------------------------------------------------------- #
+
 
 def pytest_configure(config):
     # Configure logging for test filtering information
@@ -122,27 +201,31 @@ def pytest_configure(config):
         format='%(levelname)s: %(message)s'
     )
     
-    # Register custom marker for pytest test collecting
-    config.addinivalue_line(
-        "markers",
-        "requires_solver(name): mark test as requiring a specific solver", # to filter tests when required solver is not installed
-    )
-    config.addinivalue_line(
-        "markers",
-        "requires_dependency(name): mark test as requiring a specific dependency", # to filter tests when required solver is not installed
-    )
-    config.addinivalue_line(
-        "markers",
-        "generate_constraints(generator): something", 
-    )
+    # Register custom marker for pytest test collection
+    for marker, description in MARKERS.items():
+        config.addinivalue_line(
+            "markers",
+            f"{marker}(name): {description}",
+        )
     
     # Check for non-installed solvers and issue warnings
     solver_option = config.getoption("--solver")
     if solver_option:
         # Parse without filtering to check original list
         parsed_solvers_unfiltered = _parse_solver_option(solver_option, filter_not_installed=False)
+
+        # If any solvers have been specified
         if parsed_solvers_unfiltered:
             installed_solvers = cp.SolverLookup.supported()        # installed base solvers
+            all_solvers = [name for name, solver in cp.SolverLookup.base_solvers()]
+
+            # Check for solver argument typos
+            non_existent_solvers = list(set(parsed_solvers_unfiltered) - set(all_solvers))
+            if non_existent_solvers:
+                raise ValueError(f"The following solvers are not supported by CPMpy: {', '.join(non_existent_solvers)}. "
+                                 "Please check the solver names.")
+
+            # Warn about non-installed solvers
             not_installed_solvers = list(set(parsed_solvers_unfiltered) - set(installed_solvers))
             if not_installed_solvers:
                 warnings.warn(
@@ -151,38 +234,41 @@ def pytest_configure(config):
                     UserWarning,
                     stacklevel=2
                 )
-            logger.info(f"Using solvers: {', '.join(parsed_solvers_unfiltered)}")
+
+        # No solvers
         else:
+            # No solvers specified, use default behavior (parametrised using OR-Tools and solver-specific tests)
             if parsed_solvers_unfiltered is None:
                 logger.info("No solvers specified, using default behavior (parametrised using OR-Tools and solver-specific tests).")
             else:
                 logger.info("No solvers available to run tests with. Install some solvers or choose different solvers.")
 
 
-def generate_inputs(generator, solvers):
-    result = []
-    if solvers is None:
-        installed_solvers = cp.SolverLookup.supported() 
-        solvers = [installed_solvers[0]]
-    for solver in solvers:
-        result += [(solver, expr) for expr in generator(solver)]
-    return result
+# ------------------------------ Parametrisation ----------------------------- #
 
 def pytest_generate_tests(metafunc):
     """
-    Dynamically parametrize non-solver-specific tests with all provided solvers.
+    Pytest hook which allows to define custom test parametrisation schemes. Gets called for each test function.
+
+    We currently use the following custom parametrisation schemes:
     
-    When multiple solvers are provided via --solver, tests that use the 'solver' fixture
-    but are not already parametrized will be parametrized to run against all provided solvers.
+    1) Dynamically parametrize non-solver-specific tests with all provided solvers.
+    
+        When one or more solvers are provided via --solver, tests that use the 'solver' fixture
+        will be parametrized to run against all provided solvers.
+
+    Arguments:
+        metafunc (pytest.Metafunc): The metafunction object that provides access to the test function and its metadata
+
+    Returns:
+        None
+    
     """
 
-    # Early exists
-    # 1) Check if this test uses the 'solver' fixture
+    # Early exist
+    #    Check if this test uses the 'solver' fixture
+    #    currently we only parametrise tests that use the 'solver' fixture, change if in the future we add other parametrisation schemes
     if "solver" not in metafunc.fixturenames:
-        return
-    # 2) Check if test is already parametrized with solver
-    #    Check callspec (for tests parametrized programmatically)
-    if hasattr(metafunc, "callspec") and metafunc.callspec and "solver" in metafunc.callspec.params:
         return
 
     # Get solvers from command line option
@@ -194,7 +280,7 @@ def pytest_generate_tests(metafunc):
     if constraint_generator_marker:
         # take generator callable from marker, generate input expressions, and parameterise test with result
         generator = constraint_generator_marker.args[0]
-        metafunc.parametrize(("solver","constraint"), list(generate_inputs(generator, parsed_solvers)),  ids=str)
+        metafunc.parametrize(("solver","constraint"), list(_generate_inputs(generator, parsed_solvers)),  ids=str)
         return   
     
     # Check parametrize markers (for tests parametrized via @pytest.mark.parametrize)
@@ -209,29 +295,38 @@ def pytest_generate_tests(metafunc):
                 #     return
                 if argnames == "generator":
                     generator = argvalues
-                    print(list(generate_inputs(generator)))
-                    metafunc.parametrize(("solver","constraint"), list(generate_inputs(generator)),  ids=str)
+                    print(list(_generate_inputs(generator)))
+                    metafunc.parametrize(("solver","constraint"), list(_generate_inputs(generator)),  ids=str)
             elif isinstance(argnames, (tuple, list)):
                 if "solver" in argnames:
                     return
     
     # Check if test has requires_solver marker (solver-specific tests)
     if metafunc.definition.get_closest_marker("requires_solver"):
+        metafunc.parametrize("solver", metafunc.definition.get_closest_marker("requires_solver").args)
         return
     
     # Only parametrize if multiple solvers are explicitly provided
-    # When parsed_solvers is None (no --solver specified), don't parametrize - use default solver
+    # When parsed_solvers is None (no --solver specified), don't parametrize -> use default solver
     # When parsed_solvers is empty list (all filtered out), don't parametrize
     # Only parametrize when we have 2+ solvers explicitly specified
     if parsed_solvers is not None and len(parsed_solvers) > 1:
         metafunc.parametrize("solver", parsed_solvers)
 
+# --------------------------------- Filtering -------------------------------- #
 
 def pytest_collection_modifyitems(config, items):
     """
     Centrally apply filters and skips to test targets.
 
     For now, only solver-based filtering gets applied.
+
+    Arguments:
+        config (pytest.Config): The pytest configuration object (holds cli options)
+        items (list[pytest.Item]): The list of test items to filter and modify
+
+    Note:
+        pytest_collection_modifyitems gets called after pytest_generate_tests, so the tests have already been parametrised at this point
     """
     initial_count = len(items)
     logger.info(f"Test suite size before filtering: {initial_count} tests")
@@ -250,13 +345,15 @@ def pytest_collection_modifyitems(config, items):
     # else:
     #     logger.info("No --solver option provided (using default behavior)")
 
-    filtered = []
+    # data structures to keep track of skipped and filtered tests
+    filtered = [] # <- will hold the tests that pass all filters
     skipped_dependency = 0
     skipped_solver_specific = 0
     skipped_parametrized = 0
     skipped_solver_fixture = 0
     
     for item in items:
+        # Markers
         required_solver_marker = item.get_closest_marker("requires_solver")
         required_dependency_marker = item.get_closest_marker("requires_dependency")
 
@@ -270,100 +367,93 @@ def pytest_collection_modifyitems(config, items):
                 skipped_dependency += 1
                 continue
 
-        # --------------------------------- Solver filtering --------------------------------- #
-
-        # Skip test if the required solver is not installed (for solver-specific tests)
+        # A) Solver-specific test
         if required_solver_marker:
-            required_solvers = required_solver_marker.args
-
-            # --------------------------------- Filtering -------------------------------- #
             
-            # when solvers are specified on the command line, 
+            """
+            Solver parametrisation
+                i.e. get the solver with which the test was parametrised
+            """
+            
+            parametrised_solver = None # will hold solver with which the test was parametrised
+            
+            # A) Test item is a method 
+            #    try to get solver from item.callspec
+            if hasattr(item, "callspec") and item.callspec is not None:
+                if hasattr(item.callspec, "params") and "solver" in item.callspec.params:
+                    parametrised_solver = item.callspec.params["solver"]
+            
+            # B) Test item is a unittest test class
+            #    try to get solver from parent's callspec
+            if parametrised_solver is None and hasattr(item, "parent") and item.parent is not None:
+                if hasattr(item.parent, "callspec") and item.parent.callspec is not None:
+                    if hasattr(item.parent.callspec, "params") and "solver" in item.parent.callspec.params:
+                        parametrised_solver = item.parent.callspec.params["solver"]
+            
+            """
+            Solver filtering
+                i.e. skip test if the required solver is not installed (for solver-specific tests)
+            """
+            
+            # When solvers are specified on the command line, 
             # only run solver-specific tests that require any of those solvers
             if cmd_solvers is not None:
-                # If cmd_solvers is empty (all filtered out), skip solver-specific tests
+                # A) If cmd_solvers is empty (all filtered out), skip solver-specific tests
                 if len(cmd_solvers) == 0:
                     skipped_solver_specific += 1
                     continue
-                # If required solver is in the list of specified solvers on the command line, run the test
-                if any(cmd_solver in required_solvers for cmd_solver in cmd_solvers):
+                # B) If required solver is in the list of specified solvers on the command line, run the test
+                if parametrised_solver in cmd_solvers:
+                    # include test
                     filtered.append(item)
-                # If required solver is not in the list of specified solvers on the command line, filter the test to be skipped
+                # C) If required solver is not in the list of specified solvers on the command line, filter the test to be skipped
                 else:
                     skipped_solver_specific += 1
                     continue
-            # instance has survived filtering
+
+            # No solvers specified on the command line, include all solver-specific tests
             else:
                 filtered.append(item)
 
-            # --------------------------------- Skipping --------------------------------- #
+            """
+            Solver skipping
+                i.e. for the solvers that survived filtering, skip test if the required solver is not installed
+            """
 
             # skip test if the required solver is not installed
-            if not {k:v for k,v in cp.SolverLookup.base_solvers()}[required_solvers[0]].supported():
-                skip = pytest.mark.skip(reason=f"Solver {required_solvers[0]} not installed")
+            if not cp.SolverLookup.lookup(parametrised_solver).supported():
+                skip = pytest.mark.skip(reason=f"Solver {parametrised_solver} not installed")
                 item.add_marker(skip)
-            
-            continue # skip rest of the logic for this test
-            
-        # ------------------------------ More filtering ------------------------------ #
+                skipped_solver_specific += 1
+                continue
 
-        # Check if test uses solver fixture (for non-parametrized tests)
-        uses_solver_fixture = hasattr(item, "_fixtureinfo") and "solver" in getattr(item._fixtureinfo, "names_closure", [])
-        
-        # Only filter tests that are parameterized with a 'solver' (through `_generate_inputs`)
-        #   i.e. filter externally parametrized tests
-        if hasattr(item, "callspec"):
-            if cmd_solvers is not None:
-                # If cmd_solvers is empty (all filtered out), skip solver-dependent tests
-                if len(cmd_solvers) == 0:
-                    # Skip tests parametrized with solver, but keep others that don't depend on solver
-                    if "solver" not in item.callspec.params and "solver_name" not in item.callspec.params:
-                        filtered.append(item)
-                    else:
-                        skipped_parametrized += 1
-                    continue
-                # If test is parametrized with solver, filter it if it is not in the list of specified solvers on the command line
-                if "solver" in item.callspec.params:
-                    solver = item.callspec.params["solver"]
-                    if solver in cmd_solvers:
-                        filtered.append(item)
-                    else:
-                        skipped_parametrized += 1
-                # If test is parametrized with solver_name, filter it if it is not in the list of specified solvers on the command line
-                elif "solver_name" in item.callspec.params:
-                    solver = item.callspec.params["solver_name"]
-                    if solver in cmd_solvers:
-                        filtered.append(item)
-                    else:
-                        skipped_parametrized += 1
-                # If test is not parametrized with solver or solver_name, keep it
-                else:
-                    # Parametrized but not with solver - keep it
-                    filtered.append(item)
-            else:
-                filtered.append(item)
-        # Non-parametrized tests:
+        # B) Non-solver-specific test
         else:
+            
+            # Check if test uses solver fixture (for non-parametrized tests)
+            uses_solver_fixture = hasattr(item, "_fixtureinfo") and "solver" in getattr(item._fixtureinfo, "names_closure", [])
+                      
             # Filter out test if it uses solver fixture and cmd_solvers is empty
             if cmd_solvers is not None and len(cmd_solvers) == 0:
                 if uses_solver_fixture:
                     skipped_solver_fixture += 1
-                    continue  # Skip tests that use solver fixture when no solvers available
+                    # Skip tests that use solver fixture when no solvers available
             # keep non-parametrized tests that don't depend on solver
-            filtered.append(item)
+            else:
+                filtered.append(item)
 
-    # Uncomment for debugging
-    # final_count = len(filtered)
-    # logger.info(f"Test suite filtering summary:")
-    # logger.info(f"  Initial tests: {initial_count}")
-    # if skipped_dependency > 0:
-    #     logger.info(f"  Skipped (missing dependency): {skipped_dependency}")
-    # if skipped_solver_specific > 0:
-    #     logger.info(f"  Skipped (solver-specific, not matching): {skipped_solver_specific}")
-    # if skipped_parametrized > 0:
-    #     logger.info(f"  Skipped (parametrized solver, not matching): {skipped_parametrized}")
-    # if skipped_solver_fixture > 0:
-    #     logger.info(f"  Skipped (solver fixture, no solvers): {skipped_solver_fixture}")
-    # logger.info(f"  Final tests: {final_count} ({final_count - initial_count:+d})")
+        # Uncomment for debugging
+        # final_count = len(filtered)
+        # logger.info(f"Test suite filtering summary:")
+        # logger.info(f"  Initial tests: {initial_count}")
+        # if skipped_dependency > 0:
+        #     logger.info(f"  Skipped (missing dependency): {skipped_dependency}")
+        # if skipped_solver_specific > 0:
+        #     logger.info(f"  Skipped (solver-specific, not matching): {skipped_solver_specific}")
+        # if skipped_parametrized > 0:
+        #     logger.info(f"  Skipped (parametrized solver, not matching): {skipped_parametrized}")
+        # if skipped_solver_fixture > 0:
+        #     logger.info(f"  Skipped (solver fixture, no solvers): {skipped_solver_fixture}")
+        # logger.info(f"  Final tests: {final_count} ({final_count - initial_count:+d})")
     
     items[:] = filtered # replace the original list with the filtered list
