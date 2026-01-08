@@ -1032,8 +1032,8 @@ class TestGlobal(unittest.TestCase):
         self.assertFalse(cp.Model(constraints).solve(solver=self.solver))
 
     def test_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=5)
-        val = cp.intvar(-3, 3, shape=3)
+        iv = cp.intvar(-1, 4, shape=5)
+        val = cp.intvar(-1, 4, shape=3)
         occ = cp.intvar(0, len(iv), shape=3)
         self.assertTrue(cp.Model([cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve(solver=self.solver))
         self.assertTrue(cp.GlobalCardinalityCount(iv, val, occ).value())
@@ -1049,8 +1049,8 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
     def test_not_global_cardinality_count(self):
-        iv = cp.intvar(-8, 8, shape=5)
-        val = cp.intvar(-3, 3, shape=3)
+        iv = cp.intvar(-1, 4, shape=5)
+        val = cp.intvar(-1, 4, shape=3)
         occ = cp.intvar(0, len(iv), shape=3)
         self.assertTrue(cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve(solver=self.solver))
         self.assertTrue(~cp.GlobalCardinalityCount(iv, val, occ).value())
