@@ -1253,88 +1253,134 @@ class GlobalCardinalityCount(GlobalConstraint):
 
 class Increasing(GlobalConstraint):
     """
-        The "Increasing" constraint, the expressions will have increasing (not strictly) values
+    Enforces that the expressions are assigned to (non-strictly) increasing values.
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args: Expression):
+        """
+        Arguments:
+            args (list[Expression]): List of expressions to be assigned to increasing values
+        """
         super().__init__("increasing", flatlist(args))
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Returns two lists of constraints:
-            1) the decomposition of the Increasing constraint
-            2) empty list of defining constraints
+        Decomposition of the Increasing constraint.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
         return [args[i] <= args[i+1] for i in range(len(args)-1)], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         args = argvals(self.args)
+        if any(x is None for x in args):
+            return None
         return all(args[i] <= args[i+1] for i in range(len(args)-1))
 
 
 class Decreasing(GlobalConstraint):
     """
-        The "Decreasing" constraint, the expressions will have decreasing (not strictly) values
+    Enforces that the expressions are assigned to (non-strictly) decreasing values.
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args: Expression):
+        """
+        Arguments:
+            args (list[Expression]): List of expressions to be assigned to decreasing values
+        """
         super().__init__("decreasing", flatlist(args))
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Returns two lists of constraints:
-            1) the decomposition of the Decreasing constraint
-            2) empty list of defining constraints
+        Decomposition of the Decreasing constraint.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
         return [args[i] >= args[i+1] for i in range(len(args)-1)], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         args = argvals(self.args)
+        if any(x is None for x in args):
+            return None
         return all(args[i] >= args[i+1] for i in range(len(args)-1))
 
 
 class IncreasingStrict(GlobalConstraint):
     """
-        The "IncreasingStrict" constraint, the expressions will have increasing (strictly) values
+    Enforces that the expressions are assigned to strictly increasing values.
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args: Expression):
+        """
+        Arguments:
+            args (list[Expression]): List of expressions to be assigned to strictly increasing values
+        """
         super().__init__("strictly_increasing", flatlist(args))
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Returns two lists of constraints:
-            1) the decomposition of the IncreasingStrict constraint
-            2) empty list of defining constraints
+        Decomposition of the IncreasingStrict constraint.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
         return [args[i] < args[i+1] for i in range(len(args)-1)], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        args = argvals(self.args)
+        if any(x is None for x in args):
+            return None
         args = argvals(self.args)
         return all(args[i] < args[i+1] for i in range(len(args)-1))
 
 
 class DecreasingStrict(GlobalConstraint):
     """
-        The "DecreasingStrict" constraint, the expressions will have decreasing (strictly) values
+    Enforces that the expressions are assigned to strictly decreasing values.
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args: Expression):
+        """
+        Arguments:
+            args (list[Expression]): List of expressions to be assigned to strictly decreasing values
+        """
         super().__init__("strictly_decreasing", flatlist(args))
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Returns two lists of constraints:
-            1) the decomposition of the DecreasingStrict constraint
-            2) empty list of defining constraints
+        Decomposition of the DecreasingStrict constraint.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
         return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        args = argvals(self.args)
+        if any(x is None for x in args):
+            return None
         args = argvals(self.args)
         return all(args[i] > args[i+1] for i in range(len(args)-1))
 
