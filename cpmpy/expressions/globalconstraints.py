@@ -1132,8 +1132,69 @@ class NoOverlap(GlobalConstraint):
             return f"NoOverlap({start}, {dur})"
         else:
             return f"NoOverlap({start}, {dur}, {end})"
-    
 
+class Precedence(GlobalConstraint):
+    """
+    Enforces a precedence relationship between a set of variables.
+    Given an array of variables X and a list of values P, values in P must appear in X in the order specified by P.
+    I.e., if X[i] = P[j+1], then there exists a X[i'] = P[j] with i' < i
+
+    Examples:
+        - X = [1,2,1,3] satisfies the precedence [1,2,3].
+        - X = [4,1,2,1,3] also satisfies the precedence, as values not appearing in P can appear in any order.
+        - X = [2,1,3] does not satisfy the precedence, as 1 does not appear before 2.
+    """
+    def __init__(self, vars: list[Expression], precedence: list[int]):
+        """
+        Arguments:
+            vars (list[Expression]): List of Expression objects representing the variables
+            precedence (list[int]): List of integers representing the precedence
+        """
+        if not is_any_list(vars):
+            raise TypeError("Precedence expects a list of variables, but got", vars)
+        if not is_any_list(precedence) or not all(is_num(p) for p in precedence):
+            raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
+        super().__init__("precedence", [cpm_array(vars), precedence])
+
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition based on:
+        Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
+        Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+
+        args, precedence = self.args
+        constraints = []
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            # constraint 1 from paper
+            constraints.append(args[0] != t) 
+            # constraint 2 from paper
+            for j in range(1,len(args)):
+                lhs = args[j] == t
+                if is_bool(lhs):  # args[j] and t could both be constants
+                    lhs = BoolVal(lhs)
+                constraints += [lhs.implies(cp.any(args[:j] == s))]
+        return constraints, []
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        args, precedence = self.args
+        vals = argvals(args)
+        if any(v is None for v in vals):
+            return None
+        vals = np.array(vals)
+        for s,t in zip(precedence[:-1], precedence[1:]):
+            if vals[0] == t: return False
+            for j in range(len(args)):
+                if vals[j] == t and sum(vals[:j] == s) == 0:
+                    return False
+        return True
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
