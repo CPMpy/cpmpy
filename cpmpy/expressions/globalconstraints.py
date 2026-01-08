@@ -834,21 +834,32 @@ class InDomain(GlobalConstraint):
 
 class Xor(GlobalConstraint):
     """
-        The :class:`Xor` exclusive-or constraint
+    Enforces the exclusive-or relation of the arguments.
+    Supports n-ary xor-constraints, which are treated as cascaed binary xor-constraints.
+    Equivalent to `sum(args) % 2 == 1`
     """
 
-    def __init__(self, arg_list):
-        flatargs = flatlist(arg_list)
-        if not (all(is_boolexpr(arg) for arg in flatargs)):
-            raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(flatargs))
+    def __init__(self, arg_list: list[Expression]):
+        """
+        Arguments:
+            arg_list (list[Expression]): List of Boolean expressions to be xor'ed
+        """
+        if not all(is_boolexpr(arg) for arg in arg_list):
+            raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
         # convention for commutative binary operators:
         # swap if right is constant and left is not
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-            flatargs = arg_list
-        super().__init__("xor", flatargs)
+        super().__init__("xor", arg_list)
 
     def decompose(self):
+        """
+        Decomposition of the Xor global constraint.
+        Recursively decomposes the constraint into a chain of binary xor-constraints, represented using a sum.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
         # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
         decomp = [sum(self.args[:2]) == 1]
         if len(self.args) > 2:
