@@ -1,11 +1,13 @@
 import time
 from unittest import TestCase
 
+import pytest
+
 import cpmpy as cp
 from cpmpy.tools import ParameterTuner, GridSearchTuner
 
 
-
+@pytest.mark.requires_solver("ortools")
 class TunerTests(TestCase):
 
     def test_ortools(self):
