@@ -1386,17 +1386,20 @@ class DecreasingStrict(GlobalConstraint):
 
 
 class LexLess(GlobalConstraint):
-    """ Given lists X,Y, enforcing that X is lexicographically less than Y.
+    """ 
+    Enforces that the first list is lexicographically smaller than the second list.
     """
-    def __init__(self, list1, list2):
-        X = flatlist(list1)
-        Y = flatlist(list2)
-        if len(X) != len(Y):
-            raise CPMpyException(f"The 2 lists given in LexLess must have the same size: X length is {len(X)} "
-                                 f"and Y length is {len(Y)}")
+    def __init__(self, list1: list[Expression], list2: list[Expression]):
+        """
+        Arguments:
+            list1 (list[Expression]): First list of expressions to be compared lexicographically
+            list2 (list[Expression]): Second list of expressions to be compared lexicographically
+        """ 
+        if len(list1) != len(list2):
+            raise ValueError(f"The 2 lists given in LexLess must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
         super().__init__("lex_less", [X, Y])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
 
@@ -1412,6 +1415,9 @@ class LexLess(GlobalConstraint):
         maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
         every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
         subsequent positions.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         X, Y = cpm_array(self.args)
 
@@ -1429,23 +1435,32 @@ class LexLess(GlobalConstraint):
 
         return constraining, defining
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         X, Y = argvals(self.args)
+        if any(val is None for val in X + Y):
+            return None
         return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X)))
 
 
 class LexLessEq(GlobalConstraint):
-    """ Given lists X,Y, enforcing that X is lexicographically less than Y (or equal).
     """
-    def __init__(self, list1, list2):
-        X = flatlist(list1)
-        Y = flatlist(list2)
-        if len(X) != len(Y):
-            raise CPMpyException(f"The 2 lists given in LexLessEq must have the same size: X length is "
-                                 f"{len(X)} and Y length is {len(Y)}")
-        super().__init__("lex_lesseq", [X, Y])
+    Enforces that the first list is lexicographically smaller than or equal to the second list.
+    """
+    def __init__(self, list1: list[Expression], list2: list[Expression]):
+        """
+        Arguments:
+            list1 (list[Expression]): First list of expressions to be compared lexicographically
+            list2 (list[Expression]): Second list of expressions to be compared lexicographically
+        """
+        if len(list1) != len(list2):
+            raise ValueError(f"The 2 lists given in LexLessEq must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
+        super().__init__("lex_lesseq", [list1, list2])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
 
@@ -1461,6 +1476,9 @@ class LexLessEq(GlobalConstraint):
         maintaining arc-consistency. Each bvar[i] enforces the lexicographic ordering at each position, ensuring that
         every value in the domain of X[i] can be extended to a consistent value in the domain of $Y_i$ for all
         subsequent positions.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         X, Y = cpm_array(self.args)
 
@@ -1474,49 +1492,81 @@ class LexLessEq(GlobalConstraint):
 
         return constraining, defining
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         X, Y = argvals(self.args)
+        if any(val is None for val in X + Y):
+            return None
         return any((X[i] < Y[i]) & all(X[j] <= Y[j] for j in range(i)) for i in range(len(X))) | all(X[i] == Y[i] for i in range(len(X)))
 
 
 class LexChainLess(GlobalConstraint):
-    """ Given a matrix X, :class:`LexChainLess` enforces that all rows are lexicographically ordered.
     """
-    def __init__(self, X):
-        # Ensure the numpy array is 2D
-        X = cpm_array(X)
-        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+    Enforces that all rows of the matrix are lexicographically ordered.
+    """
+    def __init__(self, X: list[list[Expression]]):
+        """
+        Arguments:
+            X (list[list[Expression]]): Matrix of expressions to be compared lexicographically
+        """
+        X = np.array(X) # also checks length of each row is equal
+        if X.ndim != 2:
+            raise ValueError(f"The matrix given in LexChainLess must be 2D, but got {X.ndim} dimensions")
         super().__init__("lex_chain_less", X.tolist())
 
-    def decompose(self):
-        """ Decompose to a series of LexLess constraints between subsequent rows
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the LexChainLess constraint.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         X = self.args
         return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         X = argvals(self.args)
-        return all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
+        if any(val is None for val in flatlist(X)):
+            return None
+        return cp.all(LexLess(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class LexChainLessEq(GlobalConstraint):
-    """ Given a matrix X, LexChainLessEq enforces that all rows are lexicographically ordered.
+    """ 
+    Enforces that all rows of the matrix are lexicographically ordered (less or equal)
     """
-    def __init__(self, X):
-        # Ensure the numpy array is 2D
-        X = cpm_array(X)
-        assert X.ndim == 2, "Input must be a 2D array or a list of lists"
+    def __init__(self, X: list[list[Expression]]):
+        """
+        Arguments:
+            X (list[list[Expression]]): Matrix of expressions to be compared lexicographically
+        """
+        X = np.array(X) # also checks length of each row is equal
+        if X.ndim != 2:
+            raise ValueError(f"The matrix given in LexChainLessEq must be 2D, but got {X.ndim} dimensions")
         super().__init__("lex_chain_lesseq", X.tolist())
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """ Decompose to a series of LexLessEq constraints between subsequent rows
         """
         X = self.args
         return [LexLessEq(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
         X = argvals(self.args)
-        return all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
+        if any(val is None for val in flatlist(X)):
+            return None
+        return cp.all(LexLessEq(prev_row, curr_row).value() for prev_row, curr_row in zip(X, X[1:]))
 
 
 class DirectConstraint(Expression):
