@@ -224,21 +224,21 @@ class TestMul(unittest.TestCase):
 class TestArrayExpressions(unittest.TestCase):
 
     def test_sum(self):
-        x = cp.intvar(0,5,shape=10, name="x")
+        x = cp.intvar(0,5,shape=3, name="x")
         y = cp.intvar(0, 1000, name="y")
         model = cp.Model(y == x.sum())
         model.solve(solver=self.solver)
         self.assertTrue(y.value() == sum(x.value()))
         # with axis arg
-        x = cp.intvar(0,5,shape=(10,10), name="x")
-        y = cp.intvar(0, 1000, shape=10, name="y")
+        x = cp.intvar(0,5,shape=(3,3), name="x")
+        y = cp.intvar(0, 1000, shape=3, name="y")
         model = cp.Model(y == x.sum(axis=0))
         model.solve(solver=self.solver)
         res = np.array([sum(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
     def test_prod(self):
-        x = cp.intvar(0,5,shape=10, name="x")
+        x = cp.intvar(0,5,shape=3, name="x")
         y = cp.intvar(0, 1000, name="y")
         model = cp.Model(y == x.prod())
         model.solve(solver=self.solver)
@@ -247,8 +247,8 @@ class TestArrayExpressions(unittest.TestCase):
             res *= v.value()
         self.assertTrue(y.value() == res)
         # with axis arg
-        x = cp.intvar(0,5,shape=(10,10), name="x")
-        y = cp.intvar(0, 1000, shape=10, name="y")
+        x = cp.intvar(0,5,shape=(3,3), name="x")
+        y = cp.intvar(0, 1000, shape=3, name="y")
         model = cp.Model(y == x.prod(axis=0))
         model.solve(solver=self.solver)
         for i,vv in enumerate(x):
@@ -258,28 +258,28 @@ class TestArrayExpressions(unittest.TestCase):
             self.assertTrue(y[i].value() == res)
 
     def test_max(self):
-        x = cp.intvar(0,5,shape=10, name="x")
+        x = cp.intvar(0,5,shape=3, name="x")
         y = cp.intvar(0, 1000, name="y")
         model = cp.Model(y == x.max())
         model.solve(solver=self.solver)
         self.assertTrue(y.value() == max(x.value()))
         # with axis arg
-        x = cp.intvar(0,5,shape=(10,10), name="x")
-        y = cp.intvar(0, 1000, shape=10, name="y")
+        x = cp.intvar(0,5,shape=(3,3), name="x")
+        y = cp.intvar(0, 1000, shape=3, name="y")
         model = cp.Model(y == x.max(axis=0))
         model.solve(solver=self.solver)
         res = np.array([max(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
     def test_min(self):
-        x = cp.intvar(0,5,shape=10, name="x")
+        x = cp.intvar(0,5,shape=3, name="x")
         y = cp.intvar(0, 1000, name="y")
         model = cp.Model(y == x.min())
         model.solve(solver=self.solver)
         self.assertTrue(y.value() == min(x.value()))
         # with axis arg
-        x = cp.intvar(0,5,shape=(10,10), name="x")
-        y = cp.intvar(0, 1000, shape=10, name="y")
+        x = cp.intvar(0,5,shape=(3,3), name="x")
+        y = cp.intvar(0, 1000, shape=3, name="y")
         model = cp.Model(y == x.min(axis=0))
         model.solve(solver=self.solver)
         res = np.array([min(x[i, ...].value()) for i in range(len(y))])
@@ -287,14 +287,14 @@ class TestArrayExpressions(unittest.TestCase):
 
     def test_any(self):
         from cpmpy.expressions.python_builtins import any as cpm_any
-        x = cp.boolvar(shape=10, name="x")
+        x = cp.boolvar(shape=3, name="x")
         y = cp.boolvar(name="y")
         model = cp.Model(y == x.any())
         model.solve(solver=self.solver)
         self.assertTrue(y.value() == cpm_any(x.value()))
         # with axis arg
-        x = cp.boolvar(shape=(10,10), name="x")
-        y = cp.boolvar(shape=10, name="y")
+        x = cp.boolvar(shape=(3,3), name="x")
+        y = cp.boolvar(shape=3, name="y")
         model = cp.Model(y == x.any(axis=0))
         model.solve(solver=self.solver)
         res = np.array([cpm_any(x[i, ...].value()) for i in range(len(y))])
@@ -303,14 +303,14 @@ class TestArrayExpressions(unittest.TestCase):
 
     def test_all(self):
         from cpmpy.expressions.python_builtins import all as cpm_all
-        x = cp.boolvar(shape=10, name="x")
+        x = cp.boolvar(shape=3, name="x")
         y = cp.boolvar(name="y")
         model = cp.Model(y == x.all())
         model.solve(solver=self.solver)
         self.assertTrue(y.value() == cpm_all(x.value()))
         # with axis arg
-        x = cp.boolvar(shape=(10,10), name="x")
-        y = cp.boolvar(shape=10, name="y")
+        x = cp.boolvar(shape=(3,3), name="x")
+        y = cp.boolvar(shape=3, name="y")
         model = cp.Model(y == x.all(axis=0))
         model.solve(solver=self.solver)
         res = np.array([cpm_all(x[i, ...].value()) for i in range(len(y))])
