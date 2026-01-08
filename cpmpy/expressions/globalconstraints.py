@@ -1198,28 +1198,58 @@ class Precedence(GlobalConstraint):
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
-    The number of occurrences of each value `vals[i]` in the list of variables `vars`
-    must be equal to `occ[i]`.
+    Enforces that the number of occurrences of each value `vals[i]` in the list of variables `vars` is equal to `occ[i]`.
     """
 
-    def __init__(self, vars, vals, occ, closed=False):
-        flatargs = flatlist([vars, vals, occ])
-        if any(is_boolexpr(arg) for arg in flatargs):
-            raise TypeError("Only numerical arguments allowed for gcc global constraint: {}".format(flatargs))
-        super().__init__("gcc", [vars,vals,occ])
+    def __init__(self, vars: list[Expression], vals: list[int], occ: list[Expression], closed: bool = False):
+        """
+        Arguments:
+            vars (list[Expression]): List of Expression objects representing the variables
+            vals (list[int]): List of integers representing the values
+            occ (list[Expression]): List of Expression objects representing the number of occurrences of each value
+            closed (bool): Whether the constraint is closed, if true, `vars` can only take values in `vals`
+        """
+        if not is_any_list(vars):
+            raise TypeError("GlobalCardinalityCount expects a list of variables, but got", vars)
+        if not is_any_list(vals) or not all(is_num(v) for v in vals):
+            raise TypeError("GlobalCardinalityCount expects a list of values, but got", vals)
+        if not is_any_list(occ):
+            raise TypeError("GlobalCardinalityCount expects a list of variables as occurrences, but got", occ)
+        if len(vars) != len(occ):
+            raise ValueError(f"Number of variables and occurrences must be equal, but got {len(vars)} and {len(occ)}")
+        super().__init__("gcc", [vars, vals, occ])
         self.closed = closed
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the GlobalCardinalityCount constraint.
+        Uses a conjunction of Count global function constraints.
+        """
         vars, vals, occ = self.args
-        constraints = [Count(vars, i) == v for i, v in zip(vals, occ)]
+        constraints = [cp.Count(vars, i) == v for i, v in zip(vals, occ)]
         if self.closed:
             constraints += [InDomain(v, vals) for v in vars]
         return constraints, []
 
-    def value(self):
-        decomposed, _ = self.decompose()
-        return cp.all(decomposed).value()
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        vars, vals, occ = self.args
+        vars, occ = argvals([vars, occ])
+        if any(x is None for x in vars + occ):
+            return None
 
+        vals = np.array(vals)
+        for val, cnt in zip(vals, occ):
+            if sum(vars == val) != cnt:
+                return False
+        
+        if self.closed and any(v not in frozenset(vals) for v in vars):
+            return False
+
+        return True
 
 class Increasing(GlobalConstraint):
     """
