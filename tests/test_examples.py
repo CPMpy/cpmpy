@@ -46,7 +46,8 @@ SOLVERS = [
 
 
 # run the test for each combination of solver and example
-@pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
+@pytest.mark.usefixtures("solver")
+@pytest.mark.parametrize("example", EXAMPLES)
 @pytest.mark.timeout(60)  # 60-second timeout for each test
 def test_example(solver, example):
     """Loads the example file and executes its __main__ block with the given solver being set as default.

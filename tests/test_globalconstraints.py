@@ -928,8 +928,7 @@ class TestGlobal(unittest.TestCase):
         # also test decomposition
         self.assertFalse(cp.Model(cons.decompose()).solve(solver=self.solver)) # capacity was not taken into account and this failed
 
-    @pytest.mark.skipif(not CPM_minizinc.supported(),
-                        reason="Minizinc not installed")
+    @pytest.mark.requires_solver("minizinc")
     def test_cumulative_nested(self):
         start = cp.intvar(0, 10, name="start", shape=3)
         dur = [5,5,5]
@@ -945,8 +944,7 @@ class TestGlobal(unittest.TestCase):
         self.assertTrue(m.solve(solver="ortools"))
         self.assertTrue(m.solve(solver="minizinc"))
 
-    @pytest.mark.skipif(not CPM_minizinc.supported(),
-                        reason="Minizinc not installed")
+    @pytest.mark.requires_solver("minizinc")
     def test_negative_table_minizinc(self):
         """Test negative_table constraint with minizinc solver"""
         iv = cp.intvar(-8, 8, 3)
@@ -970,8 +968,6 @@ class TestGlobal(unittest.TestCase):
                        cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
         model = cp.Model(constraints)
         self.assertFalse(model.solve(solver="minizinc"))
-
-
 
     def test_cumulative_no_np(self):
         start = cp.intvar(0, 10, 4, "start")
@@ -1666,10 +1662,7 @@ class TestTypeChecks(unittest.TestCase):
         self.assertTrue(cp.Model(cp.AllDifferentExceptN([x,3,y,0], [3,0]).decompose()).solve(solver=self.solver))
 
 
-
-
-solvers = [name for name, cls in cp.SolverLookup.base_solvers() if cls.supported()]
-@pytest.mark.parametrize("solver", solvers)
+@pytest.mark.usefixtures("solver")
 def test_issue801_expr_in_cumulative(solver):
 
     if solver in ("pysat", "pysdd", "pindakaas"):

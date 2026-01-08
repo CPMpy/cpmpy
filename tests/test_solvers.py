@@ -787,8 +787,7 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(m.solve(solver="minizinc"))
 
 
-solvers = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-@pytest.mark.parametrize("solver", solvers)
+@pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
     def test_installed_solvers(self, solver):
         # basic model

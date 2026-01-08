@@ -1,5 +1,6 @@
 import pytest
 
+from utils import skip_on_missing_pblib
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.core import Comparison, Operator, BoolVal
@@ -20,14 +21,6 @@ p = boolvar(name="p")
 q = boolvar(name="q")
 
 c = intvar(2, 2, name="c")
-
-SOLVERS = [
-    "pindakaas",
-    "pysat",
-]
-SOLVERS = [
-    (name, solver) for name, solver in SolverLookup.base_solvers() if name in SOLVERS and solver.supported()
-]
 
 CONSTRAINTS = [
     # BoolVal(True),  # TODO or tools problem
@@ -99,9 +92,11 @@ class TestTransInt2Bool:
         else:
             return f"{val}"
 
+    @pytest.mark.requires_solver("pindakaas", "pysat")
+    @skip_on_missing_pblib(skip_on_exception_only=True)
     @pytest.mark.parametrize(
-        ("solver", "constraint", "encoding"),
-        itertools.product(SOLVERS, CONSTRAINTS, ENCODINGS),
+        ("constraint", "encoding"),
+        itertools.product(CONSTRAINTS, ENCODINGS),
         ids=idfn,
     )
     def test_transforms(self, solver, constraint, encoding, setup):
@@ -118,8 +113,7 @@ class TestTransInt2Bool:
             display=lambda: cons_sols.append(tuple(argvals(user_vars))),
         )
         cons_sols = sorted(cons_sols)
-        name, solver_class = solver
-        solver = solver_class()
+        solver = SolverLookup().get(solver)
         solver.encoding = encoding
         for c in flat:
             solver.add(c)
