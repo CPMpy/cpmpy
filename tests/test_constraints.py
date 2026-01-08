@@ -58,12 +58,6 @@ NUM_VAR = cp.intvar(0, 10, name="l")                   # A numerical variable
 BOOL_ARGS = [cp.boolvar(name=n) for n in "abc"]        # Boolean variables
 BOOL_VAR = cp.boolvar(name="p")                        # A boolean variable
 
-def _generate_inputs(generator):
-    exprs = []
-    for solver in SOLVERNAMES:
-        exprs += [(solver, expr) for expr in generator(solver)]
-    return exprs
-
 
 def numexprs(solver):
     """
