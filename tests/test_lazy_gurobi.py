@@ -233,4 +233,4 @@ class TestTables:
         X = (x, y, z)
         T = np.array([(2, 1, 1), (3, 2, 2), (4, 3, 3), (1, 2, 3), (2, 1, 2)])
         model = cp.Model(cp.Table(X, T), cp.AllDifferent(X))
-        check_model(model)
+        check_model(model, env=env)
