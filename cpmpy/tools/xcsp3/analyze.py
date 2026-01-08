@@ -48,6 +48,8 @@ def _extract_cost(solution_str):
 OPT = 'OPTIMUM FOUND'
 UNS = 'UNSATISFIABLE'
 SAT = 'SATISFIABLE'
+MEM = 'MEMORY'
+ERR = 'ERROR'
 
 def xcsp3_plot(df, time_limit=None, metric="time_solve", filter="solved"):
     # Get unique solvers
@@ -195,7 +197,8 @@ def xcsp3_stats(df):
     df["area"] = df["file_name"].map(get_metadata)
     pd.set_option('display.float_format', '{:0.1f}'.format)
 
-
+    df["error"] = df["status"] == ERR
+    df["memory"] = df["status"] == MEM
     df["feasible"] = df["status"].isin((OPT, SAT, UNS))
     df["solved"] = df["status"].isin((OPT, UNS))
     df["posted"] = ~df["time_post"].isna()
@@ -214,10 +217,12 @@ def xcsp3_stats(df):
     for grouping in (['problem', 'solver'], ['solver']):
         groups = df.groupby(grouping).agg(
                 area = ('area', 'mean'),
+                t_totl_hr = ('time_total', 'sum'),
                 t_post_p2 = ('time_post_p2', 'sum'),
                 t_solv_p2 = ('time_solve_p2', 'sum'),
-                # t_totl_p2 = ('time_total', 'sum'),
                 insts = ('status', 'count'),
+                error = ('error', 'sum'),
+                memory = ('memory', 'sum'),
                 posted = ('posted', 'sum'),
                 feasib = ('feasible', 'sum'),
                 solved = ('solved', 'sum'),
@@ -227,6 +232,7 @@ def xcsp3_stats(df):
         # groups = groups.sort_index(level=["problem"], by="area")
         # groups = groups.sort_values(by="area", ascending=False)
         groups["area"] = groups["area"].map(lambda x: f"{x:.1e}")
+        groups["t_totl_hr"] = groups["t_totl_hr"].map(lambda x: x / 3600)
         # groups.loc[('Total')] = groups.sum(numeric_only=True)
 
         print(groups)

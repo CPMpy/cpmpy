@@ -750,7 +750,7 @@ def xcsp3_cpmpy(
             time_check = time.time()
             for c in model.constraints:
                 assert c.value(), f"Constraint {c} failed for assignment {show_assignment(get_variables(c))}"
-                if check_time_limit - (time.time() - time_check) < 0.1:
+                if check_time_limit - (time.time() - time_check) < 1:
                     raise TimeoutError(f"Checking did not finish in time limit {check_time_limit}")
             print_comment(f"Checking passed in {time.time() - time_check:.4f}")
         
@@ -759,7 +759,7 @@ def xcsp3_cpmpy(
         print_status(ExitStatus.memory)
         raise e
     except ParseError as e:
-        if "out of memory" in e.msg:
+        if "Out of memory" in e.msg:
             print_comment(f"MemoryError raised by parser. Reached limit of {mem_limit} MiB")
             print_status(ExitStatus.memory)
         else:
