@@ -32,17 +32,17 @@ Supported solvers
      - The default solver
    * - :doc:`Pumpkin <api/solvers/pumpkin>`
      - CP (LCG)
-     - SAT ASAT ALLSAT - OPT - PROOF
+     - SAT ASAT ISAT ALLSAT - OPT - PROOF
      - local install (maturin)
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
-     - SAT ALLSAT - OPT - PROOF
+     - SAT ISAT ALLSAT - OPT IOPT - PROOF
      - pip
      -
    * - :doc:`Choco <api/solvers/choco>`
      - CP
-     - SAT ALLSAT - OPT
+     - SAT ISAT ALLSAT - OPT
      - pip
      - 
    * - :doc:`CP Optimizer <api/solvers/cpo>`
@@ -57,16 +57,17 @@ Supported solvers
      - Communicates through textfiles
    * - :doc:`Z3 <api/solvers/z3>`
      - SMT
-     - SAT ASAT ISAT - OPT IOPT
+     - SAT ASAT ISAT - OPT
      - pip
      - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
-     - SAT - OPT IOPT - PAR
+     - SAT ISAT - OPT IOPT - PAR
      - pip + (aca.) license
      - 
    * - :doc:`CPLEX <api/solvers/cplex>`
      - ILP
+     - SAT ISAT - OPT IOPT - PAR
      - pip + local + (aca.) license
      - No
      - 
@@ -76,17 +77,17 @@ Supported solvers
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
-     - Pseudo-Boolean
      - SAT
-     - local install (git + pip > 3.10)
-     - Encodes to SAT
+     - SAT ISAT
+     - pip
+     - Automatically encodes PB to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - SAT ASAT ISAT
      - pip
      - 
    * - :doc:`PySDD <api/solvers/pysdd>`
-     - SAT Counter
+     - Decis. Diagram
      - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
