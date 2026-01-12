@@ -6,8 +6,7 @@
 """
     Interface to Hexaly's API
 
-
-    Hexaly is a local search solver with support for  global constraints.
+    Hexaly is a global optimization solver that supports nonlinear and a few global constraints.
 
     Always use :func:`cp.SolverLookup.get("hexaly") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
@@ -21,7 +20,7 @@
 
         $ pip install hexaly -i https://pip.hexaly.com                
     
-    The Hexaly local solver requires an active licence (for example a free academic license)
+    It also requires to install the Hexaly Optimizer with a Hexaly license (for example a free academic license)
     You can read more about available licences at https://www.hexaly.com/
 
     See detailed installation instructions at:
@@ -39,13 +38,14 @@
         CPM_hexaly
 """
 
-from typing import Optional
+from typing import Optional, List
+import time
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -118,7 +118,7 @@ class CPM_hexaly(SolverInterface):
     def native_model(self):
         return self.hex_model
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
             Call the Hexaly solver
 
@@ -147,17 +147,26 @@ class CPM_hexaly(SolverInterface):
 
         # set solver parameters
         for arg, val in kwargs.items():
-            setattr(self.hex_solver, arg, val)
+            setattr(self.hex_solver.param, arg, val)
 
         if self.is_satisfaction: # set dummy objective for satisfaction problems
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
+        # register solution callback
+        if solution_callback is not None:
+            from hexaly.optimizer import HxCallbackType
+            self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        
         # new status, translate runtime
         self.hex_model.close() # model must be closed
         self.hex_solver.solve()
         self.hex_sol = self.hex_solver.get_solution()
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
+
+        # unregister solution callback
+        if solution_callback is not None:
+            self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
@@ -415,7 +424,7 @@ class CPM_hexaly(SolverInterface):
         raise NotImplementedError(f"Unexpected expression {cpm_expr}")
 
     
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -438,7 +447,7 @@ class CPM_hexaly(SolverInterface):
         return super(CPM_hexaly, self).solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
 
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         from hexaly.optimizer import HxObjectiveDirection
         if self.is_satisfaction: # set dummy objective, otherwise cannot close model
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
@@ -453,5 +462,110 @@ class CPM_hexaly(SolverInterface):
 
     def __del__(self):
         # release lock on licence file
-        self.hex_solver.delete()
+        if hasattr(self, "hex_solver"):
+            self.hex_solver.delete()
 
+
+
+class HexSolutionPrinter:
+    """
+    Native Hexaly callback for solution printing.
+
+    Use with :class:`CPM_hexaly` as follows:
+
+    .. code-block:: python
+
+        cb = HexSolutionPrinter(s, display=vars)
+        s.solve(solution_callback=cb)
+
+    For multiple variables (single or NDVarArray), use:
+    
+    .. code-block:: python
+        cb = HexSolutionPrinter(s, display=[v, x, z])
+
+    For a custom print function, use for example:
+            
+    .. code-block:: python
+
+        def myprint():
+            print(f"x0={x[0].value()}, x1={x[1].value()}")
+        
+        cb = HexSolutionPrinter(s, display=myprint)
+
+    Optionally retrieve the solution count with ``cb.solution_count()``.
+
+    Arguments:
+        verbose (bool, default = False): whether to print info on every solution found 
+        display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                    default/None: nothing displayed
+        solution_limit (default = None): stop after this many solutions 
+    """
+    def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+        self.__last_best_value = None
+        self.__solution_count = 0
+
+        self._solver = solver  # store solver reference to access _varmap
+        self._cpm_vars = []
+        self._display = display
+        self._solution_limit = solution_limit
+        self._verbose = verbose
+        if isinstance(display, (list,Expression)):
+            self._cpm_vars = get_variables(display)
+        elif callable(display):
+            # might use any, so populate all (user) variables with their values
+            self._cpm_vars = solver.user_vars
+
+    def on_solution_callback(self, optimizer, cb_type):
+        """Called on each new solution."""
+        # check if solution with different objective (or if verbose)
+        obj = optimizer.model.objectives[0]
+        if (self.__solution_count == 0) or (obj.value != self.__last_best_value) or (self._verbose):
+
+            # if "display" target has been provided
+            if len(self._cpm_vars):
+                # get current solution from optimizer
+                hex_sol = optimizer.get_solution()
+                # populate values before printing
+                for cpm_var in self._cpm_vars:
+                    # it might be an NDVarArray
+                    if hasattr(cpm_var, "flat"):
+                        for cpm_subvar in cpm_var.flat:
+                            hex_var = self._solver.solver_var(cpm_subvar)
+                            cpm_subvar._value = int(hex_sol.get_value(hex_var))
+                    elif isinstance(cpm_var, _BoolVarImpl):
+                        hex_var = self._solver.solver_var(cpm_var)
+                        cpm_var._value = bool(hex_sol.get_value(hex_var))
+                    else:
+                        hex_var = self._solver.solver_var(cpm_var)
+                        cpm_var._value = int(hex_sol.get_value(hex_var))
+                # populate objective value
+                if self._solver.has_objective():
+                    self._solver.objective_value_ = int(hex_sol.get_objective_bound(0))
+
+                # display
+                if isinstance(self._display, Expression):
+                    print(argval(self._display))
+                elif isinstance(self._display, list):
+                    # explicit list of expressions to display
+                    print(argvals(self._display))
+                else: # callable
+                    self._display()
+                
+            # update data
+            self.__solution_count += 1
+            self.__last_best_value = obj.value
+
+            # check for count limit
+            if self.solution_count() == self._solution_limit:
+                optimizer.stop()
+
+    def solution_count(self):
+        return self.__solution_count
+
+    def __call__(self, optimizer, cb_type):
+        """Make HexSolutionPrinter callable so it can be used directly as callback."""
+        return self.on_solution_callback(optimizer, cb_type)
+
+    
+
+    

@@ -1202,6 +1202,17 @@ class TestSupportedSolvers:
         assert s.solve()
         assert s.objective_value() == 5
 
+    def test_bug810(self, solver):
+        if solver == "pysdd":  # non-supported constraint
+            pytest.skip(reason=f"{solver} does not support int*boolvar")
+
+        kwargs = {}
+        if solver in ("gurobi", "cplex"):
+            kwargs["solution_limit"] = 10
+        p, q = cp.boolvar(2)
+        model = cp.Model(p.implies(3 * q == 2))
+        assert model.solve(solver)
+        assert model.solveAll(solver, **kwargs) == 2
 
 
 @pytest.mark.parametrize(("solver", "expr"), [(s, expr) for s in solvers for expr in numexprs(s)], ids=str)

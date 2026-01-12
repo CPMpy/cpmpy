@@ -19,18 +19,20 @@
         ExitStatus
 
 """
-from typing import Optional
+from typing import Optional, List, Callable, TypeAlias
 import warnings
 import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
+from ..expressions.variables import _NumVarImpl
 from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
 
+Callback: TypeAlias = Expression | List[Expression] | Callable # type alias to use in solveAll
 
 class SolverInterface(object):
     """
@@ -140,18 +142,13 @@ class SolverInterface(object):
     def status(self):
         return self.cpm_status
 
-    def solve(self, model, time_limit=None):
+    def solve(self,time_limit:Optional[float]=None):
         """
-            Build the CPMpy model into solver-supported model ready for solving
-            and returns the answer (True/False/objective.value())
+            Call the underlying solver.
 
             Overwrites self.cpm_status
 
-            :param model: CPMpy model to be parsed.
-            :type model: Model
-
             :param time_limit: optional, time limit in seconds
-            :type time_limit: int or float
 
             :return: Bool:
                 - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
@@ -239,7 +236,7 @@ class SolverInterface(object):
 
     # OPTIONAL functions
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -307,7 +304,7 @@ class SolverInterface(object):
 
         return solution_count
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         For warmstarting the solver with a variable assignment
 
