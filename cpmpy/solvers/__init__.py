@@ -36,6 +36,7 @@
         gurobi
         exact
         z3
+        cvc5
         pysat
         pysdd
         pindakaas

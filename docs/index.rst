@@ -60,6 +60,11 @@ Supported solvers
      - SAT ASAT ISAT - OPT IOPT
      - pip
      - 
+   * - :doc:`cvc5 <api/solvers/cvc5>`
+     - SMT
+     - SAT
+     - pip
+     - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
      - SAT - OPT IOPT - PAR
