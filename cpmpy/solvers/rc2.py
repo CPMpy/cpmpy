@@ -50,6 +50,8 @@
     Module details
     ==============
 """
+import os
+
 from threading import Timer
 from .solver_interface import SolverStatus, ExitStatus
 from .pysat import CPM_pysat
@@ -185,9 +187,11 @@ class CPM_rc2(CPM_pysat):
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         self.user_vars = encode_user_vars(self.user_vars, self.ivarmap)
 
-        # hack to support decision problems
         if not self.has_objective():
-            self.pysat_solver.add_clause([self.pysat_solver.nv + 1], weight=1)
+            if "PYTEST_CURRENT_TEST" in os.environ:  # support decision problems for testing purposes
+                self.pysat_solver.add_clause([self.pysat_solver.nv + 1], weight=1)
+            else:
+                raise NotSupportedError("RC2 does not support solving decision problems. Add an objective to your problem.")
 
         # determine subsolver
         default_kwargs = {"solver": "glucose3", "adapt": True, "exhaust": True, "minz": True}
