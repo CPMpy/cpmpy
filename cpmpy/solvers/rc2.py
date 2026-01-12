@@ -104,35 +104,14 @@ class CPM_rc2(CPM_pysat):
         if not self.supported():
             raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
 
-        from pysat.formula import IDPool, WCNFPlus, CNFPlus
+        from pysat.formula import IDPool, WCNF
 
         # In order for all features to work (e.g. `process` option), RC2 should be bootstrapped from a formula
-        self.pysat_solver = WCNFPlus()
+        self.pysat_solver = WCNF()
 
-        def append_formula(cnf, weight=None):
-            """Some RC2 oracles/solvers support AtMostK constraints in the form of CNFPlus objects, which can be passed through this function in addition to regular clauses."""
-            clauses = []
-            atmosts = []
-            if isinstance(cnf, list):
-                clauses = cnf
-            elif isinstance(cnf, tuple):
-                atmosts = cnf
-            else:  # CNFPlus
-                assert isinstance(cnf, CNFPlus)
-                clauses = cnf.clauses
-                atmosts = cnf.atmosts
-
-            for c in clauses:
-                self.pysat_solver.append(c, weight=weight)
-            for c in atmosts:
-                self.pysat_solver.append(c, weight=weight, is_atmost=True)
-
-        self.pysat_solver.append_formula = append_formula
         self.pysat_solver.add_clause = lambda c, weight=None: self.pysat_solver.append(c, weight=weight)
-        # Note: in case it becomes neccessary in the future to support CNFPlus objects for `add_clause`, this function should be replaced by: `lambda c, weight=None: append_formula([c], weight=weight)`
-
-        # We collect all AtMostK constraints in the WCNFPlus object, then encode them if the solver (set at `solve`) does not accept them
-        self.pysat_solver.supports_atmost = lambda: True
+        self.pysat_solver.append_formula = lambda c, weights=None: self.pysat_solver.extend(c, weights=weights)
+        self.pysat_solver.supports_atmost = lambda: False  # native atmost support disabled for RC2 to reduce complexity
 
         # objective value related
         self.objective_ = None
@@ -178,8 +157,6 @@ class CPM_rc2(CPM_pysat):
             Note that currently, no args are passed to the underlying oracle.
         """
         from pysat.examples import rc2
-        from pysat.solvers import Solver
-        from pysat.formula import WCNF
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -198,22 +175,8 @@ class CPM_rc2(CPM_pysat):
         stratified = kwargs.get("stratified", True)
         slv_kwargs = kwargs if kwargs else default_kwargs
 
-        # get subsolver kwarg or default, then check if it supports AtMostK constrains
-        sub_solver = slv_kwargs.get("solver", default_kwargs["solver"])
-
-        if sub_solver and not Solver(name=sub_solver).supports_atmost():
-            # encode AtMostK constraints since they are unsupported by sub-solver oracle
-            wcnf = WCNF()
-            wcnf.extend(self.pysat_solver.hard)
-            wcnf.extend(self.pysat_solver.soft, weights=self.pysat_solver.wght)
-            for atmost in self.pysat_solver.atms:
-                lits, k = atmost
-                wcnf.extend(self._card.CardEnc.atmost(lits=lits, bound=k, vpool=self.pysat_vpool))
-        else:
-            wcnf = self.pysat_solver
-
         # instantiate and configure RC2
-        solver = rc2.RC2Stratified(wcnf, **slv_kwargs) if stratified else rc2.RC2(self.pysat_solver, **slv_kwargs)
+        solver = rc2.RC2Stratified(self.pysat_solver, **slv_kwargs) if stratified else rc2.RC2(self.pysat_solver, **slv_kwargs)
 
         # set time limit
         if time_limit is None:
@@ -314,11 +277,11 @@ class CPM_rc2(CPM_pysat):
 
         # transform the objective to a list of (w,x) and a constant
         weights, xs, const = self.transform_objective(expr)
+
         assert len(weights) == len(xs), f"CPM_rc2 objective: expected equal nr weights and vars, got {weights, xs}"
         assert isinstance(const, int), f"CPM_rc2 objective: expected constant to be an integer, got {const}"
-        # we don't need to keep the constant, we will recompute the objective value
+        assert all(w > 0 for w in weights), f"CPM_rc2 objective: strictly positive weights only, got {weights}"
 
-        # post weighted literals
-        for wi,vi in zip(weights, xs):
-            assert wi > 0, f"CPM_rc2 objective: strictly positive weights only, got {wi,vi}"
-            self.pysat_solver.add_clause([self.solver_var(vi)], weight=wi)
+        # post each weighted literal as a soft clause
+        # we don't need to keep the constant, we will recompute the objective value
+        self.pysat_solver.append_formula([[x] for x in self.solver_vars(xs)], weights=weights)
