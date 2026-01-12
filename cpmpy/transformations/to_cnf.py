@@ -36,9 +36,9 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     # the encoded constraints (i.e. `PB`s) will be added to this `pdk.CNF` object
     slv.pdk_solver = pdk.CNF()
 
-    # however, we bypass `pindakaas` for simple clauses
+    # however, we bypass `pindakaas` for simple clauses for efficiency
     clauses = []
-    slv._add_clause = lambda cpm_expr: clauses.append(cp.any(cpm_expr))
+    slv._add_clause = lambda clause, conditions=[]: clauses.append(cp.any([~c for c in conditions] + clause))
 
     # add, transform, and encode constraints into CNF/clauses
     slv += constraints
