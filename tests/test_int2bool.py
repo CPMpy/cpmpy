@@ -54,6 +54,7 @@ CONSTRAINTS = [
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), -10),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),  # where ub(lhs)<rhs
         Comparison(cmp, Operator("wsum", [[2, 3], [x, p]]), 5),  # mix int and bool terms
+        Comparison(cmp, Operator("wsum", [[3], [q]]), 2),
         Comparison(
             cmp,
             Operator(
