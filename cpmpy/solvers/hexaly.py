@@ -39,10 +39,10 @@
         CPM_hexaly
 """
 
+from typing import Optional, List
 import time
-from typing import Optional
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -119,7 +119,7 @@ class CPM_hexaly(SolverInterface):
     def native_model(self):
         return self.hex_model
 
-    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
             Call the Hexaly solver
 
@@ -154,8 +154,9 @@ class CPM_hexaly(SolverInterface):
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # register solution callback
-        from hexaly.optimizer import HxCallbackType
-        self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        if solution_callback is not None:
+            from hexaly.optimizer import HxCallbackType
+            self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
         
         # new status, translate runtime
         self.hex_model.close() # model must be closed
@@ -165,7 +166,8 @@ class CPM_hexaly(SolverInterface):
         self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
 
         # unregister solution callback
-        self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        if solution_callback is not None:
+            self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
@@ -423,7 +425,7 @@ class CPM_hexaly(SolverInterface):
         raise NotImplementedError(f"Unexpected expression {cpm_expr}")
 
     
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -446,7 +448,7 @@ class CPM_hexaly(SolverInterface):
         return super(CPM_hexaly, self).solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
 
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         from hexaly.optimizer import HxObjectiveDirection
         if self.is_satisfaction: # set dummy objective, otherwise cannot close model
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)

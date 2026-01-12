@@ -39,7 +39,7 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, List
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
@@ -125,7 +125,21 @@ class CPM_pindakaas(SolverInterface):
     def native_model(self):
         return self.pdk_solver
 
-    def solve(self, time_limit=None, assumptions=None):
+    def _int2bool_user_vars(self):
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
+        user_vars = set()
+        for x in self.user_vars:
+            if isinstance(x, _BoolVarImpl):
+                user_vars.add(x)
+            else:
+                # extends set with encoding variables of `x`
+                user_vars.update(self.ivarmap[x.name].vars())
+        return user_vars
+
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
 
@@ -139,19 +153,7 @@ class CPM_pindakaas(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
-
-        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        user_vars = set()
-        for x in self.user_vars:
-            if isinstance(x, _BoolVarImpl):
-                user_vars.add(x)
-            else:
-                # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
-
-        self.user_vars = user_vars
+        self.user_vars = self._int2bool_user_vars()
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -272,24 +274,30 @@ class CPM_pindakaas(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
+    def _add_clause(self, clause, conditions=[]):
+        """Add a clause implied by conditions; both arguments are lists of CPMpy literals."""
+        if not isinstance(clause, list):
+            raise TypeError
+
+        self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + clause))
+
     def _post_constraint(self, cpm_expr, conditions=[]):
+        if not isinstance(conditions, list):
+            raise TypeError
+
         """Add a single, *transformed* constraint, implied by conditions."""
         import pindakaas as pdk
-
-        def add_clause(clause, conditions):
-            """Add a clause implied by conditions; both arguments are lists of CPMpy literals."""
-            self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + clause))
 
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                add_clause([], conditions)
+                self._add_clause([], conditions=conditions)
 
         elif isinstance(cpm_expr, _BoolVarImpl):  # (implied) literal
-            add_clause([cpm_expr], conditions)
+            self._add_clause([cpm_expr], conditions=conditions)
 
         elif cpm_expr.name == "or":  # (implied) clause
-            add_clause(cpm_expr.args, conditions)
+            self._add_clause(cpm_expr.args, conditions=conditions)
 
         elif cpm_expr.name == "->":  # implication
             a0, a1 = cpm_expr.args
@@ -326,11 +334,10 @@ class CPM_pindakaas(SolverInterface):
                 if conditions:
                     # trivial unsat with conditions does not count; posts ~conditions
                     # `add_clause` may raise `pdk.Unsatisfiable` too, but the conditions are added to the clause, so no need to catch
-                    add_clause([], conditions)
+                    self._add_clause([], conditions=conditions)
                 else:
-                    # no condtions means truly unsatisfiable
+                    # no conditions means truly unsatisfiable
                     raise e
-
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 
