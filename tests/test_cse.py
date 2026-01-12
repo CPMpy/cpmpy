@@ -1,4 +1,4 @@
-import unittest
+from utils import TestCase
 import cpmpy as cp
 
 from cpmpy.transformations.comparison import only_numexpr_equality
@@ -8,11 +8,11 @@ from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 from cpmpy.transformations.linearize import linearize_constraint
 
 
-class TestCSE(unittest.TestCase):
+class TestCSE(TestCase):
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         # ensure reproducable variable names
-        _IntVarImpl.counter = 0 
+        _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0   
 
 

@@ -1,14 +1,15 @@
-import unittest
 import pytest
 import importlib
 import cpmpy as cp 
 from cpmpy.solvers.pysat import CPM_pysat
 
+from utils import TestCase
+
 @pytest.mark.requires_solver("pysat")
 @pytest.mark.skipif(importlib.util.find_spec("pypblib") is not None, reason="Test requires pypblib to be NOT installed")
 def test_pypblib_error():
     # NOTE if you want to run this but pypblib is already installed, run `pip uninstall pypblib && pip install -e .[pysat]`
-    unittest.TestCase().assertRaises(
+    TestCase().assertRaises(
             ImportError, # just solve a pb constraint with pypblib not installed
             lambda : CPM_pysat(cp.Model(2*cp.boolvar() + 3 * cp.boolvar() + 5 * cp.boolvar() <= 6)).solve()
         )
@@ -18,8 +19,8 @@ def test_pypblib_error():
 
 @pytest.mark.requires_solver("pysat")
 @pytest.mark.requires_dependency("pypblib")
-class TestEncodePseudoBooleanConstraint(unittest.TestCase):
-    def setUp(self):
+class TestEncodePseudoBooleanConstraint(TestCase):
+    def setup_method(self):
         self.bv = cp.boolvar(shape=3)
 
     def test_pysat_simple_atmost(self):
@@ -91,7 +92,4 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
         ## check all types of linear constraints are handled
         for expression in expressions:
             cp.Model(expression).solve("pysat")
-
-if __name__ == '__main__':
-    unittest.main()
 

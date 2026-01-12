@@ -1,4 +1,4 @@
-import unittest
+from utils import TestCase
 import pytest
 
 import cpmpy as cp
@@ -7,8 +7,8 @@ from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
 @pytest.mark.usefixtures("solver")
-class TestTransfComp(unittest.TestCase):
-    def setUp(self):
+class TestTransfComp(TestCase):
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 

@@ -1,4 +1,4 @@
-import unittest
+from utils import TestCase
 import pytest
 
 import cpmpy as cp
@@ -9,9 +9,9 @@ from cpmpy.transformations.linearize import linearize_constraint, canonical_comp
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 @pytest.mark.usefixtures("solver")
-class TestTransLinearize(unittest.TestCase):
+class TestTransLinearize(TestCase):
 
-    def setUp(self):
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
         self.ivars = cp.intvar(1, 10, shape=(5,))
@@ -258,7 +258,7 @@ class TestTransLinearize(unittest.TestCase):
 
 
 
-class TestConstRhs(unittest.TestCase):
+class TestConstRhs(TestCase):
 
     def test_numvar(self):
         a, b = [cp.intvar(0, 10, name=n) for n in "ab"]
@@ -310,9 +310,9 @@ class TestConstRhs(unittest.TestCase):
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
 @pytest.mark.usefixtures("solver")
-class TestVarsLhs(unittest.TestCase):
+class TestVarsLhs(TestCase):
 
-    def setUp(self): # reset counters
+    def setup_method(self): # reset counters
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
@@ -410,8 +410,8 @@ class TestVarsLhs(unittest.TestCase):
         cons = linearize_constraint(cons, supported={"alldifferent"})[0]
         self.assertEqual("alldifferent(a,b,c)", str(cons))
 
-class testCanonical_comparison(unittest.TestCase):
-    def setUp(self):
+class testCanonical_comparison(TestCase):
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
         self.ivars = cp.intvar(1, 10, shape=(5,))
@@ -499,8 +499,8 @@ class testCanonical_comparison(unittest.TestCase):
         self.assertEqual(str([p <= 0]), str(only_positive_bv(linearize_constraint([~p]))))
         
         
-class testOnlyPositiveBv(unittest.TestCase):
-    def setUp(self):
+class testOnlyPositiveBv(TestCase):
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
         self.ivars = cp.intvar(1, 10, shape=(5,))

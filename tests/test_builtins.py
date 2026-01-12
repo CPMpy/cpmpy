@@ -1,4 +1,4 @@
-import unittest
+from utils import TestCase
 import pytest
 
 import cpmpy as cp
@@ -7,7 +7,7 @@ from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any
 iv = cp.intvar(-8, 8, shape=5)
 
 @pytest.mark.usefixtures("solver")
-class TestBuiltin(unittest.TestCase):
+class TestBuiltin(TestCase):
 
     def test_max(self):
         constraints = [cp.max(iv) + 9 <= 8]

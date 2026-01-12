@@ -1,5 +1,4 @@
 import inspect
-import unittest
 import tempfile
 import pytest
 import numpy as np
@@ -13,9 +12,10 @@ from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
 from test_constraints import numexprs
+from utils import TestCase
 
 @pytest.mark.usefixtures("solver")
-class TestSolvers(unittest.TestCase):
+class TestSolvers(TestCase):
 
     
     @pytest.mark.skip(reason="upstream bug, waiting on release for https://github.com/google/or-tools/issues/4640")

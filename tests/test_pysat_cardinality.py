@@ -4,13 +4,13 @@ import cpmpy as cp
 from cpmpy.solvers.pysat import CPM_pysat
 
 from utils import skip_on_missing_pblib
-
+from utils import TestCase
 SOLVER = "pysat"
 
 @pytest.mark.requires_solver("pysat")
-class TestCardinality(unittest.TestCase):
+class TestCardinality(TestCase):
         
-    def setUp(self):
+    def setup_method(self):
         self.bv_before = cp.boolvar(shape=7)
         self.bvs = cp.cpm_array(cp.boolvar(shape=2).tolist() + [~cp.boolvar()])
 

@@ -1,11 +1,10 @@
-import unittest
 import pytest
 import cpmpy as cp
 import numpy as np
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray, _gen_var_names
-
+from utils import TestCase
 @pytest.mark.usefixtures("solver")
-class TestSolvers(unittest.TestCase):
+class TestSolvers(TestCase):
     def test_zero_boolvar(self):
         with self.assertRaises(NullShapeError):
             bv = cp.boolvar(0)
@@ -106,7 +105,7 @@ class TestSolvers(unittest.TestCase):
         self.assertEqual(n_none(bv), 9)
 
 
-class TestGenVarNames(unittest.TestCase):
+class TestGenVarNames(TestCase):
 
     def test_gen_var_names_basic_string(self):
         self.assertEqual(_gen_var_names('x', (2, 2)), ['x[0,0]', 'x[0,1]', 'x[1,0]', 'x[1,1]'])
@@ -140,6 +139,3 @@ class TestGenVarNames(unittest.TestCase):
         with self.assertRaises(ValueError):
             _gen_var_names(np.array(list("xxyz")), (4))
 
-
-if __name__ == "__main__":
-    unittest.main()

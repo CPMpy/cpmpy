@@ -4,9 +4,11 @@ import numpy as np
 import pytest
 
 import cpmpy as cp
+from utils import TestCase
 
+@pytest.mark.usefixtures("solver")    
 @pytest.mark.requires_solver("ortools")
-class TestDirectORTools(unittest.TestCase):
+class TestDirectORTools(TestCase):
 
     def test_direct_automaton(self):
         trans_vars = cp.boolvar(shape=4, name="trans")
@@ -25,8 +27,9 @@ class TestDirectORTools(unittest.TestCase):
 
         self.assertEqual(model.solveAll(), 6)
 
+@pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver("exact")
-class TestDirectExact(unittest.TestCase):
+class TestDirectExact(TestCase):
 
     def test_direct_left_reif(self):
         x,y = cp.boolvar(2)
@@ -36,8 +39,9 @@ class TestDirectExact(unittest.TestCase):
         model += cp.DirectConstraint("addRightReification", (x, 1, [(1, y)], 1), novar=[1,3])
         self.assertEqual(model.solveAll(), 3)
 
+@pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver("pysat")
-class TestDirectPySAT(unittest.TestCase):
+class TestDirectPySAT(TestCase):
 
     def test_direct_clause(self):
         x,y = cp.boolvar(2)
@@ -49,8 +53,9 @@ class TestDirectPySAT(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(x.value() or y.value())
 
+@pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver("pysdd")
-class TestDirectPySDD(unittest.TestCase):
+class TestDirectPySDD(TestCase):
 
     def test_direct_clause(self):
         x,y = cp.boolvar(2)
@@ -62,8 +67,9 @@ class TestDirectPySDD(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(x.value() or y.value())
 
+@pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver("z3")
-class TestDirectZ3(unittest.TestCase):
+class TestDirectZ3(TestCase):
 
     def test_direct_distinct(self):
         iv = cp.intvar(1,9, shape=3)
@@ -75,8 +81,9 @@ class TestDirectZ3(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.AllDifferent(iv).value())
 
+@pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver("minizinc")
-class TestDirectMiniZinc(unittest.TestCase):
+class TestDirectMiniZinc(TestCase):
 
     def test_direct_alldiff_except_0(self):
         iv = cp.intvar(0,9, shape=3)
@@ -94,8 +101,10 @@ class TestDirectMiniZinc(unittest.TestCase):
         self.assertTrue(model.solve())
         self.assertTrue(cp.AllDifferentExcept0(iv).value())
 
+
+@pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver("gurobi")
-class TestDirectGurobi(unittest.TestCase):
+class TestDirectGurobi(TestCase):
 
     def test_direct_poly(self):
 
@@ -117,8 +126,9 @@ class TestDirectGurobi(unittest.TestCase):
 
         self.assertEqual(y.value(), poly_val)
 
+@pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver("choco")
-class TestDirectChoco(unittest.TestCase):
+class TestDirectChoco(TestCase):
 
     def test_direct_global(self):
         iv = cp.intvar(1,9, shape=3)
@@ -131,8 +141,9 @@ class TestDirectChoco(unittest.TestCase):
         self.assertFalse(model.solve())
 
 
+@pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver("hexaly")
-class TestDirectHexaly(unittest.TestCase):
+class TestDirectHexaly(TestCase):
 
     def test_direct_distance(self):
 

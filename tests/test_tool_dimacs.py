@@ -1,5 +1,4 @@
 import os
-import unittest
 import tempfile
 
 import pytest
@@ -8,12 +7,13 @@ from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
 
+from utils import TestCase
 
-@pytest.mark.requires_solver("pindakaas", restrict_solving=False)
+@pytest.mark.requires_solver("pindakaas")
 @pytest.mark.usefixtures("solver")
-class CNFTool(unittest.TestCase):
+class CNFTool(TestCase):
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.tmpfile = tempfile.NamedTemporaryFile(mode='w', delete=False)
 
     def tearDown(self) -> None:

@@ -1,13 +1,14 @@
-import unittest
+
 import pytest
 import cpmpy as cp
 from cpmpy.transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, normalized_boolexpr
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 from cpmpy.expressions.core import Operator
+from utils import TestCase
 
 @pytest.mark.usefixtures("solver")
-class TestFlattenModel(unittest.TestCase):
-    def setUp(self):
+class TestFlattenModel(TestCase):
+    def setup_method(self):
         self.ivars = cp.intvar(1, 10, (5,))
         self.bvars = cp.boolvar((2,))
         #self.constraints = [self.ivars != 3] # should work in future (broadcasting)
@@ -40,8 +41,8 @@ class TestFlattenModel(unittest.TestCase):
         self.assertTrue( m.solve(solver=self.solver) )
 
 
-class TestFlattenConstraint(unittest.TestCase):
-    def setUp(self):
+class TestFlattenConstraint(TestCase):
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
         self.ivars = cp.intvar(1, 10, shape=(5,))
@@ -80,8 +81,8 @@ class TestFlattenConstraint(unittest.TestCase):
         e = ((a > 5) == (b < 3))
         self.assertEqual(len(flatten_constraint(e)), 2)
     
-class TestFlattenExpr(unittest.TestCase):
-    def setUp(self):
+class TestFlattenExpr(TestCase):
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
         self.ivars = cp.intvar(1, 10, shape=(5,))

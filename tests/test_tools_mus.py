@@ -1,6 +1,6 @@
 import unittest
 import pytest
-from unittest import TestCase
+from utils import TestCase
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
@@ -195,7 +195,7 @@ class MARCOMUSTests(MusTests):
 
 
 
-class MSSTests(unittest.TestCase):
+class MSSTests(TestCase):
 
     def test_circular(self):
         x = cp.intvar(0, 3, shape=4, name="x")
@@ -213,7 +213,7 @@ class MSSTests(unittest.TestCase):
         self.assertIn(cons[4], set(mss_opt(cons, weights=[1,1,1,1,5]))) # weighted version
 
 
-class MCSTests(unittest.TestCase):
+class MCSTests(TestCase):
 
     def test_circular(self):
         x = cp.intvar(0, 3, shape=4, name="x")
@@ -229,6 +229,3 @@ class MCSTests(unittest.TestCase):
         self.assertEqual(len(mcs(cons)), 1)
 
 
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,4 +1,3 @@
-import unittest
 import pytest
 import numpy as np
 import cpmpy as cp
@@ -7,13 +6,13 @@ from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.globalconstraints import Xor
 from cpmpy.expressions.utils import argvals
-from cpmpy.solvers.pindakaas import CPM_pindakaas
-
+from utils import TestCase
 import pytest
 
+@pytest.mark.requires_dependency("pindakaas")
+class TestToCnf(TestCase):
 
-@pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
-class TestToCnf(unittest.TestCase):
+    @pytest.mark.requires_solver("ortools")
     def test_tocnf(self):
         a, b, clause = cp.boolvar(shape=3)
         x = cp.intvar(1, 2)

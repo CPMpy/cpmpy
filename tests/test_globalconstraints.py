@@ -1,6 +1,4 @@
 import copy
-import unittest
-
 import pytest
 
 import cpmpy as cp
@@ -14,12 +12,13 @@ from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.safening import no_partial_functions
 
 from utils import skip_on_missing_pblib, inclusive_range
+from utils import TestCase
 
 @pytest.mark.usefixtures("solver")
 @skip_on_missing_pblib(skip_on_exception_only=True)
-class TestGlobal(unittest.TestCase):
+class TestGlobal(TestCase):
 
-    def setUp(self):
+    def setup_method(self):
         _BoolVarImpl.counter = 0
         _IntVarImpl.counter = 0
 
@@ -1220,7 +1219,7 @@ class TestGlobal(unittest.TestCase):
         cp.Model(~cons).solveAll(display=check_val) # no solver parametrisation due to large performance impact
 
 @pytest.mark.usefixtures("solver")
-class TestBounds(unittest.TestCase):
+class TestBounds(TestCase):
     def test_bounds_minimum(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
@@ -1384,7 +1383,7 @@ class TestBounds(unittest.TestCase):
 
 @pytest.mark.usefixtures("solver")
 @skip_on_missing_pblib(skip_on_exception_only=True)
-class TestTypeChecks(unittest.TestCase):
+class TestTypeChecks(TestCase):
     def test_AllDiff(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)

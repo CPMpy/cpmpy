@@ -1,4 +1,3 @@
-import unittest
 import pytest
 import tempfile
 import os
@@ -7,18 +6,18 @@ from os.path import join
 import cpmpy as cp
 from cpmpy.expressions.utils import flatlist
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
-
+from utils import TestCase
 @pytest.mark.usefixtures("solver")
-class TestModel(unittest.TestCase):
+class TestModel(TestCase):
     
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.tempdir = tempfile.mkdtemp()
         print(self.tempdir)
-        return super().setUp()
+        return super().setup_method()
     
     def tearDown(self) -> None:
         os.rmdir(self.tempdir)
-        return super().tearDown()
+        return super().teardown_method()
 
     def test_ndarray(self):
         iv = cp.intvar(1,9, shape=3)

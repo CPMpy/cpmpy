@@ -1,7 +1,8 @@
-import unittest
 import pytest
 import cpmpy as cp
 from cpmpy.solvers import CPM_pysat
+
+from utils import TestCase
 
 def frietkot():
     # Construct the model.
@@ -25,7 +26,7 @@ def frietkot():
     return model, [mayo, ketchup, curry, andalouse, samurai]
 
 @pytest.mark.requires_solver("pysat")
-class TestPySATInterrupt(unittest.TestCase):
+class TestPySATInterrupt(TestCase):
     def test_small_isntance_no_interrupt(self):
         """Check if the instance still returns the expected results
         after adding interrupt to pysat solver.
@@ -62,5 +63,3 @@ class TestPySATInterrupt(unittest.TestCase):
 
         self.assertLessEqual(tend_solving - tstart_solving, time_limit + grace_time_limit)
 
-if __name__ == '__main__':
-    unittest.main()

@@ -1,4 +1,4 @@
-import unittest
+from utils import TestCase
 import pytest
 import cpmpy as cp
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
@@ -7,8 +7,8 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 
 @pytest.mark.usefixtures("solver")
-class TestTransfReif(unittest.TestCase):
-    def setUp(self):
+class TestTransfReif(TestCase):
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 

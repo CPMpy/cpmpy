@@ -1,5 +1,6 @@
 import importlib
 import pytest
+import unittest
 from functools import wraps
 
 # ---------------------------------------------------------------------------- #
@@ -105,3 +106,58 @@ def skip_on_missing_pblib(skip_on_exception_only:bool=False):
 
 def inclusive_range(lb,ub):
     return range(lb,ub+1)
+
+
+# ---------------------------------------------------------------------------- #
+#                                TestCase class                                #
+# ---------------------------------------------------------------------------- #
+
+class TestCase:
+    """
+    Custom TestCase class that provides unittest-style assertions.
+
+    Does NOT inherit from unittest.TestCase to avoid conflicts with pytest's
+    pytest_generate_tests parametrization. Instead, copies all attributes
+    (methods and class variables) from unittest.TestCase.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _init_unittest_attrs(self, request):
+        """
+        Initialize instance attributes needed by unittest assertions.
+        """
+
+        # Initialize the type equality funcs dictionary used by assertions
+        self._type_equality_funcs = {}
+        self.addTypeEqualityFunc(dict, 'assertDictEqual')
+        self.addTypeEqualityFunc(list, 'assertListEqual')
+        self.addTypeEqualityFunc(tuple, 'assertTupleEqual')
+        self.addTypeEqualityFunc(set, 'assertSetEqual')
+        self.addTypeEqualityFunc(frozenset, 'assertSetEqual')
+        # Initialize other attributes that unittest.TestCase sets
+        self._outcome = None
+
+        # Set solver on instance if the test uses solver fixture
+        if 'solver' in request.fixturenames:
+            self.solver = request.getfixturevalue('solver')
+
+    def setup_method(self, method=None):
+        """
+        Empty setup_method to allow subclasses to call super().setup_method()
+        """
+        pass
+
+    def teardown_method(self, method=None):
+        """
+        Empty teardown_method to allow subclasses to call super().teardown_method()
+        """
+        pass
+
+
+# Copy all attributes (methods and class variables) from unittest.TestCase to TestCase
+for _attr_name in dir(unittest.TestCase):
+    if not _attr_name.startswith('__'):  # Skip dunder methods
+        _attr = getattr(unittest.TestCase, _attr_name)
+        if not hasattr(TestCase, _attr_name):
+            setattr(TestCase, _attr_name, _attr)    
+

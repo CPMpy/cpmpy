@@ -1,12 +1,12 @@
-import unittest
 import pytest
 
 import cpmpy as cp
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.expressions.utils import argval
+from utils import TestCase
 
 @pytest.mark.usefixtures("solver")
-class TestTransLinearize(unittest.TestCase):
+class TestTransLinearize(TestCase):
 
     def test_division_by_zero(self):
         a = cp.intvar(1, 10, name="a")

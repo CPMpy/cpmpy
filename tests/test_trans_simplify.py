@@ -1,14 +1,14 @@
-import unittest
 import pytest
 
 import cpmpy as cp
 from cpmpy.expressions.core import Operator, BoolVal, Comparison
 from cpmpy.transformations.normalize import simplify_boolean, toplevel_list
+from utils import TestCase
 
 @pytest.mark.usefixtures("solver")
-class TransSimplify(unittest.TestCase):
+class TransSimplify(TestCase):
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.bvs = cp.boolvar(shape=3, name="bv")
         self.ivs = cp.intvar(0, 5, shape=3, name="iv")
 

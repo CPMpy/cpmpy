@@ -1,12 +1,13 @@
-import unittest
+from utils import TestCase
+import pytest
 import cpmpy as cp
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
 
+@pytest.mark.usefixtures("solver")
+class TestTransfDecomp(TestCase):
 
-class TestTransfDecomp(unittest.TestCase):
-
-    def setUp(self):
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 

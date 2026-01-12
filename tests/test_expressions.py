@@ -8,12 +8,12 @@ from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
 from cpmpy.transformations.get_variables import get_variables
 
-from utils import inclusive_range
-
+from utils import inclusive_range, TestCase
 
 @pytest.mark.usefixtures("solver")
-class TestComparison(unittest.TestCase):
+class TestComparison(TestCase):    
     def test_comps(self):
+
         # from the docs
         # XXX is this the right place? it should be tested with all solvers...
         import cpmpy as cp
@@ -37,9 +37,9 @@ class TestComparison(unittest.TestCase):
             self.assertTrue(cp.Model(c).solve(solver=self.solver))
 
 @pytest.mark.usefixtures("solver")
-class TestSum(unittest.TestCase):
+class TestSum(TestCase):
 
-    def setUp(self):
+    def setup_method(self):
         self.iv = cp.intvar(0, 10)
 
     def test_add_int(self):
@@ -82,8 +82,8 @@ class TestSum(unittest.TestCase):
         self.assertTrue(model.solve(solver=self.solver))
         self.assertEqual(v.value(), 1)
 
-class TestWeightedSum(unittest.TestCase):
-    def setUp(self) -> None:
+class TestWeightedSum(TestCase):
+    def setup_method(self) -> None:
         self.ivs = cp.intvar(lb=0, ub=5, shape=4)
 
     def test_weightedadd_int(self):
@@ -165,9 +165,9 @@ class TestWeightedSum(unittest.TestCase):
         assert(str(expr1) == str(expr2))
         assert(str(expr1) == str(expr3))
 
-class TestMul(unittest.TestCase):
+class TestMul(TestCase):
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.bvar = cp.boolvar(name="bv")
         self.ivar = cp.boolvar(name="iv")
 
@@ -221,7 +221,7 @@ class TestMul(unittest.TestCase):
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
 @pytest.mark.usefixtures("solver")
-class TestArrayExpressions(unittest.TestCase):
+class TestArrayExpressions(TestCase):
 
     def test_sum(self):
         x = cp.intvar(0,5,shape=3, name="x")
@@ -330,7 +330,7 @@ class TestArrayExpressions(unittest.TestCase):
                 self.assertEqual(cpm_res.shape, np_res.shape)
 
 @pytest.mark.usefixtures("solver")
-class TestBounds(unittest.TestCase):
+class TestBounds(TestCase):
     def test_bounds_mul_sub_sum(self):
         x = cp.intvar(-8,8)
         y = cp.intvar(-4,6)
@@ -503,9 +503,9 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(bool, type((a == b).value()))
         self.assertEqual(bool, type((a != b).value()))
 
-class TestBuildIns(unittest.TestCase):
+class TestBuildIns(TestCase):
 
-    def setUp(self):
+    def setup_method(self):
         self.x = cp.intvar(0,10,shape=3)
 
     def test_sum(self):
@@ -536,9 +536,10 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(gt.value(), 0)
         self.x[0]._value = None
         self.assertIsNone(gt.value())
-class TestNullifyingArguments(unittest.TestCase):
+        
+class TestNullifyingArguments(TestCase):
 
-    def setUp(self):
+    def setup_method(self):
         self.x = cp.intvar(0,10, name="x")
         self.b = cp.boolvar(name="b")
 
@@ -570,9 +571,9 @@ class TestNullifyingArguments(unittest.TestCase):
 
 
 
-class TestContainer(unittest.TestCase):
+class TestContainer(TestCase):
 
-    def setUp(self):
+    def setup_method(self):
         self.x = cp.intvar(0,10,name="x")
         self.y = cp.intvar(0,10,name="y")
         self.z = cp.intvar(0,10,name="z")
@@ -622,7 +623,7 @@ class TestContainer(unittest.TestCase):
         assert d[self.z] == "z"
 
         
-class TestUtils(unittest.TestCase):
+class TestUtils(TestCase):
 
     def test_cpm_array(self):
         x = cp.intvar(0,10, shape=(5, 3))
@@ -681,5 +682,3 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(str(expr.args[0]), "x")
             self.assertEqual(expr.args[1], True) # should always put the constant on the right
 
-if __name__ == '__main__':
-    unittest.main()
