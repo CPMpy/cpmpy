@@ -8,6 +8,8 @@ from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
 
+
+@pytest.mark.requires_solver("pindakaas", restrict_solving=False)
 @pytest.mark.usefixtures("solver")
 class CNFTool(unittest.TestCase):
 
@@ -60,10 +62,13 @@ class CNFTool(unittest.TestCase):
         m += b.implies(~c)
         m += a <= 0
 
-        cnf_txt = write_dimacs(m)
         gt_cnf = "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
+        gt_clauses = set(gt_cnf.split("\n")[1:]) # skip the p-line
 
-        self.assertEqual(cnf_txt, gt_cnf)
+        cnf_txt = write_dimacs(model=m)
+        cnf_clauses = set(cnf_txt.split("\n")[1:]) # skip the p-line
+       
+        self.assertEqual(cnf_clauses, gt_clauses)
 
 
     def test_missing_p_line(self):

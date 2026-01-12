@@ -514,7 +514,8 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(str(gt), str(cp.sum(self.x)))
         self.assertEqual(str(gt), str(cp.sum(list(self.x))))
         self.assertEqual(str(gt), str(cp.sum(v for v in self.x)))
-        self.assertEqual(str(gt), str(cp.sum(self.x[0], self.x[1], self.x[2])))
+        with self.assertRaises(TypeError):  # Python sum does not accept sum(1,2,3)
+            cp.sum(self.x[0], self.x[1], self.x[2])
 
     def test_max(self):
         gt = cp.Maximum(self.x)
