@@ -102,7 +102,7 @@ class CPM_rc2(CPM_pysat):
         
         """
         if not self.supported():
-            raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
+            raise ImportError("CPM_rc2: RC2 is not installed. The recommended way to install RC2 is with `pip install cpmpy[rc2]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
 
         from pysat.formula import IDPool, WCNF
 
@@ -168,7 +168,7 @@ class CPM_rc2(CPM_pysat):
             if "PYTEST_CURRENT_TEST" in os.environ:  # support decision problems for testing purposes
                 self.pysat_solver.add_clause([self.pysat_solver.nv + 1], weight=1)
             else:
-                raise NotSupportedError("RC2 does not support solving decision problems. Add an objective to your problem.")
+                raise NotSupportedError("CPM_rc2: RC2 does not support solving decision problems. Add an objective to your problem.")
 
         # determine subsolver
         default_kwargs = {"solver": "glucose3", "adapt": True, "exhaust": True, "minz": True}
@@ -183,7 +183,7 @@ class CPM_rc2(CPM_pysat):
             solution = solver.compute()
         else:
             if time_limit <= 0:
-                raise ValueError("Time limit must be positive")
+                raise ValueError("CPM_rc2: Time limit must be positive")
             timer = Timer(time_limit, lambda: solver.interrupt())
             timer.start()
             solution = solver.compute(expect_interrupt=True)
