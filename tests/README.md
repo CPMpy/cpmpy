@@ -146,20 +146,53 @@ def test_basic_model():
     assert x.value() >= 5
 ```
 
+### Using the Custom TestCase Class
+
+CPMpy's test suite includes a custom `TestCase` class (in `tests/utils.py`) that provides all unittest-style assertion methods without inheriting from `unittest.TestCase`. This design allows pytest's `pytest_generate_tests` parametrization to work properly.
+
+#### Benefits
+
+- Access to all familiar unittest assertions: `assertEqual`, `assertTrue`, `assertIn`, `assertIsInstance`, etc.
+- Compatible with pytest's parametrization and fixture system
+- Automatic initialization of required unittest internal attributes
+- Support for `setup_method` and `teardown_method` hooks
+
+#### Usage
+
+```python
+from utils import TestCase
+import cpmpy as cp
+
+class TestMyFeature(TestCase):
+    def setup_method(self):
+        # Called before each test method
+        self.x = cp.intvar(0, 10, name="x")
+
+    def test_example(self):
+        # Use unittest-style assertions
+        self.assertEqual(str(self.x), "x")
+        self.assertIsInstance(self.x, cp.intvar)
+        self.assertTrue(self.x.lb == 0)
+        self.assertIn(self.x, [self.x])
+```
+
 ### Using the Solver Fixture
 
 For tests that should run with different solvers:
 
 ```python
+from utils import TestCase
+
 @pytest.mark.usefixtures("solver")
-class TestMyFeature:
+class TestMyFeature(TestCase):
     def test_with_solver(self):
         x = cp.intvar(0, 10)
         m = cp.Model(x >= 5)
-        assert m.solve(solver=self.solver)
+        self.assertTrue(m.solve(solver=self.solver))
+        self.assertGreaterEqual(x.value(), 5)
 ```
 
-When multiple solvers are provided via `--solver`, these tests will automatically be parametrised to run against each solver.
+When multiple solvers are provided via `--solver`, these tests will automatically be parametrised to run against each solver. The `self.solver` attribute is automatically set by the test framework.
 
 ### Solver-Parametrised Tests
 
