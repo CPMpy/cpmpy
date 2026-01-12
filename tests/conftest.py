@@ -127,23 +127,27 @@ def solver(request):
     """
     # Check if test has been parametrized with a solver (via pytest_generate_tests or explicit parametrisation)
     if hasattr(request, "param"):
-        solver_value = request.param 
+        solver_value = request.param
     else:
         # Not parametrized, use command line option
         # This branch is reached when:
         # - Single solver provided (will use that solver)
-        # - No solver provided (will use None/default)
+        # - No solver provided (will use default solver: OR-Tools)
         # - Empty list returned (all solvers filtered out) - use default solver (OR-Tools)
         # - Multiple solvers provided but test wasn't parametrized (shouldn't happen, but uses first solver as fallback)
         solver_option = request.config.getoption("--solver")
         parsed_solvers = _parse_solver_option(solver_option)
-        # Handle empty list (all solvers filtered out) same as None
-        solver_value = parsed_solvers[0] if parsed_solvers else None
-    
+        # Default to "ortools" when no solver specified
+        solver_value = parsed_solvers[0] if parsed_solvers else "ortools"
+
     # Set solver value on class if available (for tests using self.solver)
     if hasattr(request, "cls") and request.cls:
         request.cls.solver = solver_value
-    
+
+    # Also set on instance if available (for plain classes)
+    if hasattr(request, "instance") and request.instance:
+        request.instance.solver = solver_value
+
     return solver_value
 
 
@@ -172,7 +176,7 @@ during test parametrisation and filtering.
 """
 
 MARKERS = {
-    "requires_solver": "mark test as requiring a specific solver (optional: restrict_solving=True to restrict solving to only the listed solvers)",          # to filter (not skip) tests when required solver is not installed
+    "requires_solver": "mark test as requiring a specific solver",          # to filter (not skip) tests when required solver is not installed
     "requires_dependency": "mark test as requiring a specific dependency",  # to filter (not skip) tests when required dependency is not installed
     "generate_constraints": "mark test as generating constraints",          # to make multiple copies of the same test, based on a generated set of constraints
 }
@@ -266,10 +270,11 @@ def pytest_generate_tests(metafunc):
     
     """
 
-    # Early exist
-    #    Check if this test uses the 'solver' fixture
-    #    currently we only parametrise tests that use the 'solver' fixture, change if in the future we add other parametrisation schemes
-    if "solver" not in metafunc.fixturenames:
+    # Check if this test uses the 'solver' fixture
+    uses_solver_fixture = "solver" in metafunc.fixturenames
+
+    # Early exit if solver fixture is not used (nothing to parametrise)
+    if not uses_solver_fixture:
         return
 
     # Get solvers from command line option
@@ -296,32 +301,24 @@ def pytest_generate_tests(metafunc):
                 #     return
                 if argnames == "generator":
                     generator = argvalues
-                    print(list(_generate_inputs(generator)))
                     metafunc.parametrize(("solver","constraint"), list(_generate_inputs(generator)),  ids=str)
             elif isinstance(argnames, (tuple, list)):
                 if "solver" in argnames:
                     return
     
     # Check if test has requires_solver marker (solver-specific tests)
-    requires_solver_marker = metafunc.definition.get_closest_marker("requires_solver")
+    # For test classes, the marker might be on the class, not the method
+    requires_solver_marker = None
+
+    # Try iter_markers which traverses up the hierarchy (works for both function and class-based tests)
+    for marker in metafunc.definition.iter_markers("requires_solver"):
+        requires_solver_marker = marker
+        break
+        
+    # Parametrise test with solvers specified in requires_solver marker
     if requires_solver_marker:
         marker_solvers = list(requires_solver_marker.args)
-        restrict_solving = requires_solver_marker.kwargs.get("restrict_solving", True)
-        
-        if restrict_solving:
-            # Restrict solving to only the solvers in the marker
-            # Intersect with command-line solvers if provided
-            if parsed_solvers is not None:
-                # Intersect marker solvers with command-line solvers
-                allowed_solvers = [s for s in marker_solvers if s in parsed_solvers]
-                # Always parametrize, even if empty (test will be filtered out later)
-                metafunc.parametrize("solver", allowed_solvers)
-            else:
-                # No command-line solvers specified, use all marker solvers
-                metafunc.parametrize("solver", marker_solvers)
-        else:
-            # Default behavior: parametrize with CLI solvers
-            metafunc.parametrize("solver", parsed_solvers)
+        metafunc.parametrize("solver", marker_solvers)
         return
     
     # Only parametrize if multiple solvers are explicitly provided
@@ -394,25 +391,26 @@ def pytest_collection_modifyitems(config, items):
             """
             
             parametrised_solver = None # will hold solver with which the test was parametrised
-            
-            # A) Test item is a method 
+
+            # A) Test item is a method
             #    try to get solver from item.callspec
             if hasattr(item, "callspec") and item.callspec is not None:
                 if hasattr(item.callspec, "params") and "solver" in item.callspec.params:
                     parametrised_solver = item.callspec.params["solver"]
-            
+
             # B) Test item is a unittest test class
-            #    try to get solver from parent's callspec
+            #    For test classes, parametrization might be on the class (parent) level
             if parametrised_solver is None and hasattr(item, "parent") and item.parent is not None:
+                # Check parent's callspec (for class-level parametrization)
                 if hasattr(item.parent, "callspec") and item.parent.callspec is not None:
                     if hasattr(item.parent.callspec, "params") and "solver" in item.parent.callspec.params:
                         parametrised_solver = item.parent.callspec.params["solver"]
-            
+
             """
             Solver filtering
                 i.e. skip test if the required solver is not installed (for solver-specific tests)
             """
-            
+
             # When solvers are specified on the command line, 
             # only run solver-specific tests that require any of those solvers
             if cmd_solvers is not None:
@@ -421,7 +419,7 @@ def pytest_collection_modifyitems(config, items):
                     skipped_solver_specific += 1
                     continue
                 # B) If required solver is in the list of specified solvers on the command line, run the test
-                if parametrised_solver in cmd_solvers:
+                if parametrised_solver is not None and parametrised_solver in cmd_solvers:
                     # include test
                     filtered.append(item)
                 # C) If required solver is not in the list of specified solvers on the command line, filter the test to be skipped
@@ -439,11 +437,12 @@ def pytest_collection_modifyitems(config, items):
             """
 
             # skip test if the required solver is not installed
-            if not cp.SolverLookup.lookup(parametrised_solver).supported():
-                skip = pytest.mark.skip(reason=f"Solver {parametrised_solver} not installed")
-                item.add_marker(skip)
-                skipped_solver_specific += 1
-                continue
+            if parametrised_solver is not None:
+                if not cp.SolverLookup.lookup(parametrised_solver).supported():
+                    skip = pytest.mark.skip(reason=f"Solver {parametrised_solver} not installed")
+                    item.add_marker(skip)
+                    skipped_solver_specific += 1
+                    continue    
 
         # B) Non-solver-specific test
         else:
