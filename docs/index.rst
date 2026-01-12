@@ -60,6 +60,11 @@ Supported solvers
      - SAT ASAT ISAT - OPT IOPT
      - pip
      - 
+   * - :doc:`Hexaly <api/solvers/hexaly>`
+     - Global Opt.
+     - SAT ALLSAT - OPT IOPT
+     - pip + local + (aca.) licence
+     -
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
      - SAT - OPT IOPT - PAR
@@ -76,26 +81,20 @@ Supported solvers
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
-     - Pseudo-Boolean
+     - SAT Encoder
      - SAT
      - local install (git + pip > 3.10)
-     - Encodes to SAT
+     - 
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - SAT ASAT ISAT
      - pip
      - 
    * - :doc:`PySDD <api/solvers/pysdd>`
-     - SAT Counter
+     - Decis. Diagram
      - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
-
-   * - :doc:`Hexaly <api/solvers/hexaly>`
-     - Local search
-     - SAT ALLSAT - OPT IOPT
-     - pip + local + (aca.) licence
-     -
 
 Native capability abbreviations:
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
