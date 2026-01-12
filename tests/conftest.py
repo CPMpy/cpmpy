@@ -172,7 +172,7 @@ during test parametrisation and filtering.
 """
 
 MARKERS = {
-    "requires_solver": "mark test as requiring a specific solver",          # to filter (not skip) tests when required solver is not installed
+    "requires_solver": "mark test as requiring a specific solver (optional: restrict_solving=True to restrict solving to only the listed solvers)",          # to filter (not skip) tests when required solver is not installed
     "requires_dependency": "mark test as requiring a specific dependency",  # to filter (not skip) tests when required dependency is not installed
     "generate_constraints": "mark test as generating constraints",          # to make multiple copies of the same test, based on a generated set of constraints
 }
@@ -303,8 +303,25 @@ def pytest_generate_tests(metafunc):
                     return
     
     # Check if test has requires_solver marker (solver-specific tests)
-    if metafunc.definition.get_closest_marker("requires_solver"):
-        metafunc.parametrize("solver", metafunc.definition.get_closest_marker("requires_solver").args)
+    requires_solver_marker = metafunc.definition.get_closest_marker("requires_solver")
+    if requires_solver_marker:
+        marker_solvers = list(requires_solver_marker.args)
+        restrict_solving = requires_solver_marker.kwargs.get("restrict_solving", True)
+        
+        if restrict_solving:
+            # Restrict solving to only the solvers in the marker
+            # Intersect with command-line solvers if provided
+            if parsed_solvers is not None:
+                # Intersect marker solvers with command-line solvers
+                allowed_solvers = [s for s in marker_solvers if s in parsed_solvers]
+                # Always parametrize, even if empty (test will be filtered out later)
+                metafunc.parametrize("solver", allowed_solvers)
+            else:
+                # No command-line solvers specified, use all marker solvers
+                metafunc.parametrize("solver", marker_solvers)
+        else:
+            # Default behavior: parametrize with CLI solvers
+            metafunc.parametrize("solver", parsed_solvers)
         return
     
     # Only parametrize if multiple solvers are explicitly provided
