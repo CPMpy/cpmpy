@@ -60,6 +60,11 @@ Supported solvers
      - SAT ASAT ISAT - OPT
      - pip
      - 
+   * - :doc:`Hexaly <api/solvers/hexaly>`
+     - Global Opt.
+     - SAT ALLSAT - OPT IOPT
+     - pip + local + (aca.) licence
+     -
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
      - SAT ISAT - OPT IOPT - PAR
@@ -91,12 +96,6 @@ Supported solvers
      - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
-
-   * - :doc:`Hexaly <api/solvers/hexaly>`
-     - Local search
-     - SAT ALLSAT - OPT IOPT
-     - pip + local + (aca.) licence
-     -
 
 Native capability abbreviations:
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
