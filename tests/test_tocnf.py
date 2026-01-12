@@ -53,7 +53,7 @@ class TestToCnf(TestCase):
         # test for equivalent solutions with/without to_cnf
         for case in cases:
             vs = cp.cpm_array(get_variables(case))
-            s1 = self.allsols([case], vs)
+            s1 = self._allsols([case], vs)
             ivarmap = dict()
             cnf = to_cnf(case, ivarmap=ivarmap)
 
@@ -69,11 +69,11 @@ class TestToCnf(TestCase):
             #     )
             # ), f"The following was not CNF: {cnf}"
 
-            s2 = self.allsols(cnf, vs, ivarmap=ivarmap)
+            s2 = self._allsols(cnf, vs, ivarmap=ivarmap)
             assert s1 == s2, f"The equivalence check failed for translaton from {case} to {cnf}"
 
-    @pytest.mark.requires_solver("ortools")
-    def allsols(self, cons, vs, ivarmap=None):
+
+    def _allsols(self, cons, vs, ivarmap=None):
         m = cp.Model(cons)
         sols = set()
 
@@ -87,6 +87,3 @@ class TestToCnf(TestCase):
         assert len(sols) < 100, sols
         return sols
 
-
-if __name__ == "__main__":
-    unittest.main()
