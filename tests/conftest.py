@@ -61,7 +61,7 @@ def _parse_solver_option(solver_option: Optional[str] , filter_not_installed: bo
 
     # Expand "all" to all installed solvers
     if "all" in original_solvers:
-        solvers = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()] 
+        solvers = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported() and name != "pysdd"] # TODO: Temporarily exclude pysdd due to missing use of int2bool 
         if filter_not_installed:
             warnings.warn('Option "all" already expands to all installed solvers. Ignoring filter for "filter_not_installed".')
 
