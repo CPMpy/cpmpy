@@ -23,12 +23,12 @@ solver_dependencies = {
     "ortools": ["ortools,>=9.3.10497,<=9.14.6206,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
     "z3": ["z3-solver>=4.8.15.0,<=4.15.4.0"],
     "choco": ["pychoco>=0.2.1,<=0.2.4"],
-    "exact": ["exact==2.2.1"], # older versions are bugger on py3.13
+    "exact": ["exact==2.2.1"], # older versions are bugged on py3.13
     "minizinc": ["minizinc>=0.7.0,<=0.10.0"],
     "pysat": ["python-sat>=1.8.dev4,<=1.9.dev26"],
     "gurobi": ["gurobipy>=11.0.0,<=13.0.0"],
     "pysdd": ["pysdd>=0.2.11,<=1.0.6"],
-    "gcs": ["gcspy==0.1.9"],
+    "gcs": ["gcspy==0.1.9"], # first version to pass all tests
     "cpo": ["docplex>=2.28.240,<=2.31.254"],
     "pumpkin": ["pumpkin-solver==0.2.2"], # CPMpy requires features only available from Pumpkin version >=0.2.2
     "pindakaas": ["pindakaas>=0.2.1,<=0.3.0"],
