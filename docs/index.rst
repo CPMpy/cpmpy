@@ -37,7 +37,7 @@ Supported solvers
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
-     - SAT ISAT ALLSAT - OPT IOPT - PROOF
+     - SAT ISAT ALLSAT - OPT - PROOF
      - pip
      -
    * - :doc:`Choco <api/solvers/choco>`
