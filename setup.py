@@ -50,7 +50,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'ortools>=9.9',
+        'ortools>=9.3.10497,<=9.14.6206,!=9.9.*,!=9.10.*,!=9.11.*',
         'numpy>=1.5',
         'setuptools',
     ],
