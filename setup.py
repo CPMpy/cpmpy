@@ -26,7 +26,7 @@ solver_dependencies = {
     "exact": ["exact==2.2.1"], # older versions are bugger on py3.13
     "minizinc": ["minizinc"],
     "pysat": ["python-sat"],
-    "gurobi": ["gurobipy"],
+    "gurobi": ["gurobipy>=11.0.0,<=13.0.0"],
     "pysdd": ["pysdd"],
     "gcs": ["gcspy"],
     "cpo": ["docplex"],
