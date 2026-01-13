@@ -3,7 +3,7 @@ import pytest
 import cpmpy as cp
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.expressions.utils import argval
-from utils import TestCase
+from utils import TestCase, skip_on_missing_pblib
 
 @pytest.mark.usefixtures("solver")
 class TestTransLinearize(TestCase):
@@ -60,6 +60,7 @@ class TestTransLinearize(TestCase):
         safened = no_partial_functions([~expr])
         self.assertEqual(str(safened[0]), "not([boolval(False)])")
 
+    @skip_on_missing_pblib()
     def test_element_out_of_bounds(self):
         arr = cp.intvar(1,3, shape=3, name="x")
         idx = cp.intvar(-1, 4, name="i")

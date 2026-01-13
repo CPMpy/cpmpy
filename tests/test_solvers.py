@@ -12,7 +12,7 @@ from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
 from test_constraints import numexprs
-from utils import TestCase
+from utils import TestCase, skip_on_missing_pblib
 
 @pytest.mark.usefixtures("solver")
 class TestSolvers(TestCase):
@@ -1158,6 +1158,7 @@ class TestSupportedSolvers:
         assert s.solve()
         assert s.objective_value() == 5
 
+    @skip_on_missing_pblib()
     def test_bug810(self, solver):
         if solver == "pysdd":  # non-supported constraint
             pytest.skip(reason=f"{solver} does not support int*boolvar")

@@ -1,4 +1,4 @@
-from utils import TestCase
+from utils import TestCase, skip_on_missing_pblib
 import pytest
 
 import cpmpy as cp
@@ -117,6 +117,7 @@ class TestTransLinearize(TestCase):
         self.assertTrue(all(cons_vals))
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
+    @skip_on_missing_pblib()
     def test_alldiff(self):
         # alldiff has a specialized linearization
 

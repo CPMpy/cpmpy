@@ -2,7 +2,7 @@ import pytest
 import cpmpy as cp
 import numpy as np
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray, _gen_var_names
-from utils import TestCase
+from utils import TestCase, skip_on_missing_pblib
 @pytest.mark.usefixtures("solver")
 class TestSolvers(TestCase):
     def test_zero_boolvar(self):
@@ -84,6 +84,7 @@ class TestSolvers(TestCase):
         self.assertRaises(ValueError, lambda: cp.intvar(0, 10, name=("x", "BV1", "y"), shape=3))
         self.assertRaises(ValueError, lambda: cp.intvar(0,10, name=[["x","y","z"],["a", "BV0", "b"]], shape=(2,3)))
 
+    @skip_on_missing_pblib()
     def test_clear(self):
         def n_none(v):
             return sum(v.value() == None)

@@ -1,4 +1,4 @@
-from utils import TestCase
+from utils import TestCase, skip_on_missing_pblib
 import pytest
 import cpmpy as cp
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
@@ -32,6 +32,7 @@ class TestTransfReif(TestCase):
             self.assertEqual( str(only_implies(only_bv_reifies((expr,)))), strexpr )
             self.assertTrue(cp.Model(expr).solve(solver=self.solver))
 
+    @skip_on_missing_pblib()
     def test_reif_element(self):
         bvs = cp.boolvar(shape=5, name="bvs")
         iv = cp.intvar(1,10, name="iv")

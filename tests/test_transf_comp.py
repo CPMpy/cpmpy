@@ -1,4 +1,4 @@
-from utils import TestCase
+from utils import TestCase, skip_on_missing_pblib
 import pytest
 
 import cpmpy as cp
@@ -12,6 +12,7 @@ class TestTransfComp(TestCase):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
+    @skip_on_missing_pblib()
     def test_only_numexpr_eq(self):
         ivs = cp.intvar(1,9, shape=3, name="ivs")
         

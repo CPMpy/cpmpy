@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, normalized_boolexpr
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 from cpmpy.expressions.core import Operator
-from utils import TestCase
+from utils import TestCase, skip_on_missing_pblib
 
 @pytest.mark.usefixtures("solver")
 class TestFlattenModel(TestCase):
@@ -28,6 +28,7 @@ class TestFlattenModel(TestCase):
         self.assertTrue(model2.objective_ is not None)
         self.assertFalse(model2.objective_is_min)
 
+    @skip_on_missing_pblib()
     def test_abs(self):
         l = cp.intvar(0,9, shape=3)
         # bounds used to be computed wrong, making both unsat

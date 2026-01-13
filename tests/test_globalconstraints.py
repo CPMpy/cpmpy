@@ -1337,6 +1337,7 @@ class TestBounds(TestCase):
         self.assertFalse(cp.Model(expr < lb).solve(solver=self.solver))
         self.assertFalse(cp.Model(expr > ub).solve(solver=self.solver))
 
+    @skip_on_missing_pblib()
     def test_incomplete_func(self):
         # element constraint
         arr = cp.cpm_array([1,2,3])

@@ -1,6 +1,6 @@
 from utils import TestCase
 import pytest
-
+from utils import skip_on_missing_pblib
 import cpmpy as cp
 from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any
 
@@ -22,6 +22,7 @@ class TestBuiltin(TestCase):
         self.assertNotEqual(max(iv.value()), 4)
         self.assertNotEqual(cp.max(iv).value(), 4)
 
+    @skip_on_missing_pblib()
     def test_min(self):
         constraints = [cp.min(iv) + 9 == 8]
         model = cp.Model(constraints)
@@ -35,7 +36,7 @@ class TestBuiltin(TestCase):
         self.assertNotEqual(min(iv.value()), 4)
         self.assertNotEqual(cp.min(iv).value(), 4)
 
-
+    @skip_on_missing_pblib()
     def test_abs(self):
         constraints = [cp.abs(iv[0]) + 9 <= 8]
         model = cp.Model(constraints)

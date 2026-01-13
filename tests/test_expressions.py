@@ -8,10 +8,12 @@ from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
 from cpmpy.transformations.get_variables import get_variables
 
-from utils import inclusive_range, TestCase
+from utils import inclusive_range, TestCase, skip_on_missing_pblib
 
 @pytest.mark.usefixtures("solver")
-class TestComparison(TestCase):    
+class TestComparison(TestCase): 
+
+    @skip_on_missing_pblib()   
     def test_comps(self):
 
         # from the docs
@@ -223,6 +225,7 @@ class TestMul(TestCase):
 @pytest.mark.usefixtures("solver")
 class TestArrayExpressions(TestCase):
 
+    @skip_on_missing_pblib()
     def test_sum(self):
         x = cp.intvar(0,5,shape=3, name="x")
         y = cp.intvar(0, 1000, name="y")
@@ -257,6 +260,7 @@ class TestArrayExpressions(TestCase):
                 res *= v.value()
             self.assertTrue(y[i].value() == res)
 
+    @skip_on_missing_pblib()
     def test_max(self):
         x = cp.intvar(0,5,shape=3, name="x")
         y = cp.intvar(0, 1000, name="y")
@@ -271,6 +275,7 @@ class TestArrayExpressions(TestCase):
         res = np.array([max(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
+    @skip_on_missing_pblib()
     def test_min(self):
         x = cp.intvar(0,5,shape=3, name="x")
         y = cp.intvar(0, 1000, name="y")
