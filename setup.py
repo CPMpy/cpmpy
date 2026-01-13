@@ -28,7 +28,7 @@ solver_dependencies = {
     "pysat": ["python-sat>=1.8.dev4,<=1.9.dev26"],
     "gurobi": ["gurobipy>=11.0.0,<=13.0.0"],
     "pysdd": ["pysdd>=0.2.11,<=1.0.6"],
-    "gcs": ["gcspy"],
+    "gcs": ["gcspy==0.1.9"],
     "cpo": ["docplex>=2.28.240,<=2.31.254"],
     "pumpkin": ["pumpkin-solver==0.2.2"], # CPMpy requires features only available from Pumpkin version >=0.2.2
     "pindakaas": ["pindakaas>=0.2.1,<=0.3.0"],
