@@ -29,7 +29,7 @@ solver_dependencies = {
     "gurobi": ["gurobipy>=11.0.0,<=13.0.0"],
     "pysdd": ["pysdd"],
     "gcs": ["gcspy"],
-    "cpo": ["docplex"],
+    "cpo": ["docplex>=2.28.240,<=2.31.254"],
     "pumpkin": ["pumpkin-solver==0.2.2"], # CPMpy requires features only available from Pumpkin version >=0.2.2
     "pindakaas": ["pindakaas>=0.2.1,<=0.3.0"],
     "cplex": ["docplex", "cplex>=2.28.240,<=2.31.254"],
