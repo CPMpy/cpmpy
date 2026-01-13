@@ -23,7 +23,7 @@ solver_dependencies = {
     "ortools": ["ortools,>=9.3.10497,<=9.14.6206,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
     "z3": ["z3-solver>=4.8.15.0,<=4.15.4.0"],
     "choco": ["pychoco>=0.2.1,<=0.2.4"],
-    "exact": ["exact>=2.1.0"],
+    "exact": ["exact==2.2.1"], # older versions are bugger on py3.13
     "minizinc": ["minizinc"],
     "pysat": ["python-sat"],
     "gurobi": ["gurobipy"],
