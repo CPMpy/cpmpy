@@ -232,7 +232,7 @@ class TestArrayExpressions(TestCase):
         # with axis arg
         x = cp.intvar(0,5,shape=(3,3), name="x")
         y = cp.intvar(0, 1000, shape=3, name="y")
-        model = cp.Model(y == x.sum(axis=0))
+        model = cp.Model(y == x.sum(axis=1))
         model.solve(solver=self.solver)
         res = np.array([sum(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
@@ -249,7 +249,7 @@ class TestArrayExpressions(TestCase):
         # with axis arg
         x = cp.intvar(0,5,shape=(3,3), name="x")
         y = cp.intvar(0, 1000, shape=3, name="y")
-        model = cp.Model(y == x.prod(axis=0))
+        model = cp.Model(y == x.prod(axis=1))
         model.solve(solver=self.solver)
         for i,vv in enumerate(x):
             res = 1
@@ -266,7 +266,7 @@ class TestArrayExpressions(TestCase):
         # with axis arg
         x = cp.intvar(0,5,shape=(3,3), name="x")
         y = cp.intvar(0, 1000, shape=3, name="y")
-        model = cp.Model(y == x.max(axis=0))
+        model = cp.Model(y == x.max(axis=1))
         model.solve(solver=self.solver)
         res = np.array([max(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
@@ -280,7 +280,7 @@ class TestArrayExpressions(TestCase):
         # with axis arg
         x = cp.intvar(0,5,shape=(3,3), name="x")
         y = cp.intvar(0, 1000, shape=3, name="y")
-        model = cp.Model(y == x.min(axis=0))
+        model = cp.Model(y == x.min(axis=1))
         model.solve(solver=self.solver)
         res = np.array([min(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
@@ -295,7 +295,7 @@ class TestArrayExpressions(TestCase):
         # with axis arg
         x = cp.boolvar(shape=(3,3), name="x")
         y = cp.boolvar(shape=3, name="y")
-        model = cp.Model(y == x.any(axis=0))
+        model = cp.Model(y == x.any(axis=1))
         model.solve(solver=self.solver)
         res = np.array([cpm_any(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
@@ -311,7 +311,7 @@ class TestArrayExpressions(TestCase):
         # with axis arg
         x = cp.boolvar(shape=(3,3), name="x")
         y = cp.boolvar(shape=3, name="y")
-        model = cp.Model(y == x.all(axis=0))
+        model = cp.Model(y == x.all(axis=1))
         model.solve(solver=self.solver)
         res = np.array([cpm_all(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
