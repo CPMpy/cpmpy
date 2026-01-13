@@ -1,13 +1,14 @@
-import unittest
+import pytest
 
 import cpmpy as cp
 from cpmpy.expressions.core import Operator, BoolVal, Comparison
 from cpmpy.transformations.normalize import simplify_boolean, toplevel_list
+from utils import TestCase
 
+@pytest.mark.usefixtures("solver")
+class TransSimplify(TestCase):
 
-class TransSimplify(unittest.TestCase):
-
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.bvs = cp.boolvar(shape=3, name="bv")
         self.ivs = cp.intvar(0, 5, shape=3, name="iv")
 
@@ -122,7 +123,7 @@ class TransSimplify(unittest.TestCase):
         x = cp.intvar(0, 3, name="x")
         cons = (x == 2) == (bv == 4)
         self.assertEqual(str(self.transform(cons)), "[x != 2]")
-        self.assertTrue(cp.Model(cons).solve())
+        self.assertTrue(cp.Model(cons).solve(solver=self.solver))
 
         # Simplify boolean expressions nested within a weighted sum
         #   wsum([1, 2], [bv[0] != 0, bv[1] != 1]) ----> wsum([1, 2], [bv[0], ~bv[1]])
@@ -131,5 +132,5 @@ class TransSimplify(unittest.TestCase):
         bool_as_ints = cp.cpm_array([0, 1])
         cons = sum( weights * (bv != bool_as_ints) ) == 1
         self.assertEqual(str(self.transform(cons)), "[sum([1, 2] * [bv[0], ~bv[1]]) == 1]")
-        self.assertTrue(cp.Model(cons).solve())
+        self.assertTrue(cp.Model(cons).solve(solver=self.solver))
 

@@ -1,11 +1,9 @@
-import unittest
-
 import cpmpy as cp
 from cpmpy.exceptions import NotSupportedError
 
+from utils import TestCase
 
-class TestSolveAll(unittest.TestCase):
-
+class TestSolveAll(TestCase):
 
     def test_solveall_no_obj(self):
 

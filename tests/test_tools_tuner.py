@@ -1,17 +1,19 @@
 import time
-from unittest import TestCase
+from utils import TestCase
 
-from cpmpy import *
+import pytest
+
+import cpmpy as cp
 from cpmpy.tools import ParameterTuner, GridSearchTuner
 
-
-
+@pytest.mark.usefixtures("solver")
+@pytest.mark.requires_solver("ortools")
 class TunerTests(TestCase):
 
     def test_ortools(self):
-        x = intvar(lb=0, ub=10, shape=10)
-        model = Model([
-            AllDifferent(x),
+        x = cp.intvar(lb=0, ub=10, shape=10)
+        model = cp.Model([
+            cp.AllDifferent(x),
         ])
 
         tuner = ParameterTuner("ortools", model)
@@ -25,9 +27,9 @@ class TunerTests(TestCase):
 
     def test_ortools_custom(self):
 
-        x = intvar(lb=0,ub=10, shape=10)
-        model = Model([
-            AllDifferent(x),
+        x = cp.intvar(lb=0,ub=10, shape=10)
+        model = cp.Model([
+            cp.AllDifferent(x),
         ])
 
         tunables = {
@@ -50,9 +52,9 @@ class TunerTests(TestCase):
 
 
     def test_ortools_timelimit(self):
-        x = intvar(lb=0, ub=10, shape=10)
-        model = Model([
-            AllDifferent(x),
+        x = cp.intvar(lb=0, ub=10, shape=10)
+        model = cp.Model([
+            cp.AllDifferent(x),
         ])
 
         tuner = ParameterTuner("ortools", model)

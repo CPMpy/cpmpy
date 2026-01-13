@@ -1,12 +1,12 @@
-import unittest
+import pytest
 
 import cpmpy as cp
-from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.expressions.utils import argval
+from utils import TestCase
 
-
-class TestTransLinearize(unittest.TestCase):
+@pytest.mark.usefixtures("solver")
+class TestTransLinearize(TestCase):
 
     def test_division_by_zero(self):
         a = cp.intvar(1, 10, name="a")
@@ -14,11 +14,11 @@ class TestTransLinearize(unittest.TestCase):
         expr = (a // b) == 3
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
-        self.assertTrue(cp.Model(safe_expr).solve())
+        self.assertTrue(cp.Model(safe_expr).solve(solver=self.solver))
         self.assertTrue(argval(safe_expr))
 
         safened = no_partial_functions([expr | ~expr])
-        solcount = cp.Model(safened).solveAll()
+        solcount = cp.Model(safened).solveAll(solver=self.solver)
         self.assertEqual(solcount, 110)
 
         # check with reification
@@ -26,7 +26,7 @@ class TestTransLinearize(unittest.TestCase):
         reif_expr = bv == expr
         def check():
             self.assertTrue(reif_expr.value())
-        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 110)
 
     def test_division_by_zero_proper_hole(self):
@@ -35,18 +35,18 @@ class TestTransLinearize(unittest.TestCase):
         expr = (a // b) <= 3
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
-        self.assertTrue(cp.Model(safe_expr).solve())
+        self.assertTrue(cp.Model(safe_expr).solve(solver=self.solver))
         self.assertTrue(argval(safe_expr))
 
         safened = no_partial_functions([expr | ~expr])
-        solcount = cp.Model(safened).solveAll()
+        solcount = cp.Model(safened).solveAll(solver=self.solver)
         self.assertEqual(solcount, 120)
 
         bv = cp.boolvar(name="bv")
         reif_expr = bv == expr
         def check():
             self.assertTrue(reif_expr.value())
-        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 120)
 
     def test_division_by_constant_zero(self):
@@ -55,7 +55,7 @@ class TestTransLinearize(unittest.TestCase):
         expr = (a // b) <= 3
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
-        self.assertFalse(cp.Model(safe_expr).solve())
+        self.assertFalse(cp.Model(safe_expr).solve(solver=self.solver))
 
         safened = no_partial_functions([~expr])
         self.assertEqual(str(safened[0]), "not([boolval(False)])")
@@ -66,18 +66,18 @@ class TestTransLinearize(unittest.TestCase):
         expr = arr[idx] == 2
 
         safe_expr = no_partial_functions([expr])
-        self.assertTrue(cp.Model(safe_expr).solve())
+        self.assertTrue(cp.Model(safe_expr).solve(solver=self.solver))
         self.assertTrue(argval(safe_expr))
 
         safened = no_partial_functions([expr | ~expr])
-        solcount = cp.Model(safened).solveAll()
+        solcount = cp.Model(safened).solveAll(solver=self.solver)
         self.assertEqual(solcount, 162)
 
         bv = cp.boolvar(name="bv")
         reif_expr = bv == expr
         def check():
             self.assertTrue(reif_expr.value())
-        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 162)
     
     def test_multiple_partial_functions(self):
@@ -89,18 +89,18 @@ class TestTransLinearize(unittest.TestCase):
         expr = (a / b + arr[idx]) == 2
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
-        self.assertTrue(cp.Model(safe_expr).solve())
+        self.assertTrue(cp.Model(safe_expr).solve(solver=self.solver))
         self.assertTrue(argval(safe_expr))
 
         safened = no_partial_functions([expr | ~expr])
-        solcount = cp.Model(safened).solveAll()
+        solcount = cp.Model(safened).solveAll(solver=self.solver)
         self.assertEqual(solcount, 15*162)
 
         bv = cp.boolvar(name="bv")
         reif_expr = bv == expr
         def check():
             self.assertTrue(reif_expr.value())
-        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 15*162)
 
     def test_nested_partial_functions(self):
@@ -111,18 +111,18 @@ class TestTransLinearize(unittest.TestCase):
         expr = (a / arr[idx]) == 2
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
-        self.assertTrue(cp.Model(safe_expr).solve())
+        self.assertTrue(cp.Model(safe_expr).solve(solver=self.solver))
         self.assertTrue(argval(safe_expr))
 
         safened = no_partial_functions([expr | ~expr])
-        solcount = cp.Model(safened).solveAll()
+        solcount = cp.Model(safened).solveAll(solver=self.solver)
         self.assertEqual(solcount, 10*(4**3)*6)
 
         bv = cp.boolvar(name="bv")
         reif_expr = bv == expr
         def check():
             self.assertTrue(reif_expr.value())
-        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(display=check)
+        solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 10*(4**3)*6)
 
     def test_nested_partial_functions2(self):
@@ -133,4 +133,4 @@ class TestTransLinearize(unittest.TestCase):
         expr = ~((a * arr[idx]) == 0)
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
-        self.assertTrue(cp.Model([safe_expr, idx == 4]).solve())
+        self.assertTrue(cp.Model([safe_expr, idx == 4]).solve(solver=self.solver))

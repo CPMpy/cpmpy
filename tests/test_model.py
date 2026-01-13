@@ -1,31 +1,29 @@
-import unittest
 import pytest
 import tempfile
 import os
 from os.path import join
 
-from numpy import logaddexp
 import cpmpy as cp
 from cpmpy.expressions.utils import flatlist
-from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
-
-
-class TestModel(unittest.TestCase):
+from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
+from utils import TestCase
+@pytest.mark.usefixtures("solver")
+class TestModel(TestCase):
     
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.tempdir = tempfile.mkdtemp()
         print(self.tempdir)
-        return super().setUp()
+        return super().setup_method()
     
     def tearDown(self) -> None:
         os.rmdir(self.tempdir)
-        return super().tearDown()
+        return super().teardown_method()
 
     def test_ndarray(self):
         iv = cp.intvar(1,9, shape=3)
         m = cp.Model( iv > 3 )
         m += (iv[0] == 5)
-        self.assertTrue(m.solve())
+        self.assertTrue(m.solve(solver=self.solver))
 
     def test_empty(self):
         m = cp.Model()
@@ -41,7 +39,7 @@ class TestModel(unittest.TestCase):
 
         with pytest.warns(UserWarning):
             loaded = cp.Model.from_file(fname)
-            self.assertTrue(loaded.solve())
+            self.assertTrue(loaded.solve(solver=self.solver))
         os.remove(fname)
 
     def test_io_counters(self):
@@ -73,12 +71,12 @@ class TestModel(unittest.TestCase):
         memodict = dict()
         m_dcopy = m.copy()
         print(memodict)
-        m_dcopy.solve()
+        m_dcopy.solve(solver=self.solver)
 
         self.assertTrue(cons1.value())
         self.assertTrue(cons2.value())
 
-        m.solve()
+        m.solve(solver=self.solver)
 
         m2 = m.copy()
 
@@ -97,13 +95,13 @@ class TestModel(unittest.TestCase):
 
         memodict = dict()
         m_dcopy = copy.deepcopy(m, memodict)
-        m_dcopy.solve()
+        m_dcopy.solve(solver=self.solver)
 
         self.assertIsNone(cons1.value())
         self.assertIsNone(cons2.value())
         self.assertIsNone(cons3.value())
 
-        m.solve()
+        m.solve(solver=self.solver)
 
         m2 = copy.deepcopy(m)
 

@@ -1,37 +1,30 @@
-import unittest
-
 import cpmpy as cp
 from cpmpy.exceptions import NotSupportedError
-from cpmpy import SolverLookup
 
 import pytest
 
 
-@pytest.mark.parametrize(
-        "solver",
-        [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-)
+@pytest.mark.usefixtures("solver") 
 class TestSolutionHinting:
 
-    def test_hints(self, solver):
-
+    def test_hints(self):
         a,b = cp.boolvar(shape=2)
         model = cp.Model(a | b)
 
-        slv = cp.SolverLookup.get(solver, model)
+        slv = cp.SolverLookup.get(self.solver, model)
         try:
             slv.solution_hint([], [])
         except NotSupportedError:
-            pytest.skip(f"{solver} does not support solution hinting")
+            pytest.skip(f"{self.solver} does not support solution hinting")
             return
         
-        if solver == "gurobi":
+        if self.solver == "gurobi":
             pytest.skip("Gurobi supports solution hinting, but simple models are solved too fast to see the effect")
             return
         
-        if solver == "ortools":
+        if self.solver == "ortools" or self.solver is None:
             args = {"cp_model_presolve": False} # hints are not taken into account in presolve
-        elif solver == "cplex":
+        elif self.solver == "cplex":
             args = {"clean_before_solve": True} # will continue from previous solution otherwise
         else:
             args = {}

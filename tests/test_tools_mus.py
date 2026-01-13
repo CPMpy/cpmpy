@@ -1,11 +1,12 @@
 import unittest
-from unittest import TestCase
+import pytest
+from utils import TestCase
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive
 
-
+@pytest.mark.usefixtures("solver")
 class MusTests(TestCase):
 
     def __init__(self, *args, **kwargs):
@@ -81,10 +82,10 @@ class MusTests(TestCase):
         #self.assertEqual(set(mus(cons)), set(cons[1:3]))
         ms = self.mus_func(cons)
         self.assertLess(len(ms), len(cons))
-        self.assertFalse(cp.Model(ms).solve())
+        self.assertFalse(cp.Model(ms).solve(solver=self.solver))
         ms = self.naive_func(cons)
         self.assertLess(len(ms), len(cons))
-        self.assertFalse(cp.Model(ms).solve())
+        self.assertFalse(cp.Model(ms).solve(solver=self.solver))
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
 
 
@@ -194,7 +195,7 @@ class MARCOMUSTests(MusTests):
 
 
 
-class MSSTests(unittest.TestCase):
+class MSSTests(TestCase):
 
     def test_circular(self):
         x = cp.intvar(0, 3, shape=4, name="x")
@@ -212,7 +213,7 @@ class MSSTests(unittest.TestCase):
         self.assertIn(cons[4], set(mss_opt(cons, weights=[1,1,1,1,5]))) # weighted version
 
 
-class MCSTests(unittest.TestCase):
+class MCSTests(TestCase):
 
     def test_circular(self):
         x = cp.intvar(0, 3, shape=4, name="x")
@@ -228,6 +229,3 @@ class MCSTests(unittest.TestCase):
         self.assertEqual(len(mcs(cons)), 1)
 
 
-
-if __name__ == '__main__':
-    unittest.main()
