@@ -25,7 +25,7 @@ solver_dependencies = {
     "choco": ["pychoco>=0.2.1,<=0.2.4"],
     "exact": ["exact==2.2.1"], # older versions are bugger on py3.13
     "minizinc": ["minizinc>=0.7.0,<=0.10.0"],
-    "pysat": ["python-sat"],
+    "pysat": ["python-sat>=1.8.dev4,<=1.9.dev26"],
     "gurobi": ["gurobipy>=11.0.0,<=13.0.0"],
     "pysdd": ["pysdd"],
     "gcs": ["gcspy"],
