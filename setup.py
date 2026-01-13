@@ -24,7 +24,7 @@ solver_dependencies = {
     "z3": ["z3-solver>=4.8.15.0,<=4.15.4.0"],
     "choco": ["pychoco>=0.2.1,<=0.2.4"],
     "exact": ["exact==2.2.1"], # older versions are bugger on py3.13
-    "minizinc": ["minizinc"],
+    "minizinc": ["minizinc>=0.7.0,<=0.10.0"],
     "pysat": ["python-sat"],
     "gurobi": ["gurobipy>=11.0.0,<=13.0.0"],
     "pysdd": ["pysdd"],
@@ -32,7 +32,7 @@ solver_dependencies = {
     "cpo": ["docplex"],
     "pumpkin": ["pumpkin-solver==0.2.2"], # CPMpy requires features only available from Pumpkin version >=0.2.2
     "pindakaas": ["pindakaas>=0.2.1,<=0.3.0"],
-    "cplex": ["docplex", "cplex"],
+    "cplex": ["docplex", "cplex>=2.28.240,<=2.31.254"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
