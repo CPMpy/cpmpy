@@ -1,11 +1,11 @@
 import cpmpy as cp
 from cpmpy.exceptions import NotSupportedError
-
+from utils import TestCase
 import pytest
 
 
 @pytest.mark.usefixtures("solver") 
-class TestSolutionHinting:
+class TestSolutionHinting(TestCase):
 
     def test_hints(self):
         a,b = cp.boolvar(shape=2)
