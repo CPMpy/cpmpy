@@ -32,7 +32,7 @@ Supported solvers
      - The default solver
    * - :doc:`Pumpkin <api/solvers/pumpkin>`
      - CP (LCG)
-     - SAT ASAT ISAT ALLSAT - OPT - PROOF
+     - SAT ASAT ALLSAT - OPT - PROOF
      - local install (maturin)
      - 
    * - :doc:`GCS <api/solvers/gcs>`
@@ -62,7 +62,7 @@ Supported solvers
      - 
    * - :doc:`Hexaly <api/solvers/hexaly>`
      - Global Opt.
-     - SAT ALLSAT - OPT IOPT
+     - SAT ISAT ALLSAT - OPT IOPT
      - pip + local + (aca.) licence
      -
    * - :doc:`Gurobi <api/solvers/gurobi>`
@@ -72,7 +72,7 @@ Supported solvers
      - 
    * - :doc:`CPLEX <api/solvers/cplex>`
      - ILP
-     - SAT ISAT - OPT IOPT - PAR
+     - SAT - OPT IOPT - PAR
      - pip + local + (aca.) license
      - No
      - 
