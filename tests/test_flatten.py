@@ -35,6 +35,8 @@ class TestFlattenModel(TestCase):
         self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) < 0).solve(solver=self.solver) )
         self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) > 0).solve(solver=self.solver) )
 
+    @pytest.mark.skip_for_solver("pysat", "linearisation of integer multiplication is not supported")
+    @pytest.mark.skip_for_solver("pindakaas", "linearisation of integer multiplication is not supported")
     def test_mod(self):
         iv1 = cp.intvar(2,9)
         iv2 = cp.intvar(5,9)

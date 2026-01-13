@@ -240,6 +240,8 @@ class TestArrayExpressions(TestCase):
         res = np.array([sum(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
+    @pytest.mark.skip_for_solver("pysat", "linearisation of integer multiplication is not supported")
+    @pytest.mark.skip_for_solver("pindakaas", "linearisation of integer multiplication is not supported")
     def test_prod(self):
         x = cp.intvar(0,5,shape=3, name="x")
         y = cp.intvar(0, 1000, name="y")

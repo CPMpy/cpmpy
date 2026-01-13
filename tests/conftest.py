@@ -179,6 +179,7 @@ MARKERS = {
     "requires_solver": "mark test as requiring a specific solver",          # to filter (not skip) tests when required solver is not installed
     "requires_dependency": "mark test as requiring a specific dependency",  # to filter (not skip) tests when required dependency is not installed
     "generate_constraints": "mark test as generating constraints",          # to make multiple copies of the same test, based on a generated set of constraints
+    "skip_for_solver": "mark test as skipping for a specific solver",       # to skip test for a specific solver
 }
 
 # ---------------------------------------------------------------------------- #
@@ -366,12 +367,45 @@ def pytest_collection_modifyitems(config, items):
     skipped_solver_specific = 0
     skipped_parametrized = 0
     skipped_solver_fixture = 0
+    skipped_for_solver = 0
     
     for item in items:
         # Markers
         required_solver_marker = item.get_closest_marker("requires_solver")
         required_dependency_marker = item.get_closest_marker("requires_dependency")
 
+        """
+        Solver parametrisation
+            i.e. get the solver with which the test was parametrised
+        """
+        
+        parametrised_solver = None # will hold solver with which the test was parametrised
+
+        # A) Test item is a method
+        #    try to get solver from item.callspec
+        if hasattr(item, "callspec") and item.callspec is not None:
+            if hasattr(item.callspec, "params") and "solver" in item.callspec.params:
+                parametrised_solver = item.callspec.params["solver"]
+
+        # B) Test item is a unittest test class
+        #    For test classes, parametrization might be on the class (parent) level
+        if parametrised_solver is None and hasattr(item, "parent") and item.parent is not None:
+            # Check parent's callspec (for class-level parametrization)
+            if hasattr(item.parent, "callspec") and item.parent.callspec is not None:
+                if hasattr(item.parent.callspec, "params") and "solver" in item.parent.callspec.params:
+                    parametrised_solver = item.parent.callspec.params["solver"]
+
+        # ----------------------------- Marked filtering ----------------------------- #
+
+        # Check all skip_for_solver markers (support multiple occurrences)
+        for skip_for_solver_marker in item.iter_markers("skip_for_solver"):
+            solver_name, reason = skip_for_solver_marker.args
+            if solver_name == parametrised_solver:
+                item.add_marker(pytest.mark.skip(reason=reason))
+                skipped_for_solver += 1
+                filtered.append(item)
+                break  # Found a match, no need to check other markers
+        
         # --------------------------------- Dependency filtering --------------------------------- #
 
         # Skip test if the required dependency is not installed
@@ -385,26 +419,7 @@ def pytest_collection_modifyitems(config, items):
         # A) Solver-specific test
         if required_solver_marker:
             
-            """
-            Solver parametrisation
-                i.e. get the solver with which the test was parametrised
-            """
             
-            parametrised_solver = None # will hold solver with which the test was parametrised
-
-            # A) Test item is a method
-            #    try to get solver from item.callspec
-            if hasattr(item, "callspec") and item.callspec is not None:
-                if hasattr(item.callspec, "params") and "solver" in item.callspec.params:
-                    parametrised_solver = item.callspec.params["solver"]
-
-            # B) Test item is a unittest test class
-            #    For test classes, parametrization might be on the class (parent) level
-            if parametrised_solver is None and hasattr(item, "parent") and item.parent is not None:
-                # Check parent's callspec (for class-level parametrization)
-                if hasattr(item.parent, "callspec") and item.parent.callspec is not None:
-                    if hasattr(item.parent.callspec, "params") and "solver" in item.parent.callspec.params:
-                        parametrised_solver = item.parent.callspec.params["solver"]
 
             """
             Solver filtering

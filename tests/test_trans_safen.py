@@ -8,6 +8,8 @@ from utils import TestCase, skip_on_missing_pblib
 @pytest.mark.usefixtures("solver")
 class TestTransLinearize(TestCase):
 
+    @pytest.mark.skip_for_solver("pysat", "linearisation of integer multiplication is not supported")
+    @pytest.mark.skip_for_solver("pindakaas", "linearisation of integer multiplication is not supported")
     def test_division_by_zero(self):
         a = cp.intvar(1, 10, name="a")
         b = cp.intvar(0, 10, name="b")
@@ -29,6 +31,8 @@ class TestTransLinearize(TestCase):
         solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 110)
 
+    @pytest.mark.skip_for_solver("pysat", "linearisation of integer multiplication is not supported")
+    @pytest.mark.skip_for_solver("pindakaas", "linearisation of integer multiplication is not supported")
     def test_division_by_zero_proper_hole(self):
         a = cp.intvar(1, 10, name="a")
         b = cp.intvar(-1, 10, name="b")
@@ -81,6 +85,8 @@ class TestTransLinearize(TestCase):
         solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 162)
     
+    @pytest.mark.skip_for_solver("pysat", "linearisation of integer multiplication is not supported")
+    @pytest.mark.skip_for_solver("pindakaas", "linearisation of integer multiplication is not supported")
     def test_multiple_partial_functions(self):
         a = cp.intvar(1, 5)
         b = cp.intvar(0, 2)
@@ -104,6 +110,8 @@ class TestTransLinearize(TestCase):
         solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 15*162)
 
+    @pytest.mark.skip_for_solver("pysat", "linearisation of integer multiplication is not supported")
+    @pytest.mark.skip_for_solver("pindakaas", "linearisation of integer multiplication is not supported")
     def test_nested_partial_functions(self):
         a = cp.intvar(1, 10)
         arr = cp.intvar(0,3, shape=3, name="x")
@@ -126,6 +134,8 @@ class TestTransLinearize(TestCase):
         solcount = cp.Model(no_partial_functions([reif_expr])).solveAll(solver=self.solver, display=check)
         self.assertEqual(solcount, 10*(4**3)*6)
 
+    @pytest.mark.skip_for_solver("pysat", "linearisation of integer multiplication is not supported")
+    @pytest.mark.skip_for_solver("pindakaas", "linearisation of integer multiplication is not supported")
     def test_nested_partial_functions2(self):
         a = cp.intvar(1, 10)
         arr = cp.intvar(0,3, shape=3, name="x")
