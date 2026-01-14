@@ -440,12 +440,14 @@ def pytest_collection_modifyitems(config, items):
             """
 
             # skip test if the required solver is not installed
+            # Note: item is already in filtered list if it passed filtering above
             if parametrised_solver is not None:
                 if not cp.SolverLookup.lookup(parametrised_solver).supported():
                     skip = pytest.mark.skip(reason=f"Solver {parametrised_solver} not installed")
                     item.add_marker(skip)
                     skipped_solver_specific += 1
-                    filtered.append(item) # included
+                    # Item already added to filtered above, just mark it for skip
+                    continue
 
         # B) Non-solver-specific test
         else:
@@ -459,6 +461,8 @@ def pytest_collection_modifyitems(config, items):
                 if uses_solver_fixture:
                     skipped_solver_fixture += 1
                     continue # filtered out
+                else:
+                    filtered.append(item) # included
 
             # keep non-parametrized tests that don't depend on solver
             else:
