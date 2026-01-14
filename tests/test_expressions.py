@@ -78,6 +78,7 @@ class TestSum(TestCase):
         self.assertEqual(expr.name, 'sum')
         self.assertEqual(len(expr.args), 3)
 
+    @pytest.mark.skip_for_solver("pindakaas", "pindakaas does not support an objective function")
     def test_sum_unary(self):
         v = cp.intvar(1,9)
         model = cp.Model(v>=1, minimize=sum([v]))
