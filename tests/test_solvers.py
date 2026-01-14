@@ -1196,6 +1196,7 @@ class TestSupportedSolvers:
         assert s.solve()
         assert s.objective_value() == 5
 
+    @skip_on_missing_pblib()
     def test_bug810(self, solver):
         if solver == "pysdd":  # non-supported constraint
             pytest.skip(reason=f"{solver} does not support int*boolvar")
