@@ -8,7 +8,7 @@ CPMpy has an extensive test suite, covering all major components including varia
 
 Run all tests:
 ```bash
-pytest tests
+pytest tests/
 ```
 
 Run a specific test file:
@@ -44,12 +44,14 @@ pip install pytest-xdist
 
 ### Solver Selection
 
-The test suite supports changing the solver backend used to run the tests via the `--solver` command-line option:
+The test suite supports changing the solver backend used to run the tests via the `--solver` command-line option.
+
+For now, this only affects tests/test_constraints.py, but it will gradually be added to the entire test-suite.
 
 #### Single Solver
 Run tests with a specific solver:
 ```bash
-pytest --solver=gurobi
+pytest tests/ --solver=gurobi
 ```
 
 #### Multiple Solvers
@@ -58,13 +60,13 @@ Run tests with multiple solvers
 - other non-solver-specific tests will only run against the default solver (OR-Tools)
 - solver-specific tests will be filtered on specified solvers
 ```bash
-pytest --solver=ortools,cplex,gurobi
+pytest tests/ --solver=ortools,cplex,gurobi
 ```
 
 #### All Installed Solvers
 Run tests with all installed solvers:
 ```bash
-pytest --solver=all
+pytest tests/ --solver=all
 ```
 
 This automatically detects all installed solvers from `SolverLookup` and parametrises the subset of non-solver-specific tests to run against each one.
