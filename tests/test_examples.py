@@ -89,9 +89,9 @@ def test_example(solver, example):
     finally:
         SolverLookup.base_solvers = base_solvers
 
-
 @pytest.mark.parametrize("example", ADVANCED_EXAMPLES)
 @pytest.mark.timeout(30)
+@pytest.mark.depends_on_solver # let pytest know this test indirectly depends on the solver fixture
 def test_advanced_example(example):
     """Loads the advanced example file and executes its __main__ block with no default solver set."""
     if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):

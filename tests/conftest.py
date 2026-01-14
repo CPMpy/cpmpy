@@ -178,9 +178,10 @@ during test parametrisation and filtering.
 """
 
 MARKERS = {
-    "requires_solver": "mark test as requiring a specific solver",          # to filter (not skip) tests when required solver is not installed
-    "requires_dependency": "mark test as requiring a specific dependency",  # to filter (not skip) tests when required dependency is not installed
-    "generate_constraints": "mark test as generating constraints",          # to make multiple copies of the same test, based on a generated set of constraints
+    "requires_solver": "mark test as requiring a specific solver",                      # to filter (not skip) tests when required solver is not installed
+    "requires_dependency": "mark test as requiring a specific dependency",              # to filter (not skip) tests when required dependency is not installed
+    "generate_constraints": "mark test as generating constraints",                      # to make multiple copies of the same test, based on a generated set of constraints
+    "depends_on_solver": "mark test as depending on solvers (directly or indirectly)",  # for marking tests that indirectly use a solver (without using the solver fixture)
 }
 
 # ---------------------------------------------------------------------------- #
@@ -373,6 +374,7 @@ def pytest_collection_modifyitems(config, items):
         # Markers
         required_solver_marker = item.get_closest_marker("requires_solver")
         required_dependency_marker = item.get_closest_marker("requires_dependency")
+        depends_on_solver_marker = item.get_closest_marker("depends_on_solver")
 
         # --------------------------------- Dependency filtering --------------------------------- #
 
@@ -383,6 +385,9 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(skip)
                 skipped_dependency += 1
                 # Continue with the rest of the logic, test might still be filtered out
+
+        if depends_on_solver_marker and (cmd_solvers is not None and len(cmd_solvers) == 0):
+            continue # skip test
 
         # A) Solver-specific test
         if required_solver_marker:

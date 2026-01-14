@@ -111,6 +111,7 @@ Tests can be marked with special markers:
 - **`@pytest.mark.requires_solver("solver_name_1", "solver_name_2", ...)`** - Test requires a specific solver, one of the listed names
 - **`@pytest.mark.requires_dependency("package_name")`** - Test requires a specific Python package
 - **`@pytest.mark.generate_constraints.with_args(generator_function)`** - Parametrise test's "constraint" argument using the provided generator
+- **`@pytest.mark.depends_on_solver`** - Test indirectly depends on solvers
 
 
 Examples:
