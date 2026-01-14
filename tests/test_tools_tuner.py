@@ -6,7 +6,7 @@ from cpmpy.tools import ParameterTuner, GridSearchTuner
 
 
 
-class TunerTests(TestCase):
+class TestTuner:
 
     def test_ortools(self):
         x = intvar(lb=0, ub=10, shape=10)
@@ -15,13 +15,13 @@ class TunerTests(TestCase):
         ])
 
         tuner = ParameterTuner("ortools", model)
-        self.assertIsNotNone(tuner.tune(max_tries=100, fix_params={"num_search_workers":1}))
-        self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
+        assert tuner.tune(max_tries=100, fix_params={"num_search_workers":1}) is not None
+        assert tuner.best_runtime <= tuner.base_runtime
 
         # run again with grid search tuner
         tuner = GridSearchTuner("ortools", model)
-        self.assertIsNotNone(tuner.tune(max_tries=100, fix_params={"num_search_workers": 1}))
-        self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
+        assert tuner.tune(max_tries=100, fix_params={"num_search_workers": 1}) is not None
+        assert tuner.best_runtime <= tuner.base_runtime
 
     def test_ortools_custom(self):
 
@@ -39,13 +39,13 @@ class TunerTests(TestCase):
         }
 
         tuner = ParameterTuner("ortools", model, tunables, defaults)
-        self.assertIsNotNone(tuner.tune(max_tries=100, fix_params={"num_search_workers":1}))
-        self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
+        assert tuner.tune(max_tries=100, fix_params={"num_search_workers":1}) is not None
+        assert tuner.best_runtime <= tuner.base_runtime
 
         # run again with grid search tuner
         tuner = GridSearchTuner("ortools", model, tunables, defaults)
-        self.assertIsNotNone(tuner.tune(max_tries=100, fix_params={"num_search_workers": 1}))
-        self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
+        assert tuner.tune(max_tries=100, fix_params={"num_search_workers": 1}) is not None
+        assert tuner.best_runtime <= tuner.base_runtime
 
 
 
@@ -58,19 +58,19 @@ class TunerTests(TestCase):
         tuner = ParameterTuner("ortools", model)
 
         start = time.time()
-        self.assertIsNotNone(tuner.tune(max_tries=100, fix_params={"num_search_workers":1}))
+        assert tuner.tune(max_tries=100, fix_params={"num_search_workers":1}) is not None
         end = time.time()
 
-        self.assertLessEqual(10, 1.05 * end - start)
-        self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
+        assert 10 <= 1.05 * end - start
+        assert tuner.best_runtime <= tuner.base_runtime
 
 
         # run again with grid search tuner
         tuner = GridSearchTuner("ortools", model)
 
         start = time.time()
-        self.assertIsNotNone(tuner.tune(max_tries=100, fix_params={"num_search_workers": 1}))
+        assert tuner.tune(max_tries=100, fix_params={"num_search_workers": 1}) is not None
         end = time.time()
 
-        self.assertLessEqual(10, 1.05 * end - start)
-        self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
+        assert 10 <= 1.05 * end - start
+        assert tuner.best_runtime <= tuner.base_runtime

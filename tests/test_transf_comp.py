@@ -6,8 +6,8 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
-class TestTransfComp(unittest.TestCase):
-    def setUp(self):
+class TestTransfComp:
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
@@ -26,7 +26,5 @@ class TestTransfComp(unittest.TestCase):
         transform = lambda expr: only_numexpr_equality(flatten_constraint(expr))
 
         for (expr, strexpr) in cases:
-            self.assertSetEqual( set([str(c) for c in transform(expr)]), set(strexpr) )
-            self.assertTrue(cp.Model(expr).solve())
-
-
+            assert  set([str(c) for c in transform(expr)]) == set(strexpr)
+            assert cp.Model(expr).solve()

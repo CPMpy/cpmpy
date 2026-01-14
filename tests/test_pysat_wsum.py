@@ -20,8 +20,8 @@ def test_pypblib_error():
     assert CPM_pysat(cp.Model(1*cp.boolvar() + 1 * cp.boolvar() + 1 * cp.boolvar() <= 2)).solve()
 
 @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
-class TestEncodePseudoBooleanConstraint(unittest.TestCase):
-    def setUp(self):
+class TestEncodePseudoBooleanConstraint:
+    def setup_method(self):
         self.bv = boolvar(shape=3)
 
     def test_pysat_simple_atmost(self):
@@ -46,7 +46,7 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
         )
         ps = CPM_pysat(ls)
         solved = ps.solve()
-        self.assertTrue(solved)
+        assert solved
 
     def test_pysat_unsat(self):
         ls = cp.Model(
@@ -57,7 +57,7 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
 
         ps = CPM_pysat(ls)
         solved = ps.solve()
-        self.assertFalse(solved)
+        assert not solved
 
     def test_encode_pb_expressions(self):
         expressions = [
@@ -96,4 +96,3 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

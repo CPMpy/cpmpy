@@ -1,3 +1,4 @@
+import pytest
 import unittest
 from unittest import TestCase
 
@@ -6,7 +7,7 @@ from cpmpy.tools import mss_opt, marco, OCUSException
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive
 
 
-class MusTests(TestCase):
+class TestMus:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -25,8 +26,8 @@ class MusTests(TestCase):
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
 
-        self.assertEqual(set(self.mus_func(cons)), set(cons[:3]))
-        self.assertEqual(set(self.naive_func(cons)), set(cons[:3]))
+        assert set(self.mus_func(cons)) == set(cons[:3])
+        assert set(self.naive_func(cons)) == set(cons[:3])
 
     def test_bug_191(self):
         """
@@ -38,9 +39,9 @@ class MusTests(TestCase):
         soft = [bv]
 
         mus_cons = self.mus_func(soft=soft, hard=hard, solver="ortools") # crashes
-        self.assertEqual(set(mus_cons), set(soft))
+        assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
-        self.assertEqual(set(mus_naive_cons), set(soft))
+        assert set(mus_naive_cons) == set(soft)
 
     def test_bug_191_many_soft(self):
         """
@@ -56,9 +57,9 @@ class MusTests(TestCase):
         ]
 
         mus_cons = self.mus_func(soft=soft, hard=hard) # crashes
-        self.assertEqual(set(mus_cons), set(soft))
+        assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
-        self.assertEqual(set(mus_naive_cons), set(soft))
+        assert set(mus_naive_cons) == set(soft)
 
     def test_wglobal(self):
         x = cp.intvar(-9, 9, name="x")
@@ -80,11 +81,11 @@ class MusTests(TestCase):
         # non-determinstic
         #self.assertEqual(set(mus(cons)), set(cons[1:3]))
         ms = self.mus_func(cons)
-        self.assertLess(len(ms), len(cons))
-        self.assertFalse(cp.Model(ms).solve())
+        assert len(ms) < len(cons)
+        assert not cp.Model(ms).solve()
         ms = self.naive_func(cons)
-        self.assertLess(len(ms), len(cons))
-        self.assertFalse(cp.Model(ms).solve())
+        assert len(ms) < len(cons)
+        assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
 
 
@@ -104,14 +105,14 @@ class QuickXplainTests(MusTests):
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.mus_func([a,b,c,d],hard)
-        self.assertSetEqual(set(subset), {a,b,c})
+        assert set(subset) == {a,b,c}
         subset2 = self.mus_func([d,c,b,a], hard)
-        self.assertSetEqual(set(subset2), {b,d})
+        assert set(subset2) == {b,d}
 
         subset = self.naive_func([a, b, c, d], hard)
-        self.assertSetEqual(set(subset), {a, b, c})
+        assert set(subset) == {a, b, c}
         subset2 = self.naive_func([d, c, b, a], hard)
-        self.assertSetEqual(set(subset2), {b, d})
+        assert set(subset2) == {b, d}
 
 class OptimalMUSTests(MusTests):
 
@@ -128,18 +129,18 @@ class OptimalMUSTests(MusTests):
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.mus_func([a, b, c, d], hard, weights = [1,1,2,4])
-        self.assertSetEqual(set(subset), {a, b, c})
+        assert set(subset) == {a, b, c}
         subset2 = self.mus_func([a,b,c,d], hard, weights= [2,3,4,2])
-        self.assertSetEqual(set(subset2), {b, d})
+        assert set(subset2) == {b, d}
         subset3 = self.mus_func([a,b,c,d], hard)
-        self.assertEqual(set(subset3), {b,d})
+        assert set(subset3) == {b,d}
 
         subset = self.mus_func_naive([a, b, c, d], hard, weights=[1, 1, 2, 4])
-        self.assertSetEqual(set(subset), {a, b, c})
+        assert set(subset) == {a, b, c}
         subset2 = self.mus_func_naive([a, b, c, d], hard, weights=[2, 3, 4, 2])
-        self.assertSetEqual(set(subset2), {b, d})
+        assert set(subset2) == {b, d}
         subset3 = self.mus_func_naive([a, b, c, d], hard)
-        self.assertEqual(set(subset3), {b, d})
+        assert set(subset3) == {b, d}
 
 class OCUSTests(OptimalMUSTests):
 
@@ -156,17 +157,17 @@ class OCUSTests(OptimalMUSTests):
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.mus_func([a, b, c, d], hard=hard, meta_constraint = ~b | d)
-        self.assertSetEqual(set(subset), {b,d})
+        assert set(subset) == {b,d}
         subset2 = self.mus_func([a,b,c,d], hard, meta_constraint = a & d)
-        self.assertSetEqual(set(subset2), {a,b,d}) # not subset-minimal
-        self.assertRaises(OCUSException, lambda: self.mus_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
+        assert set(subset2) == {a,b,d}# not subset-minimal
+        pytest.raises(OCUSException, lambda: self.mus_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
 
         hard = [~cp.all(mus1), ~cp.all(mus2)]
         subset = self.naive_func([a, b, c, d], hard=hard, meta_constraint = ~b | d)
-        self.assertSetEqual(set(subset), {b,d})
+        assert set(subset) == {b,d}
         subset2 = self.naive_func([a,b,c,d], hard, meta_constraint = a & d)
-        self.assertSetEqual(set(subset2), {a,b,d}) # not subset-minimal
-        self.assertRaises(OCUSException, lambda: self.naive_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
+        assert set(subset2) == {a,b,d}# not subset-minimal
+        pytest.raises(OCUSException, lambda: self.naive_func([a,b,c,d], hard, meta_constraint = ~b)) # does not exist
 
 
 
@@ -181,38 +182,20 @@ class MARCOMUSTests(MusTests):
         subsets = list(marco(soft=model.constraints))
         musses = [ss for kind, ss in subsets if kind == "MUS"]
         mcses = [ss for kind, ss in subsets if kind == "MCS"]
-        self.assertEqual(len(musses), 5)
-        self.assertEqual(len(mcses), 13)
+        assert len(musses) == 5
+        assert len(mcses) == 13
 
         # also works when only enumerating MUSes?
         musses = list(marco(soft=model.constraints, return_mcs=False))
-        self.assertEqual(len(musses), 5)
+        assert len(musses) == 5
         # or only MCSes?
         mcses = list(marco(soft=model.constraints, return_mus=False))
-        self.assertEqual(len(mcses), 13) # any combination of 3 pigeon constraints + 3 mcses with the hole constraints
+        assert len(mcses) == 13# any combination of 3 pigeon constraints + 3 mcses with the hole constraints
 
 
 
 
-class MSSTests(unittest.TestCase):
-
-    def test_circular(self):
-        x = cp.intvar(0, 3, shape=4, name="x")
-        # circular "bigger then", UNSAT
-        cons = [
-            x[0] > x[1],
-            x[1] > x[2],
-            x[2] > x[0],
-
-            x[3] > x[0],
-            (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
-        ]
-
-        self.assertLess(len(mss(cons)), len(cons))
-        self.assertIn(cons[4], set(mss_opt(cons, weights=[1,1,1,1,5]))) # weighted version
-
-
-class MCSTests(unittest.TestCase):
+class TestMSS:
 
     def test_circular(self):
         x = cp.intvar(0, 3, shape=4, name="x")
@@ -225,7 +208,25 @@ class MCSTests(unittest.TestCase):
             x[3] > x[0],
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
-        self.assertEqual(len(mcs(cons)), 1)
+
+        assert len(mss(cons)) < len(cons)
+        assert cons[4] in set(mss_opt(cons, weights=[1,1,1,1,5]))# weighted version
+
+
+class TestMCS:
+
+    def test_circular(self):
+        x = cp.intvar(0, 3, shape=4, name="x")
+        # circular "bigger then", UNSAT
+        cons = [
+            x[0] > x[1],
+            x[1] > x[2],
+            x[2] > x[0],
+
+            x[3] > x[0],
+            (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
+        ]
+        assert len(mcs(cons)) == 1
 
 
 

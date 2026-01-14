@@ -12,7 +12,7 @@ import pytest
 
 
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
-class TestToCnf(unittest.TestCase):
+class TestToCnf:
     def test_tocnf(self):
         a, b, clause = cp.boolvar(shape=3)
         x = cp.intvar(1, 2)
