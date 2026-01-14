@@ -8,7 +8,7 @@ CPMpy has an extensive test suite, covering all major components including varia
 
 Run all tests:
 ```bash
-pytest
+pytest tests
 ```
 
 Run a specific test file:
@@ -17,8 +17,11 @@ pytest tests/test_model.py
 ```
 
 Run a specific test:
-```bash
+```raw
 pytest tests/test_model.py::TestModel::test_ndarray
+                                |            |
+                       (name of the class)   |
+                                 (name of the test method)
 ```
 
 ### Parallelisation
@@ -29,7 +32,7 @@ E.g. running with 40 workers:
 pytest -n 40 tests/test_model.py
 ```
 
-Or letting pytest decide how many workers to use:
+Or letting pytest auto-decide how many workers to use based on the number of available cores on your machine:
 ```console
 pytest -n auto tests/test_model.py
 ```
@@ -51,7 +54,8 @@ pytest --solver=gurobi
 
 #### Multiple Solvers
 Run tests with multiple solvers
-- non-solver-specific tests will run against all specified solvers
+- certain non-solver-specific tests (test_constraints, test_solverinterface, test_solvers_solhint) will run against all specified solvers
+- other non-solver-specific tests will only run against the default solver (OR-Tools)
 - solver-specific tests will be filtered on specified solvers
 ```bash
 pytest --solver=ortools,cplex,gurobi
@@ -63,7 +67,7 @@ Run tests with all installed solvers:
 pytest --solver=all
 ```
 
-This automatically detects all installed solvers from `SolverLookup` and parametrises non-solver-specific tests to run against each one.
+This automatically detects all installed solvers from `SolverLookup` and parametrises the subset of non-solver-specific tests to run against each one.
 
 #### Skip Solver Tests
 Skip all solver-parametrised tests (only run tests that don't depend on solver parametrisation).
@@ -217,6 +221,8 @@ def test_cplex_feature():
     # Test cplex-specific functionality
     pass
 ```
+
+You can pass multiple solvers, for all of which the test will be run.
 
 ## Contributing
 
