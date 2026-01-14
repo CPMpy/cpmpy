@@ -1,14 +1,10 @@
-
-import pytest
+import unittest
 import cpmpy as cp
-from cpmpy.transformations.flatten_model import flatten_model, flatten_constraint, flatten_objective, get_or_make_var, normalized_boolexpr
+from cpmpy.transformations.flatten_model import *
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
-from cpmpy.expressions.core import Operator
-from utils import TestCase
 
-@pytest.mark.usefixtures("solver")
-class TestFlattenModel(TestCase):
-    def setup_method(self):
+class TestFlattenModel(unittest.TestCase):
+    def setUp(self):
         self.ivars = cp.intvar(1, 10, (5,))
         self.bvars = cp.boolvar((2,))
         #self.constraints = [self.ivars != 3] # should work in future (broadcasting)
@@ -31,18 +27,18 @@ class TestFlattenModel(TestCase):
     def test_abs(self):
         l = cp.intvar(0,9, shape=3)
         # bounds used to be computed wrong, making both unsat
-        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) < 0).solve(solver=self.solver) )
-        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) > 0).solve(solver=self.solver) )
+        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) < 0).solve() )
+        self.assertTrue( cp.Model(abs(l[0]-l[1])- abs(l[2]-l[1]) > 0).solve() )
 
     def test_mod(self):
         iv1 = cp.intvar(2,9)
         iv2 = cp.intvar(5,9)
         m = cp.Model([(iv1+iv2) % 2 >= 0, (iv1+iv2) % 2 <= 1])
-        self.assertTrue( m.solve(solver=self.solver) )
+        self.assertTrue( m.solve() )
 
 
-class TestFlattenConstraint(TestCase):
-    def setup_method(self):
+class TestFlattenConstraint(unittest.TestCase):
+    def setUp(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
         self.ivars = cp.intvar(1, 10, shape=(5,))
@@ -81,8 +77,8 @@ class TestFlattenConstraint(TestCase):
         e = ((a > 5) == (b < 3))
         self.assertEqual(len(flatten_constraint(e)), 2)
     
-class TestFlattenExpr(TestCase):
-    def setup_method(self):
+class TestFlattenExpr(unittest.TestCase):
+    def setUp(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
         self.ivars = cp.intvar(1, 10, shape=(5,))

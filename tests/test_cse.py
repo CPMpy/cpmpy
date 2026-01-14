@@ -1,4 +1,4 @@
-from utils import TestCase
+import unittest
 import cpmpy as cp
 
 from cpmpy.transformations.comparison import only_numexpr_equality
@@ -6,13 +6,14 @@ from cpmpy.transformations.flatten_model import flatten_constraint, flatten_obje
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 from cpmpy.transformations.linearize import linearize_constraint
+from cpmpy.transformations.reification import only_bv_reifies
 
 
-class TestCSE(TestCase):
+class TestCSE(unittest.TestCase):
 
-    def setup_method(self) -> None:
+    def setUp(self) -> None:
         # ensure reproducable variable names
-        _IntVarImpl.counter = 0
+        _IntVarImpl.counter = 0 
         _BoolVarImpl.counter = 0   
 
 

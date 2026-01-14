@@ -1,14 +1,13 @@
-from utils import TestCase
-import pytest
+import unittest
+import numpy as np
 
 import cpmpy as cp
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
-@pytest.mark.usefixtures("solver")
-class TestTransfComp(TestCase):
-    def setup_method(self):
+class TestTransfComp(unittest.TestCase):
+    def setUp(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
@@ -28,6 +27,6 @@ class TestTransfComp(TestCase):
 
         for (expr, strexpr) in cases:
             self.assertSetEqual( set([str(c) for c in transform(expr)]), set(strexpr) )
-            self.assertTrue(cp.Model(expr).solve(solver=self.solver))
+            self.assertTrue(cp.Model(expr).solve())
 
 

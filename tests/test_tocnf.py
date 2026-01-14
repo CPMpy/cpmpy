@@ -1,18 +1,18 @@
-import pytest
-import numpy as np
+import unittest
 import cpmpy as cp
-from cpmpy.solvers.ortools import CPM_ortools
+
+
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.globalconstraints import Xor
 from cpmpy.expressions.utils import argvals
-from utils import TestCase
+from cpmpy.solvers.pindakaas import CPM_pindakaas
+
 import pytest
 
-@pytest.mark.requires_dependency("pindakaas")
-class TestToCnf(TestCase):
 
-    @pytest.mark.requires_solver("ortools")
+@pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
+class TestToCnf(unittest.TestCase):
     def test_tocnf(self):
         a, b, clause = cp.boolvar(shape=3)
         x = cp.intvar(1, 2)
@@ -53,7 +53,7 @@ class TestToCnf(TestCase):
         # test for equivalent solutions with/without to_cnf
         for case in cases:
             vs = cp.cpm_array(get_variables(case))
-            s1 = self._allsols([case], vs)
+            s1 = self.allsols([case], vs)
             ivarmap = dict()
             cnf = to_cnf(case, ivarmap=ivarmap)
 
@@ -69,11 +69,10 @@ class TestToCnf(TestCase):
             #     )
             # ), f"The following was not CNF: {cnf}"
 
-            s2 = self._allsols(cnf, vs, ivarmap=ivarmap)
+            s2 = self.allsols(cnf, vs, ivarmap=ivarmap)
             assert s1 == s2, f"The equivalence check failed for translaton from {case} to {cnf}"
 
-
-    def _allsols(self, cons, vs, ivarmap=None):
+    def allsols(self, cons, vs, ivarmap=None):
         m = cp.Model(cons)
         sols = set()
 
@@ -87,3 +86,6 @@ class TestToCnf(TestCase):
         assert len(sols) < 100, sols
         return sols
 
+
+if __name__ == "__main__":
+    unittest.main()

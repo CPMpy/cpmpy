@@ -1,37 +1,37 @@
-from utils import TestCase
-import pytest
+import unittest
 
 import cpmpy as cp
 from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any
+from cpmpy.exceptions import CPMpyException
 
 iv = cp.intvar(-8, 8, shape=5)
 
-@pytest.mark.usefixtures("solver")
-class TestBuiltin(TestCase):
+
+class TestBuiltin(unittest.TestCase):
 
     def test_max(self):
         constraints = [cp.max(iv) + 9 <= 8]
         model = cp.Model(constraints)
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertTrue(cp.max(iv.value()) <= -1)
 
         _max, define = cp.max(iv).decompose()
         model = cp.Model(_max != 4, define)
 
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertNotEqual(max(iv.value()), 4)
         self.assertNotEqual(cp.max(iv).value(), 4)
 
     def test_min(self):
         constraints = [cp.min(iv) + 9 == 8]
         model = cp.Model(constraints)
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertEqual(str(cp.min(iv.value())), '-1')
 
         _min, define = cp.max(iv).decompose()
         model = cp.Model(_min != 4, define)
 
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertNotEqual(min(iv.value()), 4)
         self.assertNotEqual(cp.min(iv).value(), 4)
 
@@ -39,21 +39,21 @@ class TestBuiltin(TestCase):
     def test_abs(self):
         constraints = [cp.abs(iv[0]) + 9 <= 8]
         model = cp.Model(constraints)
-        self.assertFalse(model.solve(solver=self.solver))
+        self.assertFalse(model.solve())
 
         #with list
         constraints = [cp.abs(iv+2) <= 8, iv < 0]
         model = cp.Model(constraints)
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
 
         constraints = [cp.abs([iv[0], iv[2], iv[1], -8]) <= 8, iv < 0]
         model = cp.Model(constraints)
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
 
         _abs, define = cp.abs(iv[0]).decompose()
         model = cp.Model(_abs != 4, define)
 
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertNotEqual(abs(iv[0].value()), 4)
         self.assertNotEqual(cp.abs(iv[0]).value(), 4)
 

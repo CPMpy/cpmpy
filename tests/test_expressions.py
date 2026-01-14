@@ -1,19 +1,17 @@
 import unittest
-import pytest
 import cpmpy as cp
 import numpy as np
 
+from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
-from cpmpy.transformations.get_variables import get_variables
 
-from utils import inclusive_range, TestCase
+from utils import inclusive_range
 
-@pytest.mark.usefixtures("solver")
-class TestComparison(TestCase):    
+
+class TestComparison(unittest.TestCase):
     def test_comps(self):
-
         # from the docs
         # XXX is this the right place? it should be tested with all solvers...
         import cpmpy as cp
@@ -34,12 +32,11 @@ class TestComparison(TestCase):
             bv & (iv != 0),     # allowed
         )
         for c in m.constraints:
-            self.assertTrue(cp.Model(c).solve(solver=self.solver))
+            self.assertTrue(cp.Model(c).solve())
 
-@pytest.mark.usefixtures("solver")
-class TestSum(TestCase):
+class TestSum(unittest.TestCase):
 
-    def setup_method(self):
+    def setUp(self):
         self.iv = cp.intvar(0, 10)
 
     def test_add_int(self):
@@ -79,11 +76,11 @@ class TestSum(TestCase):
     def test_sum_unary(self):
         v = cp.intvar(1,9)
         model = cp.Model(v>=1, minimize=sum([v]))
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertEqual(v.value(), 1)
 
-class TestWeightedSum(TestCase):
-    def setup_method(self) -> None:
+class TestWeightedSum(unittest.TestCase):
+    def setUp(self) -> None:
         self.ivs = cp.intvar(lb=0, ub=5, shape=4)
 
     def test_weightedadd_int(self):
@@ -93,9 +90,6 @@ class TestWeightedSum(TestCase):
         expr2 = 3 + self.ivs[0] * 4
         self.assertIsInstance(expr2, Operator)
         self.assertEqual(expr2.name, 'sum')
-        expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
-        self.assertIsInstance(expr, Operator)
-        self.assertEqual(expr.name, 'sum')
 
     def test_weightedadd_iv(self):
 
@@ -132,6 +126,11 @@ class TestWeightedSum(TestCase):
         self.assertIsInstance(expr4, Operator)
         self.assertEqual(expr4.name, 'wsum')
 
+    def test_weightedadd_int(self):
+        expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
+        self.assertIsInstance(expr, Operator)
+        self.assertEqual(expr.name, 'sum')
+
     def test_weightedadd_sub(self):
         expr = self.ivs[0] * 4 - 5 * self.ivs[1]
         self.assertIsInstance(expr, Operator)
@@ -152,7 +151,7 @@ class TestWeightedSum(TestCase):
 
     def test_weighted_nested_mul(self):
         # issue #137
-        x = cp.boolvar()
+        x = boolvar()
         expr = 100 * (x < 5) * (5 - x) + 10 * (x - 5)
         self.assertIsInstance(expr, Operator)
         self.assertEqual(expr.name, 'wsum')
@@ -165,11 +164,11 @@ class TestWeightedSum(TestCase):
         assert(str(expr1) == str(expr2))
         assert(str(expr1) == str(expr3))
 
-class TestMul(TestCase):
+class TestMul(unittest.TestCase):
 
-    def setup_method(self) -> None:
-        self.bvar = cp.boolvar(name="bv")
-        self.ivar = cp.boolvar(name="iv")
+    def setUp(self) -> None:
+        self.bvar = boolvar(name="bv")
+        self.ivar = boolvar(name="iv")
 
     def test_mul_const(self):
         expr = self.ivar * 10
@@ -189,6 +188,8 @@ class TestMul(TestCase):
         # # same for numpy false
         # expr = self.ivar * np.False_
         # self.assertEqual(0, expr)
+
+
 
     def test_mul_var(self):
         #ivar and bvar
@@ -211,7 +212,7 @@ class TestMul(TestCase):
         self.assertIn(self.bvar, set(expr.args))
 
     def test_nullarg_mul(self):
-        x = cp.intvar(0,5,shape=3, name="x")
+        x = intvar(0,5,shape=3, name="x")
         a = np.array([0,1,1], dtype=bool)
 
         prod = x * a
@@ -220,37 +221,36 @@ class TestMul(TestCase):
         for expr in prod.args:
             self.assertTrue(isinstance(expr, Expression) or expr == 0)
 
-@pytest.mark.usefixtures("solver")
-class TestArrayExpressions(TestCase):
+class TestArrayExpressions(unittest.TestCase):
 
     def test_sum(self):
-        x = cp.intvar(0,5,shape=3, name="x")
-        y = cp.intvar(0, 1000, name="y")
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
         model = cp.Model(y == x.sum())
-        model.solve(solver=self.solver)
+        model.solve()
         self.assertTrue(y.value() == sum(x.value()))
         # with axis arg
-        x = cp.intvar(0,5,shape=(3,3), name="x")
-        y = cp.intvar(0, 1000, shape=3, name="y")
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.sum(axis=0))
-        model.solve(solver=self.solver)
+        model.solve()
         res = np.array([sum(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
     def test_prod(self):
-        x = cp.intvar(0,5,shape=3, name="x")
-        y = cp.intvar(0, 1000, name="y")
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
         model = cp.Model(y == x.prod())
-        model.solve(solver=self.solver)
+        model.solve()
         res = 1
         for v in x:
             res *= v.value()
         self.assertTrue(y.value() == res)
         # with axis arg
-        x = cp.intvar(0,5,shape=(3,3), name="x")
-        y = cp.intvar(0, 1000, shape=3, name="y")
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.prod(axis=0))
-        model.solve(solver=self.solver)
+        model.solve()
         for i,vv in enumerate(x):
             res = 1
             for v in vv:
@@ -258,61 +258,61 @@ class TestArrayExpressions(TestCase):
             self.assertTrue(y[i].value() == res)
 
     def test_max(self):
-        x = cp.intvar(0,5,shape=3, name="x")
-        y = cp.intvar(0, 1000, name="y")
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
         model = cp.Model(y == x.max())
-        model.solve(solver=self.solver)
+        model.solve()
         self.assertTrue(y.value() == max(x.value()))
         # with axis arg
-        x = cp.intvar(0,5,shape=(3,3), name="x")
-        y = cp.intvar(0, 1000, shape=3, name="y")
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.max(axis=0))
-        model.solve(solver=self.solver)
+        model.solve()
         res = np.array([max(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
     def test_min(self):
-        x = cp.intvar(0,5,shape=3, name="x")
-        y = cp.intvar(0, 1000, name="y")
+        x = intvar(0,5,shape=10, name="x")
+        y = intvar(0, 1000, name="y")
         model = cp.Model(y == x.min())
-        model.solve(solver=self.solver)
+        model.solve()
         self.assertTrue(y.value() == min(x.value()))
         # with axis arg
-        x = cp.intvar(0,5,shape=(3,3), name="x")
-        y = cp.intvar(0, 1000, shape=3, name="y")
+        x = intvar(0,5,shape=(10,10), name="x")
+        y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.min(axis=0))
-        model.solve(solver=self.solver)
+        model.solve()
         res = np.array([min(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
     def test_any(self):
         from cpmpy.expressions.python_builtins import any as cpm_any
-        x = cp.boolvar(shape=3, name="x")
-        y = cp.boolvar(name="y")
+        x = boolvar(shape=10, name="x")
+        y = boolvar(name="y")
         model = cp.Model(y == x.any())
-        model.solve(solver=self.solver)
+        model.solve()
         self.assertTrue(y.value() == cpm_any(x.value()))
         # with axis arg
-        x = cp.boolvar(shape=(3,3), name="x")
-        y = cp.boolvar(shape=3, name="y")
+        x = boolvar(shape=(10,10), name="x")
+        y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.any(axis=0))
-        model.solve(solver=self.solver)
+        model.solve()
         res = np.array([cpm_any(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
         
 
     def test_all(self):
         from cpmpy.expressions.python_builtins import all as cpm_all
-        x = cp.boolvar(shape=3, name="x")
-        y = cp.boolvar(name="y")
+        x = boolvar(shape=10, name="x")
+        y = boolvar(name="y")
         model = cp.Model(y == x.all())
-        model.solve(solver=self.solver)
+        model.solve()
         self.assertTrue(y.value() == cpm_all(x.value()))
         # with axis arg
-        x = cp.boolvar(shape=(3,3), name="x")
-        y = cp.boolvar(shape=3, name="y")
+        x = boolvar(shape=(10,10), name="x")
+        y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.all(axis=0))
-        model.solve(solver=self.solver)
+        model.solve()
         res = np.array([cpm_all(x[i, ...].value()) for i in range(len(y))])
         self.assertTrue(all(y.value() == res))
 
@@ -329,11 +329,10 @@ class TestArrayExpressions(TestCase):
                 self.assertIsInstance(cpm_res, NDVarArray)
                 self.assertEqual(cpm_res.shape, np_res.shape)
 
-@pytest.mark.usefixtures("solver")
-class TestBounds(TestCase):
+class TestBounds(unittest.TestCase):
     def test_bounds_mul_sub_sum(self):
-        x = cp.intvar(-8,8)
-        y = cp.intvar(-4,6)
+        x = intvar(-8,8)
+        y = intvar(-4,6)
         for name, test_lb, test_ub in [('mul',-48,48),('sub',-14,12),('sum',-12,14)]:
             op = Operator(name,[x,y])
             lb, ub = op.get_bounds()
@@ -346,7 +345,7 @@ class TestBounds(TestCase):
                     self.assertLessEqual(val,ub)
 
     def test_bounds_wsum(self):
-        x = cp.intvar(-8, 8,3)
+        x = intvar(-8, 8,3)
         weights = [2,4,-3]
         op = Operator('wsum',[weights,x])
         lb, ub = op.get_bounds()
@@ -360,9 +359,9 @@ class TestBounds(TestCase):
                     self.assertLessEqual(val,ub)
 
     def test_bounds_unary(self):
-        x = cp.intvar(-8, 5)
-        y = cp.intvar(-7, -2)
-        z = cp.intvar(1, 9)
+        x = intvar(-8, 5)
+        y = intvar(-7, -2)
+        z = intvar(1, 9)
         for var,test_lb,test_ub in [(x,-5,8),(y,2,7),(z,-9,-1)]:
             name = '-'
             op = Operator(name,[var])
@@ -388,35 +387,35 @@ class TestBounds(TestCase):
         self.assertListEqual([0, 0, 0], lbs)
         self.assertListEqual([10, 10, 10], ubs)
         # nested list
-        exprs = [cp.intvar(0,1), [cp.intvar(2,3), cp.intvar(4,5)], [cp.intvar(5,6)]]
+        exprs = [intvar(0,1), [intvar(2,3), intvar(4,5)], [intvar(5,6)]]
         lbs, ubs = get_bounds(exprs)
         self.assertListEqual([0,[2,4],[5]], lbs)
         self.assertListEqual([1,[3,5],[6]], ubs)
 
 
     def test_array(self):
-        m = cp.intvar(-3,3, shape = (3,2), name= [['a','b'],['c','d'],['e','f']])
-        self.assertEqual(str(cp.cpm_array(m)), '[[a b]\n [c d]\n [e f]]')
-        self.assertEqual(str(cp.cpm_array(m.T)), '[[a c e]\n [b d f]]')
+        m = intvar(-3,3, shape = (3,2), name= [['a','b'],['c','d'],['e','f']])
+        self.assertEqual(str(cpm_array(m)), '[[a b]\n [c d]\n [e f]]')
+        self.assertEqual(str(cpm_array(m.T)), '[[a c e]\n [b d f]]')
 
     def test_not_operator(self):
-        p = cp.boolvar()
-        q = cp.boolvar()
-        x = cp.intvar(0,9)
-        self.assertTrue(cp.Model([~p]).solve(solver=self.solver))
+        p = boolvar()
+        q = boolvar()
+        x = intvar(0,9)
+        self.assertTrue(cp.Model([~p]).solve())
         #self.assertRaises(cp.exceptions.TypeError, cp.Model([~x]).solve())
-        self.assertTrue(cp.Model([~(x == 0)]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([~~p]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([~(p & p)]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([~~~~~(p & p)]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([~cp.cpm_array([p,q,p])]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([~p.implies(q)]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([~p.implies(~q)]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([p.implies(~q)]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([p == ~q]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([~~p == ~q]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([Operator('not',[p]) == q]).solve(solver=self.solver))
-        self.assertTrue(cp.Model([Operator('not',[p])]).solve(solver=self.solver))
+        self.assertTrue(cp.Model([~(x == 0)]).solve())
+        self.assertTrue(cp.Model([~~p]).solve())
+        self.assertTrue(cp.Model([~(p & p)]).solve())
+        self.assertTrue(cp.Model([~~~~~(p & p)]).solve())
+        self.assertTrue(cp.Model([~cpm_array([p,q,p])]).solve())
+        self.assertTrue(cp.Model([~p.implies(q)]).solve())
+        self.assertTrue(cp.Model([~p.implies(~q)]).solve())
+        self.assertTrue(cp.Model([p.implies(~q)]).solve())
+        self.assertTrue(cp.Model([p == ~q]).solve())
+        self.assertTrue(cp.Model([~~p == ~q]).solve())
+        self.assertTrue(cp.Model([Operator('not',[p]) == q]).solve())
+        self.assertTrue(cp.Model([Operator('not',[p])]).solve())
 
     def test_description(self):
 
@@ -453,7 +452,7 @@ class TestBounds(TestCase):
     def test_dtype(self):
 
         x = cp.intvar(1,10,shape=(3,3), name="x")
-        self.assertTrue(cp.Model(cp.sum(x) >= 10).solve(solver=self.solver))
+        self.assertTrue(cp.Model(cp.sum(x) >= 10).solve())
         self.assertIsNotNone(x.value())
         # test all types of expressions
         self.assertEqual(int, type(x[0,0].value())) # just the var
@@ -503,9 +502,9 @@ class TestBounds(TestCase):
         self.assertEqual(bool, type((a == b).value()))
         self.assertEqual(bool, type((a != b).value()))
 
-class TestBuildIns(TestCase):
+class TestBuildIns(unittest.TestCase):
 
-    def setup_method(self):
+    def setUp(self):
         self.x = cp.intvar(0,10,shape=3)
 
     def test_sum(self):
@@ -518,7 +517,7 @@ class TestBuildIns(TestCase):
             cp.sum(self.x[0], self.x[1], self.x[2])
 
     def test_max(self):
-        gt = cp.Maximum(self.x)
+        gt = Maximum(self.x)
 
         self.assertEqual(str(gt), str(cp.max(self.x)))
         self.assertEqual(str(gt), str(cp.max(list(self.x))))
@@ -526,7 +525,7 @@ class TestBuildIns(TestCase):
         self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
 
     def test_abs(self):
-        gt = cp.Abs(self.x[0])
+        gt = Abs(self.x[0])
         self.assertEqual(str(gt), str(cp.abs(self.x[0])))
         self.x[0]._value = 1
         self.assertEqual(gt.value(), 1)
@@ -536,10 +535,11 @@ class TestBuildIns(TestCase):
         self.assertEqual(gt.value(), 0)
         self.x[0]._value = None
         self.assertIsNone(gt.value())
-        
-class TestNullifyingArguments(TestCase):
 
-    def setup_method(self):
+from cpmpy.transformations.get_variables import get_variables
+class TestNullifyingArguments(unittest.TestCase):
+
+    def setUp(self):
         self.x = cp.intvar(0,10, name="x")
         self.b = cp.boolvar(name="b")
 
@@ -571,9 +571,9 @@ class TestNullifyingArguments(TestCase):
 
 
 
-class TestContainer(TestCase):
+class TestContainer(unittest.TestCase):
 
-    def setup_method(self):
+    def setUp(self):
         self.x = cp.intvar(0,10,name="x")
         self.y = cp.intvar(0,10,name="y")
         self.z = cp.intvar(0,10,name="z")
@@ -623,18 +623,18 @@ class TestContainer(TestCase):
         assert d[self.z] == "z"
 
         
-class TestUtils(TestCase):
+class TestUtils(unittest.TestCase):
 
     def test_cpm_array(self):
         x = cp.intvar(0,10, shape=(5, 3))
-        self.assertIsInstance(cp.cpm_array(x), NDVarArray)
-        self.assertEqual(cp.cpm_array(x).shape, (5, 3))
+        self.assertIsInstance(cpm_array(x), NDVarArray)
+        self.assertEqual(cpm_array(x).shape, (5, 3))
 
-        self.assertIsInstance(cp.cpm_array(x.T), NDVarArray)
-        self.assertEqual(cp.cpm_array(x.T).shape, (3, 5))
+        self.assertIsInstance(cpm_array(x.T), NDVarArray)
+        self.assertEqual(cpm_array(x.T).shape, (3, 5))
 
     def test_eval_comparison(self):
-        x = cp.intvar(0,10, name="x")
+        x = intvar(0,10, name="x")
 
         for comp in ["==", "!=", "<", "<=", ">", ">="]:
             expr = eval_comparison(comp, x, 5)
@@ -682,3 +682,5 @@ class TestUtils(TestCase):
             self.assertEqual(str(expr.args[0]), "x")
             self.assertEqual(expr.args[1], True) # should always put the constant on the right
 
+if __name__ == '__main__':
+    unittest.main()

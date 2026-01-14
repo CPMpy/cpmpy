@@ -1,15 +1,17 @@
+import unittest
 import pytest
-import importlib
 import cpmpy as cp 
+from cpmpy import *
 from cpmpy.solvers.pysat import CPM_pysat
 
-from utils import TestCase
+import importlib # can check for modules *without* importing them
+pysat_available = CPM_pysat.supported()
+pblib_available = importlib.util.find_spec("pypblib") is not None
 
-@pytest.mark.requires_solver("pysat")
-@pytest.mark.skipif(importlib.util.find_spec("pypblib") is not None, reason="Test requires pypblib to be NOT installed")
+@pytest.mark.skipif(not (pysat_available and not pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` is installed")
 def test_pypblib_error():
     # NOTE if you want to run this but pypblib is already installed, run `pip uninstall pypblib && pip install -e .[pysat]`
-    TestCase().assertRaises(
+    unittest.TestCase().assertRaises(
             ImportError, # just solve a pb constraint with pypblib not installed
             lambda : CPM_pysat(cp.Model(2*cp.boolvar() + 3 * cp.boolvar() + 5 * cp.boolvar() <= 6)).solve()
         )
@@ -17,11 +19,10 @@ def test_pypblib_error():
     # this one should still work without `pypblib`
     assert CPM_pysat(cp.Model(1*cp.boolvar() + 1 * cp.boolvar() + 1 * cp.boolvar() <= 2)).solve()
 
-@pytest.mark.requires_solver("pysat")
-@pytest.mark.requires_dependency("pypblib")
-class TestEncodePseudoBooleanConstraint(TestCase):
-    def setup_method(self):
-        self.bv = cp.boolvar(shape=3)
+@pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
+class TestEncodePseudoBooleanConstraint(unittest.TestCase):
+    def setUp(self):
+        self.bv = boolvar(shape=3)
 
     def test_pysat_simple_atmost(self):
 
@@ -74,7 +75,7 @@ class TestEncodePseudoBooleanConstraint(TestCase):
 
         ## check all types of linear constraints are handled
         for expression in expressions:
-            cp.Model(expression).solve("pysat")
+            Model(expression).solve("pysat")
 
     def test_encode_pb_oob(self):
         # test out of bounds (meaningless) thresholds
@@ -91,5 +92,8 @@ class TestEncodePseudoBooleanConstraint(TestCase):
 
         ## check all types of linear constraints are handled
         for expression in expressions:
-            cp.Model(expression).solve("pysat")
+            Model(expression).solve("pysat")
+
+if __name__ == '__main__':
+    unittest.main()
 

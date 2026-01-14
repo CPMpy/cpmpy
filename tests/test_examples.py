@@ -25,8 +25,7 @@ ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES)
 SKIPPED_EXAMPLES = [
                     "ocus_explanations.py", # waiting for issues to be resolved 
                     "psplib.py", # randomly fails on github due to file creation
-                    "nurserostering.py",
-                    "psplib.py", # wants to open visualisations in the browser
+                    "nurserostering.py"
                     ]
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
@@ -46,16 +45,15 @@ SOLVERS = [
 
 
 # run the test for each combination of solver and example
-@pytest.mark.parametrize("example", EXAMPLES)
+@pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
 @pytest.mark.timeout(60)  # 60-second timeout for each test
-def test_example(example):
+def test_example(solver, example):
     """Loads the example file and executes its __main__ block with the given solver being set as default.
 
     Args:
         solver ([string]): Loaded with parametrized solver name
         example ([string]): Loaded with parametrized example filename
     """
-    solver = "ortools" # TODO: Temporarily set to ortools due to examples taking too long on some solvers
     if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):
         pytest.skip(f"Skipped {example}, waiting for issues to be resolved")
     if solver in ('gurobi',) and any(x in example for x in SKIP_MIP):
@@ -88,18 +86,6 @@ def test_example(example):
             raise e
     except ModuleNotFoundError as e:
         pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))
-    except Exception as e:
-        # Check if the exception indicates a missing solver installation (or other optional dependencies)
-        # TODO: this is a hack to skip tests when the solver is not installed, 
-        #       for now no better way to do this without having to manually label all 
-        #       examples with the required solvers / dependencies
-        error_msg = str(e).lower()
-        if ("install" in error_msg and ("package" in error_msg or "solver" in error_msg)) or \
-           ("not installed" in error_msg) or \
-           ("not available" in error_msg):
-            pytest.skip(f"Skipped, solver not installed: {e}")
-        else:
-            raise e
     finally:
         SolverLookup.base_solvers = base_solvers
 
@@ -110,17 +96,4 @@ def test_advanced_example(example):
     """Loads the advanced example file and executes its __main__ block with no default solver set."""
     if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):
         pytest.skip(f"Skipped {example}, waiting for issues to be resolved")
-    try:
-        test_example(example)
-    except Exception as e:
-        # Check if the exception indicates a missing solver installation (or other optional dependencies)
-        # TODO: this is a hack to skip tests when the solver is not installed, 
-        #       for now no better way to do this without having to manually label all 
-        #       examples with the required solvers / dependencies
-        error_msg = str(e).lower()
-        if ("install" in error_msg and ("package" in error_msg or "solver" in error_msg)) or \
-           ("not installed" in error_msg) or \
-           ("not available" in error_msg):
-            pytest.skip(f"Skipped, solver not installed: {e}")
-        # Re-raise other exceptions
-        raise e
+    test_example(None, example)

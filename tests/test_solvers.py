@@ -1,21 +1,33 @@
 import inspect
+import importlib
+import inspect
+import unittest
 import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
+from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.pindakaas import CPM_pindakaas
 from cpmpy.solvers.solver_interface import ExitStatus
+from cpmpy.solvers.z3 import CPM_z3
+from cpmpy.solvers.minizinc import CPM_minizinc
+from cpmpy.solvers.gurobi import CPM_gurobi
+from cpmpy.solvers.exact import CPM_exact
+from cpmpy.solvers.choco import CPM_choco
+from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
 from test_constraints import numexprs
-from utils import TestCase
+from utils import skip_on_missing_pblib
 
-@pytest.mark.usefixtures("solver")
-class TestSolvers(TestCase):
+pysat_available = CPM_pysat.supported()
+pblib_available = importlib.util.find_spec("pypblib") is not None
+
+class TestSolvers(unittest.TestCase):
 
     
     @pytest.mark.skip(reason="upstream bug, waiting on release for https://github.com/google/or-tools/issues/4640")
@@ -41,7 +53,7 @@ class TestSolvers(TestCase):
         objective = (x*distance_matrix).sum()
 
         model = cp.Model(constraint, minimize=objective)
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertEqual(model.objective_value(), 214)
         self.assertEqual(x.value().tolist(),
         [[0, 0, 0, 0, 0, 1],
@@ -51,9 +63,8 @@ class TestSolvers(TestCase):
          [0, 0, 0, 1, 0, 0],
          [1, 0, 0, 0, 0, 0]])
 
-    @pytest.mark.requires_solver("ortools")
     def test_ortools(self):
-        # b = cp.boolvar()
+        b = cp.boolvar()
         x = cp.intvar(1,13, shape=3)
 
         # reifiability (automatic handling in case of !=)
@@ -69,17 +80,16 @@ class TestSolvers(TestCase):
         t = cp.Table([x[0],x[1]], [[2,6],[7,3]])
 
         m = cp.Model(t, minimize=x[0])
-        self.assertTrue(m.solve(solver=self.solver))
+        self.assertTrue(m.solve())
         self.assertEqual( m.objective_value(), 2 )
 
         m = cp.Model(t, maximize=x[0])
-        self.assertTrue(m.solve(solver=self.solver))
+        self.assertTrue(m.solve())
         self.assertEqual( m.objective_value(), 7 )
 
         # modulo
-        self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve(solver=self.solver) )
+        self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve() )
 
-    @pytest.mark.requires_solver("ortools")
     def test_ortools_inverse(self):
         from cpmpy.solvers.ortools import CPM_ortools
 
@@ -97,7 +107,7 @@ class TestSolvers(TestCase):
         self.assertTrue(solver.solve())
         self.assertEqual(list(rev.value()), expected_inverse)
 
-    @pytest.mark.requires_solver("ortools")
+
     def test_ortools_direct_solver(self):
         """
         Test direct solver access.
@@ -228,7 +238,6 @@ class TestSolvers(TestCase):
         self.assertFalse(s.solve(assumptions=bv))
         self.assertTrue(len(s.get_core()) > 0)
 
-    @pytest.mark.requires_solver("ortools")
     # this test fails on OR-tools version <9.6
     def test_ortools_version(self):
 
@@ -268,20 +277,20 @@ class TestSolvers(TestCase):
 
         self.assertTrue(model.solve(solver="ortools")) # this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
 
-    @pytest.mark.requires_solver("ortools")
     def test_ortools_real_coeff(self):
 
         m = cp.Model()
         # this works in OR-Tools
         x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
         m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
-        assert m.solve(solver="ortools")
+        assert m.solve()
         assert m.objective_value() == 1.4
         # this does not
         m += 0.7 * x + 0.8 * y >= 1
         self.assertRaises(TypeError, m.solve)
 
-    @pytest.mark.requires_solver("pysat")
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
     def test_pysat(self):
 
         # Construct the model.
@@ -324,7 +333,8 @@ class TestSolvers(TestCase):
         self.assertFalse(ps2.solve(assumptions=[mayo]+[v for v in inds]))
         self.assertSetEqual(set(ps2.get_core()), set([mayo,inds[6],inds[9]]))
 
-    @pytest.mark.requires_solver("pysat")
+    @pytest.mark.skipif(not CPM_pysat.supported(),
+                        reason="PySAT not installed")
     def test_pysat_subsolver(self):
         pysat = CPM_pysat(subsolver="pysat:cadical195")
         x, y = cp.boolvar(shape=2)
@@ -332,8 +342,8 @@ class TestSolvers(TestCase):
         pysat += ~x | ~y
         assert pysat.solve()
 
-    @pytest.mark.requires_solver("pysat")
-    @pytest.mark.requires_dependency("pypblib")
+    @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
+    @skip_on_missing_pblib()
     def test_pysat_card(self):
         b = cp.boolvar()
         x = cp.boolvar(shape=5)
@@ -344,7 +354,8 @@ class TestSolvers(TestCase):
             self.assertTrue(cp.Model(c).solve("pysat"))
             self.assertTrue(c.value())
 
-    @pytest.mark.requires_solver("pindakaas")
+    @pytest.mark.skipif(not CPM_pindakaas.supported(),
+                        reason="pindakaas not installed")
     def test_pindakaas(self):
         # Construct the model.
 
@@ -367,7 +378,9 @@ class TestSolvers(TestCase):
         ps = CPM_pindakaas(model)
         self.assertTrue(ps.solve())
 
-    @pytest.mark.requires_solver("minizinc")
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
     def test_minizinc(self):
         # (from or-tools)
         b = cp.boolvar()
@@ -395,7 +408,9 @@ class TestSolvers(TestCase):
         # modulo
         self.assertTrue( cp.Model([ x[0] == x[1] % x[2] ]).solve(solver="minizinc") )
 
-    @pytest.mark.requires_solver("minizinc")
+
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
     def test_minizinc_names(self):
         a = cp.boolvar(name='5var')#has to start with alphabetic character
         b = cp.boolvar(name='va+r')#no special characters
@@ -407,7 +422,8 @@ class TestSolvers(TestCase):
         with self.assertRaises(MinizincNameException):
             cp.Model(c == 0).solve(solver="minizinc")
 
-    @pytest.mark.requires_solver("minizinc")
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
     def test_minizinc_inverse(self):
         from cpmpy.solvers.minizinc import CPM_minizinc
 
@@ -425,7 +441,8 @@ class TestSolvers(TestCase):
         self.assertTrue(solver.solve())
         self.assertEqual(list(rev.value()), expected_inverse)
 
-    @pytest.mark.requires_solver("minizinc")
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="MiniZinc not installed")
     def test_minizinc_gcc(self):
         from cpmpy.solvers.minizinc import CPM_minizinc
 
@@ -445,7 +462,8 @@ class TestSolvers(TestCase):
         self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
         self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
-    @pytest.mark.requires_solver("z3")
+    @pytest.mark.skipif(not CPM_z3.supported(),
+                        reason="Z3 not installed")
     def test_z3(self):
         bv = cp.boolvar(shape=3)
         iv = cp.intvar(0, 9, shape=3)
@@ -486,10 +504,12 @@ class TestSolvers(TestCase):
         # from test_sum_unary and #95
         v = cp.intvar(1,9)
         model = cp.Model(minimize=sum([v]))
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertEqual(v.value(), 1)
 
-    @pytest.mark.requires_solver("exact")
+
+    @pytest.mark.skipif(not CPM_exact.supported(),
+                        reason="Exact not installed")
     def test_exact(self):
         bv = cp.boolvar(shape=3)
         iv = cp.intvar(0, 9, shape=3)
@@ -523,7 +543,8 @@ class TestSolvers(TestCase):
         s = cp.SolverLookup.get("exact", m)
         self.assertEqual(s.solveAll(display=_trixor_callback),7)
 
-    @pytest.mark.requires_solver("exact")
+    @pytest.mark.skipif(not CPM_exact.supported(), 
+                        reason="Exact not installed")
     def test_parameters_to_exact(self):
     
         # php with 5 pigeons, 4 holes
@@ -546,7 +567,8 @@ class TestSolvers(TestCase):
         with open(proof_file+".proof", "r") as f:
             self.assertEqual(f.readline()[:-1], "pseudo-Boolean proof version 1.1") # check header of proof-file
 
-    @pytest.mark.requires_solver("choco")
+    @pytest.mark.skipif(not CPM_choco.supported(),
+                        reason="pychoco not installed")
     def test_choco(self):
         bv = cp.boolvar(shape=3)
         iv = cp.intvar(0, 9, shape=3)
@@ -573,7 +595,8 @@ class TestSolvers(TestCase):
         s = cp.SolverLookup.get("choco", m)
         self.assertTrue(s.solve())
 
-    @pytest.mark.requires_solver("choco")
+    @pytest.mark.skipif(not CPM_choco.supported(),
+                        reason="pychoco not installed")
     def test_choco_element(self):
 
         # test 1-D
@@ -603,7 +626,8 @@ class TestSolvers(TestCase):
         self.assertTrue(s.solve())
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
-    @pytest.mark.requires_solver("choco")
+    @pytest.mark.skipif(not CPM_choco.supported(),
+                        reason="pychoco not installed")
     def test_choco_gcc_alldiff(self):
 
         iv = cp.intvar(-8, 8, shape=5)
@@ -622,8 +646,10 @@ class TestSolvers(TestCase):
         self.assertTrue(all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val))))
         self.assertTrue(cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value())
 
-    @pytest.mark.requires_solver("choco")
+    @pytest.mark.skipif(not CPM_choco.supported(),
+                        reason="pychoco not installed")
     def test_choco_inverse(self):
+        from cpmpy.solvers.ortools import CPM_ortools
 
         fwd = cp.intvar(0, 9, shape=10)
         rev = cp.intvar(0, 9, shape=10)
@@ -639,7 +665,8 @@ class TestSolvers(TestCase):
         self.assertTrue(solver.solve())
         self.assertEqual(list(rev.value()), expected_inverse)
 
-    @pytest.mark.requires_solver("choco")
+    @pytest.mark.skipif(not CPM_choco.supported(),
+                        reason="pychoco not installed")
     def test_choco_objective(self):
         iv = cp.intvar(0,10, shape=2)
         m = cp.Model(iv >= 1, iv <= 5, maximize=sum(iv))
@@ -652,7 +679,8 @@ class TestSolvers(TestCase):
         self.assertTrue( s.solve() )
         self.assertEqual(s.objective_value(), 2)
 
-    @pytest.mark.requires_solver("gurobi")
+    @pytest.mark.skipif(not CPM_gurobi.supported(),
+                        reason="Gurobi not installed")
     def test_gurobi_element(self):
         # test 1-D
         iv = cp.intvar(-8, 8, 3)
@@ -681,7 +709,8 @@ class TestSolvers(TestCase):
         self.assertTrue(s.solve())
         self.assertTrue(iv.value()[idx.value(), idx2.value()] == 8)
 
-    @pytest.mark.requires_solver("gurobi")
+    @pytest.mark.skipif(not CPM_gurobi.supported(),
+                        reason="Gurobi not installed")
     def test_gurobi_float_objective(self):
         """Test that Gurobi properly handles float objective values."""
         # Test case with float coefficients that should result in a float objective value
@@ -703,7 +732,9 @@ class TestSolvers(TestCase):
         self.assertIsInstance(actual_obj, float)
         self.assertAlmostEqual(actual_obj, expected_obj, places=5)
 
-    @pytest.mark.requires_solver("cplex")
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
     def test_cplex(self):
         bv = cp.boolvar(shape=3)
         iv = cp.intvar(0, 10, shape=3)
@@ -729,7 +760,9 @@ class TestSolvers(TestCase):
         s = cp.SolverLookup.get("cplex", m)
         self.assertTrue(s.solve())
 
-    @pytest.mark.requires_solver("cplex")
+
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
     def test_cplex_float_objective(self):
         """Test that cplex properly handles float objective values."""
         # Test case with float coefficients that should result in a float objective value
@@ -751,7 +784,8 @@ class TestSolvers(TestCase):
         self.assertIsInstance(actual_obj, float)
         self.assertAlmostEqual(actual_obj, expected_obj, places=5)
 
-    @pytest.mark.requires_solver("cplex")
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
     def test_cplex_solveAll(self):
         iv = cp.intvar(0,5, shape=3)
         m = cp.Model(cp.AllDifferent(iv))
@@ -760,7 +794,8 @@ class TestSolvers(TestCase):
         self.assertTrue(sol_count == 10)
         self.assertEqual(s.status().exitstatus, ExitStatus.FEASIBLE)
 
-    @pytest.mark.requires_solver("cplex")
+    @pytest.mark.skipif(not CPM_cplex.supported(),
+                        reason="cplex not installed")
     def test_cplex_objective(self):
         iv = cp.intvar(0,10, shape=2)
         m = cp.Model(iv >= 1, iv <= 5, maximize=sum(iv))
@@ -773,7 +808,8 @@ class TestSolvers(TestCase):
         self.assertTrue( s.solve() )
         self.assertEqual(s.objective_value(), 2)
 
-    @pytest.mark.requires_solver("minizinc")
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
     def test_count_mzn(self):
         # bug #461
         from cpmpy.expressions.core import Operator
@@ -787,7 +823,8 @@ class TestSolvers(TestCase):
         self.assertTrue(m.solve(solver="minizinc"))
 
 
-@pytest.mark.usefixtures("solver")
+solvers = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+@pytest.mark.parametrize("solver", solvers)
 class TestSupportedSolvers:
     def test_installed_solvers(self, solver):
         # basic model
@@ -1050,6 +1087,8 @@ class TestSupportedSolvers:
         assert num_sols == 7
         assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
 
+
+
         # adding a bunch of variables to increase nb of sols
         try:
             x = cp.boolvar(shape=32, name="x")
@@ -1170,16 +1209,17 @@ class TestSupportedSolvers:
         assert model.solve(solver)
         assert model.solveAll(solver, **kwargs) == 2
 
-@pytest.mark.generate_constraints.with_args(numexprs)
-def test_objective_numexprs(solver, constraint):
+
+@pytest.mark.parametrize(("solver", "expr"), [(s, expr) for s in solvers for expr in numexprs(s)], ids=str)
+def test_objective_numexprs(solver, expr):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     try:
-        model.minimize(constraint)
+        model.minimize(expr)
         assert model.solve(solver=solver, time_limit=3)
-        assert constraint.value() < constraint.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
-        model.maximize(constraint)
+        assert expr.value() < expr.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
+        model.maximize(expr)
         assert model.solve(solver=solver)
-        assert constraint.value() > constraint.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
+        assert expr.value() > expr.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")

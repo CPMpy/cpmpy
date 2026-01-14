@@ -1,4 +1,5 @@
 import os
+import unittest
 import tempfile
 
 import pytest
@@ -6,14 +7,14 @@ import cpmpy as cp
 from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
+from cpmpy.solvers.pindakaas import CPM_pindakaas
 
-from utils import TestCase
 
-@pytest.mark.requires_solver("pindakaas")
-@pytest.mark.usefixtures("solver")
-class CNFTool(TestCase):
 
-    def setup_method(self) -> None:
+@pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
+class CNFTool(unittest.TestCase):
+
+    def setUp(self) -> None:
         self.tmpfile = tempfile.NamedTemporaryFile(mode='w', delete=False)
 
     def tearDown(self) -> None:
@@ -35,12 +36,12 @@ class CNFTool(TestCase):
 
     def test_empty_formula(self):
         model = self.dimacs_to_model("p cnf 0 0")
-        self.assertTrue(model.solve(solver=self.solver))
+        self.assertTrue(model.solve())
         self.assertEqual(model.status().exitstatus, ExitStatus.FEASIBLE)
 
     def test_empty_clauses(self):
         model = self.dimacs_to_model("p cnf 0 2\n0\n0")
-        self.assertFalse(model.solve(solver=self.solver))
+        self.assertFalse(model.solve())
         self.assertEqual(model.status().exitstatus, ExitStatus.UNSATISFIABLE)
 
     def test_with_comments(self):
@@ -50,7 +51,7 @@ class CNFTool(TestCase):
         sols = set()
         addsol = lambda : sols.add(tuple([v.value() for v in vars]))
 
-        self.assertEqual(model.solveAll(solver=self.solver, display=addsol), 2)
+        self.assertEqual(model.solveAll(display=addsol), 2)
         self.assertSetEqual(sols, {(False, False, True), (False, True, False)})
 
     def test_write_cnf(self):

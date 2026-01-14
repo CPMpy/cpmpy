@@ -1,12 +1,11 @@
+import unittest
 import pytest
-import cpmpy as cp
+from cpmpy import *
 from cpmpy.solvers import CPM_pysat
-
-from utils import TestCase
 
 def frietkot():
     # Construct the model.
-    (mayo, ketchup, curry, andalouse, samurai) = cp.boolvar(5)
+    (mayo, ketchup, curry, andalouse, samurai) = boolvar(5)
 
     # Pure CNF
     Nora = mayo | ketchup
@@ -22,11 +21,12 @@ def frietkot():
 
     allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
 
-    model = cp.Model(allwishes)
+    model = Model(allwishes)
     return model, [mayo, ketchup, curry, andalouse, samurai]
 
-@pytest.mark.requires_solver("pysat")
-class TestPySATInterrupt(TestCase):
+@pytest.mark.skipif(not CPM_pysat.supported(),
+                    reason="PySAT not installed")
+class TestPySATInterrupt(unittest.TestCase):
     def test_small_isntance_no_interrupt(self):
         """Check if the instance still returns the expected results
         after adding interrupt to pysat solver.
@@ -42,13 +42,13 @@ class TestPySATInterrupt(TestCase):
         from pysat.examples.genhard import PHP
         from collections import defaultdict
         import time
-        lit_cpmvar = defaultdict(lambda: cp.boolvar())
-        m  = cp.Model()
+        lit_cpmvar = defaultdict(lambda: boolvar())
+        m  = Model()
 
         # Implementing pysat example for interrupt in cpmpy
         # https://pysathq.github.io/docs/html/api/solvers.html#pysat.solvers.Solver.interrupt
         for clause in PHP(nof_holes=20).clauses:
-            m +=cp.any(~lit_cpmvar[abs(lit)] if lit < 0 else lit_cpmvar[abs(lit)] for lit in clause)
+            m +=any(~lit_cpmvar[abs(lit)] if lit < 0 else lit_cpmvar[abs(lit)] for lit in clause)
 
         s = CPM_pysat(m)
 
@@ -63,3 +63,5 @@ class TestPySATInterrupt(TestCase):
 
         self.assertLessEqual(tend_solving - tstart_solving, time_limit + grace_time_limit)
 
+if __name__ == '__main__':
+    unittest.main()
