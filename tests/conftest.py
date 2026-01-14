@@ -115,7 +115,9 @@ def solver(request):
     Limit tests to specific solvers.
 
     By providing the cli argument `--solver=<SOLVER_NAME>`, `--solver=<SOLVER1,SOLVER2,...>`, `--solver=all`, or `--solver=None`, two things will happen:
-    - non-solver-specific tests which make a `.solve()` call will now run against all specified solvers (instead of just the default OR-Tools)
+    - a limited set of non-solver-specific tests (test_constraints, test_solverinterface, test_solvers_solhint) 
+      will now run against all specified solvers (instead of just the default OR-Tools)
+    - other non-solver-specific tests will run against the default solver (OR-Tools)
     - solver-specific tests will be filtered if they don't match any of the specified solvers
 
     Special values:
@@ -380,7 +382,7 @@ def pytest_collection_modifyitems(config, items):
                 skip = pytest.mark.skip(reason=f"Dependency {required_dependency_marker.args} not installed")
                 item.add_marker(skip)
                 skipped_dependency += 1
-                continue
+                # Continue with the rest of the logic, test might still be filtered out
 
         # A) Solver-specific test
         if required_solver_marker:
@@ -417,23 +419,24 @@ def pytest_collection_modifyitems(config, items):
                 # A) If cmd_solvers is empty (all filtered out), skip solver-specific tests
                 if len(cmd_solvers) == 0:
                     skipped_solver_specific += 1
-                    continue
+                    continue # filtered out
                 # B) If required solver is in the list of specified solvers on the command line, run the test
                 if parametrised_solver is not None and parametrised_solver in cmd_solvers:
-                    # include test
-                    filtered.append(item)
-                # C) If required solver is not in the list of specified solvers on the command line, filter the test to be skipped
+                    filtered.append(item) # included
+                # C) If required solver is not in the list of specified solvers on the command line, filter the test
                 else:
                     skipped_solver_specific += 1
-                    continue
+                    continue # filtered out
 
             # No solvers specified on the command line, include all solver-specific tests
             else:
-                filtered.append(item)
+                filtered.append(item) # included
 
             """
             Solver skipping
                 i.e. for the solvers that survived filtering, skip test if the required solver is not installed
+                -> we get in this situation when we explicitly want to show a "skipped" message to inform user why a test,
+                   which they might have intended to run, is not running
             """
 
             # skip test if the required solver is not installed
@@ -442,7 +445,7 @@ def pytest_collection_modifyitems(config, items):
                     skip = pytest.mark.skip(reason=f"Solver {parametrised_solver} not installed")
                     item.add_marker(skip)
                     skipped_solver_specific += 1
-                    continue    
+                    filtered.append(item) # included
 
         # B) Non-solver-specific test
         else:
@@ -450,11 +453,13 @@ def pytest_collection_modifyitems(config, items):
             # Check if test uses solver fixture (for non-parametrized tests)
             uses_solver_fixture = hasattr(item, "_fixtureinfo") and "solver" in getattr(item._fixtureinfo, "names_closure", [])
                       
-            # Filter out test if it uses solver fixture and cmd_solvers is empty
+            # Filter out test if it uses solver fixture and cmd_solvers is empty (i.e. no solver remaining to run)
+            # -> more for safety, should not really occur
             if cmd_solvers is not None and len(cmd_solvers) == 0:
                 if uses_solver_fixture:
                     skipped_solver_fixture += 1
-                    # Skip tests that use solver fixture when no solvers available
+                    continue # filtered out
+
             # keep non-parametrized tests that don't depend on solver
             else:
                 filtered.append(item)
