@@ -1669,7 +1669,7 @@ class TestTypeChecks(unittest.TestCase):
 
 
 
-
+@pytest.mark.usefixtures("solver")
 def test_issue801_expr_in_cumulative(solver):
 
     if solver in ("pysat", "pysdd", "pindakaas"):
