@@ -97,6 +97,7 @@ def _encode_int_var(ivarmap, x, encoding):
 
 
 def _encode_lin_expr(ivarmap, xs, weights, encoding, cmp=None):
+    """Return encoding of the linear expression with variables `xs` and coefficients `weights`, using `encoding`. If the linear expression occus as part of an `Comparison` (e.g. linear constraint), and the `encoding` is `auto`, then comparator of the Comparison `cmp` can be given to guide the encoding selection."""
     terms = []
     domain_constraints = []
     k = 0

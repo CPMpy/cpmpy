@@ -165,10 +165,7 @@ class CPM_rc2(CPM_pysat):
         self.user_vars = encode_user_vars(self.user_vars, self.ivarmap)
 
         if not self.has_objective():
-            if "PYTEST_CURRENT_TEST" in os.environ:  # support decision problems for testing purposes
-                self.pysat_solver.add_clause([self.pysat_solver.nv + 1], weight=1)
-            else:
-                raise NotSupportedError("CPM_rc2: RC2 does not support solving decision problems. Add an objective to your problem.")
+            raise NotSupportedError("CPM_rc2: RC2 does not support solving decision problems. Add an objective to your problem.")
 
         # determine subsolver
         default_kwargs = {"solver": "glucose3", "adapt": True, "exhaust": True, "minz": True}
@@ -189,7 +186,7 @@ class CPM_rc2(CPM_pysat):
             solution = solver.compute(expect_interrupt=True)
             # ensure timer is stopped
             timer.cancel()
-            # this part cannot be added to timer otherwhise it "interrups" the timeout timer too soon
+            # this part cannot be added to timer otherwise it "interrupts" the timeout timer too soon
             solver.clear_interrupt()
 
         # new status, translate runtime
@@ -200,14 +197,13 @@ class CPM_rc2(CPM_pysat):
         if solution is None:
             # `None` for either unsat or unknown!
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN if solver.interrupted else ExitStatus.UNSATISFIABLE
-        elif self.has_objective():
-            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         else:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
 
         return self._process_solution(solution)
 
     def _process_solution(self, sol):
+        """Process solution `sol`, and handles post-processing `int2bool`."""
         has_sol = super()._process_solution(sol)
         if self.has_objective():
             self.objective_value_ = self.objective_.value()
@@ -249,7 +245,7 @@ class CPM_rc2(CPM_pysat):
         self += cons
         const += k
 
-        terms = [(w, x) for w,x in terms if w != 0]  # positive coefficients only
+        terms = [(w, x) for w,x in terms if w != 0]  # non-zero coefficients only
         ws, xs = zip(*terms)  # unzip
         new_weights, new_xs, k = only_positive_coefficients_(ws, xs) # this is actually only_non_negative_coefficients
         const += k

@@ -547,11 +547,11 @@ def canonical_comparison(lst_of_expr):
     return newlist
 
 def only_positive_coefficients_(ws, xs):
-    """Helper function to make coefficients positive for Boolean terms given as list of coefficients `ws` and list of Boolean variables `xs`."""
+    """Helper function to make coefficients positive for Boolean terms given as list of coefficients `ws` and list of Boolean variables `xs`. Returns new coefficients and variables, and a constant term to be added."""
     indices = {i for i, (w, x) in enumerate(zip(ws, xs)) if w < 0 and isinstance(x, _BoolVarImpl)}
     nw, na = zip(*[(-w, ~x) if i in indices else (w, x) for i, (w, x) in enumerate(zip(ws, xs))])
-    cons = sum(ws[i] for i in indices)
-    return nw, na, cons
+    constant = sum(ws[i] for i in indices)
+    return nw, na, constant
 
 def only_positive_coefficients(lst_of_expr):
     """
