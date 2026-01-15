@@ -66,8 +66,11 @@
                 return [self.args[0] != self.args[1]] # your decomposition
 
     ..
-        If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
-        then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
+
+    You can also implement a `.negate()` method if the global constraint has a better way to negate it than negating the decomposition.
+
+    If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
+    then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
 
 
     Alternative decompositions
@@ -183,6 +186,14 @@ class GlobalConstraint(Expression):
         Numerical global constraints should reimplement this.
         """
         return 0, 1
+
+    def negate(self):
+        """
+        Returns the negation of this global constraint.
+        Defaults to ~self, but subclasses can implement a better version,
+        > Fages, François, and Sylvain Soliman. Reifying global constraints. Diss. INRIA, 2012.
+        """
+        return ~self
 
 
 # Global Constraints (with Boolean return type)
