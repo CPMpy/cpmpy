@@ -277,23 +277,23 @@ def test_time_limit(solver):
 def test_has_objective(solver):
     """Test has_objective() method"""
     solver_class = SolverLookup.lookup(solver)
-    solver = solver_class() if solver != "z3" else solver_class(subsolver="opt")
+    slv = solver_class() if solver != "z3" else solver_class(subsolver="opt")
     
     # Initially should have no objective
-    assert not solver.has_objective()
+    assert not slv.has_objective()
     
     # Add an objective if supported
     try:
         ivar = cp.intvar(1, 10)
-        solver.minimize(ivar)
-        assert solver.has_objective()
+        slv.minimize(ivar)
+        assert slv.has_objective()
 
-        if solver_name != "rc2": # rc2 can set obj only once
-            solver.maximize(ivar)
-            assert solver.has_objective()
+        if solver != "rc2": # rc2 can set obj only once
+            slv.maximize(ivar)
+            assert slv.has_objective()
     except NotImplementedError:
         # Solver doesn't support objectives
-        assert not solver.has_objective()
+        assert not slv.has_objective()
 
 @pytest.mark.usefixtures("solver")
 @skip_on_missing_pblib(skip_on_exception_only=True)
