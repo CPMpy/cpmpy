@@ -6,9 +6,7 @@ from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, 
 
 
 class TestMus:
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup_method(self):
         self.mus_func = mus
         self.naive_func = mus_naive
 
@@ -87,10 +85,9 @@ class TestMus:
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
 
 
-class QuickXplainTests(MusTests):
+class TestQuickXplain(TestMus):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup_method(self):
         self.mus_func = quickxplain
         self.naive_func = quickxplain_naive
 
@@ -112,12 +109,11 @@ class QuickXplainTests(MusTests):
         subset2 = self.naive_func([d, c, b, a], hard)
         assert set(subset2) == {b, d}
 
-class OptimalMUSTests(MusTests):
+class TestOptimalMUS(TestMus):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup_method(self):
         self.mus_func = optimal_mus
-        self.mus_func_naive = optimal_mus_naive
+        self.naive_func = optimal_mus_naive
 
     def test_weighted(self):
         a, b, c, d = [cp.boolvar(name=n) for n in "abcd"]
@@ -133,17 +129,16 @@ class OptimalMUSTests(MusTests):
         subset3 = self.mus_func([a,b,c,d], hard)
         assert set(subset3) == {b,d}
 
-        subset = self.mus_func_naive([a, b, c, d], hard, weights=[1, 1, 2, 4])
+        subset = self.naive_func([a, b, c, d], hard, weights=[1, 1, 2, 4])
         assert set(subset) == {a, b, c}
-        subset2 = self.mus_func_naive([a, b, c, d], hard, weights=[2, 3, 4, 2])
+        subset2 = self.naive_func([a, b, c, d], hard, weights=[2, 3, 4, 2])
         assert set(subset2) == {b, d}
-        subset3 = self.mus_func_naive([a, b, c, d], hard)
+        subset3 = self.naive_func([a, b, c, d], hard)
         assert set(subset3) == {b, d}
 
-class OCUSTests(OptimalMUSTests):
+class TestOCUS(TestOptimalMUS):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def setup_method(self):
         self.mus_func = ocus
         self.naive_func = ocus_naive
 
@@ -169,7 +164,7 @@ class OCUSTests(OptimalMUSTests):
 
 
 
-class MARCOMUSTests(MusTests):
+class TestMARCOMUS(TestMus):
 
     def test_php(self):
         x = cp.boolvar(shape=(5,3), name="x")
