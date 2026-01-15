@@ -99,7 +99,7 @@ class CPM_hexaly(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise Exception("CPM_hexaly: Install the python package 'hexaly' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_hexaly: Install the python package 'hexaly' to use this solver interface.")
 
         from hexaly.optimizer import HexalyOptimizer
 

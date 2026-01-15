@@ -186,7 +186,7 @@ class CPM_pysat(SolverInterface):
             subsolver (str, name of the pysat solver, e.g. glucose4):  see .solvernames() to get the list of available solver(names)
         """
         if not self.supported():
-            raise ImportError("PySAT is not installed. The recommended way to install PySAT is with `pip install cpmpy[pysat]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
+            raise ModuleNotFoundError("CPM_pysat: Install the python package 'cpmpy[pysat]' (recommended), or otherwise 'python-sat' if you do not require 'pblib' to encode (weighted) sums.")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysat: only satisfaction, does not support an objective function")
 
