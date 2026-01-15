@@ -25,7 +25,8 @@ ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES)
 SKIPPED_EXAMPLES = [
                     "ocus_explanations.py", # waiting for issues to be resolved 
                     "psplib.py", # randomly fails on github due to file creation
-                    "nurserostering.py"
+                    "nurserostering.py",
+                    "test_incremental_solving.py",  # 30s timeout for some solver
                     ]
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
