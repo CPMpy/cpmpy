@@ -22,11 +22,17 @@ ADVANCED_EXAMPLES = glob(join("examples", "advanced", "*.py"))
 EXAMPLES = sorted(EXAMPLES)
 ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES)
 
+# Examples that get skipped (with a message)
 SKIPPED_EXAMPLES = [
                     "ocus_explanations.py", # waiting for issues to be resolved 
                     "psplib.py", # randomly fails on github due to file creation
-                    "nurserostering.py"
+                    "nurserostering.py",
                     ]
+
+# Examples that silently get ignored (no message)
+EXCLUDE_EXAMPLES = [
+    "decision_focused_learning.py" # hard coded dependency on gurobi, gets its own test function
+]
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
             'prob009_perfect_squares.py', 'blocks_world.py', 'flexible_jobshop.py',
@@ -47,7 +53,7 @@ SOLVERS = [
 # run the test for each combination of solver and example
 @pytest.mark.usefixtures("solver")
 @pytest.mark.requires_solver(*SOLVERS)
-@pytest.mark.parametrize("example", EXAMPLES)
+@pytest.mark.parametrize("example", [e for e in EXAMPLES if not any(exclude_name in e for exclude_name in EXCLUDE_EXAMPLES)])
 @pytest.mark.timeout(60)  # 60-second timeout for each test
 def test_example(solver, example):
     """Loads the example file and executes its __main__ block with the given solver being set as default.
@@ -91,7 +97,7 @@ def test_example(solver, example):
     finally:
         SolverLookup.base_solvers = base_solvers
 
-@pytest.mark.parametrize("example", ADVANCED_EXAMPLES)
+@pytest.mark.parametrize("example", [e for e in ADVANCED_EXAMPLES if not any(exclude_name in e for exclude_name in EXCLUDE_EXAMPLES)])
 @pytest.mark.timeout(30)
 @pytest.mark.depends_on_solver # let pytest know this test indirectly depends on the solver fixture
 def test_advanced_example(example):
@@ -99,3 +105,11 @@ def test_advanced_example(example):
     if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):
         pytest.skip(f"Skipped {example}, waiting for issues to be resolved")
     test_example(None, example)
+
+@pytest.mark.timeout(30)
+@pytest.mark.requires_solver("gurobi")
+@pytest.mark.requires_dependency("pyepo")
+def test_advanced_example_dfl():
+    example = "examples/advanced/decision_focused_learning.py"
+    sys.argv = [example]  # avoid pytest arguments being passed the executed module
+    runpy.run_path(example, run_name="__main__")  # many examples won't do anything `__name__ != "__main__"`
