@@ -136,7 +136,7 @@ class CPM_gurobi(SolverInterface):
         if not self.installed():
             raise ModuleNotFoundError("CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.")
         elif not self.license_ok():
-            raise ModuleNotFoundError("CPM_gurobi: A problem occured during license check. Make sure your license is activated!")
+            raise ModuleNotFoundError("CPM_gurobi: No license found or a problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
