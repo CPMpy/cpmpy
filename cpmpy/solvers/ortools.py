@@ -223,11 +223,11 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.log_callback = print
 
         # call the solver, with parameters
-        self.ort_status = self.ort_solver.Solve(self.ort_model, solution_callback=solution_callback)
+        self.ort_status = self.ort_solver.solve(self.ort_model, solution_callback=solution_callback)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.ort_solver.WallTime()
+        self.cpm_status.runtime = self.ort_solver.wall_time()
 
         # translate exit status
         if self.ort_status == ort.FEASIBLE:
@@ -263,7 +263,7 @@ class CPM_ortools(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 try:
-                    cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
+                    cpm_var._value = self.ort_solver.value(self.solver_var(cpm_var))
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
@@ -272,7 +272,7 @@ class CPM_ortools(SolverInterface):
 
             # translate objective
             if self.has_objective():
-                ort_obj_val = self.ort_solver.ObjectiveValue()
+                ort_obj_val = self.ort_solver.objective_value()
                 if round(ort_obj_val) == ort_obj_val: # it is an integer?
                     self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
                 else: # can happen when using floats as coeff in objective
@@ -702,7 +702,7 @@ class CPM_ortools(SolverInterface):
         assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
 
         # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
-        assum_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
+        assum_idx = self.ort_solver.sufficient_assumptions_for_infeasibility()
 
         # return cpm_variables corresponding to ort_assum vars in UNSAT core
         return [self.assumption_dict[i] for i in assum_idx]
