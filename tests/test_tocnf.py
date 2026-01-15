@@ -1,6 +1,4 @@
-import unittest
 import cpmpy as cp
-
 
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
@@ -12,7 +10,7 @@ import pytest
 
 
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
-class TestToCnf(unittest.TestCase):
+class TestToCnf:
     def test_tocnf(self):
         a, b, clause = cp.boolvar(shape=3)
         x = cp.intvar(1, 2)
@@ -86,6 +84,3 @@ class TestToCnf(unittest.TestCase):
         assert len(sols) < 100, sols
         return sols
 
-
-if __name__ == "__main__":
-    unittest.main()
