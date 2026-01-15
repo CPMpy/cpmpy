@@ -7,10 +7,7 @@ from cpmpy import SolverLookup
 import pytest
 
 
-@pytest.mark.parametrize(
-        "solver",
-        [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-)
+@pytest.mark.usefixtures("solver")
 class TestSolutionHinting:
 
     def test_hints(self, solver):
