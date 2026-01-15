@@ -134,7 +134,7 @@ import cpmpy as cp
 
 from .core import BoolVal
 from .utils import all_pairs, is_int, is_bool, STAR
-from .variables import _IntVarImpl
+from .variables import _IntVarImpl, _BoolVarImpl
 from .globalfunctions import * # XXX make this file backwards compatible
 
 
@@ -172,6 +172,14 @@ class GlobalConstraint(Expression):
         Numerical global constraints should reimplement this.
         """
         return 0, 1
+
+    def negate(self):
+        """
+        Returns the negation of this global constraint.
+        Defaults to ~self, but subclasses can implement a better version,
+        > Fages, François, and Sylvain Soliman. Reifying global constraints. Diss. INRIA, 2012.
+        """
+        return ~self
 
 
 # Global Constraints (with Boolean return type)
@@ -436,6 +444,9 @@ class Table(GlobalConstraint):
         arrval = argvals(arr)
         return arrval in tab
 
+    def negate(self):
+        return NegativeTable(self.args[0], self.args[1])
+
 class ShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
@@ -485,6 +496,9 @@ class NegativeTable(GlobalConstraint):
         arrval = argvals(arr)
         tabval = argvals(tab)
         return arrval not in tabval
+
+    def negate(self):
+        return Table(self.args[0], self.args[1])
     
 
 class Regular(GlobalConstraint):
@@ -602,6 +616,9 @@ class IfThenElse(GlobalConstraint):
         condition, if_true, if_false = self.args
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
+    def negate(self):
+        return IfThenElse(self.args[0], self.args[2], self.args[1])
+
 
 
 class InDomain(GlobalConstraint):
@@ -642,6 +659,11 @@ class InDomain(GlobalConstraint):
     def __repr__(self):
         return "{} in {}".format(self.args[0], self.args[1])
 
+    def negate(self):
+        lb, ub = get_bounds(self.args[0])
+        return InDomain(self.args[0],
+                        [v for v in range(lb,ub+1) if v not in set(self.args[1])])
+
 
 class Xor(GlobalConstraint):
     """
@@ -673,6 +695,21 @@ class Xor(GlobalConstraint):
         if len(self.args) == 2:
             return "{} xor {}".format(*self.args)
         return "xor({})".format(self.args)
+
+    def negate(self):
+        # negate one of the arguments, ideally a variable
+        new_args = None
+        for i, a in enumerate(self.args):
+            if isinstance(a, _BoolVarImpl):
+                new_args = self.args[:i] + [~a] + self.args[i+1:]
+                break
+
+        if new_args is None:# did not find a Boolean variable to negate
+            # pick first arg, and push down negation
+            new_args = list(self.args)
+            new_args[0] = cp.transformations.negation.recurse_negation(self.args[0])
+
+        return Xor(new_args)
 
 
 class Cumulative(GlobalConstraint):
