@@ -8,7 +8,7 @@ CPMpy has an extensive test suite, covering all major components including varia
 
 Run all tests:
 ```bash
-pytest tests
+pytest tests/
 ```
 
 Run a specific test file:
@@ -44,12 +44,14 @@ pip install pytest-xdist
 
 ### Solver Selection
 
-The test suite supports changing the solver backend used to run the tests via the `--solver` command-line option:
+The test suite supports changing the solver backend used to run the tests via the `--solver` command-line option.
+
+For now, this only affects tests/test_constraints.py, but it will gradually be added to the entire test-suite.
 
 #### Single Solver
 Run tests with a specific solver:
 ```bash
-pytest --solver=gurobi
+pytest tests/ --solver=gurobi
 ```
 
 #### Multiple Solvers
@@ -58,13 +60,13 @@ Run tests with multiple solvers
 - other non-solver-specific tests will only run against the default solver (OR-Tools)
 - solver-specific tests will be filtered on specified solvers
 ```bash
-pytest --solver=ortools,cplex,gurobi
+pytest tests/ --solver=ortools,cplex,gurobi
 ```
 
 #### All Installed Solvers
 Run tests with all installed solvers:
 ```bash
-pytest --solver=all
+pytest tests/ --solver=all
 ```
 
 This automatically detects all installed solvers from `SolverLookup` and parametrises the subset of non-solver-specific tests to run against each one.
@@ -149,36 +151,6 @@ def test_basic_model():
     m = cp.Model(x >= 5)
     assert m.solve()
     assert x.value() >= 5
-```
-
-### Using the Custom TestCase Class
-
-CPMpy's test suite includes a custom `TestCase` class (in `tests/utils.py`) that provides all unittest-style assertion methods without inheriting from `unittest.TestCase`. This design allows pytest's `pytest_generate_tests` parametrization to work properly.
-
-#### Benefits
-
-- Access to all familiar unittest assertions: `assertEqual`, `assertTrue`, `assertIn`, `assertIsInstance`, etc.
-- Compatible with pytest's parametrization and fixture system
-- Automatic initialization of required unittest internal attributes
-- Support for `setup_method` and `teardown_method` hooks
-
-#### Usage
-
-```python
-from utils import TestCase
-import cpmpy as cp
-
-class TestMyFeature(TestCase):
-    def setup_method(self):
-        # Called before each test method
-        self.x = cp.intvar(0, 10, name="x")
-
-    def test_example(self):
-        # Use unittest-style assertions
-        self.assertEqual(str(self.x), "x")
-        self.assertIsInstance(self.x, cp.intvar)
-        self.assertTrue(self.x.lb == 0)
-        self.assertIn(self.x, [self.x])
 ```
 
 ### Using the Solver Fixture

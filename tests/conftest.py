@@ -381,7 +381,8 @@ def pytest_collection_modifyitems(config, items):
         # Skip test if the required dependency is not installed
         if required_dependency_marker:
             if not all(importlib.util.find_spec(dependency) is not None for dependency in required_dependency_marker.args):
-                skip = pytest.mark.skip(reason=f"Dependency {required_dependency_marker.args} not installed")
+                deps = required_dependency_marker.args[0] if len(required_dependency_marker.args) == 1 else list(required_dependency_marker.args)
+                skip = pytest.mark.skip(reason=f"Dependency {deps} not installed")
                 item.add_marker(skip)
                 skipped_dependency += 1
                 # Continue with the rest of the logic, test might still be filtered out
