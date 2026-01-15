@@ -275,7 +275,7 @@ class CPM_ortools(SolverInterface):
 
             # translate objective
             if self.has_objective():
-                ort_obj_val = self.ort_solver.objective_value()
+                ort_obj_val = self.ort_solver.objective_value
                 if round(ort_obj_val) == ort_obj_val: # it is an integer?
                     self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
                 else: # can happen when using floats as coeff in objective
