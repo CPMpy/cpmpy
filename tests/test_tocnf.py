@@ -18,7 +18,6 @@ class TestToCnf(unittest.TestCase):
         x = cp.intvar(1, 2)
         y, z = cp.intvar(0, 1, shape=2)
 
-        bvs = cp.boolvar(shape=3)
         cases = [
             a,
             a | b,
@@ -50,6 +49,9 @@ class TestToCnf(unittest.TestCase):
             cp.sum(cp.intvar(lb=2, ub=3, shape=3)) <= 3,
         ]
 
+        x = cp.boolvar(shape=2, name="x")
+        cases += [(cp.sum(x) == 0) | cp.all(x)]  # https://github.com/CPMpy/cpmpy/issues/823
+
         # test for equivalent solutions with/without to_cnf
         for case in cases:
             vs = cp.cpm_array(get_variables(case))
@@ -70,7 +72,7 @@ class TestToCnf(unittest.TestCase):
             # ), f"The following was not CNF: {cnf}"
 
             s2 = self.allsols(cnf, vs, ivarmap=ivarmap)
-            assert s1 == s2, f"The equivalence check failed for translaton from {case} to {cnf}"
+            assert s1 == s2, f"The equivalence check failed for translation from:\n\n{case}\n\nto:\n\n{cnf}"
 
     def allsols(self, cons, vs, ivarmap=None):
         m = cp.Model(cons)

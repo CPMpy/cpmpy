@@ -36,10 +36,6 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     # the encoded constraints (i.e. `PB`s) will be added to this `pdk.CNF` object
     slv.pdk_solver = pdk.CNF()
 
-    # however, we bypass `pindakaas` for simple clauses for efficiency
-    clauses = []
-    slv._add_clause = lambda clause, conditions=[]: clauses.append(cp.any([~c for c in conditions] + clause))
-
     # add, transform, and encode constraints into CNF/clauses
     slv += constraints
 
@@ -47,7 +43,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     cpmpy_vars = {str(slv.solver_var(x).var()): x for x in slv._int2bool_user_vars()}
 
     # if a user variable `x` does not occur in any clause, they should be added as `x | ~x`
-    free_vars = set(cpmpy_vars.values()) - set(get_variables(clauses))
+    free_vars = set(cpmpy_vars.values())
 
     def to_cpmpy_clause(clause):
         """Lazily convert `pdk.CNF` to CPMpy."""
@@ -65,6 +61,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
             else:
                 yield y
 
+    clauses = []
     clauses += (cp.any(to_cpmpy_clause(clause)) for clause in slv.pdk_solver.clauses())
     clauses += ((x | ~x) for x in free_vars)  # add free variables so they are "known" by the CNF
 
