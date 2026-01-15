@@ -1,5 +1,4 @@
 import pytest
-import unittest
 
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar

@@ -1,4 +1,3 @@
-import unittest
 import pytest
 import tempfile
 import os

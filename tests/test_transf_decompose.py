@@ -1,4 +1,3 @@
-import unittest
 import numpy as np
 from cpmpy import *
 from cpmpy.transformations.flatten_model import flatten_constraint

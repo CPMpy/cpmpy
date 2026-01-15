@@ -1,6 +1,4 @@
 import pytest
-import unittest
-from unittest import TestCase
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
@@ -227,8 +225,3 @@ class TestMCS:
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
         assert len(mcs(cons)) == 1
-
-
-
-if __name__ == '__main__':
-    unittest.main()

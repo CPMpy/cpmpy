@@ -1,5 +1,5 @@
 import pytest
-import unittest
+
 import numpy as np
 from cpmpy import *
 from cpmpy.transformations.decompose_global import decompose_in_tree

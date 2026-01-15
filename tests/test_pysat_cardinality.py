@@ -1,4 +1,3 @@
-import unittest
 import pytest
 import cpmpy as cp 
 from cpmpy.expressions import *
@@ -210,6 +209,3 @@ class TestCardinality:
         p = cp.boolvar(name="p")
         assert cp.SolverLookup.get(SOLVER, cp.Model(p.implies(2 * x + 3 * y + 5 * z <= 12))).solve()
 
-
-if __name__ == '__main__':
-    unittest.main()

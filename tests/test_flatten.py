@@ -1,4 +1,3 @@
-import unittest
 import cpmpy as cp
 from cpmpy.transformations.flatten_model import *
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl

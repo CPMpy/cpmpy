@@ -1,6 +1,4 @@
-import unittest
 import cpmpy as cp
-
 
 from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
@@ -86,6 +84,3 @@ class TestToCnf:
         assert len(sols) < 100, sols
         return sols
 
-
-if __name__ == "__main__":
-    unittest.main()

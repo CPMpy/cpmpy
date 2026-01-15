@@ -1,4 +1,3 @@
-import unittest
 import pytest
 from cpmpy import *
 from cpmpy.solvers import CPM_pysat
@@ -63,5 +62,3 @@ class TestPySATInterrupt:
 
         assert tend_solving - tstart_solving <= time_limit + grace_time_limit
 
-if __name__ == '__main__':
-    unittest.main()

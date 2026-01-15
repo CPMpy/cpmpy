@@ -1,5 +1,4 @@
 import pytest
-import unittest
 
 import cpmpy as cp
 from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any

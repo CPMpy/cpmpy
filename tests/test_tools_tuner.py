@@ -1,5 +1,4 @@
 import time
-from unittest import TestCase
 
 from cpmpy import *
 from cpmpy.tools import ParameterTuner, GridSearchTuner

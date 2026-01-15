@@ -1,5 +1,3 @@
-import unittest
-
 import cpmpy as cp
 from cpmpy.exceptions import NotSupportedError
 

@@ -1,5 +1,5 @@
 import pytest
-import unittest
+
 import cpmpy as cp
 import numpy as np
 
@@ -682,6 +682,3 @@ class TestUtils:
             assert isinstance(expr, Comparison)
             assert str(expr.args[0]) == "x"
             assert expr.args[1] == True# should always put the constant on the right
-
-if __name__ == '__main__':
-    unittest.main()

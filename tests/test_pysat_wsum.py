@@ -1,4 +1,3 @@
-import unittest
 import pytest
 import cpmpy as cp 
 from cpmpy import *
@@ -11,10 +10,8 @@ pblib_available = importlib.util.find_spec("pypblib") is not None
 @pytest.mark.skipif(not (pysat_available and not pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` is installed")
 def test_pypblib_error():
     # NOTE if you want to run this but pypblib is already installed, run `pip uninstall pypblib && pip install -e .[pysat]`
-    unittest.TestCase().assertRaises(
-            ImportError, # just solve a pb constraint with pypblib not installed
-            lambda : CPM_pysat(cp.Model(2*cp.boolvar() + 3 * cp.boolvar() + 5 * cp.boolvar() <= 6)).solve()
-        )
+    with pytest.raises(ImportError):
+        CPM_pysat(cp.Model(2*cp.boolvar() + 3 * cp.boolvar() + 5 * cp.boolvar() <= 6)).solve()
 
     # this one should still work without `pypblib`
     assert CPM_pysat(cp.Model(1*cp.boolvar() + 1 * cp.boolvar() + 1 * cp.boolvar() <= 2)).solve()
@@ -94,5 +91,3 @@ class TestEncodePseudoBooleanConstraint:
         for expression in expressions:
             Model(expression).solve("pysat")
 
-if __name__ == '__main__':
-    unittest.main()

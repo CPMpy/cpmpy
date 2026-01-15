@@ -1,4 +1,3 @@
-import unittest
 import cpmpy as cp
 
 from cpmpy.transformations.comparison import only_numexpr_equality

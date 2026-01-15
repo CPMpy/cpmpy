@@ -1,5 +1,3 @@
-import unittest
-
 import cpmpy as cp
 from cpmpy.expressions.core import Operator, BoolVal, Comparison
 from cpmpy.transformations.normalize import simplify_boolean, toplevel_list

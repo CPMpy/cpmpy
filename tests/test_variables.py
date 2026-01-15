@@ -1,5 +1,5 @@
 import pytest
-import unittest
+
 import cpmpy as cp
 import numpy as np
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray, _gen_var_names
@@ -139,7 +139,3 @@ class TestGenVarNames:
             _gen_var_names(list("aabd"), (4))
         with pytest.raises(ValueError):
             _gen_var_names(np.array(list("xxyz")), (4))
-
-
-if __name__ == "__main__":
-    unittest.main()
