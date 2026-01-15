@@ -25,7 +25,8 @@ ADVANCED_EXAMPLES = sorted(ADVANCED_EXAMPLES)
 SKIPPED_EXAMPLES = [
                     "ocus_explanations.py", # waiting for issues to be resolved 
                     "psplib.py", # randomly fails on github due to file creation
-                    "nurserostering.py"
+                    "nurserostering.py",
+                    "test_incremental_solving.py",  # 30s timeout for some solver
                     ]
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',
@@ -45,7 +46,9 @@ SOLVERS = [
 
 
 # run the test for each combination of solver and example
-@pytest.mark.parametrize(("solver", "example"), itertools.product(SOLVERS, EXAMPLES))
+@pytest.mark.usefixtures("solver")
+@pytest.mark.requires_solver(*SOLVERS)
+@pytest.mark.parametrize("example", EXAMPLES)
 @pytest.mark.timeout(60)  # 60-second timeout for each test
 def test_example(solver, example):
     """Loads the example file and executes its __main__ block with the given solver being set as default.
@@ -85,13 +88,13 @@ def test_example(solver, example):
         else:  # still fail for other reasons
             raise e
     except ModuleNotFoundError as e:
-        pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))
+        pytest.skip(f'Skipped {example}, module {str(e).split()[-1]} is required')
     finally:
         SolverLookup.base_solvers = base_solvers
 
-
 @pytest.mark.parametrize("example", ADVANCED_EXAMPLES)
 @pytest.mark.timeout(30)
+@pytest.mark.depends_on_solver # let pytest know this test indirectly depends on the solver fixture
 def test_advanced_example(example):
     """Loads the advanced example file and executes its __main__ block with no default solver set."""
     if any(skip_name in example for skip_name in SKIPPED_EXAMPLES):

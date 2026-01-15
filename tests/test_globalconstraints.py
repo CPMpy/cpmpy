@@ -1645,9 +1645,7 @@ class TestTypeChecks(unittest.TestCase):
 
 
 
-
-solvers = [name for name, cls in cp.SolverLookup.base_solvers() if cls.supported()]
-@pytest.mark.parametrize("solver", solvers)
+@pytest.mark.usefixtures("solver")
 def test_issue801_expr_in_cumulative(solver):
 
     if solver in ("pysat", "pysdd", "pindakaas"):

@@ -823,8 +823,7 @@ class TestSolvers(unittest.TestCase):
         self.assertTrue(m.solve(solver="minizinc"))
 
 
-solvers = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-@pytest.mark.parametrize("solver", solvers)
+@pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
     def test_installed_solvers(self, solver):
         # basic model
@@ -1197,18 +1196,30 @@ class TestSupportedSolvers:
         assert s.solve()
         assert s.objective_value() == 5
 
+    @skip_on_missing_pblib()
+    def test_bug810(self, solver):
+        if solver == "pysdd":  # non-supported constraint
+            pytest.skip(reason=f"{solver} does not support int*boolvar")
+
+        kwargs = {}
+        if solver in ("gurobi", "cplex"):
+            kwargs["solution_limit"] = 10
+        p, q = cp.boolvar(2)
+        model = cp.Model(p.implies(3 * q == 2))
+        assert model.solve(solver)
+        assert model.solveAll(solver, **kwargs) == 2
 
 
-@pytest.mark.parametrize(("solver", "expr"), [(s, expr) for s in solvers for expr in numexprs(s)], ids=str)
-def test_objective_numexprs(solver, expr):
+@pytest.mark.generate_constraints.with_args(numexprs)
+def test_objective_numexprs(solver, constraint):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     try:
-        model.minimize(expr)
+        model.minimize(constraint)
         assert model.solve(solver=solver, time_limit=3)
-        assert expr.value() < expr.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
-        model.maximize(expr)
+        assert constraint.value() < constraint.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
+        model.maximize(constraint)
         assert model.solve(solver=solver)
-        assert expr.value() > expr.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
+        assert constraint.value() > constraint.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
