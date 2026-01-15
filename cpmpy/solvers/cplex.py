@@ -51,22 +51,24 @@
     ==============
 """
 import warnings
-from typing import Optional
+from typing import Optional, List
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
 from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_bool
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, \
+    only_positive_bv_wsum_const
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
+
 
 class CPM_cplex(SolverInterface):
     """
@@ -82,6 +84,7 @@ class CPM_cplex(SolverInterface):
     Documentation of the solver's own Python API:
     https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
     """
+    supported_global_constraints = frozenset({"min", "max", "abs"})
 
     @staticmethod
     def supported():
@@ -125,12 +128,13 @@ class CPM_cplex(SolverInterface):
         
         Two version numbers get returned: ``<docplex version>/<solver version>``
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            import pkg_resources
             import cplex
-            cpx = cplex.Cplex()
-            return f"{pkg_resources.get_distribution('docplex').version}/{cpx.get_version()}"
-        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            cplex_version = cplex.Cplex().get_version()
+            docplex_version = version("docplex")
+            return f"{docplex_version}/{cplex_version}"
+        except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -148,6 +152,7 @@ class CPM_cplex(SolverInterface):
 
         from docplex.mp.model import Model
         self.cplex_model = Model()
+        self._obj_offset = 0
         super().__init__(name="cplex", cpm_model=cpm_model)
 
     @property
@@ -157,7 +162,7 @@ class CPM_cplex(SolverInterface):
         """
         return self.cplex_model
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, **kwargs):
         """
             Call the cplex solver
 
@@ -299,18 +304,26 @@ class CPM_cplex(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
-        self.add(flat_cons)
+        # save user vars
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
+
+        self.add(safe_cons + decomp_cons + flat_cons)
 
         # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        cplex_obj = self._make_numexpr(obj)
         if minimize:
-            self.cplex_model.set_objective('min',obj)
+            self.cplex_model.set_objective('min', cplex_obj)
         else:
-            self.cplex_model.set_objective('max', obj)
+            self.cplex_model.set_objective('max', cplex_obj)
 
     def has_objective(self):
         return self.cplex_model.is_optimized()
@@ -341,6 +354,10 @@ class CPM_cplex(SolverInterface):
         if cpm_expr.name == "sub":
             a,b = self.solver_vars(cpm_expr.args)
             return a - b
+
+        if cpm_expr.name == "mul":
+            a,b = self.solver_vars(cpm_expr.args)
+            return a * b
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
@@ -361,15 +378,17 @@ class CPM_cplex(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"})  # linearize expects safe exprs
-        supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
-        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized MIP decomp in linearize
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub", "mul"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "min", "max", "abs", "mul"}), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub", "min", "max", "abs"}), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -416,10 +435,6 @@ class CPM_cplex(SolverInterface):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     cplexlhs = self._make_numexpr(lhs)
                     self.cplex_model.add_constraint(cplexlhs == cplexrhs)
-
-                elif lhs.name == 'mul':
-                    raise NotImplementedError(f'CPLEX only supports quadratic constraints that define a convex region, i.e. quadratic equalities are not supported: {cpm_expr}')
-
                 else:
                     # Global functions
                     if lhs.name == 'min':
@@ -472,7 +487,7 @@ class CPM_cplex(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         CPLEX supports warmstarting the solver with a (in)feasible solution.
         This is done using MIP starts which provide the solver with a starting point
@@ -509,7 +524,7 @@ class CPM_cplex(SolverInterface):
 
             self.cplex_model.add_mip_start(warmstart)
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit: Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -600,7 +615,7 @@ class CPM_cplex(SolverInterface):
 
                 # Translate objective
                 if self.has_objective():
-                    self.objective_value_ = sol_obj_val
+                    self.objective_value_ = sol_obj_val + self._obj_offset
 
                 if display is not None:
                     if isinstance(display, Expression):
