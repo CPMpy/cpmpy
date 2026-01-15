@@ -14,11 +14,9 @@ class TestModel:
     def setup_method(self) -> None:
         self.tempdir = tempfile.mkdtemp()
         print(self.tempdir)
-        return super().setUp()
     
     def teardown_method(self) -> None:
         os.rmdir(self.tempdir)
-        return super().tearDown()
 
     def test_ndarray(self):
         iv = cp.intvar(1,9, shape=3)
