@@ -87,7 +87,7 @@ def test_example(solver, example):
         else:  # still fail for other reasons
             raise e
     except ModuleNotFoundError as e:
-        pytest.skip('Skipped, module {} is required'.format(str(e).split()[-1]))
+        pytest.skip(f'Skipped {example}, module {str(e).split()[-1]} is required')
     finally:
         SolverLookup.base_solvers = base_solvers
 
