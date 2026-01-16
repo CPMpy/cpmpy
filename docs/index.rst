@@ -87,7 +87,7 @@ Supported solvers
      - 
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
      - SAT
-     - SAT ISAT
+     - SAT ASAT ISAT
      - pip
      - Automatically encodes PB to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
