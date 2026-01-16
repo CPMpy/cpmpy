@@ -733,10 +733,15 @@ class CPM_ortools(SolverInterface):
             return value  # Already an enum or other type
         
         # Get the enum class from SatParameters
-        from ortools.sat.python.cp_model_helper import SatParameters
-        enum_class = getattr(SatParameters, self._ENUM_PARAMS[param_name])
-        # Convert integer to enum member by value
-        return enum_class(int(value))  # Convert np.int64 to int first
+        try:
+            from ortools.sat.python.cp_model_helper import SatParameters
+            enum_class = getattr(SatParameters, self._ENUM_PARAMS[param_name])
+            # Convert integer to enum member by value
+            return enum_class(int(value))  # Convert np.int64 to int first
+        except (ImportError, AttributeError, ValueError):
+            # Fall back to integer if enum conversion fails (older OR-Tools versions)
+            warnings.warn(f"Failed to convert {param_name} to enum: {value}")
+            return value
 
     @classmethod
     def tunable_params(cls):
