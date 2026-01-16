@@ -4,6 +4,7 @@
 
 ### Added
 
+* **New solver**: Rc2 MaxSAT solver [#729](https://github.com/CPMpy/cpmpy/pull/729)
 * Expended `to_cnf` using `pumpkin` encoding backend [#782](https://github.com/CPMpy/cpmpy/pull/782)
 * Linearisation of multiplication between Boolean and Integer [#769](https://github.com/CPMpy/cpmpy/pull/769)
 * Solution callback for Hexaly [#787](https://github.com/CPMpy/cpmpy/pull/787), [#809](https://github.com/CPMpy/cpmpy/pull/809)
@@ -12,6 +13,7 @@
 * Typehints and documentation update for global constraints [#812](https://github.com/CPMpy/cpmpy/pull/812)
 * Typehints for Solve and SolveAll [#775](https://github.com/CPMpy/cpmpy/pull/775)
 * OCUS in tools, allowing meta-constraints on MUSes [#698](https://github.com/CPMpy/cpmpy/pull/698)
+* Fix supported solver version ranges [#816](https://github.com/CPMpy/cpmpy/pull/816)
 * Transversal / hitting set example (contributed by @nandorsieben) [#790](https://github.com/CPMpy/cpmpy/pull/790)
 * Nurserostering benchmark  [#789](https://github.com/CPMpy/cpmpy/pull/789)
 * Prediction+optimisation example of scheduling surgeries under uncertainty [5a87c5e](https://github.com/CPMpy/cpmpy/commit/5a87c5ec464394a952b166f93076788f70f4e2ce)
@@ -25,8 +27,15 @@
 * Refactor decompose for global functions [#793](https://github.com/CPMpy/cpmpy/pull/793)
 * Refactor and update Cumulative and NoOverlap constraints [#694](https://github.com/CPMpy/cpmpy/pull/694)
 
+### Changed
+
+* Throw `ModuleNotFoundError` when module is not installed [#825](https://github.com/CPMpy/cpmpy/pull/825)
+
 ### Fixed
 
+* Fix support for newest OR-Tools 9.15 release [#821](https://github.com/CPMpy/cpmpy/pull/821)
+* Check Hexaly license before using solver [#826](https://github.com/CPMpy/cpmpy/pull/826)
+* Fix `to_cnf` clause bypass issue [#824](https://github.com/CPMpy/cpmpy/pull/824)
 * Fix bug handle pdk unsat with conditions [#811](https://github.com/CPMpy/cpmpy/pull/811)
 * Missing packaging dependency in setup.py [#813](https://github.com/CPMpy/cpmpy/pull/813)
 * Abs constraint handle None  [#794](https://github.com/CPMpy/cpmpy/pull/794)
