@@ -20,9 +20,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
         Equivalent CPMpy constraints in CNF, and the updated `ivarmap`
     """
     if not CPM_pindakaas.supported():
-        raise ImportError(
-            f"Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use the `to_cnf` transformation"
-        )
+        raise ImportError(f"Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use the `to_cnf` transformation")
 
     import pindakaas as pdk
 
@@ -36,18 +34,14 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     # the encoded constraints (i.e. `PB`s) will be added to this `pdk.CNF` object
     slv.pdk_solver = pdk.CNF()
 
-    # however, we bypass `pindakaas` for simple clauses for efficiency
-    clauses = []
-    slv._add_clause = lambda clause, conditions=[]: clauses.append(cp.any([~c for c in conditions] + clause))
-
     # add, transform, and encode constraints into CNF/clauses
     slv += constraints
 
     # now we read the pdk.CNF back to cpmpy constraints by mapping from `pdk.Lit` to CPMpy lit
     cpmpy_vars = {str(slv.solver_var(x).var()): x for x in slv._int2bool_user_vars()}
 
-    # if a user variable `x` does not occur in any clause, they should be added as `x | ~x`
-    free_vars = set(cpmpy_vars.values()) - set(get_variables(clauses))
+    # if a user variable `x` does not occur in any clause, it should be added as `x | ~x`
+    free_vars = set(cpmpy_vars.values())
 
     def to_cpmpy_clause(clause):
         """Lazily convert `pdk.CNF` to CPMpy."""
@@ -55,16 +49,11 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
             x = str(lit.var())
             if x not in cpmpy_vars:
                 cpmpy_vars[x] = cp.boolvar()
-            y = cpmpy_vars[x]
-            try:
-                free_vars.remove(y)
-            except KeyError:
-                pass
-            if lit.is_negated():
-                yield ~y
-            else:
-                yield y
+            elif cpmpy_vars[x] in free_vars:  # cpmpy_vars[x] is only in free_vars if it existed before
+                free_vars.remove(cpmpy_vars[x])
+            yield ~cpmpy_vars[x] if lit.is_negated() else cpmpy_vars[x]
 
+    clauses = []
     clauses += (cp.any(to_cpmpy_clause(clause)) for clause in slv.pdk_solver.clauses())
     clauses += ((x | ~x) for x in free_vars)  # add free variables so they are "known" by the CNF
 
