@@ -203,7 +203,7 @@ class CPM_rc2(CPM_pysat):
         return self._process_solution(solution)
 
     def _process_solution(self, sol):
-        """Process solution `sol`, and handles post-processing `int2bool`."""
+        """Process solution `sol` by using PySAT's `_process_solution()`, and setting the objective value."""
         has_sol = super()._process_solution(sol)
         if self.has_objective():
             self.objective_value_ = self.objective_.value()
