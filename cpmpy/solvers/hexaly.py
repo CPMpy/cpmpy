@@ -40,6 +40,7 @@
 
 from typing import Optional, List
 import time
+import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
@@ -70,7 +71,10 @@ class CPM_hexaly(SolverInterface):
 
     @staticmethod
     def supported():
-        # try to import the package
+        return CPM_hexaly.installed() and CPM_hexaly.license_ok()
+
+    @staticmethod
+    def installed():
         try:
             import hexaly as hex
             return True
@@ -78,6 +82,21 @@ class CPM_hexaly(SolverInterface):
             return False
         except Exception as e:
             raise e
+
+    @staticmethod
+    def license_ok():
+        if not CPM_hexaly.installed():
+            warnings.warn(
+                f"License check failed, python package 'hexaly' is not installed! Please check 'CPM_hexaly.installed()' before attempting to check license.")
+            return False
+        else:
+            try:
+                from hexaly.optimizer import HexalyOptimizer
+                HexalyOptimizer()
+                return True
+            except Exception as e:
+                warnings.warn(f"Problem encountered with Hexaly license: {e}.")
+                return False
 
     @classmethod
     def version(cls) -> Optional[str]:
