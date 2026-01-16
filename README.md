@@ -40,10 +40,12 @@ Install simply with `pip install cpmpy`
 CPMpy can translate to a wide variety of constraint solving paradigms, including both commercial and open-source solvers.
 
 * **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, Pumpkin, MiniZinc+solvers
-* **ILP Solvers**: Gurobi (license required)
+* **ILP Solvers**: Gurobi (license required), CPLEX (license required)
+* **GO Solvers**: Hexaly (license required)
 * **SMT Solvers**: Z3
-* **PB Solvers**: Exact, Pindakaas
-* **SAT Solvers**: PySAT+solvers, PySDD
+* **PB Solvers**: Exact
+* **SAT Encoders and Solvers**: PySAT+solvers, Pindakaas
+* **Decision Diagrams**: PySDD
 
 ### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling
 
