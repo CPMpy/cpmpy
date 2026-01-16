@@ -32,7 +32,7 @@ solver_dependencies = {
     "cpo": ["docplex>=2.28.240,<=2.31.254"],
     "pumpkin": ["pumpkin-solver==0.2.2"], # CPMpy requires features only available from Pumpkin version >=0.2.2
     "pindakaas": ["pindakaas>=0.2.1,<=0.3.0"],
-    "cplex": ["docplex", "cplex>=2.28.240,<=2.31.254"],
+    "cplex": ["docplex>=2.28.240,<=2.31.254", "cplex>=20.1.0.4,<=22.1.2.0"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
