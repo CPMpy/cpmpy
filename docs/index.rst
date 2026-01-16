@@ -75,7 +75,6 @@ Supported solvers
      - SAT - OPT IOPT - PAR
      - pip + local + (aca.) license
      - No
-     - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
