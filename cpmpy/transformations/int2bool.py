@@ -443,8 +443,9 @@ def _dom_size(x):
     return x.ub + 1 - x.lb
 
 
-def _only_bool_user_vars(user_vars, ivarmap):
-    """Convert user vars to Booleans. This to ensure solveAll behaves consistently."""
+def replace_int_user_vars(user_vars, ivarmap):
+    """Replace integer user vars by the corresponding Booleans from ivarmap.
+    Note that it returns a new set, it does not modify the user_vars set."""
     bool_user_vars = set()
     for x in user_vars:
         if isinstance(x, _BoolVarImpl):
