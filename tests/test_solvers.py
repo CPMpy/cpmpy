@@ -845,7 +845,7 @@ class TestSupportedSolvers:
 
     def test_time_limit(self, solver):
         if solver == "pysdd": # pysdd does not support time limit
-            return
+            pytest.skip("time limit not supported")
         
         x = cp.boolvar(shape=3)
         m = cp.Model(x[0] | x[1] | x[2])
@@ -885,6 +885,9 @@ class TestSupportedSolvers:
             assert m.objective_value() == 10
         except NotSupportedError:
             return None
+        
+        if solver == "rc2":
+            pytest.skip("does not support re-optimisation")
 
         # if the above works, so should everything below
         m.minimize(sum(iv))
@@ -929,6 +932,8 @@ class TestSupportedSolvers:
 
         assert s.solve()
         assert s.objective_value() == 0
+        if solver == "rc2":
+            return # RC2 only supports setting obj once
         s += x[0] == 5
         s.solve()
         assert s.objective_value() == 5
@@ -1011,7 +1016,7 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin"):  # don't support div or mod with vars
+        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin", "rc2"):  # don't support div or mod with vars
             return
         if solver == 'cplex':
             pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
@@ -1063,7 +1068,7 @@ class TestSupportedSolvers:
         m.minimize(cp.max(end))
         m.solve(solver=solver, time_limit=1)
         # normally, should not be able to solve within 1s...
-        assert m.status().exitstatus == ExitStatus.FEASIBLE or m.status().exitstatus == ExitStatus.UNKNOWN
+        assert m.status().exitstatus in (ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
         # now trivally unsat
         m += cp.sum(bv) <= 0
@@ -1143,7 +1148,7 @@ class TestSupportedSolvers:
         kwargs = dict()
         if solver in ("gurobi", "cplex"):
             kwargs['solution_limit'] = 10
-        if solver == "hexaly":
+        elif solver == "hexaly":
             kwargs['time_limit'] = 2
 
         # empty model

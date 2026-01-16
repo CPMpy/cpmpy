@@ -39,6 +39,16 @@
 
 **Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.29...v0.10.0
 
+## 0.9.29
+
+### Fixed
+
+This is a hotfix release due to external breaking changes in the default solver backend.
+
+* Pin solver versions (not merged, cherry picked for this hotfix) [#816](https://github.com/CPMpy/cpmpy/pull/816)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.28...v0.9.29
+
 ## 0.9.28
 
 This is a very small release with a hotfix for multi-dimensional indexing where the index is a decision variable.
