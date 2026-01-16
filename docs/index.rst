@@ -91,6 +91,11 @@ Supported solvers
      - SAT ASAT ISAT
      - pip
      - 
+   * - :doc:`RC2 <api/solvers/rc2>`
+     - MaxSAT
+     - OPT
+     - pip
+     - 
    * - :doc:`PySDD <api/solvers/pysdd>`
      - Decis. Diagram
      - SAT ISAT ALLSAT - KC 
