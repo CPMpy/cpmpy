@@ -245,9 +245,10 @@ class CPM_rc2(CPM_pysat):
         self += cons
         const += k
 
-        terms = [(w, x) for w,x in terms if w != 0]  # non-zero coefficients only
+        # remove terms with coefficient 0 (`only_positive_coefficients_` may return them and RC2 does not accept them)
+        terms = [(w, x) for w,x in terms if w != 0]  
         ws, xs = zip(*terms)  # unzip
-        new_weights, new_xs, k = only_positive_coefficients_(ws, xs) # this is actually only_non_negative_coefficients
+        new_weights, new_xs, k = only_positive_coefficients_(ws, xs)
         const += k
 
         return list(new_weights), list(new_xs), const
