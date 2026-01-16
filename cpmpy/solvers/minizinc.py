@@ -263,7 +263,7 @@ class CPM_minizinc(SolverInterface):
         if not self.installed():
             raise ModuleNotFoundError("CPM_minizinc: Install the python package 'minizinc' to use this solver interface.")
         elif not self.executable_installed():
-            raise Exception("CPM_minizinc: Install the MiniZinc executable and make it available in path.")
+            raise ModuleNotFoundError("CPM_minizinc: Install the MiniZinc executable and make it available in path.")
         elif self.outdated():
             version = str(self.required_version[0])
             for x in self.required_version[1:]:
