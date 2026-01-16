@@ -80,6 +80,11 @@ Supported solvers
      - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
+   * - :doc:`RC2 <api/solvers/rc2>`
+     - MaxSAT
+     - OPT
+     - pip
+     - 
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
      - SAT
      - SAT ISAT
@@ -88,11 +93,6 @@ Supported solvers
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - SAT ASAT ISAT
-     - pip
-     - 
-   * - :doc:`RC2 <api/solvers/rc2>`
-     - MaxSAT
-     - OPT
      - pip
      - 
    * - :doc:`PySDD <api/solvers/pysdd>`
