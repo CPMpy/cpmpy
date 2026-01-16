@@ -117,9 +117,9 @@ def recurse_negation(expr):
     # global constraints
     elif hasattr(expr, "decompose"):
         newexpr = copy.copy(expr)
-        # args are positive as we will negate the global, still check if no 'not' in its arguments
+        # args are positive as we will negate the global, still check if no 'not' in its arguments        
         newexpr.update_args(push_down_negation(expr.args, toplevel=False))
-        return ~newexpr
+        return newexpr.negate()
 
     elif is_bool(expr): # unlikely case with non-CPMpy True or False
         return ~BoolVal(expr)
