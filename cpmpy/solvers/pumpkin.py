@@ -103,13 +103,14 @@ class CPM_pumpkin(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, proof=None):
         """
         Constructor of the native solver object
 
         Arguments:
             cpm_model: Model(), a CPMpy Model() (optional)
             subsolver: None, not used
+            proof (str, optional): path to the proof file
         """
         if not self.supported():
             raise ModuleNotFoundError("CPM_pumpkin: Install the python package 'pumpkin_solver'")
@@ -119,7 +120,8 @@ class CPM_pumpkin(SolverInterface):
         assert subsolver is None 
 
         # initialise the native solver object
-        self.pum_solver = Model() 
+        self._proof = proof
+        self.pum_solver = Model(proof=self._proof)
         self.predicate_map = {} # cache predicates for reuse
 
         # for objective
@@ -137,7 +139,7 @@ class CPM_pumpkin(SolverInterface):
         return self.pum_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name="proof.drcp", proof_location=".", assumptions:Optional[List[_BoolVarImpl]]=None):
+    def solve(self, time_limit:Optional[float]=None, prove=False, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
         """
         Call the Pumpkin solver
 
@@ -159,20 +161,24 @@ class CPM_pumpkin(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        if "proof" in kwargs or "prove" in kwargs or "prove_location" in kwargs or "proof_name" in kwargs:
+            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solve."
+                             "`cpmpy.SolverLookup.get('pumpkin', model, proof='path/to/proof.drcp')`")
+
         # parse and dispatch the arguments
         if time_limit is not None and time_limit < 0:
             raise ValueError("Time limit cannot be negative, but got {time_limit}")
-        kwargs = dict(timeout=time_limit)
+        
+        kwargs.update(timeout=time_limit)
 
         if self.has_objective():
             assert assumptions is None, "Optimization under assumptions is not supported"
             solve_func = self.pum_solver.optimise
-            kwargs.update(proof=join(proof_location, proof_name) if prove else None,
-                          objective=self.solver_var(self._objective),
+            kwargs.update(objective=self.solver_var(self._objective),
                           direction=Direction.Minimise if self.objective_is_min else Direction.Maximise)
 
         elif assumptions is not None:
-            assert not prove, "Proof-logging under assumptions is not supported"
+            assert self._proof is None, "Proof-logging under assumptions is not supported"
             pum_assumptions = [self.to_predicate(a, tag=None) for a in assumptions]
             self.assump_map = dict(zip(pum_assumptions, assumptions))
             solve_func = self.pum_solver.satisfy_under_assumptions
@@ -180,7 +186,6 @@ class CPM_pumpkin(SolverInterface):
 
         else:
             solve_func = self.pum_solver.satisfy
-            kwargs.update(proof=join(proof_location, proof_name) if prove else None)
 
         self._pum_core = None
         
