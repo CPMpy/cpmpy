@@ -49,11 +49,13 @@ General comparisons or expressions
 
 """
 import copy
+import warnings
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
 from .flatten_model import flatten_constraint, get_or_make_var
+from .decompose_global import decompose_in_tree
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
@@ -61,6 +63,7 @@ from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
+from ..expressions.python_builtins import sum as cpm_sum
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
@@ -598,3 +601,52 @@ def only_positive_coefficients(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
+
+
+from .int2bool import _encode_int_var, _encode_comparison
+def decompose_linear(lst_of_expr, supported=frozenset(), supported_reified=frozenset(), csemap=None, ivarmap=None):
+    """
+        Decompose unsupported global constraints in a linear-friendly way.
+        Currently support constraints are AllDifferent and Element
+    """
+
+    if ivarmap is None:
+        return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap)
+
+    # AllDifferent
+    def decompose_alldifferent(expr):
+
+        if expr.has_subexpr():
+            warnings.warn(f"AllDifferent constraint {expr} cannot be decompose in a linear-friendly way as it has nested expressions. Using default decomposition")
+            return expr.decompose()
+
+        lbs, ubs = get_bounds(expr.args)
+        lb, ub = min(lbs), max(ubs)
+
+        value, defining = [], []
+        for val in range(lb, ub + 1):
+            args = []
+            for arg in expr.args:
+                if isinstance(arg, _NumVarImpl):
+                    bv, domain_constraints = _encode_comparison(ivarmap, arg, "==", val, encoding="direct")
+                    value.append(bv)
+                    defining.append(domain_constraints)
+                elif is_num(arg) and arg == val:
+                    args.append(BoolVal(True))
+                elif is_num(arg) and arg != val:
+                    args.append(BoolVal(False))
+                else:
+                    raise ValueError(f"unexpected argument {arg} in AllDifferent")
+
+            value.append(cpm_sum(args) <= 1)
+        
+        # for var in newvars:s # variables for which we introduced a new encoding
+        #     terms, k = ivarmap[var].encode_term()
+        #     defining.append(eval_comparison("==", cpm_sum(x for _, x in terms) + k, val))
+        
+        return value, defining
+
+    # Element
+
+    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap,
+    decompose_custom=dict(alldifferent=decompose_alldifferent))
