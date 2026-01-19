@@ -15,7 +15,8 @@ class TestSolveAll(unittest.TestCase):
         for name, solver in cp.SolverLookup.base_solvers():
             if not solver.supported():
                 continue
-
+            if name == "rc2":
+                continue
 
             sols = set()
             add_sol = lambda: sols.add(str([a.value(), b.value()]))

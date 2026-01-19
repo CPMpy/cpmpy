@@ -44,9 +44,9 @@
     ==============
 """
 from functools import reduce
-from typing import Optional
+from typing import Optional, List
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
@@ -114,7 +114,7 @@ class CPM_pysdd(SolverInterface):
             subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_pysdd: Install the python package 'pysdd' to use this solver interface")
+            raise ModuleNotFoundError("CPM_pysdd: Install the python package 'pysdd' to use this solver interface")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
@@ -135,7 +135,7 @@ class CPM_pysdd(SolverInterface):
         """
         return self.pysdd_root
 
-    def solve(self, time_limit=None, assumptions=None):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
         """
             See if an arbitrary model exists
 
@@ -186,7 +186,7 @@ class CPM_pysdd(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 

@@ -6,8 +6,7 @@
 """
     Interface to Hexaly's API
 
-
-    Hexaly is a local search solver with support for  global constraints.
+    Hexaly is a global optimization solver that supports nonlinear and a few global constraints.
 
     Always use :func:`cp.SolverLookup.get("hexaly") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
 
@@ -21,7 +20,7 @@
 
         $ pip install hexaly -i https://pip.hexaly.com                
     
-    The Hexaly local solver requires an active licence (for example a free academic license)
+    It also requires to install the Hexaly Optimizer with a Hexaly license (for example a free academic license)
     You can read more about available licences at https://www.hexaly.com/
 
     See detailed installation instructions at:
@@ -39,10 +38,11 @@
         CPM_hexaly
 """
 
+from typing import Optional, List
 import time
-from typing import Optional
+import warnings
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction, DirectConstraint
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -71,7 +71,10 @@ class CPM_hexaly(SolverInterface):
 
     @staticmethod
     def supported():
-        # try to import the package
+        return CPM_hexaly.installed() and CPM_hexaly.license_ok()
+
+    @staticmethod
+    def installed():
         try:
             import hexaly as hex
             return True
@@ -79,6 +82,21 @@ class CPM_hexaly(SolverInterface):
             return False
         except Exception as e:
             raise e
+
+    @staticmethod
+    def license_ok():
+        if not CPM_hexaly.installed():
+            warnings.warn(
+                f"License check failed, python package 'hexaly' is not installed! Please check 'CPM_hexaly.installed()' before attempting to check license.")
+            return False
+        else:
+            try:
+                from hexaly.optimizer import HexalyOptimizer
+                HexalyOptimizer()
+                return True
+            except Exception as e:
+                warnings.warn(f"Problem encountered with Hexaly license: {e}.")
+                return False
 
     @classmethod
     def version(cls) -> Optional[str]:
@@ -100,7 +118,7 @@ class CPM_hexaly(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise Exception("CPM_hexaly: Install the python package 'hexaly' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_hexaly: Install the python package 'hexaly' to use this solver interface.")
 
         from hexaly.optimizer import HexalyOptimizer
 
@@ -119,7 +137,7 @@ class CPM_hexaly(SolverInterface):
     def native_model(self):
         return self.hex_model
 
-    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
             Call the Hexaly solver
 
@@ -154,8 +172,9 @@ class CPM_hexaly(SolverInterface):
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
         # register solution callback
-        from hexaly.optimizer import HxCallbackType
-        self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        if solution_callback is not None:
+            from hexaly.optimizer import HxCallbackType
+            self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
         
         # new status, translate runtime
         self.hex_model.close() # model must be closed
@@ -165,7 +184,8 @@ class CPM_hexaly(SolverInterface):
         self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
 
         # unregister solution callback
-        self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        if solution_callback is not None:
+            self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
@@ -423,7 +443,7 @@ class CPM_hexaly(SolverInterface):
         raise NotImplementedError(f"Unexpected expression {cpm_expr}")
 
     
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all solutions, map them to CPMpy and optionally display the solutions.
 
@@ -446,7 +466,7 @@ class CPM_hexaly(SolverInterface):
         return super(CPM_hexaly, self).solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
 
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         from hexaly.optimizer import HxObjectiveDirection
         if self.is_satisfaction: # set dummy objective, otherwise cannot close model
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)

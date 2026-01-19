@@ -546,9 +546,18 @@ def canonical_comparison(lst_of_expr):
 
     return newlist
 
+def only_positive_coefficients_(ws, xs):
+    """
+    Helper function to replace Boolean terms with negative coefficients with terms with positive coefficients (including 0) in Boolean linear expressions, given as a list of coefficients `ws` and a list of Boolean variables `xs`. Returns new non-negative coefficients and variables, and a constant term to be added.
+    """
+    indices = {i for i, (w, x) in enumerate(zip(ws, xs)) if w < 0 and isinstance(x, _BoolVarImpl)}
+    nw, na = zip(*[(-w, ~x) if i in indices else (w, x) for i, (w, x) in enumerate(zip(ws, xs))])
+    constant = sum(ws[i] for i in indices)
+    return nw, na, constant
+
 def only_positive_coefficients(lst_of_expr):
     """
-        Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
+        Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients (including 0) by negating its literal.
         This can simplify a `wsum` into `sum`.
         `cpm_expr` is expected to be a canonical comparison.
         Only apply after applying :func:`canonical_comparison(cpm_expr) <canonical_comparison>`
@@ -566,9 +575,8 @@ def only_positive_coefficients(lst_of_expr):
             # :: ... + c*~b + ... <= k+c
             if lhs.name == "wsum":
                 weights, args = lhs.args
-                idxes = {i for i, (w, a) in enumerate(zip(weights, args)) if w < 0 and isinstance(a, _BoolVarImpl)}
-                nw, na = zip(*[(-w, ~a) if i in idxes else (w, a) for i, (w, a) in enumerate(zip(weights, args))])
-                rhs += sum(-weights[i] for i in idxes)
+                nw, na, k = only_positive_coefficients_(weights, args)
+                rhs -= k
 
                 # Simplify wsum to sum if all weights are 1
                 if all(w == 1 for w in nw):

@@ -48,11 +48,11 @@
 """
 import sys  # for stdout checking
 import time
-from typing import Optional
+from typing import Optional, List
 
 from packaging.version import Version
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
@@ -132,7 +132,7 @@ class CPM_exact(SolverInterface):
         A workaround is to use dict-unpacking: `CPM_Exact(**{parameter-with-hyphen: 42})`
         """
         if not self.supported():
-            raise Exception("CPM_exact: Install the python package 'exact' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_exact: Install the python package 'exact' to use this solver interface.")
         
         assert subsolver is None, "Exact does not allow subsolvers."
 
@@ -173,7 +173,7 @@ class CPM_exact(SolverInterface):
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
-    def solve(self, time_limit=None, assumptions=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
         """
             Call Exact
 
@@ -275,7 +275,7 @@ class CPM_exact(SolverInterface):
             if timelim == 0: timelim = -1
         return timelim
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally, display the solutions.
 
@@ -652,7 +652,7 @@ class CPM_exact(SolverInterface):
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
 
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         Exact supports warmstarting the solver with a partial feasible assignment.
 

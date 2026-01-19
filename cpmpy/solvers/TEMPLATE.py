@@ -52,7 +52,7 @@ from typing import Optional
 import warnings
 from packaging.version import Version
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
@@ -159,7 +159,7 @@ class CPM_template(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise Exception("CPM_TEMPLATE: Install the python package 'TEMPLATEpy' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_TEMPLATE: Install the python package 'TEMPLATEpy' to use this solver interface.")
 
         import TEMPLATEpy
 
@@ -184,7 +184,7 @@ class CPM_template(SolverInterface):
         """
         return self.TPL_model
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, **kwargs):
         """
             Call the TEMPLATE solver
 
@@ -496,7 +496,7 @@ class CPM_template(SolverInterface):
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 

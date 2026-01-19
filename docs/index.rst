@@ -37,12 +37,12 @@ Supported solvers
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
-     - SAT ALLSAT - OPT - PROOF
+     - SAT ISAT ALLSAT - OPT - PROOF
      - pip
      -
    * - :doc:`Choco <api/solvers/choco>`
      - CP
-     - SAT ALLSAT - OPT
+     - SAT ISAT ALLSAT - OPT
      - pip
      - 
    * - :doc:`CP Optimizer <api/solvers/cpo>`
@@ -57,45 +57,49 @@ Supported solvers
      - Communicates through textfiles
    * - :doc:`Z3 <api/solvers/z3>`
      - SMT
-     - SAT ASAT ISAT - OPT IOPT
+     - SAT ASAT ISAT - OPT
      - pip
      - 
+   * - :doc:`Hexaly <api/solvers/hexaly>`
+     - Global Opt.
+     - SAT ISAT ALLSAT - OPT IOPT
+     - pip + local + (aca.) licence
+     -
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
-     - SAT - OPT IOPT - PAR
+     - SAT ISAT - OPT IOPT - PAR
      - pip + (aca.) license
      - 
    * - :doc:`CPLEX <api/solvers/cplex>`
      - ILP
+     - SAT - OPT IOPT - PAR
      - pip + local + (aca.) license
      - No
-     - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
+   * - :doc:`RC2 <api/solvers/rc2>`
+     - MaxSAT
+     - OPT
+     - pip
+     - 
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
-     - Pseudo-Boolean
      - SAT
-     - local install (git + pip > 3.10)
-     - Encodes to SAT
+     - SAT ASAT ISAT
+     - pip
+     - Automatically encodes PB to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - SAT ASAT ISAT
      - pip
      - 
    * - :doc:`PySDD <api/solvers/pysdd>`
-     - SAT Counter
+     - Decis. Diagram
      - SAT ISAT ALLSAT - KC 
      - pip
      - only Boolean variables (CPMpy transformation incomplete)
-
-   * - :doc:`Hexaly <api/solvers/hexaly>`
-     - Local search
-     - SAT ALLSAT - OPT IOPT
-     - pip + local + (aca.) licence
-     -
 
 Native capability abbreviations:
     * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
@@ -121,6 +125,7 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
    unsat_core_extraction
    developers
    adding_solver
+   testing
 
 Open Source
 -----------

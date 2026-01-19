@@ -7,13 +7,12 @@ from cpmpy import SolverLookup
 import pytest
 
 
-@pytest.mark.parametrize(
-        "solver",
-        [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-)
+@pytest.mark.usefixtures("solver")
 class TestSolutionHinting:
 
     def test_hints(self, solver):
+        if solver == "rc2":
+            pytest.skip("does not support solution hints")
 
         a,b = cp.boolvar(shape=2)
         model = cp.Model(a | b)

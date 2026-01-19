@@ -51,9 +51,9 @@
     ==============
 """
 import warnings
-from typing import Optional
+from typing import Optional, List
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
 from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_bool
@@ -146,9 +146,9 @@ class CPM_cplex(SolverInterface):
         - subsolver: None, not used
         """
         if not self.installed():
-            raise Exception("CPM_cplex: Install the python packages 'docplex' and 'cplex' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_cplex: Install the python packages 'docplex' and 'cplex' to use this solver interface.")
         elif not self.license_ok():
-            raise Exception("CPM_cplex: A problem occured during license check. Make sure your installed the CPLEX Optimization Studio and that you have an active license.")
+            raise ModuleNotFoundError("CPM_cplex: No license found or a problem occured during license check. Make sure your installed the CPLEX Optimization Studio and that you have an active license.")
 
         from docplex.mp.model import Model
         self.cplex_model = Model()
@@ -162,7 +162,7 @@ class CPM_cplex(SolverInterface):
         """
         return self.cplex_model
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, **kwargs):
         """
             Call the cplex solver
 
@@ -487,7 +487,7 @@ class CPM_cplex(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         CPLEX supports warmstarting the solver with a (in)feasible solution.
         This is done using MIP starts which provide the solver with a starting point
@@ -524,7 +524,7 @@ class CPM_cplex(SolverInterface):
 
             self.cplex_model.add_mip_start(warmstart)
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit: Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 

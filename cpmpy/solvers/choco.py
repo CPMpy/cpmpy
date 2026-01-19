@@ -50,7 +50,7 @@ from packaging.version import Version
 import warnings
 
 from ..transformations.normalize import toplevel_list
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import Cumulative, DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
@@ -136,7 +136,7 @@ class CPM_choco(SolverInterface):
             subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_choco: Install the python package 'pychoco' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_choco: Install the python package 'pychoco' to use this solver interface.")
 
         import pychoco as chc
 
@@ -161,7 +161,7 @@ class CPM_choco(SolverInterface):
         """
         return self.chc_model
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit: Optional[float]=None, **kwargs):
         """
             Call the Choco solver
 
@@ -239,7 +239,7 @@ class CPM_choco(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 

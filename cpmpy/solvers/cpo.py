@@ -45,7 +45,7 @@
 from typing import Optional
 import warnings
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
@@ -138,11 +138,11 @@ class CPM_cpo(SolverInterface):
             subsolver: str, name of a subsolver (optional)
         """
         if not self.installed():
-            raise Exception("CPM_cpo: Install the python package 'docplex'")
+            raise ModuleNotFoundError("CPM_cpo: Install the python package 'docplex'")
 
         if not self.license_ok():
-            raise Exception("You need to install the CPLEX Optimization Studio to use this solver. "
-                            "Also make sure that the binary is in your path")
+            raise ModuleNotFoundError("CPM_cpo: You also need to install the CPLEX Optimization Studio to use this solver. "
+                                      "Also make sure that the binary is in your path")
 
         docp = self.get_docp()
         assert subsolver is None
@@ -156,7 +156,7 @@ class CPM_cpo(SolverInterface):
         """
         return self.cpo_model
     
-    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
             Call the CP Optimizer solver
 
@@ -258,7 +258,7 @@ class CPM_cpo(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
