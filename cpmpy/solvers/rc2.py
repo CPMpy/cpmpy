@@ -102,7 +102,7 @@ class CPM_rc2(CPM_pysat):
         
         """
         if not self.supported():
-            raise ImportError("CPM_rc2: RC2 is not installed. The recommended way to install RC2 is with `pip install cpmpy[rc2]`, or `pip install python-sat` if you do not require `pblib` to encode (weighted) sums.")
+            raise ModuleNotFoundError("CPM_rc2: Install the python package 'cpmpy[rc2]' (recommended), or 'python-sat' if you do not require 'pblib' to encode (weighted) sums.")
 
         from pysat.formula import IDPool, WCNF
 
