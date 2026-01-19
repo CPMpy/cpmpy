@@ -17,7 +17,7 @@ class TestTransfDecomp(unittest.TestCase):
         bv = boolvar(name="bv")
 
         cons = [AllDifferent(ivs)]
-        self.assertEqual(str(decompose_in_tree(cons)), "[(x) != (y), (x) != (z), (y) != (z)]")
+        self.assertEqual(str(decompose_in_tree(cons)), "[and([(x) != (y), (x) != (z), (y) != (z)])]")
         self.assertEqual(str(decompose_in_tree(cons, supported={"alldifferent"})), str(cons))
 
         # reified
