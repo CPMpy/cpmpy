@@ -607,7 +607,7 @@ from .int2bool import _encode_int_var, _encode_comparison
 def decompose_linear(lst_of_expr, supported=frozenset(), supported_reified=frozenset(), csemap=None, ivarmap=None):
     """
         Decompose unsupported global constraints in a linear-friendly way.
-        Currently support constraints are AllDifferent and Element
+        Currently support constraints are AllDifferent, Element, Count, NValue
     """
 
     if ivarmap is None:
@@ -615,6 +615,7 @@ def decompose_linear(lst_of_expr, supported=frozenset(), supported_reified=froze
 
     # AllDifferent
     def decompose_alldifferent(expr):
+        print("Decomposing expr")
 
         if expr.has_subexpr():
             warnings.warn(f"AllDifferent constraint {expr} cannot be decompose in a linear-friendly way as it has nested expressions. Using default decomposition")
@@ -623,30 +624,59 @@ def decompose_linear(lst_of_expr, supported=frozenset(), supported_reified=froze
         lbs, ubs = get_bounds(expr.args)
         lb, ub = min(lbs), max(ubs)
 
-        value, defining = [], []
-        for val in range(lb, ub + 1):
-            args = []
-            for arg in expr.args:
-                if isinstance(arg, _NumVarImpl):
-                    bv, domain_constraints = _encode_comparison(ivarmap, arg, "==", val, encoding="direct")
-                    value.append(bv)
-                    defining.append(domain_constraints)
-                elif is_num(arg) and arg == val:
-                    args.append(BoolVal(True))
-                elif is_num(arg) and arg != val:
-                    args.append(BoolVal(False))
-                else:
-                    raise ValueError(f"unexpected argument {arg} in AllDifferent")
-
-            value.append(cpm_sum(args) <= 1)
+        encodings, defining = [], []
+        for arg in expr.args:
+            if isinstance(arg, _NumVarImpl):
+                enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
+                encodings.append(enc)
+                defining += domain_constraints
+            elif is_num(arg):
+                encodings.append(DummyEncoding(arg))
         
-        # for var in newvars:s # variables for which we introduced a new encoding
-        #     terms, k = ivarmap[var].encode_term()
-        #     defining.append(eval_comparison("==", cpm_sum(x for _, x in terms) + k, val))
-        
-        return value, defining
+        return [cpm_sum(enc.eq(val) for enc in encodings) <= 1 for val in range(lb, ub+1)], defining
 
     # Element
+    def decompose_element(expr):
+        arr, idx = expr.args
+        if not all(is_num(a) for a in arr):
+            # otherwise results in multiplication constraints...
+            return expr.decompose()
+
+        lb, ub = get_bounds(idx)
+        assert 0 <= lb and ub < len(arr)
+        enc, defining = _encode_int_var(ivarmap, idx, "direct")
+        return cp.sum(val * enc.eq(val) for val in range(0, len(arr))), defining
+
+    # NValue
+    def decompose_nvalue(expr):
+        
+        lbs, ubs = get_bounds(expr.args)
+        lb, ub = min(lbs), max(ubs)
+        encodings, defining = [], []
+        for arg in expr.args:
+            if isinstance(arg, _NumVarImpl):
+                enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
+                encodings.append(enc)
+                defining += domain_constraints
+            elif is_num(arg):
+                encodings.append(DummyEncoding(arg))
+
+        return cp.sum(cp.any(enc.eq(v) for enc in encodings) for v in range(lb, ub+1)), defining
 
     return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap,
-    decompose_custom=dict(alldifferent=decompose_alldifferent))
+    decompose_custom=dict(alldifferent=decompose_alldifferent,
+                        #   element=decompose_element,
+                          nvalue=decompose_nvalue
+                          ))
+
+
+class DummyEncoding:
+
+    def __init__(self, val):
+        self.val = val
+
+    def eq(self, d):
+        if self.val == d:
+            return cp.BoolVal(True)
+        else:
+            return cp.BoolVal(False)
