@@ -20,7 +20,7 @@ This allows to post the decomposed expression tree to the solver if it supports 
 
 import copy
 import warnings  # for deprecation warning
-from typing import List, Set, Optional, Dict
+from typing import Optional, Callable
 
 from .normalize import toplevel_list
 from ..expressions.globalconstraints import GlobalConstraint
@@ -32,7 +32,12 @@ from ..expressions.python_builtins import all as cpm_all
 from .flatten_model import flatten_constraint, normalized_numexpr
 
 
-def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set(), supported_reified: Set[str] = set(), csemap: Optional[Dict[Expression, Expression]] = None, _nested=False) -> List[Expression]:
+def decompose_in_tree(lst_of_expr: list[Expression], 
+                      supported: set[str] = set(), 
+                      supported_reified: set[str] = set(), 
+                      csemap: Optional[dict[Expression, Expression]] = None, 
+                      _nested=False,
+                      decompose_custom:dict[str, Callable]= dict()) -> list[Expression]:
     """
         Decomposes any global constraint not supported by the solver.
         Accepts a list of CPMpy expressions as input and returns a list of CPMpy expressions.
@@ -50,7 +55,7 @@ def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set()
         So even if numerical constraints are not supported in reified context, we can rewrite them to non-reified versions if they are total.
     """
     
-    toplevel: List[Expression] = [] # list of constraints that should be added toplevel
+    toplevel: list[Expression] = [] # list of constraints that should be added toplevel
 
     def decompose_helper(lst_of_expr, nested):
         """
@@ -92,8 +97,12 @@ def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set()
                     if csemap is not None and expr in csemap:
                         newlist.append(csemap[expr])
                         continue # no need to decompose, re-use the expression we already have
+
+                    if expr.name in decompose_custom:
+                        val, define = decompose_custom[expr.name](expr)
+                    else:
+                        val, define = expr.decompose()
                     
-                    val, define = expr.decompose()
                     if isinstance(val, list) and expr.is_bool():
                         val = cpm_all(val)
 
@@ -117,7 +126,7 @@ def decompose_in_tree(lst_of_expr: List[Expression], supported: Set[str] = set()
         
     newlist = decompose_helper(lst_of_expr, nested=_nested)
     if len(toplevel):
-        toplevel = decompose_in_tree(toplevel_list(toplevel), supported, supported_reified, csemap=csemap, _nested=_nested)
+        toplevel = decompose_in_tree(toplevel_list(toplevel), supported, supported_reified, csemap=csemap, _nested=_nested, decompose_custom=decompose_custom)
     return newlist + toplevel
 
 
