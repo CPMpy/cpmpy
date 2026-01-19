@@ -598,7 +598,7 @@ for solvername in cp.SolverLookup.solvernames() # all solvers (+subsolvers) inst
 ```{Note}
 For solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. Most solvers can easily be installed through `pip install cpmpy[<solver_name>]`. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
 ```console
-    ModuleNotFoundException: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
+    ModuleNotFoundError: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
 ```
 
 
