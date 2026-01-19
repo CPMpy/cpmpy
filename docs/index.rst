@@ -75,15 +75,19 @@ Supported solvers
      - SAT - OPT IOPT - PAR
      - pip + local + (aca.) license
      - No
-     - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
+   * - :doc:`RC2 <api/solvers/rc2>`
+     - MaxSAT
+     - OPT
+     - pip
+     - 
    * - :doc:`Pindakaas <api/solvers/pindakaas>`
      - SAT
-     - SAT ISAT
+     - SAT ASAT ISAT
      - pip
      - Automatically encodes PB to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
