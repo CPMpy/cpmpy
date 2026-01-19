@@ -23,7 +23,7 @@ solver_dependencies = {
     "ortools": ["ortools>=9.3.10497,<=9.14.6206,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
     "z3": ["z3-solver>=4.8.15.0,<=4.15.4.0"],
     "choco": ["pychoco>=0.2.1,<=0.2.4"],
-    "exact": ["exact==2.2.1"], # older versions are bugged on py3.13
+    "exact": ["exact>=2.1.0,<=2.2.1"], # older versions (<2.2.1) are bugged on py3.13
     "minizinc": ["minizinc>=0.7.0,<=0.10.0"],
     "pysat": ["python-sat>=1.8.dev4,<=1.9.dev26"],
     "gurobi": ["gurobipy>=11.0.0,<=13.0.0"],
@@ -32,7 +32,7 @@ solver_dependencies = {
     "cpo": ["docplex>=2.28.240,<=2.31.254"],
     "pumpkin": ["pumpkin-solver==0.2.2"], # CPMpy requires features only available from Pumpkin version >=0.2.2
     "pindakaas": ["pindakaas>=0.2.1,<=0.3.0"],
-    "cplex": ["docplex", "cplex>=2.28.240,<=2.31.254"],
+    "cplex": ["docplex>=2.28.240,<=2.31.254", "cplex>=20.1.0.4,<=22.1.2.0"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
@@ -71,8 +71,6 @@ setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
@@ -80,5 +78,5 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.8'
+    python_requires='>=3.10'
 )
