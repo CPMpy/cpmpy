@@ -103,7 +103,7 @@ class CPM_pumpkin(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None, proof=None):
+    def __init__(self, cpm_model=None, subsolver=None, proof=None, seed=None):
         """
         Constructor of the native solver object
 
@@ -111,6 +111,7 @@ class CPM_pumpkin(SolverInterface):
             cpm_model: Model(), a CPMpy Model() (optional)
             subsolver: None, not used
             proof (str, optional): path to the proof file
+            seed (int, optional): ranomd seed for the solver
         """
         if not self.supported():
             raise ModuleNotFoundError("CPM_pumpkin: Install the python package 'pumpkin_solver'")
@@ -121,7 +122,7 @@ class CPM_pumpkin(SolverInterface):
 
         # initialise the native solver object
         self._proof = proof
-        self.pum_solver = Model(proof=self._proof)
+        self.pum_solver = Model(proof=self._proof, seed=seed)
         self.predicate_map = {} # cache predicates for reuse
 
         # for objective
@@ -176,6 +177,8 @@ class CPM_pumpkin(SolverInterface):
             solve_func = self.pum_solver.optimise
             kwargs.update(objective=self.solver_var(self._objective),
                           direction=Direction.Minimise if self.objective_is_min else Direction.Maximise)
+            if self._solhint is not None:
+                kwargs.update(warm_start=self._solhint)
 
         elif assumptions is not None:
             assert self._proof is None, "Proof-logging under assumptions is not supported"
@@ -647,3 +650,13 @@ class CPM_pumpkin(SolverInterface):
         assert self._pum_core is not None, "Can only get core if the last solve-call was unsatisfiable under assumptions"
         return [self.assump_map[pred] for pred in self._pum_core]
 
+    def solution_hint(self, cpm_vars: List[_NumVarImpl], vals: List[int]):
+        """
+        Pumpkin supports warmstarting the solver with a (in)feasible solution.
+        The provided value will affect branching heurstics during solving, making it more likely the final solution will contain the provided assignment.
+        Technical side-node: only used during optimization.
+
+        :param cpm_vars: list of CPMpy variables
+        :param vals: list of (corresponding) values for the variables
+        """
+        self._solhint = {self.solver_var(v) : val for v, val in zip(cpm_vars, vals)} # store for later use in solve
