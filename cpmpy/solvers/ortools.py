@@ -44,7 +44,8 @@
     ==============
 """
 import sys
-from typing import Optional, List  # for stdout checking
+from typing import Optional, List
+import warnings  # for stdout checking
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -122,7 +123,7 @@ class CPM_ortools(SolverInterface):
             subsolver: None, not used
         """
         if not self.supported():
-            raise Exception("CPM_ortools: Install the python package 'ortools' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_ortools: Install the python package 'cpmpy[ortools]' to use this solver interface.")
 
         from ortools.sat.python import cp_model as ort
 
@@ -212,6 +213,8 @@ class CPM_ortools(SolverInterface):
 
         # set additional keyword arguments in sat_parameters.proto
         for (kw, val) in kwargs.items():
+            # Convert integer values to enum values for parameters that require enums (OR-Tools >= 9.15)
+            val = self._convert_to_enum(kw, val)
             setattr(self.ort_solver.parameters, kw, val)
 
         if 'log_search_progress' in kwargs and hasattr(self.ort_solver, "log_callback") \
@@ -223,11 +226,11 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.log_callback = print
 
         # call the solver, with parameters
-        self.ort_status = self.ort_solver.Solve(self.ort_model, solution_callback=solution_callback)
+        self.ort_status = self.ort_solver.solve(self.ort_model, solution_callback=solution_callback)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = self.ort_solver.WallTime()
+        self.cpm_status.runtime = self.ort_solver.wall_time
 
         # translate exit status
         if self.ort_status == ort.FEASIBLE:
@@ -263,7 +266,7 @@ class CPM_ortools(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 try:
-                    cpm_var._value = self.ort_solver.Value(self.solver_var(cpm_var))
+                    cpm_var._value = self.ort_solver.value(self.solver_var(cpm_var))
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(cpm_var._value) # ort value is always an int
                 except IndexError:
@@ -272,7 +275,7 @@ class CPM_ortools(SolverInterface):
 
             # translate objective
             if self.has_objective():
-                ort_obj_val = self.ort_solver.ObjectiveValue()
+                ort_obj_val = self.ort_solver.objective_value
                 if round(ort_obj_val) == ort_obj_val: # it is an integer?
                     self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
                 else: # can happen when using floats as coeff in objective
@@ -702,10 +705,43 @@ class CPM_ortools(SolverInterface):
         assert (self.assumption_dict is not None),  "get_core(): requires a list of assumption variables, e.g. s.solve(assumptions=[...])"
 
         # use our own dict because of VarIndexToVarProto(0) bug in ort 8.2
-        assum_idx = self.ort_solver.SufficientAssumptionsForInfeasibility()
+        assum_idx = self.ort_solver.sufficient_assumptions_for_infeasibility()
 
         # return cpm_variables corresponding to ort_assum vars in UNSAT core
         return [self.assumption_dict[i] for i in assum_idx]
+
+    # Mapping of parameter names to their enum types (for OR-Tools >= 9.15)
+    # These parameters require enum values instead of integers
+    _ENUM_PARAMS = {
+        'search_branching': 'SearchBranching',
+        'clause_cleanup_ordering': 'ClauseOrdering',
+        'binary_minimization_algorithm': 'BinaryMinizationAlgorithm',
+        'minimization_algorithm': 'ConflictMinimizationAlgorithm',
+    }
+
+    def _convert_to_enum(self, param_name, value):
+        """
+        Convert integer values to enum values for parameters that require enums (OR-Tools >= 9.15).
+        Returns the value unchanged if no conversion is needed.
+        """
+        import numpy as np
+        
+        if param_name not in self._ENUM_PARAMS:
+            return value
+        # Check for int or numpy integer types
+        if not isinstance(value, (int, np.integer)):
+            return value  # Already an enum or other type
+        
+        # Get the enum class from SatParameters
+        try:
+            from ortools.sat.python.cp_model_helper import SatParameters
+            enum_class = getattr(SatParameters, self._ENUM_PARAMS[param_name])
+            # Convert integer to enum member by value
+            return enum_class(int(value))  # Convert np.int64 to int first
+        except (ImportError, AttributeError, ValueError):
+            # Fall back to integer if enum conversion fails (older OR-Tools versions)
+            warnings.warn(f"Failed to convert {param_name} to enum: {value}")
+            return value
 
     @classmethod
     def tunable_params(cls):

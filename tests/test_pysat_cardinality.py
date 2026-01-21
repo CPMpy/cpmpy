@@ -204,6 +204,7 @@ class TestCardinality(unittest.TestCase):
         a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]
         self.assertTrue(cp.SolverLookup.get(SOLVER, cp.Model(p.implies(a+b-c < 2))).solve())
 
+    @skip_on_missing_pblib()
     def test_pysat_linearize_example(self):
         x, y, z = [cp.intvar(0, 3, name=n) for n in "xyz"]
         p = cp.boolvar(name="p")

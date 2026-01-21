@@ -105,9 +105,7 @@ class CPM_pindakaas(SolverInterface):
         """
         name = "pindakaas"
         if not self.supported():
-            raise ImportError(
-                f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use this solver interface"
-            )
+            raise ModuleNotFoundError(f"CPM_{name}: Install the python package 'cpmpy[pindakaas]' to use this solver interface.")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError(f"CPM_{name}: only satisfaction, does not support an objective function")
 

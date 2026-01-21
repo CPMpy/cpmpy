@@ -112,7 +112,7 @@ class CPM_pumpkin(SolverInterface):
             subsolver: None, not used
         """
         if not self.supported():
-            raise Exception("CPM_Pumpkin: Install the python package 'pumpkin_solver'")
+            raise ModuleNotFoundError("CPM_pumpkin: Install the python package 'cpmpy[pumpkin]' to use this solver interface.")
 
         from pumpkin_solver import Model
 
