@@ -79,18 +79,6 @@ def _get_constraint_type(constraint_type: str) -> ConstraintType:
 
 class MPS:
 
-    _metadata = dict()                # metadata on the MPS instance
-    _row_map = dict()                 # maps constraint names to types of constraint (ConstraintType)
-    objective = None                            # name of the expression which represents the objective
-    minimize = True                             # direction of optimisation
-    _A_matrix = {}                              # A matrix (variable x constraint)    
-    _rhs_map = dict()                 # right hand side of the expressions, maps expression name to its rhs
-    _lb_map = dict()                  # lower bounds of the variables, maps variable name to its lb
-    _ub_map = dict()                  # upper bounds of the variables, maps variable name to its ub
-    _type_map = dict()                # for each variable name, stores the type of variable it represents (VariableType)
-    _intorg = False                             # state management for the INTORG marker (in COLUMNS section)
-
-
     def __init__(self, assume_interger_variables:bool=True):
         """
         Initializes the MPS object.
@@ -102,6 +90,16 @@ class MPS:
                                             and an exception will be raised (cpmpy does not support floating point decision variables)
         """
         self.ASSUME_INTEGER_VARIABLES = assume_interger_variables
+        self._metadata = dict()                # metadata on the MPS instance
+        self._row_map = dict()                 # maps constraint names to types of constraint (ConstraintType)
+        self.objective = None                            # name of the expression which represents the objective
+        self.minimize = True                             # direction of optimisation
+        self._A_matrix = {}                              # A matrix (variable x constraint)    
+        self._rhs_map = dict()                 # right hand side of the expressions, maps expression name to its rhs
+        self._lb_map = dict()                  # lower bounds of the variables, maps variable name to its lb
+        self._ub_map = dict()                  # upper bounds of the variables, maps variable name to its ub
+        self._type_map = dict()                # for each variable name, stores the type of variable it represents (VariableType)
+        self._intorg = False                             # state management for the INTORG marker (in COLUMNS section)
 
     @property
     def metadata(self) -> dict:
