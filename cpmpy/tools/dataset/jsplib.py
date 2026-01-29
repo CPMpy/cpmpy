@@ -17,8 +17,11 @@ import zipfile
 import numpy as np
 
 import cpmpy as cp
+from cpmpy.tools.dataset._base import _Dataset
 
-class JSPLibDataset(object):  # torch.utils.data.Dataset compatible
+class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
+
+    name = "jsplib"
 
     """
     JSP Dataset in a PyTorch compatible format.
