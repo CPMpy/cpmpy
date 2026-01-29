@@ -36,10 +36,10 @@ class _Dataset(ABC):
                 raise ValueError(f"Dataset not found. Please set download=True to download the dataset.")
             else:
                 self.download()
-                files = sorted(list(self.dataset_dir.glob(f"*{self.extension}")))
+                files = sorted(list(self.dataset_dir.rglob(f"*{self.extension}")))
                 print(f"Finished downloading {len(files)} instances")
 
-        files = sorted(list(self.dataset_dir.glob(f"*{self.extension}")))
+        files = sorted(list(self.dataset_dir.rglob(f"*{self.extension}")))
         if len(files) == 0:
             raise ValueError("Cannot find any instances inside dataset. Is it a valid dataset? If so, please report on GitHub.")
                 
@@ -79,7 +79,7 @@ class _Dataset(ABC):
     
     def __len__(self) -> int:
         """Return the total number of instances."""
-        return len(list(self.dataset_dir.glob(f"*{self.extension}")))
+        return len(list(self.dataset_dir.rglob(f"*{self.extension}")))
     
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
@@ -88,7 +88,7 @@ class _Dataset(ABC):
             raise IndexError("Index out of range")
 
         # Get all compressed XML files and sort for deterministic behavior
-        files = sorted(list(self.dataset_dir.glob(f"*{self.extension}")))
+        files = sorted(list(self.dataset_dir.rglob(f"*{self.extension}")))
         file_path = files[index]
 
         filename = str(file_path)
