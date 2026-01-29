@@ -125,7 +125,6 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
             assert not is_toplevel, "Lists in lists is only allowed for arguments (e.g. of global constrainst)." \
                                     "Make sure to run func:`cpmpy.transformations.normalize.toplevel_list` first."
 
-            #print(f"\tis list: {str(expr)[:50]}")
             if isinstance(expr, NDVarArray) and not expr.has_subexpr():
                 pass  # no subexpressions, nothing to do
             elif isinstance(expr, np.ndarray) and expr.dtype != object:
@@ -141,7 +140,6 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
 
         # if an expression, decompose its arguments first
         if isinstance(expr, Expression) and expr.has_subexpr():
-            #print(f"\thas subexpr: {str(expr)[:50]}")
             rec_changed, newargs, rec_toplevel = _decompose_in_tree(expr.args, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap)
             if rec_changed:
                 expr = copy.copy(expr)
@@ -150,7 +148,6 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                 changed = True
 
         if hasattr(expr, "decompose"):  # it is a global function or global constraint
-            #print(f"\tis decomposable: {str(expr)[:50]}")
             is_supported = expr.name in supported
             if not is_toplevel and expr.is_bool():
                 # argument to another expression, only possible if supported reified
