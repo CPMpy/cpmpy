@@ -68,6 +68,7 @@ from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
 _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
+_VAR_STRICT_NAME_CHECK = True
 
 def BoolVar(shape=1, name=None):
     """
@@ -790,5 +791,58 @@ def _genname(basename, idxs):
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
 
 def _is_invalid_name(name):
-    return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
+    """
+    Check if a variable name is invalid.
 
+    In 'strict' mode, the name is invalid if it starts with {_IV_PREFIX} or {_BV_PREFIX}.
+    In 'non-strict' mode, the name is invalid if it starts with {_IV_PREFIX} or {_BV_PREFIX} 
+    and the variables' counter is greater than the index, i.e. the name is already in use.
+
+    Toggle the strict mode with `_enable_strict_variable_name_check()` and `_disable_strict_variable_name_check()`,
+    or use the context manager `ignore_strict_variable_name_check()`.
+    """
+    if name.startswith(_IV_PREFIX):
+        if _VAR_STRICT_NAME_CHECK:
+            return True
+        else:
+            id = int(name[len(_IV_PREFIX):])
+            if _IntVarImpl.counter > id:
+                return True # TODO: better error message
+            else:
+                return False
+    
+    elif name.startswith(_BV_PREFIX):
+        if _VAR_STRICT_NAME_CHECK:
+            return True
+        else:
+            id = int(name[len(_BV_PREFIX):])
+            if _BoolVarImpl.counter > id:
+                return True # TODO: better error message
+            else:
+                return False
+    
+    else:
+        return False
+
+def _enable_strict_variable_name_check():
+    global _VAR_STRICT_NAME_CHECK
+    _VAR_STRICT_NAME_CHECK = True
+
+def _disable_strict_variable_name_check():
+    global _VAR_STRICT_NAME_CHECK
+    _VAR_STRICT_NAME_CHECK = False
+
+
+def ignore_strict_variable_name_check():
+    """
+    Context manager to temporarily disable strict variable name check.
+    """
+    class IgnoreStrictVariableNameCheck:
+        def __enter__(self):
+            _disable_strict_variable_name_check()
+        def __exit__(self, exc_type, exc_value, traceback):
+            _enable_strict_variable_name_check()
+            _update_variable_counters()
+            return False  # propagate exceptions
+
+    return IgnoreStrictVariableNameCheck()
