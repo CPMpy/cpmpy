@@ -38,6 +38,9 @@ def write_dimacs(model, fname=None, encoding="auto", header:Optional[str]="DIMAC
         :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     """
 
+    if model.has_objective():
+        raise ValueError("DIMACS format does not support objective functions")
+
     constraints = toplevel_list(model.constraints)
     constraints = to_cnf(constraints, encoding=encoding)
 
