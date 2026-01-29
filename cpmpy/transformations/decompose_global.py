@@ -189,5 +189,5 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
         # constants, variables, other expressions are left as is
         newlist.append(expr)
 
-    assert len(newlist) == len(lst_of_expr), f"Decomposition should not change the number of expressions\n{lst_of_expr}\n{newlist}"
+    assert is_toplevel or len(newlist) == len(lst_of_expr), f"Decomposition should not change the number of expressions\n{lst_of_expr}\n{newlist}"
     return (changed, newlist, toplevel)
