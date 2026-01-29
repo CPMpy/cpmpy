@@ -162,6 +162,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                     newexpr, define = expr.decompose()
                     toplevel.extend(define)
 
+                    # decomposed constraints may introduce new globals
                     if isinstance(newexpr, list):  # globals return a list instead of a single expression (TODO: change?)
                         rec_changed, rec_newexpr, rec_toplevel = _decompose_in_tree(newexpr, supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap)
                         if rec_changed:
