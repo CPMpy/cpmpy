@@ -52,7 +52,8 @@ def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = s
     if not changed:
         return lst_of_expr
 
-    todo_toplevel = toplevel_list(todo_toplevel)  # the test-suite wants this somehow, TODO change?
+    # new toplevel constraints may need to be decomposed too
+    todo_toplevel = toplevel_list(todo_toplevel) # decompositions may have introduced nested lists or ands
     while len(todo_toplevel):
         changed, decomp, next_toplevel = _decompose_in_tree(todo_toplevel, supported=supported, supported_reified=supported_reified, is_toplevel=True, csemap=csemap)
         if not changed:
@@ -61,7 +62,7 @@ def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = s
 
         # changed, loop again
         newlst_of_expr.extend(decomp)
-        todo_toplevel = toplevel_list(next_toplevel)  # the test-suite wants this somehow, TODO change?
+        todo_toplevel = toplevel_list(next_toplevel) # decompositions may have introduced nested lists or ands
 
     return newlst_of_expr
 
