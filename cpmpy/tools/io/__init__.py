@@ -1,3 +1,11 @@
+"""
+IO tools for CPMpy.
+
+This module provides tools to read and write models in various formats.
+Use the generic `read(..., format="...")` and `write(..., format="...")` functions to read and write 
+models in one of the supported formats.
+"""
+
 from .writer import write, write_formats
 from .reader import read, read_formats
 from .utils import get_extension, get_format
