@@ -23,9 +23,9 @@ from cpmpy.transformations.to_cnf import to_cnf
 from cpmpy.transformations.get_variables import get_variables
 
 import re
+from typing import Optional
 
-
-def write_dimacs(model, fname=None, encoding="auto"):
+def write_dimacs(model, fname=None, encoding="auto", header:Optional[str]="DIMACS file written by CPMpy"):
     """
         Writes CPMpy model to DIMACS format
         Uses the "to_cnf" transformation from CPMpy
@@ -64,6 +64,10 @@ def write_dimacs(model, fname=None, encoding="auto"):
                 raise ValueError(f"Expected Boolean variable in clause, but got {v} which is of type {type(v)}")
 
         out += " ".join(ints + ["0"]) + "\n"
+
+    if header is not None:
+        header_lines = ["c " + line for line in header.splitlines()]
+        out = "\n".join(header_lines) + "\n" + out
 
     if fname is not None:
         with open(fname, "w") as f:
