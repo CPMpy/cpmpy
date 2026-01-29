@@ -12,7 +12,8 @@ Even if the solver does not explicitely support them in a subexpression,
 we can rewrite them using func:`cpmpy.transformations.reification.reify_rewrite` to a non-reified version when the function is total.
 E.g., bv <-> max(a,b,c) >= 4 can be rewritten as [bv <-> IV0 >= 4, IV0 == max(a,b,c)]
 
-Unsupported gobal constraints and global functions are decomposed in-place (in the new expression)
+Unsupported global constraints and global functions are decomposed in-place and the resulting set of constraints
+is wrapped in a conjunction.
 E.g., x + ~AllDifferent(a,b,c) >= 2 is decomposed into x + ~((a) != (b) & (a) != (c) & (b) != (c)) >= 2
 This allows to post the decomposed expression tree to the solver if it supports it (e.g., SMT-solvers, MiniZinc, CPO)
 """
