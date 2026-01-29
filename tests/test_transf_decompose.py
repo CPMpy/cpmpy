@@ -1,5 +1,8 @@
 import unittest
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
+from cpmpy.expressions.globalfunctions import GlobalFunction
+from cpmpy.expressions.utils import flatlist
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
 
@@ -99,4 +102,58 @@ class TestTransfDecomp(unittest.TestCase):
 
         self.assertEqual(str(decompose_in_tree(cons, supported={"min"})),
                          "[(min(x,y)) == (z)]")
+
+
+    def test_globals_in_decomp(self):
+
+        class MyGlobal1(GlobalConstraint):
+
+            def __init__(self, arr):
+                super().__init__("myglobal1", flatlist(arr))
+
+            def decompose(self):
+                return ([MyGlobalFunc(self.args)+5 <= 0, cp.max(self.args) == 1],
+                        [MyGlobal2(self.args)])
+
+        class MyGlobalFunc(GlobalFunction):
+
+            def __init__(self, arr):
+                super().__init__("myglobalfunc", flatlist(arr))
+
+            def decompose(self):
+                return cp.sum(self.args), [self.args[0] != 0]
+
+        class MyGlobal2(GlobalConstraint):
+
+            def __init__(self, arr):
+                super().__init__("myglobal2", flatlist(arr))
+            def decompose(self):
+                return [cp.sum(self.args) >= 3], []
+
+
+        # non-nested case
+        x = cp.intvar(0,10,shape=2, name="x")
+
+        cons = MyGlobal1([x])
+        self.assertSetEqual(set(map(str,decompose_in_tree([cons], supported={"myglobalfunc","max"}))),
+                            {'((myglobalfunc(x[0],x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
+                             '(x[0]) + (x[1]) >= 3'})
+
+        # decompose all
+        self.assertSetEqual(set(map(str, decompose_in_tree([cons], supported={"max"}))),
+                            {'(((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
+                             '(x[0]) + (x[1]) >= 3','x[0] != 0'})
+
+        # nested case
+        bv = cp.boolvar(name="bv")
+
+        cons = bv == MyGlobal1([x])
+        self.assertSetEqual(set(map(str, decompose_in_tree([cons], supported={"myglobalfunc", "max"}))),
+                            {'(bv) == (((myglobalfunc(x[0],x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1))',
+                             '(x[0]) + (x[1]) >= 3'})
+
+        self.assertSetEqual(set(map(str, decompose_in_tree([cons], supported={"max"}))),
+                            {'(bv) == ((((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1))',
+                             '(x[0]) + (x[1]) >= 3', 'x[0] != 0'})
+
 
