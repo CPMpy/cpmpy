@@ -167,6 +167,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                         if rec_changed:
                             newexpr = rec_newexpr
                             toplevel.extend(rec_toplevel)
+                        newexpr = cpm_all(newexpr)  # make the list a single expression
                     else:
                         rec_changed, rec_lst_newexpr, rec_toplevel = _decompose_in_tree((newexpr,), supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap)
                         if rec_changed:
@@ -176,14 +177,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                     if csemap is not None:
                         csemap[expr] = newexpr
 
-
-                if not expr.is_bool(): # global function, newexpr is an Expresson
-                    newlist.append(newexpr)
-                elif is_toplevel:
-                    newlist += newexpr # extend the toplevel list
-                else:
-                    newlist.append(cpm_all(newexpr)) # merge in `and` operator
-
+                newlist.append(newexpr)
                 changed = True
                 continue
 
