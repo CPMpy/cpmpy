@@ -26,6 +26,8 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
     More information on the competition can be found here: https://maxsat-evaluations.github.io/
     """
+    
+    name = "mse"
 
     def __init__(
             self, 

@@ -28,6 +28,8 @@ class XCSP3Dataset(_Dataset):
     More information on the competition can be found here: https://xcsp.org/competitions/
     """
 
+    name = "xcsp3"
+    
     def __init__(
             self,
             root: str = ".", 

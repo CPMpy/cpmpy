@@ -15,6 +15,7 @@ from cpmpy.tools.dataset._base import _Dataset
 
 class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
   
+    name = "miplib"
 
     def __init__(
             self, 

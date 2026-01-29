@@ -71,6 +71,7 @@ class _Dataset(ABC):
 
     def metadata(self, file) -> dict:
         metadata = self.category() | {
+            'dataset': self.name,
             'name': pathlib.Path(file).stem.replace(self.extension, ''),
             'path': file,
         }
@@ -101,7 +102,6 @@ class _Dataset(ABC):
             metadata = self.target_transform(metadata)
             
         return filename, metadata
-    
     
 
 
