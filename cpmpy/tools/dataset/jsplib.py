@@ -21,13 +21,13 @@ from cpmpy.tools.dataset._base import _Dataset
 
 class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
-    name = "jsplib"
-
     """
     JSP Dataset in a PyTorch compatible format.
     
     More information on JSPLib can be found here: https://github.com/tamy0612/JSPLIB
     """
+
+    name = "jsplib"
     
     def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False):
         """

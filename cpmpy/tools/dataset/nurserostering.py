@@ -15,7 +15,7 @@ import zipfile
 import re
 
 import cpmpy as cp
-
+from cpmpy.tools.dataset._base import _Dataset
 # Optional dependencies
 try:
     import pandas as pd
@@ -30,13 +30,15 @@ except ImportError:
     _HAS_FAKER = False
 
 
-class NurseRosteringDataset(object):  # torch.utils.data.Dataset compatible
-
+class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
+        
     """
     Nurserostering Dataset in a PyTorch compatible format.
 
     More information on nurserostering instances can be found here: https://schedulingbenchmarks.org/nrp/
     """
+
+    name = "nurserostering"
 
     def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False, sort_key=None):
         """

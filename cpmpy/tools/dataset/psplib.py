@@ -10,14 +10,17 @@ from urllib.request import urlretrieve
 from urllib.error import HTTPError, URLError
 import zipfile
 
-class PSPLibDataset(object):  # torch.utils.data.Dataset compatible
+from cpmpy.tools.dataset._base import _Dataset
 
+class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
     PSPlib Dataset in a PyTorch compatible format.
     
     More information on PSPlib can be found here: https://www.om-db.wi.tum.de/psplib/main.html
     """
     
+    name = "psplib"
+
     def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False):
         """
         Constructor for a dataset object for PSPlib.
