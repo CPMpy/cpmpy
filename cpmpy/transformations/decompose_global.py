@@ -119,6 +119,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
     changed = False
     newlist: List[Expression] = []
     toplevel: List[Expression] = []
+    has_csemap = (csemap is not None)
 
     for expr in lst_of_expr:
         if is_any_list(expr):
@@ -154,7 +155,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                 is_supported = expr.name in supported_reified
 
             if is_supported is False:
-                if csemap is not None and expr in csemap:
+                if has_csemap and expr in csemap:
                     # we might have already decomposed it previously
                     newexpr = csemap[expr]
                 else:
@@ -174,7 +175,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                             newexpr = rec_lst_newexpr[0]
                             toplevel.extend(rec_toplevel)
 
-                    if csemap is not None:
+                    if has_csemap:
                         csemap[expr] = newexpr
 
                 newlist.append(newexpr)
