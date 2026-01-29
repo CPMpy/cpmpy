@@ -3,7 +3,10 @@ from .reader import read, read_formats
 from .utils import get_extension, get_format
 
 from .jsplib import read_jsplib
-from .mps import read_mps, write_mps
+# TODO: this tool is just a wrapper around read_scip and write_scip, 
+# do we want such a wrapper for each format scip provides? 
+# You can already use the generic `read()` and `write()` to read and write any format scip provides.
+from .mps import read_mps, write_mps            
 from .nurserostering import read_nurserostering
 from .opb import read_opb
 from .rcpsp import read_rcpsp
