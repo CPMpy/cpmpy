@@ -842,7 +842,7 @@ def ignore_strict_variable_name_check():
             _disable_strict_variable_name_check()
         def __exit__(self, exc_type, exc_value, traceback):
             _enable_strict_variable_name_check()
-            _update_variable_counters()
+            # _update_variable_counters() # TODO: add automatic support for this later (different PR)
             return False  # propagate exceptions
 
     return IgnoreStrictVariableNameCheck()
