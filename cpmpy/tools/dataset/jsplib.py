@@ -41,7 +41,8 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         """
         
         self.root = pathlib.Path(root)
-        self.metadata_file = "instances.json"
+        self._source_metadata_file = "instances.json"
+        self._source_metadata = None  # Loaded lazily during metadata collection
 
         dataset_dir = self.root / self.name
 
@@ -52,7 +53,40 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         )
 
     def category(self) -> dict:
-        return {} # no categories
+        return {}  # no categories
+
+    def collect_instance_metadata(self, file: str) -> dict:
+        """
+        Collect metadata for a JSPLib instance from the source instances.json.
+
+        Reads the bundled instances.json file and extracts metadata for the
+        given instance, including bounds information.
+        """
+        # Lazy load the source metadata
+        if self._source_metadata is None:
+            source_path = self.dataset_dir / self._source_metadata_file
+            if source_path.exists():
+                with open(source_path, "r") as f:
+                    self._source_metadata = json.load(f)
+            else:
+                self._source_metadata = []
+
+        file_path = pathlib.Path(file)
+        for entry in self._source_metadata:
+            if entry.get("name") == file_path.stem:
+                metadata = dict(entry)  # Copy to avoid modifying source
+                # Ensure bounds are present
+                if "bounds" not in metadata:
+                    if "optimum" in metadata:
+                        metadata["bounds"] = {
+                            "upper": metadata["optimum"],
+                            "lower": metadata["optimum"]
+                        }
+                # Remove path from source (will be set by base class)
+                metadata.pop('path', None)
+                return metadata
+
+        return {}  # No metadata found for this instance
     
     def download(self):
 
@@ -77,62 +111,15 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
                     filename = pathlib.Path(file_info.filename).name
                     with zip_ref.open(file_info) as source, open(self.dataset_dir / filename, 'wb') as target:
                         target.write(source.read())
-            # extract metadata file
-            with zip_ref.open("JSPLIB-master/instances.json") as source, open(self.dataset_dir / self.metadata_file, 'wb') as target:
+            # extract source metadata file
+            with zip_ref.open("JSPLIB-master/instances.json") as source, open(self.dataset_dir / self._source_metadata_file, 'wb') as target:
                 target.write(source.read())
         
         # Clean up the zip file
         target_download_path.unlink()
 
-    
-    def __getitem__(self, index: int|str) -> Tuple[Any, Any]:
-        """
-        Get a single JSPLib instance filename and metadata.
 
-        Args:
-            index (int or str): Index or name of the instance to retrieve
-            
-        Returns:
-            Tuple[Any, Any]: A tuple containing:
-                - The filename of the instance
-                - Metadata dictionary with file name, track, year etc.
-        """
-        if isinstance(index, int) and (index < 0 or index >= len(self)):
-            raise IndexError("Index out of range")
 
-        # Get all instance files and sort for deterministic behavior # TODO: use natsort instead?
-        files = sorted(list(self.dataset_dir.rglob("*[!.json]"))) # exclude metadata file
-        if isinstance(index, int):
-            file_path = files[index]
-        elif isinstance(index, str):
-            for file_path in files:
-                if file_path.stem == index:
-                    break
-            else:
-                raise IndexError(f"Instance {index} not found in dataset")
-
-        filename = str(file_path)
-        if self.transform:
-            # does not need to remain a filename...
-            filename = self.transform(filename)
-
-        with open(self.dataset_dir / self.metadata_file, "r") as f:
-            for entry in json.load(f):
-                if entry["name"] == file_path.stem:
-                    metadata = entry
-                    if "bounds" not in metadata: 
-                        metadata["bounds"] = {"upper": metadata["optimum"], "lower": metadata["optimum"]}
-                    del metadata['path']
-                    metadata['path'] = str(file_path)
-                    break
-            else:
-                metadata = dict()
-        
-        if self.target_transform:
-            metadata = self.target_transform(metadata)
-            
-        return filename, metadata
-    
     def open(self, instance: os.PathLike) -> callable:
         return open(instance, "r")
 

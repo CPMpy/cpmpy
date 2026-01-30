@@ -2,11 +2,12 @@
 Dataset Base Class
 
 This module defines the abstract `_Dataset` class, which serves as the foundation
-for loading and managing benchmark instance collections in CPMpy-based experiments.  
+for loading and managing benchmark instance collections in CPMpy-based experiments.
 It standardizes how datasets are stored, accessed, and optionally transformed.
 """
 
 from abc import ABC, abstractmethod
+import json
 import os
 import pathlib
 import io
@@ -14,6 +15,9 @@ import tempfile
 from typing import Any, Optional, Tuple
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
+
+# Extension for metadata sidecar files
+METADATA_EXTENSION = ".meta.json"
 
 def format_bytes(bytes_num):
     """
@@ -55,10 +59,11 @@ class _Dataset(ABC):
                 raise ValueError(f"Dataset not found. Please set download=True to download the dataset.")
             else:
                 self.download()
-                files = sorted(list(self.dataset_dir.rglob(f"*{self.extension}")))
+                self._collect_all_metadata()
+                files = self._list_instances()
                 print(f"Finished downloading {len(files)} instances")
 
-        files = sorted(list(self.dataset_dir.rglob(f"*{self.extension}")))
+        files = self._list_instances()
         if len(files) == 0:
             raise ValueError(f"Cannot find any instances inside dataset {self.dataset_dir}. Is it a valid dataset? If so, please report on GitHub.")
                 
@@ -79,6 +84,62 @@ class _Dataset(ABC):
         """
         pass
 
+    def _list_instances(self) -> list:
+        """
+        List all instance files, excluding metadata sidecar files.
+
+        Returns a sorted list of pathlib.Path objects for all instance files
+        matching the dataset's extension pattern, excluding any `.meta.json` files.
+        """
+        files = list(self.dataset_dir.rglob(f"*{self.extension}"))
+        # Exclude metadata sidecar files (important for datasets using .json extension)
+        files = [f for f in files if not str(f).endswith(METADATA_EXTENSION)]
+        return files
+
+    def _metadata_path(self, instance_path) -> pathlib.Path:
+        """
+        Get the path to the metadata sidecar file for an instance.
+
+        Args:
+            instance_path: Path to the instance file (string or Path)
+
+        Returns:
+            Path to the corresponding .meta.json sidecar file
+        """
+        return pathlib.Path(str(instance_path).split(".")[0] + METADATA_EXTENSION)
+
+    def _collect_all_metadata(self):
+        """
+        Collect and store metadata for all instances in sidecar files.
+
+        Called automatically after download. Iterates over all instances and
+        calls `collect_instance_metadata()` for each, storing the result in
+        a `.meta.json` sidecar file next to each instance.
+        """
+        files = self._list_instances()
+        for file_path in files:
+            metadata = self.collect_instance_metadata(str(file_path))
+            meta_path = self._metadata_path(file_path)
+            with open(meta_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+
+    def collect_instance_metadata(self, file: str) -> dict:  # noqa: ARG002
+        """
+        Collect instance-specific metadata for a single instance.
+
+        Override this method in subclasses to collect richer metadata
+        per instance. This is called once during setup (after download)
+        and the result is stored in a sidecar file.
+
+        Arguments:
+            file: Path to the instance file
+
+        Returns:
+            Dictionary containing instance-specific metadata
+        """
+        # Default: no instance-specific metadata (subclasses can use `file`)
+        return {}
+
     def open(self, instance) -> io.TextIOBase:
         """
         How an instance file from the dataset should be opened.
@@ -88,7 +149,29 @@ class _Dataset(ABC):
         return open(instance, "r")
 
     def metadata(self, file) -> dict:
-        metadata = self.category() | {
+        """
+        Get metadata for an instance, loading from sidecar file if available.
+
+        Combines:
+        - Category metadata (from `category()`)
+        - Instance-specific metadata (from sidecar file if exists)
+        - Base fields: dataset name, instance name, and path
+
+        Arguments:
+            file: Path to the instance file
+
+        Returns:
+            Dictionary containing all metadata for the instance
+        """
+        # Load instance-specific metadata from sidecar if it exists
+        meta_path = self._metadata_path(file)
+        instance_metadata = {}
+        if meta_path.exists():
+            with open(meta_path, 'r') as f:
+                instance_metadata = json.load(f)
+
+        # Combine category, instance metadata, and base fields
+        metadata = self.category() | instance_metadata | {
             'dataset': self.name,
             'name': pathlib.Path(file).stem.replace(self.extension, ''),
             'path': file,
@@ -97,20 +180,19 @@ class _Dataset(ABC):
     
     def __len__(self) -> int:
         """Return the total number of instances."""
-        return len(list(self.dataset_dir.rglob(f"*{self.extension}")))
+        return len(self._list_instances())
     
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
-
         if index < 0 or index >= len(self):
             raise IndexError("Index out of range")
 
-        # Get all compressed XML files and sort for deterministic behavior
-        files = sorted(list(self.dataset_dir.rglob(f"*{self.extension}")))
+        # Get file at index
+        files = self._list_instances()
         file_path = files[index]
         filename = str(file_path)
 
-        # Basic metadata about the instance
+        # Load metadata
         metadata = self.metadata(file=filename)
         if self.target_transform:
             metadata = self.target_transform(metadata)
@@ -118,7 +200,7 @@ class _Dataset(ABC):
         if self.transform:
             # does not need to remain a filename...
             filename = self.transform(filename)
-                        
+
         return filename, metadata
 
     @staticmethod

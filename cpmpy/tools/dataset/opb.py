@@ -80,9 +80,14 @@ class OPBDataset(_Dataset):
             "track": self.track
         }
 
-    def metadata(self, file) -> dict:
-        # Add the author to the metadata
-        return super().metadata(file) | {'author': str(file).split(os.sep)[-1].split("_")[0],}
+    def collect_instance_metadata(self, file: str) -> dict:
+        """
+        Collect instance-specific metadata including the author from the filename.
+        """
+        
+        # Author is encoded as the first part of the filename (before underscore)
+        author = str(file).split(os.sep)[-1].split("_")[0]
+        return {'author': author}
                 
     def download(self):
                 
