@@ -799,7 +799,7 @@ def _is_invalid_name(name):
     and the variables' counter is greater than the index, i.e. the name is already in use.
 
     Toggle the strict mode with `_enable_strict_variable_name_check()` and `_disable_strict_variable_name_check()`,
-    or use the context manager `ignore_strict_variable_name_check()`.
+    or use the context manager `_ignore_strict_variable_name_check()`.
     """
     if name.startswith(_IV_PREFIX):
         if _VAR_STRICT_NAME_CHECK:
@@ -833,7 +833,7 @@ def _disable_strict_variable_name_check():
     _VAR_STRICT_NAME_CHECK = False
 
 
-def ignore_strict_variable_name_check():
+def _ignore_strict_variable_name_check():
     """
     Context manager to temporarily disable strict variable name check.
     """
