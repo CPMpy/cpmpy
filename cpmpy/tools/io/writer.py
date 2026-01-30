@@ -23,6 +23,7 @@ from functools import partial
 import cpmpy as cp
 from cpmpy.tools.dimacs import write_dimacs
 from cpmpy.tools.io.scip import write_scip
+from cpmpy.tools.io.opb import write_opb
 
 # mapping format names to appropriate writer functions
 _writer_map = {
@@ -40,6 +41,7 @@ _writer_map = {
     # "wbo": partial(write_scip, format="wbo"),      # requires SIMPL, not included in pip package   
     # "zpl": partial(write_scip, format="zpl"),      # requires SIMPL, not included in pip package
     "dimacs": write_dimacs,
+    "opb": write_opb,
     # "wcnf": write_wcnf,                            # currently not supported
 }
 

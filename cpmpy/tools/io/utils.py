@@ -11,6 +11,7 @@ _format_map = {
     "pip"   : "pip",
     "wcnf"  : "wcnf",
     "cnf"   : "dimacs",
+    "opb"   : "opb",
 }
 
 _extension_map = {}

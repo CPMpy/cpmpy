@@ -18,6 +18,7 @@ import cpmpy as cp
 from cpmpy.tools.dimacs import read_dimacs
 from cpmpy.tools.io.scip import read_scip
 from cpmpy.tools.io.wcnf import read_wcnf
+from cpmpy.tools.io.opb import read_opb
 from cpmpy.tools.io.utils import get_format
 
 # mapping format names to appropriate reader functions
@@ -29,6 +30,7 @@ _reader_map = {
     "gms": read_scip,
     "pip": read_scip,
     "dimacs": read_dimacs,
+    "opb": read_opb,
     "wcnf": read_wcnf,
 }
 
