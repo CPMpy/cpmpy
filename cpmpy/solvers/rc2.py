@@ -59,7 +59,7 @@ from ..transformations.decompose_global import decompose_objective
 from ..transformations.safening import safen_objective
 from ..exceptions import NotSupportedError
 from ..expressions.variables import _IntVarImpl, NegBoolView
-from ..transformations.linearize import only_positive_coefficients_
+from ..transformations.linearize import only_positive_coefficients_, decompose_linear_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_objective
 from ..transformations.int2bool import replace_int_user_vars, _encode_lin_expr
@@ -218,11 +218,12 @@ class CPM_rc2(CPM_pysat):
 
         # transform objective
         obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(
+        obj, decomp_cons = decompose_linear_objective(
             obj,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap
+            csemap=self._csemap,
+            ivarmap=self.ivarmap
         )
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         self.add(safe_cons + decomp_cons + flat_cons)
