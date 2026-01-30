@@ -42,17 +42,19 @@ class _Dataset(ABC):
     """
 
     def __init__(
-            self, 
+            self,
             dataset_dir: str = ".",
-            transform=None, target_transform=None, 
+            transform=None, target_transform=None,
             download: bool = False,
-            extension:str=".txt",
+            extension: Optional[str] = ".txt",
+            sorter=None,
             **kwargs
         ):
         self.dataset_dir = pathlib.Path(dataset_dir)
         self.transform = transform
         self.target_transform = target_transform
         self.extension = extension
+        self.sorter = sorter if sorter is not None else sorted
 
         if not self.dataset_dir.exists():
             if not download:
@@ -88,10 +90,25 @@ class _Dataset(ABC):
         """
         List all instance files, excluding metadata sidecar files.
 
-        Returns a sorted list of pathlib.Path objects for all instance files
-        matching the dataset's extension pattern, excluding any `.meta.json` files.
+        Returns a list of pathlib.Path objects for all instance files matching
+        the dataset's extension pattern, excluding any `.meta.json` files.
+
+        Extension handling:
+        - None: match all files
+        - "": match files without an extension
+        - ".txt" (etc.): match files with that specific extension
         """
-        files = list(self.dataset_dir.rglob(f"*{self.extension}"))
+        if self.extension is None:
+            # Match all files
+            files = [f for f in self.dataset_dir.rglob("*") if f.is_file()]
+        elif self.extension == "":
+            # Match files without an extension (name has no '.' or only starts with '.')
+            files = [f for f in self.dataset_dir.rglob("*")
+                     if f.is_file() and f.suffix == ""]
+        else:
+            # Match files with the specific extension
+            files = list(self.dataset_dir.rglob(f"*{self.extension}"))
+
         # Exclude metadata sidecar files (important for datasets using .json extension)
         files = [f for f in files if not str(f).endswith(METADATA_EXTENSION)]
         return files
@@ -100,7 +117,7 @@ class _Dataset(ABC):
         """
         Get the path to the metadata sidecar file for an instance.
 
-        Args:
+        Arguments:
             instance_path: Path to the instance file (string or Path)
 
         Returns:
