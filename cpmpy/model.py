@@ -53,12 +53,12 @@ def _update_variable_counters(model: Model):
         if v.name.startswith(_BV_PREFIX):
             try:
                 bv_counter = max(bv_counter, int(v.name[2:])+1)
-            except:
+            except: # When name starts with _BV_PREFIX but is not a valid integer (user created name), ignore
                 pass
         elif v.name.startswith(_IV_PREFIX):
             try:
                 iv_counter = max(iv_counter, int(v.name[2:])+1)
-            except:
+            except: # When name starts with _IV_PREFIX but is not a valid integer (user created name), ignore
                 pass
 
     if (_BoolVarImpl.counter > 0 and bv_counter > 0) or \
