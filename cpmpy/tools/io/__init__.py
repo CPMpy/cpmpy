@@ -18,6 +18,6 @@ from .nurserostering import read_nurserostering
 from .rcpsp import read_rcpsp
 
 # Model datasets
-from .opb import read_opb
+from .opb import read_opb, write_opb
 from .scip import read_scip, write_scip
 from .wcnf import read_wcnf
