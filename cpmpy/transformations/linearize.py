@@ -50,13 +50,16 @@ General comparisons or expressions
 """
 import copy
 import warnings
+from typing import Set, Sequence, Optional
+
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
 from .flatten_model import flatten_constraint, get_or_make_var
-from .decompose_global import decompose_in_tree
+from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
+from .int2bool import _encode_int_var, IntVarEnc
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
@@ -64,8 +67,8 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
 from ..expressions.python_builtins import sum as cpm_sum
-
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
     """
@@ -603,8 +606,80 @@ def only_positive_coefficients(lst_of_expr):
     return newlist
 
 
-from .int2bool import _encode_int_var, _encode_comparison
-def decompose_linear(lst_of_expr, supported=frozenset(), supported_reified=frozenset(), csemap=None, ivarmap=None):
+def get_linear_decompositions(ivarmap):
+    """
+        Implementation of custom linear decompositions for some global constraints.
+        Relies on the "direct encoding" of integer variables to ensure a more efficient decomposition for linear solvers.
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    # AllDifferent
+    def decompose_alldifferent(expr):
+        print("Decomposing expr")
+
+        if expr.has_subexpr():
+            warnings.warn(
+                f"AllDifferent constraint {expr} cannot be decomposed in a linear-friendly way as it has nested expressions. Using default decomposition")
+            return expr.decompose()
+
+        lbs, ubs = get_bounds(expr.args)
+        lb, ub = min(lbs), max(ubs)
+
+        encodings, defining = [], []
+        for arg in expr.args:
+            if isinstance(arg, _NumVarImpl):
+                enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
+                encodings.append(enc)
+                defining += domain_constraints
+            elif is_num(arg):
+                encodings.append(DummyEncoding(arg))
+
+        return [cpm_sum(enc.eq(val) for enc in encodings) <= 1 for val in range(lb, ub + 1)], defining
+
+    # Element
+    def decompose_element(expr):
+        arr, idx = expr.args
+        if not all(is_num(a) for a in arr):
+            warnings.warn(
+                f"Element constraint {expr} cannot be decomposed in a linear-friendly way as it has integer variables in the array. Using default decomposition")
+            return expr.decompose()
+
+        lb, ub = get_bounds(idx)
+        if not (0 <= lb) and (ub < len(arr)):
+            warnings.warn("Element constraint is partial, and cannot be decomposed in a linear-friendly way. Using default decomposition")
+            return expr.decompose()
+
+        enc, defining = _encode_int_var(ivarmap, idx, "direct")
+        return cp.sum(val * enc.eq(val) for val in range(0, len(arr))), defining
+
+    # NValue
+    def decompose_nvalue(expr):
+
+        lbs, ubs = get_bounds(expr.args)
+        lb, ub = min(lbs), max(ubs)
+        encodings, defining = [], []
+        for arg in expr.args:
+            if isinstance(arg, _NumVarImpl):
+                enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
+                encodings.append(enc)
+                defining += domain_constraints
+            elif is_num(arg):
+                encodings.append(DummyEncoding(arg))
+
+        return cp.sum(cp.any(enc.eq(v) for enc in encodings) for v in range(lb, ub + 1)), defining
+
+    return dict(
+        alldifferent=decompose_alldifferent,
+        element=decompose_element,
+        nvalue=decompose_nvalue,
+    )
+
+def decompose_linear(lst_of_expr: Sequence[Expression],
+                     supported: Set[str]=frozenset(),
+                     supported_reified:Set[str]=frozenset(),
+                     csemap:Optional[dict[Expression,Expression]]=None,
+                     ivarmap:Optional[dict[_NumVarImpl, IntVarEnc]]=None):
     """
         Decompose unsupported global constraints in a linear-friendly way.
         Currently support constraints are AllDifferent, Element, Count, NValue
@@ -613,65 +688,27 @@ def decompose_linear(lst_of_expr, supported=frozenset(), supported_reified=froze
     if ivarmap is None:
         return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap)
 
-    # AllDifferent
-    def decompose_alldifferent(expr):
-        print("Decomposing expr")
-
-        if expr.has_subexpr():
-            warnings.warn(f"AllDifferent constraint {expr} cannot be decompose in a linear-friendly way as it has nested expressions. Using default decomposition")
-            return expr.decompose()
-
-        lbs, ubs = get_bounds(expr.args)
-        lb, ub = min(lbs), max(ubs)
-
-        encodings, defining = [], []
-        for arg in expr.args:
-            if isinstance(arg, _NumVarImpl):
-                enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
-                encodings.append(enc)
-                defining += domain_constraints
-            elif is_num(arg):
-                encodings.append(DummyEncoding(arg))
-        
-        return [cpm_sum(enc.eq(val) for enc in encodings) <= 1 for val in range(lb, ub+1)], defining
-
-    # Element
-    def decompose_element(expr):
-        arr, idx = expr.args
-        if not all(is_num(a) for a in arr):
-            # otherwise results in multiplication constraints...
-            return expr.decompose()
-
-        lb, ub = get_bounds(idx)
-        assert 0 <= lb and ub < len(arr)
-        enc, defining = _encode_int_var(ivarmap, idx, "direct")
-        return cp.sum(val * enc.eq(val) for val in range(0, len(arr))), defining
-
-    # NValue
-    def decompose_nvalue(expr):
-        
-        lbs, ubs = get_bounds(expr.args)
-        lb, ub = min(lbs), max(ubs)
-        encodings, defining = [], []
-        for arg in expr.args:
-            if isinstance(arg, _NumVarImpl):
-                enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
-                encodings.append(enc)
-                defining += domain_constraints
-            elif is_num(arg):
-                encodings.append(DummyEncoding(arg))
-
-        return cp.sum(cp.any(enc.eq(v) for enc in encodings) for v in range(lb, ub+1)), defining
-
     return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap,
-    decompose_custom=dict(alldifferent=decompose_alldifferent,
-                        #   element=decompose_element,
-                          nvalue=decompose_nvalue
-                          ))
+                             decompose_custom=get_linear_decompositions(ivarmap=ivarmap))
 
+def decompose_linear_objective(lst_of_expr: Sequence[Expression],
+                               supported: Set[str] = frozenset(),
+                               supported_reified: Set[str] = frozenset(),
+                               csemap: Optional[dict[Expression, Expression]] = None,
+                               ivarmap: Optional[dict[_NumVarImpl, IntVarEnc]] = None
+                               ):
+
+    if ivarmap is None:
+        return decompose_objective(lst_of_expr, supported, supported_reified, csemap=csemap)
+
+    return decompose_objective(lst_of_expr, supported, supported_reified, csemap=csemap,
+                               decompose_custom=get_linear_decompositions(ivarmap=ivarmap))
 
 class DummyEncoding:
-
+    """
+        Emulates an `class:cpmpy.transformations.int2bool.IntVarEnc` wrapping a constant.
+        Eases the use of encoding the linear decompositions of global constraints.
+    """
     def __init__(self, val):
         self.val = val
 
