@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## nurserostering.py
+##
 """
 Parser for the Nurse Rostering format.
 
@@ -20,7 +25,7 @@ import tempfile
 import cpmpy as cp
 from typing import Union
 
-from cpmpy.tools.dataset.problem.nurserostering import (
+from cpmpy.tools.dataset.nurserostering import (
     parse_scheduling_period,
     nurserostering_model
 )

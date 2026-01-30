@@ -10,17 +10,14 @@ List of functions
 
     read
     read_formats
-
-==============
-Module details
-==============
 """
 
 from typing import Callable, List, Optional
 
 import cpmpy as cp
-from cpmpy.tools.scip.parser import read_scip
 from cpmpy.tools.dimacs import read_dimacs
+from cpmpy.tools.io.scip import read_scip
+from cpmpy.tools.io.wcnf import read_wcnf
 from cpmpy.tools.io.utils import get_format
 
 # mapping format names to appropriate reader functions
@@ -32,6 +29,7 @@ _reader_map = {
     "gms": read_scip,
     "pip": read_scip,
     "dimacs": read_dimacs,
+    "wcnf": read_wcnf,
 }
 
 

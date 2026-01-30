@@ -1,5 +1,10 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## scip.py
+##
 """
-This file implements helper functions for exporting CPMpy models from and to various data 
+This file implements helper functions for converting CPMpy models to and from various data 
 formats supported by the SCIP optimization suite.
 
 ============
@@ -12,15 +17,6 @@ The 'pyscipopt' python package must be installed separately through `pip`:
     
     $ pip install cpmpy[io.scip]
 
-===============
-List of classes
-===============
-
-.. autosummary::
-    :nosignatures:
-
-    CPM_scip
-
 =================
 List of functions
 =================
@@ -31,15 +27,13 @@ List of functions
     read_scip
     write_scip
     to_scip
-
-==============
-Module details
-==============
 """
 
 
+import argparse
 import math
 import os
+import sys
 import tempfile
 import numpy as np
 import cpmpy as cp
@@ -562,4 +556,41 @@ def write_scip(model: cp.Model, fname: Optional[str] = None, format: str = "mps"
         with open(fname, "r") as f:
             return f.read()
 
+def main():
+    parser = argparse.ArgumentParser(description="Parse and solve a SCIP compatible model using CPMpy")
+    parser.add_argument("model", help="Path to a SCIP compatible file (or raw string if --string is given)")
+    parser.add_argument("-s", "--solver", default=None, help="Solver name to use (default: CPMpy's default)")
+    parser.add_argument("--string", action="store_true", help="Interpret the first argument (model) as a raw OPB string instead of a file path")
+    parser.add_argument("-t", "--time-limit", type=int, default=None, help="Time limit for the solver in seconds (default: no limit)")
+    args = parser.parse_args()
 
+    # Build the CPMpy model
+    try:
+        if args.string:
+            model = read_scip(args.model)
+        else:
+            model = read_scip(os.path.expanduser(args.model))
+    except Exception as e:
+        sys.stderr.write(f"Error reading model: {e}\n")
+        sys.exit(1)
+
+    # Solve the model
+    try:
+        if args.solver:
+            result = model.solve(solver=args.solver, time_limit=args.time_limit)
+        else:
+            result = model.solve(time_limit=args.time_limit)
+    except Exception as e:
+        sys.stderr.write(f"Error solving model: {e}\n")
+        sys.exit(1)
+
+    # Print results
+    print("Status:", model.status())
+    if result is not None:
+        if model.has_objective():
+            print("Objective:", model.objective_value())
+    else:
+        print("No solution found.")
+
+if __name__ == "__main__":
+    main()

@@ -21,8 +21,8 @@ from typing import Callable, Optional, List
 from functools import partial
 
 import cpmpy as cp
-from cpmpy.tools.scip.parser import write_scip
 from cpmpy.tools.dimacs import write_dimacs
+from cpmpy.tools.io.scip import write_scip
 
 # mapping format names to appropriate writer functions
 _writer_map = {
@@ -40,6 +40,7 @@ _writer_map = {
     # "wbo": partial(write_scip, format="wbo"),      # requires SIMPL, not included in pip package   
     # "zpl": partial(write_scip, format="zpl"),      # requires SIMPL, not included in pip package
     "dimacs": write_dimacs,
+    # "wcnf": write_wcnf,                            # currently not supported
 }
 
 def _get_writer(format: str) -> Callable:
