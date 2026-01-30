@@ -121,8 +121,13 @@ class CPM_pumpkin(SolverInterface):
         assert subsolver is None 
 
         # initialise the native solver object
+        init_kwargs = dict()
+        if proof is not None:
+            init_kwargs['proof'] = proof
+        if seed is not None:
+            init_kwargs['seed'] = seed
         self._proof = proof
-        self.pum_solver = Model(proof=self._proof, seed=seed)
+        self.pum_solver = Model(**init_kwargs)
         self.predicate_map = {} # cache predicates for reuse
 
         # for objective
