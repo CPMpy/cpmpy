@@ -138,7 +138,7 @@ class CPM_cpo(SolverInterface):
             subsolver: str, name of a subsolver (optional)
         """
         if not self.installed():
-            raise ModuleNotFoundError("CPM_cpo: Install the python package 'docplex'")
+            raise ModuleNotFoundError("CPM_cpo: Install the python package 'cpmpy[cpo]' to use this solver interface.")
 
         if not self.license_ok():
             raise ModuleNotFoundError("CPM_cpo: You also need to install the CPLEX Optimization Studio to use this solver. "
