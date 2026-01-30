@@ -9,11 +9,18 @@ import os
 import gzip
 import zipfile
 import pathlib
+import io
 
 from cpmpy.tools.dataset._base import _Dataset
 
 
 class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
+
+    """
+    MIPLib Dataset in a PyTorch compatible format.
+
+    More information on MIPLib can be found here: https://miplib.zib.de/
+    """
   
     name = "miplib"
 
@@ -25,16 +32,15 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
             download: bool = False
         ):
         """
-        Constructor for a dataset object of the MSE competition.
+        Constructor for a dataset object of the MIPLib competition.
 
         Arguments:
             root (str): Root directory where datasets are stored or will be downloaded to (default="."). 
-            year (int): Competition year of the dataset to use (default=2024).
-            track (str): Track name specifying which subset of the competition instances to load (default="exact-unweighted").
+            year (int): Year of the dataset to use (default=2024).
+            track (str): Track name specifying which subset of the dataset instances to load (default="exact-unweighted").
             transform (callable, optional): Optional transform applied to the instance file path.
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
-
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
@@ -45,13 +51,7 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         self.year = year
         self.track = track
 
-        # # Check requested dataset
-        # if not str(year).startswith('20'):
-        #     raise ValueError("Year must start with '20'")
-        # if not track:
-        #     raise ValueError("Track must be specified, e.g. OPT-LIN, DEC-LIN, ...")
-
-        dataset_dir = self.root / "miplib"
+        dataset_dir = self.root / self.name / str(year) / track
 
         super().__init__(
             dataset_dir=dataset_dir, 
@@ -59,53 +59,47 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
             download=download, extension=".mps.gz"
         )
 
-
     def category(self) -> dict:
         return {
             "year": self.year,
             "track": self.track
         }
-        
     
     def download(self):
-        print("Downloading MIPLib instances...")
         
-        zip_name = "collection.zip"
         url = "https://miplib.zib.de/downloads/"
+        target = "collection.zip"
+        target_download_path = self.root / target
 
-        dataset_dir = self.root / "miplib"
+        print(f"Downloading MIPLib instances from miplib.zib.de")
 
-        if dataset_dir.exists():
-            print(f"Using existing dataset directory: {dataset_dir}")
-        else:
-            print(f"Downloading {zip_name}...")
-            try:
-                cached_filepath = super().download_file(url, target=zip_name, desc=zip_name)
-            except ValueError as e:
-                raise ValueError(f"No dataset available. Error: {str(e)}")
+        try:
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+        except ValueError as e:
+            raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
         
-        # Extract only the specific track folder from the tar
-        with zipfile.ZipFile(cached_filepath, 'r') as zip_ref:                    
-            # Create track folder in root directory, parents=True ensures recursive creation
+        # Extract files
+        with zipfile.ZipFile(target_download_path, 'r') as zip_ref:                    
             self.dataset_dir.mkdir(parents=True, exist_ok=True)
             
             # Extract files
             for file_info in zip_ref.infolist():
-                # Extract file to family_dir, removing main_folder/track prefix
                 filename = pathlib.Path(file_info.filename).name
                 with zip_ref.open(file_info) as source, open(self.dataset_dir / filename, 'wb') as target:
                     target.write(source.read())
-        # Do not cleanup cached file, as it is in the global cache directory
-        # zip_path.unlink()
 
-    def open(self, instance: os.PathLike) -> callable:
+        # Clean up the zip file
+        target_download_path.unlink()
+
+    def open(self, instance: os.PathLike) -> io.TextIOBase:
         return gzip.open(instance, "rt") if str(instance).endswith(".gz") else open(instance)
+
 
 if __name__ == "__main__":
     dataset = MIPLibDataset(download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:", dataset[0])
 
-    from cpmpy.tools.mps import read_mps
+    from cpmpy.tools.io.mps import read_mps
     model = read_mps(dataset[0][0], open=dataset.open)
     print(model)

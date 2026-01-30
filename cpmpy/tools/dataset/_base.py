@@ -9,6 +9,7 @@ It standardizes how datasets are stored, accessed, and optionally transformed.
 from abc import ABC, abstractmethod
 import os
 import pathlib
+import io
 import tempfile
 from typing import Any, Optional, Tuple
 from urllib.error import URLError
@@ -78,13 +79,13 @@ class _Dataset(ABC):
         """
         pass
 
-    def open(self, instance) -> callable:
+    def open(self, instance) -> io.TextIOBase:
         """
         How an instance file from the dataset should be opened.
         Especially usefull when files come compressed and won't work with 
         python standard library's 'open', e.g. '.xz', '.lzma'.
         """
-        return open
+        return open(instance, "r")
 
     def metadata(self, file) -> dict:
         metadata = self.category() | {

@@ -8,9 +8,8 @@ import fnmatch
 import lzma
 import os
 import pathlib
-from urllib.request import urlretrieve
-from urllib.error import HTTPError, URLError
 import tarfile
+import io
 
 from cpmpy.tools.dataset._base import _Dataset
 
@@ -34,7 +33,7 @@ class OPBDataset(_Dataset):
             self, 
             root: str = ".", 
             year: int = 2024, track: str = "OPT-LIN", 
-            competition: bool = False,
+            competition: bool = True,
             transform=None, target_transform=None, 
             download: bool = False
         ):
@@ -67,7 +66,7 @@ class OPBDataset(_Dataset):
         if not track:
             raise ValueError("Track must be specified, e.g. exact-weighted, exact-unweighted, ...")
 
-        dataset_dir = self.root / str(year) / track / ('selected' if self.competition else 'normalized')
+        dataset_dir = self.root / self.name / str(year) / track / ('selected' if self.competition else 'normalized')
 
         super().__init__(
             dataset_dir=dataset_dir, 
@@ -85,23 +84,21 @@ class OPBDataset(_Dataset):
         # Add the author to the metadata
         return super().metadata(file) | {'author': str(file).split(os.sep)[-1].split("_")[0],}
                 
-
     def download(self):
-        # TODO: add option to filter on competition instances
-        print(f"Downloading OPB {self.year} {self.track} {'competition' if self.competition else 'non-competition'} instances...")
-        
-        url = f"https://www.cril.univ-artois.fr/PB24/benchs/"
-        year_suffix = str(self.year)[2:]  # Drop the starting '20'
-        url_path = url + f"{'normalized' if not self.competition else 'selected'}-PB{year_suffix}.tar"
-        tar_path = self.root / f"{'normalized' if not self.competition else 'selected'}-PB{year_suffix}.tar"
+                
+        url = "https://www.cril.univ-artois.fr/PB24/benchs/"
+        target = f"{'normalized' if not self.competition else 'selected'}-PB{str(self.year)[2:]}.tar"
+        target_download_path = self.root / target
+
+        print(f"Downloading OPB {self.year} {self.track} {'competition' if self.competition else 'non-competition'} instances from www.cril.univ-artois.fr")
         
         try:
-            urlretrieve(url_path, str(tar_path))
-        except (HTTPError, URLError) as e:
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+        except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year}. Error: {str(e)}")
         
         # Extract only the specific track folder from the tar
-        with tarfile.open(tar_path, "r:*") as tar_ref:  # r:* handles .tar, .tar.gz, .tar.bz2, etc.
+        with tarfile.open(target_download_path, "r:*") as tar_ref:  # r:* handles .tar, .tar.gz, .tar.bz2, etc.
             # Get the main folder name
             main_folder = None
             for name in tar_ref.getnames():
@@ -157,10 +154,11 @@ class OPBDataset(_Dataset):
                         target.write(source.read())
 
         # Clean up the tar file
-        tar_path.unlink()
+        target_download_path.unlink()
 
-    def open(self, instance: os.PathLike) -> callable:
+    def open(self, instance: os.PathLike) -> io.TextIOBase:
         return lzma.open(instance, 'rt') if str(instance).endswith(".xz") else open(instance)
+
 
 if __name__ == "__main__":
     dataset = OPBDataset(year=2024, track="DEC-LIN", competition=True, download=True)

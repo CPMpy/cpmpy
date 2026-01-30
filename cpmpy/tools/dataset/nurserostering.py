@@ -9,11 +9,9 @@ https://schedulingbenchmarks.org/nrp/
 
 import os
 import pathlib
-from typing import Tuple, Any
-from urllib.request import urlretrieve
-from urllib.error import HTTPError, URLError
 import zipfile
 import re
+import io
 
 import cpmpy as cp
 from cpmpy.tools.dataset._base import _Dataset
@@ -57,11 +55,9 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         """
 
         self.root = pathlib.Path(root)
-        self.transform = transform
-        self.target_transform = target_transform
         self.sort_key = sorted if sort_key is None else sort_key
 
-        dataset_dir = pathlib.Path(os.path.join(root, "nurserostering"))
+        dataset_dir = self.root / self.name
 
         super().__init__(
             dataset_dir=dataset_dir,
@@ -73,21 +69,20 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         return {} # no categories
 
     def download(self):
-        print(f"Downloading Nurserostering instances from schedulingbenchmarks.org")
         
         url = "https://schedulingbenchmarks.org/nrp/data/"
         target = "instances1_24.zip" # download full repo...
-        zip_path = self.root / target
+        target_download_path = self.root / target
 
         print(f"Downloading Nurserostering instances from schedulingbenchmarks.org")
 
         try:
-            zip_path = self._download_file(url, target, destination=str(zip_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
         except ValueError as e:
             raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
 
         # make directory and extract files
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        with zipfile.ZipFile(target_download_path, 'r') as zip_ref:
             self.dataset_dir.mkdir(parents=True, exist_ok=True)
 
             # Extract files
@@ -96,10 +91,10 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
                     with zip_ref.open(file_info) as source, open(self.dataset_dir / filename, 'wb') as target:
                         target.write(source.read())
 
-            # Clean up the zip file
-        zip_path.unlink()
+        # Clean up the zip file
+        target_download_path.unlink()
 
-    def open(self, instance: os.PathLike) -> callable:
+    def open(self, instance: os.PathLike) -> io.TextIOBase:
         return open(instance, "r")
 
 

@@ -6,18 +6,18 @@ The `metadata` contains usefull information about the current problem instance.
 
 https://github.com/tamy0612/JSPLIB
 """
+
+import io
 import os
 import json
 import pathlib
-from os.path import join
 from typing import Tuple, Any
-from urllib.request import urlretrieve
-from urllib.error import HTTPError, URLError
 import zipfile
 import numpy as np
 
 import cpmpy as cp
 from cpmpy.tools.dataset._base import _Dataset
+
 
 class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
@@ -41,49 +41,49 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         """
         
         self.root = pathlib.Path(root)
-        self.instance_dir = pathlib.Path(join(self.root, "jsplib"))
         self.metadata_file = "instances.json"
-        self.transform = transform
-        self.target_transform = target_transform
 
-        # Create root directory if it doesn't exist
-        self.root.mkdir(parents=True, exist_ok=True)
+        dataset_dir = self.root / self.name
 
-        if not self.instance_dir.exists():
-            if not download:
-                raise ValueError(f"Dataset not found in local file system. Please set download=True to download the dataset.")
-            else:
-                url = f"https://github.com/tamy0612/JSPLIB/archive/refs/heads/master.zip" # download full repo...
-                url_path = url
-                zip_path = pathlib.Path(join(root,"jsplib-master.zip"))
+        super().__init__(
+            dataset_dir=dataset_dir,
+            transform=transform, target_transform=target_transform, 
+            download=download, extension=""
+        )
 
-                print(f"Downloading JSPLib instances..")
+    def category(self) -> dict:
+        return {} # no categories
+    
+    def download(self):
 
-                try:
-                    urlretrieve(url_path, str(zip_path))
-                except (HTTPError, URLError) as e:
-                    raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
-                
-                # make directory and extract files
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    self.instance_dir.mkdir(parents=True, exist_ok=True)
+        url = "https://github.com/tamy0612/JSPLIB/archive/refs/heads/" # download full repo...
+        target = "master.zip"
+        target_download_path = self.root / target
 
-                    # Extract files
-                    for file_info in zip_ref.infolist():
-                        if file_info.filename.startswith("JSPLIB-master/instances/") and file_info.file_size > 0:
-                            filename = pathlib.Path(file_info.filename).name
-                            with zip_ref.open(file_info) as source, open(self.instance_dir / filename, 'wb') as target:
-                                target.write(source.read())
-                    # extract metadata file
-                    with zip_ref.open("JSPLIB-master/instances.json") as source, open(self.instance_dir / self.metadata_file, 'wb') as target:
-                        target.write(source.read())
-                                 # Clean up the zip file
-                zip_path.unlink()
+        print(f"Downloading JSPLib instances from github.com/tamy0612/JSPLIB")
 
+        try:
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+        except ValueError as e:
+            raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
         
-    def __len__(self) -> int:
-        """Return the total number of instances."""
-        return len(list(self.instance_dir.glob("*")))
+        # Extract files
+        with zipfile.ZipFile(target_download_path, 'r') as zip_ref:
+            self.dataset_dir.mkdir(parents=True, exist_ok=True)
+
+            # Extract files
+            for file_info in zip_ref.infolist():
+                if file_info.filename.startswith("JSPLIB-master/instances/") and file_info.file_size > 0:
+                    filename = pathlib.Path(file_info.filename).name
+                    with zip_ref.open(file_info) as source, open(self.dataset_dir / filename, 'wb') as target:
+                        target.write(source.read())
+            # extract metadata file
+            with zip_ref.open("JSPLIB-master/instances.json") as source, open(self.dataset_dir / self.metadata_file, 'wb') as target:
+                target.write(source.read())
+        
+        # Clean up the zip file
+        target_download_path.unlink()
+
     
     def __getitem__(self, index: int|str) -> Tuple[Any, Any]:
         """
@@ -101,7 +101,7 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
             raise IndexError("Index out of range")
 
         # Get all instance files and sort for deterministic behavior # TODO: use natsort instead?
-        files = sorted(list(self.instance_dir.glob("*[!.json]"))) # exclude metadata file
+        files = sorted(list(self.dataset_dir.rglob("*[!.json]"))) # exclude metadata file
         if isinstance(index, int):
             file_path = files[index]
         elif isinstance(index, str):
@@ -116,7 +116,7 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
             # does not need to remain a filename...
             filename = self.transform(filename)
 
-        with open(self.instance_dir / self.metadata_file, "r") as f:
+        with open(self.dataset_dir / self.metadata_file, "r") as f:
             for entry in json.load(f):
                 if entry["name"] == file_path.stem:
                     metadata = entry
@@ -161,8 +161,12 @@ def parse_jsp(filename: str):
 
         return task_to_machines, task_durations
 
+
 def jobshop_model(task_to_machines, task_durations):
 
+    """
+    Create a CPMpy model for the Jobshop problem.
+    """
 
     task_to_machines = np.array(task_to_machines)
     dur = np.array(task_durations)

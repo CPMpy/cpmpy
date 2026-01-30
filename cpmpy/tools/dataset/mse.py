@@ -9,12 +9,13 @@ import os
 import lzma
 import zipfile
 import pathlib
-from urllib.request import urlretrieve
-from urllib.error import HTTPError, URLError
+import io
 
-from .._base import _Dataset
+from cpmpy.tools.dataset._base import _Dataset
+
 
 class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
+
     """
     MaxSAT Evaluation (MSE) benchmark dataset.
 
@@ -63,7 +64,7 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
         if not track:
             raise ValueError("Track must be specified, e.g. OPT-LIN, DEC-LIN, ...")
 
-        dataset_dir = self.root / str(year) / track
+        dataset_dir = self.root / self.name / str(year) / track
 
         super().__init__(
             dataset_dir=dataset_dir, 
@@ -71,30 +72,27 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
             download=download, extension=".wcnf.xz"
         )
 
-
     def category(self) -> dict:
         return {
             "year": self.year,
             "track": self.track
         }
         
-    
     def download(self):
-        print(f"Downloading MaxSAT Eval {self.year} {self.track} instances...")
-        
-        zip_name = f"mse{str(self.year)[2:]}-{self.track}.zip"
-        url = f"https://www.cs.helsinki.fi/group/coreo/MSE{self.year}-instances/"
 
-        url_path = url + zip_name
-        zip_path = self.root / zip_name
-        
+        url = f"https://www.cs.helsinki.fi/group/coreo/MSE{self.year}-instances/"
+        target = f"mse{str(self.year)[2:]}-{self.track}.zip"
+        target_download_path = self.root / target
+
+        print(f"Downloading MaxSAT Eval {self.year} {self.track} instances from cs.helsinki.fi")
+                
         try:
-            urlretrieve(url_path, str(zip_path))
-        except (HTTPError, URLError) as e:
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+        except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year} and track {self.track}. Error: {str(e)}")
         
         # Extract only the specific track folder from the tar
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:                    
+        with zipfile.ZipFile(target_download_path, 'r') as zip_ref:                    
             # Create track folder in root directory, parents=True ensures recursive creation
             self.dataset_dir.mkdir(parents=True, exist_ok=True)
             
@@ -104,11 +102,13 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
                 filename = pathlib.Path(file_info.filename).name
                 with zip_ref.open(file_info) as source, open(self.dataset_dir / filename, 'wb') as target:
                     target.write(source.read())
-        # Clean up the zip file
-        zip_path.unlink()
 
-    def open(self, instance: os.PathLike) -> callable:
+        # Clean up the zip file
+        target_download_path.unlink()
+
+    def open(self, instance: os.PathLike) -> io.TextIOBase:
         return lzma.open(instance, "rt") if str(instance).endswith(".xz") else open(instance)
+
 
 if __name__ == "__main__":
     dataset = MSEDataset(year=2024, track="exact-weighted", download=True)
