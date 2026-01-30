@@ -3,8 +3,6 @@ import unittest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.expressions.utils import argvals
-from cpmpy.transformations.decompose_global import decompose_global
 from cpmpy.transformations.flatten_model import flatten_objective
 from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
