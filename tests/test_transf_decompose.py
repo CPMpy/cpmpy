@@ -5,6 +5,7 @@ from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import flatlist
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
+from cpmpy.transformations.linearize import decompose_linear
 
 
 class TestTransfDecomp(unittest.TestCase):
@@ -156,4 +157,42 @@ class TestTransfDecomp(unittest.TestCase):
                             {'(bv) == ((((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1))',
                              '(x[0]) + (x[1]) >= 3', 'x[0] != 0'})
 
+
+    def test_decompose_linear(self):
+
+        x = cp.intvar(1,3, shape=2, name=("a","b"))
+        bv = cp.boolvar(name="bv")
+
+        cons = cp.AllDifferent(x)
+        ivarmap = dict()
+        self.assertSetEqual(set(map(str,decompose_linear([cons], ivarmap=ivarmap))),
+                            {"and([(EncDir(a)[0]) + (EncDir(b)[0]) <= 1, (EncDir(a)[1]) + (EncDir(b)[1]) <= 1, (EncDir(a)[2]) + (EncDir(b)[2]) <= 1])",
+                             "sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1",
+                             "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
+        # next time, re-use the encoding, no domain constraints
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
+                            {"and([(EncDir(a)[0]) + (EncDir(b)[0]) <= 1, (EncDir(a)[1]) + (EncDir(b)[1]) <= 1, (EncDir(a)[2]) + (EncDir(b)[2]) <= 1])"})
+
+        # nested
+        cons = bv == cp.AllDifferent(x)
+        ivarmap = dict()
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
+                            {"(bv) == (and([(EncDir(a)[0]) + (EncDir(b)[0]) <= 1, (EncDir(a)[1]) + (EncDir(b)[1]) <= 1, (EncDir(a)[2]) + (EncDir(b)[2]) <= 1]))",
+                             "sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1",
+                             "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
+
+        # test nvalue
+        cons = cp.NValue(x) == 8
+        ivarmap = dict()
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
+                            {"sum([(EncDir(a)[0]) or (EncDir(b)[0]), (EncDir(a)[1]) or (EncDir(b)[1]), (EncDir(a)[2]) or (EncDir(b)[2])]) == 8",
+                             "sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1",
+                             "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
+
+        # test element
+        cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
+        ivarmap = dict()
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
+                            {"sum([0, 1, 2, 3] * [boolval(False), EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 8",
+                             "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
 
