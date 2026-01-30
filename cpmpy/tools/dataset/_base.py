@@ -90,17 +90,17 @@ class _Dataset(ABC):
         # Get all compressed XML files and sort for deterministic behavior
         files = sorted(list(self.dataset_dir.rglob(f"*{self.extension}")))
         file_path = files[index]
-
         filename = str(file_path)
+
+        # Basic metadata about the instance
+        metadata = self.metadata(file=filename)
+        if self.target_transform:
+            metadata = self.target_transform(metadata)
+
         if self.transform:
             # does not need to remain a filename...
             filename = self.transform(filename)
-            
-        # Basic metadata about the instance
-        metadata = self.metadata(file=filename, )
-        if self.target_transform:
-            metadata = self.target_transform(metadata)
-            
+                        
         return filename, metadata
     
 
