@@ -169,7 +169,10 @@ class _Dataset(ABC):
     @staticmethod
     def _download_sequential(url: str, filepath: pathlib.Path, total_size: int, desc: str,
                              chunk_size: int = 1024 * 1024):
-        """Download file sequentially (fallback method)."""
+        """
+        Download file sequentially with progress bar.
+        """
+        
         import sys
         
         req = Request(url)
