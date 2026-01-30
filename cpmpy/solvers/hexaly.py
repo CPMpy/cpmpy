@@ -117,8 +117,11 @@ class CPM_hexaly(SolverInterface):
         - cpm_model: Model(), a CPMpy Model() (optional)
         - subsolver: str, name of a subsolver (optional)
         """
-        if not self.supported():
-            raise ModuleNotFoundError("CPM_hexaly: Install the python package 'hexaly' to use this solver interface.")
+
+        if not self.installed():
+            raise ModuleNotFoundError("CPM_hexaly: Install the python package 'cpmpy[hexaly]' to use this solver interface.") 
+        elif not self.license_ok():
+            raise ModuleNotFoundError("CPM_hexaly: No license found or a problem occured during license check. Make sure your license is activated!")
 
         from hexaly.optimizer import HexalyOptimizer
 
