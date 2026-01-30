@@ -92,8 +92,8 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
                     target.write(source.read())
         # Clean up the zip file
         target_download_path.unlink()
-            
-                    
+
+
 if __name__ == "__main__":
     dataset = PSPLibDataset(variant="rcpsp", family="j30", download=True)
     print("Dataset size:", len(dataset))

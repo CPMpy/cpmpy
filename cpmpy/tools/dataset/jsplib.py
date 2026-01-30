@@ -195,31 +195,6 @@ def jobshop_model(task_to_machines, task_durations):
 
 
 if __name__ == "__main__":
-
     dataset = JSPLibDataset(root=".", download=True, transform=parse_jsp)
     print("Dataset size:", len(dataset))
     print("Instance 0:")
-    (machines, dur), metadata = dataset[0]
-    print("Machines:", machines)
-    print("Durations:", dur)
-    print("Metadata:", metadata)
-
-    print("Solving", metadata['name'])
-    model, (start, makespan) = jobshop_model(task_to_machines=machines, task_durations=dur)
-    assert model.solve(time_limit=10)
-
-    import pandas as pd
-    import plotly.express as px
-    import plotly.io as pio
-    pio.renderers.default = "browser" # ensure plotly opens figure in browser
-
-    df = pd.DataFrame({"Start": start.value().flat, "Duration": dur.flat, "Machine": machines.flat})
-    df["Job"] = [j for j in range(metadata['jobs']) for _ in range(metadata['machines']) ]
-    df["Task"] = [j for _ in range(metadata['machines']) for j in range(metadata['jobs'])]
-    df["Name"] = "T" + df["Job"].astype(str) + "-" + df["Task"].astype(str)
-    print(df)
-    ghant_fig = px.bar(df, orientation='h',
-                       base="Start", x="Duration", y="Machine", color="Job", text="Name",
-                       title=f"Jobshop instance {metadata['name']}, makespan: {makespan.value()}, status: {model.status()}"
-                       )
-    ghant_fig.show()

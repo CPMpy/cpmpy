@@ -515,3 +515,9 @@ if __name__ == "__main__":
         for d, val in enumerate(row):
             print(f" {str(val):>{col_widths[d]}}", end="")
         print()
+
+
+if __name__ == "__main__":
+    dataset = NurseRosteringDataset(download=True)
+    print("Dataset size:", len(dataset))
+    print("Instance 0:", dataset[0])

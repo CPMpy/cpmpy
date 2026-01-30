@@ -99,7 +99,3 @@ if __name__ == "__main__":
     dataset = MIPLibDataset(download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:", dataset[0])
-
-    from cpmpy.tools.io.mps import read_mps
-    model = read_mps(dataset[0][0], open=dataset.open)
-    print(model)
