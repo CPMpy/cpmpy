@@ -6,6 +6,7 @@ The `metadata` contains usefull information about the current problem instance.
 
 https://schedulingbenchmarks.org/nrp/
 """
+
 import os
 import pathlib
 from typing import Tuple, Any
@@ -16,6 +17,7 @@ import re
 
 import cpmpy as cp
 from cpmpy.tools.dataset._base import _Dataset
+
 # Optional dependencies
 try:
     import pandas as pd
@@ -55,76 +57,47 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         """
 
         self.root = pathlib.Path(root)
-        self.instance_dir = pathlib.Path(os.path.join(self.root, "nurserostering"))
         self.transform = transform
         self.target_transform = target_transform
         self.sort_key = sorted if sort_key is None else sort_key
 
-        # Create root directory if it doesn't exist
-        self.root.mkdir(parents=True, exist_ok=True)
+        dataset_dir = pathlib.Path(os.path.join(root, "nurserostering"))
 
-        if not self.instance_dir.exists():
-            if not download:
-                raise ValueError(f"Dataset not found in local file system. Please set download=True to download the dataset.")
-            else:
-                url = f"https://schedulingbenchmarks.org/nrp/data/instances1_24.zip" # download full repo...
-                zip_path = pathlib.Path(os.path.join(root,"jsplib-master.zip"))
+        super().__init__(
+            dataset_dir=dataset_dir,
+            transform=transform, target_transform=target_transform, 
+            download=download, extension=".txt"
+        )
 
-                print(f"Downloading Nurserostering instances from schedulingbenchmarks.org")
+    def category(self) -> dict:
+        return {} # no categories
 
-                try:
-                    urlretrieve(url, str(zip_path))
-                except (HTTPError, URLError) as e:
-                    raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
+    def download(self):
+        print(f"Downloading Nurserostering instances from schedulingbenchmarks.org")
+        
+        url = "https://schedulingbenchmarks.org/nrp/data/"
+        target = "instances1_24.zip" # download full repo...
+        zip_path = self.root / target
 
-                # make directory and extract files
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    self.instance_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Downloading Nurserostering instances from schedulingbenchmarks.org")
 
-                    # Extract files
-                    for file_info in zip_ref.infolist():
-                            filename = pathlib.Path(file_info.filename).name
-                            with zip_ref.open(file_info) as source, open(self.instance_dir / filename, 'wb') as target:
-                                target.write(source.read())
+        try:
+            zip_path = self._download_file(url, target, destination=str(zip_path))
+        except ValueError as e:
+            raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
 
-                 # Clean up the zip file
-                zip_path.unlink()
+        # make directory and extract files
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            self.dataset_dir.mkdir(parents=True, exist_ok=True)
 
+            # Extract files
+            for file_info in zip_ref.infolist():
+                    filename = pathlib.Path(file_info.filename).name
+                    with zip_ref.open(file_info) as source, open(self.dataset_dir / filename, 'wb') as target:
+                        target.write(source.read())
 
-    def __len__(self) -> int:
-        """Return the total number of instances."""
-        return len(list(self.instance_dir.glob("*.txt")))
-
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
-        """
-        Get a single Nurserostering instance filename and metadata.
-
-        Args:
-            index (int): Index of the instance to retrieve
-
-        Returns:
-            Tuple[Any, Any]: A tuple containing:
-                - The filename of the instance
-                - Metadata dictionary with file name, track, year etc.
-        """
-        if isinstance(index, int) and not (0 <= index < len(self)):
-            raise IndexError("Index out of range")
-
-        # Get all instance files and sort for deterministic behavior
-        files = self.sort_key(list(self.instance_dir.glob("*.txt"))) # use .txt files instead of xml files
-        file_path = files[index]
-
-        filename = str(file_path)
-        if self.transform:
-            # user might want to process the filename to something else
-            filename = self.transform(filename)
-
-        metadata = dict(name=file_path.stem)
-
-        if self.target_transform:
-            metadata = self.target_transform(metadata)
-
-        return filename, metadata
+            # Clean up the zip file
+        zip_path.unlink()
 
     def open(self, instance: os.PathLike) -> callable:
         return open(instance, "r")
@@ -287,7 +260,7 @@ def parse_scheduling_period(filename: str):
                 shift_on=shift_on, shift_off=shift_off, cover=cover)
 
 
-def add_fake_names(data, seed=0):
+def _add_fake_names(data, seed=0):
     """
     Transform function to add randomly generated names to staff using Faker.
     
@@ -331,7 +304,7 @@ def add_fake_names(data, seed=0):
     return data
 
 
-def to_dataframes(data):
+def _to_dataframes(data):
     """
     Transform function to convert native data structures to pandas DataFrames.
     
