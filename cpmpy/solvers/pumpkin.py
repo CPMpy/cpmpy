@@ -134,6 +134,9 @@ class CPM_pumpkin(SolverInterface):
         self._objective = None
         self.objective_is_min = True
 
+        # for solution hint
+        self._solhint = None
+
         # initialise everything else and post the constraints/objective
         super().__init__(name="pumpkin", cpm_model=cpm_model)
 
