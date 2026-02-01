@@ -193,6 +193,6 @@ class TestTransfDecomp(unittest.TestCase):
         cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
         ivarmap = dict()
         self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
-                            {"sum([0, 1, 2, 3] * [boolval(False), EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 8",
+                            {"sum([10, 20, 30, 40] * [boolval(False), EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 8",
                              "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
 
