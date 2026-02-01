@@ -616,7 +616,6 @@ def get_linear_decompositions(ivarmap):
     """
     # AllDifferent
     def decompose_alldifferent(expr):
-        print("Decomposing expr")
 
         if expr.has_subexpr():
             warnings.warn(
