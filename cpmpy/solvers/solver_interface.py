@@ -31,6 +31,7 @@ from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
+from ..transformations.cse import CSEMap
 
 Callback: TypeAlias = Expression | List[Expression] | Callable # type alias to use in solveAll
 
@@ -87,7 +88,7 @@ class SolverInterface(object):
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
         self._varmap = dict()  # maps cpmpy variables to native solver variables
-        self._csemap = dict()  # maps cpmpy expressions to solver expressions
+        self._csemap = CSEMap()  # maps cpmpy expressions to solver expressions
 
         # rest uses own API
         if cpm_model is not None:
