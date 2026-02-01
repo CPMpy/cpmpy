@@ -337,37 +337,25 @@ def get_or_make_var(expr, csemap=None):
 
     if csemap is not None and expr in csemap:
         return csemap[expr], []
-
+        
+    # need to recursively flatten new_cons
     if expr.is_bool():
-        # normalize expr into a boolexpr LHS, reify LHS == bvar
-        (flatexpr, flatcons) = normalized_boolexpr(expr, csemap=csemap)
-
+        flatexpr, flatcons = normalized_boolexpr(expr, csemap=csemap)
         if isinstance(flatexpr,_BoolVarImpl):
             # avoids unnecessary bv == bv or bv == ~bv assignments
             return flatexpr,flatcons
-        bvar = _BoolVarImpl()
-
-        # save expr in dict
-        if csemap is not None:
-            csemap[expr] = bvar
-        return bvar, [flatexpr == bvar] + flatcons
-
     else:
-        # normalize expr into a numexpr LHS,
-        # then compute bounds and return (newintvar, LHS == newintvar)
-        (flatexpr, flatcons) = normalized_numexpr(expr, csemap=csemap)
+        flatexpr, flatcons = normalized_numexpr(expr, csemap=csemap)
+    
+    if csemap is None:
+        # this will have some overhead, but it nicely stores all logic in the csemap object
+        new_var, _new_cons = CSEMap().get_or_make_var(expr)
+    else:
+        new_var, _new_cons = csemap.get_or_make_var(expr)
 
-        lb, ub = flatexpr.get_bounds()
-        if not is_int(lb) or not is_int(ub):
-            warnings.warn(f"CPMpy only uses integer variables, but found expression ({expr}) with domain {lb}({type(lb)}"
-                          f" - {ub}({type(ub)}. CPMpy will rewrite this constriants with integer bounds instead.")
-            lb, ub = math.floor(lb), math.ceil(ub)
-        ivar = _IntVarImpl(lb, ub)
-
-        # save expr in dict
-        if csemap is not None:
-            csemap[expr] = ivar
-        return ivar, [flatexpr == ivar] + flatcons
+    # TODO: this seems weird, we are dismissing the `new_var == expr` made by the csemap
+    #   can be fixed by doing the normalization in the main flatten loop instead of here
+    return new_var, [flatexpr == new_var] + flatcons
 
 def get_or_make_var_or_list(expr, csemap=None):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
