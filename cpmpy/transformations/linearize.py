@@ -631,7 +631,9 @@ def get_linear_decompositions(ivarmap):
             if isinstance(arg, _NumVarImpl):
                 enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
                 encodings.append(enc)
-                defining += domain_constraints
+                if len(domain_constraints) > 0:
+                    defining += domain_constraints
+
             elif is_num(arg):
                 encodings.append(DummyEncoding(arg))
 
