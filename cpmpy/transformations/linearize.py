@@ -618,8 +618,8 @@ def get_linear_decompositions(ivarmap):
     def decompose_alldifferent(expr):
 
         if expr.has_subexpr():
-            warnings.warn(
-                f"AllDifferent constraint {expr} cannot be decomposed in a linear-friendly way as it has nested expressions. Using default decomposition")
+            # warnings.warn(
+                # f"AllDifferent constraint {expr} cannot be decomposed in a linear-friendly way as it has nested expressions. Using default decomposition")
             return expr.decompose()
 
         lbs, ubs = get_bounds(expr.args)
@@ -642,13 +642,13 @@ def get_linear_decompositions(ivarmap):
     def decompose_element(expr):
         arr, idx = expr.args
         if not all(is_num(a) for a in arr):
-            warnings.warn(
-                f"Element constraint {expr} cannot be decomposed in a linear-friendly way as it has integer variables in the array. Using default decomposition")
+            # warnings.warn(
+            #     f"Element constraint cannot be decomposed in a linear-friendly way as it has integer variables in the array. Using default decomposition")
             return expr.decompose()
 
         lb, ub = get_bounds(idx)
         if not (0 <= lb) and (ub < len(arr)):
-            warnings.warn("Element constraint is partial, and cannot be decomposed in a linear-friendly way. Using default decomposition")
+            # warnings.warn("Element constraint is partial, and cannot be decomposed in a linear-friendly way. Using default decomposition")
             return expr.decompose()
 
         enc, defining = _encode_int_var(ivarmap, idx, "direct")
