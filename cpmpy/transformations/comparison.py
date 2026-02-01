@@ -15,12 +15,16 @@
 """
 
 import copy
+from typing import Optional
+
 from .flatten_model import get_or_make_var
 from ..expressions.core import Comparison, Operator
 from ..expressions.utils import is_boolexpr
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
+from .cse import CSEMap
 
-def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
+
+def only_numexpr_equality(constraints, supported=frozenset(), csemap:Optional[CSEMap]=None):
     """
         Transforms ``NumExpr <op> IV`` to ``(NumExpr == A) & (A <op> IV)`` if not supported.
         Also for the reified uses of `NumExpr`
@@ -85,7 +89,7 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
     return newlist
 
 
-def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap=None):
+def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap:Optional[CSEMap]=None):
     """
     Rewrite a comparison to an equality comparison, and a defining constraint.
 

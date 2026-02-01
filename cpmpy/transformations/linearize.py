@@ -49,14 +49,16 @@ General comparisons or expressions
 
 """
 import copy
+from typing import Optional
+
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
 from .flatten_model import flatten_constraint, get_or_make_var
+from .cse import CSEMap
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
-
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
@@ -64,7 +66,7 @@ from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is
 
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
-def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
+def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap:Optional[CSEMap]=None):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -309,7 +311,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
     return newlist
 
-def only_positive_bv(lst_of_expr, csemap=None):
+def only_positive_bv(lst_of_expr, csemap:Optional[CSEMap]=None):
     """
         Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
         Comparisons are expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
