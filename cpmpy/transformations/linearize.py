@@ -653,7 +653,7 @@ def get_linear_decompositions(ivarmap):
             return expr.decompose()
 
         enc, defining = _encode_int_var(ivarmap, idx, "direct")
-        return cp.sum(val * enc.eq(val) for val in range(0, len(arr))), defining
+        return cp.sum(val * enc.eq(i) for i, val in enumerate(arr)), defining
 
     # NValue
     def decompose_nvalue(expr):
