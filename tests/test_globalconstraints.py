@@ -1,6 +1,7 @@
 import copy
 import unittest
 
+import numpy as np
 import pytest
 
 import cpmpy as cp
@@ -427,6 +428,26 @@ class TestGlobal(unittest.TestCase):
         model = cp.Model(constraints[0].decompose())
         self.assertFalse(model.solve())
 
+    def test_table_value(self):
+        """Test Table.value() with known assignments (and unassigned -> None)."""
+        iv = cp.intvar(0, 10, shape=3)
+        table = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+        c = cp.Table(iv, table)
+        # (assignment, expected value())
+        cases = [
+            ([1, 2, 3], True),
+            ([4, 5, 6], True),
+            ([7, 8, 9], True),
+            ([1, 2, 4], False),
+            ([0, 0, 0], False),
+            ([1, None, 3], None),
+            ([None, 2, 3], None),
+        ]
+        for vals, oracle in cases:
+            for var, val in zip(iv, vals):
+                var._value = val
+            self.assertEqual(c.value(), oracle, msg=f"Table.value() for {vals}")
+
     def test_negative_table(self):
         iv = cp.intvar(-8,8,3)
 
@@ -469,6 +490,24 @@ class TestGlobal(unittest.TestCase):
         model += constraints[1].decompose()
         self.assertFalse(model.solve())
 
+    def test_negative_table_value(self):
+        """Test NegativeTable.value() with known assignments (and unassigned -> None)."""
+        iv = cp.intvar(0, 10, shape=3)
+        table = [[1, 2, 3], [4, 5, 6]]
+        c = cp.NegativeTable(iv, table)
+        # (assignment, expected value(): True = row NOT in table)
+        cases = [
+            ([7, 8, 9], True),
+            ([0, 0, 0], True),
+            ([1, 2, 3], False),
+            ([4, 5, 6], False),
+            ([1, None, 3], None),
+        ]
+        for vals, oracle in cases:
+            for var, val in zip(iv, vals):
+                var._value = val
+            self.assertEqual(c.value(), oracle, msg=f"NegativeTable.value() for {vals}")
+
     def test_shorttable(self):
         iv = cp.intvar(-8,8,shape=3, name="x")
 
@@ -507,7 +546,57 @@ class TestGlobal(unittest.TestCase):
         constraining, defining = true_cons.decompose() # should be True, []
         self.assertTrue(constraining[0])
 
+    def test_shorttable_value(self):
+        """Test ShortTable.value() with known assignments and STAR; unassigned -> None."""
+        iv = cp.intvar(0, 10, shape=3)
+        # table rows: [1,*,3] and [*,5,6]; so [1,x,3] and [y,5,6] match
+        c = cp.ShortTable(iv, [[1, STAR, 3], [STAR, 5, 6]])
+        cases = [
+            ([1, 0, 3], True),
+            ([1, 99, 3], True),
+            ([0, 5, 6], True),
+            ([99, 5, 6], True),
+            ([2, 5, 6], True),   # matches [STAR, 5, 6]
+            ([1, 5, 7], False),
+            ([2, 4, 6], False),
+            ([1, None, 3], None),
+        ]
+        for vals, oracle in cases:
+            for var, val in zip(iv, vals):
+                var._value = val
+            self.assertEqual(c.value(), oracle, msg=f"ShortTable.value() for {vals}")
 
+    def test_table_accepts_ndarray(self):
+        """Table, NegativeTable, ShortTable accept np.ndarray as table; value() works (stored as list)."""
+        iv = cp.intvar(0, 10, shape=2)
+        tab = np.array([[1, 2], [3, 4]], dtype=int)
+        t = cp.Table(iv, tab)
+        for var, val in zip(iv, [1, 2]):
+            var._value = val
+        self.assertTrue(t.value())
+        for var, val in zip(iv, [3, 4]):
+            var._value = val
+        self.assertTrue(t.value())
+        for var, val in zip(iv, [0, 0]):
+            var._value = val
+        self.assertFalse(t.value())
+
+        nt = cp.NegativeTable(iv, tab)
+        for var, val in zip(iv, [1, 2]):
+            var._value = val
+        self.assertFalse(nt.value())
+        for var, val in zip(iv, [0, 0]):
+            var._value = val
+        self.assertTrue(nt.value())
+
+        tab_star = np.array([[1, 2], [STAR, 4]], dtype=object)
+        st = cp.ShortTable(iv, tab_star)
+        for var, val in zip(iv, [1, 2]):
+            var._value = val
+        self.assertTrue(st.value())
+        for var, val in zip(iv, [99, 4]):
+            var._value = val
+        self.assertTrue(st.value())
 
     def test_table_onearg(self):
 

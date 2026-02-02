@@ -132,7 +132,7 @@
 """
 import copy
 import warnings
-from typing import cast, Union, Optional, Sequence, Any
+from typing import cast, Literal, Union, Optional, Sequence, Any
 import numpy as np
 
 import cpmpy as cp
@@ -546,17 +546,26 @@ class Inverse(GlobalConstraint):
 
 class Table(GlobalConstraint):
     """
-    Enforces that the values of the variables in 'array' correspond to a row in 'table'
+    Enforces that the values of the variables in 'array' correspond to a row in 'table'.
     """
-    def __init__(self, array: Sequence[Expression], table: list[list[int]]):
+    def __init__(self, array: Sequence[Expression], table: Union[list[list[int]], np.ndarray]):
         """
         Arguments:
             array (Sequence[Expression]): List of expressions representing the array of variables
-            table (list[list[int]]): List of lists of integers representing the table
+            table (list[list[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: {array}")
+        if isinstance(table, np.ndarray):  # Ensure it is a list
+            assert table.ndim == 2, "Table's table must be a 2D array"
+            assert table.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
+            table = table.tolist()
+        else:
+            tmp = np.array(table)
+            assert tmp.ndim == 2, "Table's table must be a 2D array"
+            assert tmp.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
+            
         super().__init__("table", [array, table])
 
     def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
@@ -583,24 +592,33 @@ class Table(GlobalConstraint):
     def negate(self):
         return NegativeTable(self.args[0], self.args[1])
 
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args  # the table 'tab' is asserted to only hold constants
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
+
 class ShortTable(GlobalConstraint):
     """
-        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
-        no restrictions for the corresponding variable in that tuple.
+    Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
+    no restrictions for the corresponding variable in that tuple.
     """
-    def __init__(self, array: Sequence[Expression], table: list[list[int]]):
+    def __init__(self, array: Sequence[Expression], table: Union[list[list[int|Literal["*"]]], np.ndarray]):
         """
         Arguments:
             array (Sequence[Expression]): List of expressions representing the array of variables
-            table (list[list[int]]): List of lists of integers representing the table
+            table (list[list[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
+                STAR represents a wildcard (corresponding variable can take any value).
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
+        if isinstance(table, np.ndarray):
+            assert table.ndim == 2, "ShortTable's table must be a 2D array"
+            table = table.tolist()
         if not all(is_int(x) or x == STAR for row in table for x in row):
             raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-        if isinstance(table, np.ndarray): # Ensure it is a list
-            table = table.tolist()
         super().__init__("short_table", [array, table])
 
     def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
@@ -619,30 +637,46 @@ class ShortTable(GlobalConstraint):
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
         arr, tab = self.args
-        tab = np.array(tab)
-        arrval = np.array(argvals(arr))
+        arrval = argvals(arr)
         if any(x is None for x in arrval):
             return None
+        arrval = np.asarray(arrval, dtype=int)
+        tab = np.asarray(tab)
         for row in tab:
-            num_row = row[row != STAR].astype(int)
-            num_vals = arrval[row != STAR].astype(int)
-            if (num_row == num_vals).all():
+            mask = (row != STAR)
+            if (row[mask].astype(int) == arrval[mask]).all():
                 return True
         return False
 
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
+
 class NegativeTable(GlobalConstraint):
-    """The values of the variables in 'array' do not correspond to any row in 'table'
     """
-    def __init__(self, array: Sequence[Expression], table: list[list[int]]):
+    The values of the variables in 'array' do not correspond to any row in 'table'.
+    """
+    def __init__(self, array: Sequence[Expression], table: Union[list[list[int]], np.ndarray]):
         """
         Arguments:
             array (Sequence[Expression]): List of expressions representing the array of variables
-            table (list[list[int]]): List of lists of integers representing the table
+            table (list[list[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: "
-                            f"{array}")
+            raise TypeError(f"the first argument of a NegativeTable constraint should only contain variables/expressions: {array}")
+        if isinstance(table, np.ndarray):  # Ensure it is a list
+            assert table.ndim == 2, "NegativeTable's table must be a 2D array"
+            assert table.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
+            table = table.tolist()
+        else:
+            tmp = np.array(table)
+            assert tmp.ndim == 2, "NegativeTable's table must be a 2D array"
+            assert tmp.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
+            
         super().__init__("negative_table", [array, table])
 
     def decompose(self):
@@ -666,6 +700,13 @@ class NegativeTable(GlobalConstraint):
         if any(x is None for x in arrval):
             return None
         return arrval not in tab
+
+    # specialisation to avoid recursing over big tables
+    def has_subexpr(self):
+        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
+            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+            self._has_subexpr = any(a.has_subexpr() for a in arr)
+        return self._has_subexpr
 
     def negate(self):
         return Table(self.args[0], self.args[1])
