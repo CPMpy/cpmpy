@@ -27,7 +27,12 @@ from .gcs import CPM_gcs
 from .pysdd import CPM_pysdd
 from .exact import CPM_exact
 from .choco import CPM_choco
+from .pumpkin import CPM_pumpkin
 from .cpo   import CPM_cpo
+from .cplex import CPM_cplex
+from .pindakaas import CPM_pindakaas
+from .hexaly import CPM_hexaly
+from .rc2 import CPM_rc2
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -69,7 +74,8 @@ class SolverLookup():
 
             First one is default
         """
-        return [("ortools", CPM_ortools),
+        return [
+                ("ortools", CPM_ortools),
                 ("z3", CPM_z3),
                 ("minizinc", CPM_minizinc),
                 ("gcs", CPM_gcs),
@@ -78,27 +84,62 @@ class SolverLookup():
                 ("pysdd", CPM_pysdd),
                 ("exact", CPM_exact),
                 ("choco", CPM_choco),
+                ("pumpkin", CPM_pumpkin),
                 ("cpo", CPM_cpo),
+                ("cplex", CPM_cplex),
+                ("pindakaas", CPM_pindakaas),
+                ("hexaly", CPM_hexaly),
+                ("rc2", CPM_rc2),
                ]
 
     @classmethod
-    def solvernames(cls):
+    def print_status(cls):
+        """
+            Print all CPMpy solvers and their installation status on this system.
+        """
+        for (basename, CPM_slv) in cls.base_solvers():
+            if CPM_slv.supported():
+                print(f"{basename}: Supported, ready to use.")
+            else:
+                print(f"{basename}: Not supported (missing Python package, binary or license).")
+
+    @classmethod
+    def supported(cls):
+        """
+            Return the list of names of all solvers (and subsolvers) supported on this system.
+
+            If a solver name is returned, it means that the solver's `.supported()` function returns True
+            and it is hence ready for immediate use
+            (e.g. any separate binaries are also installed if necessary, and licenses are active if needed).
+
+            Typical use case is to use these names in `SolverLookup.get(name)`.
+        """
         names = []
         for (basename, CPM_slv) in cls.base_solvers():
             if CPM_slv.supported():
                 names.append(basename)
                 if hasattr(CPM_slv, "solvernames"):
-                    subnames = CPM_slv.solvernames()
+                    subnames = CPM_slv.solvernames(installed=True)
                     for subn in subnames:
                         names.append(basename+":"+subn)
         return names
 
     @classmethod
-    def get(cls, name=None, model=None):
+    def solvernames(cls):
+        # The older (more indirectly named) way to get the list of names of *supported* solvers.
+        # Will be deprecated at some point.
+        return cls.supported()
+
+    @classmethod
+    def get(cls, name=None, model=None, **init_kwargs):
         """
             get a specific solver (by name), with 'model' passed to its constructor
 
             This is the preferred way to initialise a solver from its name
+
+            :param name: name of the solver to use
+            :param model: model to pass to the solver constructor
+            :param init_kwargs: additional keyword arguments to pass to the solver constructor
         """
         solver_cls = cls.lookup(name=name)
 
@@ -106,7 +147,7 @@ class SolverLookup():
         subname = None
         if name is not None and ':' in name:
             _,subname = name.split(':',maxsplit=1)
-        return solver_cls(model, subsolver=subname)
+        return solver_cls(model, subsolver=subname, **init_kwargs)
 
     @classmethod
     def lookup(cls, name=None):
@@ -130,7 +171,72 @@ class SolverLookup():
             if basename == solvername:
                 # found the right solver
                 return CPM_slv
-        raise ValueError(f"Unknown solver '{name}', chose from {cls.solvernames()}")
+        raise ValueError(f"Unknown solver '{name}', choose from {cls.solvernames()}")
+ 
+
+    @classmethod
+    def version(cls):
+        """
+        Returns an overview of all solvers supported by CPMpy as a list of dicts.
+
+        Each dict consists of:
+
+        - "name": <base_solver> or <base_solver>:<subsolver>
+        - "installed": install status (True/False)
+        - "version": version of solver's Python library (or one of its subsolvers if applicable)
+        """
+        result = []
+        for (basename, CPM_slv) in cls.base_solvers():
+            installed = CPM_slv.supported()
+            version = CPM_slv.version() if installed and hasattr(CPM_slv, 'version') else None
+            
+            # Collect main solver status
+            result.append({
+                    "name": basename,
+                    "installed": installed, 
+                    "version": version,
+                })
+            
+            # Handle subsolvers if applicable
+            if installed and hasattr(CPM_slv, 'solvernames'):
+                subnames = CPM_slv.solvernames()
+                installed_subnames = CPM_slv.solvernames(installed=True)
+                for subn in subnames:
+                    is_installed = subn in installed_subnames
+                    subsolver_status = {
+                        "name": basename + ":" + subn, 
+                        "installed": is_installed, 
+                        "version": CPM_slv.solverversion(subn) if installed else None,
+                    }
+                    result.append(subsolver_status)  # Append subsolver status
+        return result
+
+
+    @classmethod
+    def print_version(cls):
+        """
+        Prints a tabulated report on the different solvers supported by CPMpy,
+        i.e. whether they are installed on the current system and if so which version.
+        """
+        
+        # Get the solver information using the version() method
+        solver_versions = cls.version()
+
+        # Print the header
+        print(f"{'Solver':<25} {'Installed':<10} {'Version':<15}")
+        print("-" * 50)
+
+        # Iterate over the solvers
+        for solver_version in solver_versions:
+            basename, installed, version = solver_version["name"], solver_version["installed"], solver_version["version"]
+
+            # If this is a subsolver (indicated by a ':' in the name), indent the output
+            if ':' in basename:
+                print(f" ↪ {basename.split(':')[-1]:<22} {'Yes' if installed else 'No':<10} {(version if version else ' '):<15}")  # Subsolver with indentation
+            else:
+                # For main solvers, show version if available
+                version = version if version else "Not found" if installed else "-"
+                print(f"{basename:<25} {'Yes' if installed else 'No':<10} {version:<15}")
 
 
 # using `builtin_solvers` is DEPRECATED, use `SolverLookup` object instead

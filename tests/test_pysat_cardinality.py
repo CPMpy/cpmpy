@@ -6,6 +6,7 @@ from cpmpy.expressions.core import Operator
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.linearize import only_positive_coefficients
 
+from utils import skip_on_missing_pblib
 
 SOLVER = "pysat"
 
@@ -134,6 +135,7 @@ class TestCardinality(unittest.TestCase):
         self.assertTrue(ps.solve())
         self.assertGreaterEqual(sum(self.bvs.value()), 2)
 
+    @skip_on_missing_pblib()
     def test_pysat_card_implied(self):
         b = cp.boolvar()
         x = cp.boolvar(shape=5)
@@ -202,9 +204,11 @@ class TestCardinality(unittest.TestCase):
         a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]
         self.assertTrue(cp.SolverLookup.get(SOLVER, cp.Model(p.implies(a+b-c < 2))).solve())
 
-    @pytest.mark.skip(reason="TODO: PySAT does not linearize models at the moment, because there is no integer encoding layer, so adding non-linear expressions will always fail.")
+    @skip_on_missing_pblib()
     def test_pysat_linearize_example(self):
-        self.assertTrue(cp.SolverLookup.get(SOLVER, cp.Model((a+b).implies(a+b-c < 2))).solve())
+        x, y, z = [cp.intvar(0, 3, name=n) for n in "xyz"]
+        p = cp.boolvar(name="p")
+        self.assertTrue(cp.SolverLookup.get(SOLVER, cp.Model(p.implies(2 * x + 3 * y + 5 * z <= 12))).solve())
 
 
 if __name__ == '__main__':

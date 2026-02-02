@@ -1,11 +1,12 @@
 """
+    Transforms partial functions into total functions.
 """
 
 from copy import copy
 
 from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray, cpm_array
 from ..expressions.core import Expression, Operator, BoolVal
-from ..expressions.utils import get_bounds, is_num
+from ..expressions.utils import get_bounds, is_num, is_any_list
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.python_builtins import all as cpm_all
@@ -44,9 +45,10 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
         argument must equal the original argument so the two are coupled again. If `is_defined` is false, the new
         argument remains decoupled (can take any value, as will the function's output).
 
-        WARNING! Under the relational semantics, ``b <-> ~(partial==5)`` and ``b <-> (partial!=5)`` mean
-        different things! The second is ``b <-> (is_defined & (total!=5))`` the first is
-        ``b <-> (~is_defined | (total!=5))``.
+        .. warning::
+            Under the relational semantics, ``b <-> ~(partial==5)`` and ``b <-> (partial!=5)`` mean
+            different things! The second is ``b <-> (is_defined & (total!=5))`` the first is
+            ``b <-> (~is_defined | (total!=5))``.
 
 
         A clever observation of the implementation below is that for the above 3 expressions, the 'safe'
@@ -246,4 +248,13 @@ def _safen_hole(cpm_expr, exclude, idx_to_safen):
 
     return is_defined, output_var, toplevel
 
+
+def safen_objective(expr):
+    if is_any_list(expr):
+        raise ValueError(f"Expected numerical expression as objective but got a list {expr}")
+
+    toplevel, nbc = [],[]
+    safe_expr = no_partial_functions([expr], _toplevel=toplevel, _nbc=nbc)
+    assert len(safe_expr) == 1
+    return safe_expr[0], toplevel + nbc
 

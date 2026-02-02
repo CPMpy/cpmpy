@@ -3,10 +3,26 @@ from unittest import TestCase
 
 from cpmpy import *
 from cpmpy.tools import ParameterTuner, GridSearchTuner
+from cpmpy.solvers.ortools import CPM_ortools
 
 
 
 class TunerTests(TestCase):
+
+    def test_ortools_tunable_params(self):
+        """
+        Test that all tunable parameters can be set without errors
+        """
+        x = intvar(lb=0, ub=5, shape=3)
+        model = Model([x[0] < x[1], x[1] < x[2]])
+        
+        tunable = CPM_ortools.tunable_params()
+        
+        for param_name, values in tunable.items():
+            for val in values:
+                solver = CPM_ortools(model)
+                self.assertTrue(solver.solve(**{param_name: val}))
+                self.assertIsNotNone(solver.status())
 
     def test_ortools(self):
         x = intvar(lb=0, ub=10, shape=10)

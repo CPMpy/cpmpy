@@ -10,6 +10,7 @@ CPMpy is ideal for solving combinatorial problems like assignment problems or co
    :caption: Getting started:
 
    modeling
+   summary
 
 .. _supported-solvers:
 
@@ -21,59 +22,89 @@ Supported solvers
 
    * - **Solver**
      - **Technology**
+     - **Capabilities**
      - **Installation**
-     - **Assumptions?**
      - **Notes**
    * - :doc:`OR-Tools <api/solvers/ortools>`
-     - CP-SAT
+     - CP (LCG)
+     - SAT ASAT ALLSAT - OPT - PAR
      - pip
-     - Yes
-     - Assumptions NOT incremental! Every solve starts from scratch
-   * - :doc:`Choco <api/solvers/choco>`
-     - CP
-     - pip
-     - No
+     - The default solver
+   * - :doc:`Pumpkin <api/solvers/pumpkin>`
+     - CP (LCG)
+     - SAT ASAT ALLSAT - OPT - PROOF
+     - local install (maturin)
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
+     - SAT ISAT ALLSAT - OPT - PROOF
      - pip
-     - No
-     - Supports proof logging
-   * - :doc:`MiniZinc <api/solvers/minizinc>`
+     -
+   * - :doc:`Choco <api/solvers/choco>`
      - CP
-     - pip + local install
-     - No
-     - Communicates through textfiles
+     - SAT ISAT ALLSAT - OPT
+     - pip
+     - 
    * - :doc:`CP Optimizer <api/solvers/cpo>`
      - CP
+     - SAT - OPT - PAR
      - pip + local + (aca.) license
-     - No
      - 
-   * - :doc:`Gurobi <api/solvers/gurobi>`
-     - ILP
-     - pip + (aca.) license
-     - No
-     - 
-   * - :doc:`Exact <api/solvers/exact>`
-     - Pseudo-Boolean
-     - pip >3.10 (Linux, Win)
-     - Yes
-     - Manual installation on Mac possible
+   * - :doc:`MiniZinc <api/solvers/minizinc>`
+     - CP
+     - SAT - OPT
+     - pip + local install
+     - Communicates through textfiles
    * - :doc:`Z3 <api/solvers/z3>`
      - SMT
+     - SAT ASAT ISAT - OPT
      - pip
-     - Yes
      - 
+   * - :doc:`Hexaly <api/solvers/hexaly>`
+     - Global Opt.
+     - SAT ISAT ALLSAT - OPT IOPT
+     - pip + local + (aca.) licence
+     -
+   * - :doc:`Gurobi <api/solvers/gurobi>`
+     - ILP
+     - SAT ISAT - OPT IOPT - PAR
+     - pip + (aca.) license
+     - 
+   * - :doc:`CPLEX <api/solvers/cplex>`
+     - ILP
+     - SAT - OPT IOPT - PAR
+     - pip + local + (aca.) license
+     - No
+   * - :doc:`Exact <api/solvers/exact>`
+     - Pseudo-Boolean
+     - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
+     - pip >3.10 (Linux, Win)
+     - Manual installation on Mac possible
+   * - :doc:`RC2 <api/solvers/rc2>`
+     - MaxSAT
+     - OPT
+     - pip
+     - 
+   * - :doc:`Pindakaas <api/solvers/pindakaas>`
+     - SAT
+     - SAT ASAT ISAT
+     - pip
+     - Automatically encodes PB to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
+     - SAT ASAT ISAT
      - pip
-     - Yes
-     - Only Boolean variables (CPMpy transformation incomplete)
+     - 
    * - :doc:`PySDD <api/solvers/pysdd>`
-     - SAT Counter
+     - Decis. Diagram
+     - SAT ISAT ALLSAT - KC 
      - pip
-     - Yes
-     - Knowledge compiler, only Boolean variables (CPMpy transformation incomplete)
+     - only Boolean variables (CPMpy transformation incomplete)
+
+Native capability abbreviations:
+    * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
+    * OPT: Optimisation, IOPT: Incremental optimisation
+    * PAR: Parallel solving, PROOF: Proof logging, KC: Knowledge Compilation
 
 Different solvers excel at different problems. `Try multiple! <modeling.html#selecting-a-solver>`_
 
@@ -83,7 +114,6 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
   :width: 480
   :alt: Waterfall from model to solvers
 
-(* automated int-to-bool not yet supported )
 
 
 .. toctree::
@@ -95,6 +125,7 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
    unsat_core_extraction
    developers
    adding_solver
+   testing
 
 Open Source
 -----------

@@ -1,89 +1,354 @@
-import unittest
-
 import pytest
 
-from cpmpy.expressions.core import Operator, Comparison
-from cpmpy.solvers import CPM_pysat, CPM_ortools, CPM_minizinc, CPM_gurobi
 from cpmpy.solvers.solver_interface import ExitStatus
-from cpmpy import *
-from cpmpy.transformations.flatten_model import flatten_constraint
+from cpmpy.solvers.utils import SolverLookup
+import cpmpy as cp
+from cpmpy.expressions.utils import is_any_list
+from cpmpy.exceptions import NotSupportedError
+from utils import skip_on_missing_pblib
 
-SOLVER_CLASS = CPM_ortools  # Replace by your own solver class
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_empty_constructor(solver):
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+
+    assert hasattr(solver, "status")
+    assert solver.status() is not None
+    assert solver.status().exitstatus == ExitStatus.NOT_RUN
+    assert solver.status().solver_name != "dummy"
 
 
-class TestInterface(unittest.TestCase):
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_constructor(solver):
+    solver_class = SolverLookup.lookup(solver)
+    
+    bvar = cp.boolvar(shape=3)
+    x, y, z = bvar
 
-    def setUp(self) -> None:
-        self.solver = SOLVER_CLASS()
+    m = cp.Model([x & y])
+    solver = solver_class(m)
 
-        self.bvar = boolvar(shape=3)
-        self.x, self.y, self.z = self.bvar
+    assert solver.status() is not None
+    assert solver.status().exitstatus == ExitStatus.NOT_RUN
+    assert solver.status().solver_name != "dummy"
 
-        ivar = intvar(1, 10, shape=2)
-        self.i, self.j = ivar
 
-    def test_empty_constructor(self):
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_native_model(solver):
+    solver_class = SolverLookup.lookup(solver)
+    
+    bvar = cp.boolvar(shape=3)
+    x, y, z = bvar
 
-        self.assertTrue(hasattr(self, "solver"))
+    m = cp.Model([x & y])
+    solver = solver_class(m)
+    assert solver.native_model is not None
 
-        self.assertIsNotNone(self.solver.status())
-        self.assertEqual(self.solver.status().exitstatus, ExitStatus.NOT_RUN)
-        self.assertNotEqual(self.solver.status().solver_name, "dummy")
 
-    def test_constructor(self):
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_add_var(solver):
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
 
-        m = Model([self.x & self.y])
-        solver = SOLVER_CLASS(m)
+    bvar = cp.boolvar(shape=3)
+    x, y, z = bvar
 
-        self.assertIsNotNone(solver.status())
-        self.assertEqual(solver.status().exitstatus, ExitStatus.NOT_RUN)
-        self.assertNotEqual(solver.status().solver_name, "dummy")
+    solver += x
 
-    def test_add_var(self):
+    assert len(solver.user_vars) == 1
 
-        self.solver += self.x
 
-        self.assertEqual(1, len(self.solver.user_vars))
-        self.assertEqual(1, len(self.solver._varmap))
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_add_constraint(solver):
 
-    def test_add_constraint(self):
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
 
-        self.solver += [self.x & self.y]
-        self.assertEqual(2, len(self.solver.user_vars))
+    bvar = cp.boolvar(shape=3)
+    x, y, z = bvar
 
-        self.solver += [sum(self.bvar) == 2]
-        self.assertEqual(3, len(self.solver.user_vars))
-        self.assertGreaterEqual(3, len(self.solver._varmap))  # Possible that solver requires extra intermediate vars
+    solver += [x & y]
+    assert len(solver.user_vars) == 2
 
-    def test_solve(self):
+    # Skip pysdd as it doesn't support sum
+    if solver == "pysdd":
+        return
 
-        self.solver += self.x.implies(self.y & self.z)
-        self.solver += self.y | self.z
-        self.solver += ~ self.z
+    solver += [sum(bvar) == 2]
+    assert len(solver.user_vars) == 3
 
-        self.assertTrue(self.solver.solve())
-        self.assertTrue(self.solver.status().exitstatus == ExitStatus.FEASIBLE or self.solver.status().exitstatus == ExitStatus.OPTIMAL)
 
-        self.assertListEqual([0, 1, 0], [self.x.value(), self.y.value(), self.z.value()])
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_solve(solver):
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
 
-    def test_solve_infeasible(self):
+    bvar = cp.boolvar(shape=3)
+    x, y, z = bvar
 
-        self.solver += self.x.implies(self.y & self.z)
-        self.solver += ~ self.z
-        self.solver += self.x
+    solver += x.implies(y & z)
+    solver += y | z
+    solver += ~ z
 
-        self.assertFalse(self.solver.solve())
-        self.assertEqual(ExitStatus.UNSATISFIABLE, self.solver.status().exitstatus)
+    assert solver.solve()
+    assert solver.status().exitstatus == ExitStatus.FEASIBLE
 
-    def test_objective(self):
+    assert [x.value(), y.value(), z.value()] == [0, 1, 0]
 
-        try:
-            self.solver.minimize(self.i)
-        except NotImplementedError:
-            # TODO: assert false or just ignore and return?
-            return
 
-        self.assertTrue(hasattr(self.solver, "objective_value_"))
-        self.assertTrue(self.solver.solve())
-        self.assertEqual(1, self.solver.objective_value())
-        self.assertEqual(ExitStatus.OPTIMAL, self.solver.status().exitstatus)
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_solve_infeasible(solver):
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+
+    bvar = cp.boolvar(shape=3)
+    x, y, z = bvar
+
+    solver += x.implies(y & z)
+
+    assert solver.solve()
+    assert solver.status().exitstatus == ExitStatus.FEASIBLE
+
+    solver += ~ z
+    solver += x
+
+    assert not solver.solve()
+    assert solver.status().exitstatus == ExitStatus.UNSATISFIABLE
+
+
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_minimize(solver):
+    """Test minimize functionality"""
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class() if solver != "z3" else solver_class(subsolver="opt")
+
+    ivar = cp.intvar(1, 10)
+
+    try:
+        solver.minimize(ivar)
+    except NotImplementedError:
+        return
+
+    assert hasattr(solver, "objective_value_")
+    assert solver.solve()
+    assert solver.objective_value() == 1
+    assert solver.status().exitstatus == ExitStatus.OPTIMAL
+
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_maximize(solver):
+    """Test maximize functionality"""
+    solver_class = SolverLookup.lookup(solver)
+    if solver == "z3":
+        return
+    solver = solver_class() if solver != "z3" else solver_class(subsolver="opt")
+
+    ivar = cp.intvar(1, 10)    
+
+    try:
+        solver.maximize(ivar)
+    except NotImplementedError:
+        return
+
+    assert solver.solve()
+    assert solver.objective_value() == 10
+    assert solver.status().exitstatus == ExitStatus.OPTIMAL
+
+# solver_var() tests
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_solver_var(solver):
+    """Test basic solver_var functionality with different variable types"""
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+    
+    # Test with boolean variable
+    bool_var = cp.boolvar(name="test_bool")
+    solver_bool = solver.solver_var(bool_var)
+    
+    # Should return something (not None)
+    assert solver_bool is not None
+    
+    # Test if it is cashed correctly    
+    # Should return the same object/reference
+    assert solver_bool is solver.solver_var(bool_var) if not is_any_list(solver_bool) else solver_bool == solver.solver_var(bool_var), f"Solver {solver} did not cache bool variable properly"
+
+    # Test with negative boolean view
+    neg_bool_var = ~bool_var    
+    
+    
+    try:
+        solver_bool = solver.solver_var(bool_var)
+        solver_neg_bool = solver.solver_var(neg_bool_var)
+        
+        # Both should return something
+        assert solver_bool is not None
+        assert solver_neg_bool is not None
+    
+    except (NotSupportedError, ValueError) as e: # TODO: fix consistency among solvers
+        # Some solvers might not support NegBoolView in solver_var
+        # That's potentially OK if they handle it elsewhere
+        print(f"Solver {solver} raised exception for NegBoolView: {e}")
+
+    # Test with integer variable
+
+    # Skip pysdd as it doesn't support sum
+    if solver == "pysdd":
+        return
+
+    # Test with integer variable
+    int_var = cp.intvar(1, 10, name="test_int")
+    solver_int = solver.solver_var(int_var)
+    
+    # Should return something (not None)
+    assert solver_int is not None
+
+    # Test if it is cashed correctly    
+    assert solver_int is solver.solver_var(int_var) if not is_any_list(solver_int) else solver_int == solver.solver_var(int_var), f"Solver {solver} did not cache int variable properly"    
+
+
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_solver_vars(solver):
+    """Test solver_vars (plural) function with arrays"""
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+    
+    # Test with array of boolean variables
+    bool_array = cp.boolvar(shape=3, name="bool_array")
+    solver_bool_array = solver.solver_vars(bool_array)
+    
+    # Should return list of same length
+    assert len(solver_bool_array) == 3
+    assert all(var is not None for var in solver_bool_array)
+    
+    # Test with nested arrays
+    nested_array = cp.boolvar(shape=(2, 2), name="nested_array")
+    solver_nested = solver.solver_vars(nested_array)
+    
+    # Should preserve structure
+    assert len(solver_nested) == 2
+    assert len(solver_nested[0]) == 2
+    assert len(solver_nested[1]) == 2
+    
+    # Test with single variable (should work too)
+    single_var = cp.boolvar(name="single")
+    solver_single = solver.solver_vars(single_var)
+    assert solver_single is not None
+
+
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_time_limit(solver):
+    """Test time limit functionality"""
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+    
+    # Skip pysdd as it doesn't support time limits
+    if solver == "pysdd":
+        return
+    
+    bvar = cp.boolvar(shape=3)
+    x, y, z = bvar
+    solver += [x | y | z]
+    
+    # Test with positive time limit
+    assert solver.solve(time_limit=1.0)
+    assert solver.status().exitstatus == ExitStatus.FEASIBLE
+    
+    # Test with negative time limit should raise ValueError
+    try:
+        solver.solve(time_limit=-1)
+        assert False, f"Solver {solver} should raise ValueError for negative time limit"
+    except ValueError:
+        pass  # Expected behavior
+
+
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_has_objective(solver):
+    """Test has_objective() method"""
+    solver_class = SolverLookup.lookup(solver)
+    slv = solver_class() if solver != "z3" else solver_class(subsolver="opt")
+    
+    # Initially should have no objective
+    assert not slv.has_objective()
+    
+    # Add an objective if supported
+    try:
+        ivar = cp.intvar(1, 10)
+        slv.minimize(ivar)
+        assert slv.has_objective()
+
+        if solver != "rc2": # rc2 can set obj only once
+            slv.maximize(ivar)
+            assert slv.has_objective()
+    except NotImplementedError:
+        # Solver doesn't support objectives
+        assert not slv.has_objective()
+
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_runtime_tracking(solver):
+    """Test that solver tracks runtime correctly"""
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+    
+    bvar = cp.boolvar(shape=2)
+    x, y = bvar
+    
+    solver += [x | y]
+    
+    # Before solving, runtime should be None
+    assert solver.status().runtime is None
+    
+    # After solving, runtime should be recorded
+    solver.solve()
+    status = solver.status()
+    assert status.runtime is not None
+    assert status.runtime >= 0  # Should be non-negative
+
+
+@pytest.mark.usefixtures("solver")
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_solveall_basic(solver):
+    """Test solveAll functionality if supported"""
+    solver_class = SolverLookup.lookup(solver)
+    solver = solver_class()
+    
+    bvar = cp.boolvar(shape=2)
+    x, y = bvar
+    
+    # Create a problem with multiple solutions
+    solver += [x | y]  # 3 solutions: (T,T), (T,F), (F,T)
+    
+    try:
+        # Test solveAll with solution limit
+        solution_count = 0
+        def count_solution():
+            nonlocal solution_count
+            solution_count += 1
+            
+        if solver == "pysdd":
+            # pysdd doesn't support solution_limit
+            total = solver.solveAll(display=count_solution)
+        elif solver == "hexaly":
+            # set time limit, hexaly cannot prove UNSAT at last call
+            total = solver.solveAll(display=count_solution, solution_limit=10, time_limit=5)
+        else:
+            total = solver.solveAll(display=count_solution, solution_limit=10)
+        
+        assert total == 3  # Should find all 3 solutions
+        assert solution_count == 3
+
+    except NotSupportedError:
+        # Solver doesn't support solveAll with objectives or other limitations
+        pass

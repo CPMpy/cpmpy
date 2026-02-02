@@ -35,10 +35,10 @@
     `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
     `x - y`                      `Operator("sum", [x, -y])`                    
     `x * y`                      `Operator("mul", [x, y])`                     
-    `x // y`                     `Operator("div", [x, y])` (integer division)
-    `x % y`                      `Operator("mod", [x, y])` (modulo)                    
-    `x ** y`                     `Operator("pow", [x, y])` (power)  
-    ===========================  ===============================================                   
+    `x // y`                     `globalfunctions.Division([x, y])` (integer division, rounding towards zero)
+    `x % y`                      `globalfunctions.Modulo([x, y])` (remainder after integer division)
+    `x ** y`                     `globalfunctions.Power([x, y])`
+    ===========================  ===============================================
 
     
     Logical Operators
@@ -49,7 +49,7 @@
     `x & y`              `Operator("and", [x, y])`                             
     `x | y`              `Operator("or", [x, y])`                              
     `~x`                 `Operator("not", [x])` or `NegBoolView(x)` if Boolean 
-    `x ^ y`              `Xor([x, y])`                                         
+    `x ^ y`              `globalconstraints.Xor([x, y])`
     ===================  =======================================================
 
     Python has no built-in operator for `implication` that can be overloaded.
@@ -90,7 +90,7 @@ from types import GeneratorType
 import numpy as np
 import cpmpy as cp
 
-from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
+from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
@@ -265,10 +265,8 @@ class Expression(object):
         # some simple constant removal
         if is_true_cst(other):
             return self
-        if is_false_cst(other):
-            return BoolVal(False)
         # catch beginner mistake
-        if is_num(other):
+        if is_num(other) and not is_bool(other):
             raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forget to put brackets? "
                             f"E.g. always write (x==2)&(y<5).")
         return Operator("and", [self, other])
@@ -277,34 +275,28 @@ class Expression(object):
         # some simple constant removal
         if is_true_cst(other):
             return self
-        if is_false_cst(other):
-            return BoolVal(False)
         # catch beginner mistake
-        if is_num(other):
+        if is_num(other) and not is_bool(other):
             raise TypeError(f"{other}&{self} is not valid because {other} is a number, "
                             f"did you forget to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
     def __or__(self, other):
         # some simple constant removal
-        if is_true_cst(other):
-            return BoolVal(True)
         if is_false_cst(other):
             return self
         # catch beginner mistake
-        if is_num(other):
+        if is_num(other) and not is_bool(other):
             raise TypeError(f"{self}|{other} is not valid because {other} is a number, "
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [self, other])
 
     def __ror__(self, other):
         # some simple constant removal
-        if is_true_cst(other):
-            return BoolVal(True)
         if is_false_cst(other):
             return self
         # catch beginner mistake
-        if is_num(other):
+        if is_num(other) and not is_bool(other):
             raise TypeError(f"{other}|{self} is not valid because {other} is a number, "
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
@@ -382,29 +374,26 @@ class Expression(object):
     def __floordiv__(self, other):
         if is_num(other) and other == 1:
             return self
-        return Operator("div", [self, other])
+        return cp.Division(self, other)
 
     def __rfloordiv__(self, other):
-        return Operator("div", [other, self])
+        return cp.Division(other, self)
 
     def __mod__(self, other):
-        return Operator("mod", [self, other])
+        return cp.Modulo(self, other)
 
     def __rmod__(self, other):
-        return Operator("mod", [other, self])
+        return cp.Modulo(other, self)
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        if is_num(other):
-            if other == 0:
-                return 1
-            if other == 1:
-                return self
-        return Operator("pow", [self, other])
+        if is_num(other) and other == 1:
+            return self
+        return cp.Power(self, other)
 
     def __rpow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        return Operator("pow", [other, self])
+        return cp.Power(other, self)
 
     # Not implemented: (yet?)
     #object.__divmod__(self, other)
@@ -430,6 +419,10 @@ class Expression(object):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", [self])
 
+    def __bool__(self):
+        raise ValueError(f"__bool__ should not be called on a CPMPy expression {self} as it will always return True\n"
+                         "Do not use an expression as argument in an `if` statement and use cpmpy.any, cpmpy.max instead of python builtins\n"
+                         "If you think this is an error, please report on github")
 
 class BoolVal(Expression):
     """
@@ -551,6 +544,12 @@ class Comparison(Expression):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+    
+    def __bool__(self):
+        # will be called when comparing elements in a container, but always with `==`
+        if self.name == "==":
+            return repr(self.args[0]) == repr(self.args[1])
+        super().__bool__() # default to exception
 
     # return the value of the expression
     # optional, default: None
@@ -584,12 +583,9 @@ class Operator(Expression):
         'wsum': (2, False),
         'sub': (2, False), # x - y
         'mul': (2, False),
-        'div': (2, False),
-        'mod': (2, False),
-        'pow': (2, False),
         '-':   (1, False), # -x
     }
-    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -623,6 +619,13 @@ class Operator(Expression):
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
+            weights = []
+            for w in arg_list[0]:
+                if is_int(w):
+                    weights.append(int(w)) # bool or int, simplifies things later on
+                else:
+                    weights.append(w) # can be float
+            arg_list = (weights, arg_list[1])
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
@@ -700,23 +703,7 @@ class Operator(Expression):
             return val # can be a float
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
-        elif self.name == "div":
-            try:
-                return int(arg_vals[0] / arg_vals[1])  # integer division
-            except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                              + "\n Use argval(expr) to get the value of expr with relational "
-                                                "semantics.")
-        elif self.name == "mod":
-            try:# modulo defined with integer division
-                return arg_vals[0] - arg_vals[1] * int(arg_vals[0] / arg_vals[1])
-            except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                              + "\n Use argval(expr) to get the value of expr with relational "
-                                                "semantics.")
-
 
         # boolean
         elif self.name == "and": return all(arg_vals)
@@ -745,60 +732,21 @@ class Operator(Expression):
         elif self.name == 'wsum':
             weights, vars = self.args
             bounds = []
+            lowerbound, upperbound = 0,0
             #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
-            for i, varbounds in enumerate([get_bounds(arg) for arg in vars]):
-                sortbounds = (list(weights[i] * x for x in varbounds))
-                sortbounds.sort()
-                bounds += [sortbounds]
-            lbs, ubs = (zip(*bounds))
-            lowerbound, upperbound = sum(lbs), sum(ubs) #this is builtins sum, not numpy sum
+            for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]):
+                x,y = int(w) * lb, int(w) * ub
+                if x <= y: # x is the lb of this arg
+                    lowerbound += x
+                    upperbound += y
+                else:
+                    lowerbound += y
+                    upperbound += x
+
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             lowerbound, upperbound = lb1-ub2, ub1-lb2
-        elif self.name == 'div':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 <= 0 <= ub2:
-                if lb2 == ub2:
-                    raise ZeroDivisionError(f"Domain of {self.args[1]} only contains 0")
-                if lb2 == 0:
-                    lb2 = 1
-                if ub2 == 0:
-                    ub2 = -1
-                bounds = [
-                    int(lb1 / lb2), int(lb1 / -1), int(lb1 / 1), int(lb1 / ub2),
-                    int(ub1 / lb2), int(ub1 / -1), int(ub1 / 1), int(ub1 / ub2)
-                ]
-            else:
-                bounds = [int(lb1 / lb2), int(lb1 / ub2), int(ub1 / lb2), int(ub1 / ub2)]
-            lowerbound, upperbound = min(bounds), max(bounds)
-        elif self.name == 'mod':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 == ub2 == 0:
-                raise ZeroDivisionError("Domain of {} only contains 0".format(self.args[1]))
-            # the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
-            lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
-            ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
-            if lb1 >= 0:  # result will be positive if first argument is positive
-                return 0, max(-lb, ub, 0)  # lb = 0
-            elif ub1 <= 0:  # result will be negative if first argument is negative
-                return min(-ub, lb, 0), 0  # ub = 0
-            return min(-ub, lb, 0), max(-lb, ub, 0)  # 0 should always be in the domain
-        elif self.name == 'pow':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 < 0:
-                raise NotImplementedError(f"Power operator: For integer values, exponent must be non-negative: {self}")
-            bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
-            if lb1 < 0 and 0 < ub2:  
-                # The lower and upper bounds depend on either the largest or the second largest exponent 
-                # value when the base term can be negative. 
-                # E.g., (-2)^2 is positive, but (-2)^1 is negative, so for (-2)^[0,2] we also need to add (-2)^1.
-                bounds += [lb1 ** (ub2 - 1), ub1 ** (ub2 - 1)] 
-                # This approach is safe but not tight (e.g., [-2,-1]^2 will give (-2,4) as range instead of [1,4]).
-            lowerbound, upperbound = min(bounds), max(bounds)
 
         elif self.name == '-':
             lb1, ub1 = get_bounds(self.args[0])
