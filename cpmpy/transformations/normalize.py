@@ -51,8 +51,10 @@ def toplevel_list(cpm_expr, merge_and=True):
 
 def simplify_boolean(lst_of_expr, num_context=False):
     """
-    Removes boolean constants from all CPMpy expressions.
-    Only resulting boolean constant is literal 'false'.
+    Removes boolean constants from all CPMpy expressions, except for constants in global constraints/functions.
+    Solver interfaces are expected to implement special cases of typing for global constraints themselves.
+
+    Only resulting Boolean constant is literal 'false'.
     Boolean constants are promoted to `int` if in a numerical context,
     `ints` are never converted to `bool`.
     
@@ -225,7 +227,8 @@ def simplify_boolean(lst_of_expr, num_context=False):
                 if is_bool(res): # Result is a Boolean constant
                     newlist.append(int(res) if num_context else BoolVal(res))
                 else: # Result is an expression
-                    newlist.append(res)                    
+                    newlist.append(res)    
+
         elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
             newargs = simplify_boolean(expr.args) # TODO: how to determine which are Bool/int?
             if any(a1 is not a2 for a1,a2 in zip(expr.args, newargs)):

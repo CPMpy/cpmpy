@@ -44,15 +44,19 @@
     ==============
 """
 from functools import reduce
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from typing import Optional, List
+
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
-from ..expressions.variables import _BoolVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.safening import no_partial_functions
+
 
 class CPM_pysdd(SolverInterface):
     """
@@ -70,6 +74,9 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
     """
 
+    supported_global_constraints = frozenset({"xor"})
+    supported_reified_global_constraints = frozenset({"xor"})
+
     @staticmethod
     def supported():
         # try to import the package
@@ -80,6 +87,17 @@ class CPM_pysdd(SolverInterface):
             return False
         except Exception as e:
             raise e
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        from importlib.metadata import version, PackageNotFoundError
+        try:
+            return version('pysdd')
+        except PackageNotFoundError:
+            return None
 
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -96,20 +114,28 @@ class CPM_pysdd(SolverInterface):
             subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_pysdd: Install the python package 'pysdd' to use this solver interface")
+            raise ModuleNotFoundError("CPM_pysdd: Install the python package 'cpmpy[pysdd]' to use this solver interface.") 
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
-        # these will be loaded once a first formula is added
-        self.pysdd_vtree = None
-        self.pysdd_manager = None
-        self.pysdd_root = None
+        from pysdd.sdd import SddManager, Vtree
+
+        cnt = 1
+        self.pysdd_vtree = Vtree(var_count=cnt, vtree_type="balanced")
+        self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
+        self.pysdd_root = self.pysdd_manager.true()
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysdd", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.pysdd_root
 
-    def solve(self, time_limit=None, assumptions=None):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
         """
             See if an arbitrary model exists
 
@@ -125,6 +151,10 @@ class CPM_pysdd(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
+
         has_sol = True
         if self.pysdd_root is not None:
             # if root node is false (empty), no solutions
@@ -135,6 +165,7 @@ class CPM_pysdd(SolverInterface):
 
         # translate exit status
         if has_sol:
+            # Only CSP (does not support COP)
             self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         else:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -155,7 +186,7 @@ class CPM_pysdd(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -174,12 +205,16 @@ class CPM_pysdd(SolverInterface):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        # edge case, empty model, ensure the solver has something to solve
+        if not len(self.user_vars):
+            self.add(boolvar() == True)
+
         if time_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), time_limit not (yet?) supported")
         if solution_limit is not None:
             raise NotImplementedError("PySDD.solveAll(), solution_limit not (yet?) supported")
 
-        if self.pysdd_root is None:
+        if self.pysdd_root is None or self.pysdd_root.is_false():
             # clear user vars if no solution found
             for var in self.user_vars:
                 var._value = None
@@ -197,27 +232,32 @@ class CPM_pysdd(SolverInterface):
                 projected_sols.add(tuple(projectedsol))
         else:
             projected_sols = set(sddmodels)
-        if display is None:
-            # the desired, fast computation
-            return len(projected_sols)
 
+        if projected_sols:
+            if projected_sols == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else:
+                # time limit not (yet) supported -> always all solutions found
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         else:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+
+        # display if needed
+        if display is not None:
             # manually walking over the tree, much slower...
-            solution_count = 0
             for sol in projected_sols:
-                solution_count += 1
                 # fill in variable values
                 for i, cpm_var in enumerate(self.user_vars):
                     cpm_var._value = sol[i]
 
-                # display is not None:
                 if isinstance(display, Expression):
                     print(argval(display))
                 elif isinstance(display, list):
                     print(argvals(display))
                 else:
                     display()  # callback
-            return solution_count
+        
+        return len(projected_sols)
 
     def solver_var(self, cpm_var):
         """
@@ -260,7 +300,11 @@ class CPM_pysdd(SolverInterface):
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}) #keep unsupported xor for error message purposes.
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 
@@ -285,25 +329,8 @@ class CPM_pysdd(SolverInterface):
 
         newvars = get_variables(cpm_expr)
 
-        # check only Boolean variables
-        # XXX a bit redundant, `solver_var()` already does this too
-        for v in newvars:
-            if not isinstance(v, _BoolVarImpl):
-                raise NotSupportedError(f"CPM_pysdd: only Boolean variables allowed -- {type(v)}: {v}")
         # add new user vars to the set
         self.user_vars |= set(newvars)
-
-        # if needed initialize (arbitrary) vtree from all user-specified vars
-        # we waited till here to already have some vars... beneficial?
-        if self.pysdd_root is None:
-            from pysdd.sdd import SddManager, Vtree
-
-            cnt = len(self.user_vars)
-            if cnt == 0:
-                cnt = 1  # otherwise segfault
-            self.pysdd_vtree = Vtree(var_count=cnt, vtree_type="balanced")
-            self.pysdd_manager = SddManager.from_vtree(self.pysdd_vtree)
-            self.pysdd_root = self.pysdd_manager.true()
 
         # transform and post the constraints
         # XXX the order in the for loop will matter on runtime efficiency...

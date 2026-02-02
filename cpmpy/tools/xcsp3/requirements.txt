@@ -1,0 +1,7 @@
+pycsp3
+requests
+tqdm
+matplotlib
+psutil
+filelock
+gnureadline

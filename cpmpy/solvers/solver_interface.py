@@ -19,17 +19,20 @@
         ExitStatus
 
 """
+from typing import Optional, List, Callable, TypeAlias
 import warnings
 import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression
+from ..expressions.variables import _NumVarImpl
 from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
 
+Callback: TypeAlias = Expression | List[Expression] | Callable # type alias to use in solveAll
 
 class SolverInterface(object):
     """
@@ -37,8 +40,10 @@ class SolverInterface(object):
         the ``SolverInterface``
     """
 
-    # REQUIRED functions:
+    supported_global_constraints: frozenset[str] = frozenset()  # global constraints supported by the solver (e.g., AllDifferent...)
+    supported_reified_global_constraints: frozenset[str] = frozenset()  # global constraints supported in reified context
 
+    # REQUIRED functions:
     @staticmethod
     def supported():
         """
@@ -49,6 +54,13 @@ class SolverInterface(object):
                 [bool]: Solver support by current system setup.
         """
         return False
+    
+    @classmethod
+    def version(cls) -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        raise NotImplementedError("Implementation of 'version' is missing in solver interface. This should be fixed. If encountered, please report on GitHub.")
 
     def __init__(self, name="dummy", cpm_model=None, subsolver=None):
         """
@@ -75,6 +87,7 @@ class SolverInterface(object):
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
         self._varmap = dict()  # maps cpmpy variables to native solver variables
+        self._csemap = dict()  # maps cpmpy expressions to solver expressions
 
         # rest uses own API
         if cpm_model is not None:
@@ -129,18 +142,13 @@ class SolverInterface(object):
     def status(self):
         return self.cpm_status
 
-    def solve(self, model, time_limit=None):
+    def solve(self,time_limit:Optional[float]=None):
         """
-            Build the CPMpy model into solver-supported model ready for solving
-            and returns the answer (True/False/objective.value())
+            Call the underlying solver.
 
             Overwrites self.cpm_status
 
-            :param model: CPMpy model to be parsed.
-            :type model: Model
-
             :param time_limit: optional, time limit in seconds
-            :type time_limit: int or float
 
             :return: Bool:
                 - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
@@ -176,6 +184,7 @@ class SolverInterface(object):
         if is_any_list(cpm_vars):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
+
 
     def transform(self, cpm_expr):
         """
@@ -227,7 +236,7 @@ class SolverInterface(object):
 
     # OPTIONAL functions
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -251,9 +260,12 @@ class SolverInterface(object):
         if not call_from_model:
             warnings.warn("Adding constraints to solver object to find all solutions, "
                           "solver state will be invalid after this call!")
+            
+        self.cpm_status = SolverStatus(self.name)
 
         solution_count = 0
-        while self.solve(time_limit=time_limit, **kwargs):
+        start = time.time()
+        while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
@@ -271,9 +283,28 @@ class SolverInterface(object):
             # add nogood on the user variables
             self += any([v != v.value() for v in self.user_vars if v.value() is not None])
 
+            if time_limit is not None: # update remaining time
+                time_limit -= self.status().runtime
+        end = time.time()
+
+        # update solver status
+        self.cpm_status.runtime = end - start
+        if solution_count:
+            if solution_count == solution_limit:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        # else: <- is implicit since nothing needs to update
+        #     if self.cpm_status.exitstatus == ExitStatus.UNSATISFIABLE:
+        #         self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        #     elif self.cpm_status.exitstatus == ExitStatus.UNKNOWN:
+        #         self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         return solution_count
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         For warmstarting the solver with a variable assignment
 
