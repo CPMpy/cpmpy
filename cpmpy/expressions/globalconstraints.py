@@ -117,9 +117,9 @@
         Xor
         Cumulative
         CumulativeOptional
-        Precedence
         NoOverlap
         NoOverlapOptional
+        Precedence
         GlobalCardinalityCount
         Increasing
         Decreasing
@@ -1148,7 +1148,129 @@ class Cumulative(GlobalConstraint):
         else:
             return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity})"
 
+class NoOverlap(GlobalConstraint):
+    """
+    Enforces that a set of tasks are scheduled without overlapping, and enforces:
+        - duration >= 0
+        - start + duration == end
+    """
 
+    def __init__(self, start: Sequence[Expression], duration: Sequence[Expression], end: Optional[Sequence[Expression]] = None):
+        """
+        Arguments:
+            start (Sequence[Expression]): List of Expression objects representing the start times of the tasks
+            duration (Sequence[Expression]): List of Expression objects representing the durations of the tasks
+            end (Sequence[Expression] | None): optional, list of Expression objects representing the end times of the tasks
+        """
+       
+        if not is_any_list(start):
+            raise TypeError("start should be a list")
+        if not is_any_list(duration):
+            raise TypeError("duration should be a list")
+        if end is not None and not is_any_list(end):
+            raise TypeError("end should be a list if it is provided")
+        
+        if len(start) != len(duration):
+            raise ValueError("Start and duration should have equal length")
+        if end is not None and len(start) != len(end):
+            raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
+        
+        super().__init__("no_overlap", [list(start), list(duration), list(end) if end is not None else None])
+
+    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+        """
+        Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
+        
+        Returns:
+            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, dur, end = self.args
+        cons = [d >= 0 for d in dur]
+        
+        if end is None:
+            end = [s+d for s,d in zip(start, dur)]
+        else: # can use the expression directly below
+            cons += [s + d == e for s,d,e in zip(start, dur, end)]
+            
+        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
+            cons += [(e1 <= s2) | (e2 <= s1)]
+        return cons, []
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        start, dur, end = argvals(self.args)
+        if end is None:
+            if any(s is None for s in start) or any(d is None for d in dur):
+                return None
+            end = [s + d for s,d in zip(start, dur)]
+        else:
+            if any(s is None for s in start) or any(d is None for d in dur) or any(e is None for e in end):
+                return None
+       
+        if any(d < 0 for d in dur):
+            return False
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
+            return False
+        for (s1,d1), (s2,d2) in all_pairs(zip(start,dur)):
+            if s1 + d1 > s2 and s2 + d2 > s1:
+                return False
+        return True
+    
+    def __repr__(self) -> str:
+        """
+        Returns:
+            str: String representation of the NoOverlap constraint
+        """
+        start, dur, end = self.args
+        if end is None:
+            return f"NoOverlap({start}, {dur})"
+        else:
+            return f"NoOverlap({start}, {dur}, {end})"
+
+class NoOverlapOptional(GlobalConstraint):
+    """
+        Generalization of the NoOverlap constraint which allows for optional tasks.
+        A task is only scheduled if the corresponing is_present variable is set to True.
+    """
+    
+    def __init__(self, start, dur, end, is_present):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(dur), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+        assert is_any_list(is_present), "is_present should be a list"
+
+        start = flatlist(start)
+        dur = flatlist(dur)
+        end = flatlist(end)
+        is_present = [cp.BoolVal(x) if is_bool(x) else x for x in flatlist(is_present)] # normalize
+        assert len(start) == len(dur) == len(end) == len(is_present), "Start, duration, end and is_present should have equal length " \
+                                                   "in NoOverlap constraint"
+
+        super().__init__("no_overlap_optional", [start, dur, end, is_present])
+
+    def decompose(self):
+        start, dur, end, is_present = self.args
+        cons = [p.implies(s + d == e) for s,d,e,p in zip(start, dur, end, is_present)]
+        for (s1, e1,p1), (s2, e2,p2) in all_pairs(zip(start, end, is_present)):
+            cons += [(p1 & p2).implies((e1 <= s2) | (e2 <= s1))]
+        return cons, []
+
+    def value(self):
+        start, dur, end, is_present = argvals(self.args)
+        start, dur, end, is_present = np.array(start), np.array(dur), np.array(end), np.array(is_present)
+        # filter to the tasks which are present
+        start, dur, end = start[is_present], dur[is_present], end[is_present]
+
+        if any(s + d != e for s,d,e in zip(start, dur, end)):
+            return False
+        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
+            if e1 > s2 and e2 > s1:
+                return False
+        return True
+    
 class Precedence(GlobalConstraint):
     """
     Enforces a precedence relationship between a set of variables.
@@ -1213,85 +1335,6 @@ class Precedence(GlobalConstraint):
                 if vals[j] == t and sum(vals[:j] == s) == 0:
                     return False
         return True
-
-
-class NoOverlap(GlobalConstraint):
-    """
-    NoOverlap constraint, enforcing that the intervals defined by start, duration and end do not overlap.
-    """
-
-    def __init__(self, start, dur, end):
-        assert is_any_list(start), "start should be a list"
-        assert is_any_list(dur), "duration should be a list"
-        assert is_any_list(end), "end should be a list"
-
-        start = flatlist(start)
-        dur = flatlist(dur)
-        end = flatlist(end)
-        assert len(start) == len(dur) == len(end), "Start, duration and end should have equal length " \
-                                                   "in NoOverlap constraint"
-
-        super().__init__("no_overlap", [start, dur, end])
-
-    def decompose(self):
-        start, dur, end = self.args
-        cons = [s + d == e for s,d,e in zip(start, dur, end)]
-        for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
-            cons += [(e1 <= s2) | (e2 <= s1)]
-        return cons, []
-
-    def value(self):
-        start, dur, end = argvals(self.args)
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
-            return False
-        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
-            if e1 > s2 and e2 > s1:
-                return False
-        return True
-    
-
-class NoOverlapOptional(GlobalConstraint):
-    """
-        Generalization of the NoOverlap constraint which allows for optional tasks.
-        A task is only scheduled if the corresponing is_present variable is set to True.
-    """
-    
-    def __init__(self, start, dur, end, is_present):
-        assert is_any_list(start), "start should be a list"
-        assert is_any_list(dur), "duration should be a list"
-        assert is_any_list(end), "end should be a list"
-        assert is_any_list(is_present), "is_present should be a list"
-
-        start = flatlist(start)
-        dur = flatlist(dur)
-        end = flatlist(end)
-        is_present = [cp.BoolVal(x) if is_bool(x) else x for x in flatlist(is_present)] # normalize
-        assert len(start) == len(dur) == len(end) == len(is_present), "Start, duration, end and is_present should have equal length " \
-                                                   "in NoOverlap constraint"
-
-        super().__init__("no_overlap_optional", [start, dur, end, is_present])
-
-    def decompose(self):
-        start, dur, end, is_present = self.args
-        cons = [p.implies(s + d == e) for s,d,e,p in zip(start, dur, end, is_present)]
-        for (s1, e1,p1), (s2, e2,p2) in all_pairs(zip(start, end, is_present)):
-            cons += [(p1 & p2).implies((e1 <= s2) | (e2 <= s1))]
-        return cons, []
-
-    def value(self):
-        start, dur, end, is_present = argvals(self.args)
-        start, dur, end, is_present = np.array(start), np.array(dur), np.array(end), np.array(is_present)
-        # filter to the tasks which are present
-        start, dur, end = start[is_present], dur[is_present], end[is_present]
-
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
-            return False
-        for (s1,d1, e1), (s2,d2, e2) in all_pairs(zip(start,dur, end)):
-            if e1 > s2 and e2 > s1:
-                return False
-        return True
-        
-
 
 class GlobalCardinalityCount(GlobalConstraint):
     """
