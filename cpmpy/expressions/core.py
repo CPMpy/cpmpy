@@ -87,7 +87,7 @@
 import copy
 import warnings
 from types import GeneratorType
-from typing import Union, TypeAlias, TypeVar, Collection, Optional, Sequence, cast, List
+from typing import Union, TypeAlias, TypeVar, Collection, Optional, Sequence, cast, List, Tuple
 
 import numpy as np
 import cpmpy as cp
@@ -95,14 +95,24 @@ import cpmpy as cp
 from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
 
-# Define types
-BoolConst : TypeAlias = Union[bool, np.bool_, "BoolVal"]
-NumConst : TypeAlias = Union[BoolConst, int, float, np.integer, np.floating]
-ExprOrConst : TypeAlias = Union["Expression", NumConst]
+# Basic types
+# -----------
+Bool: TypeAlias = Union[bool, np.bool_]  # bool/np.bool_ are apparently separate types
+Int: TypeAlias  = Union[int, np.integer, Bool]  # same for int, also Bool is Int
 
+BoolExpression: TypeAlias = "Expression"  # Expression for which is_bool() returns True
+
+# Examples and their interpretation:
+# Sequence[BoolExpression]|"NDVarArray"  # No constants, NDVarArray can only contain BoolExpressions
+# Sequence[Expression]|"NDVarArray"  # No constants
+# Sequence[Bool|BoolExpression]|np.ndarray  # With constants, np.ndarray can contain Bool/BoolExpression
+# Sequence[Int|Expression]|np.ndarray  # With constants, np.ndarray can contain Bool/Int/Expression
+# In the above, the array may be multi-dimensional but will be converted/treated as a 1D list.
+
+# Nested sequences/arrays:
 T = TypeVar('T')
-FlatList = Sequence[T] | "NDVarArray"
-NestedList = Sequence[Union[T, Collection[T]]]
+Nested: TypeAlias = Union[Sequence[T|"Nested[T]"], np.ndarray]
+
 
 class Expression(object):
     """
@@ -120,41 +130,45 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name:str, arg_list):
+    def __init__(self, name:str, arg_list: Sequence[Int|"Expression"|Nested["Expression"|Int]]):
         self.name = name
 
-        if isinstance(arg_list, (tuple, GeneratorType)):
-            arg_list = list(arg_list)
-        elif isinstance(arg_list, np.ndarray):
+        if isinstance(arg_list, np.ndarray):
+            # XXX This should not happen... subclass should pass list of Expr
             # must flatten
             arg_list = arg_list.reshape(-1)
-        for i in range(len(arg_list)):
-            if isinstance(arg_list[i], np.ndarray):
-                # must flatten
-                arg_list[i] = arg_list[i].reshape(-1)
+        else:
+            arg_list = list(arg_list)
 
+        for i,elem in enumerate(arg_list):
+            if isinstance(elem, np.ndarray):
+                # must flatten
+                # XXX This looks bad, what if a global wants to store a 2D table?
+                arg_list[i] = elem.reshape(-1)
+
+        # XXX ideally it would actually be an (imutable and lightweight) tuple...
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self._args = arg_list
 
 
     @property
-    def args(self):
+    def args(self) -> List[Int|"Expression"|Nested["Expression"|Int]]|np.ndarray:
         return self._args
 
     @args.setter
     def args(self, args):
         raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
 
-    def update_args(self, args):
+    def update_args(self, args: List[Int|"Expression"|Nested["Expression"|Int]]):
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
         """
         self._args = args
         # Reset cached "_has_subexpr"
         if hasattr(self, "_has_subexpr"):
-            del self._has_subexpr
+            del self._has_subexpr # type: ignore[has-type]
 
-    def set_description(self, txt, override_print=True, full_print=False):
+    def set_description(self, txt: str, override_print: bool = True, full_print: bool = False):
         self.desc = txt
         self._override_print = override_print
         self._full_print = full_print
@@ -179,10 +193,10 @@ class Expression(object):
                 strargs.append(f"{arg}")
         return "{}({})".format(self.name, ",".join(strargs))
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.__repr__())
 
-    def has_subexpr(self):
+    def has_subexpr(self) -> bool:
         """ Does it contains nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
             Is of importance when deciding whether certain transformations are needed
             along particular paths of the expression tree.
@@ -191,7 +205,7 @@ class Expression(object):
         """
         # return cached result
         if hasattr(self, '_has_subexpr'):
-            return self._has_subexpr
+            return self._has_subexpr # type: ignore[has-type]
 
         # Initialize stack with args
         stack = list(self.args)
@@ -200,10 +214,10 @@ class Expression(object):
             el = stack.pop()
             if isinstance(el, Expression):
                 # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
-                if isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
+                if isinstance(el, cp.expressions.variables.NDVarArray) and el.has_subexpr():
                     self._has_subexpr = True
                     return True
-                elif not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
+                elif not isinstance(el, (cp.expressions.variables._NumVarImpl, BoolVal)):
                     self._has_subexpr = True
                     return True
             elif is_any_list(el):
@@ -214,29 +228,29 @@ class Expression(object):
         self._has_subexpr = False
         return False
 
-    def is_bool(self):
+    def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
             Default: yes
         """
         return True
 
-    def value(self):
+    def value(self) -> Optional[Int|Nested[Int]]:
         return None # default
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int,int]:
         if self.is_bool():
             return 0, 1 #default for boolean expressions
         raise NotImplementedError(f"`get_bounds` is not implemented for type {self}")
 
     # keep for backwards compatibility
-    def deepcopy(self, memodict={}):
+    def deepcopy(self, memodict:dict={}):
         warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
         return copy.deepcopy(self, memodict)
 
     # implication constraint: self -> other
     # Python does not offer relevant syntax...
     # for double implication, use equivalence self == other
-    def implies(self, other:ExprOrConst) -> "Expression":
+    def implies(self, other: Bool|BoolExpression) -> BoolExpression:
         # other constant
         if is_true_cst(other):
             return BoolVal(True)
@@ -245,7 +259,7 @@ class Expression(object):
         return Operator('->', [self, other])
 
     # Comparisons
-    def __eq__(self, other: ExprOrConst) -> "Expression":  # type: ignore
+    def __eq__(self, other: Int|"Expression") -> BoolExpression: # type: ignore[override]
         # BoolExpr == 1|true|0|false, common case, simply BoolExpr
         if self.is_bool() and is_num(other):
             if other is True or other == 1:
@@ -254,24 +268,24 @@ class Expression(object):
                 return ~self
         return Comparison("==", self, other)
 
-    def __ne__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
+    def __ne__(self, other: Int|"Expression") -> "Comparison": # type: ignore[override]
         return Comparison("!=", self, other)
 
-    def __lt__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
+    def __lt__(self, other: Int|"Expression") -> "Comparison":  # type: ignore[misc]
         return Comparison("<", self, other)
 
-    def __le__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
+    def __le__(self, other: Int|"Expression") -> "Comparison":  # type: ignore[misc]
         return Comparison("<=", self, other)
 
-    def __gt__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
+    def __gt__(self, other: Int|"Expression") -> "Comparison":  # type: ignore[misc]
         return Comparison(">", self, other)
 
-    def __ge__(self, other: ExprOrConst) -> "Comparison":  # type: ignore
+    def __ge__(self, other: Int|"Expression") -> "Comparison":  # type: ignore[misc]
         return Comparison(">=", self, other)
 
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
-    def __and__(self, other: ExprOrConst) -> "Expression":
+    def __and__(self, other: Bool|BoolExpression) -> BoolExpression:
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -281,7 +295,7 @@ class Expression(object):
                             f"E.g. always write (x==2)&(y<5).")
         return Operator("and", [self, other])
 
-    def __rand__(self, other: ExprOrConst) -> "Expression":
+    def __rand__(self, other: Bool|BoolExpression) -> BoolExpression:
         # some simple constant removal
         if is_true_cst(other):
             return self
@@ -291,7 +305,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
-    def __or__(self, other: ExprOrConst) -> "Expression":
+    def __or__(self, other: Bool|BoolExpression) -> BoolExpression:
         # some simple constant removal
         if is_false_cst(other):
             return self
@@ -301,7 +315,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [self, other])
 
-    def __ror__(self, other: ExprOrConst) -> "Expression":
+    def __ror__(self, other: Bool|BoolExpression) -> BoolExpression:
         # some simple constant removal
         if is_false_cst(other):
             return self
@@ -311,7 +325,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
 
-    def __xor__(self, other: ExprOrConst) -> "Expression":
+    def __xor__(self, other: Bool|BoolExpression) -> BoolExpression:
         # some simple constant removal
         if is_true_cst(other):
             return ~self
@@ -319,7 +333,7 @@ class Expression(object):
             return self
         return cp.Xor([self, other])
 
-    def __rxor__(self, other: ExprOrConst) -> "Expression":
+    def __rxor__(self, other: Bool|BoolExpression) -> BoolExpression:
         # some simple constant removal
         if is_true_cst(other):
             return ~self
@@ -329,31 +343,33 @@ class Expression(object):
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
-    def __add__(self, other: ExprOrConst) -> "Expression":
+    def __add__(self, other: Int|"Expression") -> "Expression":
         if is_num(other) and other == 0:
             return self
         return Operator("sum", [self, other])
 
-    def __radd__(self, other: ExprOrConst) -> "Expression":  # type: ignore
+    def __radd__(self, other: Int|"Expression") -> "Expression": # type: ignore[misc]
         if is_num(other) and other == 0:
             return self
         return Operator("sum", [other, self])
 
     # substraction
-    def __sub__(self, other: ExprOrConst) -> "Expression":
+    def __sub__(self, other: Int|"Expression") -> "Expression":
         # if is_num(other) and other == 0:
         #     return self
         # return Operator("sub", [self, other])
-        return self.__add__(-other)
+        if isinstance(other, np.bool_):
+            other = bool(other)  # -np.bool_() not defined
+        return self.__add__(-other)  # type: ignore[operator]
 
-    def __rsub__(self, other: ExprOrConst) -> "Expression":  # type: ignore
+    def __rsub__(self, other: Int|"Expression") -> "Expression":  # type: ignore[misc]
         # if is_num(other) and other == 0:
         #     return -self
         # return Operator("sub", [other, self])
         return (-self).__radd__(other)
     
     # multiplication, puts the 'constant' (other) first
-    def __mul__(self, other: ExprOrConst) -> "Expression":
+    def __mul__(self, other: Int|"Expression") -> "Expression":
         if is_num(other) and other == 1:
             return self
         # this unnecessarily complicates wsum creation
@@ -361,7 +377,7 @@ class Expression(object):
         #    return other
         return Operator("mul", [self, other])
 
-    def __rmul__(self, other: ExprOrConst) -> "Expression":  # type: ignore
+    def __rmul__(self, other: Int|"Expression") -> "Expression":  # type: ignore[misc]
         if is_num(other) and other == 1:
             return self
         # this unnecessarily complicates wsum creation
@@ -373,37 +389,39 @@ class Expression(object):
     #object.__matmul__(self, other)
 
     # other mathematical ones
-    def __truediv__(self, other: ExprOrConst) -> "Expression":
+    def __truediv__(self, other: Int|"Expression") -> "Expression":
         warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
         return self.__floordiv__(other)
 
-    def __rtruediv__(self, other: ExprOrConst) -> "Expression":  # type: ignore
+    def __rtruediv__(self, other: Int|"Expression") -> "Expression":  # type: ignore[misc]
         warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
         return self.__rfloordiv__(other)
 
-    def __floordiv__(self, other: ExprOrConst) -> "Expression":
+    def __floordiv__(self, other: Int|"Expression") -> "Expression":
         if is_num(other) and other == 1:
             return self
         return Operator("div", [self, other])
 
-    def __rfloordiv__(self, other: ExprOrConst) -> "Expression":  # type: ignore
+    def __rfloordiv__(self, other: Int|"Expression") -> "Expression":  # type: ignore[misc]
         return Operator("div", [other, self])
 
-    def __mod__(self, other: ExprOrConst) -> "Expression":
+    def __mod__(self, other: Int|"Expression") -> "Expression":
         return Operator("mod", [self, other])
 
-    def __rmod__(self, other: ExprOrConst) -> "Expression":  # type: ignore
+    def __rmod__(self, other: Int|"Expression") -> "Expression":  # type: ignore[misc]
         return Operator("mod", [other, self])
 
-    def __pow__(self, other: ExprOrConst, modulo=None) -> "Expression":
+    def __pow__(self, other: Int, modulo=None) -> "Expression":
         assert (modulo is None), "Power operator: modulo not supported"
+        # XXX I think only a power with a constant exponent is supported
         if is_num(other):
             if other == 1:
                 return self
         return Operator("pow", [self, other])
 
-    def __rpow__(self, other: ExprOrConst, modulo=None) -> "Expression":  # type: ignore
+    def __rpow__(self, other: Int, modulo=None) -> "Expression":  # type: ignore[misc]
         assert (modulo is None), "Power operator: modulo not supported"
+        # XXX I think only a power with a constant exponent is supported
         return Operator("pow", [other, self])
 
     # Not implemented: (yet?)
@@ -413,10 +431,10 @@ class Expression(object):
     def __neg__(self) -> "Expression":
         # special case, -(w*x) -> -w*x
         if self.name == 'mul' and is_num(self.args[0]):
-            return Operator(self.name, [-self.args[0], self.args[1]])
+            return Operator(self.name, [-self.args[0], self.args[1]]) # type: ignore
         elif self.name == 'wsum':
             # negate the constant weights
-            return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
+            return Operator(self.name, [[-a for a in self.args[0]], self.args[1]]) # type: ignore
         return Operator("-", [self])
 
     def __pos__(self) -> "Expression":
@@ -425,7 +443,7 @@ class Expression(object):
     def __abs__(self) -> "Expression":
         return cp.Abs(self)
 
-    def __invert__(self) -> "Expression":
+    def __invert__(self: BoolExpression) -> BoolExpression:
         if not (is_boolexpr(self)):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", [self])
@@ -440,29 +458,29 @@ class BoolVal(Expression):
         Wrapper for python or numpy BoolVals
     """
 
-    def __init__(self, arg: BoolConst) -> None:
+    def __init__(self, arg: Bool):
         assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
-        super(BoolVal, self).__init__("boolval", [bool(arg)])
+        super().__init__("boolval", [bool(arg)])  # Note: we store the pure bool
 
-    def value(self):
-        return self.args[0]
+    def value(self) -> bool:
+        return self.args[0] # type: ignore[return-value]
 
     def __invert__(self) -> "BoolVal":
         return BoolVal(not self.args[0])
 
     def __bool__(self) -> bool:
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
-        return self.args[0]
+        return self.args[0] # type: ignore[return-value]
 
     def __int__(self) -> int:
         """Called to implement conversion to numerical"""
-        return int(self.args[0])
+        return int(self.args[0]) # type: ignore[arg-type]
 
-    def get_bounds(self):
-        v = int(self.args[0])
+    def get_bounds(self) -> tuple[int,int]:
+        v = int(self.args[0]) # type: ignore[arg-type]
         return (v,v)
 
-    def __and__(self, other: ExprOrConst) -> Expression:
+    def __and__(self, other: Bool|BoolExpression) -> BoolExpression:
         if is_bool(other): # Boolean constant
             return BoolVal(cast("bool", self.args[0] and other))
         elif isinstance(other, Expression) and other.is_bool():
@@ -473,9 +491,9 @@ class BoolVal(Expression):
         raise ValueError(f"{self}&{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
         
     
-    def __rand__(self, other: ExprOrConst) -> Expression:
+    def __rand__(self, other: Bool|BoolExpression) -> BoolExpression:
         if is_bool(other): # Boolean constant
-            return BoolVal(cast("bool", self.args[0] and other))
+            return BoolVal(self.args[0] and other) # type: ignore[arg-type]
         elif isinstance(other, Expression) and other.is_bool():
             if self.args[0]:
                 return other
@@ -484,9 +502,9 @@ class BoolVal(Expression):
         raise ValueError(f"{self}&{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
 
     
-    def __or__(self, other : ExprOrConst) -> Expression:
+    def __or__(self, other: Bool|BoolExpression) -> BoolExpression:
         if is_bool(other): # Boolean constant
-            return BoolVal(cast("bool", self.args[0] or other))
+            return BoolVal(self.args[0] or other) # type: ignore[arg-type]
         elif isinstance(other, Expression) and other.is_bool():
             if not self.args[0]:
                 return other
@@ -495,9 +513,9 @@ class BoolVal(Expression):
         raise ValueError(f"{self}|{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
         
         
-    def __ror__(self, other: ExprOrConst) -> Expression:
+    def __ror__(self, other: Bool|BoolExpression) -> BoolExpression:
         if is_bool(other): # Boolean constant
-            return BoolVal(cast("bool", self.args[0] or other))
+            return BoolVal(self.args[0] or other) # type: ignore[arg-type]
         elif isinstance(other, Expression) and other.is_bool():
             if not self.args[0]:
                 return other
@@ -505,9 +523,9 @@ class BoolVal(Expression):
                 return BoolVal(True)
         raise ValueError(f"{self}|{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
         
-    def __xor__(self, other : ExprOrConst) -> Expression:
+    def __xor__(self, other: Bool|BoolExpression) -> BoolExpression:
         if is_bool(other): # Boolean constant
-            return BoolVal(self.args[0] ^ other)
+            return BoolVal(self.args[0] ^ other) # type: ignore
         elif isinstance(other, Expression) and other.is_bool():
             if self.args[0]:
                 return ~other
@@ -516,9 +534,9 @@ class BoolVal(Expression):
         raise ValueError(f"{self}^^{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
     
     
-    def __rxor__(self, other: ExprOrConst) -> Expression:
+    def __rxor__(self, other: Bool|BoolExpression) -> BoolExpression:
         if is_bool(other): # Boolean constant
-            return BoolVal(self.args[0] ^ other)
+            return BoolVal(self.args[0] ^ other) # type: ignore
         elif isinstance(other, Expression) and other.is_bool():
             if self.args[0]:
                 return ~other
@@ -534,7 +552,7 @@ class BoolVal(Expression):
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other: ExprOrConst) -> "Expression":
+    def implies(self, other: Bool|BoolExpression) -> BoolExpression:
         # other constant
         if is_true_cst(other):
             return BoolVal(True)
@@ -552,21 +570,21 @@ class Comparison(Expression):
     """
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
-    def __init__(self, name:str, left:ExprOrConst, right:ExprOrConst):
+    def __init__(self, name: str, left: Int|Expression, right: Int|Expression):
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if all(isinstance(x, Expression) for x in self.args):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
     
-    def __bool__(self):
+    def __bool__(self) -> bool:
         # will be called when comparing elements in a container, but always with `==`
         if self.name == "==":
             return repr(self.args[0]) == repr(self.args[1])
-        super().__bool__() # default to exception
+        return super().__bool__() # default to exception
 
     # return the value of the expression
     # optional, default: None
@@ -607,7 +625,7 @@ class Operator(Expression):
     }
     printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
 
-    def __init__(self, name: str, arg_list: NestedList[ExprOrConst]):
+    def __init__(self, name: str, arg_list):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         arity, is_bool_op = Operator.allowed[name]
