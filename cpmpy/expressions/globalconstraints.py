@@ -1246,9 +1246,9 @@ class Precedence(GlobalConstraint):
             precedence (list[int]): List of integers representing the precedence
         """
         if not is_any_list(vars):
-            raise TypeError("Precedence expects a list of variables, but got", vars)
+            raise TypeError("Precedence expects a list of variables as first argument, but got", vars)
         if not is_any_list(precedence) or not all(is_num(p) for p in precedence):
-            raise TypeError("Precedence expects a list of values as precedence, but got", precedence)
+            raise TypeError("Precedence expects a list of values as second argument, but got", precedence)
         super().__init__("precedence", [list(vars), list(precedence)])
 
     def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
