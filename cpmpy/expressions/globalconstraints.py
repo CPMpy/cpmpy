@@ -1148,6 +1148,86 @@ class Cumulative(GlobalConstraint):
         else:
             return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity})"
 
+class CumulativeOptional(GlobalConstraint):
+    """
+        Generalization of the Cumulative constraint which allows for optional tasks.
+        A task is only scheduled if the corresponing is_present variable is set to True.
+    """
+
+    def __init__(self, start, duration, end, demand, capacity, is_present):
+        assert is_any_list(start), "start should be a list"
+        assert is_any_list(duration), "duration should be a list"
+        assert is_any_list(end), "end should be a list"
+
+        start = flatlist(start)
+        duration = flatlist(duration)
+        end = flatlist(end)
+        is_present = [cp.BoolVal(x) if is_bool(x) else x for x in flatlist(is_present)] # normalize
+        assert len(start) == len(duration) == len(end) == len(is_present), "Start, duration, end and is_present should have equal length"
+        n_jobs = len(start)
+
+        for lb in get_bounds(duration)[0]:
+            if lb < 0:
+                raise TypeError("Durations should be non-negative")
+
+        if is_any_list(demand):
+            demand = flatlist(demand)
+            assert len(demand) == n_jobs, "Demand should be supplied for each task or be single constant"
+        else: # constant demand
+            demand = [demand] * n_jobs
+
+        super().__init__("cumulative_optional", [start, duration, end, demand, capacity, is_present])
+
+    def decompose(self):
+        """
+            Time-resource decomposition from:
+            Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+            International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        """
+
+        arr_args = (cpm_array(arg) if is_any_list(arg) else arg for arg in self.args)
+        start, duration, end, demand, capacity, is_present = arr_args
+        cons = []
+
+        # set duration of tasks
+        for t in range(len(start)):
+            cons += [is_present[t].implies(start[t] + duration[t] == end[t])]
+
+        # demand doesn't exceed capacity
+        lb, ub = min(get_bounds(start)[0]), max(get_bounds(end)[1])
+        for t in range(lb,ub+1):
+            demand_at_t = 0
+            for job in range(len(start)):
+                if is_num(demand):
+                    demand_at_t += demand * ((start[job] <= t) & (t < end[job]) & is_present[job])
+                else:
+                    demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]) & is_present[job])
+
+            cons += [demand_at_t <= capacity]
+
+        return cons, []
+    
+    def value(self):
+        arg_vals = [np.array(argvals(arg)) if is_any_list(arg)
+                    else argval(arg) for arg in self.args]
+
+        if any(a is None for a in arg_vals):
+            return None
+
+        # start, dur, end are np arrays
+        start, dur, end, demand, capacity, is_present = arg_vals
+        # start and end seperated by duration, if the tasks are present
+        if not (~is_present | (start + dur == end)).all():
+            return False
+
+        # demand of present tasks doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        for t in range(lb, ub+1):
+            if capacity < sum(demand * ((start <= t) & (t < end) & is_present)):
+                return False
+
+        return True
+
 class NoOverlap(GlobalConstraint):
     """
     Enforces that a set of tasks are scheduled without overlapping, and enforces:
