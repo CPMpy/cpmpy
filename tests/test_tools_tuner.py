@@ -90,3 +90,17 @@ class TunerTests(TestCase):
 
         self.assertLessEqual(10, 1.05 * end - start)
         self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
+
+    def test_ortools_multi_model(self):
+        """Test tuner with a list of models (MultiSolver path)."""
+        models = [
+            Model([AllDifferent(intvar(lb=0, ub=5, shape=5))]),
+            Model([AllDifferent(intvar(lb=0, ub=6, shape=6))]),
+        ]
+        tuner = ParameterTuner("ortools", models)
+        self.assertIsNotNone(tuner.tune(max_tries=20, fix_params={"num_search_workers": 1}))
+        self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
+
+        tuner = GridSearchTuner("ortools", models)
+        self.assertIsNotNone(tuner.tune(max_tries=20, fix_params={"num_search_workers": 1}))
+        self.assertLessEqual(tuner.best_runtime, tuner.base_runtime)
