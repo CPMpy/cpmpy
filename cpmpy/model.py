@@ -27,6 +27,7 @@
 """
 import copy
 import warnings
+from typing import Optional
 
 import numpy as np
 
@@ -35,7 +36,7 @@ from .expressions.core import Expression
 from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
-from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 
 import pickle
 
@@ -166,7 +167,7 @@ class Model(object):
         """
         return self.objective_.value()
 
-    def solve(self, solver=None, time_limit=None, **kwargs):
+    def solve(self, solver:Optional[str]=None, time_limit:Optional[int|float]=None, **kwargs):
         """ Send the model to a solver and get the result.
 
             Run :func:`SolverLookup.solvernames() <cpmpy.solvers.SolverLookup.solvernames>` to find out the valid solver names on your system. (default: None = first available solver)
@@ -198,7 +199,7 @@ class Model(object):
         self.cpm_status = s.status()
         return ret
 
-    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -284,24 +285,25 @@ class Model(object):
             m = pickle.load(f)
             # bug 158, we should increase the boolvar/intvar counters to avoid duplicate names
             from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
+            from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, _BV_PREFIX, _IV_PREFIX # avoid circular import
             vs = get_variables_model(m)
             bv_counter = 0
             iv_counter = 0
             for v in vs:
-                if v.name.startswith("BV"):
+                if v.name.startswith(_BV_PREFIX):
                     try:
                         bv_counter = max(bv_counter, int(v.name[2:])+1)
                     except:
                         pass
-                elif v.name.startswith("IV"):
+                elif v.name.startswith(_IV_PREFIX):
                     try:
                         iv_counter = max(iv_counter, int(v.name[2:])+1)
                     except:
                         pass
-            from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl  # avoid circular import
+
             if (_BoolVarImpl.counter > 0 and bv_counter > 0) or \
                     (_IntVarImpl.counter > 0 and iv_counter > 0):
-                warnings.warn(f"from_file '{fname}': contains auxiliary IV*/BV* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
+                warnings.warn(f"from_file '{fname}': contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
             _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
             _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)
             return m
