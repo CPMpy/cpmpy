@@ -13,11 +13,11 @@ def maximal_propagate(constraints, vars=None, solver="ortools", method="union"):
         Returns all values for variables for which at least one model exists.
         I.e., returns a globally consistent constraint network.
 
-        :param: constraints: list of CPMpy constraints
-        :param: vars: list of variables, optional, list of variables to propagate.
-        :param: solver: name of a solver, see SolverLookup.solvernames().
-                            for faster propgation, use incremental solver such as pysat, z3 or gurobi.
-        :param: method: method of propagation, optional, for large domains, use 'union',
+        :param constraints: list of CPMpy constraints
+        :param vars: list of variables, optional, list of variables to propagate.
+        :param solver: name of a solver, see :func:`SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>`
+                            for faster propagation, use incremental solver such as pysat, z3 or gurobi.
+        :param method: method of propagation, optional, for large domains, use 'union',
                                                     for small domains use 'intersect'
     """
     if vars is None or len(vars) == 0:

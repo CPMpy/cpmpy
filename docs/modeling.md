@@ -4,13 +4,21 @@ This page explains and demonstrates how to use CPMpy to model and solve combinat
 
 ## Installation
 
-Installation is available through the `pip` Python package manager. This will also install and use `ortools` as default solver (see how to use alternative solvers [here](#selecting-a-solver)):
+Installation is available through the `pip` Python package manager. This will also install and use `ortools` as default solver:
 
 ```commandline
 pip install cpmpy
 ```
 
-CPMpy requires python verion  3.8 or higher.
+Additional solvers can be downloaded as optional dependencies (see how to use alternative solvers [here](#selecting-a-solver)):
+
+```commandline
+pip install cpmpy[gurobi, choco, exact] # installs 3 additional solving backends
+```
+
+An overview of the available backends can be found [here](index.rst#supported-solvers).
+
+CPMpy requires python version  3.8 or higher.
 
 See [installation instructions](./installation_instructions.rst) for more details. 
 
@@ -428,7 +436,12 @@ if hassol:
 else:
     print("No solution found.")
 ```
-
+The status of solve-call can be the following:
+1. `ExitStatus.OPTIMAL`: The solver found a solution to an optimisation problem and proved its optimality.
+2. `ExitStatus.FEASIBLE`: The solver found a solution to a satisfaction problem, or a feasible solution to an optimization problem but did not prove optimality
+3. `ExitStatus.UNSATIFIABLE`: The solver proved the input problem is unsatisfiable.
+4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, nor proved the problem is unsatisfiable. Can happen when a time-limit is reached.
+5. `ExitStatus.NOT_RUN`: The solver is not run yet (default when initializing a solver)
 
 ## Finding all solutions
 
@@ -442,6 +455,13 @@ m = cp.Model(x[0] > x[1])
 n = m.solveAll()
 print("Nr of solutions:", n)  # Nr of solutions: 6
 ```
+
+The status of solveAll-call can be the following:
+1. `ExitStatus.OPTIMAL`: The solver found all possible solutions to a problem and proved there to be none remaining.
+2. `ExitStatus.FEASIBLE`: The solver found a subset of all solutions, or found all solutions but did not prove there to be none remaining.
+3. `ExitStatus.UNSATIFIABLE`: The solver proved the input problem is unsatisfiable.
+4. `ExitStatus.UNKNOWN`: The solver did not find a feasible solution, nor proved the problem is unsatisfiable. Can happen when a time-limit is reached.
+5. `ExitStatus.NOT_RUN`: The solver is not run yet (default when initializing a solver)
 
 When using `solveAll()`, a solver will use an optimized native implementation behind the scenes when that exists. Otherwise it will be emulated with an iterative approach, resulting in a performance impact.
 
@@ -490,15 +510,72 @@ If that is not sufficient or you want to debug an unexpected (non)solution, have
 
 The default solver is [OR-Tools CP-SAT](https://developers.google.com/optimization), an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
-The list of supported solver interfaces can be found in [the API documentation](./api/solvers.rst).
-See the full list of solvers known by CPMpy with:
 
+
+The list of supported solver interfaces can be found in [the API documentation](./api/solvers.rst) or by using the following:
+
+```python
+import cpmpy as cp
+cp.SolverLookup.base_solvers() # returns a list of tuples, 
+                               # where each tuple is a pair of (<solver name>, <cpmpy solver class>)
+# [('ortools', <class 'cpmpy.solvers.ortools.CPM_ortools'>), ('z3', <class 'cpmpy.solvers.z3.CPM_z3'>), ('minizinc', <class 'cpmpy.solvers.minizinc.CPM_minizinc'>), ('gcs', <class 'cpmpy.solvers.gcs.CPM_gcs'>), ('gurobi', <class 'cpmpy.solvers.gurobi.CPM_gurobi'>), ('pysat', <class 'cpmpy.solvers.pysat.CPM_pysat'>), ('pysdd', <class 'cpmpy.solvers.pysdd.CPM_pysdd'>), ('exact', <class 'cpmpy.solvers.exact.CPM_exact'>), ('choco', <class 'cpmpy.solvers.choco.CPM_choco'>), ('cpo', <class 'cpmpy.solvers.cpo.CPM_cpo'>)]
+```
+
+To get some information on which solvers are currently available on your system, you can make use of our convenient CLI:
+
+```bash
+cpmpy version
+```
+```console
+CPMpy version: 0.9.26
+Solver               Installed  Version        
+--------------------------------------------------
+ortools              Yes        9.12.4544
+z3                   Yes        4.14.1.0       
+minizinc             Yes        0.10.0
+ ↪ cplex             Yes        22.1.2.0
+ ↪ gecode            Yes        6.3.0
+ ↪ cp-sat            Yes        9.12.4544
+ ↪ highs             Yes        1.9.0
+ ↪ chuffed           Yes        0.13.2
+ ↪ coin-bc           Yes        2.10.12/1.17.10
+gcs                  No         -
+gurobi               No         -
+pysat                No         -    
+pysdd                No         -
+exact                Yes        2.1.0
+choco                No         -
+cpo                  No         -
+...                  ...        ...
+```
+
+
+Additionally, we provide programatic access to that same information:
+
+```python
+import cpmpy as cp
+cp.SolverLookup.version() # returns list of per-solver version reports: {name: ..., installed: ..., version: ...}
+# [{'name': 'ortools', 'installed': True, 'version': '9.12.4544'}, {'name': 'pysat', 'installed': True, 'version': '1.8.dev16'}, ...]
+cp.SolverLookup.print_version() # prints 'solver version' table to stdout, same as the CLI
+```
+
+
+Some solvers (like minizinc and pysat) also provide a collection of subsolvers:
+```python
+import cpmpy as cp
+cp.SolverLookup.get('pysat').solvernames()
+# ['cadical103', 'cadical153', 'cadical195', 'gluecard3', 'gluecard4', 'glucose3', 'glucose4', 'glucose42', 'lingeling', 'maplechrono', 'maplecm', 'maplesat', 'mergesat3', 'minicard', 'minisat22', 'minisat-gh']
+```
+
+
+To get a list of all installed solvers (with subsolvers):
 ```python
 import cpmpy as cp
 cp.SolverLookup.solvernames()
 ```
 
 On a system with pysat and minizinc installed, this for example gives `['ortools', 'minizinc', 'minizinc:chuffed', 'minizinc:coin-bc', ..., 'pysat:minicard', 'pysat:minisat22', 'pysat:minisat-gh']`
+
 
 You can specify a solvername when calling `solve()` on a model:
 
@@ -507,10 +584,23 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 m = cp.Model(cp.sum(x) <= 5)
 # use named solver
-m.solve(solver="minizinc:chuffed")
+m.solve(solver="minizinc:chuffed") # <solver> or <solver>:<subsolver>
 ```
 
-Note that for solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
+You can even use the same model across different solvers to see which one you like best:
+```python
+# m = same model as above
+for solvername in cp.SolverLookup.solvernames() # all solvers (+subsolvers) installed on the system
+    m.solve(solver=solvername)
+    print(m.status())
+```
+
+```{Note}
+For solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. Most solvers can easily be installed through `pip install cpmpy[<solver_name>]`. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
+```console
+    ModuleNotFoundError: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
+```
+
 
 ## Model versus solver interface
 

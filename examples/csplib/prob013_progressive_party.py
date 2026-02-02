@@ -23,39 +23,37 @@ from cpmpy.expressions.utils import all_pairs
 
 
 def progressive_party(n_boats, n_periods, capacity, crew_size, **kwargs):
-
     is_host = boolvar(shape=n_boats, name="is_host")
-    visits = intvar(lb=0, ub=n_boats-1, shape=(n_periods,n_boats), name="visits")
+    visits = intvar(0, n_boats - 1, shape=(n_periods, n_boats), name="visits")
 
     model = Model()
 
-    # crews of host boats stay on boat
+    # Crews of host boats stay on boat
     for boat in range(n_boats):
-        model += (is_host[boat]).implies(all(visits[:,boat] == boat))
+        model += (is_host[boat]).implies(all(visits[:, boat] == boat))
 
-    # number of visitors can never exceed capacity of boat
+    # The total number of people aboard a boat, including the host crew and guest crews, must not exceed the capacity.
     for slot in range(n_periods):
         for boat in range(n_boats):
+            # Sum of crew sizes of visiting boats + crew size of host boat (hosts are also included in visits, so no need to add separately)
             model += sum((visits[slot] == boat) * crew_size) <= capacity[boat]
 
-    # guests cannot visit a boat twice
+    # Guests cannot visit a boat twice
     for boat in range(n_boats):
-        # Alldiff must be decomposed in v0.9.8, see issue #105 on github
-        model += (~is_host[boat]).implies(all((AllDifferent(visits[:,boat]).decompose())))
+        model += (~is_host[boat]).implies(AllDifferent(visits[:, boat]))
 
-    # non-host boats cannot be visited
+    # Non-host boats cannot be visited
     for boat in range(n_boats):
         model += (~is_host[boat]).implies(all(visits != boat))
 
-    # crews cannot meet more than once
+    # Crews cannot meet more than once
     for c1, c2 in all_pairs(range(n_boats)):
-        model += sum(visits[:,c1] == visits[:,c2]) <= 1
+        model += sum(visits[:, c1] == visits[:, c2]) <= 1
 
-    # minimize number of hosts needed
+    # Minimize number of hosts needed
     model.minimize(sum(is_host))
 
-    return model, (visits,is_host)
-
+    return model, (visits, is_host)
 
 
 # Helper functions
@@ -79,7 +77,7 @@ if __name__ == "__main__":
     # argument parsing
     url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob013_progressive_party.json"
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('-instance', nargs='?', default="csplib_example", help="Name of the problem instance found in file 'filename'")
+    parser.add_argument('-instance', nargs='?', default="lan01", help="Name of the problem instance found in file 'filename'")
     parser.add_argument('-filename', nargs='?', default=url, help="File containing problem instances, can be local file or url")
     parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 

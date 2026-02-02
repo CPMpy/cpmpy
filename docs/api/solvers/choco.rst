@@ -1,4 +1,4 @@
-CPMpy exact interface (:mod:`cpmpy.solvers.choco`)
+CPMpy choco interface (:mod:`cpmpy.solvers.choco`)
 =====================================================
 
 .. automodule:: cpmpy.solvers.choco

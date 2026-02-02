@@ -1,17 +1,23 @@
 """
-  Transformations regarding reification constraints.
+    Transformations that rewrite reified constraints as needed.
 
-  There are three types of reification (BV=BoolVar, BE=BoolExpr):
-    - BV -> BE      single implication, from var to expression
-    - BV <- BE      single implication, from expression to var
-    - BE == BV      full reification / double implication (e.g. BV <-> BE)
+    There are three types of reification (BV=BoolVar, BE=BoolExpr):
 
-  Using logical operations, they can be decomposed and rewritten to each other.
+    =============  ============================================================
+    ``BV -> BE``   single implication, from var to expression                 
+    ``BV <- BE``   single implication, from expression to var                
+    ``BE == BV``   full reification / double implication (e.g. ``BV <-> BE``) 
+    =============  ============================================================
 
-  This file implements:
-    - only_bv_reifies():    transforms all reifications to BV -> BE or BV == BE
-    - only_implies():       transforms all reifications to BV -> BE form
-    - reify_rewrite():      rewrites reifications not supported by a solver to ones that are
+    Using logical operations, they can be decomposed and rewritten to each other.
+
+    This file implements:
+
+    ==========================  =================================================================
+    :func:`only_bv_reifies()`   transforms all reifications to ``BV -> BE`` or ``BV == BE``      
+    :func:`only_implies()`      transforms all reifications to ``BV -> BE`` form                 
+    :func:`reify_rewrite()`     rewrites reifications not supported by a solver to ones that are 
+    ==========================  =================================================================
 """
 import copy
 from ..expressions.core import Operator, Comparison, Expression
@@ -23,7 +29,8 @@ from ..expressions.utils import is_any_list
 from .flatten_model import flatten_constraint, get_or_make_var
 from .negation import recurse_negation
 
-def only_bv_reifies(constraints):
+def only_bv_reifies(constraints, csemap=None):
+
     newcons = []
     for cpm_expr in constraints:
         if cpm_expr.name in ['->', "=="]:
@@ -33,11 +40,11 @@ def only_bv_reifies(constraints):
                 # BE -> BV :: ~BV -> ~BE
                 if cpm_expr.name == '->':
                     newexpr = (~a1).implies(recurse_negation(a0))
-                    newexpr = only_bv_reifies(flatten_constraint(newexpr))
+                    newexpr = only_bv_reifies(flatten_constraint(newexpr, csemap=csemap), csemap=csemap)
                 else:
                     newexpr = [a1 == a0]  # BE == BV :: BV == BE
                     if not a0.is_bool():
-                        newexpr = flatten_constraint(newexpr)
+                        newexpr = flatten_constraint(newexpr, csemap=csemap)
                 newcons.extend(newexpr)
             else:
                 newcons.append(cpm_expr)
@@ -45,18 +52,21 @@ def only_bv_reifies(constraints):
             newcons.append(cpm_expr)
     return newcons
 
-def only_implies(constraints):
+def only_implies(constraints, csemap=None):
     """
-        Transforms all reifications to BV -> BE form
+        Transforms all reifications to ``BV -> BE`` form
 
         More specifically:
+
+        .. code-block:: text
+
             BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
                               :: BV0 -> (BV2->BV3) & BV0 -> (BV3->BV2)
                               :: BV0 -> (~BV2|BV3) & BV0 -> (~BV3|BV2)
             BV == BE :: ~BV -> ~BE, BV -> BE
 
         Assumes all constraints are in 'flat normal form' and all reifications have a variable in lhs. Hence, only apply
-        AFTER `flatten()` and 'only_bv_reifies()'.
+        AFTER :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`only_bv_reifies()`.
     """
     newcons = []
     retransform = []
@@ -74,7 +84,7 @@ def only_implies(constraints):
             else:
                 newcons.append(cpm_expr)
 
-        # Comparisons: transform bV == BE
+        # Comparisons: transform BV == BE
         elif cpm_expr.name == '==' and cpm_expr.args[0].is_bool():
             # a0 is a boolvar, because of previous transformation only_bv_reifies.
             a0,a1 = cpm_expr.args
@@ -87,33 +97,52 @@ def only_implies(constraints):
                 # then it is actually an integer expression, keep
                 newcons.append(cpm_expr)
             else:
-                # BVar1 == BE0 :: ~BVar1 -> ~BE0, BVar1 -> BE0
-                retransform.extend(( (~a0).implies(recurse_negation(a1)), a0.implies(a1) ))
+                # BVar1 == BE0 :: BVar1 -> BE0, ~BVar1 -> ~BE0
+                # assume that if a0 == a1 was fine, that a0 -> a1 is too
+                # EXCEPT, optimisation a0 -> a1_0 & ... & a1_n :: a0 -> a1_0 & ... & a0 -> a1_n
+                if a1.name == 'and':
+                    # optimisation without going through retransform
+                    newcons.extend(a0.implies(a1_i) for a1_i in a1.args)
+                elif a1.has_subexpr():
+                    # requires retransform
+                    retransform.append(a0.implies(a1))
+                else:
+                    newcons.append(a0.implies(a1))
+
+                neg_a1 = recurse_negation(a1)
+                if neg_a1.name == 'and':
+                    # optimisation without going through retransform
+                    newcons.extend((~a0).implies(na1_i) for na1_i in neg_a1.args)
+                elif neg_a1.has_subexpr():
+                    # requires retransform
+                    retransform.append((~a0).implies(neg_a1))
+                else:
+                    newcons.append((~a0).implies(neg_a1))
         else:
             # all other flat normal form expressions are fine
             newcons.append(cpm_expr)
     
     if len(retransform) != 0:
-        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform))))
+        newcons.extend(only_implies(only_bv_reifies(flatten_constraint(retransform, csemap=csemap), csemap=csemap), csemap=csemap))
 
     return newcons
 
 
-def reify_rewrite(constraints, supported=frozenset()):
+def reify_rewrite(constraints, supported=frozenset(), csemap=None):
     """
         Rewrites reified constraints not natively supported by a solver,
         to a version that uses standard constraints and reification over equalities between variables.
 
         Input is expected to be in Flat Normal Form without unsupported globals present.
-        (so after `flatten_constraint()` and 'decompose_global()')
+        (so after :func:`~cpmpy.transformations.flatten_model.flatten_constraint()` and :func:`~cpmpy.transformations.decompose_global.decompose_global()`)
         Output will also be in Flat Normal Form
 
-        Boolean expressions 'and', 'or', and '->' and comparison expression 'IV1==IV2' are assumed to support reification
+        Boolean expressions ``and``, ``or``, and ``->`` and comparison expression ``IV1==IV2`` are assumed to support reification
         (actually currently all comparisons <op> in {'==', '!=', '<=', '<', '>=', '>'},
-         IV1 <op> IV2 are assumed to support reification BV -> (IV1 <op> IV2))
+        ``IV1 <op> IV2`` are assumed to support reification ``BV -> (IV1 <op> IV2)``)
 
-        :param supported  a (frozen)set of expression names that support reification in the solver, including
-                          supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. BV -> (LHS == V)
+        :param supported: a (frozen)set of expression names that support reification in the solver, including
+                          supported 'Left Hand Side (LHS)' expressions in reified comparisons, e.g. ``BV -> (LHS == V)``
     """
     if not is_any_list(constraints):
         # assume list, so make list
@@ -167,7 +196,7 @@ def reify_rewrite(constraints, supported=frozenset()):
                     #     introduce aux var and bring function to toplevel
                     #     (AUX,c) = get_or_make_var(LHS)
                     #     return c+[Comp(OP,AUX,RHS) == BV] or +[Comp(OP,AUX,RHS) -> BV] or +[Comp(OP,AUX,RHS) <- BV]
-                    (auxvar, cons) = get_or_make_var(lhs)
+                    (auxvar, cons) = get_or_make_var(lhs, csemap=csemap)
                     newcons += cons
                     reifexpr = copy.copy(cpm_expr)
                     reifexpr.args[boolexpr_index] = Comparison(op, auxvar, rhs)  # Comp(OP,AUX,RHS)

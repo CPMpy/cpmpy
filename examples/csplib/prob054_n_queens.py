@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("-n", type=int, default=16, help="Number of queens")
-    parser.add_argument("--solution_limit", type=int, default=0, help="Number of solutions, find all by default")
+    parser.add_argument("--solution_limit", type=int, default=10, help="Number of solutions, find all by default")
 
     args = parser.parse_args()
 

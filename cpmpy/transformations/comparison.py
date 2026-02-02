@@ -1,18 +1,17 @@
 """
-  Transformations regarding Comparison constraints (originally).
-  Now, it is regarding numeric expressions in general, including nested ones.
+  Transforms non-equality comparisons into equality comparisons as needed.
   
-  Let with <op> one of == or !=,<,<=,>,>=
-  Numeric expressions in Flat Normal Form are of the kind
-    - NumExpr <op> IV
-    - BoolVar == NumExpr <op> IV
-    - BoolVar -> NumExpr <op> IV
-    - NumExpr <op> IV -> BoolVar
+  Let <op> be one of `==` or `!=`, `<`, `<=`, `>`, `>=`. Numeric expressions in **Flat Normal Form** are of the kind:
 
-  The NumExpr can be a sum, wsum or global function with a non-bool return type.
+    - `NumExpr <op> IV`
+    - `BoolVar == NumExpr <op> IV`
+    - `BoolVar -> NumExpr <op> IV`
+    - `NumExpr <op> IV -> BoolVar`
+
+  The `NumExpr` can be a sum, wsum or global function with a non-bool return type.
     
   This file implements:
-    - only_numexpr_equality():    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
+    - :func:`only_numexpr_equality()`:    transforms `NumExpr <op> IV` (also reified) to `(NumExpr == A) & (A <op> IV)` if not supported
 """
 
 import copy
@@ -21,65 +20,94 @@ from ..expressions.core import Comparison, Operator
 from ..expressions.utils import is_boolexpr
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl
 
-def only_numexpr_equality(constraints, supported=frozenset()):
+def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
     """
-        transforms `NumExpr <op> IV` to `(NumExpr == A) & (A <op> IV)` if not supported
-        also for the reified uses of NumExpr
+        Transforms ``NumExpr <op> IV`` to ``(NumExpr == A) & (A <op> IV)`` if not supported.
+        Also for the reified uses of `NumExpr`
 
-        :param supported  a (frozen)set of expression names that supports all comparisons in the solver
+        :param supported:  a (frozen)set of expression names that supports all comparisons in the solver
     """
 
-    # shallow copy (could support inplace too this way...)
-    newcons = copy.copy(constraints)
-
-    for i,cpm_expr in enumerate(newcons):
+    newlist = []
+    for cpm_expr in constraints:
 
         if isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
             cond, subexpr = cpm_expr.args
             if not isinstance(cond, _BoolVarImpl): # expr -> bv
-                res = only_numexpr_equality([cond], supported)
-                if len(res) > 1:
-                    newcons[i] = res[1].implies(subexpr)
-                    newcons.insert(i, res[0])
+                idx = 0
+            elif not isinstance(subexpr, _BoolVarImpl): # bv -> expr
+                idx = 1
+            else: # bv -> bv
+                newlist.append(cpm_expr)
+                continue
 
-            elif not isinstance(subexpr, _BoolVarImpl):  # bv -> expr
-                res = only_numexpr_equality([subexpr], supported)
-                if len(res) > 1:
-                    newcons[i] = cond.implies(res[1])
-                    newcons.insert(i, res[0])
-            else: #bv -> bv
-                pass
+            new_arg, new_cons = _rewrite_comparison(cpm_expr.args[idx], supported=supported,csemap=csemap)
+            if new_arg is not cpm_expr.args[idx]: # changed
+                cpm_expr = copy.copy(cpm_expr) # shallow copy
+                cpm_expr.args[idx] = new_arg                
+                cpm_expr.update_args(cpm_expr.args) # XXX redundant? we know it's flat so no subexprs anyway
+            
+            newlist += [cpm_expr] + new_cons
 
+            
+        elif isinstance(cpm_expr, Comparison):
 
-        if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-
-            if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification, check recursively
-
+            if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
                 if not isinstance(lhs, _BoolVarImpl):  # expr == bv
-                    res = only_numexpr_equality([lhs], supported)
-                    if len(res) > 1:
-                        newcons[i] = res[1] == rhs
-                        newcons.insert(i, res[0])
-
+                    idx = 0
                 elif not isinstance(rhs, _BoolVarImpl):  # bv == expr
-                    res = only_numexpr_equality([rhs], supported)
-                    if len(res) > 1:
-                        newcons[i] = lhs == res[1]
-                        newcons.insert(i, res[0])
-                else:  # bv == bv
-                    pass
+                    idx = 1
+                else: # bv == bv
+                    newlist.append(cpm_expr)
+                    continue
 
-            elif cpm_expr.name != "==":
-                # LHS <op> IV    with <op> one of !=,<,<=,>,>=
-                lhs = cpm_expr.args[0]
-                if not isinstance(lhs, _NumVarImpl) and lhs.name not in supported:
-                    # LHS is unsupported for LHS <op> IV, rewrite to `(LHS == A) & (A <op> IV)`
-                    (lhsvar, lhscons) = get_or_make_var(lhs)
-                    # replace comparison by A <op> IV
-                    newcons[i] = Comparison(cpm_expr.name, lhsvar, cpm_expr.args[1])
-                    # add lhscon(s), which will be [(LHS == A)]
-                    assert(len(lhscons) == 1), "only_numexpr_eq: lhs surprisingly non-flat"
-                    newcons.insert(i, lhscons[0])
+                # identical to the above, but keep for readability?
+                new_arg, new_cons = _rewrite_comparison(cpm_expr.args[idx], supported=supported,csemap=csemap)
+                if new_arg is not cpm_expr.args[idx]: # changed
+                    cpm_expr = copy.copy(cpm_expr) # shallow copy
+                    cpm_expr.args[idx] = new_arg
+                    cpm_expr.update_args(cpm_expr.args) # XXX redundant? we know it's flat so no subexprs anyway
 
-    return newcons
+                newlist += [cpm_expr] + new_cons
+
+            elif cpm_expr.name != "==": # numerical comparison
+                new_expr, new_cons = _rewrite_comparison(cpm_expr, supported=supported,csemap=csemap)
+                newlist += [new_expr] + new_cons
+            
+            else:
+                newlist.append(cpm_expr) # equality constraint, keep
+
+        else:
+            # default, keep original
+            newlist.append(cpm_expr)
+                
+    return newlist
+
+
+def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap=None):
+    """
+    Rewrite a comparison to an equality comparison, and a defining constraint.
+
+    E.g., max(x,y,z) < p is rewritten to:
+        max(x,y,z) == iv & iv < p
+
+    :param cpm_expr: the comparison to rewrite
+    :param csemap: the cse map to use
+    :return: the rewritten comparison and the defining constraint
+    """
+    if not isinstance(cpm_expr, Comparison):
+        return cpm_expr, []
+
+    lhs, rhs = cpm_expr.args # flat, so expression will be on left hand side
+    if cpm_expr.name != "==" and not isinstance(lhs, _NumVarImpl) and lhs.name not in supported:
+        # lhs is unsupported, rewrite to `(LHS == A) & (A <op> RHS)`
+        cpm_expr = copy.copy(cpm_expr)
+        new_lhs, new_cons = get_or_make_var(lhs, csemap=csemap)
+        cpm_expr.args[0] = new_lhs
+        cpm_expr.update_args(cpm_expr.args) # XXX redundant? we know it's flat so no subexprs anyway
+        return cpm_expr, new_cons
+    
+    return cpm_expr, []
+
+

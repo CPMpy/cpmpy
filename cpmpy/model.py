@@ -4,31 +4,30 @@
 ## model.py
 ##
 """
-    The `Model` class is a lazy container for constraints and an objective function.
+    The :class:`Model <cpmpy.model.Model>` class is a lazy container for constraints and an objective function.
+    Constraints and objectives are CPMpy :mod:`expressions <cpmpy.expressions>`.
 
     It is lazy in that it only stores the constraints and objective that are added
-    to it. Processing only starts when solve() is called, and this does not modify
+    to it. Processing only starts when :meth:`solve() <cpmpy.model.Model.solve>` is called, and this does not modify
     the constraints or objective stored in the model.
 
-    A model can be solved multiple times, and constraints can be added to it inbetween
-    solve calls.
+    A model can be solved multiple times, and constraints can be added inbetween solve calls.
+    Note that constraints are added using the ``+=`` operator (implemented by :meth:`__add__() <cpmpy.model.Model.__add__>`).
 
-    See the examples for basic usage, which involves:
-
-    - creation, e.g. `m = Model(cons, minimize=obj)` 
-    - solving, e.g. `m.solve()` 
-    - optionally, checking status/runtime, e.g. `m.status()` 
+    See the full list of functions below.
 
     ===============
     List of classes
     ===============
     .. autosummary::
         :nosignatures:
+        :toctree:
 
         Model
 """
 import copy
 import warnings
+from typing import Optional
 
 import numpy as np
 
@@ -37,7 +36,7 @@ from .expressions.core import Expression
 from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
-from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 
 import pickle
 
@@ -50,9 +49,10 @@ class Model(object):
         """
             Arguments of constructor:
 
-            - `*args`: Expression object(s) or list(s) of Expression objects
-            - `minimize`: Expression object representing the objective to minimize
-            - `maximize`: Expression object representing the objective to maximize
+            Arguments:
+                `*args`: Expression object(s) or list(s) of Expression objects
+                `minimize`: Expression object representing the objective to minimize
+                `maximize`: Expression object representing the objective to maximize
 
             At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
         """
@@ -81,12 +81,21 @@ class Model(object):
             self.minimize(minimize)
 
         
-    def __add__(self, con):
+    def add(self, con):
         """
-            Add one or more constraints to the model
+        Add one or more constraints to the model.
 
-            m = Model()
-            m += [x > 0]
+        Arguments:
+            con (Expression or list): Expression object(s) or list(s) of Expression objects representing constraints
+
+        Returns:
+            Model: Returns self to allow for method chaining
+
+        Example:
+            .. code-block:: python
+
+                m = Model()
+                m += [x > 0]
         """
         if is_any_list(con):
             # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
@@ -107,22 +116,8 @@ class Model(object):
 
         self.constraints.append(con)
         return self
+    __add__ = add  # Make __add__() (for the += operation) be the same as add() 
 
-
-    def objective(self, expr, minimize):
-        """
-            Post the given expression to the solver as objective to minimize/maximize
-
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
-
-            'objective()' can be called multiple times, only the last one is stored
-        """
-        self.objective_ = expr
-        self.objective_is_min = minimize
-
-    def has_objective(self):
-        return self.objective_ is not None
 
     def minimize(self, expr):
         """
@@ -140,17 +135,52 @@ class Model(object):
         """
         self.objective(expr, minimize=False)
 
-    # solver: name of supported solver or any SolverInterface object
-    def solve(self, solver=None, time_limit=None, **kwargs):
-        """ Send the model to a solver and get the result
+    def objective(self, expr, minimize):
+        """
+            Users will typically use :meth:`minimize() <cpmpy.model.Model.minimize>` or :meth:`maximize() <cpmpy.model.Model.maximize>` to set the objective function,
+            this is the generic implementation for both.
 
-        :param solver: name of a solver to use. Run SolverLookup.solvernames() to find out the valid solver names on your system. (default: None = first available solver)
-        :type string: None (default) or a name in SolverLookup.solvernames() or a SolverInterface class (Class, not object!)
+            Arguments:
+                expr (Expression):      the CPMpy expression that represents the objective function
+                minimize (bool):        whether it is a minimization problem (True) or maximization problem (False)
 
-        :param time_limit: optional, time limit in seconds
-        :type time_limit: int or float
+            'objective()' can be called multiple times, only the last one is stored
+        """
+        self.objective_ = expr
+        self.objective_is_min = minimize
 
-        :return: Bool: the computed output:
+    def has_objective(self):
+        """
+            Check if the model has an objective function
+
+            Returns:
+                bool: True if the model has an objective function, False otherwise
+        """
+        return self.objective_ is not None
+
+    def objective_value(self):
+        """
+            Returns the value of the objective function of the last solver run on this model
+
+            Returns:
+                an integer or 'None' if it is not run or is a satisfaction problem
+        """
+        return self.objective_.value()
+
+    def solve(self, solver:Optional[str]=None, time_limit:Optional[int|float]=None, **kwargs):
+        """ Send the model to a solver and get the result.
+
+            Run :func:`SolverLookup.solvernames() <cpmpy.solvers.SolverLookup.solvernames>` to find out the valid solver names on your system. (default: None = first available solver)
+
+        Arguments:
+            solver (string or a name in SolverLookup.solvernames() or a SolverInterface class (Class, not object!), optional): 
+                name of a solver to use.
+            time_limit (int or float, optional): time limit in seconds
+
+            
+        Returns:
+            bool: the computed output:
+
             - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
             - False     if no solution is found
         """
@@ -169,18 +199,20 @@ class Model(object):
         self.cpm_status = s.status()
         return ret
 
-    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
-            Delegated to the solver, who might implement this efficiently
+            If no solution is found, the solver status will be 'Unsatisfiable'.
+            If at least one solution was found and the solver exhausted all possible solutions, the solver status will be 'Optimal', otherwise 'Feasible'.
 
             Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - solution_limit: stop after this many solutions (default: None)
+                display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                                    default/None: nothing displayed
+                solution_limit:     stop after this many solutions (default: None)
 
-            Returns: number of solutions found
+            Returns:
+                int: number of solutions found (within the time and solution limit)
         """
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
@@ -203,19 +235,18 @@ class Model(object):
 
             Status information includes exit status (optimality) and runtime.
 
-        :return: an object of :class:`SolverStatus`
+            Returns:
+                an object of :class:`SolverStatus`
         """
         return self.cpm_status
 
-    def objective_value(self):
-        """
-            Returns the value of the objective function of the latste solver run on this model
-
-        :return: an integer or 'None' if it is not run, or a satisfaction problem
-        """
-        return self.objective_.value()
-
     def __repr__(self):
+        """
+            Returns a string representation of the model
+
+            Returns:
+                str: A string representation of the model
+        """
         cons_str = ""
         for c in self.constraints:
             cons_str += "    {}\n".format(c)
@@ -233,9 +264,10 @@ class Model(object):
 
     def to_file(self, fname):
         """
-            Serializes this model to a .pickle format
+            Serializes this model to a ``.pickle`` format
 
-            :param: fname: Filename of the resulting serialized model
+            Arguments:
+                fname (FileDescriptorOrPath): Filename of the resulting serialized model
         """
         with open(fname,"wb") as f:
             pickle.dump(self, file=f)
@@ -246,30 +278,32 @@ class Model(object):
         """
             Reads a Model instance from a binary pickled file
 
-            :return: an object of :class: `Model`
+            Returns:
+                an object of :class: `Model`
         """
         with open(fname, "rb") as f:
             m = pickle.load(f)
             # bug 158, we should increase the boolvar/intvar counters to avoid duplicate names
             from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
+            from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, _BV_PREFIX, _IV_PREFIX # avoid circular import
             vs = get_variables_model(m)
             bv_counter = 0
             iv_counter = 0
             for v in vs:
-                if v.name.startswith("BV"):
+                if v.name.startswith(_BV_PREFIX):
                     try:
                         bv_counter = max(bv_counter, int(v.name[2:])+1)
                     except:
                         pass
-                elif v.name.startswith("IV"):
+                elif v.name.startswith(_IV_PREFIX):
                     try:
                         iv_counter = max(iv_counter, int(v.name[2:])+1)
                     except:
                         pass
-            from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl  # avoid circular import
+
             if (_BoolVarImpl.counter > 0 and bv_counter > 0) or \
                     (_IntVarImpl.counter > 0 and iv_counter > 0):
-                warnings.warn(f"from_file '{fname}': contains auxiliary IV*/BV* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
+                warnings.warn(f"from_file '{fname}': contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
             _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
             _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)
             return m

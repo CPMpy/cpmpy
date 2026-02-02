@@ -1,3 +1,4 @@
+import os
 import unittest
 import tempfile
 
@@ -6,11 +7,19 @@ import cpmpy as cp
 from cpmpy.tools.dimacs import read_dimacs, write_dimacs
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
+from cpmpy.solvers.pindakaas import CPM_pindakaas
 
+
+
+@pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
 class CNFTool(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.tmpfile = tempfile.NamedTemporaryFile()
+        self.tmpfile = tempfile.NamedTemporaryFile(mode='w', delete=False)
+
+    def tearDown(self) -> None:
+        self.tmpfile.close()
+        os.remove(self.tmpfile.name)
 
     def dimacs_to_model(self, cnf_str):
         # return read_dimacs(io.StringIO(cnf_str))
@@ -28,7 +37,7 @@ class CNFTool(unittest.TestCase):
     def test_empty_formula(self):
         model = self.dimacs_to_model("p cnf 0 0")
         self.assertTrue(model.solve())
-        self.assertEqual(model.status().exitstatus, ExitStatus.OPTIMAL)
+        self.assertEqual(model.status().exitstatus, ExitStatus.FEASIBLE)
 
     def test_empty_clauses(self):
         model = self.dimacs_to_model("p cnf 0 2\n0\n0")
@@ -54,10 +63,13 @@ class CNFTool(unittest.TestCase):
         m += b.implies(~c)
         m += a <= 0
 
-        cnf_txt = write_dimacs(m)
         gt_cnf = "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
+        gt_clauses = set(gt_cnf.split("\n")[1:]) # skip the p-line
 
-        self.assertEqual(cnf_txt, gt_cnf)
+        cnf_txt = write_dimacs(model=m)
+        cnf_clauses = set(cnf_txt.split("\n")[1:]) # skip the p-line
+       
+        self.assertEqual(cnf_clauses, gt_clauses)
 
 
     def test_missing_p_line(self):

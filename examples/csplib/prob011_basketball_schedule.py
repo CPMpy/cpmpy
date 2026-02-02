@@ -123,13 +123,12 @@ def basketball_schedule():
         for d in days[:-3]:
             if t not in [UNC, DUKE, WAKE]:
                 # No team plays in three consecutive dates against UNC, Duke and Wake (independent of home/away).
-                model += ~((config[d,t] == UNC)  & (config[d+1,t] == DUKE) & (config[d+2] == WAKE))
-                model += ~((config[d,t] == UNC)  & (config[d+1,t] == WAKE) & (config[d+2] == DUKE))
-                model += ~((config[d,t] == DUKE) & (config[d+1,t] == UNC)  & (config[d+2] == WAKE))
-                model += ~((config[d,t] == DUKE) & (config[d+1,t] == WAKE) & (config[d+2] == UNC))
-                model += ~((config[d,t] == WAKE) & (config[d+1,t] == UNC)  & (config[d+2] == DUKE))
-                model += ~((config[d,t] == WAKE) & (config[d+1,t] == DUKE) & (config[d+2] == UNC))
-
+                model += ~((config[d,t] == UNC)  & (config[d+1,t] == DUKE) & (config[d+2,t] == WAKE))
+                model += ~((config[d,t] == UNC)  & (config[d+1,t] == WAKE) & (config[d+2,t] == DUKE))
+                model += ~((config[d,t] == DUKE) & (config[d+1,t] == UNC)  & (config[d+2,t] == WAKE))
+                model += ~((config[d,t] == DUKE) & (config[d+1,t] == WAKE) & (config[d+2,t] == UNC))
+                model += ~((config[d,t] == WAKE) & (config[d+1,t] == UNC)  & (config[d+2,t] == DUKE))
+                model += ~((config[d,t] == WAKE) & (config[d+1,t] == DUKE) & (config[d+2,t] == UNC))
 
     # 9. Other constraints
     # UNC plays its rival Duke in the last date and in date 11
