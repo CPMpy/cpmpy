@@ -205,8 +205,8 @@ def global_constraints(solver):
             continue
 
         elif name == "CumulativeOptional":
-            s = intvar(0, 10, shape=4, name="start")
-            e = intvar(0, 10, shape=4, name="end")
+            s = cp.intvar(0, 10, shape=4, name="start")
+            e = cp.intvar(0, 10, shape=4, name="end")
             dur = [1, 4, 3, 2]
             demand = [11, 4, 8, 7]
             is_present = [cp.boolvar(), cp.boolvar(), True, False]
@@ -233,8 +233,8 @@ def global_constraints(solver):
                 yield cp.NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
             continue
         elif name == "NoOverlapOptional":
-            s = intvar(0, 10, shape=4, name="start")
-            e = intvar(0, 10, shape=4, name="end")
+            s = cp.intvar(0, 10, shape=4, name="start")
+            e = cp.intvar(0, 10, shape=4, name="end")
             dur = [1, 4, 3, 2]
             is_present = [cp.boolvar(), cp.boolvar(), True, False]
             expr = cls(s, dur, e, is_present)
