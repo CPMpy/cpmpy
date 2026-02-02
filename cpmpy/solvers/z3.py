@@ -45,7 +45,7 @@
     Module details
     ==============
 """
-from typing import Optional, List
+from typing import Optional, List, Iterable
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -54,7 +54,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
-from ..expressions.utils import flatlist, is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -142,7 +142,7 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit=None, assumptions=[], **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
             Call the z3 solver
 
@@ -187,11 +187,8 @@ class CPM_z3(SolverInterface):
             self.z3_solver.set(timeout=int(time_limit*1000))
 
 
-        if assumptions is None:
-            assumptions = []
-
         if assumptions is not None:
-            assumptions = flatlist(assumptions)
+            assumptions = list(assumptions)  # iterable to ordered list
             z3_assum_vars = self.solver_vars(assumptions)
             self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
         else:

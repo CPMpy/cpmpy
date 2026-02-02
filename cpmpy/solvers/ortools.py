@@ -44,7 +44,7 @@
     ==============
 """
 import sys
-from typing import Optional, List
+from typing import Optional, List, Iterable
 import warnings  # for stdout checking
 import numpy as np
 
@@ -148,13 +148,13 @@ class CPM_ortools(SolverInterface):
         return self.ort_model
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, solution_callback=None, **kwargs):
         """
             Call the CP-SAT solver
 
             Arguments:
                 time_limit (float, optional):  maximum solve time in seconds 
-                assumptions:    list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                assumptions:    iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                 For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                 get_core() returns a small subset of assumption variables that are unsat together.
                                 Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
@@ -201,7 +201,8 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:
-            ort_assum_vars = self.solver_vars(flatlist(assumptions))
+            assumptions = list(assumptions)  # iterable to ordered list
+            ort_assum_vars = self.solver_vars(assumptions)
             # dict mapping ortools vars to CPMpy vars
             self.assumption_dict = {ort_var.Index(): cpm_var for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars)}
             self.ort_model.ClearAssumptions()  # because add just appends

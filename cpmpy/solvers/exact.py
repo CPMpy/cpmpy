@@ -48,7 +48,7 @@
 """
 import sys  # for stdout checking
 import time
-from typing import Optional, List
+from typing import Optional, List, Iterable
 
 from packaging.version import Version
 
@@ -173,7 +173,7 @@ class CPM_exact(SolverInterface):
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
             Call Exact
 
@@ -182,7 +182,7 @@ class CPM_exact(SolverInterface):
             :param assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
-            :type assumptions: list of CPMpy Boolean variables
+            :type assumptions: iterable (e.g. list, set, tuple) of CPMpy Boolean variables
 
             :param time_limit: optional, time limit in seconds
             :type time_limit: int or float
@@ -206,7 +206,7 @@ class CPM_exact(SolverInterface):
 
         # set assumptions
         if assumptions is not None:
-            assumptions = flatlist(assumptions)
+            assumptions = list(assumptions)  # iterable to ordered list
             assert all(v.is_bool() for v in assumptions), "Non-Boolean assumptions given to Exact: " + str([v for v in assumptions if not v.is_bool()])
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
             assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
