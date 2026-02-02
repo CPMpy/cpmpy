@@ -508,7 +508,7 @@ class NDVarArray(np.ndarray, Expression):
                 index += [index.pop(expr_dim[0])]
 
                 arr = np.moveaxis(self, expr_dim[0], -1)
-                return cp.Element(arr[index[:-1]], index[-1])
+                return cp.Element(arr[(*index[:-1],)], index[-1])
 
 
             arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
