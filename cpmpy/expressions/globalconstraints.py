@@ -137,7 +137,7 @@ import numpy as np
 
 import cpmpy as cp
 
-from .core import Expression, BoolVal
+from .core import Expression, BoolVal, Bool, BoolExpression # last two are for type hints
 from .variables import cpm_array, intvar, boolvar
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr
 from .globalfunctions import * # XXX make this file backwards compatible
@@ -917,7 +917,7 @@ class Xor(GlobalConstraint):
     Equivalent to `sum(args) % 2 == 1`
     """
 
-    def __init__(self, arg_list: Sequence[Expression]):
+    def __init__(self, arg_list: Sequence[Bool|BoolExpression]):
         """
         Arguments:
             arg_list (Sequence[Expression]): List of Boolean expressions to be xor'ed

@@ -413,15 +413,14 @@ class Expression(object):
 
     def __pow__(self, other: Int, modulo=None) -> "Expression":
         assert (modulo is None), "Power operator: modulo not supported"
-        # XXX I think only a power with a constant exponent is supported
-        if is_num(other) and other == 1:
-            return self
-        return cp.Power(self, other)
+        if is_num(other):
+            if other == 1:
+                return self
+            return cp.Power(self, int(other))
+        raise TypeError(f"Power operator: exponent must be an integer, got {other} of type {type(other)}")
 
-    def __rpow__(self, other: Int, modulo=None) -> "Expression":  # type: ignore[misc]
-        assert (modulo is None), "Power operator: modulo not supported"
-        # XXX I think only a power with a constant exponent is supported
-        return cp.Power(other, self)
+    def __rpow__(self, other, modulo=None) -> "Expression":  # type: ignore[misc]
+        raise TypeError(f"Power operator: exponent must be an integer, got {self} of type {type(self)}")
 
     # Not implemented: (yet?)
     #object.__divmod__(self, other)

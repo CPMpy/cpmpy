@@ -77,7 +77,7 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator
+from .core import Expression, Operator, Int  # Int is for type hints
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
@@ -316,7 +316,7 @@ class Division(GlobalFunction):
         * floor division (Python): `-7 // 3` = `math.floor(-7/3)` = -3
     """
 
-    def __init__(self, x: Expression, y: Expression):
+    def __init__(self, x: Int|Expression, y: Int|Expression):
         """
         Arguments:
             x (Expression): Expression to divide
@@ -497,7 +497,7 @@ class Power(GlobalFunction):
     Only non-negative constant integer exponents are supported.
     """
 
-    def __init__(self, base:Expression, exponent:int):
+    def __init__(self, base:Int|Expression, exponent:int):
         """
         Arguments:
             base (Expression): Expression to raise to the power
