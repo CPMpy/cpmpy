@@ -55,10 +55,9 @@ def explain_ocus(soft, soft_weights=None,  hard=[], solver="ortools", verbose=0)
     # compute all derivable literals
     full_sol = solution_intersection(Model(hard + soft), solver, verbose)
 
-
     # prep soft constraint formulation with a literal for each soft constraint
     # (so we can iteratively use an assumption solver on softliterals)
-    soft_lit = BoolVar(shape=len(soft), name="ind")
+    soft_lit = boolvar(shape=len(soft), name="ind")
     reified_soft = []
     for i,bv in enumerate(soft_lit):
         reified_soft += [bv.implies(soft[i])]
@@ -196,7 +195,7 @@ def explain_one_step_ocus(hard, soft_lit, cost, remaining_sol_to_explain, solver
     ## ----- SAT solver model ----
     SAT = SolverLookup.lookup(solver)(Model(hard))
 
-    while(True):
+    while True:
         hittingset_solver.solve()
 
         # Get hitting set
@@ -209,6 +208,7 @@ def explain_one_step_ocus(hard, soft_lit, cost, remaining_sol_to_explain, solver
             print("\n\t hs =", hs, S)
 
         # SAT check and computation of model
+        # TODO: fix needing to cast to list for OR-Tools (Issue #689)
         if not SAT.solve(assumptions=S):
             if verbose > 1:
                 print("\n\t ===> OCUS =", S)
@@ -242,7 +242,7 @@ def solution_intersection(model, solver="ortools", verbose=False):
     assert SAT.solve(), "Propagation of soft constraints only possible if model is SAT."
     sat_model = set(bv if bv.value() else ~bv for bv in sat_vars)
 
-    while(SAT.solve()):
+    while SAT.solve():
         # negate the values of the model
         sat_model &= set(bv if bv.value() else ~bv for bv in sat_vars)
         blocking_clause = ~all(sat_model)
@@ -265,11 +265,10 @@ def cost_func(soft, soft_weights):
     '''
 
     def cost_lit(cons):
-        # return soft weight if constraint is a soft constraint
-        if len(set({cons}) & set(soft)) > 0:
+        # return soft weight if the constraint is a soft constraint
+        if cons in set(soft):
             return soft_weights[soft.index(cons)]
-        else:
-            return 1
+        return 1
 
     return cost_lit
 

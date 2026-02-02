@@ -20,17 +20,19 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 
 
 solver_dependencies = {
-    "ortools": ["ortools"],
-    "z3": ["z3-solver"],
-    "choco": ["pychoco>=0.2.1"],
-    "exact": ["exact>=2.1.0"],
-    "minizinc": ["minizinc"],
-    "pysat": ["python-sat"],
-    "gurobi": ["gurobipy"],
-    "pysdd": ["pysdd"],
-    "gcs": ["gcspy"],
-    "cpo": ["docplex"],
-    "pindakaas": ["pindakaas"],
+    "ortools": ["ortools>=9.3.10497,<=9.14.6206,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
+    "z3": ["z3-solver>=4.8.15.0,<=4.15.4.0"],
+    "choco": ["pychoco>=0.2.1,<=0.2.4"],
+    "exact": ["exact>=2.1.0,<=2.2.1"], # older versions (<2.2.1) are bugged on py3.13
+    "minizinc": ["minizinc>=0.7.0,<=0.10.0"],
+    "pysat": ["python-sat>=1.8.dev4,<=1.9.dev26"],
+    "gurobi": ["gurobipy>=11.0.0,<=13.0.0"],
+    "pysdd": ["pysdd>=0.2.11,<=1.0.6"],
+    "gcs": ["gcspy==0.1.9"], # first version to pass all tests
+    "cpo": ["docplex>=2.28.240,<=2.31.254"],
+    "pumpkin": ["pumpkin-solver==0.2.2"], # CPMpy requires features only available from Pumpkin version >=0.2.2
+    "pindakaas": ["pindakaas>=0.2.1,<=0.3.0"],
+    "cplex": ["docplex>=2.28.240,<=2.31.254", "cplex>=20.1.0.4,<=22.1.2.0"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
@@ -48,23 +50,27 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'ortools>=9.9',
+        'ortools>=9.3.10497,<=9.14.6206,!=9.9.*,!=9.10.*,!=9.11.*',
         'numpy>=1.5',
         'setuptools',
+        'packaging', # to check solver versions
     ],
     extras_require={
         # Solvers
         **solver_dependencies,
         # Tools
-        "xcsp3": ["pycsp3", "requests", "tqdm", "matplotlib", "psutil", "filelock", "gnureadlines; platform_system != 'Windows'", "pyreadline3; platform_system == 'Windows'"], # didn't add CLI-specific req since some are not cross-platform
+        "xcsp3": ["pycsp3", "requests", "tqdm", "matplotlib", "psutil", "filelock", "gnureadline; platform_system != 'Windows'", "pyreadline3; platform_system == 'Windows'"], # didn't add CLI-specific req since some are not cross-platform
         # Other
-        "test": ["pytest"],
+        "test": ["pytest", "pytest-timeout"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
+    },
+    entry_points={
+        'console_scripts': [
+            'cpmpy = cpmpy.cli:main',
+        ],
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
@@ -72,5 +78,5 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.8'
+    python_requires='>=3.10'
 )
