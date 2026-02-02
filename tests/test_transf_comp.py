@@ -1,35 +1,33 @@
-import pytest
-from cpmpy import *
+import unittest
+import numpy as np
+
+import cpmpy as cp
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.comparison import only_numexpr_equality
-from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
+from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
-# three integer variables
-xs = intvar(1, 9, shape=3, name="x")
+class TestTransfComp(unittest.TestCase):
+    def setUp(self):
+        _IntVarImpl.counter = 0
+        _BoolVarImpl.counter = 0
 
-# these expected in- and output constraints for `only_numexpr_equality(flatten_constraint)`
-TEST_CASES = [
-    (min(xs) == 3, "[min(x[0],x[1],x[2]) == 3]"),
-    (min(xs) > 3, "[(min(x[0],x[1],x[2])) == (IV0), IV0 > 3]"),
-    (min(xs) <= 3, "[(min(x[0],x[1],x[2])) == (IV0), IV0 <= 3]"),
-    (3 != max(xs), "[(max(x[0],x[1],x[2])) == (IV0), IV0 != 3]"),
-    (3 > max(xs), "[(max(x[0],x[1],x[2])) == (IV0), IV0 < 3]"),
-    (3 <= max(xs), "[(max(x[0],x[1],x[2])) == (IV0), IV0 >= 3]"),
-]
+    def test_only_numexpr_eq(self):
+        ivs = cp.intvar(1,9, shape=3, name="ivs")
+        
+        cases = [(cp.min(ivs) == 3, ["min(ivs[0],ivs[1],ivs[2]) == 3"]),
+                 (cp.min(ivs) > 3, ["(min(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 > 3"]),
+                 (cp.min(ivs) <= 3, ["(min(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 <= 3"]),
+                 (3 != cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 != 3"]),
+                 (3 > cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 < 3"]),
+                 (3 <= cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 >= 3"]),
+                ]
+
+        # test transformation
+        transform = lambda expr: only_numexpr_equality(flatten_constraint(expr))
+
+        for (expr, strexpr) in cases:
+            self.setUp()  # reset the IV counters
+            self.assertSetEqual( set([str(c) for c in transform(expr)]), set(strexpr) )
+            self.assertTrue(cp.Model(expr).solve())
 
 
-@pytest.fixture()
-def setup():
-    # reset counters *before* parametrization
-    _IntVarImpl.counter = 0
-    _BoolVarImpl.counter = 0
-    yield
-
-
-class TestTransform:
-    @pytest.mark.parametrize("case", TEST_CASES)
-    def test_flatten_constraint(self, case, setup):
-        constraint, expected = case
-        flat = only_numexpr_equality(flatten_constraint(constraint))
-        assert str(flat) == expected
-        assert Model(constraint).solve()
