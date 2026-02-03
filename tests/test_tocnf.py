@@ -51,6 +51,7 @@ cases = [
     c | (a & b),  # above minimized
 ]
 
+
 def get_gcnf_cases():
     p, q = cp.boolvar(shape=2, name=["p", "q"])
     soft = (cp.sum([2 * p + 3 * q]) <= 4, p & q)
@@ -70,6 +71,11 @@ def get_gcnf_cases():
     hard = [y == 1]
     yield soft, hard
 
+    bs = cp.boolvar(4, name="b")
+    soft = [cp.sum(bs) >= 1, cp.sum(bs) <= 1]
+    hard = []
+    yield soft, hard
+
 
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
 class TestToCnf:
@@ -82,7 +88,7 @@ class TestToCnf:
 
     @pytest.mark.parametrize(
         "case",
-        [case for case in get_gcnf_cases()],
+        get_gcnf_cases(),
         ids=idfn,
     )
     def test_togcnf(self, case):
@@ -90,14 +96,17 @@ class TestToCnf:
 
         model = cp.Model(soft + hard)
         assump_model, _, _ = make_assump_model(soft, hard, name="a")
-        print("a_model", assump_model)
 
         ivarmap = dict()
+        normalize = True
+        print("hard = ", hard)
+        print("soft = ", soft)
         gcnf_model, soft_, hard_, assumptions = to_gcnf(
             soft,
             hard,
             name="a",
             ivarmap=ivarmap,
+            normalize=normalize,
         )
         print("m", gcnf_model)
         print("s", soft_)

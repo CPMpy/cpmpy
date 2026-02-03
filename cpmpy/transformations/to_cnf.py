@@ -9,9 +9,10 @@ from ..expressions.utils import is_any_list
 from ..solvers.pindakaas import CPM_pindakaas
 from ..transformations.get_variables import get_variables
 from cpmpy.tools.explain.marco import make_assump_model
+from cpmpy.expressions.utils import all_pairs
 
 
-def to_gcnf(soft, hard, name=None, csemap=None, ivarmap=None, encoding="auto"):
+def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="auto", normalize=False):
     """
     Or `make_assump_cnf`; returns an assumption CNF model, and separately the soft clauses, hard clauses, and assumption variables. Follows https://satisfiability.org/competition/2011/rules.pdf, however, there is no guarantee that the groups are disjoint.
     """
@@ -20,26 +21,79 @@ def to_gcnf(soft, hard, name=None, csemap=None, ivarmap=None, encoding="auto"):
     model_ = to_cnf(model.constraints, encoding=encoding, csemap=csemap, ivarmap=ivarmap)
 
     hard_clauses = []
-    soft_clauses = []
+    # soft_clauses = dict()
+    constraints = {True: [], **{a: [] for a in assump}}
 
-    def add_gcnf_clause(lits):
-        # ASSUMPTION: first literal should be the (negated) assumption variable
-        if ~lits[0] in assump:
-            soft_clauses.append(cp.any(lits[1:]))
+    def add_gcnf_clause_(lits):
+        # find the assumption variable (not guaranteed to be first)
+        i = next((i for i, l in enumerate(lits) if (~l) in assump), None)
+        if i:
+            constraints[~lits[i]].append(cp.any(l for i_, l in enumerate(lits) if i_ != i))
         else:
-            hard_clauses.append(cp.any(lits))
+            # hard clause (w/o assumption var)
+            constraints[True].append(cp.any(lits))
+
+    def add_gcnf_clause(cpm_expr):
+        for clause in _to_clauses(cpm_expr):
+            i = next((i for i, l in enumerate(clause) if (~l) in assump), None)
+            print("II", i)
+            if i is None:
+                # hard clause (w/o assumption var)
+                constraints[True].append(cp.any(clause))
+            else:
+                # soft clause
+                constraints[~clause[i]].append(cp.any(l for i_, l in enumerate(clause) if i_ != i))
 
     for c in model_:
-        if isinstance(c, _BoolVarImpl):
-            add_gcnf_clause([c])
-        elif is_any_list(c):
-            for ci in c:
-                add_gcnf_clause(ci.args)
-        elif isinstance(c, Operator) and c.name == "or":
-            add_gcnf_clause(c.args)
+        add_gcnf_clause(c)
+
+    if normalize:
+        for (a, g_a), (b, g_b) in all_pairs(constraints.items()):
+            print("a", a, g_a)
+            print("b", b, g_b)
+            for i, c_a in enumerate(g_a):
+                for j, c_b in enumerate(g_b):
+                    print("cc, ", c_a, c_b)
+                    if c_a == c_b:
+                        f = cp.boolvar()
+                        g_b[j] = f
+                        # add_gcnf_clause(f.implies(c_b))
+                        print(c_b)
+                        add_gcnf_clause(f.implies(c_b))
+
+            # if g_a == g_b:
+            #     soft_clauses[j] = cp.boolvar()
+            #     add_gcnf_clause_(soft_clauses[j].implies(g_a))
+            #
+    # if normalize:
+    #     print(soft_clauses)
+    #     assert all(set(a).isdisjoint(b) for a, b in all_pairs(soft_clauses))
+
+    return (
+        cp.Model(model_),
+        [cp.all(constraints[a]) for a in assump],
+        [cp.all(constraints[True])] if constraints[True] else [],
+        assump,
+    )
+
+
+def _to_clauses(cons):
+    """Takes some CPMpy constraints in CNF and returns clauses as lists of lists"""
+    if isinstance(cons, _BoolVarImpl):
+        return [[cons]]
+    elif isinstance(cons, Operator):
+        if cons.name == "or":
+            return [cons.args]
+        elif cons.name == "and":
+            return [c_ for c in cons.args for c_ in _to_clauses(c)]
+        elif cons.name == "->":
+            return [[~cons.args[0], *c] for c in _to_clauses(cons.args[1])]
         else:
-            raise TypeError
-    return cp.Model(model_), soft_clauses, hard_clauses, assump
+            raise NotImplementedError(f"Unsupported Op {cons.name}")
+    elif cons is True:
+        return []
+    else:
+        raise NotImplementedError(f"Unsupported constraint {cons}")
 
 
 def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):

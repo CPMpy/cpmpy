@@ -8,11 +8,12 @@ from cpmpy.tools.dimacs import read_dimacs, write_dimacs, write_gcnf
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.pindakaas import CPM_pindakaas
+from test_tocnf import get_gcnf_cases
 
 
 
-@pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
-class CNFTool(unittest.TestCase):
+# @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
+class CnfTool:
 
     def setUp(self) -> None:
         self.tmpfile = tempfile.NamedTemporaryFile(mode='w', delete=False)
@@ -106,6 +107,7 @@ class CNFTool(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.dimacs_to_model("p cnf 2 1\n1 0")
     
+class TestDimacs:
     def test_gcnf(self):
         x = cp.boolvar(shape=3, name="x")
         def x_(i):
@@ -142,17 +144,46 @@ class CNFTool(unittest.TestCase):
         # {4} -2 3 0
         # """
 
-        assert write_gcnf(soft, hard=hard, encoding="direct") == """p gcnf 6 12 4
+        assert write_gcnf(soft, hard=hard, name="a", encoding="direct") == """p gcnf 5 12 4
 {0} 1 2 3 0
-{0} 3 -4 0
-{0} -5 6 0
-{0} -2 -5 0
-{0} 5 -6 2 0
-{0} -6 -3 2 0
-{0} 3 6 0
-{0} -2 6 0
+{0} -4 5 0
+{0} -2 -4 0
+{0} 4 -5 2 0
+{0} -5 -3 2 0
+{0} 3 5 0
+{0} -2 5 0
 {1} -1 2 0
-{2} -2 3 0
-{3} 5 -3 0
+{1} -2 3 0
+{2} 3 0
+{3} 4 -3 0
 {4} -2 3 0
 """
+
+        # note: 2nd clause of group 4 is merged with 2nd clause of group 1
+        assert write_gcnf(soft, hard=hard, name="a", encoding="direct", normalize=True) == """p gcnf 6 13 4
+{0} 1 2 3 0
+{0} -4 5 0
+{0} -2 -4 0
+{0} 4 -5 2 0
+{0} -5 -3 2 0
+{0} 3 5 0
+{0} -2 5 0
+{0} -6 -2 3 0
+{1} -1 2 0
+{1} -2 3 0
+{2} 3 0
+{3} 4 -3 0
+{4} 6 0
+"""
+
+
+    @pytest.mark.parametrize(
+        "case",
+        get_gcnf_cases(),
+    )
+    def test_normalized_gcnf(self, case):
+        print("case", case)
+        soft, hard = case
+        gcnf = write_gcnf(soft, hard=hard, name="a", encoding="direct", normalize=True)
+        print('gcnf', gcnf)
+

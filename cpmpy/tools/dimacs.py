@@ -20,10 +20,10 @@ import cpmpy as cp
 from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView, Operator
 
 from cpmpy.transformations.normalize import toplevel_list
-from cpmpy.transformations.to_cnf import to_cnf, to_gcnf
+from cpmpy.transformations.to_cnf import to_cnf, to_gcnf, _to_clauses
 from cpmpy.transformations.get_variables import get_variables
 
-def write_gcnf(soft, hard=None, name=None, fname=None, encoding="auto"):
+def write_gcnf(soft, hard=None, name=None, fname=None, encoding="auto", normalize=False):
     """
         Writes CPMpy model to GDIMACS format.
         Uses the "to_gcnf" transformation from CPMpy.
@@ -33,7 +33,7 @@ def write_gcnf(soft, hard=None, name=None, fname=None, encoding="auto"):
         :param hard: list of hard constraints
         :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     """
-    _, soft, hard, assumptions = to_gcnf(soft, hard, name=name, encoding=encoding)
+    _, soft, hard, assumptions = to_gcnf(soft, hard, name=name, encoding=encoding, normalize=normalize)
     return write_dimacs_(hard, groups=zip(assumptions, soft), fname=fname)
 
 def write_dimacs(model, fname=None, encoding="auto"):
@@ -49,50 +49,43 @@ def write_dimacs(model, fname=None, encoding="auto"):
     return write_dimacs_(constraints, fname=fname)
 
 def write_dimacs_(constraints, groups=None, fname=None):
-    vars = get_variables(constraints)
-    mapping = {v : i+1 for i, v in enumerate(vars)}
 
     # Check explicitly for None, since groups=[] is a GCNF with only hard constraints (the {0} group), while groups=None should be a CNF
     is_gcnf = groups is not None
 
+    groups = list(groups) if groups is not None else []
+
+    vars = get_variables([constraints] + [con for _, con in groups])
+    mapping = {v : i+1 for i, v in enumerate(vars)}
+
     out = ""
-    if is_gcnf:
-        typ = "gcnf"
-        # exhaust iterator to get number of groups up-front
-        groups = list(groups)
-        out += f' {len(groups)}'
-    else:
-        typ = "cnf"
-        groups = []
-
-    out = f"p {typ} {len(vars)} {len(constraints) + len(groups)}{f' {len(groups)}' if is_gcnf else ''}"
-
-    out += '\n'
-
+    n_clauses = 0
     for group, cons in itertools.chain(
             zip(itertools.repeat(0), constraints),
             ((i, constraint) for i, (_, constraint) in enumerate(groups, start=1))
         ):
 
-        if isinstance(cons, _BoolVarImpl):
-            cons = Operator("or", [cons])
 
-        if not (isinstance(cons, Operator) and cons.name == "or"):
-            raise NotImplementedError(f"Unsupported constraint {cons}")
+        clauses = _to_clauses(cons)
+        n_clauses += len(clauses)
+        for clause in clauses:
+            # write clause to cnf format
+            ints = []
+            for v in clause:
+                if v is True:
+                    continue
+                elif isinstance(v, NegBoolView):
+                    ints.append(str(-mapping[v._bv]))
+                elif isinstance(v, _BoolVarImpl):
+                    ints.append(str(mapping[v]))
+                else:
+                    raise ValueError(f"Expected Boolean variable in clause, but got {v} which is of type {type(v)}")
 
-        # write clause to cnf format
-        ints = []
-        for v in cons.args:
-            if isinstance(v, NegBoolView):
-                ints.append(str(-mapping[v._bv]))
-            elif isinstance(v, _BoolVarImpl):
-                ints.append(str(mapping[v]))
-            else:
-                raise ValueError(f"Expected Boolean variable in clause, but got {v} which is of type {type(v)}")
+            if is_gcnf:
+                out += f"{{{group}}} "
+            out += " ".join(ints + ["0"]) + "\n"
 
-        if is_gcnf:
-            out += f"{{{group}}} "
-        out += " ".join(ints + ["0"]) + "\n"
+    out = f"p {'g' if is_gcnf else ''}cnf {len(vars)} {n_clauses}{f' {len(groups)}' if is_gcnf else ''}\n" + out
 
     if fname is not None:
         with open(fname, "w") as f:
