@@ -48,20 +48,23 @@
         CPM_template
 """
 
+from typing import Optional
 import warnings
-import pkg_resources
-from pkg_resources import VersionConflict
+from packaging.version import Version
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.flatten_model import flatten_constraint
+from ..transformations.safening import no_partial_functions
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies
+from ..transformations.safening import safen_objective
+
 
 class CPM_template(SolverInterface):
     """
@@ -74,23 +77,78 @@ class CPM_template(SolverInterface):
     <URL to docs or source code>
     """
 
+    # [GUIDELINE] list all supported global constraints and global functions
+    #           (e.g., 'alldifferent', 'max', 'element', ...)
+    supported_global_constraints = frozenset({'alldifferent', 'max', 'element'})
+    # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
+    #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         # try to import the package
         try:
             import TEMPLATEpy as gp
             # optionally enforce a specific version
-            pkg_resources.require("TEMPLATEpy>=2.1.0")
+            tpl_version = CPM_template.version()
+            if Version(tpl_version) < Version("2.1.0"):
+                warnings.warn(f"CPMpy uses features only available from TEMPLATEpy version 0.2.1, "
+                              f"but you have version {tpl_version}.")
+                return False
             return True
         except ModuleNotFoundError: # if solver's Python package is not installed
-            return False
-        except VersionConflict: # unsupported version of TEMPLATEpy (optional)
-            warnings.warn(f"CPMpy uses features only available from TEMPLATEpy version 0.2.1, "
-                          f"but you have version {pkg_resources.get_distribution('TEMPLATEpy').version}.")
             return False
         except Exception as e:
             raise e
 
+    @classmethod
+    def version(cls) -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        from importlib.metadata import version, PackageNotFoundError
+        try:
+            return version('TEMPLATEpy')
+        except PackageNotFoundError:
+            return None
+        
+    # [GUIDELINE] If your solver supports different subsolvers, implement below method to return a list of subsolver names
+    @staticmethod
+    def solvernames(installed:bool=True):
+        """
+            Returns solvers supported by TEMPLATE (on your system).
+
+            Arguments:
+                installed (boolean): whether to filter the solvernames to those installed on your system (default True)
+               
+            Returns:
+                list of solver names
+        """
+        if CPM_template.supported():
+            # Collect solver names
+            if installed:
+                return # [ ... list of the installed subsolver names ... ]
+            else:
+                return # [ ... list of all subsolver names ... ]
+        else:
+            warnings.warn("TEMPLATE is not installed or not supported on this system.")
+            return []
+
+    # [GUIDELINE] If your solver supports different subsolvers, implement below method to return their respective versions
+    @classmethod
+    def solverversion(cls, subsolver:str) -> Optional[str]:
+        """
+        Returns the version of the requested subsolver.
+
+        Arguments:
+            subsolver (str): name of the subsolver
+
+        Returns:
+            Version number of the subsolver if installed, else None 
+        """
+        # return version of requested subsolver (if installed)
+        # if requested subsolver does not exist, raise ValueError
+        pass
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -101,7 +159,7 @@ class CPM_template(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise Exception("CPM_TEMPLATE: Install the python package 'TEMPLATEpy' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_TEMPLATE: Install the python package 'cpmpy[TEMPLATE]' to use this solver interface.")   
 
         import TEMPLATEpy
 
@@ -111,6 +169,7 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] we commonly use 3-letter abbrivations to refer to native objects:
         #           OR-tools uses ort_solver, Gurobi grb_solver, Exact xct_solver...
         self.TPL_solver = TEMPLATEpy.Solver("cpmpy") 
+        self.TPL_model = TEMPLATEpy.model("cpmpy")
 
         # initialise everything else and post the constraints/objective
         # [GUIDELINE] this superclass call should happen AFTER all solver-native objects are created.
@@ -118,7 +177,14 @@ class CPM_template(SolverInterface):
         super().__init__(name="TEMPLATE", cpm_model=cpm_model)
 
 
-    def solve(self, time_limit=None, **kwargs):
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.TPL_model
+
+    def solve(self, time_limit:Optional[float]=None, **kwargs):
         """
             Call the TEMPLATE solver
 
@@ -151,9 +217,19 @@ class CPM_template(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds
 
-        # translate solver exit status to CPMpy exit status
+        # Translate solver exit status to CPMpy exit status
+        # CSP:                         COP:
+        # ├─ sat -> FEASIBLE           ├─ optimal -> OPTIMAL
+        # ├─ unsat -> UNSATISFIABLE    ├─ sub-optimal -> FEASIBLE
+        # └─ timeout -> UNKNOWN        ├─ unsat -> UNSATISFIABLE
+        #                              └─ timeout -> UNKNOWN
         if my_status is True:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif my_status is False:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
         elif my_status is None:
@@ -226,21 +302,35 @@ class CPM_template(SolverInterface):
 
             are permanently posted to the solver)
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
-        # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+
+        # [GUIDELINE] solvers typically can not handle partial functions (e.g. element, div, mod)
+        #             this transformation makes all partial functions total following the relational semantics
+        obj, safe_cons = safen_objective(expr)
+        # [GUIDELINE] all unsupported global functions and (reified) global constraints are decomposed here
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        # [GUIDELINE] after this, the objective will be a variable, sum, wsum or supported global function
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+
+        self.add(safe_cons + decomp_cons + flat_cons)
+
+        # make native objective expression and post
+        tpl_obj = self._make_numexpr(obj)
         # [GUIDELINE] if the solver interface does not provide a solver native "numeric expression" object,
-        #         _make_numexpr may be removed and an objective can be posted as:
+        #         _make_numexpr may be removed and an objective for wsum can be posted as:
         #           self.TPL_solver.MinimizeWeightedSum(obj.args[0], self.solver_vars(obj.args[1]) or similar
 
         if minimize:
-            self.TPL_solver.Minimize(obj)
+            self.TPL_solver.Minimize(tpl_obj)
         else:
-            self.TPL_solver.Maximize(obj)
+            self.TPL_solver.Maximize(tpl_obj)
 
     def has_objective(self):
         return self.TPL_solver.hasObjective()
@@ -278,7 +368,6 @@ class CPM_template(SolverInterface):
            # ...
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
-
     # `add()` first calls `transform()`
     def transform(self, cpm_expr):
         """
@@ -297,7 +386,11 @@ class CPM_template(SolverInterface):
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons, supported={"alldifferent"})
+        cpm_cons = no_partial_functions(cpm_cons)  # to also safen at toplevel, add: `, safen_toplevel={"element", "div", "mod"})`
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
         cpm_cons = only_bv_reifies(cpm_cons)
@@ -403,13 +496,13 @@ class CPM_template(SolverInterface):
     # Other functions from SolverInterface that you can overwrite:
     # solveAll, solution_hint, get_core
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
             If the problem is an optimization problem, returns only optimal solutions.
 
-           Arguments:
+            Arguments:
                 - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                         default/None: nothing displayed
                 - time_limit: stop after this many seconds (default: None)
@@ -420,7 +513,7 @@ class CPM_template(SolverInterface):
             Returns: number of solutions found
         """
 
-        # check if objective function
+        # check if objective function (optional if solver doesn't support finding all solutions for COP)
         if self.has_objective():
             raise NotSupportedError("TEMPLATE does not support finding all optimal solutions")
 
@@ -430,7 +523,21 @@ class CPM_template(SolverInterface):
         else:
             callback = display
 
-        self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+        my_status = self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
+
+        # new status, translate runtime
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.runtime = self.TPL_solver.time() # wallclock time in (float) seconds (of entire solveAll call)
+
+        # Translate solver exit status to CPMpy exit status
+        # CSP & COP:
+        # ├─ all solutions found -> OPTIMAL
+        # ├─ at least 1 found (timeout / solution limit reached) -> FEASIBLE
+        # ├─ 0 solutions found due to timeout -> UNKNOWN
+        # └─ unsat -> UNSATISFIABLE
+
+        # self.cpm_status.exitstatus = ...
+
         # clear user vars if no solution found
         if self.TPL_solver.SolutionCount() == 0:
             for var in self.user_vars:

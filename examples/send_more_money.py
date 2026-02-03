@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 """
 Send more money in CPMpy
 

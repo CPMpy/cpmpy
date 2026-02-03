@@ -50,17 +50,22 @@
 
         CPM_gcs
 """
+import warnings
+from typing import Optional
+
+from packaging.version import Version
+
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, argval, argvals
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.safening import no_partial_functions
 
 from ..transformations.normalize import toplevel_list
@@ -88,16 +93,36 @@ class CPM_gcs(SolverInterface):
     https://github.com/ciaranm/glasgow-constraint-solver/blob/main/python/python_test.py
     """
 
+    supported_global_constraints = frozenset({"alldifferent", "table", "negative_table", "inverse", "circuit", "xor",
+                                              "min", "max", "abs", "div", "mod", "pow", "element", "count", "nvalue"})
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         # try to import the package
         try:
             import gcspy
+            gcs_version = CPM_gcs.version()
+            if Version(gcs_version) < Version("0.1.8"):
+                warnings.warn(f"CPMpy requires GCS version >=0.1.8 but you have version "
+                              f"{gcs_version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
+                return False
             return True
         except ModuleNotFoundError:
             return False
         except Exception as e:
             raise e
+        
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        from importlib.metadata import version, PackageNotFoundError
+        try:
+            return version('gcspy')
+        except PackageNotFoundError:
+            return None
 
     def __init__(self, cpm_model=None, subsolver=None):
         """
@@ -108,7 +133,7 @@ class CPM_gcs(SolverInterface):
             subsolver: None (not supported)
         """
         if not self.supported():
-            raise Exception("CPM_gcs: Install the python package 'gcspy' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_gcs: Install the python package 'cpmpy[gcs]' to use this solver interface.")
 
         import gcspy
 
@@ -125,10 +150,17 @@ class CPM_gcs(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.gcs
+    
     def has_objective(self):
         return self.objective_var is not None
     
-    def solve(self, time_limit=None, prove=False, proof_name=None, proof_location=".", 
+    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
               verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
@@ -182,7 +214,10 @@ class CPM_gcs(SolverInterface):
 
         # translate exit status
         if self.gcs_result['solutions'] != 0:
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            if self.gcs_result['completed'] and self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif not self.gcs_result['completed']:
             self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
@@ -227,9 +262,9 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def solveAll(self, time_limit=None, display=None, solution_limit=None, call_from_model=False, 
-                 prove=False, proof_name=None, proof_location=".", verify=False, verify_time_limit=None, veripb_args = [], 
-                 display_verifier_output=True, **kwargs):
+    def solveAll(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, solution_limit:Optional[int]=None, call_from_model=False,
+                 prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
+                 verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, and get a number of solutions, with optional solution callbacks. 
 
@@ -303,6 +338,16 @@ class CPM_gcs(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.gcs_result["solve_time"]
 
+        num_sols = self.gcs_result["solutions"]
+        if self.gcs_result["completed"] and num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+        elif self.gcs_result["completed"] and num_sols == 0:
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif num_sols >= 1:
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else: # maybe unsat, maybe not (maybe a timeout)
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+
         # clear user vars if no solution found
         if self._solve_return(self.cpm_status, self.objective_value_) is False:
             for var in self.user_vars:
@@ -313,7 +358,7 @@ class CPM_gcs(SolverInterface):
             self.verify(name=self.proof_name, location=proof_location, time_limit=verify_time_limit, 
                         veripb_args=veripb_args, display_output=display_verifier_output)
 
-        return self.gcs_result["solutions"]
+        return num_sols
 
     def solver_var(self, cpm_var):
         """
@@ -352,20 +397,24 @@ class CPM_gcs(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are permanently posted to the solver
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
-        (obj, obj_cons) = get_or_make_var(flat_obj)
-        self += obj_cons
+        # save variables
+        get_variables(expr, collect=self.user_vars)
 
-        self.objective_var = obj
+        # transform objective
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
+        self.add(decomp_cons + obj_cons)
+
+        self.objective_var = obj_var
 
         if minimize:
-            self.gcs.minimise(self.solver_var(obj))  
+            self.gcs.minimise(self.solver_var(obj_var))
         else:
-            self.gcs.maximise(self.solver_var(obj))
+            self.gcs.maximise(self.solver_var(obj_var))
 
     def transform(self, cpm_expr):
         """
@@ -382,32 +431,22 @@ class CPM_gcs(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {
-            "min", 
-            "max", 
-            "abs", 
-            "alldifferent", 
-            "element", 
-            'table', 
-            'negative_table', 
-            'count', 
-            'nvalue',
-            'inverse', 
-            'circuit', 
-            'xor'}
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints
         # but no reification for linear not equals and not half reification for linear equality. 
         # Maybe a future transformation (or future work on the GCS solver).
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']))
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['==']), csemap=self._csemap)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
 
         # NB: GCS supports a small number of simple expressions as the reifying term
-        # e.g. (x > 3) -> constraint could in principle be supported in future. 
-        cpm_cons = only_bv_reifies(cpm_cons)
+        # e.g. (x > 3) -> constraint could in principle be supported in the future.
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         str_rep = ""
         for c in cpm_cons:
             str_rep += str(c) + '\n'

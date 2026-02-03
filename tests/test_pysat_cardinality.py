@@ -204,9 +204,11 @@ class TestCardinality(unittest.TestCase):
         a, b, c, p = [cp.boolvar(name=n) for n in "abcp"]
         self.assertTrue(cp.SolverLookup.get(SOLVER, cp.Model(p.implies(a+b-c < 2))).solve())
 
-    @pytest.mark.skip(reason="TODO: PySAT does not linearize models at the moment, because there is no integer encoding layer, so adding non-linear expressions will always fail.")
+    @skip_on_missing_pblib()
     def test_pysat_linearize_example(self):
-        self.assertTrue(cp.SolverLookup.get(SOLVER, cp.Model((a+b).implies(a+b-c < 2))).solve())
+        x, y, z = [cp.intvar(0, 3, name=n) for n in "xyz"]
+        p = cp.boolvar(name="p")
+        self.assertTrue(cp.SolverLookup.get(SOLVER, cp.Model(p.implies(2 * x + 3 * y + 5 * z <= 12))).solve())
 
 
 if __name__ == '__main__':
