@@ -53,6 +53,19 @@ The typical flow in which these submodules are used when programming with CPMpy 
 Tools are not part of the core of CPMpy. They are additional tools that _use_ CPMpy, e.g. for debugging, parameter tuning etc.
 
 
+## Documentation
+
+When contributing changes back to use, we kindly ask you to add some documentation to your code. Both comments above individual lines adding clarificiations and larger docstring comments at the beginning of methods, classes, files. CPMpy follows the [Google docstring style](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). 
+
+Further guidelines:
+
+- use backlinks to the referenced code whenever possible (e.g. ``:func:`SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` ``)
+- use double backticks whenever an inline piece of text should be rendered as code, use codeblocks (``.. code-block:: python``) for multiline code blocks.
+- when applicable, document the default values of argument: ``(default: ...)``
+
+Use [model.py](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/model.py) as a reference.
+
+
 ## GitHub practices
 
 When filing a bug, please add a small case that allows us to reproduce it. If the testcase is confidential, mail [Tias](mailto:tias.guns@kuleuven.be) directly.
