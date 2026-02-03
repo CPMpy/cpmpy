@@ -620,7 +620,7 @@ class Operator(Expression):
     }
     printmap = {'sum': '+', 'sub': '-', 'mul': '*'}
 
-    def __init__(self, name: str, arg_list):
+    def __init__(self, name: str, arg_list: Sequence[Int|Expression|Sequence[Int|Expression]|np.ndarray]):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         arity, is_bool_op = Operator.allowed[name]
@@ -630,7 +630,7 @@ class Operator(Expression):
                 if not is_boolexpr(arg):
                     raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
         if arity == 0:
-            arg_list = flatlist(arg_list)
+            arg_list = flatlist(arg_list)  # XXX should expect Sequence[Int|Expression]|np.ndarray
             assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
@@ -642,8 +642,8 @@ class Operator(Expression):
         # then create a wsum of weights,expressions over all
         if name == 'sum' and \
                 all(not is_num(a) for a in arg_list) and \
-                any(_wsum_should(a) for a in arg_list):
-            we = [_wsum_make(a) for a in arg_list]
+                any(_wsum_should(a) for a in arg_list):  # type: ignore[arg-type]
+            we = [_wsum_make(a) for a in arg_list]  # type: ignore[arg-type]
             w = [wi for w, _ in we for wi in w]
             e = [ei for _, e in we for ei in e]
             name = 'wsum'
@@ -651,47 +651,51 @@ class Operator(Expression):
 
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
-            assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
-            weights = []
-            for w in arg_list[0]:
+            weights = list(arg_list[0]) # type: ignore[arg-type]
+            assert len(weights) == len(arg_list[1]), f"wsum: arg0 and arg1 must have the same length, but are {len(weights)} and {len(arg_list[1])}" # type: ignore[arg-type]
+            assert all(is_num(a) for a in weights), f"wsum: arg0 has to be all constants, but is {weights}: "+str(weights)
+            for i, w in enumerate(weights):
                 if is_int(w):
-                    weights.append(int(w)) # bool or int, simplifies things later on
-                else:
-                    weights.append(w) # can be float
+                    weights[i] = int(w) # bool or int, simplifies things later on
+                # XXX there should be no else... there used to be a comment about floats!?
             arg_list = (weights, arg_list[1])
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
         #  expressions the way the user wrote them)
         if arity == 0:
+            arg_list = list(arg_list) # ensure it is a list
             i = 0 # length can change
             while i < len(arg_list):
-                if isinstance(arg_list[i], Operator) and arg_list[i].name == name:
+                elem = arg_list[i]
+                if isinstance(elem, Operator) and elem.name == name:
                     # merge args in at this position
-                    l = len(arg_list[i].args)
-                    arg_list[i:i+1] = arg_list[i].args
+                    l = len(elem.args)
+                    arg_list[i:i+1] = list(elem.args) # type: ignore[arg-type]
                     i += l
                 i += 1
 
         # another cleanup, translate -(v*c) to v*-c
-        if hasattr(arg_list[0], 'name'):
-            if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args) == 2:
-                mul_args = arg_list[0].args
-                if is_num(mul_args[0]):
-                    name = 'mul'
-                    arg_list = (-mul_args[0], mul_args[1])
-                elif is_num(mul_args[1]):
-                    name = 'mul'
-                    arg_list = (mul_args[0], -mul_args[1])
+        if name == '-':
+            expr = arg_list[0]
+            if isinstance(expr, Operator):
+                if expr.name == 'mul' and len(expr.args) == 2:
+                    mul_args = expr.args
+                    if is_num(mul_args[0]):
+                        name = 'mul'
+                        arg_list = (-mul_args[0], mul_args[1]) # type: ignore[assignment,operator]
+                    elif is_num(mul_args[1]):
+                        name = 'mul'
+                        arg_list = (mul_args[0], -mul_args[1]) # type: ignore[assignment,operator]
 
         super().__init__(name, arg_list)
 
-    def is_bool(self):
+    def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
         """
         return Operator.allowed[self.name][1]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         printname = self.name
         if printname in Operator.printmap:
             printname = Operator.printmap[printname]
@@ -717,7 +721,7 @@ class Operator(Expression):
 
         return "{}({})".format(self.name, self.args)
 
-    def value(self):
+    def value(self) -> Optional[int]:
 
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
@@ -746,7 +750,7 @@ class Operator(Expression):
 
         return None # default
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int,int]:
         """
         Returns an estimate of lower and upper bound of the expression.
         These bounds are safe: all possible values for the expression agree with the bounds.
@@ -755,20 +759,21 @@ class Operator(Expression):
         if self.is_bool():
             return 0, 1 #boolean
         elif self.name == 'mul':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
+            lb1, ub1 = cast(tuple[int, int], get_bounds(self.args[0]))
+            lb2, ub2 = cast(tuple[int, int], get_bounds(self.args[1]))
             bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'sum':
-            lbs, ubs = get_bounds(self.args)
+            lbs, ubs = cast(tuple[list[int], list[int]], get_bounds(self.args))
             lowerbound, upperbound = sum(lbs), sum(ubs)
         elif self.name == 'wsum':
             weights, vars = self.args
             bounds = []
             lowerbound, upperbound = 0,0
             #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
-            for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]):
-                x,y = int(w) * lb, int(w) * ub
+            for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]): # type: ignore
+                x:int = int(w) * lb # type: ignore[assignment]
+                y:int = int(w) * ub # type: ignore[assignment]
                 if x <= y: # x is the lb of this arg
                     lowerbound += x
                     upperbound += y
@@ -777,12 +782,12 @@ class Operator(Expression):
                     upperbound += x
 
         elif self.name == 'sub':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
+            lb1, ub1 = cast(tuple[int, int], get_bounds(self.args[0]))
+            lb2, ub2 = cast(tuple[int, int], get_bounds(self.args[1]))
             lowerbound, upperbound = lb1-ub2, ub1-lb2
 
         elif self.name == '-':
-            lb1, ub1 = get_bounds(self.args[0])
+            lb1, ub1 = cast(tuple[int, int], get_bounds(self.args[0]))
             lowerbound, upperbound = -ub1, -lb1
 
         if lowerbound == None:
@@ -791,7 +796,9 @@ class Operator(Expression):
             #overflow happened
             raise OverflowError(f'Overflow when calculating bounds, your expression exceeds integer bounds: {self}')
         return lowerbound, upperbound
-def _wsum_should(arg):
+
+# Internal helpers
+def _wsum_should(arg: Int|Expression) -> bool:
     """ Internal helper: should the arg be in a wsum instead of sum
 
     True if the arg is already a wsum,
@@ -805,23 +812,25 @@ def _wsum_should(arg):
              any(is_num(a) for a in arg.args)
             ) )
 
-def _wsum_make(arg):
+def _wsum_make(arg: Int|Expression):
     """ Internal helper: prep the arg for wsum
 
+    This converts sum/wsum/mul/neg's into a wsum (the cases of _wsum_should)
+
     returns ([weights], [expressions]) where 'weights' are constants
-    call only if arg is Operator
     """
-    if arg.name == 'wsum':
-        return arg.args
-    elif arg.name == 'sum':
-        return [1]*len(arg.args), arg.args
-    elif arg.name == 'mul':
-        if is_num(arg.args[0]):
-            return [arg.args[0]], [arg.args[1]]
-        elif is_num(arg.args[1]):
-            return [arg.args[1]], [arg.args[0]]
-        # else falls through to default below
-    elif arg.name == '-':
-        return [-1], [arg.args[0]]
+    if isinstance(arg, Operator):
+        if arg.name == 'wsum':
+            return arg.args
+        elif arg.name == 'sum':
+            return [1]*len(arg.args), arg.args
+        elif arg.name == 'mul':
+            if is_num(arg.args[0]):
+                return [arg.args[0]], [arg.args[1]]
+            elif is_num(arg.args[1]):
+                return [arg.args[1]], [arg.args[0]]
+            # else falls through to default below
+        elif arg.name == '-':
+            return [-1], [arg.args[0]]
     # default
     return [1], [arg]
