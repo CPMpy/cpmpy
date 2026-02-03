@@ -449,27 +449,15 @@ class CPM_pumpkin(SolverInterface):
 
             :return: Returns a list of Pumpkin integer expressions
         """
-        args = []
         if tag is None: raise ValueError("Expected tag to be provided but got None")
         if isinstance(expr, Operator) and expr.name == "sum":
-            for cpm_var in expr.args:
-                pum_var = self.solver_var(cpm_var)
-                if cpm_var.is_bool(): # have convert to integer
-                    pum_var = self.pum_solver.boolean_as_integer(pum_var, tag=tag)
-                args.append(pum_var.scaled(-1 if negate else 1))
+            pum_vars = self.to_pum_ivar(expr.args, tag=tag)
+            args = [pv.scaled(-1) if negate else pv for pv in pum_vars]
         elif isinstance(expr, Operator) and expr.name == "wsum":
-            for w, cpm_var in zip(*expr.args):
-                if w == 0: continue # exclude
-                pum_var = self.solver_var(cpm_var)
-                if cpm_var.is_bool(): # have convert to integer
-                    pum_var = self.pum_solver.boolean_as_integer(pum_var, tag=tag)
-                args.append(pum_var.scaled(-w if negate else w))
+            pum_vars = self.to_pum_ivar(expr.args[1], tag=tag)
+            args = [pv.scaled(-w if negate else w) for w,pv in zip(expr.args[0], pum_vars) if w != 0]
         elif isinstance(expr, Operator) and expr.name == "sub":
-            x, y = self.solver_vars(expr.args)
-            if expr.args[0].is_bool():
-                x = self.pum_solver.boolean_as_integer(x, tag=tag)
-            if expr.args[1].is_bool():
-                y = self.pum_solver.boolean_as_integer(y, tag=tag)
+            x, y = self.to_pum_ivar(expr.args, tag=tag)
             args = [x.scaled(-1 if negate else 1), y.scaled(1 if negate else -1)]
         else:
             raise ValueError(f"Unknown expression to convert in sum-arguments: {expr}")
