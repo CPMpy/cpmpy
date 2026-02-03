@@ -20,7 +20,7 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 
 
 solver_dependencies = {
-    "ortools": ["ortools>=9.3.10497,<=9.14.6206,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
+    "ortools": ["ortools>=9.3.10497,<=9.15.6755,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
     "z3": ["z3-solver>=4.8.15.0,<=4.15.4.0"],
     "choco": ["pychoco>=0.2.1,<=0.2.4"],
     "exact": ["exact>=2.1.0,<=2.2.1"], # older versions (<2.2.1) are bugged on py3.13
@@ -50,7 +50,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'ortools>=9.3.10497,<=9.14.6206,!=9.9.*,!=9.10.*,!=9.11.*',
+        'ortools>=9.3.10497,<=9.15.6755,!=9.9.*,!=9.10.*,!=9.11.*',
         'numpy>=1.5',
         'setuptools',
         'packaging', # to check solver versions
