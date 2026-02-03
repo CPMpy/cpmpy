@@ -4,14 +4,14 @@ Pseudo Boolean Competition (PB) Dataset
 https://www.cril.univ-artois.fr/PB25/
 """
 
+import fnmatch
 import lzma
 import os
 import pathlib
-from urllib.request import urlretrieve
-from urllib.error import HTTPError, URLError
 import tarfile
+import io
 
-from .._base import _Dataset
+from cpmpy.tools.dataset._base import _Dataset
 
 
 class OPBDataset(_Dataset): 
@@ -27,10 +27,13 @@ class OPBDataset(_Dataset):
     More information on the competition can be found here: https://www.cril.univ-artois.fr/PB25/
     """
 
+    name = "opb"
+
     def __init__(
             self, 
             root: str = ".", 
             year: int = 2024, track: str = "OPT-LIN", 
+            competition: bool = True,
             transform=None, target_transform=None, 
             download: bool = False
         ):
@@ -41,6 +44,7 @@ class OPBDataset(_Dataset):
             root (str): Root directory where datasets are stored or will be downloaded to (default="."). 
             year (int): Competition year of the dataset to use (default=2024).
             track (str): Track name specifying which subset of the competition instances to load (default="OPT-LIN").
+            competition (bool): If True, the dataset will filtered on competition-used instances.
             transform (callable, optional): Optional transform applied to the instance file path.
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
@@ -54,6 +58,7 @@ class OPBDataset(_Dataset):
         self.root = pathlib.Path(root)
         self.year = year
         self.track = track
+        self.competition = competition
 
         # Check requested dataset
         if not str(year).startswith('20'):
@@ -61,7 +66,7 @@ class OPBDataset(_Dataset):
         if not track:
             raise ValueError("Track must be specified, e.g. exact-weighted, exact-unweighted, ...")
 
-        dataset_dir = self.root / str(year) / track
+        dataset_dir = self.root / self.name / str(year) / track / ('selected' if self.competition else 'normalized')
 
         super().__init__(
             dataset_dir=dataset_dir, 
@@ -79,23 +84,21 @@ class OPBDataset(_Dataset):
         # Add the author to the metadata
         return super().metadata(file) | {'author': str(file).split(os.sep)[-1].split("_")[0],}
                 
-
     def download(self):
-        # TODO: add option to filter on competition instances
-        print(f"Downloading OPB {self.year} {self.track} instances...")
-        
-        url = f"https://www.cril.univ-artois.fr/PB24/benchs/"
-        year_suffix = str(self.year)[2:]  # Drop the starting '20'
-        url_path = url + f"normalized-PB{year_suffix}.tar"
-        tar_path = self.root / f"normalized-extraPB{year_suffix}.tar"
+                
+        url = "https://www.cril.univ-artois.fr/PB24/benchs/"
+        target = f"{'normalized' if not self.competition else 'selected'}-PB{str(self.year)[2:]}.tar"
+        target_download_path = self.root / target
+
+        print(f"Downloading OPB {self.year} {self.track} {'competition' if self.competition else 'non-competition'} instances from www.cril.univ-artois.fr")
         
         try:
-            urlretrieve(url_path, str(tar_path))
-        except (HTTPError, URLError) as e:
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+        except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year}. Error: {str(e)}")
         
         # Extract only the specific track folder from the tar
-        with tarfile.open(tar_path, "r:*") as tar_ref:  # r:* handles .tar, .tar.gz, .tar.bz2, etc.
+        with tarfile.open(target_download_path, "r:*") as tar_ref:  # r:* handles .tar, .tar.gz, .tar.bz2, etc.
             # Get the main folder name
             main_folder = None
             for name in tar_ref.getnames():
@@ -108,11 +111,18 @@ class OPBDataset(_Dataset):
 
             # Extract only files from the specified track
             # Get all unique track names from tar
-            tracks = set()
-            for member in tar_ref.getmembers():
-                parts = member.name.split("/")
-                if len(parts) > 2 and parts[0] == main_folder:
-                    tracks.add(parts[1])
+            if not self.competition:
+                tracks = set()
+                for member in tar_ref.getmembers():
+                    parts = member.name.split("/")
+                    if len(parts) > 2 and parts[0] == main_folder:
+                        tracks.add(parts[1])
+            else:
+                tracks = set()
+                for member in tar_ref.getmembers():
+                    parts = member.name.split("/")
+                    if len(parts) > 2 and parts[0] == main_folder:
+                        tracks.add(parts[2])
 
             # Check if requested track exists
             if self.track not in tracks:
@@ -122,26 +132,35 @@ class OPBDataset(_Dataset):
             self.dataset_dir.mkdir(parents=True, exist_ok=True)
 
             # Extract files for the specified track
-            prefix = f"{main_folder}/{self.track}/"
+            if not self.competition:
+                prefix = f"{main_folder}/{self.track}/"
+            else:
+                prefix = f"{main_folder}/*/{self.track}/"
             for member in tar_ref.getmembers():
-                if member.name.startswith(prefix) and member.isfile():
+                if fnmatch.fnmatch(member.name, prefix + "*") and member.isfile():
                     # Path relative to main_folder/track
-                    relative_path = member.name[len(prefix):]
+                    # Find where the track folder ends and get everything after
+                    track_marker = f"/{self.track}/"
+                    marker_pos = member.name.find(track_marker)
+                    relative_path = member.name[marker_pos + len(track_marker):]
 
                     # Flatten: replace "/" with "_" to encode subfolders (some instances have clashing names)
-                    flat_name = relative_path.replace("/", "_")
+                    flat_name = relative_path#.replace("/", "_")
                     target_path = self.dataset_dir / flat_name
+
+                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
                     with tar_ref.extractfile(member) as source, open(target_path, "wb") as target:
                         target.write(source.read())
 
         # Clean up the tar file
-        tar_path.unlink()
+        target_download_path.unlink()
 
-    def open(self, instance: os.PathLike) -> callable:
+    def open(self, instance: os.PathLike) -> io.TextIOBase:
         return lzma.open(instance, 'rt') if str(instance).endswith(".xz") else open(instance)
 
+
 if __name__ == "__main__":
-    dataset = OPBDataset(year=2024, track="DEC-LIN", download=True)
+    dataset = OPBDataset(year=2024, track="DEC-LIN", competition=True, download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:", dataset[0])

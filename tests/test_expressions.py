@@ -2,11 +2,13 @@ import unittest
 import cpmpy as cp
 import numpy as np
 
-from cpmpy.exceptions import IncompleteFunctionError
 from cpmpy.expressions import *
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
-from cpmpy.expressions.utils import eval_comparison, get_bounds, argval
+from cpmpy.expressions.utils import eval_comparison, get_bounds
+
+from utils import inclusive_range
+
 
 class TestComparison(unittest.TestCase):
     def test_comps(self):
@@ -326,9 +328,6 @@ class TestArrayExpressions(unittest.TestCase):
                 cpm_res = getattr(bv, func)(axis=axis)
                 self.assertIsInstance(cpm_res, NDVarArray)
                 self.assertEqual(cpm_res.shape, np_res.shape)
-        
-def inclusive_range(lb,ub):
-    return range(lb,ub+1)
 
 class TestBounds(unittest.TestCase):
     def test_bounds_mul_sub_sum(self):
@@ -359,82 +358,6 @@ class TestBounds(unittest.TestCase):
                     self.assertGreaterEqual(val,lb)
                     self.assertLessEqual(val,ub)
 
-    def test_bounds_div(self):
-        x = intvar(-8, 8)
-        y = intvar(-7,-1)
-        z = intvar(3,9)
-        op1 = Operator('div',[x,y])
-        lb1,ub1 = op1.get_bounds()
-        self.assertEqual(lb1,-8)
-        self.assertEqual(ub1,8)
-        op2 = Operator('div',[x,z])
-        lb2,ub2 = op2.get_bounds()
-        self.assertEqual(lb2,-2)
-        self.assertEqual(ub2,2)
-        for lhs in inclusive_range(*x.get_bounds()):
-            for rhs in inclusive_range(*y.get_bounds()):
-                val = Operator('div',[lhs,rhs]).value()
-                self.assertGreaterEqual(val,lb1)
-                self.assertLessEqual(val,ub1)
-            for rhs in inclusive_range(*z.get_bounds()):
-                val = Operator('div', [lhs, rhs]).value()
-                self.assertGreaterEqual(val,lb2)
-                self.assertLessEqual(val,ub2)
-
-    def test_bounds_mod(self):
-        x = intvar(-8, 8)
-        xneg = intvar(-8, 0)
-        xpos = intvar(0, 8)
-        y = intvar(-5, -1)
-        z = intvar(1, 4)
-        op1 = Operator('mod',[xneg,y])
-        lb1, ub1 = op1.get_bounds()
-        self.assertEqual(lb1,-4)
-        self.assertEqual(ub1,0)
-        op2 = Operator('mod',[xpos,z])
-        lb2, ub2 = op2.get_bounds()
-        self.assertEqual(lb2,0)
-        self.assertEqual(ub2,3)
-        op3 = Operator('mod',[xneg,z])
-        lb3, ub3 = op3.get_bounds()
-        self.assertEqual(lb3,-3)
-        self.assertEqual(ub3,0)
-        op4 = Operator('mod',[xpos,y])
-        lb4, ub4 = op4.get_bounds()
-        self.assertEqual(lb4,0)
-        self.assertEqual(ub4,4)
-        op5 = Operator('mod',[x,y])
-        lb5, ub5 = op5.get_bounds()
-        self.assertEqual(lb5,-4)
-        self.assertEqual(ub5,4)
-        op6 = Operator('mod',[x,z])
-        lb6, ub6 = op6.get_bounds()
-        self.assertEqual(lb6,-3)
-        self.assertEqual(ub6,3)
-        for lhs in inclusive_range(*x.get_bounds()):
-            for rhs in inclusive_range(*y.get_bounds()):
-                val = Operator('mod',[lhs,rhs]).value()
-                self.assertGreaterEqual(val,lb5)
-                self.assertLessEqual(val,ub5)
-            for rhs in inclusive_range(*z.get_bounds()):
-                val = Operator('mod', [lhs, rhs]).value()
-                self.assertGreaterEqual(val,lb6)
-                self.assertLessEqual(val,ub6)
-
-    def test_bounds_pow(self):
-        x = intvar(-8, 5)
-        z = intvar(1, 9)
-        # only nonnegative exponents allowed
-        op = Operator('pow',[x,z])
-        lb, ub = op.get_bounds()
-        self.assertEqual(lb,-134217728)
-        self.assertEqual(ub,16777216)
-        for lhs in inclusive_range(*x.get_bounds()):
-            for rhs in inclusive_range(*z.get_bounds()):
-                val = Operator('pow',[lhs,rhs]).value()
-                self.assertGreaterEqual(val,lb)
-                self.assertLessEqual(val,ub)
-
     def test_bounds_unary(self):
         x = intvar(-8, 5)
         y = intvar(-7, -2)
@@ -449,34 +372,6 @@ class TestBounds(unittest.TestCase):
                 val = Operator(name, [lhs]).value()
                 self.assertGreaterEqual(val,lb)
                 self.assertLessEqual(val,ub)
-
-
-    def test_incomplete_func(self):
-        # element constraint
-        arr = cpm_array([1,2,3])
-        i = intvar(0,5,name="i")
-        p = boolvar()
-
-        cons = (arr[i] == 1).implies(p)
-        m = cp.Model([cons, i == 5])
-        self.assertTrue(m.solve())
-        self.assertTrue(cons.value())
-
-        # div constraint
-        a,b = intvar(1,2,shape=2)
-        cons = (42 // (a - b)) >= 3
-        m = cp.Model([p.implies(cons), a == b])
-        if cp.SolverLookup.lookup("z3").supported():
-            self.assertTrue(m.solve(solver="z3")) # ortools does not support divisor spanning 0 work here
-            self.assertRaises(IncompleteFunctionError, cons.value)
-            self.assertFalse(argval(cons))
-
-        # mayhem
-        cons = (arr[10 // (a - b)] == 1).implies(p)
-        m = cp.Model([cons, a == b])
-        if cp.SolverLookup.lookup("z3").supported():
-            self.assertTrue(m.solve(solver="z3"))
-            self.assertTrue(cons.value())
 
 
     def test_list(self):
@@ -578,7 +473,7 @@ class TestBounds(unittest.TestCase):
         self.assertEqual(int, type((a - b).value()))
         self.assertEqual(int, type((a * b).value()))
         self.assertEqual(int, type((a // b).value()))
-        self.assertEqual(int, type((a ** b).value()))
+        # self.assertEqual(int, type((a ** b).value())) -> We don't allow variables as exponent anymore
         self.assertEqual(int, type((a % b).value()))
 
         # test binary operators with numpy constants
@@ -618,7 +513,8 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(str(gt), str(cp.sum(self.x)))
         self.assertEqual(str(gt), str(cp.sum(list(self.x))))
         self.assertEqual(str(gt), str(cp.sum(v for v in self.x)))
-        self.assertEqual(str(gt), str(cp.sum(self.x[0], self.x[1], self.x[2])))
+        with self.assertRaises(TypeError):  # Python sum does not accept sum(1,2,3)
+            cp.sum(self.x[0], self.x[1], self.x[2])
 
     def test_max(self):
         gt = Maximum(self.x)
@@ -627,6 +523,18 @@ class TestBuildIns(unittest.TestCase):
         self.assertEqual(str(gt), str(cp.max(list(self.x))))
         self.assertEqual(str(gt), str(cp.max(v for v in self.x)))
         self.assertEqual(str(gt), str(cp.max(self.x[0], self.x[1], self.x[2])))
+
+    def test_abs(self):
+        gt = Abs(self.x[0])
+        self.assertEqual(str(gt), str(cp.abs(self.x[0])))
+        self.x[0]._value = 1
+        self.assertEqual(gt.value(), 1)
+        self.x[0]._value = -1
+        self.assertEqual(gt.value(), 1)
+        self.x[0]._value = 0
+        self.assertEqual(gt.value(), 0)
+        self.x[0]._value = None
+        self.assertIsNone(gt.value())
 
 from cpmpy.transformations.get_variables import get_variables
 class TestNullifyingArguments(unittest.TestCase):

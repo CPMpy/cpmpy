@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## jsplib.py
+##
 """
 Parser for the JSPLib format.
 
@@ -15,7 +20,6 @@ List of functions
 
 import os
 import sys
-import lzma
 import argparse
 import cpmpy as cp
 import numpy as np

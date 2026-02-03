@@ -36,6 +36,12 @@ solver_dependencies = {
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
+format_dependencies = {
+    "io.mps": ["pyscipopt"],
+    "io.scip": ["pyscipopt"],
+    "io.dimacs": ["pyscipopt"],
+}
+
 setup(
     name='cpmpy',
     version=get_version("cpmpy/__init__.py"),
@@ -53,10 +59,12 @@ setup(
         'ortools>=9.9',
         'numpy>=1.5',
         'setuptools',
+        'packaging', # to check solver versions
     ],
     extras_require={
         # Solvers
         **solver_dependencies,
+        **format_dependencies,
         # Tools
         "xcsp3": ["pycsp3", "requests", "tqdm", "matplotlib", "psutil", "filelock", "gnureadline; platform_system != 'Windows'", "pyreadline3; platform_system == 'Windows'"], # didn't add CLI-specific req since some are not cross-platform
         # Other

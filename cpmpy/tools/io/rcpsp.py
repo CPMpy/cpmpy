@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## rcpsp.py
+##
 """
 Parser for the PSPLIB RCPSP format.
 
@@ -15,7 +20,6 @@ List of functions
 
 import os
 import sys
-import lzma
 import argparse
 import cpmpy as cp
 from io import StringIO
