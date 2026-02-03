@@ -28,6 +28,7 @@ Internal utilities for expression handling.
         eval_comparison
         get_bounds     
 """
+from __future__ import annotations  # to avoid issues with cp.BoolVal in type guards
 
 import cpmpy as cp
 import numpy as np
