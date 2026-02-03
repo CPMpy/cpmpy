@@ -61,6 +61,7 @@ Further guidelines:
 
 - use backlinks to the referenced code whenever possible (e.g. ``:func:`SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` ``)
 - use double backticks whenever an inline piece of text should be rendered as code, use codeblocks (``.. code-block:: python``) for multiline code blocks.
+- when possible, include type hints for the arguments and the return value.
 - when applicable, document the default values of argument: ``(default: ...)``
 
 Use [model.py](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/model.py) as a reference.
