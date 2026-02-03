@@ -129,6 +129,7 @@ class CPM_pumpkin(SolverInterface):
         self._proof = proof
         self.pum_solver = Model(**init_kwargs)
         self.predicate_map = {} # cache predicates for reuse
+        self.bool_to_int_map = {} # cache calls to `self.pum_solver.boolean_as_integer`
 
         # for objective
         self._objective = None
@@ -429,7 +430,9 @@ class CPM_pumpkin(SolverInterface):
         if is_any_list(cpm_var):
             return [self.to_pum_ivar(v, tag=tag) for v in cpm_var]
         elif isinstance(cpm_var, _BoolVarImpl):
-            return self.pum_solver.boolean_as_integer(self.solver_var(cpm_var), tag=tag)
+            if cpm_var not in self.bool_to_int_map:
+                self.bool_to_int_map[cpm_var] = self.pum_solver.boolean_as_integer(self.solver_var(cpm_var), tag=tag)
+            return self.bool_to_int_map[cpm_var]
         elif is_num(cpm_var):
             return self.solver_var(intvar(cpm_var, cpm_var))
         # can also be a scaled variable (multiplication view)
