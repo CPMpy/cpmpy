@@ -5,6 +5,7 @@ Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of 
 import cpmpy as cp
 from ..expressions.variables import _BoolVarImpl
 from ..expressions.core import Operator
+from ..expressions.utils import is_any_list
 from ..solvers.pindakaas import CPM_pindakaas
 from ..transformations.get_variables import get_variables
 from cpmpy.tools.explain.marco import make_assump_model
@@ -31,11 +32,13 @@ def to_gcnf(soft, hard, name=None, csemap=None, ivarmap=None, encoding="auto"):
     for c in model_:
         if isinstance(c, _BoolVarImpl):
             add_gcnf_clause([c])
-        elif isinstance(c, cp.expressions.variables.NDVarArray):
+        elif is_any_list(c):
             for ci in c:
                 add_gcnf_clause(ci.args)
-        else:
+        elif isinstance(c, Operator) and c.name == "or":
             add_gcnf_clause(c.args)
+        else:
+            raise TypeError
     return cp.Model(model_), soft_clauses, hard_clauses, assump
 
 
