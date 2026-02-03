@@ -3,8 +3,40 @@ Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of 
 """
 
 import cpmpy as cp
+from ..expressions.variables import _BoolVarImpl
+from ..expressions.core import Operator
 from ..solvers.pindakaas import CPM_pindakaas
 from ..transformations.get_variables import get_variables
+from cpmpy.tools.explain.marco import make_assump_model
+
+
+def to_gcnf(soft, hard, name=None, csemap=None, ivarmap=None, encoding="auto"):
+    """
+    Or `make_assump_cnf`; returns an assumption CNF model, and separately the soft clauses, hard clauses, and assumption variables. Follows https://satisfiability.org/competition/2011/rules.pdf, however, there is no guarantee that the groups are disjoint.
+    """
+
+    model, soft_, assump = make_assump_model(soft, hard=hard, name=name)
+    model_ = to_cnf(model.constraints, encoding=encoding, csemap=csemap, ivarmap=ivarmap)
+
+    hard_clauses = []
+    soft_clauses = []
+
+    def add_gcnf_clause(lits):
+        # ASSUMPTION: first literal should be the (negated) assumption variable
+        if ~lits[0] in assump:
+            soft_clauses.append(cp.any(lits[1:]))
+        else:
+            hard_clauses.append(cp.any(lits))
+
+    for c in model_:
+        if isinstance(c, _BoolVarImpl):
+            add_gcnf_clause([c])
+        elif isinstance(c, cp.expressions.variables.NDVarArray):
+            for ci in c:
+                add_gcnf_clause(ci.args)
+        else:
+            add_gcnf_clause(c.args)
+    return cp.Model(model_), soft_clauses, hard_clauses, assump
 
 
 def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
