@@ -812,7 +812,7 @@ def _wsum_should(arg: Int|Expression) -> bool:
              any(is_num(a) for a in arg.args)
             ) )
 
-def _wsum_make(arg: Int|Expression):
+def _wsum_make(arg: Int|Expression) -> tuple[list[int], Sequence[Int|Expression]|np.ndarray]:
     """ Internal helper: prep the arg for wsum
 
     This converts sum/wsum/mul/neg's into a wsum (the cases of _wsum_should)
@@ -821,16 +821,17 @@ def _wsum_make(arg: Int|Expression):
     """
     if isinstance(arg, Operator):
         if arg.name == 'wsum':
-            return arg.args
+            return arg.args # type: ignore[return-value]
         elif arg.name == 'sum':
-            return [1]*len(arg.args), arg.args
+            return [1]*len(arg.args), arg.args # type: ignore[return-value]
         elif arg.name == 'mul':
-            if is_num(arg.args[0]):
-                return [arg.args[0]], [arg.args[1]]
-            elif is_num(arg.args[1]):
-                return [arg.args[1]], [arg.args[0]]
+            arg0, arg1 = arg.args
+            if is_num(arg0):  # XXX should be is_int?
+                return [arg0], [arg1] # type: ignore[list-item]
+            elif is_num(arg1):  # XXX should be is_int?
+                return [arg1], [arg0] # type: ignore[list-item]
             # else falls through to default below
         elif arg.name == '-':
-            return [-1], [arg.args[0]]
+            return [-1], [arg.args[0]] # type: ignore[list-item]
     # default
     return [1], [arg]
