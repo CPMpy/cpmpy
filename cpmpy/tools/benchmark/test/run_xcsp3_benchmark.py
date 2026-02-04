@@ -2,7 +2,7 @@ from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Manager
 
 from cpmpy.tools.benchmark.test.manager import RunExecResourceManager, run_instance
-from cpmpy.tools.benchmark.test.xcsp3_instance_runner import XCSP3InstanceRunner
+from cpmpy.tools.benchmark.test.run_xcsp3_instance import XCSP3InstanceRunner
 
 
 def worker_function(worker_id, cores, job_queue, time_limit, memory_limit):
@@ -30,12 +30,12 @@ def main():
     # dataset = XCSP3Dataset(root="./data", year=2025, track="CSP25", download=True)
     # dataset = OPBDataset(root="./data", year=2024, track="DEC-LIN", download=True)
     # dataset = JSPLibDataset(root="./data", download=True)
-    dataset = XCSP3Dataset(root="./data", year=2024, track="CSP", download=True)
+    dataset = XCSP3Dataset(root="./data", year=2024, track="COP", download=True)
 
     time_limit = 10*60
     workers = 1
     cores_per_worker = 1
-    total_memory = 25000
+    total_memory = 16000 # MiB
     memory_per_worker = total_memory // workers
     memory_limit = memory_per_worker# Bytes to MB
     # resource_manager = RunExecResourceManager()

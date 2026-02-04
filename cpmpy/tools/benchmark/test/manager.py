@@ -9,16 +9,27 @@ import warnings
 import logging
 from pathlib import Path
 
+from cpmpy.tools.benchmark import _mib_as_bytes
 from cpmpy.tools.benchmark.test.instance_runner import InstanceRunner
-from cpmpy.tools.benchmark.test.xcsp3_instance_runner import XCSP3InstanceRunner
-from cpmpy.tools.benchmark.test.runner import ResourceLimitObserver
+from cpmpy.tools.benchmark.test.run_xcsp3_instance import XCSP3InstanceRunner
+from cpmpy.tools.benchmark.test.observer import ResourceLimitObserver
 
 
 class ResourceManager:
+    """
+    Abstract base class for resource managers.
+
+    Manages the allocation of resources (time, memory, cores) to a single instance run.
+    Sets limits on the resources and handles callbacks when these limits are exceeded.
+    """
     pass
 
 class RunExecResourceManager:
-    
+    """
+    Resource manager that uses benchexec's RunExecutor for resource control (build on cgroups and kernel namespaces).
+    Requires `benchexec` to be installed.
+    """
+
     @contextlib.contextmanager
     def _print_forwarding_context(self, runner: InstanceRunner):
         """Context manager that forwards all print statements, warnings, and logging to runner.print_comment."""
@@ -210,10 +221,43 @@ class RunExecResourceManager:
             stdout_forwarder.forward_to_runner()
             stderr_forwarder.forward_to_runner()
     
-    def run(self, instance: str, runner: InstanceRunner, time_limit: float, memory_limit: int, cores: list[int]):
+    def run(self, 
+            instance: str, 
+            runner: InstanceRunner, 
+            time_limit: float, 
+            memory_limit: int, 
+            cores: list[int],
+            solver: str,
+            seed: int,
+            intermediate: bool,
+            verbose: bool,
+            output_file: str,
+        ) -> dict:
+        """
+        Run a single instance with assigned resources.
 
-        runner.print_comment(f"Running instance {instance} with time limit {time_limit} and memory limit {memory_limit} and cores {cores}")
-        runner.print_comment(f"Running with manager {self.__class__.__name__}")
+        Arguments:
+            instance: Instance file path
+            runner: Instance runner
+            time_limit: Time limit in seconds
+            memory_limit: Memory limit in MB
+            cores: List of core IDs to assign to this run (e.g., [0, 1] for cores 0 and 1)
+
+        runexec creates a new process and namespace for the instance run. So the benchmark needs to be run in a 
+        separate process for runexec to be able to control the resources.
+        """
+
+        # Automatically add WriteToFileObserver if output_file is provided
+        if output_file is not None:
+            from functools import partial
+            from cpmpy.tools.benchmark.test.observer import WriteToFileObserver
+            runner.register_observer(partial(WriteToFileObserver, output_file=output_file, overwrite=True))
+        
+        _runner = runner.get_runner(instance, solver, output_file, overwrite=True)
+        # Use runner's print_comment to go through the callback system (observers)
+        # The CompetitionPrintingObserver (in default_observers) will add the 'c ' prefix
+        _runner.print_comment(f"Running instance {instance} with time limit {time_limit} and memory limit {memory_limit} and cores {cores}")
+        _runner.print_comment(f"Running with manager {self.__class__.__name__}")
 
         from benchexec.runexecutor import RunExecutor
 
@@ -256,7 +300,7 @@ class RunExecResourceManager:
                         # softtimelimit=options.softtimelimit,
                         walltimelimit=time_limit,
                         cores=cores,
-                        memlimit=memory_limit,
+                        memlimit=_mib_as_bytes(memory_limit),
                         # memory_nodes=options.memoryNodes,
                         # cgroupValues=cgroup_values,
                         # workingDir=options.dir,
@@ -285,9 +329,8 @@ class RunExecResourceManager:
                         line_stripped = line.strip()
                         # Skip empty lines and RunExecutor messages
                         if line_stripped and not _is_runexec_message(line_stripped):
-                            # Subprocess output is already formatted by the runner's observers,
-                            # so print it directly without wrapping in print_comment to avoid double-prefixing
-                            print(line_stripped, flush=True)
+                            # Forward subprocess output through runner so observers can capture it
+                            _runner.print_comment(line_stripped)
             except FileNotFoundError:
                 # Output file might not exist if process was killed before writing
                 pass
@@ -298,18 +341,51 @@ class RunExecResourceManager:
             except Exception:
                 pass
 
-        runner.print_comment(f"RunExec result: {result}")
+        _runner.print_comment(f"RunExec result: {result}")
 
         if "terminationreason" in result:
             reason = result["terminationreason"]
             if reason == "memory":
-                runner.print_comment("Memory limit exceeded")
+                _runner.print_comment("Memory limit exceeded")
             elif reason == "walltime":
-                runner.print_comment("Wall time limit exceeded")
+                _runner.print_comment("Wall time limit exceeded")
 
 class PythonResourceManager:
-    
-    def run(self, instance: str, runner: InstanceRunner, time_limit: int, memory_limit: int, cores: list[int]):
+    """
+    Resource manager that uses Python's resource module for resource control.
+    """
+
+    def run(self, 
+            instance: str, 
+            runner: InstanceRunner, 
+            time_limit: int, 
+            memory_limit: int, 
+            cores: list[int],
+            solver: str,
+            seed: int,
+            intermediate: bool,
+            verbose: bool,
+            output_file: str,
+        ) -> dict:
+        """
+        Run a single instance with assigned resources.
+
+        Arguments:
+            instance: Instance file path
+            runner: Instance runner
+            time_limit: Time limit in seconds
+            memory_limit: Memory limit in MB
+            cores: List of core IDs to assign to this run (e.g., [0, 1] for cores 0 and 1)
+
+        The python native approach to setting resource limits does not require spawning a separate process for the instance run.
+        As a downside, it offers less control over the resources and is less robust.
+        """
+        # Automatically add WriteToFileObserver if output_file is provided
+        if output_file is not None:
+            from functools import partial
+            from cpmpy.tools.benchmark.test.observer import WriteToFileObserver
+            runner.register_observer(partial(WriteToFileObserver, output_file=output_file, overwrite=True))
+        
         # Programmatically add ResourceLimitObserver if limits are provided
         if time_limit is not None or memory_limit is not None:
             # Add a resource observer with limits
@@ -320,26 +396,25 @@ class PythonResourceManager:
             runner.register_observer(resource_observer)
         
         # Run the instance using the runner's run method
-        runner.run(instance=instance, time_limit=time_limit, mem_limit=memory_limit, cores=len(cores) if cores else None)
+        runner.run(instance=instance, solver=solver, seed=seed, intermediate=intermediate, verbose=verbose, output_file=output_file, time_limit=time_limit, mem_limit=memory_limit, cores=len(cores) if cores else None)
         
 
 
 
-def run_instance(instance: str, instance_runner: InstanceRunner, time_limit: int, memory_limit: int, cores: list[int], resource_manager: ResourceManager):
-
-
+def run_instance(instance: str, instance_runner: InstanceRunner, time_limit: int, memory_limit: int, cores: list[int], resource_manager: ResourceManager, solver: str, seed: int, intermediate: bool, verbose: bool, output_file: str):
     """
     Run a single instance with assigned cores.
     
-    Args:
+    Arguments:
         instance: Instance file path
+        instance_runner: Instance runner
         time_limit: Time limit in seconds
         memory_limit: Memory limit in MB
         cores: List of core IDs to assign to this run (e.g., [0, 1] for cores 0 and 1)
     """
 
 
-    resource_manager.run(instance, instance_runner, time_limit, memory_limit, cores)
+    resource_manager.run(instance, instance_runner, time_limit, memory_limit, cores, solver, seed, intermediate, verbose, output_file)
     
     
     # Convert cores list to comma-separated string for runexec
@@ -361,7 +436,7 @@ def load_instance_runner(runner_path: str) -> InstanceRunner:
     """
     Load an instance runner class from a module path.
     
-    Args:
+    Arguments:
         runner_path: Path to the instance runner class, e.g., 
                      "cpmpy.tools.benchmark.test.xcsp3_instance_runner.XCSP3InstanceRunner"
                      or a file path like "/path/to/module.py:ClassName"
