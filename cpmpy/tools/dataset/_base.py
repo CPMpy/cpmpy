@@ -153,8 +153,10 @@ class _Dataset(ABC):
             req = Request(url + target)
             with urlopen(req) as response:
                 total_size = int(response.headers.get('Content-Length', 0))
-                        
-            _Dataset._download_sequential(url + target, destination if destination is not None else temp_destination.name, total_size, desc, chunk_size)
+            
+            # Convert destination to Path for _download_sequential
+            download_path = pathlib.Path(destination) if destination is not None else pathlib.Path(temp_destination.name)
+            _Dataset._download_sequential(url + target, download_path, total_size, desc, chunk_size)
     
             if destination is None:
                 temp_destination.close()
@@ -169,6 +171,14 @@ class _Dataset(ABC):
                              chunk_size: int = 1024 * 1024):
         """Download file sequentially (fallback method)."""
         import sys
+        import os
+        
+        # Convert to Path if it's a string
+        if isinstance(filepath, str):
+            filepath = pathlib.Path(filepath)
+        
+        # Ensure parent directory exists
+        filepath.parent.mkdir(parents=True, exist_ok=True)
         
         req = Request(url)
         with urlopen(req) as response:
