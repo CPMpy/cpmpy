@@ -109,42 +109,60 @@ def read_dimacs(fname):
     m = cp.Model()
 
     with open(fname, "r") as f:
-        clause = []
-        nr_vars = None
+        reader = DimacsReader()
         for line in f.readlines():
-            if line == "" or line.startswith("c"):
-                continue  # skip empty and comment lines
-            elif line.startswith("p"):
-                params = line.strip().split(" ")
-                assert len(params) == 4, f"Expected p-header to be formed `p cnf nr_vars nr_cls` but got {line}"
-                _,typ,nr_vars,nr_cls = params
-                if typ != "cnf":
-                    raise ValueError("Expected `cnf` (i.e. DIMACS) as file format, but got {typ} which is not supported.")
-                nr_vars = int(nr_vars)
-                if nr_vars>0:
-                    bvs = cp.boolvar(shape=nr_vars)
-                nr_cls = int(nr_cls)
-            else:
-                assert nr_vars is not None, "Expected p-line before first clause"
-                for token in line.strip().split():
-                    i = int(token.strip())
-                    if i == 0:
-                        m += cp.any(clause)
-                        clause = []
-                    else:
-                        var=abs(i)-1
-                        assert var < nr_vars, "Expected at most {nr_vars} variables (from p-line) but found literal {i} in clause {line}"
-                        bv = bvs[var]
+            reader.read_line(line)
 
-                        clause.append(bv if i > 0 else ~bv)
+        m = reader.to_model()
 
-        assert nr_vars is not None, "Expected file to contain p-line, but did not"
-        assert len(clause) == 0, f"Expected last clause to be terminated by 0, but it was not"
-        assert len(m.constraints) == nr_cls, f"Number of clauses was declared in p-line as {nr_cls}, but was {len(m.constraints)}"
+        assert reader.nr_vars is not None, "Expected file to contain p-line, but did not"
+        assert len(reader.clause) == 0, f"Expected last clause to be terminated by 0, but it was not"
+        assert len(m.constraints) == reader.nr_cls, f"Number of clauses was declared in p-line as {reader.nr_cls}, but was {len(m.constraints)}"
 
     return m
 
+class DimacsReader:
+
+    def __init__(self):
+        self.clause = []
+        self.clauses = []
+        self.nr_vars = None
+        self.nr_cls = None
+        self.bvs = []
+
+    def read_p_line(self, typ, nr_vars, nr_cls):
+        # assert len(params) == 4, f"Expected p-header to be formed `p cnf nr_vars nr_cls` but got {line}"
+        if typ != "cnf":
+            raise ValueError("Expected `cnf` (i.e. DIMACS) as file format, but got {typ} which is not supported.")
+        self.nr_vars = int(nr_vars)
+        if self.nr_vars>0:
+            self.bvs = cp.boolvar(shape=self.nr_vars)
+        self.nr_cls = int(nr_cls)
+
+    def read_line(self, line):
+        if line == "" or line.startswith("c"):
+            pass  # skip empty and comment lines
+        elif line.startswith("p"):
+            self.read_p_line(*line.strip().split(" ")[1:])
+        else:
+            # assert nr_vars is not None, "Expected p-line before first clause"
+            for token in line.strip().split():
+                i = int(token.strip())
+                if i == 0:
+                    self.clauses.append(self.clause)
+                    self.clause=[]
+                else:
+                    var=abs(i)-1
+                    if self.nr_vars is not None:
+                        assert var < self.nr_vars, "Expected at most {self.nr_vars} variables (from p-line) but found literal {i} in clause {line}"
+                        bv = self.bvs[var]
+                    else:
+                        bv = cp.boolvar()
+                        self.bvs.append(bv)
+                    self.clause.append(bv if i > 0 else ~bv)
 
 
+    def to_model(self):
+        return cp.Model([cp.any(clause) for clause in self.clauses])
 
 

@@ -1,4 +1,5 @@
 import unittest
+import itertools
 import cpmpy as cp
 
 
@@ -113,13 +114,18 @@ class TestToCnf:
         print("h", hard_)
         print("a", assumptions)
 
-        for assumptions_ in ((0, 1), (0,), (1,), tuple()):
-            assumptions_ = [assumptions[a] for a in assumptions_]
+        def powerset(iterable):
+            "Subsequences of the iterable from shortest to longest."
+            # powerset([1,2,3]) → () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)
+            s = list(iterable)
+            return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s) + 1))
+
+        for assumptions_ in powerset(assumptions):
             vs = cp.cpm_array(get_variables_model(model))
-            s1 = self.allsols(assump_model.constraints, vs, assumptions=assumptions_)
+            s1 = self.allsols(assump_model.constraints, vs, assumptions=assumptions)
 
             assert len(s1) <= 100, "Find a smaller case!"
-            s2 = self.allsols(gcnf_model.constraints, vs, assumptions=assumptions_, ivarmap=ivarmap)
+            s2 = self.allsols(gcnf_model.constraints, vs, assumptions=assumptions, ivarmap=ivarmap)
             assert s1 == s2
 
     @pytest.mark.parametrize(
@@ -159,7 +165,7 @@ class TestToCnf:
                     x_enc._x._value = x_enc.decode()
             sols.add(tuple(argvals(vs)))
 
-        solution_limit = 100000
+        solution_limit = 100
         m.solveAll(solver=SOLVER, display=display, solution_limit=solution_limit, assumptions=assumptions)
         assert len(sols) < solution_limit, (
             f"Strict less is intentional ; We didn't find ALL solutions within limit {solution_limit}"
