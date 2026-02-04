@@ -158,15 +158,13 @@ def test_basic_model():
 For tests that should run with different solvers:
 
 ```python
-from utils import TestCase
-
 @pytest.mark.usefixtures("solver")
-class TestMyFeature(TestCase):
+class TestMyFeature:
     def test_with_solver(self):
         x = cp.intvar(0, 10)
         m = cp.Model(x >= 5)
-        self.assertTrue(m.solve(solver=self.solver))
-        self.assertGreaterEqual(x.value(), 5)
+        assert (m.solve(solver=self.solver))
+        assert x.value() >= 5
 ```
 
 When multiple solvers are provided via `--solver`, these tests will automatically be parametrised to run against each solver. The `self.solver` attribute is automatically set by the test framework.
