@@ -78,17 +78,9 @@ def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="aut
         **{a: [] for a in assump},  # assumption mapped to its soft clauses
     }
 
-    def add_gcnf_clause_(lits):
-        # find the assumption variable (not guaranteed to be first)
-        i = next((i for i, l in enumerate(lits) if (~l) in assump), None)
-        if i:
-            constraints[~lits[i]].append(cp.any(l for i_, l in enumerate(lits) if i_ != i))
-        else:
-            # hard clause (w/o assumption var)
-            constraints[True].append(cp.any(lits))
-
     def add_gcnf_clause(cpm_expr):
         for clause in _to_clauses(cpm_expr):
+            # assumption var is often the first literal, but this is not guaranteed
             i = next((i for i, l in enumerate(clause) if (~l) in assump), None)
             if i is None:
                 # hard clause (w/o assumption var)
@@ -113,13 +105,6 @@ def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="aut
                         g_b[j] = f
                         # then add `f -> c_b` as a hard clause
                         add_gcnf_clause(f.implies(c_b))
-
-        for g_a, g_b in all_pairs(constraints.values()):
-            for c_a in g_a:
-                for c_b in g_b:
-                    assert not (c_a == c_b), "Still not disjoint"
-
-
 
     return (
         cp.Model(cnf),
