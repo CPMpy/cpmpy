@@ -165,18 +165,18 @@ class TestTransfDecomp(unittest.TestCase):
 
         cons = cp.AllDifferent(x)
         ivarmap = dict()
-        self.assertSetEqual(set(map(str,decompose_linear([cons], ivarmap=ivarmap))),
+        self.assertSetEqual(set(map(str,decompose_linear([cons], ivarmap=ivarmap, keep_integer=False))),
                             {"and([(EncDir(a)[0]) + (EncDir(b)[0]) <= 1, (EncDir(a)[1]) + (EncDir(b)[1]) <= 1, (EncDir(a)[2]) + (EncDir(b)[2]) <= 1])",
                              "sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1",
                              "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
         # next time, re-use the encoding, no domain constraints
-        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap, keep_integer=False))),
                             {"and([(EncDir(a)[0]) + (EncDir(b)[0]) <= 1, (EncDir(a)[1]) + (EncDir(b)[1]) <= 1, (EncDir(a)[2]) + (EncDir(b)[2]) <= 1])"})
 
         # nested
         cons = bv == cp.AllDifferent(x)
         ivarmap = dict()
-        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap, keep_integer=False))),
                             {"(bv) == (and([(EncDir(a)[0]) + (EncDir(b)[0]) <= 1, (EncDir(a)[1]) + (EncDir(b)[1]) <= 1, (EncDir(a)[2]) + (EncDir(b)[2]) <= 1]))",
                              "sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1",
                              "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
@@ -184,7 +184,7 @@ class TestTransfDecomp(unittest.TestCase):
         # test nvalue
         cons = cp.NValue(x) == 8
         ivarmap = dict()
-        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap, keep_integer=False))),
                             {"sum([(EncDir(a)[0]) or (EncDir(b)[0]), (EncDir(a)[1]) or (EncDir(b)[1]), (EncDir(a)[2]) or (EncDir(b)[2])]) == 8",
                              "sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1",
                              "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
@@ -192,7 +192,22 @@ class TestTransfDecomp(unittest.TestCase):
         # test element
         cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
         ivarmap = dict()
-        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap))),
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap, keep_integer=False)),),
                             {"sum([10, 20, 30, 40] * [boolval(False), EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 8",
                              "sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1"})
 
+        # test table
+        cons = cp.Table(x, [[1,1], [2,3]])
+        ivarmap = dict()
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap, keep_integer=False)),),
+                            {'((EncDir(a)[0]) and (EncDir(b)[0])) or ((EncDir(a)[1]) and (EncDir(b)[2]))',
+                             'sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1',
+                             'sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1'})
+
+        # test count
+        cons = cp.Count(x, 2) >= 1
+        ivarmap = dict()
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap, keep_integer=False)), ),
+                            {'(EncDir(a)[1]) + (EncDir(b)[1]) >= 1',
+                             'sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1',
+                             'sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1'})
