@@ -8,6 +8,7 @@ import contextlib
 import warnings
 import logging
 from pathlib import Path
+from typing import Optional, List
 
 from cpmpy.tools.benchmark import _mib_as_bytes
 from cpmpy.tools.benchmark.test.instance_runner import InstanceRunner
@@ -232,6 +233,7 @@ class RunExecResourceManager:
             intermediate: bool,
             verbose: bool,
             output_file: str,
+            setup_command: Optional[List[str]] = None,
         ) -> dict:
         """
         Run a single instance with assigned resources.
@@ -291,6 +293,11 @@ class RunExecResourceManager:
                     "--intermediate", 
                     #"--cores", str(len(cores))  # Pass number of cores to the solver
                 ]
+
+                # Prepend setup_command if provided - this wraps the entire command invocation
+                # e.g., systemd-run --user --scope --slice=benchexec -p Delegate=yes python script.py --args
+                if setup_command:
+                    cmd = list(setup_command) + cmd
 
                 result = executor.execute_run(
                         args=cmd,
@@ -401,7 +408,7 @@ class PythonResourceManager:
 
 
 
-def run_instance(instance: str, instance_runner: InstanceRunner, time_limit: int, memory_limit: int, cores: list[int], resource_manager: ResourceManager, solver: str, seed: int, intermediate: bool, verbose: bool, output_file: str):
+def run_instance(instance: str, instance_runner: InstanceRunner, time_limit: int, memory_limit: int, cores: list[int], resource_manager: ResourceManager, solver: str, seed: int, intermediate: bool, verbose: bool, output_file: str, setup_command=None):
     """
     Run a single instance with assigned cores.
     
@@ -411,10 +418,11 @@ def run_instance(instance: str, instance_runner: InstanceRunner, time_limit: int
         time_limit: Time limit in seconds
         memory_limit: Memory limit in MB
         cores: List of core IDs to assign to this run (e.g., [0, 1] for cores 0 and 1)
+        setup_command: Optional command to prefix before running (list of strings)
     """
 
 
-    resource_manager.run(instance, instance_runner, time_limit, memory_limit, cores, solver, seed, intermediate, verbose, output_file)
+    resource_manager.run(instance, instance_runner, time_limit, memory_limit, cores, solver, seed, intermediate, verbose, output_file, setup_command)
     
     
     # Convert cores list to comma-separated string for runexec
