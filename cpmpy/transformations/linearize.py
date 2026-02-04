@@ -278,42 +278,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 # supported comparison
                 newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
 
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name in supported:
-            newlist.append(cpm_expr)
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name not in supported:
-            """
-                More efficient implementations possible
-                http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
-                Introduces n^2 new boolean variables
-                Decomposes through bi-partite matching
-            """
-            # TODO check performance of implementation
-            if reified is True:
-                raise ValueError("Linear decomposition of AllDifferent does not work reified. "
-                                 "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
-
-            lbs, ubs = get_bounds(cpm_expr.args)
-            lb, ub = min(lbs), max(ubs)
-            n_vals = (ub-lb) + 1
-
-            x = boolvar(shape=(len(cpm_expr.args), n_vals))
-
-            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
-            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
-
-            # link Boolean matrix and integer variable
-            for arg, row in zip(cpm_expr.args, x):
-                if is_num(arg): # constant, fix directly
-                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
-                else: # ensure result is canonical
-                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
-
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
         elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
             raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
-                             f"`cpmpy.transformations.decompose_global.decompose_global() first")
+                             f"`cpmpy.transformations.linearize.decompose_linear() first")
 
     return newlist
 
