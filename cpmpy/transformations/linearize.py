@@ -635,6 +635,9 @@ def get_linear_decompositions(ivarmap, keep_integer):
     def decompose_count(expr):
 
         args, n = expr.args
+        if not is_num(n):
+            return expr.decompose()
+
         encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
         return cp.sum(enc.eq(n) for enc in encodings), defining
 
