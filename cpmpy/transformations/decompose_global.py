@@ -23,13 +23,13 @@ from typing import List, Set, Optional, Dict, Tuple, Union, Sequence
 import numpy as np
 
 from .normalize import toplevel_list
-from ..expressions.core import Expression
+from ..expressions.core import Expression, BoolExpression, Int  # last two for type hints
 from ..expressions.variables import NDVarArray
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import all as cpm_all
 
 
-def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = set(), supported_reified: Set[str] = set(), _toplevel=None, nested=False, csemap: Optional[Dict[Expression, Expression]] = None) -> List[Expression]:
+def decompose_in_tree(lst_of_expr: Sequence[BoolExpression], supported: Set[str] = set(), supported_reified: Set[str] = set(), _toplevel=None, nested=False, csemap: Optional[Dict[Expression, Expression]] = None) -> Sequence[BoolExpression]:
     """
     Decomposes global constraint or global function not supported by the solver.
 
@@ -64,10 +64,10 @@ def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = s
         newlst_of_expr.extend(decomp)
         todo_toplevel = next_toplevel # decompositions may have introduced nested lists or ands
 
-    return newlst_of_expr
+    return newlst_of_expr # type: ignore[return-value]  # gave it BoolExprs, got BoolExprs
 
 
-def decompose_objective(expr: Expression, supported: Set[str] = set(), supported_reified: Set[str] = set(), csemap: Optional[Dict[Expression, Expression]] = None) -> Tuple[Expression, List[Expression]]:
+def decompose_objective(expr: Expression, supported: Set[str] = set(), supported_reified: Set[str] = set(), csemap: Optional[Dict[Expression, Expression]] = None) -> Tuple[Expression, List[BoolExpression]]:
     """
     Decompose any global constraint or global function not supported by the solver
     in the objective function expression (numeric or global).
@@ -95,10 +95,10 @@ def decompose_objective(expr: Expression, supported: Set[str] = set(), supported
         return expr, []
 
     assert len(newexpr) == 1, "decompose_objective: expected a single expression as decomposed objective but got {newexpr}"
-    return newexpr[0], todo_toplevel
+    return newexpr[0], todo_toplevel # type: ignore[return-value]  # gave it one Expr, got one Expr
 
 
-def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], supported: Set[str], supported_reified: Set[str], is_toplevel: bool, csemap: Optional[Dict[Expression, Expression]]) -> Tuple[bool, List[Expression], List[Expression]]:
+def _decompose_in_tree(lst_of_expr: Sequence[Int|Expression], supported: Set[str], supported_reified: Set[str], is_toplevel: bool, csemap: Optional[Dict[Expression, Expression]]) -> Tuple[bool, List[Int|Expression], List[BoolExpression]]:
     """
     Decompose any global constraint or global function not supported by the solver, recursive internal version.
 
@@ -132,33 +132,33 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
             elif isinstance(expr, np.ndarray) and expr.dtype != object:
                 pass  # only constants, nothing to do
             else:
-                rec_changed, rec_expr, rec_toplevel = _decompose_in_tree(expr, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap)
+                rec_changed, rec_expr, rec_toplevel = _decompose_in_tree(expr, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap) # type: ignore[arg-type]  # yes its a list
                 if rec_changed:
-                    expr = rec_expr
+                    expr = rec_expr # type: ignore[assignment]  # list in list out
                     toplevel.extend(rec_toplevel)
                     changed = True
-            newlist.append(expr)
+            newlist.append(expr) # type: ignore[arg-type]  # list in list out
             continue
 
         # if an expression, decompose its arguments first
         if isinstance(expr, Expression) and expr.has_subexpr():
-            rec_changed, newargs, rec_toplevel = _decompose_in_tree(expr.args, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap)
+            rec_changed, newargs, rec_toplevel = _decompose_in_tree(expr.args, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap) # type: ignore[arg-type]
             if rec_changed:
                 expr = copy.copy(expr)
-                expr.update_args(newargs)
+                expr.update_args(newargs) # type: ignore[arg-type]  # list in list out
                 toplevel.extend(rec_toplevel)
                 changed = True
 
-        if hasattr(expr, "decompose"):  # it is a global function or global constraint
+        if isinstance(expr, Expression) and hasattr(expr, "decompose"):  # it is a global function or global constraint
             is_supported = expr.name in supported
             if not is_toplevel and expr.is_bool():
                 # argument to another expression, only possible if supported reified
                 is_supported = expr.name in supported_reified
 
             if is_supported is False:
-                if has_csemap and expr in csemap:
+                if has_csemap and expr in csemap: # type: ignore[operator]  # has_csemap
                     # we might have already decomposed it previously
-                    newexpr = csemap[expr]
+                    newexpr = csemap[expr] # type: ignore[index]  # has_csemap
                 else:
                     newexpr, define = expr.decompose()
                     toplevel.extend(define)
@@ -177,14 +177,14 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                             toplevel.extend(rec_toplevel)
 
                     if has_csemap:
-                        csemap[expr] = newexpr
+                        csemap[expr] = newexpr # type: ignore[index,assignment]  # has_csemap
 
                 newlist.append(newexpr)
                 changed = True
                 continue
 
         # constants, variables, other expressions are left as is
-        newlist.append(expr)
+        newlist.append(expr) # type: ignore[arg-type]  # list in list out
 
     assert is_toplevel or len(newlist) == len(lst_of_expr), f"Nested decomposition should not change the number of expressions\n{lst_of_expr}\n{newlist}"
-    return (changed, newlist, toplevel)
+    return (changed, newlist, toplevel)  # type: ignore[return-value]  # middle one is fine
