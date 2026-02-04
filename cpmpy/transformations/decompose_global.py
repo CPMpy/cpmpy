@@ -1,14 +1,14 @@
 """
 Functions to decompose global constraints and global functions not supported by the solver.
 
-This transformation is necessary for all non-CP solvers, and also used to decompose 
+This transformation is necessary for all non-CP solvers, and also used to decompose
 global constraints and global functions not implemented in a CP-solver.
 
 While a solver may natively support a global constraint, it may not support it natively in a reified context.
 In this case, we will als also decompose the global constraint.
 
 For numerical global functions, we will only decompose them if they are not supported in non-reified context.
-Even if the solver does not explicitely support them in a subexpression, 
+Even if the solver does not explicitely support them in a subexpression,
 we can rewrite them using func:`cpmpy.transformations.reification.reify_rewrite` to a non-reified version when the function is total.
 E.g., bv <-> max(a,b,c) >= 4 can be rewritten as [bv <-> IV0 >= 4, IV0 == max(a,b,c)]
 
@@ -19,7 +19,7 @@ This allows to post the decomposed expression tree to the solver if it supports 
 """
 
 import copy
-from typing import List, Set, Optional, Dict, Tuple, Union, Sequence
+from typing import List, Set, Optional, Dict, Tuple, Union, Sequence, Callable
 import numpy as np
 
 from .normalize import toplevel_list
@@ -29,7 +29,12 @@ from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import all as cpm_all
 
 
-def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = set(), supported_reified: Set[str] = set(), _toplevel=None, nested=False, csemap: Optional[Dict[Expression, Expression]] = None) -> List[Expression]:
+def decompose_in_tree(lst_of_expr: Sequence[Expression],
+                      supported: Set[str] = set(),
+                      supported_reified: Set[str] = set(),
+                      _toplevel=None, nested=False,
+                      csemap: Optional[Dict[Expression, Expression]] = None,
+                      decompose_custom: Optional[Dict[str, Callable]]= None) -> List[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
 
@@ -49,13 +54,13 @@ def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = s
     assert _toplevel is None, "decompose_in_tree: argument '_toplevel' is deprecated, do not use/modify it"
     assert nested is False, "decompose_in_tree: argument 'nested' is deprecated, do not use/modify it"
 
-    changed, newlst_of_expr, todo_toplevel = _decompose_in_tree(lst_of_expr, supported=supported, supported_reified=supported_reified, is_toplevel=True, csemap=csemap)
+    changed, newlst_of_expr, todo_toplevel = _decompose_in_tree(lst_of_expr, supported=supported, supported_reified=supported_reified, is_toplevel=True, csemap=csemap, decompose_custom=decompose_custom)
     if not changed:
         return lst_of_expr
 
     # new toplevel constraints may need to be decomposed too
     while len(todo_toplevel):
-        changed, decomp, next_toplevel = _decompose_in_tree(todo_toplevel, supported=supported, supported_reified=supported_reified, is_toplevel=True, csemap=csemap)
+        changed, decomp, next_toplevel = _decompose_in_tree(todo_toplevel, supported=supported, supported_reified=supported_reified, is_toplevel=True, csemap=csemap, decompose_custom=decompose_custom)
         if not changed:
             newlst_of_expr.extend(todo_toplevel)
             break
@@ -67,7 +72,10 @@ def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = s
     return newlst_of_expr
 
 
-def decompose_objective(expr: Expression, supported: Set[str] = set(), supported_reified: Set[str] = set(), csemap: Optional[Dict[Expression, Expression]] = None) -> Tuple[Expression, List[Expression]]:
+def decompose_objective(expr: Expression, supported: Set[str] = set(),
+                        supported_reified: Set[str] = set(),
+                        csemap: Optional[Dict[Expression, Expression]] = None,
+                        decompose_custom: Optional[Dict[str, Callable]]=None) -> Tuple[Expression, List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver
     in the objective function expression (numeric or global).
@@ -90,7 +98,7 @@ def decompose_objective(expr: Expression, supported: Set[str] = set(), supported
     """
     assert isinstance(expr, Expression), "decompose_objective: expected a single expression as objective but got {expr}"
 
-    changed, newexpr, todo_toplevel = _decompose_in_tree((expr,), supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap)
+    changed, newexpr, todo_toplevel = _decompose_in_tree((expr,), supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap, decompose_custom=decompose_custom)
     if not changed:
         return expr, []
 
@@ -98,7 +106,12 @@ def decompose_objective(expr: Expression, supported: Set[str] = set(), supported
     return newexpr[0], todo_toplevel
 
 
-def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], supported: Set[str], supported_reified: Set[str], is_toplevel: bool, csemap: Optional[Dict[Expression, Expression]]) -> Tuple[bool, List[Expression], List[Expression]]:
+def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray],
+                       supported: Set[str],
+                       supported_reified: Set[str],
+                       is_toplevel: bool,
+                       csemap: Optional[Dict[Expression, Expression]]=None,
+                       decompose_custom:Optional[Dict[str, Callable]]=None) -> Tuple[bool, List[Expression], List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver, recursive internal version.
 
@@ -132,7 +145,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
             elif isinstance(expr, np.ndarray) and expr.dtype != object:
                 pass  # only constants, nothing to do
             else:
-                rec_changed, rec_expr, rec_toplevel = _decompose_in_tree(expr, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap)
+                rec_changed, rec_expr, rec_toplevel = _decompose_in_tree(expr, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap, decompose_custom=decompose_custom)
                 if rec_changed:
                     expr = rec_expr
                     toplevel.extend(rec_toplevel)
@@ -142,7 +155,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
 
         # if an expression, decompose its arguments first
         if isinstance(expr, Expression) and expr.has_subexpr():
-            rec_changed, newargs, rec_toplevel = _decompose_in_tree(expr.args, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap)
+            rec_changed, newargs, rec_toplevel = _decompose_in_tree(expr.args, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap, decompose_custom=decompose_custom)
             if rec_changed:
                 expr = copy.copy(expr)
                 expr.update_args(newargs)
@@ -160,18 +173,21 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                     # we might have already decomposed it previously
                     newexpr = csemap[expr]
                 else:
-                    newexpr, define = expr.decompose()
+                    if decompose_custom is not None and expr.name in decompose_custom:
+                        newexpr, define = decompose_custom[expr.name](expr)
+                    else:
+                        newexpr, define = expr.decompose()
                     toplevel.extend(define)
 
                     # decomposed constraints may introduce new globals
                     if isinstance(newexpr, list):  # globals return a list instead of a single expression (TODO: change?)
-                        rec_changed, rec_newexpr, rec_toplevel = _decompose_in_tree(newexpr, supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap)
+                        rec_changed, rec_newexpr, rec_toplevel = _decompose_in_tree(newexpr, supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap, decompose_custom=decompose_custom)
                         if rec_changed:
                             newexpr = rec_newexpr
                             toplevel.extend(rec_toplevel)
                         newexpr = cpm_all(newexpr)  # make the list a single expression
                     else:
-                        rec_changed, rec_lst_newexpr, rec_toplevel = _decompose_in_tree((newexpr,), supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap)
+                        rec_changed, rec_lst_newexpr, rec_toplevel = _decompose_in_tree((newexpr,), supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap, decompose_custom=decompose_custom)
                         if rec_changed:
                             newexpr = rec_lst_newexpr[0]
                             toplevel.extend(rec_toplevel)

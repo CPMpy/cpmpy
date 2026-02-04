@@ -49,20 +49,26 @@ General comparisons or expressions
 
 """
 import copy
+import warnings
+from typing import Set, Sequence, Optional
+
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
 from .flatten_model import flatten_constraint, get_or_make_var
+from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
+from .int2bool import _encode_int_var, IntVarEnc, IntVarEncDirect
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
-
+from ..expressions.python_builtins import sum as cpm_sum
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
     """
@@ -215,6 +221,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 # very special case, avoid writing as sum of 1 argument
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
+                if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
+                    continue # skip or([BoolVal(True)])
                 newlist.append(Operator("or", new_expr))
                 continue
 
@@ -270,42 +278,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 # supported comparison
                 newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
 
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name in supported:
-            newlist.append(cpm_expr)
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name not in supported:
-            """
-                More efficient implementations possible
-                http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
-                Introduces n^2 new boolean variables
-                Decomposes through bi-partite matching
-            """
-            # TODO check performance of implementation
-            if reified is True:
-                raise ValueError("Linear decomposition of AllDifferent does not work reified. "
-                                 "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
-
-            lbs, ubs = get_bounds(cpm_expr.args)
-            lb, ub = min(lbs), max(ubs)
-            n_vals = (ub-lb) + 1
-
-            x = boolvar(shape=(len(cpm_expr.args), n_vals))
-
-            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
-            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
-
-            # link Boolean matrix and integer variable
-            for arg, row in zip(cpm_expr.args, x):
-                if is_num(arg): # constant, fix directly
-                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
-                else: # ensure result is canonical
-                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
-
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
         elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
             raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
-                             f"`cpmpy.transformations.decompose_global.decompose_global() first")
+                             f"`cpmpy.transformations.linearize.decompose_linear() first")
 
     return newlist
 
@@ -506,7 +484,7 @@ def canonical_comparison(lst_of_expr):
                 
                 # 2) add collected variables to lhs
                 if isinstance(lhs, Operator) and lhs.name == "sum":
-                    lhs = sum([1 * a for a in lhs.args] + lhs2)
+                    lhs = cpm_sum([1 * a for a in lhs.args] + lhs2)
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
                     lhs = lhs + lhs2
                 else:
@@ -598,3 +576,178 @@ def only_positive_coefficients(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
+
+
+def get_linear_decompositions(ivarmap, keep_integer):
+    """
+        Implementation of custom linear decompositions for some global constraints.
+        Relies on the "direct encoding" of integer variables to ensure a more efficient decomposition for linear solvers.
+
+        args:
+            ivarmap: map of integer variables to their encodings
+            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    # AllDifferent
+    def decompose_alldifferent(expr):
+
+        if expr.has_subexpr():
+            return expr.decompose()
+
+        encodings, defining = _encode_integers(expr.args, ivarmap, keep_integer=keep_integer)
+
+        lbs, ubs = get_bounds(expr.args)
+        lb, ub = min(lbs), max(ubs)
+        return [cpm_sum(enc.eq(val) for enc in encodings) <= 1 for val in range(lb, ub + 1)], defining
+
+    # Table
+    def decompose_table(expr):
+
+        args, arr = expr.args
+        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
+
+        return cp.any(cp.all(enc.eq(v) for enc, v in zip(encodings, row)) for row in arr), defining
+
+    # Negative table
+    def decompose_negtable(expr):
+
+        args, arr = expr.args
+        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
+
+        return ~cp.any(cp.all(enc.eq(v) for enc, v in zip(encodings, row)) for row in arr), defining
+
+    # Element
+    def decompose_element(expr):
+        arr, idx = expr.args
+        if not all(is_num(a) for a in arr):
+            return expr.decompose()
+
+        lb, ub = get_bounds(idx)
+        if not (0 <= lb) and (ub < len(arr)):
+            return expr.decompose()
+
+        encodings, defining = _encode_integers([idx], ivarmap, keep_integer=keep_integer)
+        assert len(encodings) == 1
+        enc = encodings[0]
+
+        return cp.sum(val * enc.eq(i) for i, val in enumerate(arr)), defining
+
+    # NValue
+    def decompose_nvalue(expr):
+
+        encodings, defining = _encode_integers(expr.args, ivarmap, keep_integer=keep_integer)
+        lbs, ubs = get_bounds(expr.args)
+        lb, ub = min(lbs), max(ubs)
+
+        return cp.sum(cp.any(enc.eq(v) for enc in encodings) for v in range(lb, ub + 1)), defining
+
+    # Count
+    def decompose_count(expr):
+
+        args, n = expr.args
+        if not is_num(n):
+            return expr.decompose()
+
+        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
+        return cp.sum(enc.eq(n) for enc in encodings), defining
+
+    return dict(
+        alldifferent=decompose_alldifferent,
+        table=decompose_table,
+        negative_table=decompose_negtable,
+        element=decompose_element,
+        nvalue=decompose_nvalue,
+        count=decompose_count,
+    )
+
+def decompose_linear(lst_of_expr: Sequence[Expression],
+                     supported: Set[str]=frozenset(),
+                     supported_reified:Set[str]=frozenset(),
+                     csemap:Optional[dict[Expression,Expression]]=None,
+                     ivarmap:Optional[dict[_NumVarImpl, IntVarEnc]]=None,
+                     keep_integer=True):
+    """
+        Decompose unsupported global constraints in a linear-friendly way, by encoding the integer variales using a direct Boolean encoding.
+        
+        args:
+            lst_of_expr: list of expressions to decompose
+            supported: set of supported global constraints and global functions
+            supported_reified: set of supported reified global constraints
+            csemap: map of expressions to an auxiliary variable
+            ivarmap: map of integer variables to their encodings
+            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
+        
+        returns:
+            list of expressions
+    """
+
+    if ivarmap is None:
+        return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap)
+
+    decompositions = get_linear_decompositions(ivarmap, keep_integer)
+    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap,decompose_custom=decompositions)
+
+def decompose_linear_objective(obj: Sequence[Expression],
+                               supported: Set[str] = frozenset(),
+                               supported_reified: Set[str] = frozenset(),
+                               csemap: Optional[dict[Expression, Expression]] = None,
+                               ivarmap: Optional[dict[_NumVarImpl, IntVarEnc]] = None,
+                               keep_integer=True
+                               ):
+
+    if ivarmap is None:
+        return decompose_objective(obj, supported, supported_reified, csemap=csemap)
+
+    decompositions = get_linear_decompositions(ivarmap, keep_integer)
+    return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompositions)
+
+
+# Utility functions to ease the encoding of linear decompositions
+def _encode_integers(lst_of_ivar, ivarmap, keep_integer) -> tuple[list[IntVarEnc], list[Expression]]:
+    """
+        Encode a list of integer variables using the direct encoding
+
+        args:
+            lst_of_ivar: list of integer variables to encode
+            ivarmap: map of integer variables to their encodings
+            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
+
+        returns:
+            tuple of list of encodings and list of domain constraints
+    """
+    encodings, defining = [], []
+    for iv in lst_of_ivar:
+        if isinstance(iv, _BoolVarImpl):
+            encodings.append(DummyEncoding(iv))
+        elif isinstance(iv, _NumVarImpl):
+            enc, domain_constraints = _encode_int_var(ivarmap, iv, encoding="direct")
+            encodings.append(enc)
+            defining += domain_constraints
+            if keep_integer and len(domain_constraints) > 0: # newly encoded variable
+                defining += enc.coerce_to_integer()
+        elif is_num(iv):
+            encodings.append(DummyEncoding(iv))
+        else:
+            raise ValueError(f"Expected integer variable or constant, but got {iv} of type {type(iv)}")
+    
+    return encodings, defining
+
+class DummyEncoding:
+    """
+        Emulates an `class:cpmpy.transformations.int2bool.IntVarEnc` wrapping a constant or Boolean variable.
+        Eases the use of encoding the linear decompositions of global constraints.
+    """
+    def __init__(self, val:int|_BoolVarImpl):
+        self.val = val
+
+    def eq(self, d:int):
+        if is_int(self.val):
+            return BoolVal(self.val == d)
+        elif isinstance(self.val, _BoolVarImpl):
+            if d == 0:
+                return ~self.val
+            if d == 1:
+                return self.val
+            return BoolVal(False)
