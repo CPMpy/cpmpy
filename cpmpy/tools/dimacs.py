@@ -73,7 +73,11 @@ def write_dimacs_(constraints, groups=None, fname=None):
             ints = []
             for v in clause:
                 if v is True:
-                    continue
+                    ints = None
+                    break
+                elif v is False:
+                    ints = []
+                    break
                 elif isinstance(v, NegBoolView):
                     ints.append(str(-mapping[v._bv]))
                 elif isinstance(v, _BoolVarImpl):
@@ -81,6 +85,9 @@ def write_dimacs_(constraints, groups=None, fname=None):
                 else:
                     raise ValueError(f"Expected Boolean variable in clause, but got {v} which is of type {type(v)}")
 
+            if ints is None:
+                continue
+            
             if is_gcnf:
                 out += f"{{{group}}} "
             out += " ".join(ints + ["0"]) + "\n"

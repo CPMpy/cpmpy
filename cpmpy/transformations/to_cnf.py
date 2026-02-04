@@ -78,7 +78,7 @@ def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="aut
     start = time.time()
     cnf = to_cnf(model.constraints, encoding=encoding, csemap=csemap, ivarmap=ivarmap)
     end = time.time()
-    print(f"to_gcnf: converted to CNF in {end - start:.4f} seconds")
+    print(f"c to_gcnf: converted to CNF in {end - start:.4f} seconds")
 
     constraints = {
         True: [],  # hard clauses
@@ -129,29 +129,34 @@ def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="aut
     cl_db = set()
     
     start = time.time()
-    for c in tqdm(cnf):
+    for c in cnf:
         add_gcnf_clause(c, cl_db)
     end = time.time()
-    print(f"to_gcnf: grouped clauses in {end - start:.4f} seconds")
+    print(f"c to_gcnf: grouped clauses in {end - start:.4f} seconds")
 
-    if normalize:
-        # to make groups disjoint..
-        for (a, g_a), (b, g_b) in all_pairs(constraints.items()):
-            for i, c_a in enumerate(g_a):
-                for j, c_b in enumerate(g_b):
-                    # TODO efficiency, plus account for shuffled literals
-                    # ..we find shared clauses between any two groups..
-                    if c_a == c_b:
-                        # ..in the second group, we replace the clause `c_b` for unit clause `f`
-                        f = cp.boolvar()
-                        g_b[j] = f
-                        # then add `f -> c_b` as a hard clause
-                        add_gcnf_clause(f.implies(c_b))
+    # if normalize:
+    #     # to make groups disjoint..
+    #     for (a, g_a), (b, g_b) in all_pairs(constraints.items()):
+    #         for i, c_a in enumerate(g_a):
+    #             for j, c_b in enumerate(g_b):
+    #                 # TODO efficiency, plus account for shuffled literals
+    #                 # ..we find shared clauses between any two groups..
+    #                 if c_a == c_b:
+    #                     # ..in the second group, we replace the clause `c_b` for unit clause `f`
+    #                     f = cp.boolvar()
+    #                     g_b[j] = f
+    #                     # then add `f -> c_b` as a hard clause
+    #                     # add_gcnf_clause(f.implies(c_b))
+    #                     add_gcnf_clause([~f].extend(c_b), cl_db)
+    
+    model = cp.Model(cnf)
+    softs = [cp.all(cp.any(c) for c in constraints[a]) for a in assump]
+    hards = [cp.all(cp.any(c) for c in constraints[True])] if constraints[True] else []
 
     return (
-        cp.Model(cnf),
-        [cp.all(cp.any(c) for c in constraints[a]) for a in assump],
-        [cp.all(cp.any(c) for c in constraints[True])] if constraints[True] else [],
+        model,
+        softs, 
+        hards,
         assump,
     )
 
@@ -171,5 +176,7 @@ def _to_clauses(cons):
             raise NotImplementedError(f"Unsupported Op {cons.name}")
     elif cons is True:
         return []
+    elif cons is False:
+        return [[]]
     else:
         raise NotImplementedError(f"Unsupported constraint {cons}")

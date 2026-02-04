@@ -118,6 +118,22 @@ def get_gcnf_cases():
     soft = [cp.sum(bs) >= 1, cp.sum(bs) <= 1]
     hard = []
     yield soft, hard
+    
+    
+    xs = cp.intvar(0, 2, shape=3, name="x")
+    soft = [cp.sum(xs) >= 2, cp.sum(xs) <= 2, cp.max(xs) < 0]
+    hard = [] 
+    yield soft, hard
+    
+    xs = cp.intvar(0, 2, shape=2, name="x")
+    soft = [cp.max(xs) > 0]
+    hard = [] 
+    yield soft, hard
+    
+    xs = cp.intvar(0, 2, shape=2, name="x")
+    soft = [cp.max(xs) > -1]
+    hard = [] 
+    yield soft, hard
 
     # import pickle
     # with open("/home/hbierlee/utm/Recipe.xml.lzma_1.25.pkl", "rb") as f:
