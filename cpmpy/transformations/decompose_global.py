@@ -27,9 +27,10 @@ from ..expressions.core import Expression
 from ..expressions.variables import NDVarArray
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import all as cpm_all
+from .cse import CSEMap
 
 
-def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = set(), supported_reified: Set[str] = set(), _toplevel=None, nested=False, csemap: Optional[Dict[Expression, Expression]] = None) -> List[Expression]:
+def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = set(), supported_reified: Set[str] = set(), _toplevel=None, nested=False, csemap: Optional[CSEMap] = None) -> List[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
 
@@ -67,7 +68,7 @@ def decompose_in_tree(lst_of_expr: Sequence[Expression], supported: Set[str] = s
     return newlst_of_expr
 
 
-def decompose_objective(expr: Expression, supported: Set[str] = set(), supported_reified: Set[str] = set(), csemap: Optional[Dict[Expression, Expression]] = None) -> Tuple[Expression, List[Expression]]:
+def decompose_objective(expr: Expression, supported: Set[str] = set(), supported_reified: Set[str] = set(), csemap: Optional[CSEMap] = None) -> Tuple[Expression, List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver
     in the objective function expression (numeric or global).
@@ -98,7 +99,7 @@ def decompose_objective(expr: Expression, supported: Set[str] = set(), supported
     return newexpr[0], todo_toplevel
 
 
-def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], supported: Set[str], supported_reified: Set[str], is_toplevel: bool, csemap: Optional[Dict[Expression, Expression]]) -> Tuple[bool, List[Expression], List[Expression]]:
+def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], supported: Set[str], supported_reified: Set[str], is_toplevel: bool, csemap: Optional[CSEMap]) -> Tuple[bool, List[Expression], List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver, recursive internal version.
 
@@ -158,7 +159,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
             if is_supported is False:
                 if has_csemap and expr in csemap:
                     # we might have already decomposed it previously
-                    newexpr = csemap[expr]
+                    newexpr = csemap.get(expr)
                 else:
                     newexpr, define = expr.decompose()
                     toplevel.extend(define)
@@ -177,7 +178,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray], sup
                             toplevel.extend(rec_toplevel)
 
                     if has_csemap:
-                        csemap[expr] = newexpr
+                        csemap.set(expr, newexpr) # save the decomposed expression to the CSEMap for next time
 
                 newlist.append(newexpr)
                 changed = True

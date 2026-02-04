@@ -2,6 +2,7 @@ import unittest
 import cpmpy as cp
 
 from cpmpy.transformations.comparison import only_numexpr_equality
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
@@ -22,7 +23,7 @@ class TestCSE(unittest.TestCase):
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
        
         nested_alldiff = cp.AllDifferent(x,y+y,z)      
-        csemap = dict()
+        csemap = CSEMap()
 
         flat_cons = flatten_constraint(nested_alldiff, csemap=csemap)
 
@@ -31,7 +32,7 @@ class TestCSE(unittest.TestCase):
         self.assertEqual(str(fc), "alldifferent(x,IV0,z)")
         self.assertEqual(len(csemap), 1)
 
-        self.assertEqual(str(next(iter(csemap.keys()))), "(y) + (y)")
+        self.assertEqual(str(next(iter(csemap._int_map.keys()))), "(y) + (y)")
         self.assertEqual(str(csemap[y + y]), "IV0")
 
         # next time we use y + y, it should replace it IV0
@@ -67,7 +68,7 @@ class TestCSE(unittest.TestCase):
 
         b = cp.boolvar(name="b")
         nested_cons = b == ((cp.max([x,y,z]) + q) <= 10)
-        csemap = dict()
+        csemap = CSEMap()
         decomp = decompose_in_tree([nested_cons], csemap=csemap)
     
         self.assertEqual(len(decomp), 5)
@@ -97,7 +98,7 @@ class TestCSE(unittest.TestCase):
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
 
         cons = cp.max([x,y,z]) <= 42
-        csemap = dict()
+        csemap = CSEMap()
         eq_cons = only_numexpr_equality([cons], csemap=csemap)
         
         self.assertSetEqual(set([str(c) for c in eq_cons]), {"(max(x,y,z)) == (IV0)", "IV0 <= 42"})
@@ -114,7 +115,7 @@ class TestCSE(unittest.TestCase):
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
         
         cons = cp.max(x,y) < z
-        csemap = dict()
+        csemap = CSEMap()
         lin_cons = linearize_constraint([cons], supported={"max"}, csemap=csemap)
         
         self.assertEqual(len(lin_cons), 2)
@@ -130,20 +131,21 @@ class TestCSE(unittest.TestCase):
 
         obj = cp.max(x+y,z) - cp.min(x+y,z)
 
-        csemap = dict()
+        csemap = CSEMap()
         flat_obj, cons = flatten_objective(obj, csemap=csemap)
         self.assertEqual(len(cons), 3)
         self.assertEqual(len(csemap), 3)
-        self.assertSetEqual(set(csemap.keys()),
+        self.assertSetEqual(set(csemap._int_map.keys()),
                             {cp.max(x+y,z), cp.min(x+y,z), x+y}
         )
 
         # assume we did some transformations before
-        csemap = {cp.max(x+y,z) : cp.intvar(0,20, name="aux")}
+        csemap = CSEMap()
+        csemap.set(cp.max(x+y,z), cp.intvar(0,20, name="aux"))
         flat_obj, cons = flatten_objective(obj, csemap=csemap)
         self.assertEqual(len(cons), 2) # just replaced max with aux var
         self.assertEqual(len(csemap), 3)
-        self.assertSetEqual(set(csemap.keys()),
+        self.assertSetEqual(set(csemap._int_map.keys()),
                             {cp.max(x + y, z), cp.min(x + y, z), x + y}
                             )
 
