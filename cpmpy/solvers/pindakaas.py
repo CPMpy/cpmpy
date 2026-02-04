@@ -241,7 +241,8 @@ class CPM_pindakaas(SolverInterface):
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
             csemap=self._csemap,
-            ivarmap=self.ivarmap
+            ivarmap=self.ivarmap,
+            keep_integer=False
         )
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
