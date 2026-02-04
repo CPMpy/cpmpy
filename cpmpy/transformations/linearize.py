@@ -652,6 +652,7 @@ def get_linear_decompositions(ivarmap, keep_integer):
     return dict(
         alldifferent=decompose_alldifferent,
         table=decompose_table,
+        negative_table=decompose_negtable,
         element=decompose_element,
         nvalue=decompose_nvalue,
         count=decompose_count,
