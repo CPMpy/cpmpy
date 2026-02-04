@@ -695,7 +695,9 @@ def _encode_integers(lst_of_ivar, ivarmap, keep_integer) -> tuple[list[IntVarEnc
     """
     encodings, defining = [], []
     for iv in lst_of_ivar:
-        if isinstance(iv, _NumVarImpl):
+        if isinstance(iv, _BoolVarImpl):
+            encodings.append(DummyEncoding(iv))
+        elif isinstance(iv, _NumVarImpl):
             enc, domain_constraints = _encode_int_var(ivarmap, iv, encoding="direct")
             encodings.append(enc)
             defining += domain_constraints
@@ -710,11 +712,18 @@ def _encode_integers(lst_of_ivar, ivarmap, keep_integer) -> tuple[list[IntVarEnc
 
 class DummyEncoding:
     """
-        Emulates an `class:cpmpy.transformations.int2bool.IntVarEnc` wrapping a constant.
+        Emulates an `class:cpmpy.transformations.int2bool.IntVarEnc` wrapping a constant or Boolean variable.
         Eases the use of encoding the linear decompositions of global constraints.
     """
-    def __init__(self, val:int):
+    def __init__(self, val:int|_BoolVarImpl):
         self.val = val
 
     def eq(self, d:int):
-        return BoolVal(self.val == d)
+        if is_int(self.val):
+            return BoolVal(self.val == d)
+        elif isinstance(self.val, _BoolVarImpl):
+            if d == 0:
+                return ~self.val
+            if d == 1:
+                return self.val
+            return BoolVal(False)
