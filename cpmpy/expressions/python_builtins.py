@@ -20,6 +20,7 @@
         abs
 """
 import builtins  # to use the original Python-builtins
+import numpy as np
 
 from .utils import is_false_cst, is_true_cst, is_any_list
 from .variables import NDVarArray, cpm_array
@@ -117,7 +118,10 @@ def max(*iterable, **kwargs):
         arguments are supported in that case
     """
     if len(iterable) == 1:
-        iterable = tuple(iterable[0])
+        if isinstance(iterable[0], np.ndarray):
+            iterable = iterable[0]  # otherwise tuple unwraps it partly
+        else:
+            iterable = tuple(iterable[0])
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
         return builtins.max(iterable, **kwargs)
 
@@ -134,7 +138,10 @@ def min(*iterable, **kwargs):
         arguments are supported in that case
     """
     if len(iterable) == 1:
-        iterable = tuple(iterable[0])
+        if isinstance(iterable[0], np.ndarray):
+            iterable = iterable[0]  # otherwise tuple unwraps it partly
+        else:
+            iterable = tuple(iterable[0])
     if not builtins.any(isinstance(elem, Expression) for elem in iterable):
         return builtins.min(iterable, **kwargs)
 

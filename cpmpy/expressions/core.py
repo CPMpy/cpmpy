@@ -130,7 +130,7 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name:str, arg_list: Sequence[Int|"Expression"|Nested["Expression"|Int]]):
+    def __init__(self, name:str, arg_list: Sequence[Int|"Expression"|np.ndarray|Nested[Int|"Expression"]]):
         self.name = name
 
         if isinstance(arg_list, np.ndarray):
@@ -152,7 +152,7 @@ class Expression(object):
 
 
     @property
-    def args(self) -> List[Int|"Expression"|Nested["Expression"|Int]]|np.ndarray:
+    def args(self) -> List[Int|"Expression"|np.ndarray|Nested[Int|"Expression"]]|np.ndarray:
         return self._args
 
     @args.setter

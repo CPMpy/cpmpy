@@ -459,6 +459,10 @@ class NDVarArray(np.ndarray, Expression):
         """
         return self # we can just return self
 
+    @args.setter
+    def args(self, args):  # needed by type checker
+        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
@@ -486,6 +490,11 @@ class NDVarArray(np.ndarray, Expression):
             self.name = "NDVarArray"
             self.update_args(self)
         return super().__repr__()
+
+    def __hash__(self) -> int:  # type: ignore[override]
+        # Explicitly use Expression's hash implementation
+        # (np.ndarray sets __hash__ = None, which conflicts with Expression.__hash__)
+        return hash(self.__repr__())
 
     def __getitem__(self, index):
         # array access, check if variables are used in the indexing
