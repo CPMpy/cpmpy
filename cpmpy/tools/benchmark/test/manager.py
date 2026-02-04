@@ -7,6 +7,8 @@ import importlib.util
 import contextlib
 import warnings
 import logging
+import secrets
+import subprocess
 from pathlib import Path
 from typing import Optional, List
 
@@ -14,6 +16,79 @@ from cpmpy.tools.benchmark import _mib_as_bytes
 from cpmpy.tools.benchmark.test.instance_runner import InstanceRunner
 from cpmpy.tools.benchmark.test.run_xcsp3_instance import XCSP3InstanceRunner
 from cpmpy.tools.benchmark.test.observer import ResourceLimitObserver
+
+
+def _ensure_systemd_scope():
+    """
+    Ensure the current process is in its own systemd scope with cgroup delegation.
+    
+    This is required for BenchExec's RunExecutor to work properly with cgroups v2.
+    When running under a parent systemd scope (e.g., via systemd-run), child processes
+    need their own scope to enable cgroup subtree delegation.
+    
+    Uses busctl to call systemd's D-Bus API directly, avoiding the need for pystemd.
+    
+    Returns True if successful or already in a suitable scope, False otherwise.
+    """
+    # Check if we're already in our own benchexec scope (to avoid re-creating)
+    try:
+        with open("/proc/self/cgroup", "r") as f:
+            cgroup_info = f.read()
+            if "benchexec_worker_" in cgroup_info:
+                logging.debug("Already in a benchexec worker scope")
+                return True
+    except Exception:
+        pass
+    
+    # Create a new transient scope for this process
+    random_suffix = secrets.token_urlsafe(8)
+    scope_name = f"benchexec_worker_{random_suffix}.scope"
+    
+    try:
+        # Use busctl to create a transient scope unit
+        # This is equivalent to what pystemd does but using command line
+        cmd = [
+            "busctl", "--user", "call",
+            "org.freedesktop.systemd1",
+            "/org/freedesktop/systemd1",
+            "org.freedesktop.systemd1.Manager",
+            "StartTransientUnit",
+            "ssa(sv)a(sa(sv))",
+            scope_name,  # unit name
+            "fail",      # mode
+            "3",         # number of properties
+            "PIDs", "au", "1", str(os.getpid()),  # Add current PID
+            "Delegate", "b", "true",               # Enable delegation
+            "Slice", "s", "benchexec.slice",       # Put in benchexec slice
+            "0"          # no auxiliary units
+        ]
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode == 0:
+            logging.debug(f"Created systemd scope: {scope_name}")
+            # Give systemd a moment to move the process
+            import time
+            time.sleep(0.1)
+            return True
+        else:
+            logging.warning(f"Failed to create systemd scope: {result.stderr}")
+            return False
+            
+    except FileNotFoundError:
+        logging.warning("busctl not found, cannot create systemd scope")
+        return False
+    except subprocess.TimeoutExpired:
+        logging.warning("Timeout creating systemd scope")
+        return False
+    except Exception as e:
+        logging.warning(f"Error creating systemd scope: {e}")
+        return False
 
 
 class ResourceManager:
@@ -260,6 +335,9 @@ class RunExecResourceManager:
         # The CompetitionPrintingObserver (in default_observers) will add the 'c ' prefix
         _runner.print_comment(f"Running instance {instance} with time limit {time_limit} and memory limit {memory_limit} and cores {cores}")
         _runner.print_comment(f"Running with manager {self.__class__.__name__}")
+
+        # Ensure we're in our own systemd scope for cgroup delegation (required for cgroups v2)
+        _ensure_systemd_scope()
 
         from benchexec.runexecutor import RunExecutor
 
