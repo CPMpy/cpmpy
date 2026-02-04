@@ -323,6 +323,10 @@ class IntVarEncDirect(IntVarEnc):
     def encode_term(self, w=1):
         return [(w * i, b) for i, b in enumerate(self._xs)], self._x.lb * w
 
+    def coerce_to_integer(self):
+        """Returns a list of constraints enforcing the encoding to be equal to the integer it encodes"""
+        return [self._x == Operator("wsum", [list(range(self._x.lb, self._x.ub)), self._xs])]
+
 
 class IntVarEncOrder(IntVarEnc):
     """
