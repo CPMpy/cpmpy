@@ -114,29 +114,29 @@ class TestTransLinearize(unittest.TestCase):
         self.assertTrue(all(cons_vals))
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
-    def test_alldiff(self):
-        # alldiff has a specialized linearization
-
-        x = cp.intvar(1, 5, shape=3, name="x")
-        cons = cp.AllDifferent(x)
-        lincons = linearize_constraint([cons])
-
-        def cb():
-            assert cons.value()
-
-        n_sols = cp.Model(lincons).solveAll(display=cb)
-        self.assertEqual(n_sols, 5 * 4 * 3)
-
-        # should also work with constants in arguments
-        x,y,z = x
-        cons = cp.AllDifferent([x,3,y,True,z])
-        lincons = linearize_constraint([cons])
-
-        def cb():
-            assert cons.value()
-
-        n_sols = cp.Model(lincons).solveAll(display=cb)
-        self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
+    # def test_alldiff(self): -> handled by decompose_linear now
+    #     # alldiff has a specialized linearization
+    #
+    #     x = cp.intvar(1, 5, shape=3, name="x")
+    #     cons = cp.AllDifferent(x)
+    #     lincons = linearize_constraint([cons])
+    #
+    #     def cb():
+    #         assert cons.value()
+    #
+    #     n_sols = cp.Model(lincons).solveAll(display=cb)
+    #     self.assertEqual(n_sols, 5 * 4 * 3)
+    #
+    #     # should also work with constants in arguments
+    #     x,y,z = x
+    #     cons = cp.AllDifferent([x,3,y,True,z])
+    #     lincons = linearize_constraint([cons])
+    #
+    #     def cb():
+    #         assert cons.value()
+    #
+    #     n_sols = cp.Model(lincons).solveAll(display=cb)
+    #     self.assertEqual(n_sols, 3 * 2 * 1) # 1 and 3 not allowed
 
     # def test_issue_580(self): -> Modulo is now a global constraint
     #     x = cp.intvar(1, 5, name='x')
@@ -152,24 +152,6 @@ class TestTransLinearize(unittest.TestCase):
     #     lin_mod = linearize_constraint([x % 2 == 1], supported={"mul", "sum", "wsum"})
     #     self.assertTrue(cp.Model(lin_mod).solve())
     #     self.assertIn(x.value(), {1,3,5})
-
-    def test_issue_546(self):
-        # https://github.com/CPMpy/cpmpy/issues/546
-        arr = cp.cpm_array([cp.intvar(0, 5), cp.intvar(0, 5), 5, 4]) # combination of decision variables and constants
-        c = cp.AllDifferent(arr)
-
-        linear_c = linearize_constraint([c])
-        # this triggers an error
-        pos_c = only_positive_bv([c])
-
-        # also test full transformation stack
-        if "gurobi" in cp.SolverLookup.solvernames(): # otherwise, not supported
-            model = cp.Model(c)
-            model.solve(solver="gurobi")
-
-        if "exact" in cp.SolverLookup.solvernames(): # otherwise, not supported
-            model = cp.Model(c)
-            model.solve(solver="exact")
 
     def test_sub(self):
         x = cp.intvar(0,10, name="x")

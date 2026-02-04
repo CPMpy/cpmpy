@@ -211,3 +211,27 @@ class TestTransfDecomp(unittest.TestCase):
                             {'(EncDir(a)[1]) + (EncDir(b)[1]) >= 1',
                              'sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1',
                              'sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1'})
+
+    def test_issue_546(self):
+        # https://github.com/CPMpy/cpmpy/issues/546
+        x = cp.intvar(1,3,shape=2, name=tuple("ab"))
+        arr = x.tolist() + [2]
+
+        cons = cp.AllDifferent(arr)
+        ivarmap = dict()
+        self.assertSetEqual(set(map(str, decompose_linear([cons], ivarmap=ivarmap, keep_integer=False)), ),
+                            {'and([sum([EncDir(a)[0], EncDir(b)[0], boolval(False)]) <= 1, '+\
+                                  'sum([EncDir(a)[1], EncDir(b)[1], boolval(True)]) <= 1, '+\
+                                  'sum([EncDir(a)[2], EncDir(b)[2], boolval(False)]) <= 1])',
+
+                             'sum([EncDir(b)[0], EncDir(b)[1], EncDir(b)[2]]) == 1',
+                             'sum([EncDir(a)[0], EncDir(a)[1], EncDir(a)[2]]) == 1'})
+
+        # also test full transformation stack
+        if "gurobi" in cp.SolverLookup.solvernames():  # otherwise, not supported
+            model = cp.Model(cons)
+            model.solve(solver="gurobi")
+
+        if "exact" in cp.SolverLookup.solvernames():  # otherwise, not supported
+            model = cp.Model(cons)
+            model.solve(solver="exact")
