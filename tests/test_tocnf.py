@@ -14,9 +14,51 @@ import pytest
 
 
 SOLVER = "ortools"
+ENCODING = "auto"
 a, b, c = cp.boolvar(shape=3, name=["a", "b", "c"])
 x = cp.intvar(1, 2, name="x")
 y, z = cp.intvar(0, 1, shape=2, name=["y", "z"])
+
+
+def get_gcnf_cases():
+    p, q = cp.boolvar(shape=2, name=["p", "q"])
+    soft = (cp.sum([2 * p + 3 * q]) <= 4, p & q)
+    hard = (p,)
+    yield soft, hard
+
+    b = cp.boolvar(name="b")
+    soft = [
+        b.implies(cp.sum([2 * p + 3 * q]) <= 10),
+        b | (p == 0),
+    ]
+    hard = [q >= 1]
+    yield soft, hard
+
+    x, y = cp.intvar(0, 2, shape=2, name=["x", "y"])
+    soft = [(x == 0) | (x == 1), (y == 2)]
+    hard = [y == 1]
+    yield soft, hard
+
+    bs = cp.boolvar(4, name="b")
+    soft = [cp.sum(bs) >= 1, cp.sum(bs) <= 1]
+    hard = []
+    yield soft, hard
+
+    xs = cp.intvar(0, 2, shape=3, name="x")
+    soft = [cp.sum(xs) >= 2, cp.sum(xs) <= 2, cp.max(xs) < 0]
+    hard = []
+    yield soft, hard
+
+    xs = cp.intvar(0, 2, shape=2, name="x")
+    soft = [cp.max(xs) > 0]
+    hard = []
+    yield soft, hard
+
+    xs = cp.intvar(0, 2, shape=2, name="x")
+    soft = [cp.max(xs) > -1]
+    hard = []
+    yield soft, hard
+
 
 cases = [
     a,
@@ -50,7 +92,7 @@ cases = [
     cp.sum(cp.intvar(lb=2, ub=3, shape=3)) <= 3,
     (~a & ~b) | (a & b),  # https://github.com/cpmpy/cpmpy/issues/823
     c | (a & b),  # above minimized
-]
+] + list(soft + hard for soft, hard in get_gcnf_cases())
 
 
 def get_gcnf_cases():
@@ -83,9 +125,8 @@ def get_gcnf_cases():
     # print(m)
     # yield m.constraints, []
 
-
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
-class TestToCnf:
+class TestCnf:
     def idfn(val):
         if isinstance(val, tuple):
             # solver name, class tuple
@@ -98,14 +139,14 @@ class TestToCnf:
         get_gcnf_cases(),
         ids=idfn,
     )
-    def test_togcnf(self, case):
+    def test_to_gcnf(self, case):
         soft, hard = case
 
         model = cp.Model(soft + hard)
         assump_model, _, _ = make_assump_model(soft, hard, name="a")
 
         ivarmap = dict()
-        normalize = True
+        normalize = False
         print("hard = ", hard)
         print("soft = ", soft)
         gcnf_model, soft_, hard_, assumptions = to_gcnf(
@@ -114,6 +155,7 @@ class TestToCnf:
             name="a",
             ivarmap=ivarmap,
             normalize=normalize,
+            encoding=ENCODING,
         )
         print("m", gcnf_model)
         print("s", soft_)
@@ -139,12 +181,12 @@ class TestToCnf:
         cases,
         ids=idfn,
     )
-    def test_tocnf(self, case):
+    def test_to_cnf(self, case):
         # test for equivalent solutions with/without to_cnf
         vs = cp.cpm_array(get_variables(case))
         s1 = self.allsols([case], vs)
         ivarmap = dict()
-        cnf = to_cnf(case, ivarmap=ivarmap)
+        cnf = to_cnf(case, ivarmap=ivarmap, encoding=ENCODING)
 
         # TODO
         # assert (
@@ -163,24 +205,36 @@ class TestToCnf:
 
     def allsols(self, cons, vs, ivarmap=None, assumptions=None, feasibility=False):
         m = cp.Model(cons)
-        sols = set()
+        projected_solutions = set()
+
+        solution_limit = 10000
+        projected_solution_limit = 100
+        n_solutions = [0]  # number of non-projected solutions, pass by reference hack!
 
         def display():
             if ivarmap:
                 for x_enc in ivarmap.values():
                     x_enc._x._value = x_enc.decode()
-            sols.add(tuple(argvals(vs)))
+            sol = tuple(argvals(vs))
+            n_solutions[0] += 1
+
+            projected_solutions.add(sol)
+            if n_solutions[0] >= solution_limit:
+                assert False, "Increase sol limit!"
 
         if feasibility:
             sat = m.solve(solver=SOLVER, assumptions=assumptions)
-            print("solve", sat)
             return [True] if sat else [False]
-        solution_limit = 100
-        m.solveAll(solver=SOLVER, display=display, solution_limit=solution_limit, assumptions=assumptions)
-        assert len(sols) < solution_limit, (
-            f"Strict less is intentional ; We didn't find ALL solutions within limit {solution_limit}"
+        m.solveAll(
+            solver=SOLVER,
+            display=display,
+            solution_limit=solution_limit,
+            assumptions=assumptions,
         )
-        return sols
+        assert len(projected_solutions) < projected_solution_limit, (
+            f"Strict less is intentional ; We didn't find ALL projected solutions with the limit of {projected_solution_limit}, after finding {solution_limit} non-projected solutions"
+        )
+        return projected_solutions
 
 
 if __name__ == "__main__":
