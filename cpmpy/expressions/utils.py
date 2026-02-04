@@ -26,36 +26,44 @@ Internal utilities for expression handling.
         argval
         argvals
         eval_comparison
-        get_bounds     
+        get_bounds
+        filter_boolexpr
 """
+from __future__ import annotations  # to avoid issues with cp.BoolVal in type guards
 
 import cpmpy as cp
 import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
+from typing import TypeGuard, TYPE_CHECKING
+
 from cpmpy.exceptions import IncompleteFunctionError
+if TYPE_CHECKING:
+    from cpmpy.expressions.core import Expression
 
 
-def is_bool(arg):
+def is_bool(arg) -> TypeGuard[bool | np.bool_ | cp.BoolVal]:
     """ is it a boolean (incl numpy variants)
     """
     return isinstance(arg, (bool, np.bool_, cp.BoolVal))
 
 
-def is_int(arg):
+def is_int(arg) -> TypeGuard[int | np.bool_ | cp.BoolVal | np.integer]:
     """ can it be interpreted as an integer? (incl bool and numpy variants)
     """
     return isinstance(arg, (bool, np.bool_, cp.BoolVal, int, np.integer))
 
 
-def is_num(arg):
+def is_num(arg) -> TypeGuard[int | np.bool_ | cp.BoolVal | np.integer | float | np.floating]:
     """ is it an int or float? (incl numpy variants)
+
+    DEPRECATED! CPMpy has now decided not to support floats (half work is no work)
     """
     return isinstance(arg, (bool, np.bool_, cp.BoolVal, int, np.integer, float, np.floating))
 
 
-def is_false_cst(arg):
+def is_false_cst(arg) -> bool:
     """ is the argument the constant False (can be of type bool, np.bool and BoolVal)
     """
     if arg is False or arg is np.False_:
@@ -65,7 +73,7 @@ def is_false_cst(arg):
     return False
 
 
-def is_true_cst(arg):
+def is_true_cst(arg) -> bool:
     """ is the argument the constant True (can be of type bool, np.bool and BoolVal)
     """
     if arg is True or arg is np.True_:
@@ -75,7 +83,7 @@ def is_true_cst(arg):
     return False
 
 
-def is_boolexpr(expr):
+def is_boolexpr(expr) -> bool:
     """ is the argument a boolean expression or a boolean value
     """
     #boolexpr
@@ -85,13 +93,46 @@ def is_boolexpr(expr):
     return is_bool(expr)
 
 
-def is_pure_list(arg):
+def filter_boolexpr(iterable: Iterable, return_unsat: bool = True) -> list[Expression]:
+    """
+    Filter and normalize an iterable of boolean expressions.
+    
+    - Filters out True constants (always satisfied, no need to post)
+    - If return_unsat=True and a False constant is found, immediately returns [BoolVal(False)]
+    - Otherwise wraps False constants in BoolVal
+    - Passes through Expression objects unchanged
+    
+    Useful when building constraint lists from comprehensions that may
+    contain constant results (e.g., `x >= 0` where x is a constant).
+    
+    Arguments:
+        iterable: An iterable of Bool|BoolExpression items
+        return_unsat: If True (default), return [BoolVal(False)] immediately when
+                      a False constant is encountered (short-circuit)
+        
+    Returns:
+        list[Expression]: Filtered list of boolean expressions
+    """
+    result: list[Expression] = []
+    for c in iterable:
+        if is_true_cst(c):
+            continue  # True is always satisfied, skip
+        elif is_false_cst(c):
+            if return_unsat:
+                return [cp.BoolVal(False)]  # short-circuit: whole conjunction is unsat
+            result.append(cp.BoolVal(False))
+        else:
+            result.append(c)
+    return result
+
+
+def is_pure_list(arg) -> bool:
     """ is it a list or tuple?
     """
     return isinstance(arg, (list, tuple))
 
 
-def is_any_list(arg):
+def is_any_list(arg) -> bool:
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))
@@ -182,7 +223,7 @@ def eval_comparison(str_op, lhs, rhs):
     else:
         raise Exception("Not a known comparison:", str_op)
 
-def get_bounds(expr):
+def get_bounds(expr) -> tuple[int|list[int], int|list[int]]:
     """ return the bounds of the expression
     returns appropriately rounded integers
     """
@@ -192,15 +233,17 @@ def get_bounds(expr):
     # from cpmpy.expressions.variables import cpm_array
 
     if isinstance(expr, cp.expressions.core.Expression):
+        # If it is a NDVarArray, it will return a tuple of lists of bounds
         return expr.get_bounds()
     elif is_any_list(expr):
+        # like for NDVarArray, also here can be tuple of lists of bounds (apparently)
         lbs, ubs = zip(*[get_bounds(e) for e in expr])
-        return list(lbs), list(ubs) # return list as NDVarArray is covered above
+        return list(lbs), list(ubs)
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):
             return int(expr), int(expr)
-        return math.floor(expr), math.ceil(expr)
+        return math.floor(expr), math.ceil(expr)  # type: ignore[arg-type]
 
 def implies(expr, other):
     """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
@@ -236,7 +279,7 @@ def get_nonneg_args(args):
 
 # Specific stuff for ShortTabel global (should this be in globalconstraints.py instead?)
 STAR = "*" # define constant here
-def is_star(arg):
+def is_star(arg) -> bool:
     """
         Check if arg is star as used in the ShortTable global constraint
     """
