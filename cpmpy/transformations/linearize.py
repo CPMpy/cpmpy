@@ -606,6 +606,14 @@ def get_linear_decompositions(ivarmap, keep_integer):
 
         return cp.any(cp.all(enc.eq(v) for enc, v in zip(encodings, row)) for row in arr), defining
 
+    # Negative table
+    def decompose_negtable(expr):
+
+        args, arr = expr.args
+        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
+
+        return ~cp.any(cp.all(enc.eq(v) for enc, v in zip(encodings, row)) for row in arr), defining
+
     # Element
     def decompose_element(expr):
         arr, idx = expr.args
