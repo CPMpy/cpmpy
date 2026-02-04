@@ -159,7 +159,7 @@ class CPM_template(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise Exception("CPM_TEMPLATE: Install the python package 'TEMPLATEpy' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_TEMPLATE: Install the python package 'cpmpy[TEMPLATE]' to use this solver interface.")   
 
         import TEMPLATEpy
 

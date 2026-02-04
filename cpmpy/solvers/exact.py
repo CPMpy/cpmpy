@@ -132,7 +132,7 @@ class CPM_exact(SolverInterface):
         A workaround is to use dict-unpacking: `CPM_Exact(**{parameter-with-hyphen: 42})`
         """
         if not self.supported():
-            raise Exception("CPM_exact: Install the python package 'exact' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_exact: Install the python package 'cpmpy[exact]' to use this solver interface.")
         
         assert subsolver is None, "Exact does not allow subsolvers."
 

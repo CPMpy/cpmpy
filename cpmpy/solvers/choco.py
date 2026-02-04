@@ -136,7 +136,7 @@ class CPM_choco(SolverInterface):
             subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_choco: Install the python package 'pychoco' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_choco: Install the python package 'cpmpy[choco]' to use this solver interface.")
 
         import pychoco as chc
 

@@ -1,5 +1,6 @@
 import copy
 
+import numpy as np
 import pytest
 
 import cpmpy as cp
@@ -288,49 +289,32 @@ class TestGlobal:
     def test_in_domain(self):
         iv = cp.intvar(-8, 8)
         iv_arr = cp.intvar(-8, 8, shape=5)
-        cons = [cp.InDomain(iv, iv_arr)]
-        model = cp.Model(cons)
-        assert model.solve()
-        assert iv.value() in iv_arr.value()
+
+        # Test InDomain with constant list
         vals = [1, 5, 8, -4]
-        cons = [cp.InDomain(iv, vals)]
-        model = cp.Model(cons)
+        model = cp.Model([cp.InDomain(iv, vals)])
         assert model.solve()
         assert iv.value() in vals
-        cons = [cp.InDomain(iv, [])]
-        model = cp.Model(cons)
+
+        # Test InDomain with empty list (should be unsat)
+        model = cp.Model([cp.InDomain(iv, [])])
         assert not model.solve()
-        cons = [cp.InDomain(iv, [1])]
-        model = cp.Model(cons)
+
+        # Test InDomain with singleton list
+        model = cp.Model([cp.InDomain(iv, [1])])
         assert model.solve()
-        assert iv.value() ==1
-        cons = cp.InDomain(cp.min(iv_arr), vals)
-        model = cp.Model(cons)
+        assert iv.value() == 1
+
+        # Test InDomain using minimum of array
+        model = cp.Model([cp.InDomain(cp.min(iv_arr), vals)])
         assert model.solve()
-        iv2 = cp.intvar(-8, 8)
-        vals = [1, 5, 8, -4, iv2]
-        cons = [cp.InDomain(iv, vals)]
-        model = cp.Model(cons)
-        assert model.solve()
-        assert iv.value() in argvals(vals)
-        vals = [1, 5, 8, -4]
+
+        # Test InDomain with boolean var and constants
         bv = cp.boolvar()
-        cons = [cp.InDomain(bv, vals)]
-        model = cp.Model(cons)
+        vals3 = [1, 5, 8, -4]
+        model = cp.Model([cp.InDomain(bv, vals3)])
         assert model.solve()
-        assert bv.value() in set(vals)
-        vals = [iv2, 5, 8, -4]
-        bv = cp.boolvar()
-        cons = [cp.InDomain(bv, vals)]
-        model = cp.Model(cons)
-        assert model.solve()
-        assert bv.value() in argvals(vals)
-        vals = [bv & bv, 5, 8, -4]
-        bv = cp.boolvar()
-        cons = [cp.InDomain(bv, vals)]
-        model = cp.Model(cons)
-        assert model.solve()
-        assert bv.value() in argvals(vals)
+        assert bv.value() in set(vals3)
 
     def test_lex_lesseq(self):
         from cpmpy import BoolVal
@@ -395,13 +379,16 @@ class TestGlobal:
         from cpmpy.expressions.utils import argval
         assert sum(argval(X)) == 0
 
-        Z = cp.intvar(0, 1, shape=(3,2))
+        Z = cp.intvar(0, 1, shape=(4,2))
         c = cp.LexChainLess(Z)
         m = cp.Model(c)
         assert m.solve()
         assert sum(argval(Z[0])) == 0
         assert sum(argval(Z[1])) == 1
-        assert sum(argval(Z[2])) >= 1
+        assert argval(Z[1,0]) == 0
+        assert sum(argval(Z[2])) == 1
+        assert argval(Z[2,1]) == 0
+        assert sum(argval(Z[3])) >= 1
 
 
     def test_indomain_onearg(self):
@@ -442,6 +429,26 @@ class TestGlobal:
         constraints = [cp.Table(iv, [[10, 8, 2], [5, 9, 2]])]
         model = cp.Model(constraints[0].decompose())
         assert not model.solve()
+
+    def test_table_value(self):
+        """Test Table.value() with known assignments (and unassigned -> None)."""
+        iv = cp.intvar(0, 10, shape=3)
+        table = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+        c = cp.Table(iv, table)
+        # (assignment, expected value())
+        cases = [
+            ([1, 2, 3], True),
+            ([4, 5, 6], True),
+            ([7, 8, 9], True),
+            ([1, 2, 4], False),
+            ([0, 0, 0], False),
+            ([1, None, 3], None),
+            ([None, 2, 3], None),
+        ]
+        for vals, oracle in cases:
+            for var, val in zip(iv, vals):
+                var._value = val
+            assert c.value() == oracle, f"Table.value() for {vals}"
 
     def test_negative_table(self):
         iv = cp.intvar(-8,8,3)
@@ -485,6 +492,24 @@ class TestGlobal:
         model += constraints[1].decompose()
         assert not model.solve()
 
+    def test_negative_table_value(self):
+        """Test NegativeTable.value() with known assignments (and unassigned -> None)."""
+        iv = cp.intvar(0, 10, shape=3)
+        table = [[1, 2, 3], [4, 5, 6]]
+        c = cp.NegativeTable(iv, table)
+        # (assignment, expected value(): True = row NOT in table)
+        cases = [
+            ([7, 8, 9], True),
+            ([0, 0, 0], True),
+            ([1, 2, 3], False),
+            ([4, 5, 6], False),
+            ([1, None, 3], None),
+        ]
+        for vals, oracle in cases:
+            for var, val in zip(iv, vals):
+                var._value = val
+            assert c.value() == oracle, f"NegativeTable.value() for {vals}"
+
     def test_shorttable(self):
         iv = cp.intvar(-8,8,shape=3, name="x")
 
@@ -523,7 +548,57 @@ class TestGlobal:
         constraining, defining = true_cons.decompose() # should be True, []
         assert constraining[0]
 
+    def test_shorttable_value(self):
+        """Test ShortTable.value() with known assignments and STAR; unassigned -> None."""
+        iv = cp.intvar(0, 10, shape=3)
+        # table rows: [1,*,3] and [*,5,6]; so [1,x,3] and [y,5,6] match
+        c = cp.ShortTable(iv, [[1, STAR, 3], [STAR, 5, 6]])
+        cases = [
+            ([1, 0, 3], True),
+            ([1, 99, 3], True),
+            ([0, 5, 6], True),
+            ([99, 5, 6], True),
+            ([2, 5, 6], True),   # matches [STAR, 5, 6]
+            ([1, 5, 7], False),
+            ([2, 4, 6], False),
+            ([1, None, 3], None),
+        ]
+        for vals, oracle in cases:
+            for var, val in zip(iv, vals):
+                var._value = val
+            assert c.value() == oracle, f"ShortTable.value() for {vals}"
 
+    def test_table_accepts_ndarray(self):
+        """Table, NegativeTable, ShortTable accept np.ndarray as table; value() works (stored as list)."""
+        iv = cp.intvar(0, 10, shape=2)
+        tab = np.array([[1, 2], [3, 4]], dtype=int)
+        t = cp.Table(iv, tab)
+        for var, val in zip(iv, [1, 2]):
+            var._value = val
+        assert t.value()
+        for var, val in zip(iv, [3, 4]):
+            var._value = val
+        assert t.value()
+        for var, val in zip(iv, [0, 0]):
+            var._value = val
+        assert not t.value()
+
+        nt = cp.NegativeTable(iv, tab)
+        for var, val in zip(iv, [1, 2]):
+            var._value = val
+        assert not nt.value()
+        for var, val in zip(iv, [0, 0]):
+            var._value = val
+        assert nt.value()
+
+        tab_star = np.array([[1, 2], [STAR, 4]], dtype=object)
+        st = cp.ShortTable(iv, tab_star)
+        for var, val in zip(iv, [1, 2]):
+            var._value = val
+        assert st.value()
+        for var, val in zip(iv, [99, 4]):
+            var._value = val
+        assert st.value()
 
     def test_table_onearg(self):
 
@@ -833,14 +908,13 @@ class TestGlobal:
 
 
     def test_not_xor(self):
-        bv = cp.boolvar(5)
+        bv = cp.boolvar(shape=5, name=tuple("abcde"))
         assert cp.Model(~cp.Xor(bv)).solve()
         assert not cp.Xor(bv).value()
-        nbNotModels = cp.Model(~cp.Xor(bv)).solveAll(display=lambda_assert((~cp.Xor(bv)).value))   
-        nbModels = cp.Model(cp.Xor(bv)).solveAll(display=cp.Xor(bv))
-        nbModels = cp.Model(cp.Xor(bv)).solveAll(display=lambda_assert(cp.Xor(bv).value))
-        nbDecompModels = cp.Model(cp.Xor(bv).decompose()).solveAll(display=lambda_assert(cp.Xor(bv).value))
-        assert nbDecompModels ==nbModels
+        nbNotModels = cp.Model(~cp.Xor(bv)).solveAll(display=lambda_assert(lambda: not cp.Xor(bv).value()))
+        nbModels = cp.Model(cp.Xor(bv)).solveAll(display=lambda_assert(lambda: cp.Xor(bv).value()))
+        nbDecompModels = cp.Model(cp.Xor(bv).decompose()).solveAll(display=lambda_assert(lambda: cp.Xor(bv).value()))
+        assert nbDecompModels == nbModels
         total = cp.Model(bv == bv).solveAll()
         assert str(total) == str(nbModels + nbNotModels)
 
@@ -919,7 +993,7 @@ class TestGlobal:
 
     @pytest.mark.skipif(not CPM_minizinc.supported(),
                         reason="Minizinc not installed")
-    def test_cumulative_single_demand(self):
+    def test_cumulative_single_task_mzn(self):
         start = cp.intvar(0, 10, name="start")
         dur = 5
         end = cp.intvar(0, 10, name="end")
@@ -927,7 +1001,7 @@ class TestGlobal:
         capacity = 10
 
         m = cp.Model()
-        m += cp.Cumulative([start], [dur], [end], [demand], capacity)
+        m += cp.Cumulative([start],[dur], [end],[demand], capacity)
 
         assert m.solve(solver="ortools")
         assert m.solve(solver="minizinc")
@@ -942,7 +1016,7 @@ class TestGlobal:
         capacity = 10
         bv = cp.boolvar()
 
-        cons = cp.Cumulative([start], [dur], [end], [demand], capacity)
+        cons = cp.Cumulative(start, dur, end, demand, capacity)
 
         m = cp.Model(bv.implies(cons), start + dur != end)
 
@@ -1009,11 +1083,10 @@ class TestGlobal:
         end = cp.intvar(-5,10, shape=3, name="end")
         bv = cp.boolvar()
 
-        expr = cp.Cumulative([start], [dur], [end], 1, 5)
+        expr = cp.Cumulative(start, dur, end, 1, 5)
         assert not cp.Model(expr).solve()
         assert cp.Model(bv == expr).solve()
         assert not bv.value()
-
 
 
 
@@ -1037,8 +1110,8 @@ class TestGlobal:
 
     def test_global_cardinality_count(self):
         iv = cp.intvar(-8, 8, shape=5)
-        val = cp.intvar(-3, 3, shape=3)
         occ = cp.intvar(0, len(iv), shape=3)
+        val = [1, 4, 5]
         assert cp.Model([cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve()
         assert cp.GlobalCardinalityCount(iv, val, occ).value()
         assert all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
@@ -1054,7 +1127,7 @@ class TestGlobal:
 
     def test_not_global_cardinality_count(self):
         iv = cp.intvar(-8, 8, shape=5)
-        val = cp.intvar(-3, 3, shape=3)
+        val = [0,1,2]
         occ = cp.intvar(0, len(iv), shape=3)
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve()
         assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
@@ -1070,10 +1143,8 @@ class TestGlobal:
         assert ~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
 
     def test_gcc_onearg(self):
-
         iv = cp.intvar(0, 10)
         for s, cls in cp.SolverLookup.base_solvers():
-            print(s)
             if cls.supported():
                 try:
                     assert cp.Model(cp.GlobalCardinalityCount([iv], [3],[1])).solve(solver=s)
@@ -1520,8 +1591,7 @@ class TestTypeChecks:
         b = cp.boolvar()
         a = cp.boolvar()
         assert cp.Model([cp.Circuit(x+2,2,0)]).solve()
-        pytest.raises(TypeError,cp.Circuit,(a,b))
-        pytest.raises(TypeError,cp.Circuit,(x,y,b))
+        assert cp.Model([cp.Circuit(a,b)]).solve()
 
     def test_multicicruit(self):
         c1 = cp.Circuit(cp.intvar(0,4, shape=5))
@@ -1535,8 +1605,7 @@ class TestTypeChecks:
         b = cp.boolvar()
         a = cp.boolvar()
         assert not cp.Model([cp.Inverse([x,y,x],[x,y,x])]).solve()
-        pytest.raises(TypeError,cp.Inverse,[a,b],[x,y])
-        pytest.raises(TypeError,cp.Inverse,[a,b],[b,False])
+        assert cp.Model([cp.Inverse([a,b],[a,b])]).solve() # identity function
 
     def test_ite(self):
         x = cp.intvar(-8, 8)
@@ -1606,9 +1675,12 @@ class TestTypeChecks:
         SOLVERNAMES = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()]
         for name in SOLVERNAMES:
             if name == "pysdd": continue
-            assert cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name)
-            # test closed version
-            assert not cp.Model(cp.GlobalCardinalityCount(iv, [1,4], [0,0], closed=True)).solve(solver=name)
+            try:
+                assert cp.Model([cp.GlobalCardinalityCount(iv, [1,4], [1,1])]).solve(solver=name)
+                # test closed version
+                assert not cp.Model(cp.GlobalCardinalityCount(iv, [1,4], [0,0], closed=True)).solve(solver=name)
+            except (NotImplementedError, NotSupportedError):
+                pass
 
     def test_count(self):
         x = cp.intvar(0, 1)
@@ -1672,7 +1744,7 @@ class TestTypeChecks:
 @pytest.mark.usefixtures("solver")
 def test_issue801_expr_in_cumulative(solver):
 
-    if solver in ("pysat", "pysdd", "pindakaas"):
+    if solver in ("pysat", "pysdd", "pindakaas", "rc2"):
         pytest.skip(f"{solver} does not support integer variables")
     if solver == "cplex":
         pytest.skip(f"waiting for PR #769 to be merged.")

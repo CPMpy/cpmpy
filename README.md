@@ -141,8 +141,7 @@ Other projects that build on CPMpy:
 * [Sudoku Assistant](https://sudoku-assistant.cs.kuleuven.be): an Android app for sudoku scanning, solving and intelligent hints
 * [CHAT-Opt demonstrator](https://chatopt.cs.kuleuven.be): translates natural language problem descriptions into CPMpy models
 
-Also, CPMpy participated in the [2024 XCSP3 competition](https://www.xcsp.org/competitions/), making its solvers win 3 gold and 1 silver medal.
-
+Also, CPMpy participated in both the [2024 and 2025 XCSP3 competition](https://www.xcsp.org/competitions/), twice making its solvers win 3 gold and 1 silver medal.
 
 ## 🔧 Library development
 

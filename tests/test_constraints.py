@@ -16,7 +16,7 @@ from utils import skip_on_missing_pblib
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-ALL_SOLS = False # test wheter all solutions returned by the solver satisfy the constraint
+ALL_SOLS = False # test whether all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
@@ -35,6 +35,7 @@ NUM_GLOBAL = {
 SAT_SOLVERS = {"pysdd"}
 
 EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo", "Power"},  # with int2bool,
+                  "rc2": {"Division", "Modulo", "Power"},
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "pindakaas": {"Division", "Modulo", "Power"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
@@ -44,6 +45,7 @@ EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo", "Power"},  # with int2bool,
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"pysat": {"mul-int"},  # int2bool but mul, and friends, not linearized
+                     "rc2": {"mul-int"},
                      "pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
                      "pindakaas": {"mul-int"},
                      "cplex": {"mul-int", "div"},
