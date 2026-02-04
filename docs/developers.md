@@ -47,6 +47,8 @@ The module is structured as such:
   * `solvers/` contains CPMpy interfaces to (the Python API interface of) solvers
   * `transformations/` contains methods to transform CPMpy expressions into other CPMpy expressions
   * `tools/` contains a set of independent tools that users might appreciate.
+  * `dev/` contains a collection of scripts and documentation used during the development of CPMpy.
+
 
 The typical flow in which these submodules are used when programming with CPMpy is: the user creates _expressions_ which they put into a _model_ object. This is then given to a _solver_ object to solve, which will first _transform_ the original expressions into expressions that it supports, which it then posts to the Python API interface of that particular solver.
 
