@@ -26,7 +26,8 @@ Internal utilities for expression handling.
         argval
         argvals
         eval_comparison
-        get_bounds     
+        get_bounds
+        filter_boolexpr
 """
 from __future__ import annotations  # to avoid issues with cp.BoolVal in type guards
 
@@ -88,6 +89,39 @@ def is_boolexpr(expr) -> bool:
         return expr.is_bool()
     #boolean constant
     return is_bool(expr)
+
+
+def filter_boolexpr(iterable: Iterable, return_unsat: bool = True) -> list[cp.Expression]:
+    """
+    Filter and normalize an iterable of boolean expressions.
+    
+    - Filters out True constants (always satisfied, no need to post)
+    - If return_unsat=True and a False constant is found, immediately returns [BoolVal(False)]
+    - Otherwise wraps False constants in BoolVal
+    - Passes through Expression objects unchanged
+    
+    Useful when building constraint lists from comprehensions that may
+    contain constant results (e.g., `x >= 0` where x is a constant).
+    
+    Arguments:
+        iterable: An iterable of Bool|BoolExpression items
+        return_unsat: If True (default), return [BoolVal(False)] immediately when
+                      a False constant is encountered (short-circuit)
+        
+    Returns:
+        list[Expression]: Filtered list of boolean expressions
+    """
+    result: list[cp.Expression] = []
+    for c in iterable:
+        if is_true_cst(c):
+            continue  # True is always satisfied, skip
+        elif is_false_cst(c):
+            if return_unsat:
+                return [cp.BoolVal(False)]  # short-circuit: whole conjunction is unsat
+            result.append(cp.BoolVal(False))
+        else:
+            result.append(c)
+    return result
 
 
 def is_pure_list(arg) -> bool:

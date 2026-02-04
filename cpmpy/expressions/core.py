@@ -152,7 +152,7 @@ class Expression(object):
 
 
     @property
-    def args(self) -> List[Int|"Expression"|np.ndarray|Nested[Int|"Expression"]]|np.ndarray:
+    def args(self) -> List[Int|"Expression"|Nested[Int|"Expression"]|np.ndarray]|tuple[Int|"Expression"|Nested[Int|"Expression"]|np.ndarray, ...]|np.ndarray:
         return self._args
 
     @args.setter
@@ -456,7 +456,7 @@ class BoolVal(Expression):
         Wrapper for python or numpy BoolVals
     """
 
-    def __init__(self, arg: Bool):
+    def __init__(self, arg: Bool|"BoolVal"):
         assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
         super().__init__("boolval", [bool(arg)])  # Note: we store the pure bool
 
