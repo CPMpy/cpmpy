@@ -240,7 +240,7 @@ class IntVarEnc(ABC):
         terms, k = self.encode_term()
         weights = [w for w, x in terms] + [-1]
         vars = [x for w,x in terms] + [self._x]
-        return [Operator("wsum", [weights, vars]) == k]
+        return [Operator("wsum", [weights, vars]) == -k]
 
     @abstractmethod
     def encode_domain_constraint(self):
