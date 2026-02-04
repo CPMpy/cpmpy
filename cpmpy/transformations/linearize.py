@@ -59,7 +59,7 @@ from cpmpy.transformations.get_variables import get_variables
 from .flatten_model import flatten_constraint, get_or_make_var
 from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
-from .int2bool import _encode_int_var, IntVarEnc
+from .int2bool import _encode_int_var, IntVarEnc, IntVarEncDirect
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
@@ -606,7 +606,7 @@ def only_positive_coefficients(lst_of_expr):
     return newlist
 
 
-def get_linear_decompositions(ivarmap):
+def get_linear_decompositions(ivarmap, keep_integer):
     """
         Implementation of custom linear decompositions for some global constraints.
         Relies on the "direct encoding" of integer variables to ensure a more efficient decomposition for linear solvers.
@@ -622,99 +622,126 @@ def get_linear_decompositions(ivarmap):
                 # f"AllDifferent constraint {expr} cannot be decomposed in a linear-friendly way as it has nested expressions. Using default decomposition")
             return expr.decompose()
 
+        encodings, defining = _encode_integers(expr.args, ivarmap, keep_integer=keep_integer)
+
         lbs, ubs = get_bounds(expr.args)
         lb, ub = min(lbs), max(ubs)
-
-        encodings, defining = [], []
-        for arg in expr.args:
-            if isinstance(arg, _NumVarImpl):
-                enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
-                encodings.append(enc)
-                if len(domain_constraints) > 0:
-                    defining += domain_constraints
-
-            elif is_num(arg):
-                encodings.append(DummyEncoding(arg))
-
         return [cpm_sum(enc.eq(val) for enc in encodings) <= 1 for val in range(lb, ub + 1)], defining
+
+    # Table
+    def decompose_table(expr):
+
+        args, arr = expr.args
+        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
+
+        return cp.any(cp.all(enc.eq(v) for enc, v in zip(encodings, row)) for row in arr), defining
 
     # Element
     def decompose_element(expr):
         arr, idx = expr.args
         if not all(is_num(a) for a in arr):
-            # warnings.warn(
-            #     f"Element constraint cannot be decomposed in a linear-friendly way as it has integer variables in the array. Using default decomposition")
             return expr.decompose()
 
         lb, ub = get_bounds(idx)
         if not (0 <= lb) and (ub < len(arr)):
-            # warnings.warn("Element constraint is partial, and cannot be decomposed in a linear-friendly way. Using default decomposition")
             return expr.decompose()
 
-        enc, defining = _encode_int_var(ivarmap, idx, "direct")
+        encodings, defining = _encode_integers([idx], ivarmap, keep_integer=keep_integer)
+        assert len(encodings) == 1
+        enc = encodings[0]
+
         return cp.sum(val * enc.eq(i) for i, val in enumerate(arr)), defining
 
     # NValue
     def decompose_nvalue(expr):
 
+        encodings, defining = _encode_integers(expr.args, ivarmap, keep_integer=keep_integer)
         lbs, ubs = get_bounds(expr.args)
         lb, ub = min(lbs), max(ubs)
-        encodings, defining = [], []
-        for arg in expr.args:
-            if isinstance(arg, _NumVarImpl):
-                enc, domain_constraints = _encode_int_var(ivarmap, arg, encoding="direct")
-                encodings.append(enc)
-                defining += domain_constraints
-            elif is_num(arg):
-                encodings.append(DummyEncoding(arg))
 
         return cp.sum(cp.any(enc.eq(v) for enc in encodings) for v in range(lb, ub + 1)), defining
 
+    # Count
+    def decompose_count(expr):
+
+        args, n = expr.args
+        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
+        return cp.sum(enc.eq(n) for enc in encodings), defining
+
     return dict(
         alldifferent=decompose_alldifferent,
+        table=decompose_table,
         element=decompose_element,
         nvalue=decompose_nvalue,
+        count=decompose_count,
     )
 
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Set[str]=frozenset(),
                      supported_reified:Set[str]=frozenset(),
                      csemap:Optional[dict[Expression,Expression]]=None,
-                     ivarmap:Optional[dict[_NumVarImpl, IntVarEnc]]=None):
+                     ivarmap:Optional[dict[_NumVarImpl, IntVarEnc]]=None,
+                     keep_integer=True):
     """
         Decompose unsupported global constraints in a linear-friendly way.
-        Currently support constraints are AllDifferent, Element, Count, NValue
     """
 
     if ivarmap is None:
         return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap)
 
-    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap,
-                             decompose_custom=get_linear_decompositions(ivarmap=ivarmap))
+    decompositions = get_linear_decompositions(ivarmap, keep_integer)
+    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap,decompose_custom=decompositions)
 
-def decompose_linear_objective(lst_of_expr: Sequence[Expression],
+def decompose_linear_objective(obj: Sequence[Expression],
                                supported: Set[str] = frozenset(),
                                supported_reified: Set[str] = frozenset(),
                                csemap: Optional[dict[Expression, Expression]] = None,
-                               ivarmap: Optional[dict[_NumVarImpl, IntVarEnc]] = None
+                               ivarmap: Optional[dict[_NumVarImpl, IntVarEnc]] = None,
+                               keep_integer=True
                                ):
 
     if ivarmap is None:
-        return decompose_objective(lst_of_expr, supported, supported_reified, csemap=csemap)
+        return decompose_objective(obj, supported, supported_reified, csemap=csemap)
 
-    return decompose_objective(lst_of_expr, supported, supported_reified, csemap=csemap,
-                               decompose_custom=get_linear_decompositions(ivarmap=ivarmap))
+    decompositions = get_linear_decompositions(ivarmap, keep_integer)
+    return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompositions)
+
+
+# Utility functions to ease the encoding of linear decompositions
+def _encode_integers(lst_of_ivar, ivarmap, keep_integer) -> tuple[list[IntVarEnc], list[Expression]]:
+    """
+        Encode a list of integer variables using the direct encoding
+
+        args:
+            lst_of_ivar: list of integer variables to encode
+            ivarmap: map of integer variables to their encodings
+            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
+
+        returns:
+            tuple of list of encodings and list of domain constraints
+    """
+    encodings, defining = [], []
+    for iv in lst_of_ivar:
+        if isinstance(iv, _NumVarImpl):
+            enc, domain_constraints = _encode_int_var(ivarmap, iv, encoding="direct")
+            encodings.append(enc)
+            defining += domain_constraints
+            if keep_integer and len(domain_constraints) > 0: # newly encoded variable
+                defining += enc.coerce_to_integer()
+        elif is_num(iv):
+            encodings.append(DummyEncoding(iv))
+        else:
+            raise ValueError(f"Expected integer variable or constant, but got {iv} of type {type(iv)}")
+    
+    return encodings, defining
 
 class DummyEncoding:
     """
         Emulates an `class:cpmpy.transformations.int2bool.IntVarEnc` wrapping a constant.
         Eases the use of encoding the linear decompositions of global constraints.
     """
-    def __init__(self, val):
+    def __init__(self, val:int):
         self.val = val
 
-    def eq(self, d):
-        if self.val == d:
-            return cp.BoolVal(True)
-        else:
-            return cp.BoolVal(False)
+    def eq(self, d:int):
+        return BoolVal(self.val == d)
