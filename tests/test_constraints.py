@@ -25,7 +25,7 @@ NUM_GLOBAL = {
     "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
     "Table", 'NegativeTable', "ShortTable", "Regular",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
-    "Precedence", "Cumulative", "NoOverlap",
+    "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
     "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
@@ -204,6 +204,14 @@ def global_constraints(solver):
                     yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
             continue
 
+        elif name == "CumulativeOptional":
+            s = cp.intvar(0, 10, shape=4, name="start")
+            e = cp.intvar(0, 10, shape=4, name="end")
+            dur = [1, 4, 3, 2]
+            demand = [11, 4, 8, 7]
+            is_present = [cp.boolvar(), cp.boolvar(), True, False]
+            cap = 10
+            expr = cls(s, dur, e, demand, cap, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
@@ -224,6 +232,12 @@ def global_constraints(solver):
             if solver != "pumpkin": # only supports with fixed durations
                 yield cp.NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
             continue
+        elif name == "NoOverlapOptional":
+            s = cp.intvar(0, 10, shape=4, name="start")
+            e = cp.intvar(0, 10, shape=4, name="end")
+            dur = [1, 4, 3, 2]
+            is_present = [cp.boolvar(), cp.boolvar(), True, False]
+            expr = cls(s, dur, e, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
