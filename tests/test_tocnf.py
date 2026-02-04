@@ -77,6 +77,12 @@ def get_gcnf_cases():
     hard = []
     yield soft, hard
 
+    # import pickle
+    # with open("/home/hbierlee/utm/Recipe.xml.lzma_1.25.pkl", "rb") as f:
+    #     m = pickle.load(f)
+    # print(m)
+    # yield m.constraints, []
+
 
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
 class TestToCnf:
@@ -120,7 +126,7 @@ class TestToCnf:
             s = list(iterable)
             return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s) + 1))
 
-        for assumptions_ in powerset(assumptions):
+        for assumptions_ in itertools.islice(powerset(assumptions), None):
             vs = cp.cpm_array(get_variables_model(model))
             s1 = self.allsols(assump_model.constraints, vs, assumptions=assumptions)
 
@@ -155,7 +161,7 @@ class TestToCnf:
         s2 = self.allsols(cnf, vs, ivarmap=ivarmap)
         assert s1 == s2, f"The equivalence check failed for translation from:\n\n{case}\n\nto:\n\n{cnf}"
 
-    def allsols(self, cons, vs, ivarmap=None, assumptions=None):
+    def allsols(self, cons, vs, ivarmap=None, assumptions=None, feasibility=False):
         m = cp.Model(cons)
         sols = set()
 
@@ -165,6 +171,10 @@ class TestToCnf:
                     x_enc._x._value = x_enc.decode()
             sols.add(tuple(argvals(vs)))
 
+        if feasibility:
+            sat = m.solve(solver=SOLVER, assumptions=assumptions)
+            print("solve", sat)
+            return [True] if sat else [False]
         solution_limit = 100
         m.solveAll(solver=SOLVER, display=display, solution_limit=solution_limit, assumptions=assumptions)
         assert len(sols) < solution_limit, (

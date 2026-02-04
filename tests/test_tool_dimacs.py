@@ -185,5 +185,7 @@ class TestDimacs:
         print("case", case)
         soft, hard = case
         fname = tempfile.mktemp()
-        write_gcnf(soft, hard=hard, name="a", encoding="direct", normalize=True, fname=fname)
+
+        a = write_gcnf(soft, hard=hard, name="a", normalize=False, fname="/tmp/a.gcnf")
+        b = write_gcnf(soft, hard=hard, name="a", normalize=True, fname="/tmp/b.gcnf")
 
