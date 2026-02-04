@@ -221,6 +221,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 # very special case, avoid writing as sum of 1 argument
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
+                if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
+                    continue # skip or([BoolVal(True)])
                 newlist.append(Operator("or", new_expr))
                 continue
 
@@ -512,7 +514,7 @@ def canonical_comparison(lst_of_expr):
                 
                 # 2) add collected variables to lhs
                 if isinstance(lhs, Operator) and lhs.name == "sum":
-                    lhs = sum([1 * a for a in lhs.args] + lhs2)
+                    lhs = cpm_sum([1 * a for a in lhs.args] + lhs2)
                 elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
                     lhs = lhs + lhs2
                 else:
