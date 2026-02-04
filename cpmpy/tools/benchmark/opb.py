@@ -53,7 +53,7 @@ from datetime import datetime
 # CPMpy
 from cpmpy.tools.benchmark.runner import benchmark_runner
 from cpmpy.tools.benchmark._base import Benchmark
-from cpmpy.tools.opb import read_opb
+from cpmpy.tools.io.opb import read_opb
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 
 

@@ -37,7 +37,7 @@ from cpmpy.transformations.decompose_global import decompose_in_tree, decompose_
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
 from cpmpy.transformations.linearize import linearize_constraint, only_positive_bv_wsum
-from cpmpy.transformations.int2bool import int2bool, _encode_lin_expr
+from cpmpy.transformations.int2bool import int2bool
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.variables import _IntVarImpl, NegBoolView, _BoolVarImpl
 from cpmpy.expressions.core import Operator, Comparison

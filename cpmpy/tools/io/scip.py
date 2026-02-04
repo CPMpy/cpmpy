@@ -52,7 +52,7 @@ from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.reification import only_implies, reify_rewrite
 from cpmpy.expressions.utils import is_any_list, is_num
 from cpmpy.expressions.globalconstraints import DirectConstraint
-from cpmpy.expressions.variables import ignore_variable_name_check
+# from cpmpy.expressions.variables import ignore_variable_name_check
 
 
 _std_open = open
@@ -71,39 +71,39 @@ def read_scip(fname: Union[str, os.PathLike], open=open, assume_integer:bool=Fal
     if not _SCIPWriter.supported():
         raise Exception("SCIP: Install SCIP IO dependencies: cpmpy[io.scip]")
 
-    with ignore_variable_name_check():
+    # with ignore_variable_name_check():
                 
-        from pyscipopt import Model
+    from pyscipopt import Model
 
-        # Load file into pyscipopt model
-        scip = Model()
-        scip.hideOutput()
-        scip.readProblem(filename=fname)
-        scip.hideOutput(quiet=False)
+    # Load file into pyscipopt model
+    scip = Model()
+    scip.hideOutput()
+    scip.readProblem(filename=fname)
+    scip.hideOutput(quiet=False)
 
-        # 1) translate variables
-        scip_vars = scip.getVars()
-        var_map = {}
-        for var in scip_vars:
-            name = var.name         # name of the variable
-            vtype = var.vtype()     # type of the variable
-            if vtype == "BINARY":
-                var_map[name] = cp.boolvar(name=name)
-            elif vtype == "INTEGER":
-                lb = int(var.getLbOriginal())
-                ub = int(var.getUbOriginal())
+    # 1) translate variables
+    scip_vars = scip.getVars()
+    var_map = {}
+    for var in scip_vars:
+        name = var.name         # name of the variable
+        vtype = var.vtype()     # type of the variable
+        if vtype == "BINARY":
+            var_map[name] = cp.boolvar(name=name)
+        elif vtype == "INTEGER":
+            lb = int(var.getLbOriginal())
+            ub = int(var.getUbOriginal())
+            var_map[name] = cp.intvar(lb, ub, name=name)
+        elif vtype == "CONTINUOUS":
+            if assume_integer:
+                lb = int(math.ceil(var.getLbOriginal()))
+                ub = int(math.floor(var.getUbOriginal()))
+                if lb != var.getLbOriginal() or ub != var.getUbOriginal():
+                    warnings.warn(f"Continuous variable {name} has non-integer bounds {var.getLbOriginal()} - {var.getUbOriginal()}. CPMpy will assume it is integer.")
                 var_map[name] = cp.intvar(lb, ub, name=name)
-            elif vtype == "CONTINUOUS":
-                if assume_integer:
-                    lb = int(math.ceil(var.getLbOriginal()))
-                    ub = int(math.floor(var.getUbOriginal()))
-                    if lb != var.getLbOriginal() or ub != var.getUbOriginal():
-                        warnings.warn(f"Continuous variable {name} has non-integer bounds {var.getLbOriginal()} - {var.getUbOriginal()}. CPMpy will assume it is integer.")
-                    var_map[name] = cp.intvar(lb, ub, name=name)
-                else:
-                    raise ValueError(f"CPMpy does not support continious variables: {name}")
             else:
-                raise ValueError(f"Unsupported variable type: {vtype}")
+                raise ValueError(f"CPMpy does not support continious variables: {name}")
+        else:
+            raise ValueError(f"Unsupported variable type: {vtype}")
         
 
         model = cp.Model()
