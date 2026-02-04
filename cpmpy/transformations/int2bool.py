@@ -238,7 +238,9 @@ class IntVarEnc(ABC):
     def coerce_to_integer(self):
         """Returns a list of constraints enforcing the encoding to be equal to the integer it encodes"""
         terms, k = self.encode_term()
-        return [self._x == Operator("wsum", [[w for w, x in terms],[x for w,x in terms]]) + k]
+        weights = [w for w, x in terms] + [-1]
+        vars = [x for w,x in terms] + [self._x]
+        return [Operator("wsum", [weights, vars]) == k]
 
     @abstractmethod
     def encode_domain_constraint(self):
@@ -322,10 +324,6 @@ class IntVarEncDirect(IntVarEnc):
 
     def encode_term(self, w=1):
         return [(w * i, b) for i, b in enumerate(self._xs)], self._x.lb * w
-
-    def coerce_to_integer(self):
-        """Returns a list of constraints enforcing the encoding to be equal to the integer it encodes"""
-        return [self._x == Operator("wsum", [list(range(self._x.lb, self._x.ub)), self._xs])]
 
 
 class IntVarEncOrder(IntVarEnc):
