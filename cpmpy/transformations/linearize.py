@@ -620,8 +620,6 @@ def get_linear_decompositions(ivarmap, keep_integer):
     def decompose_alldifferent(expr):
 
         if expr.has_subexpr():
-            # warnings.warn(
-                # f"AllDifferent constraint {expr} cannot be decomposed in a linear-friendly way as it has nested expressions. Using default decomposition")
             return expr.decompose()
 
         encodings, defining = _encode_integers(expr.args, ivarmap, keep_integer=keep_integer)
