@@ -583,6 +583,10 @@ def get_linear_decompositions(ivarmap, keep_integer):
         Implementation of custom linear decompositions for some global constraints.
         Relies on the "direct encoding" of integer variables to ensure a more efficient decomposition for linear solvers.
 
+        args:
+            ivarmap: map of integer variables to their encodings
+            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
+
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
     """
@@ -665,7 +669,18 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
                      ivarmap:Optional[dict[_NumVarImpl, IntVarEnc]]=None,
                      keep_integer=True):
     """
-        Decompose unsupported global constraints in a linear-friendly way.
+        Decompose unsupported global constraints in a linear-friendly way, by encoding the integer variales using a direct Boolean encoding.
+        
+        args:
+            lst_of_expr: list of expressions to decompose
+            supported: set of supported global constraints and global functions
+            supported_reified: set of supported reified global constraints
+            csemap: map of expressions to an auxiliary variable
+            ivarmap: map of integer variables to their encodings
+            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
+        
+        returns:
+            list of expressions
     """
 
     if ivarmap is None:
