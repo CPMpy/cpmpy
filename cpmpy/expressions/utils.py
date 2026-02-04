@@ -36,9 +36,11 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TypeGuard
+from typing import TypeGuard, TYPE_CHECKING
 
 from cpmpy.exceptions import IncompleteFunctionError
+if TYPE_CHECKING:
+    from cpmpy.expressions.core import Expression
 
 
 def is_bool(arg) -> TypeGuard[bool | np.bool_ | cp.BoolVal]:
@@ -91,7 +93,7 @@ def is_boolexpr(expr) -> bool:
     return is_bool(expr)
 
 
-def filter_boolexpr(iterable: Iterable, return_unsat: bool = True) -> list[cp.Expression]:
+def filter_boolexpr(iterable: Iterable, return_unsat: bool = True) -> list[Expression]:
     """
     Filter and normalize an iterable of boolean expressions.
     
@@ -111,7 +113,7 @@ def filter_boolexpr(iterable: Iterable, return_unsat: bool = True) -> list[cp.Ex
     Returns:
         list[Expression]: Filtered list of boolean expressions
     """
-    result: list[cp.Expression] = []
+    result: list[Expression] = []
     for c in iterable:
         if is_true_cst(c):
             continue  # True is always satisfied, skip

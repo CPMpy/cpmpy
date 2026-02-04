@@ -155,6 +155,7 @@ class Minimum(GlobalFunction):
     """
     Computes the minimum value of the arguments
     """
+    args: list[Int|Expression]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, arg_list: Sequence[Int|Expression]|np.ndarray):
         """
@@ -163,7 +164,6 @@ class Minimum(GlobalFunction):
         """
         if isinstance(arg_list, np.ndarray):
             arg_list = arg_list.reshape(-1).tolist()  # flatten to list
-        # XXX shouldn't n-ary be a single argument which is a list/array?
         super().__init__("min", arg_list)
 
     def value(self) -> Optional[int]:
@@ -206,6 +206,7 @@ class Maximum(GlobalFunction):
     """
     Computes the maximum value of the arguments
     """
+    args: list[Int|Expression]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, arg_list: Sequence[Int|Expression]|np.ndarray):
         """
@@ -256,6 +257,7 @@ class Abs(GlobalFunction):
     """
     Computes the absolute value of the argument
     """
+    args: tuple[Expression]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, expr: Expression):
         """
@@ -286,7 +288,7 @@ class Abs(GlobalFunction):
         Returns:
             tuple[Expression, list[BoolExpression]]: A tuple containing the expression representing the absolute value (may be the argument itself, its negation, or an auxiliary variable), and a list of constraints defining it (empty if no auxiliary variable is needed)
         """
-        expr = cast(Expression, self.args[0])
+        expr = self.args[0]
         lb, ub = cast(tuple[int, int], get_bounds(expr))
         if lb >= 0: # always positive
             return expr, []
@@ -320,6 +322,7 @@ class Division(GlobalFunction):
         * integer division (ours): `-7 div 3` = `int(-7/3)` = -2 (truncation)
         * floor division (Python): `-7 // 3` = `math.floor(-7/3)` = -3
     """
+    args: tuple[Int|Expression, Int|Expression]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, x: Int|Expression, y: Int|Expression):
         """
@@ -356,9 +359,9 @@ class Division(GlobalFunction):
             safen = [y != 0]
             warnings.warn(f"Division constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
-        r = intvar(*get_bounds(x % y))  # type: ignore  # remainder
+        r = intvar(*get_bounds(x % y))  # remainder
         _div = intvar(*self.get_bounds())
-        return _div, safen + [(x == (y * _div) + r), abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)] # type: ignore
+        return _div, safen + [(x == (y * _div) + r), abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
 
     def value(self) -> Optional[int]:
         """
@@ -415,6 +418,7 @@ class Modulo(GlobalFunction):
         * modulo (ours): `7 mod -5` = 2 because `7 div -5` = -1 and `7 - (-5*-1)` = 2. Note how the sign of x is preserved.
         * modulo (Python): `7 % -5` = -3 because `7 // -5` = -2 and `7 - (-5*-2)` = -3. Note how the sign of y is preserved.
     """
+    args: tuple[Int|Expression, Int|Expression]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, x: Int|Expression, y: Int|Expression):
         """
@@ -450,12 +454,12 @@ class Modulo(GlobalFunction):
             warnings.warn(f"Modulo constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         _mod = intvar(*self.get_bounds())
-        k = intvar(*get_bounds((x - _mod) // y))  # integer quotient (multiplier) # type: ignore
+        k = intvar(*get_bounds((x - _mod) // y))  # integer quotient (multiplier)
         return _mod, safen + [
             k * y + _mod == x,   # module is remainder of integer division
             cp.abs(_mod) < cp.abs(y),  # remainder is smaller than divisor
             x * _mod >= 0        # remainder is negative iff x is negative
-        ] # type: ignore
+        ]
 
     def value(self) -> Optional[int]:
         """
@@ -501,6 +505,7 @@ class Power(GlobalFunction):
 
     Only non-negative constant integer exponents are supported.
     """
+    args: tuple[Expression, int]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, base:Expression, exponent:int):
         """
@@ -523,15 +528,14 @@ class Power(GlobalFunction):
         Returns:
             tuple[Expression, list[BoolExpression]]: A tuple containing the auxiliary variable representing the power, and a list of constraints defining it
         """
-        base = self.args[0]
-        exp = cast(int, self.args[1])
+        base,exp = self.args
         if exp == 0:
             return 1,[]
 
         _pow = base
         for _ in range(1,exp):
-            _pow *= base # type: ignore
-        return _pow,[] # type: ignore[return-value]
+            _pow *= base
+        return _pow, []
 
     def value(self) -> Optional[int]:
         """
@@ -551,8 +555,7 @@ class Power(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the power
         """
-        base = self.args[0]
-        exp = cast(int, self.args[1])
+        base,exp = self.args
         lb_base, ub_base = cast(tuple[int, int], get_bounds(base))
 
         bounds = [lb_base ** exp, ub_base ** exp]
@@ -574,6 +577,7 @@ class Element(GlobalFunction):
     Note: because Element is a numeric global function, the return type of the `Element` function
     is always numeric, even if `Arr` only contains Boolean variables.
     """
+    args: tuple[Sequence[Int|Expression]|np.ndarray, Expression]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, arr: Sequence[Int|Expression]|np.ndarray, idx: Expression):
         """
@@ -600,10 +604,10 @@ class Element(GlobalFunction):
         if vidx is None:
             return None
 
-        if vidx < 0 or vidx >= len(arr): # type: ignore[arg-type]
-            raise IncompleteFunctionError(f"Index {vidx} out of range for array of length {len(arr)} while calculating value for expression {self}" # type: ignore[arg-type]
+        if vidx < 0 or vidx >= len(arr):
+            raise IncompleteFunctionError(f"Index {vidx} out of range for array of length {len(arr)} while calculating value for expression {self}"
                                             + "\n Use argval(expr) to get the value of expr with relational semantics.")
-        return argval(arr[vidx]) # type: ignore[index]  # can be None 
+        return argval(arr[vidx])  # can be None 
 
     def decompose(self) -> tuple[Int|Expression, list[BoolExpression]]:
         """
@@ -620,14 +624,14 @@ class Element(GlobalFunction):
 
         idx_lb, idx_ub = cast(tuple[int, int], get_bounds(idx))
         defining = []
-        if not (idx_lb >= 0 and idx_ub < len(arr)):  # type: ignore[arg-type]
-            defining += [idx >= 0, idx < len(arr)]  # type: ignore[arg-type,operator]
+        if not (idx_lb >= 0 and idx_ub < len(arr)):
+            defining += [idx >= 0, idx < len(arr)]
             warnings.warn(f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         aux = intvar(*self.get_bounds())
 
-        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)  # type: ignore[arg-type]
-        return aux, [implies(idx == i, aux == arr[i]) for i in range(lb, ub+1)] + defining  # type: ignore[index]
+        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)
+        return aux, [implies(idx == i, aux == arr[i]) for i in range(lb, ub+1)] + defining
 
     def decompose_linear(self) -> tuple[Int|Expression, list[BoolExpression]]:
         """
@@ -644,12 +648,12 @@ class Element(GlobalFunction):
 
         idx_lb, idx_ub = cast(tuple[int, int], get_bounds(idx))
         defining = []
-        if not (idx_lb >= 0 and idx_ub < len(arr)):  # type: ignore[arg-type]
-            defining += [idx >= 0, idx < len(arr)]  # type: ignore[arg-type,operator]
+        if not (idx_lb >= 0 and idx_ub < len(arr)):
+            defining += [idx >= 0, idx < len(arr)]
             warnings.warn(f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
-        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)  # type: ignore[arg-type]
-        return cp.sum((idx == i)*arr[i] for i in range(lb, ub+1)), defining  # type: ignore[return-value,operator,index]
+        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)
+        return cp.sum((idx == i)*arr[i] for i in range(lb, ub+1)), defining  # type: ignore[operator,return-value]
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -659,8 +663,8 @@ class Element(GlobalFunction):
             tuple[int, int]: A tuple of (lower bound, upper bound) for the element value
         """
         arr, idx = self.args
-        bnds = [get_bounds(x) for x in arr]  # type: ignore[union-attr]
-        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)  # type: ignore[return-value]
+        bnds = [get_bounds(x) for x in arr]
+        return cast(tuple[int, int], (min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)))
 
     def __repr__(self) -> str:
         """
@@ -690,6 +694,7 @@ class Count(GlobalFunction):
     """
     The Count global function represents the number of occurrences of a value in an array
     """
+    args: tuple[Sequence[Int|Expression]|np.ndarray, Int|Expression]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, arr: Sequence[Int|Expression]|np.ndarray, val: Int|Expression):
         """
@@ -713,7 +718,7 @@ class Count(GlobalFunction):
             tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the count, and an empty list of constraints (no auxiliary variables needed)
         """
         arr, val = self.args
-        return cp.sum((a == val) for a in arr), []  # type: ignore[union-attr]
+        return cp.sum((a == val) for a in arr), []
 
     def value(self) -> Optional[int]:
         """
@@ -725,7 +730,7 @@ class Count(GlobalFunction):
         if vval is None:
             return None
 
-        varr = [argval(a) for a in arr]  # type: ignore[union-attr]
+        varr = [argval(a) for a in arr]
         if any(v is None for v in varr):
             return None
 
@@ -739,7 +744,7 @@ class Count(GlobalFunction):
             tuple[int, int]: A tuple of (lower bound, upper bound) for the count value
         """
         arr, val = self.args
-        return 0, len(arr)  # type: ignore[arg-type]
+        return 0, len(arr)
 
 
 
@@ -751,6 +756,7 @@ class Among(GlobalFunction):
     it counts occurrences of any value in a set. For example, `Among([x1, x2, x3, x4], [1, 2])`
     returns the number of variables among x1, x2, x3, x4 that take the value 1 or 2.
     """
+    args: tuple[Sequence[Int|Expression]|np.ndarray, list[Int]]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, arr: Sequence[Int|Expression]|np.ndarray, vals: Sequence[Int]):
         """
@@ -775,7 +781,7 @@ class Among(GlobalFunction):
             tuple[Int|Expression, list[BoolExpression]]: A tuple containing the sum expression representing the total number of occurrences, and an empty list of constraints (no auxiliary variables needed)
         """
         arr, vals = self.args
-        return cp.sum(Count(arr, val) for val in vals), []  # type: ignore[arg-type,union-attr]
+        return cp.sum(Count(arr, val) for val in vals), []
 
     def value(self) -> Optional[int]:
         """
@@ -797,7 +803,7 @@ class Among(GlobalFunction):
             tuple[int, int]: A tuple of (lower bound, upper bound) for the among count value
         """
         arr, vals = self.args
-        return 0, len(arr)  # type: ignore[arg-type]
+        return 0, len(arr)
 
 
 class NValue(GlobalFunction):
@@ -807,6 +813,7 @@ class NValue(GlobalFunction):
     For example, if variables [x1, x2, x3, x4] take values [1, 2, 1, 3] respectively,
     then `NValue([x1, x2, x3, x4])` returns 3 (the distinct values are 1, 2, and 3).
     """
+    args: list[Int|Expression]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, arr: Sequence[Int|Expression]|np.ndarray):
         """
@@ -869,6 +876,7 @@ class NValueExcept(GlobalFunction):
     then `NValueExcept([x1, x2, x3, x4], 0)` returns 2 (the distinct values are 1 and 2,
     excluding 0).
     """
+    args: tuple[Sequence[Int|Expression]|np.ndarray, Int]  # type: ignore[assignment]  # for type hinting
 
     def __init__(self, arr: Sequence[Int|Expression]|np.ndarray, n: Int):
         """
@@ -898,7 +906,7 @@ class NValueExcept(GlobalFunction):
         lbs, ubs = cast(tuple[list[int], list[int]], get_bounds(arr))
         lb, ub = min(lbs), max(ubs)
 
-        return cp.sum([cp.any(a == v for a in arr) for v in range(lb, ub+1) if v != n]), []  # type: ignore[union-attr]
+        return cp.sum([cp.any(a == v for a in arr) for v in range(lb, ub+1) if v != n]), []
 
     def value(self) -> Optional[int]:
         """
@@ -906,7 +914,7 @@ class NValueExcept(GlobalFunction):
             Optional[int]: The number of distinct values in the array, excluding value n, or None if any element in arr is not assigned
         """
         arr, n = self.args
-        varr = [argval(a) for a in arr]  # type: ignore[union-attr]
+        varr = [argval(a) for a in arr]
         if any(v is None for v in varr):
             return None
 
@@ -923,4 +931,4 @@ class NValueExcept(GlobalFunction):
             tuple[int, int]: A tuple of (lower bound, upper bound) for the number of distinct values (excluding n)
         """
         arr, n = self.args
-        return 0, len(arr)  # type: ignore[arg-type]
+        return 0, len(arr)
