@@ -963,6 +963,11 @@ class TestGlobal:
         m += cp.Cumulative(start, duration, end, demand, capacity)
         assert m.solve()
 
+    def test_cumulative_subexpr(self):
+        start = cp.intvar(0,10, shape=3)
+        cons = cp.Cumulative(start+start, [1,2,3], None, [1,2,3], 3)
+        self.assertTrue(cp.Model(cons).solve())
+
     def test_cumulative_decomposition_capacity(self):
         import numpy as np
 
