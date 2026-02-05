@@ -60,7 +60,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.safening import no_partial_functions, safen_objective
 
 try:
-    import gurobipy as gp
+    import gurobipy as gp  # type: ignore[import-not-found]
     GRB_ENV = None
 except ImportError:
     pass
@@ -137,7 +137,7 @@ class CPM_gurobi(SolverInterface):
             raise ModuleNotFoundError("CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.") 
         elif not self.license_ok():
             raise ModuleNotFoundError("CPM_gurobi: No license found or a problem occured during license check. Make sure your license is activated!")
-        import gurobipy as gp
+        import gurobipy as gp  # type: ignore[import-not-found]
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
@@ -263,7 +263,7 @@ class CPM_gurobi(SolverInterface):
 
         # create if it does not exit
         if cpm_var not in self._varmap:
-            from gurobipy import GRB
+            from gurobipy import GRB  # type: ignore[import-not-found]
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
@@ -286,7 +286,7 @@ class CPM_gurobi(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
-        from gurobipy import GRB
+        from gurobipy import GRB  # type: ignore[import-not-found]
 
         # save user variables
         get_variables(expr, self.user_vars)
@@ -320,7 +320,7 @@ class CPM_gurobi(SolverInterface):
 
             Used especially to post an expression as objective function
         """
-        import gurobipy as gp
+        import gurobipy as gp  # type: ignore[import-not-found]
 
         if is_num(cpm_expr):
             return cpm_expr
@@ -529,7 +529,7 @@ class CPM_gurobi(SolverInterface):
 
             Returns: number of solutions found
         """
-        from gurobipy import GRB
+        from gurobipy import GRB  # type: ignore[import-not-found]
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))

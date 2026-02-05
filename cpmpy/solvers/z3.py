@@ -84,7 +84,7 @@ class CPM_z3(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import z3
+            import z3  # type: ignore[import-untyped]
             return True
         except ModuleNotFoundError:
             return False

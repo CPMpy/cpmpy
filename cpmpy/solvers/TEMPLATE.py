@@ -53,6 +53,7 @@ import warnings
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
+from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_any_list, is_boolexpr
@@ -88,7 +89,7 @@ class CPM_template(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import TEMPLATEpy as gp
+            import TEMPLATEpy as gp  # type: ignore[import-not-found]
             # optionally enforce a specific version
             tpl_version = CPM_template.version()
             if Version(tpl_version) < Version("2.1.0"):
@@ -161,7 +162,7 @@ class CPM_template(SolverInterface):
         if not self.supported():
             raise ModuleNotFoundError("CPM_TEMPLATE: Install the python package 'cpmpy[TEMPLATE]' to use this solver interface.")   
 
-        import TEMPLATEpy
+        import TEMPLATEpy  # type: ignore[import-not-found]
 
         assert subsolver is None # unless you support subsolvers, see pysat or minizinc
 
@@ -519,9 +520,9 @@ class CPM_template(SolverInterface):
 
         # A. Example code if solver supports callbacks
         if is_any_list(display):
-            callback = lambda : print([var.value() for var in display])
+            callback = lambda : print([var.value() for var in display]) # type: ignore[union-attr]
         else:
-            callback = display
+            callback = display  # type: ignore[assignment]
 
         my_status = self.solve(time_limit, callback=callback, enumerate_all_solutions=True, **kwargs)
 
@@ -551,7 +552,7 @@ class CPM_template(SolverInterface):
             solution_count += 1
             # Translate solution to variables
             for cpm_var in self.user_vars:
-                cpm_var._value = solution.value(solver_var)
+                cpm_var._value = solution.value(self.solver_var(cpm_var))
 
             if display is not None:
                 if isinstance(display, Expression):

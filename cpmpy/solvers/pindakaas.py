@@ -82,8 +82,7 @@ class CPM_pindakaas(SolverInterface):
     @staticmethod
     def supported():
         try:
-            import pindakaas
-
+            import pindakaas  # type: ignore[import-untyped]
             return True
         except ModuleNotFoundError:
             return False
@@ -153,13 +152,12 @@ class CPM_pindakaas(SolverInterface):
 
         self.user_vars = self._int2bool_user_vars()
 
-        if time_limit is not None:
-            time_limit = timedelta(seconds=time_limit)
+        pdk_time_limit = timedelta(seconds=time_limit) if time_limit is not None else None
         solver_assumptions = None if assumptions is None else self.solver_vars(assumptions)
 
         t = time.time()
         with self.pdk_solver.solve(
-            time_limit=time_limit,
+            time_limit=pdk_time_limit,
             assumptions=solver_assumptions,
         ) as result:
             self.cpm_status.runtime = time.time() - t
@@ -208,6 +206,7 @@ class CPM_pindakaas(SolverInterface):
                     cpm_var._value = None
                 # we have to save the unsat core here, as the result object does not live beyond this solve call
                 if assumptions is not None:
+                    assert solver_assumptions is not None  # set when assumptions is not None
                     self.core = [x for x, s_x in zip(assumptions, solver_assumptions) if result.failed(s_x)]
 
         return has_sol

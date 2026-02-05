@@ -101,7 +101,7 @@ class CPM_gcs(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import gcspy
+            import gcspy  # type: ignore[import-not-found]
             gcs_version = CPM_gcs.version()
             if Version(gcs_version) < Version("0.1.8"):
                 warnings.warn(f"CPMpy requires GCS version >=0.1.8 but you have version "
@@ -135,7 +135,7 @@ class CPM_gcs(SolverInterface):
         if not self.supported():
             raise ModuleNotFoundError("CPM_gcs: Install the python package 'cpmpy[gcs]' to use this solver interface.")
 
-        import gcspy
+        import gcspy  # type: ignore[import-not-found]
 
         assert(subsolver is None) # unless you support subsolvers, see pysat or minizinc
 
@@ -186,8 +186,9 @@ class CPM_gcs(SolverInterface):
         prove |= verify
         # Set default proof name to name of file containing __main__
         if prove and proof_name is None:
-            if hasattr(sys.modules['__main__'], "__file__"):
-                self.proof_name = path.splitext(path.basename(sys.modules['__main__'].__file__))[0]
+            main_file = getattr(sys.modules['__main__'], "__file__", None)
+            if main_file is not None:
+                self.proof_name = path.splitext(path.basename(main_file))[0]
             else:
                 self.proof_name = "gcs_proof"
         else:
@@ -262,9 +263,9 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def solveAll(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, solution_limit:Optional[int]=None, call_from_model=False,
-                 prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
-                 verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
+    def solveAll(self, display: Optional[Callback]=None, time_limit: Optional[float]=None, solution_limit: Optional[int]=None, call_from_model=False,
+                 prove: bool=False, proof_name: Optional[str]=None, proof_location: Optional[str]=".",
+                 verify: bool=False, verify_time_limit=None, veripb_args=None, display_verifier_output: bool=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, and get a number of solutions, with optional solution callbacks. 
 
@@ -286,6 +287,8 @@ class CPM_gcs(SolverInterface):
             Returns: 
                 number of solutions found
         """
+        if veripb_args is None:
+            veripb_args = []
         if self.has_objective():
             raise NotSupportedError("Glasgow Constraint Solver: does not support finding all optimal solutions.")
         # ensure all vars are known to solver
@@ -295,8 +298,9 @@ class CPM_gcs(SolverInterface):
         prove |= verify
         # Set default proof name to name of file containing __main__
         if prove and proof_name is None:
-            if hasattr(sys.modules['__main__'], "__file__"):
-                self.proof_name = path.splitext(path.basename(sys.modules['__main__'].__file__))[0]
+            main_file = getattr(sys.modules['__main__'], "__file__", None)
+            if main_file is not None:
+                self.proof_name = path.splitext(path.basename(main_file))[0]
             else:
                 self.proof_name = "gcs_proof"
         self.proof_location = proof_location
@@ -319,7 +323,7 @@ class CPM_gcs(SolverInterface):
             elif callable(display):
                 display()
             else:
-                raise NotImplementedError("Glasgow Constraint Solver: Unknown display type.".format(cpm_var))
+                raise NotImplementedError("Glasgow Constraint Solver: Unknown display type: {}".format(display))
             return 
         sol_callback = None
         if display:

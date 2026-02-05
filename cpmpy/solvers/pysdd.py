@@ -81,7 +81,7 @@ class CPM_pysdd(SolverInterface):
     def supported():
         # try to import the package
         try:
-            from pysdd.sdd import SddManager
+            from pysdd.sdd import SddManager  # type: ignore[import-untyped]
             return True
         except ModuleNotFoundError:
             return False

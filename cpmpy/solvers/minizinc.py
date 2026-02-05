@@ -113,7 +113,7 @@ class CPM_minizinc(SolverInterface):
         # try to import the package
         try:
             #  check if MiniZinc Python is installed
-            import minizinc
+            import minizinc  # type: ignore[import-not-found]
             return True
         except ModuleNotFoundError:
             return False
@@ -356,7 +356,7 @@ class CPM_minizinc(SolverInterface):
         (mzn_kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         
         # call the solver, with parameters
-        import minizinc.error
+        import minizinc.error  # type: ignore[import-not-found]
         try:
             self.mzn_result = mzn_inst.solve(**mzn_kwargs)
         except minizinc.error.MiniZincError as e:
@@ -667,8 +667,8 @@ class CPM_minizinc(SolverInterface):
         if expr.name == "table":
             str_vars = self._convert_expression(expr.args[0])
             str_tbl = "[|\n"  # opening
-            for row in expr.args[1]:
-                str_tbl += ",".join(map(str, row)) + " |"  # rows
+            for row in expr.args[1]: # type: ignore[union-attr]
+                str_tbl += ",".join(map(str, row)) + " |" # type: ignore[arg-type]  # rows 
             str_tbl += "\n|]"  # closing
             return "table({}, {})".format(str_vars, str_tbl)
 
@@ -676,8 +676,8 @@ class CPM_minizinc(SolverInterface):
         if expr.name == "negative_table":
             str_vars = self._convert_expression(expr.args[0])
             str_tbl = "[|\n"  # opening
-            for row in expr.args[1]:
-                str_tbl += ",".join(map(str, row)) + " |"  # rows
+            for row in expr.args[1]: # type: ignore[union-attr]
+                str_tbl += ",".join(map(str, row)) + " |" # type: ignore[arg-type]  # rows 
             str_tbl += "\n|]"  # closing
             return "not table({}, {})".format(str_vars, str_tbl)
 
@@ -686,21 +686,21 @@ class CPM_minizinc(SolverInterface):
             def zero_based(array):
                 return "array1d(0..{}, {})".format(len(array)-1, self._convert_expression(array))
 
-            str_fwd = zero_based(expr.args[0])
-            str_rev = zero_based(expr.args[1])
+            str_fwd = zero_based(expr.args[0]) # type: ignore[union-attr]
+            str_rev = zero_based(expr.args[1]) # type: ignore[union-attr]
             return "inverse({}, {})".format(str_fwd, str_rev)
 
         if expr.name == "alldifferent_except0":
-            args_str = [self._convert_expression(e) for e in expr.args]
+            args_str = [self._convert_expression(e) for e in expr.args] # type: ignore[union-attr]
             return "alldifferent_except_0([{}])".format(",".join(args_str))
 
         if expr.name in ["lex_lesseq", "lex_less"]:
-            X = [self._convert_expression(e) for e in expr.args[0]]
-            Y = [self._convert_expression(e) for e in expr.args[1]]
+            X = [self._convert_expression(e) for e in expr.args[0]] # type: ignore[union-attr]
+            Y = [self._convert_expression(e) for e in expr.args[1]] # type: ignore[union-attr]
             return f"{expr.name}({{}}, {{}})".format(X, Y)
 
         if expr.name in ["lex_chain_less", "lex_chain_lesseq"]:
-            X = cpm_array([[self._convert_expression(e) for e in row] for row in expr.args])
+            X = cpm_array([[self._convert_expression(e) for e in row] for row in expr.args]) # type: ignore[union-attr]
             str_X = "[|\n"  # opening
             for row in X.T:  # Minizinc enforces lexicographic order on columns
                 str_X += ",".join(map(str, row)) + " |"  # rows
@@ -708,7 +708,7 @@ class CPM_minizinc(SolverInterface):
             return f"{expr.name}({{}})".format(str_X)
 
         elif expr.name == "cumulative":
-            start, dur, end, demand, capacity = expr.args
+            start, dur, end, demand, capacity = expr.args # type: ignore[union-attr]
 
             global_str = "cumulative({},{},{},{})"
             # ensure duration is non-negative
@@ -718,7 +718,7 @@ class CPM_minizinc(SolverInterface):
             extra_cons += demand_cons
 
             if end is not None:
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)] # type: ignore[arg-type]
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
@@ -728,18 +728,18 @@ class CPM_minizinc(SolverInterface):
                                      self._convert_expression(capacity))
 
         elif expr.name == "no_overlap":
-            start, dur, end = expr.args
+            start, dur, end = expr.args # type: ignore[union-attr]
             global_str = "disjunctive({},{})"
             # ensure duration is non-negative
             dur, extra_cons = get_nonneg_args(dur)
             if end is not None:
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)] # type: ignore[arg-type]
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
             return format_str.format(self._convert_expression(start), self._convert_expression(dur))
 
-        args_str = [self._convert_expression(e) for e in expr.args]
+        args_str = [self._convert_expression(e) for e in expr.args] # type: ignore[union-attr]
         # standard expressions: comparison, operator, element
         if isinstance(expr, Comparison):
             # wrap args that are a subexpression in ()
@@ -771,8 +771,8 @@ class CPM_minizinc(SolverInterface):
             # very special case: weighted sum (before 2-ary)
             if expr.name == 'wsum':
                 # I don't think there is a more direct way unfortunately
-                w = [self._convert_expression(wi) for wi in expr.args[0]]
-                x = [self._convert_expression(xi) for xi in expr.args[1]]
+                w = [self._convert_expression(wi) for wi in expr.args[0]] # type: ignore[union-attr]
+                x = [self._convert_expression(xi) for xi in expr.args[1]] # type: ignore[union-attr]
                 args_str = [f"{wi}*({xi})" for wi, xi in zip(w, x)]
                 return "{}([{}])".format("sum", ",".join(args_str))
 
@@ -797,13 +797,13 @@ class CPM_minizinc(SolverInterface):
             subtype = "int"
             if all(isinstance(v, bool) or \
                    (isinstance(v, Expression) and v.is_bool()) \
-                   for v in expr.args[0]):
+                   for v in expr.args[0]): # type: ignore[union-attr]
                 subtype = "bool"
             idx = args_str[1]
             # minizinc is offset 1, which can be problematic for element...
             # thx Hakan, fix by using array1d(0..len, []), issue #54
             txt = "\n    let {{ array[int] of var {}: arr=array1d({}..{},{}) }} in\n".format(subtype, 0,
-                                                                                             len(expr.args[0]) - 1,
+                                                                                             len(expr.args[0]) - 1, # type: ignore
                                                                                              args_str[0])
             txt += f"      arr[{idx}]"
             return txt
@@ -826,7 +826,7 @@ class CPM_minizinc(SolverInterface):
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals)
             occ = self._convert_expression(occ)
-            if expr.closed is False:
+            if expr.closed is False:  # type: ignore[attr-defined]
                 name = "global_cardinality"
             else:
                 name = "global_cardinality_closed"
@@ -858,11 +858,11 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "InDomain":
             # InDomain(expr, domain_list) - convert domain_list to a set
-            expr_str = self._convert_expression(expr.args[0])
+            expr_str = self._convert_expression(expr.args[0]) # type: ignore[assignment]
             domain = expr.args[1]
             # Convert domain list to set format
             if is_any_list(domain):
-                domain_str = "{" + ",".join(self._convert_expression(d) for d in domain) + "}"
+                domain_str = "{" + ",".join(self._convert_expression(d) for d in domain) + "}" # type: ignore[union-attr]
             else:
                 domain_str = self._convert_expression(domain)
             return "({} in {})".format(expr_str, domain_str)
@@ -876,7 +876,7 @@ class CPM_minizinc(SolverInterface):
             # Convert transitions to a 2D array format for MiniZinc
             # transitions is a list of (src, value, dst) tuples
             transitions_list = []
-            for src, val, dst in transitions:
+            for src, val, dst in transitions: # type: ignore
                 transitions_list.append("[{}, {}, {}]".format(
                     self._convert_expression(src),
                     self._convert_expression(val),

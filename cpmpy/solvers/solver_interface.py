@@ -382,7 +382,7 @@ class SolverStatus(object):
         Status and statistics of a solver run
     """
     exitstatus: ExitStatus
-    runtime: time
+    runtime: Optional[float]
 
     def __init__(self, name):
         self.solver_name = name

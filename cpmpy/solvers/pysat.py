@@ -58,7 +58,7 @@ import warnings
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.linearize import only_positive_coefficients
 from ..expressions.utils import flatlist
@@ -101,11 +101,11 @@ class CPM_pysat(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import pysat
+            import pysat  # type: ignore[import-untyped]
             # there is actually a non-related 'pysat' package
             # while we need the 'python-sat' package, some more checks:
-            from pysat.formula import IDPool
-            from pysat.solvers import Solver
+            from pysat.formula import IDPool  # type: ignore[import-untyped]
+            from pysat.solvers import Solver  # type: ignore[import-untyped]
 
             from pysat import card
             CPM_pysat._card = card  # native
@@ -113,7 +113,7 @@ class CPM_pysat(SolverInterface):
             # try to import pypblib and avoid ever re-import by setting `_pb`
             if not hasattr(CPM_pysat, ("_pb")):
                 try:
-                    import pypblib # first do import ourself, to ensure we have the right exception if not present
+                    import pypblib  # type: ignore[import-untyped]  # first do import ourself, to ensure we have the right exception if not present
                     from pysat import pb  # require pypblib
                     """The `pysat.pb` module if its dependency `pypblib` installed, `None` if we have not checked it yet, or `False` if we checked and it is *not* installed"""
                     CPM_pysat._pb = pb
@@ -481,7 +481,7 @@ class CPM_pysat(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars:List[_BoolVarImpl], vals:List[bool]):
+    def solution_hint(self, cpm_vars: List[_NumVarImpl], vals: List[int|bool]):
         """
         PySAT supports warmstarting the solver with a feasible solution
 

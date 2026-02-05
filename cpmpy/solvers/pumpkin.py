@@ -38,7 +38,7 @@
     ==============
 """
 import warnings
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from os.path import join
 
 import numpy as np
@@ -79,7 +79,7 @@ class CPM_pumpkin(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import pumpkin_solver as psp
+            import pumpkin_solver as psp  # type: ignore[import-untyped]
             pum_version = CPM_pumpkin.version()
             if Version(pum_version) < Version("0.2.2"):
                 warnings.warn(f"CPMpy uses features only available from Pumpkin version >=0.2.2 "
@@ -152,9 +152,9 @@ class CPM_pumpkin(SolverInterface):
         """
 
         # Again, I don't know why this is necessary, but the PyO3 modules seem to be a bit wonky.
-        from pumpkin_solver import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
-        from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult
-        from pumpkin_solver.optimisation import OptimisationResult, Direction
+        from pumpkin_solver import BoolExpression as PumpkinBool, IntExpression as PumpkinInt  # type: ignore[import-untyped]
+        from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult  # type: ignore[import-untyped]
+        from pumpkin_solver.optimisation import OptimisationResult, Direction  # type: ignore[import-untyped]
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -162,7 +162,7 @@ class CPM_pumpkin(SolverInterface):
         # parse and dispatch the arguments
         if time_limit is not None and time_limit < 0:
             raise ValueError("Time limit cannot be negative, but got {time_limit}")
-        kwargs = dict(timeout=time_limit)
+        kwargs: Dict[str, Any] = dict(timeout=time_limit)
 
         if self.has_objective():
             assert assumptions is None, "Optimization under assumptions is not supported"

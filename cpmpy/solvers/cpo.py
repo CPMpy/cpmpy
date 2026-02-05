@@ -94,7 +94,7 @@ class CPM_cpo(SolverInterface):
     def installed():
         # try to import the package
         try:
-            import docplex.cp as docp
+            import docplex.cp as docp  # type: ignore[import-not-found]
             return True
         except ModuleNotFoundError:
             return False

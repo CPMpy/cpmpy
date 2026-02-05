@@ -76,7 +76,7 @@ class CPM_hexaly(SolverInterface):
     @staticmethod
     def installed():
         try:
-            import hexaly as hex
+            import hexaly as hex  # type: ignore[import-not-found]
             return True
         except ModuleNotFoundError: # if solver's Python package is not installed
             return False
@@ -91,7 +91,7 @@ class CPM_hexaly(SolverInterface):
             return False
         else:
             try:
-                from hexaly.optimizer import HexalyOptimizer
+                from hexaly.optimizer import HexalyOptimizer  # type: ignore[import-not-found]
                 HexalyOptimizer()
                 return True
             except Exception as e:
@@ -123,7 +123,7 @@ class CPM_hexaly(SolverInterface):
         elif not self.license_ok():
             raise ModuleNotFoundError("CPM_hexaly: No license found or a problem occured during license check. Make sure your license is activated!")
 
-        from hexaly.optimizer import HexalyOptimizer
+        from hexaly.optimizer import HexalyOptimizer  # type: ignore[import-not-found]
 
         assert subsolver is None # hexaly does not have subsolvers
 

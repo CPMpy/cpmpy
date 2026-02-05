@@ -191,7 +191,7 @@ class CPM_exact(SolverInterface):
                 - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
                 - False     if no solution is found
         """
-        from exact import Exact as xct
+        from exact import Exact as xct  # type: ignore[import-not-found]
  
         # set additional keyword arguments
         if(len(kwargs.items())>0):
@@ -638,7 +638,7 @@ class CPM_exact(SolverInterface):
     __add__ = add  # avoid redirect in superclass
 
     def get_core(self):
-        from exact import Exact as xct
+        from exact import Exact as xct  # type: ignore[import-not-found]
         """
             For use with s.solve(assumptions=[...]). Only meaningful if the solver returned UNSAT. In that case, get_core() returns a small subset of assumption variables that are unsat together.
 
