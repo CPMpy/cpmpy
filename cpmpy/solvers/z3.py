@@ -45,7 +45,7 @@
     Module details
     ==============
 """
-from typing import Optional, List
+from typing import Optional, List, Iterable
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -142,7 +142,7 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
             Call the z3 solver
 
@@ -187,11 +187,12 @@ class CPM_z3(SolverInterface):
             self.z3_solver.set(timeout=int(time_limit*1000))
 
 
-        if assumptions is None:
-            assumptions = []
-
-        z3_assum_vars = self.solver_vars(assumptions)
-        self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+        if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
+            z3_assum_vars = self.solver_vars(assumptions)
+            self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+        else:
+            z3_assum_vars = []
 
 
         # call the solver, with parameters

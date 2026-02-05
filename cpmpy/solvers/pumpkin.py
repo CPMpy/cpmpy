@@ -38,7 +38,7 @@
     ==============
 """
 import warnings
-from typing import Optional, List
+from typing import Optional, List, Iterable
 from os.path import join
 
 import numpy as np
@@ -137,7 +137,7 @@ class CPM_pumpkin(SolverInterface):
         return self.pum_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name="proof.drcp", proof_location=".", assumptions:Optional[List[_BoolVarImpl]]=None):
+    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name="proof.drcp", proof_location=".", assumptions:Optional[Iterable[_BoolVarImpl]]=None):
         """
         Call the Pumpkin solver
 
@@ -146,7 +146,7 @@ class CPM_pumpkin(SolverInterface):
             prove: whether to produce a DRCP proof (.lits file and .drcp proof file).
             proof_name: name for the the proof files.
             proof_location: location for the proof files (default to current working directory).
-            assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
+            assumptions: iterable (e.g. list, set, tuple) of Boolean variables (or their negation) that are assumed to be true.
                             For repeated solving, and/or for use with :func:`s.get_core() <cpmpy.solvers.pumpkin.CPM_pumpkin.get_core>`: if the model is UNSAT,
                             `get_core()` returns a small subset of assumption variables that are unsat together.
         """
@@ -173,6 +173,7 @@ class CPM_pumpkin(SolverInterface):
 
         elif assumptions is not None:
             assert not prove, "Proof-logging under assumptions is not supported"
+            assumptions = list(assumptions)  # iterable to ordered list
             pum_assumptions = [self.to_predicate(a, tag=None) for a in assumptions]
             self.assump_map = dict(zip(pum_assumptions, assumptions))
             solve_func = self.pum_solver.satisfy_under_assumptions

@@ -984,6 +984,9 @@ class TestSupportedSolvers:
 
         assert s.solve(assumptions=[])
 
+        # better for user experience: allow to use set of assumptions too
+        assert s.solve(assumptions={x,y})
+
     def test_vars_not_removed(self, solver):
 
         bvs = cp.boolvar(shape=3)
