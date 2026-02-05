@@ -18,9 +18,13 @@ pip install cpmpy[gurobi, choco, exact] # installs 3 additional solving backends
 
 An overview of the available backends can be found [here](index.rst#supported-solvers).
 
-CPMpy requires python version  3.8 or higher.
+CPMpy requires python version  3.10 or higher.
 
 See [installation instructions](./installation_instructions.rst) for more details. 
+
+```{warning}
+CPMpy does not enforce hard version upper limits on its dependencies. For settings where robustness and reproducability are of great importance, have a look at the above detailed installation instructions.
+```
 
 ## Using the library
 

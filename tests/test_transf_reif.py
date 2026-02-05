@@ -1,4 +1,5 @@
-import unittest
+import pytest
+
 import numpy as np
 from cpmpy import *
 from cpmpy.transformations.decompose_global import decompose_in_tree
@@ -7,8 +8,8 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
-class TestTransfReif(unittest.TestCase):
-    def setUp(self):
+class TestTransfReif:
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
@@ -29,8 +30,8 @@ class TestTransfReif(unittest.TestCase):
 
         # test transformation
         for (expr, strexpr) in cases:
-            self.assertEqual( str(only_implies(only_bv_reifies((expr,)))), strexpr )
-            self.assertTrue(Model(expr).solve())
+            assert  str(only_implies(only_bv_reifies((expr,)))) == strexpr
+            assert Model(expr).solve()
 
     def test_reif_element(self):
         bvs = boolvar(shape=5, name="bvs")
@@ -45,7 +46,7 @@ class TestTransfReif(unittest.TestCase):
         e1 = (bvs[iv] == rv)
         e2 = (cpm_array([1,0,1,1])[iv] == rv)
         for e in [e1,e2]:
-            self.assertTrue(Model(e).solve())
+            assert Model(e).solve()
 
 
         # Another case to be careful with:
@@ -68,11 +69,11 @@ class TestTransfReif(unittest.TestCase):
         for (lb,ub,cnt) in cases:
             idx = intvar(lb,ub, name="idx")
             e = (rv == (arr[idx] != 1))
-            self.assertEqual(Model(e).solveAll(), cnt)
+            assert Model(e).solveAll() == cnt
 
         # Another case, with a more specific check... if the element-wise decomp is empty
         e = bvs[0].implies(Element([1,2,3], iv) < 1)
-        self.assertFalse(Model(e, bvs[0]==True).solve())
+        assert not Model(e, bvs[0]==True).solve()
 
 
     def test_reif_rewrite(self):
@@ -86,13 +87,13 @@ class TestTransfReif(unittest.TestCase):
 
 
         # various reify_rewrite cases:
-        self.assertEqual(f(rv == bvs[0]), "[(rv) == (bvs[0])]")
-        self.assertEqual(f(rv == all(bvs)), "[(and([bvs[0], bvs[1], bvs[2], bvs[3]])) == (rv)]")
-        self.assertEqual(f(rv.implies(any(bvs))), "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]")
-        self.assertEqual(f((bvs[0].implies(bvs[1])).implies(rv)), "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]")
-        self.assertRaises(ValueError, lambda : f(rv == AllDifferent(ivs)))
-        self.assertEqual(fd([rv.implies(AllDifferent(ivs))]), "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]")
-        self.assertEqual(f(rv == (arr[intvar(0, 2)] != 1)), "[([0 1 2][IV0]) == (IV1), (IV1 != 1) == (rv)]")
-        self.assertEqual(f(rv == (max(ivs) > 5)), "[(max(ivs[0],ivs[1],ivs[2])) == (IV2), (IV2 > 5) == (rv)]")
-        self.assertEqual(f(rv.implies(min(ivs) != 0)), "[(min(ivs[0],ivs[1],ivs[2])) == (IV3), (rv) -> (IV3 != 0)]")
-        self.assertEqual(f((min(ivs) != 0).implies(rv)), "[(min(ivs[0],ivs[1],ivs[2])) == (IV4), (IV4 != 0) -> (rv)]")
+        assert f(rv == bvs[0]) == "[(rv) == (bvs[0])]"
+        assert f(rv == all(bvs)) == "[(and([bvs[0], bvs[1], bvs[2], bvs[3]])) == (rv)]"
+        assert f(rv.implies(any(bvs))) == "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]"
+        assert f((bvs[0].implies(bvs[1])).implies(rv)) == "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]"
+        pytest.raises(ValueError, lambda : f(rv == AllDifferent(ivs)))
+        assert fd([rv.implies(AllDifferent(ivs))]) == "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]"
+        assert f(rv == (arr[intvar(0, 2)] != 1)) == "[([0 1 2][IV0]) == (IV1), (IV1 != 1) == (rv)]"
+        assert f(rv == (max(ivs) > 5)) == "[(max(ivs[0],ivs[1],ivs[2])) == (IV2), (IV2 > 5) == (rv)]"
+        assert f(rv.implies(min(ivs) != 0)) == "[(min(ivs[0],ivs[1],ivs[2])) == (IV3), (rv) -> (IV3 != 0)]"
+        assert f((min(ivs) != 0).implies(rv)) == "[(min(ivs[0],ivs[1],ivs[2])) == (IV4), (IV4 != 0) -> (rv)]"
