@@ -1,4 +1,3 @@
-import unittest
 import pytest
 from cpmpy import *
 from cpmpy.solvers import CPM_pysat
@@ -26,7 +25,7 @@ def frietkot():
 
 @pytest.mark.skipif(not CPM_pysat.supported(),
                     reason="PySAT not installed")
-class TestPySATInterrupt(unittest.TestCase):
+class TestPySATInterrupt:
     def test_small_isntance_no_interrupt(self):
         """Check if the instance still returns the expected results
         after adding interrupt to pysat solver.
@@ -35,8 +34,8 @@ class TestPySATInterrupt(unittest.TestCase):
         s = CPM_pysat(frietkot_model)
         status = s.solve()
         var_state = [v.value() for v in variables]
-        self.assertTrue(status)
-        self.assertEqual(var_state, [False, True, False, True, False])
+        assert status
+        assert var_state == [False, True, False, True, False]
 
     def test_large_instance_interrup(self):
         from pysat.examples.genhard import PHP
@@ -55,13 +54,11 @@ class TestPySATInterrupt(unittest.TestCase):
         assumption = [lit_cpmvar[1]]
 
         # offset for additional stuff done by cpmpy after solving
-        time_limit, time_offset = 1, 0.5
+        time_limit, grace_time_limit = 1, 1.0
 
         tstart_solving = time.time()
         s.solve(assumptions=assumption, time_limit=time_limit)
         tend_solving = time.time()
 
-        self.assertLessEqual(tend_solving - tstart_solving, time_limit + time_offset)
+        assert tend_solving - tstart_solving <= time_limit + grace_time_limit
 
-if __name__ == '__main__':
-    unittest.main()

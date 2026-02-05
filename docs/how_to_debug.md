@@ -3,11 +3,12 @@
 You get an error, or no error, but also no (correct) solution... Annoying, you have a bug.
 
 The bug can be situated in one of three layers:
-- your problem specification
-- the CPMpy library
-- the solver
 
-coincidentally, they are ordered from most likely to least likely. So let's start at the bottom.
+- Your problem specification
+- The CPMpy library
+- The solver
+
+Coincidentally, they are ordered from most likely to least likely. So let's start at the bottom.
 
 If you don't have a bug yet, but are curious, here is some general advise from expert modeller [Håkan Kjellerstrand](http://www.hakank.org/):
 - Test the model early and often. This makes it easier to detect problems in the model.
@@ -21,22 +22,23 @@ If you get an error and have difficulty understanding it, try searching on the i
 
 If you don't find it, or if the solver runs fine and without error, but you don't get the answer you expect; then try swapping out the solver for another solver and see what gives...
 
-Replace `model.solve()` by `model.solve(solver='minizinc')` for example. You do need to install MiniZinc and minizinc-python first though.
+Replace `model.solve()` by `model.solve(solver='minizinc')` for example. You do need to install MiniZinc and minizinc-python first though. Take a look at [the solver API interface](./api/solvers.rst) for the install instructions. 
 
 Either you have the same output, and it is not the solver's fault, or you have a different output and you actually found one of these rare solver bugs. Report on the bugtracker of the solver, or on the CPMpy github page where we will help you file a bug 'upstream' (or maybe even work around it in CPMpy).
 
 ## Debugging a modeling error
 
-You get an error when you create an expression? Then you are probably writing it wrongly. Check the documentation and the running examples for similar examples of what you wish to express.
+You get an error when you create an expression? Then you are probably writing it wrongly. Check the documentation and the running examples for similar instances of what you wish to express.
 
 Here are a few quirks in Python/CPMpy:
-  - when using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter wont work, because Python will unfortunately think you meant `x == (1 & (y == 0))`.
-  - you can write `vars[other_var]` but you can't write `non_var_list[a_var]`. That is because the `vars` list knows CPMpy, and the `non_var_list` does not. Wrap it: `non_var_list = cpm_array(non_var_list)` first, or write `Element(non_var_list, a_var)` instead.
-  - only write `sum(v)` on lists, don't write it if `v` is a matrix or tensor, as you will get a list in response. Instead, use NumPy's `v.sum()` instead.
+  - When using `&` and `|`, make sure to always put the subexpressions in brackets. E.g. `(x == 1) & (y == 0)` instead of `x == 1 & y == 0`. The latter won't work, because Python will unfortunately think you meant `x == (1 & y) == 0`.
+  - You can write `vars[other_var]` but you can't write `non_var_list[a_var]`. That is because the `vars` list knows CPMpy, and the `non_var_list` does not. Wrap it: `non_var_list = cpm_array(non_var_list)` first, or write `Element(non_var_list, a_var)` instead.
+  - Only write `sum(v)` on lists, don't write it if `v` is a matrix or tensor, as you will get a list in response. Instead, use NumPy's `v.sum()` instead.
+  - When providing names for decision variables, make sure that they are unique. Many solvers depend on this uniqueness and you will encounter strange (and hard to debug) behaviour if you don't enforce this.
 
 Try printing the expression `print(e)` or subexpressions, and check that the output matches what you wish to express. Decompose the expression and try printing the individual components and their piecewice composition to see what works and when it starts to break.
 
-If you don't find it, report it on the CPMpy github Issues page and we'll help you (and maybe even extend the above list of quirks).
+If you don't find it, report it on the CPMpy [GitHub issue tracker](https://github.com/CPMpy/cpmpy/issues) and we'll help you (and maybe even extend the above list of quirks).
 
 ## Debugging a `solve()` error
 
@@ -52,9 +54,9 @@ for c in model.constraints:
     Model(c).solve()
 ```
 
-The last constraint printed before the exception is the curlpit... Please report on Github. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy github Issues page.
+The last constraint printed before the exception is the culprit... Please report on GitHub. We want to catch corner cases in CPMpy, even if it is a solver limitation, so please report on the CPMpy GitHub issue tracker.
 
-Or maybe, you got one of CPMpy's NotImplementedErrors. Share your use case with us on Github and we will implement it. Or implemented it yourself first, that is also very welcome ; )
+Or maybe, you got one of CPMpy's `NotImplementedErrors`. Share your use case with us on GitHub, and we will implement it. Or implemented it yourself first, that is also very welcome ; )
 
 ## Debugging an UNSATisfiable model
 
@@ -62,7 +64,7 @@ First, print the model:
 
 ```print(model)```
 
-and check that the output matches what you want to express. Do you see anything unusual? Start there, see why the expression is not what you intended to express, as described in 'Debugging a modeling error'.
+and check that the output matches what you want to express. Do you see anything unusual? Start there, see why the expression is not what you intended to express, as described in [Debugging a modeling error](#debugging-a-modeling-error).
 
 If that does not help, try printing the 'transformed' **constraints**, the way that the solver actually sees them, including decompositions and rewrites:
 
@@ -95,7 +97,7 @@ print(f"Optimizing {obj_var} subject to", s.transform(obj_expr))
 ### Automatically minimising the UNSAT program
 If the above is unwieldy because your constraint problem is too large, then consider automatically reducing it to a 'Minimal Unsatisfiable Subset' (MUS).
 
-This is now part of our standard tools, that you can use as follows:
+This is now part of our [standard tools](./api/tools.rst), that you can use as follows:
 
 ```python
 from cpmpy.tools import mus
@@ -113,23 +115,52 @@ unsat_cons = mus(model.constraints)
 
 With this smaller set of constraints, repeat the visual inspection steps above.
 
-(Note that for an UNSAT problem there can be many MUSes, the `examples/advanced/` folder has the MARCO algorithm that can enumerate all MSS/MUSes.)
+(Note that for an UNSAT problem there can be many MUSes, the `examples/advanced/` [folder](https://github.com/CPMpy/cpmpy/tree/master/examples/advanced) has the [MARCO algorithm](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/marco_musmss_enumeration.py) that can enumerate all MSS/MUSes.)
 
+### Correcting an UNSAT program
 
-## Debugging a satisfiable model, that does not contain an expected solution
+As many MUSes (i.e. conflicts) may exist in the problem, resolving one of them does not necessarily make the model satisfiable.
 
-We will ignore the (possible) objective function here and focus on the feasibility part. Actualy, in case of an optimisation problem where you know a certain value is attainable, you can add `objective == known_value` as constraint and proceed similarly.
+In order to find which constraints are to be corrected, you can use the `tools.mcs` tool which computes a 'Minimal Correction Subset' (MCS).
+By removing these contraints (or altering them), the model will become satisfiable.
+
+Note that a Minimal Correction Subset is the complement of a Maximal Satisfiable Subset (MSS).
+MSSes can be calculated optimally using a Max-CSP (resp. Max-SAT) formuation.
+By weighting each of the constraints, you can define some preferences on which constraints should be satisfied over others.
+
+```python
+from cpmpy.tools import mcs, mss
+import cpmpy as cp
+
+x = cp.boolvar(shape=3, name="x")
+model = cp.Model(
+    x[0],
+    x[0] | x[1],
+    x[2].implies(x[1]),
+    ~x[0],
+    )
+
+sat_cons = mss(model.constraints) # x[0] or x[1], x[2] -> x[1], ~x[0]
+cons_to_remove = (mcs(model.constraints)) # x[0]
+```
+
+More information about these tools can be found in [their API documentation](./api/tools/explain.rst).
+
+## Debugging a satisfiable model which does not contain an expected solution
+
+We will ignore the (possible) objective function here and focus on the feasibility part. 
+Actually, in case of an optimisation problem where you know a certain value is attainable, you can add `objective == known_value` as constraint and proceed similarly.
 
 Add the solution that you know should be a feasible solution as a constraint:
 `model.add( (x == 1) & (y == 2) & (z == 3) ) # yes, brackets around each!`
 
-You now have an UNSAT program! That means you can follow the steps above on 'Automatically minimising the UNSAT program' to better understand it.
+You now have an UNSAT program! That means you can follow the steps above to better understand and correct it.
 
-## Debugging a satisfiable model, which returns an impossible solution
+## Debugging a satisfiable model which returns an impossible solution
 
 This one is most annoying... Double check the printing of the model for oddities, also visually inspect the flat model. Try enumerating all solutions and look for an unwanted pattern in the solutions. Try a different solver. 
 
 Try generating an explanation sequence for the solution... this requires a satisfaction problem, so remove the objective function or add a constraint that constraints the objective function to the value attained by the impossible solution.
 
-As to generating the explanation sequence, check out our advanced example on [stepwise OCUS explanations](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/ocus_explanations.py)
+As to generating the explanation sequence, check out our advanced example on [stepwise OCUS explanations](https://github.com/CPMpy/cpmpy/blob/master/examples/advanced/ocus_explanations.py).
 

@@ -2,7 +2,7 @@
 
 CPMpy can be used as a declarative modeling language: you create a `Model()`, add constraints and call `solve()` on it.
 
-The default solver is ortools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, a conflict-driven cutting-planes solver (Exact), even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
+The default solver is OR-Tools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, a conflict-driven cutting-planes solver (Exact), even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
 
 See the list of solvers known by CPMpy with:
 
@@ -86,7 +86,7 @@ s.solve()
 print(x.value())
 ```
 
-`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumption variables were used. See the documentation on [Unsat core extraction](unsat_core_extraction.html).
+`get_core()` asks the solver for an unsatisfiable core, in case a solution did not exist and assumptions were used. See the documentation on [Unsat core extraction](unsat_core_extraction.html).
 
 See [the API documentation of the solvers](api/solvers.html) to learn about their special functions.
 

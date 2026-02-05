@@ -1,57 +1,65 @@
+import inspect
+
+import cpmpy as cp
+import numpy as np
 from cpmpy import Model, SolverLookup, BoolVal
-from cpmpy.expressions.globalconstraints import *
-from cpmpy.expressions.globalfunctions import *
+from cpmpy.expressions.utils import argval, is_num, eval_comparison, get_bounds
+from cpmpy.expressions.core import Comparison, Operator
+from cpmpy.expressions.globalconstraints import GlobalConstraint
+from cpmpy.expressions.globalfunctions import GlobalFunction
 
 import pytest
+
+from utils import skip_on_missing_pblib
 
 # CHANGE THIS if you want test a different solver
 #   make sure that `SolverLookup.get(solver)` works
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
+ALL_SOLS = False # test whether all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
-# Can be used when .value() method is not implemented/contains bugs
-EXCLUDE_GLOBAL = {"ortools": {},
-                  "gurobi": {},
-                  "minizinc": {"circuit"},
-                  "pysat": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "pysdd": {"circuit", "element","min","max","allequal","alldifferent","cumulative"},
-                  "exact": {},
+NUM_GLOBAL = {
+    "AllEqual", "AllDifferent", "AllDifferentExcept0",
+    "AllDifferentExceptN", "AllEqualExceptN",
+    "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
+    "Table", 'NegativeTable', "ShortTable", "Regular",
+    "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
+    "Precedence", "Cumulative", "NoOverlap",
+    "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
+    # also global functions
+    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
+}
+
+# Solvers not supporting arithmetic constraints (numeric comparisons)
+SAT_SOLVERS = {"pysdd"}
+
+EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo", "Power"},  # with int2bool,
+                  "rc2": {"Division", "Modulo", "Power"},
+                  "pysdd": NUM_GLOBAL | {"Xor"},
+                  "pindakaas": {"Division", "Modulo", "Power"},
+                  "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
+                  "cplex": {"Division", "Modulo", "Power"}
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"gurobi": {"mod"},
+EXCLUDE_OPERATORS = {"pysat": {"mul-int"},  # int2bool but mul, and friends, not linearized
+                     "rc2": {"mul-int"},
+                     "pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
+                     "pindakaas": {"mul-int"},
+                     "cplex": {"mul-int", "div"},
                      "scip" : {"mod", "pow"},
-                     "pysat": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "pysdd": {"sum", "wsum", "sub", "mod", "div", "pow", "abs", "mul","-"},
-                     "exact": {"mod","pow","div","mul"},
                      }
 
-# Some solvers only support a subset of operators in imply-constraints
-# This subset can differ between left and right hand side of the implication
-EXCLUDE_IMPL = {"ortools": {},
-                "minizinc": {"pow"},  # TODO: raises 'free variable in non-positive context', what is at play?
-                "z3": {},
-                "pysat": {},
-                "pysdd": {},
-                "exact": {"mod","pow","div","mul"},
-                }
-
 # Variables to use in the rest of the test script
-NUM_ARGS = [intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
-NN_VAR = intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
-POS_VAR = intvar(1,10, name="s_pos")                # A strictly positive variable
-NUM_VAR = intvar(0, 10, name="l")                   # A numerical variable
+NUM_ARGS = [cp.intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
+NN_VAR = cp.intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
+POS_VAR = cp.intvar(1,10, name="s_pos")                # A strictly positive variable
+NUM_VAR = cp.intvar(0, 10, name="l")                   # A numerical variable
 
-BOOL_ARGS = [boolvar(name=n) for n in "abc"]        # Boolean variables
-BOOL_VAR = boolvar(name="p")                        # A boolean variable
-
-def _generate_inputs(generator):
-    exprs = []
-    for solver in SOLVERNAMES:
-        exprs += [(solver, expr) for expr in generator(solver)]
-    return exprs
+BOOL_ARGS = [cp.boolvar(name=n) for n in "abc"]        # Boolean variables
+BOOL_VAR = cp.boolvar(name="p")                        # A boolean variable
 
 
 def numexprs(solver):
@@ -60,25 +68,37 @@ def numexprs(solver):
     Numexpr:
         - Operator (non-Boolean) with all args Var/constant (examples: +,*,/,mod,wsum)
                                                            (CPMpy class 'Operator', not is_bool())
-        - Global constraint (non-Boolean) (examples: Max,Min,Element)
-                                                           (CPMpy class 'GlobalConstraint', not is_bool()))
+        - Global functions  (examples: Max,Min,Element)    (CPMpy class 'GlobalFunction')
     """
     names = [(name, arity) for name, (arity, is_bool) in Operator.allowed.items() if not is_bool]
     if solver in EXCLUDE_OPERATORS:
         names = [(name, arity) for name, arity in names if name not in EXCLUDE_OPERATORS[solver]]
     for name, arity in names:
         if name == "wsum":
-            operator_args = [list(range(len(NUM_ARGS))), NUM_ARGS]
-        elif name == "div" or name == "pow":
-            operator_args = [NN_VAR,2]
-        elif name == "mod":
-            operator_args = [NN_VAR,POS_VAR]
-        elif arity != 0:
-            operator_args = NUM_ARGS[:arity]
-        else:
-            operator_args = NUM_ARGS
+            yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
+            yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
+            continue
+        elif name == "mul" and "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
+            yield Operator(name, [3, NUM_ARGS[0]])
+            yield Operator(name, NUM_ARGS[:arity])
+            yield Operator(name, NUM_ARGS[:2])
+            if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
+                yield Operator(name, [3, BOOL_ARGS[0]])
 
-        yield Operator(name, operator_args)
+        elif name == "mul" and "mul-bool" not in EXCLUDE_OPERATORS.get(solver, {}):
+            yield Operator(name, BOOL_ARGS[:arity])
+        elif arity != 0:
+            yield Operator(name, NUM_ARGS[:arity])
+        else:
+            yield Operator(name, NUM_ARGS)
+
+
+    # boolexprs are also numeric
+    for expr in bool_exprs(solver):
+        yield expr
+    
+    for expr in global_functions(solver):
+        yield expr
 
 
 # Generate all possible comparison constraints
@@ -90,30 +110,21 @@ def comp_constraints(solver):
         - Numeric disequality: Numexpr != Var              (CPMpy class 'Comparison')
                            Numexpr != Constant             (CPMpy class 'Comparison')
         - Numeric inequality (>=,>,<,<=): Numexpr >=< Var  (CPMpy class 'Comparison')
+                                          Var >=< NumExpr  (CPMpy class 'Comparison')
     """
-    for comp_name in Comparison.allowed:
+    for comp_name in sorted(Comparison.allowed):
+
         for numexpr in numexprs(solver):
-            for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
-                yield Comparison(comp_name, numexpr, rhs)
-
-    for comp_name in Comparison.allowed:
-        for glob_expr in global_constraints(solver):
-            if not glob_expr.is_bool():
-                for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
-                    yield Comparison(comp_name, glob_expr, rhs)
-
-    if solver == "z3":
-        for comp_name in Comparison.allowed:
-            for boolexpr in bool_exprs(solver):
-                for rhs in [NUM_VAR, BOOL_VAR, 1, BoolVal(True)]:
-                    if comp_name == '>':
-                        # >1 is unsat for boolean expressions, so change it to 0
-                        if isinstance(rhs, int) and rhs == 1:
-                            rhs = 0
-                        if isinstance(rhs, BoolVal) and rhs.args[0] == True:
-                            rhs = BoolVal(False)
-                    yield Comparison(comp_name, boolexpr, rhs)
-
+            # numeric vs bool/num var/val (incl global func)
+            for rhs in [NUM_VAR, BOOL_VAR, BoolVal(True), 1]:
+                if solver in SAT_SOLVERS and not is_num(rhs):
+                    continue
+                for x,y in [(numexpr,rhs), (rhs,numexpr)]:
+                    # check if the constraint we are trying to construct is always UNSAT
+                    if any(eval_comparison(comp_name, xb,yb) for xb in get_bounds(x) for yb in get_bounds(y)):
+                        yield Comparison(comp_name, x, y)
+                    else: # impossible comparison, skip
+                        pass
 
 # Generate all possible boolean expressions
 def bool_exprs(solver):
@@ -121,6 +132,7 @@ def bool_exprs(solver):
         Generate all boolean expressions:
         - Boolean operators: and([Var]), or([Var])              (CPMpy class 'Operator', is_bool())
         - Boolean equality: Var == Var                          (CPMpy class 'Comparison')
+        - Global constraints
     """
 
     names = [(name, arity) for name, (arity, is_bool) in Operator.allowed.items() if is_bool]
@@ -141,35 +153,131 @@ def bool_exprs(solver):
         yield Comparison(eq_name, *BOOL_ARGS[:2])
 
     for cpm_cons in global_constraints(solver):
-        if cpm_cons.is_bool():
-            yield cpm_cons
+        yield cpm_cons
 
 def global_constraints(solver):
     """
         Generate all global constraints
         -  AllDifferent, AllEqual, Circuit,  Minimum, Maximum, Element,
-           Xor, Cumulative
+           Xor, Cumulative, NValue, Count, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess
     """
-    global_cons = [AllDifferent, AllEqual, Minimum, Maximum]
-    for global_type in global_cons:
-        cons = global_type(NUM_ARGS)
-        if solver not in EXCLUDE_GLOBAL or cons.name not in EXCLUDE_GLOBAL[solver]:
-            yield cons
+    classes = inspect.getmembers(cp.expressions.globalconstraints, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
+    classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
-    # "special" constructors
-    if solver not in EXCLUDE_GLOBAL or "element" not in EXCLUDE_GLOBAL[solver]:
-        yield cpm_array(NUM_ARGS)[NUM_VAR]
+    for name, cls in classes:
+        if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
+            continue
 
-    if solver not in EXCLUDE_GLOBAL or "xor" not in EXCLUDE_GLOBAL[solver]:
-        yield Xor(BOOL_ARGS)
+        if name == "Xor":
+            yield cp.Xor(BOOL_ARGS)
+            yield cp.Xor(BOOL_ARGS + [True,False])
+            continue
+        elif name == "Inverse":
+            yield cp.Inverse(NUM_ARGS, [1,0,2])
+        elif name == "Table":
+            yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
+            yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
+        elif name == "Regular":
+            yield cp.Regular(cp.intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
+        elif name == "NegativeTable":
+            yield cp.NegativeTable(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
+        elif name == "ShortTable":
+            yield cp.ShortTable(NUM_ARGS, [[0,"*",2], ["*","*",1]])
+        elif name == "IfThenElse":
+            yield cp.IfThenElse(*BOOL_ARGS)
+        elif name == "InDomain":
+            yield cp.InDomain(NUM_VAR, [0,1,6])
+        elif name == "Cumulative":
+            s = cp.intvar(0, 10, shape=3, name="start")
+            e = cp.intvar(0, 10, shape=3, name="end")
+            dur = [1, 4, 3]
+            demand = [4, 5, 7]
+            cap = 10
+            yield cp.Cumulative(s, dur, e, demand, cap)
+            yield cp.all(cp.Cumulative(s, dur, e, demand, cap).decompose(how="time")[0])
+            yield cp.all(cp.Cumulative(s, dur, e, demand, cap).decompose(how="task")[0])
 
-    if solver not in EXCLUDE_GLOBAL or "cumulative" not in EXCLUDE_GLOBAL[solver]:
-        s = intvar(0,10,shape=3,name="start")
-        e = intvar(0,10,shape=3,name="end")
-        dur = [1,4,3]
-        demand = [4,5,7]
-        cap = 10
-        yield Cumulative(s, dur, e, demand, cap)
+            yield cp.Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
+            if solver != "pumpkin": # only supports with fixed durations
+                yield cp.Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
+                if solver not in ("pysat", "pindakaas"): # results in unsupported int2bool integer multiplication
+                    yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
+            continue
+
+        elif name == "GlobalCardinalityCount":
+            vals = [1, 2, 3]
+            cnts = cp.intvar(0,10,shape=3)
+            yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
+        elif name == "AllDifferentExceptN":
+            yield cp.AllDifferentExceptN(NUM_ARGS, NUM_VAR)
+        elif name == "AllEqualExceptN":
+            yield cp.AllEqualExceptN(NUM_ARGS, NUM_VAR)
+        elif name == "Precedence":
+            x = cp.intvar(0,5, shape=3, name="x")
+            yield cp.Precedence(x, [3,1,0])
+        elif name == "NoOverlap":
+            s = cp.intvar(0, 10, shape=3, name="start")
+            e = cp.intvar(0, 10, shape=3, name="end")
+            dur = [1,4,3]
+            yield cp.NoOverlap(s, dur, e)
+            yield cp.NoOverlap(s, dur)
+            if solver != "pumpkin": # only supports with fixed durations
+                yield cp.NoOverlap(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)])
+            continue
+        elif name == "GlobalCardinalityCount":
+            vals = [1, 2, 3]
+            cnts = cp.intvar(0,10,shape=3)
+            yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
+        elif name == "LexLessEq":
+            X = cp.intvar(0, 3, shape=3)
+            Y = cp.intvar(0, 3, shape=3)
+            yield cp.LexLessEq(X, Y)
+        elif name == "LexLess":
+            X = cp.intvar(0, 3, shape=3)
+            Y = cp.intvar(0, 3, shape=3)
+            yield cp.LexLess(X, Y)
+        elif name == "LexChainLess":
+            X = cp.intvar(0, 3, shape=(3,3))
+            yield cp.LexChainLess(X)
+        elif name == "LexChainLessEq":
+            X = cp.intvar(0, 3, shape=(3,3))
+            yield cp.LexChainLessEq(X)
+        else: # default constructor, list of numvars
+            yield cls(NUM_ARGS)            
+
+
+# also global functions
+def global_functions(solver):
+    """
+        Generate all global functions
+    """
+    classes = inspect.getmembers(cp.expressions.globalfunctions, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalFunction) and name != "GlobalFunction"]
+    classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
+
+    for name, cls in classes:
+        if solver in EXCLUDE_GLOBAL and name in EXCLUDE_GLOBAL[solver]:
+            continue
+        
+        if name == "Abs":
+            yield cp.Abs(NUM_ARGS[0])
+        elif name == "Count":
+            yield cp.Count(NUM_ARGS, NUM_VAR)
+        elif name == "Element":
+            yield cp.Element(NUM_ARGS, POS_VAR)
+        elif name == "NValueExcept":
+            yield cp.NValueExcept(NUM_ARGS, 3)
+        elif name == "Among":
+            yield cp.Among(NUM_ARGS, [1,2])
+        elif name == "Division":
+            yield cp.Division(NUM_ARGS[0], NUM_ARGS[1])
+        elif name == "Modulo":
+            yield cp.Modulo(NUM_ARGS[0], NUM_ARGS[1])
+        elif name == "Power":
+            yield cp.Power(NUM_ARGS[0], 3)
+        else:
+            yield cls(NUM_ARGS)
 
 
 def reify_imply_exprs(solver):
@@ -179,44 +287,60 @@ def reify_imply_exprs(solver):
                    Var -> Boolexpr                         (CPMpy class 'Operator', is_bool())
     """
     for bool_expr in bool_exprs(solver):
-        if solver not in EXCLUDE_IMPL or  \
-                bool_expr.name not in EXCLUDE_IMPL[solver]:
-            yield bool_expr.implies(BOOL_VAR)
-            yield BOOL_VAR.implies(bool_expr)
-            yield bool_expr == BOOL_VAR
+        yield bool_expr.implies(BOOL_VAR)
+        yield BOOL_VAR.implies(bool_expr)
+        yield bool_expr == BOOL_VAR
 
     for comp_expr in comp_constraints(solver):
         lhs, rhs = comp_expr.args
-        if solver not in EXCLUDE_IMPL or \
-                (not isinstance(lhs, Expression) or lhs.name not in EXCLUDE_IMPL[solver]) and \
-                (not isinstance(rhs, Expression) or rhs.name not in EXCLUDE_IMPL[solver]):
-            yield comp_expr.implies(BOOL_VAR)
-            yield BOOL_VAR.implies(comp_expr)
-            yield comp_expr == BOOL_VAR
+        yield comp_expr.implies(BOOL_VAR)
+        yield BOOL_VAR.implies(comp_expr)
+        yield comp_expr == BOOL_VAR
 
 
-@pytest.mark.parametrize(("solver","constraint"),_generate_inputs(bool_exprs), ids=str)
-def test_bool_constaints(solver, constraint):
+def verify(cons):
+    assert argval(cons)
+    assert cons.value()
+
+@pytest.mark.generate_constraints.with_args(bool_exprs)
+@skip_on_missing_pblib(skip_on_exception_only=True)
+def test_bool_constraints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
     """
-    assert SolverLookup.get(solver, Model(constraint)).solve()
-    assert constraint.value()
+    if ALL_SOLS:
+        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
+        assert n_sols >= 1
+    else:
+        assert SolverLookup.get(solver, Model(constraint)).solve()
+        assert argval(constraint)
+        assert constraint.value()
 
-
-@pytest.mark.parametrize(("solver","constraint"), _generate_inputs(comp_constraints),  ids=str)
+@pytest.mark.generate_constraints.with_args(comp_constraints)
+@skip_on_missing_pblib(skip_on_exception_only=True)
 def test_comparison_constraints(solver, constraint):
     """
         Tests comparison constraint by posting it to the solver and checking the value after solve.
     """
-    assert SolverLookup.get(solver,Model(constraint)).solve()
-    assert constraint.value()
+    if ALL_SOLS:
+        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display= lambda: verify(constraint))
+        assert n_sols >= 1
+    else:
+        assert SolverLookup.get(solver,Model(constraint)).solve()
+        assert argval(constraint)
+        assert constraint.value()
 
 
-@pytest.mark.parametrize(("solver","constraint"), _generate_inputs(reify_imply_exprs),  ids=str)
+@pytest.mark.generate_constraints.with_args(reify_imply_exprs)
+@skip_on_missing_pblib(skip_on_exception_only=True)
 def test_reify_imply_constraints(solver, constraint):
     """
         Tests boolean expression by posting it to solver and checking the value after solve.
     """
-    assert SolverLookup.get(solver, Model(constraint)).solve()
-    assert constraint.value()
+    if ALL_SOLS:
+        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
+        assert n_sols >= 1
+    else:
+        assert SolverLookup.get(solver, Model(constraint)).solve()
+        assert argval(constraint)
+        assert constraint.value()

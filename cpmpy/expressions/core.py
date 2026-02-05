@@ -4,57 +4,75 @@
 ## expressions.py
 ##
 """
-    The `Expression` superclass and common subclasses `Expression` and `Operator`.
+    The :class:`~cpmpy.expressions.core.Expression` superclass and common subclasses :class:`~cpmpy.expressions.core.Comparison` and :class:`~cpmpy.expressions.core.Operator`.
     
     None of these objects should be directly created, they are automatically created through operator
     overloading on variables and expressions.
 
     Here is a list of standard python operators and what object (with what expr.name) it creates:
 
-    Comparisons:
+    Comparisons
+    -----------
+    ===================  ==========================
+    Python Operator      CPMpy Object                     
+    ===================  ==========================
+    `x == y`             `Comparison("==", x, y)`         
+    `x != y`             `Comparison("!=", x, y)`         
+    `x < y`              `Comparison("<", x, y)`          
+    `x <= y`             `Comparison("<=", x, y)`         
+    `x > y`              `Comparison(">", x, y)`          
+    `x >= y`             `Comparison(">=", x, y)`         
+    ===================  ==========================
 
-    - x == y        Comparison("==", x, y)
-    - x != y        Comparison("!=", x, y)
-    - x < y         Comparison("<", x, y)
-    - x <= y        Comparison("<=", x, y)
-    - x > y         Comparison(">", x, y)
-    - x >= y        Comparison(">=", x, y)
+    Arithmetic Operators
+    --------------------
+    ===========================  ===============================================
+    Python Operator              CPMpy Object                                  
+    ===========================  ===============================================
+    `-x`                         `Operator("-", [x])`                          
+    `x + y`                      `Operator("sum", [x, y])`                     
+    `sum([x,y,z])`               `Operator("sum", [x, y, z])`                  
+    `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
+    `x - y`                      `Operator("sum", [x, -y])`                    
+    `x * y`                      `Operator("mul", [x, y])`                     
+    `x // y`                     `globalfunctions.Division([x, y])` (integer division, rounding towards zero)
+    `x % y`                      `globalfunctions.Modulo([x, y])` (remainder after integer division)
+    `x ** y`                     `globalfunctions.Power([x, y])`
+    ===========================  ===============================================
 
-    Mathematical operators:
+    
+    Logical Operators
+    -----------------
+    ===================  =======================================================
+    Python Operator      CPMpy Object  
+    ===================  =======================================================                                        
+    `x & y`              `Operator("and", [x, y])`                             
+    `x | y`              `Operator("or", [x, y])`                              
+    `~x`                 `Operator("not", [x])` or `NegBoolView(x)` if Boolean 
+    `x ^ y`              `globalconstraints.Xor([x, y])`
+    ===================  =======================================================
 
-    - -x            Operator("-", [x])
-    - x + y         Operator("sum", [x,y])
-    - sum([x,y,z])  Operator("sum", [x,y,z])
-    - sum([c0*x, c1*y, c2*z])  Operator("wsum", [[c0,c1,c2],[x,y,z]])
-    - x - y         Operator("sum", [x,-y])
-    - x * y         Operator("mul", [x,y])
-    - x / y         Operator("div", [x,y])
-    - x % y         Operator("mod", [x,y])
-    - x ** y        Operator("pow", [x,y])
+    Python has no built-in operator for `implication` that can be overloaded.
+    CPMpy hence has a function :func:`~cpmpy.expressions.core.Expression.implies` that can be called:
 
-    Logical operators:
-
-    - x & y         Operator("and", [x,y])
-    - x | y         Operator("or", [x,y])
-    - ~x            Operator("not", [x])
-                    or NegBoolView(x) in case x is a Boolean variable
-    - x ^ y         Xor([x,y])  # a global constraint
-
-    Python has no built-in operator for __implication__ that can be overloaded.
-    CPMpy hence has a function 'implies()' that can be called:
-
-    - x.implies(y)  Operator("->", [x,y])
+    ===================  ======================
+    Python Operator      CPMpy Object          
+    ===================  ======================
+    `x.implies(y)`       `Operator("->", [x,y])` 
+    ===================  ======================
 
     Apart from operator overloading, expressions implement two important functions:
 
-    - `is_bool()`   which returns whether the __return type__ of the expression is Boolean.
-                    If it does, the expression can be used as top-level constraint
-                    or in logical operators.
+    - :func:`~cpmpy.expressions.core.Expression.is_bool`   
+        which returns whether the return type of the expression is Boolean.
+        If it does, the expression can be used as top-level constraint
+        or in logical operators.
 
-    - `value()`     computes the value of this expression, by calling .value() on its
-                    subexpressions and doing the appropriate computation
-                    this is used to conveniently print variable values, objective values
-                    and any other expression value (e.g. during debugging).
+    - :func:`~cpmpy.expressions.core.Expression.value`    
+        computes the value of this expression, by calling .value() on its
+        subexpressions and doing the appropriate computation
+        this is used to conveniently print variable values, objective values
+        and any other expression value (e.g. during debugging).
     
     ===============
     List of classes
@@ -70,25 +88,26 @@ import copy
 import warnings
 from types import GeneratorType
 import numpy as np
+import cpmpy as cp
 
-
-from .utils import is_num, is_any_list, flatlist, argval, get_bounds, is_boolexpr, is_true_cst, is_false_cst
+from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
 
 
 class Expression(object):
     """
-    An Expression represents a symbolic function with a self.name and self.args (arguments)
+    An Expression represents a symbolic function with a `self.name` and `self.args` (arguments)
 
     Each Expression is considered to be a function whose value can be used
       in other expressions
 
     Expressions may implement:
-    - is_bool():    whether its return type is Boolean
-    - value():      the value of the expression, default None
-    - implies(x):   logical implication of this expression towards x
-    - __repr__():   for pretty printing the expression
-    - any __op__ python operator overloading
+
+    - :func:`~cpmpy.expressions.core.Expression.is_bool`:               whether its return type is Boolean
+    - :func:`~cpmpy.expressions.core.Expression.value`:                 the value of the expression, default None
+    - :func:`implies(x) <cpmpy.expressions.core.Expression.implies>`:   logical implication of this expression towards `x`
+    - :func:`~cpmpy.expressions.core.Expression.__repr__`:              for pretty printing the expression
+    - any ``__op__`` python operator overloading
     """
 
     def __init__(self, name, arg_list):
@@ -105,7 +124,25 @@ class Expression(object):
                 arg_list[i] = arg_list[i].reshape(-1)
 
         assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
-        self.args = arg_list
+        self._args = arg_list
+
+
+    @property
+    def args(self):
+        return self._args
+
+    @args.setter
+    def args(self, args):
+        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
+
+    def update_args(self, args):
+        """ Allows in-place update of the expression's arguments.
+            Resets all cached computations which depend on the expression tree.
+        """
+        self._args = args
+        # Reset cached "_has_subexpr"
+        if hasattr(self, "_has_subexpr"):
+            del self._has_subexpr
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -134,6 +171,38 @@ class Expression(object):
 
     def __hash__(self):
         return hash(self.__repr__())
+
+    def has_subexpr(self):
+        """ Does it contains nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
+            Is of importance when deciding whether certain transformations are needed
+            along particular paths of the expression tree.
+            Results are cached for future calls and reset when the expression changes
+            (in-place argument update).
+        """
+        # return cached result
+        if hasattr(self, '_has_subexpr'):
+            return self._has_subexpr
+
+        # Initialize stack with args
+        stack = list(self.args)
+
+        while stack:
+            el = stack.pop()
+            if isinstance(el, Expression):
+                # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
+                if isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
+                    self._has_subexpr = True
+                    return True
+                elif not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
+                    self._has_subexpr = True
+                    return True
+            elif is_any_list(el):
+                # Add list elements to stack for processing
+                stack.extend(el)
+
+        # No subexpressions found
+        self._has_subexpr = False
+        return False
 
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
@@ -196,44 +265,40 @@ class Expression(object):
         # some simple constant removal
         if is_true_cst(other):
             return self
-        if is_false_cst(other):
-            return BoolVal(False)
         # catch beginner mistake
-        if is_num(other):
-            raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
+        if is_num(other) and not is_bool(other):
+            raise TypeError(f"{self}&{other} is not valid because {other} is a number, did you forget to put brackets? "
+                            f"E.g. always write (x==2)&(y<5).")
         return Operator("and", [self, other])
 
     def __rand__(self, other):
         # some simple constant removal
         if is_true_cst(other):
             return self
-        if is_false_cst(other):
-            return BoolVal(False)
         # catch beginner mistake
-        if is_num(other):
-            raise TypeError(f"{other}&{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)&(y<5).")
+        if is_num(other) and not is_bool(other):
+            raise TypeError(f"{other}&{self} is not valid because {other} is a number, "
+                            f"did you forget to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
     def __or__(self, other):
         # some simple constant removal
-        if is_true_cst(other):
-            return BoolVal(True)
         if is_false_cst(other):
             return self
         # catch beginner mistake
-        if is_num(other):
-            raise TypeError(f"{self}|{other} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
+        if is_num(other) and not is_bool(other):
+            raise TypeError(f"{self}|{other} is not valid because {other} is a number, "
+                            f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [self, other])
 
     def __ror__(self, other):
         # some simple constant removal
-        if is_true_cst(other):
-            return BoolVal(True)
         if is_false_cst(other):
             return self
         # catch beginner mistake
-        if is_num(other):
-            raise TypeError(f"{other}|{self} is not valid because {other} is a number, did you forgot to put brackets? E.g. always write (x==2)|(y<5).")
+        if is_num(other) and not is_bool(other):
+            raise TypeError(f"{other}|{self} is not valid because {other} is a number, "
+                            f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
 
     def __xor__(self, other):
@@ -242,9 +307,7 @@ class Expression(object):
             return ~self
         if is_false_cst(other):
             return self
-        # avoid cyclic import
-        from .globalconstraints import Xor
-        return Xor([self, other])
+        return cp.Xor([self, other])
 
     def __rxor__(self, other):
         # some simple constant removal
@@ -252,9 +315,7 @@ class Expression(object):
             return ~self
         if is_false_cst(other):
             return self
-        # avoid cyclic import
-        from .globalconstraints import Xor
-        return Xor([other, self])
+        return cp.Xor([other, self])
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
@@ -313,28 +374,26 @@ class Expression(object):
     def __floordiv__(self, other):
         if is_num(other) and other == 1:
             return self
-        return Operator("div", [self, other])
+        return cp.Division(self, other)
 
     def __rfloordiv__(self, other):
-        return Operator("div", [other, self])
+        return cp.Division(other, self)
 
     def __mod__(self, other):
-        return Operator("mod", [self, other])
+        return cp.Modulo(self, other)
 
     def __rmod__(self, other):
-        return Operator("mod", [other, self])
+        return cp.Modulo(other, self)
 
     def __pow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        if other == 0:
-            return 1
-        elif other == 1:
+        if is_num(other) and other == 1:
             return self
-        return Operator("pow", [self, other])
+        return cp.Power(self, other)
 
     def __rpow__(self, other, modulo=None):
         assert (modulo is None), "Power operator: modulo not supported"
-        return Operator("pow", [other, self])
+        return cp.Power(other, self)
 
     # Not implemented: (yet?)
     #object.__divmod__(self, other)
@@ -353,14 +412,17 @@ class Expression(object):
         return self
 
     def __abs__(self):
-        from .globalfunctions import Abs
-        return Abs(self)
+        return cp.Abs(self)
 
     def __invert__(self):
         if not (is_boolexpr(self)):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", [self])
 
+    def __bool__(self):
+        raise ValueError(f"__bool__ should not be called on a CPMPy expression {self} as it will always return True\n"
+                         "Do not use an expression as argument in an `if` statement and use cpmpy.any, cpmpy.max instead of python builtins\n"
+                         "If you think this is an error, please report on github")
 
 class BoolVal(Expression):
     """
@@ -368,7 +430,7 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg):
-        assert is_true_cst(arg) or is_false_cst(arg)
+        assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
     def value(self):
@@ -380,6 +442,92 @@ class BoolVal(Expression):
     def __bool__(self):
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
+
+    def __int__(self):
+        """Called to implement conversion to numerical"""
+        return int(self.args[0])
+
+    def get_bounds(self):
+        v = int(self.args[0])
+        return (v,v)
+
+    def __and__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] and other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if self.args[0]:
+                return other
+            else:
+                return BoolVal(False)
+        raise ValueError(f"{self}&{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+        
+    
+    def __rand__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] and other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if self.args[0]:
+                return other
+            else:
+                return BoolVal(False)
+        raise ValueError(f"{self}&{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+
+    
+    def __or__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] or other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if not self.args[0]:
+                return other
+            else:
+                return BoolVal(True)
+        raise ValueError(f"{self}|{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+        
+        
+    def __ror__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] or other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if not self.args[0]:
+                return other
+            else:
+                return BoolVal(True)
+        raise ValueError(f"{self}|{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+        
+    def __xor__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] ^ other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if self.args[0]:
+                return ~other
+            else:
+                return other
+        raise ValueError(f"{self}^^{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+    
+    
+    def __rxor__(self, other):
+        if is_bool(other): # Boolean constant
+            return BoolVal(self.args[0] ^ other)
+        elif isinstance(other, Expression) and other.is_bool():
+            if self.args[0]:
+                return ~other
+            else:
+                return other
+        raise ValueError(f"{self}^^{other} is not valid. Expected Boolean constant or Boolean Expression, but got {other} of type {type(other)}.")
+    
+
+    def has_subexpr(self) -> bool:
+        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+            Is of importance when deciding whether certain transformations are needed
+            along particular paths of the expression tree.
+        """
+        return False # BoolVal is a wrapper for a python or numpy constant boolean.
+
+    def implies(self, other):
+        if self.args[0]:
+            return other
+        else:
+            return other == other  # Always true, but keep variables in the model
 
 
 class Comparison(Expression):
@@ -396,11 +544,18 @@ class Comparison(Expression):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+    
+    def __bool__(self):
+        # will be called when comparing elements in a container, but always with `==`
+        if self.name == "==":
+            return repr(self.args[0]) == repr(self.args[1])
+        super().__bool__() # default to exception
 
     # return the value of the expression
     # optional, default: None
     def value(self):
-        arg_vals = [argval(a) for a in self.args]
+        arg_vals = argvals(self.args)
+
         if any(a is None for a in arg_vals): return None
         if   self.name == "==": return arg_vals[0] == arg_vals[1]
         elif self.name == "!=": return arg_vals[0] != arg_vals[1]
@@ -428,12 +583,9 @@ class Operator(Expression):
         'wsum': (2, False),
         'sub': (2, False), # x - y
         'mul': (2, False),
-        'div': (2, False),
-        'mod': (2, False),
-        'pow': (2, False),
         '-':   (1, False), # -x
     }
-    printmap = {'sum': '+', 'sub': '-', 'mul': '*', 'div': '//'}
+    printmap = {'sum': '+', 'sub': '-', 'mul': '*'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -467,6 +619,13 @@ class Operator(Expression):
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
+            weights = []
+            for w in arg_list[0]:
+                if is_int(w):
+                    weights.append(int(w)) # bool or int, simplifies things later on
+                else:
+                    weights.append(w) # can be float
+            arg_list = (weights, arg_list[1])
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
@@ -498,7 +657,7 @@ class Operator(Expression):
         """ is it a Boolean (return type) Operator?
         """
         return Operator.allowed[self.name][1]
-    
+
     def __repr__(self):
         printname = self.name
         if printname in Operator.printmap:
@@ -526,27 +685,25 @@ class Operator(Expression):
         return "{}({})".format(self.name, self.args)
 
     def value(self):
+
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
-            arg_vals = [self.args[0], [argval(arg) for arg in self.args[1]]]
+            arg_vals = [self.args[0], argvals(self.args[1])]
         else:
-            arg_vals = [argval(arg) for arg in self.args]
+            arg_vals = argvals(self.args)
 
 
         if any(a is None for a in arg_vals): return None
         # non-boolean
         elif self.name == "sum": return sum(arg_vals)
-        elif self.name == "wsum": return sum(arg_vals[0]*np.array(arg_vals[1]))
+        elif self.name == "wsum":
+            val = np.dot(arg_vals[0], arg_vals[1]).item()
+            if round(val) == val: # it is an integer
+                return int(val)
+            return val # can be a float
         elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
-        elif self.name == "mod": return arg_vals[0] % arg_vals[1]
-        elif self.name == "pow": return arg_vals[0] ** arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
-        elif self.name == "div":
-            try:
-                return arg_vals[0] // arg_vals[1]
-            except ZeroDivisionError:
-                raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}")
 
         # boolean
         elif self.name == "and": return all(arg_vals)
@@ -570,51 +727,26 @@ class Operator(Expression):
             bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
             lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'sum':
-            lbs, ubs = zip(*[get_bounds(x) for x in self.args])
+            lbs, ubs = get_bounds(self.args)
             lowerbound, upperbound = sum(lbs), sum(ubs)
         elif self.name == 'wsum':
             weights, vars = self.args
             bounds = []
+            lowerbound, upperbound = 0,0
             #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
-            for i, varbounds in enumerate([get_bounds(arg) for arg in vars]):
-                sortbounds = (list(weights[i] * x for x in varbounds))
-                sortbounds.sort()
-                bounds += [sortbounds]
-            lbs, ubs = (zip(*bounds))
-            lowerbound, upperbound = sum(lbs), sum(ubs) #this is builtins sum, not numpy sum
+            for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]):
+                x,y = int(w) * lb, int(w) * ub
+                if x <= y: # x is the lb of this arg
+                    lowerbound += x
+                    upperbound += y
+                else:
+                    lowerbound += y
+                    upperbound += x
+
         elif self.name == 'sub':
             lb1, ub1 = get_bounds(self.args[0])
             lb2, ub2 = get_bounds(self.args[1])
             lowerbound, upperbound = lb1-ub2, ub1-lb2
-        elif self.name == 'div':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("division by domain containing 0 is not supported")
-            bounds = [lb1 // lb2, lb1 // ub2, ub1 // lb2, ub1 // ub2]
-            lowerbound, upperbound = min(bounds), max(bounds)
-        elif self.name == 'mod':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 <= 0 <= ub2:
-                raise ZeroDivisionError("% by domain containing 0 is not supported")
-            elif ub2 < 0:
-                return lb2 + 1, 0
-            elif lb2 > 0:
-                return 0, ub2 - 1
-        elif self.name == 'pow':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            if lb2 < 0:
-                raise NotImplementedError("Power operator: For integer values, exponent must be non-negative")
-            bounds = [lb1**lb2, lb1**ub2, ub1**lb2, ub1**ub2]
-            if lb1 < 0 and 0 < ub2:  
-                # The lower and upper bounds depend on either the largest or the second largest exponent 
-                # value when the base term can be negative. 
-                # E.g., (-2)^2 is positive, but (-2)^1 is negative, so for (-2)^[0,2] we also need to add (-2)^1.
-                bounds += [lb1 ** (ub2 - 1), ub1 ** (ub2 - 1)] 
-                # This approach is safe but not tight (e.g., [-2,-1]^2 will give (-2,4) as range instead of [1,4]).
-            lowerbound, upperbound = min(bounds), max(bounds)
 
         elif self.name == '-':
             lb1, ub1 = get_bounds(self.args[0])
@@ -624,7 +756,7 @@ class Operator(Expression):
             raise ValueError(f"Bound requested for unknown expression {self}, please report bug on github")
         if lowerbound > upperbound:
             #overflow happened
-            raise OverflowError('Overflow when calculating bounds, your expression exceeds integer bounds.')
+            raise OverflowError(f'Overflow when calculating bounds, your expression exceeds integer bounds: {self}')
         return lowerbound, upperbound
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum

@@ -1,37 +1,58 @@
 """
-    CPMpy interfaces to (the Python API interface of) solvers
+    Solver interfaces have the same API as :class:`Model <cpmpy.model.Model>`.
+    However some solvers are **incremental**, meaning that after solving a problem, you can add constraints or change
+    the objective, and the next solve will reuse as much information from the previous solve as possible.
+    Some clause learning solvers also support solving with **assumptions**, meaning you can solve the same problem with
+    different assumption variables toggled on/off, and the solver will reuse information from the previous solves.
 
-    Solvers typically use some of the generic transformations in
-    `transformations` as well as specific reformulations to map the
-    CPMpy expression to the solver's Python API
+    See :ref:`supported-solvers` for the list of solvers and their capabilities.
 
-    ==================
-    List of submodules
-    ==================
+    To benefit from incrementality, you have to instantiate the solver object and reuse it, rather than working on a Model object.
+    Solvers must be instantiated throught the static :class:`cp.SolverLookup <cpmpy.solvers.utils.SolverLookup>` class:
+
+    - :meth:`cp.SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` -- List all installed solvers (including subsolvers).
+    - :meth:`cp.SolverLookup.get(solvername, model=None) <cpmpy.solvers.utils.SolverLookup.get>` -- Initialize a specific solver.
+
+    For example creating a CPMpy solver object for OR-Tools:
+
+    .. code-block:: python
+
+        import cpmpy as cp
+        s = cp.SolverLookup.get("ortools")
+        # can now use solver object 's' over and over again 
+
+
+    =========================
+    List of solver submodules
+    =========================
     .. autosummary::
         :nosignatures:
 
         ortools
-        pysat
+        choco
+        gcs
+        minizinc
+        cpo
         gurobi
-        pysdd
-        z3
         exact
+        z3
+        pysat
+        pysdd
+        pindakaas
+        pumpkin
+        cplex
+        hexaly
+        rc2
         scip
-        utils
 
-    ===============
-    List of classes
-    ===============
+    =========================
+    List of helper submodules
+    =========================
     .. autosummary::
         :nosignatures:
 
-        CPM_ortools
-        CPM_pysat
-        CPM_gurobi
-        CPM_pysdd
-        CPM_z3
-        CPM_exact
+        solver_interface
+        utils
         CPM_scip
 
     =================
@@ -51,4 +72,12 @@ from .gurobi import  CPM_gurobi
 from .pysdd import CPM_pysdd
 from .z3 import CPM_z3
 from .exact import CPM_exact
+from .choco import CPM_choco
+from .gcs import CPM_gcs
+from .cpo import CPM_cpo
+from .pindakaas import CPM_pindakaas
+from .pumpkin import CPM_pumpkin
+from .cplex import CPM_cplex
+from .hexaly import CPM_hexaly
+from .rc2 import CPM_rc2
 from .scip import CPM_scip

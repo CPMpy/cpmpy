@@ -20,11 +20,11 @@ import cpmpy
 # -- Project information -----------------------------------------------------
 
 project = 'CPMpy'
-copyright = '2021, Tias Guns'
+copyright = '2026, Tias Guns'
 author = 'Tias Guns'
 
 # The full version, including alpha/beta/rc tags
-release = '0.5'
+release = '0.9.24'
 
 # variables to be accessed from html
 html_context = {
@@ -42,12 +42,38 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
+    'myst_parser',
+    'sphinx_rtd_theme',
     'sphinx_automodapi.automodapi',
-    'm2r2'
+    'sphinx_automodapi.smart_resolver',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.todo',
+    'sphinx.ext.autosectionlabel'
+]
+
+myst_enable_extensions = [
+    "amsmath",
+    "attrs_inline",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "fieldlist",
+    "html_admonition",
+    "html_image",
+    "replacements",
+    "smartquotes",
+    "strikethrough",
+    "substitution",
+    "tasklist",
 ]
 
 numpydoc_show_class_members = False
 numpydoc_show_inherited_class_members = False
+napoleon_use_param = True
+napoleon_use_rtype = True
+
+
+todo_include_todos = True
 
 source_suffix =  ['.rst', '.md']
 # source_suffix =  '.rst'
@@ -64,17 +90,6 @@ templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 
-html_theme_options = {
-    'logo': 'cpmpy.png',
-    'github_user': 'tias',
-    'github_repo': 'cppy',
-    'github_button': True,
-    'github_type': 'star',
-    'sidebar_width': '152px',
-    'body_text_align': 'justify'
-}
-
-
 # Autodoc settings
 autodoc_default_flags = ['members', 'special-members']
 
@@ -83,7 +98,7 @@ autodoc_default_flags = ['members', 'special-members']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-# html_theme = 'alabaster'
+html_theme = "sphinx_rtd_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
