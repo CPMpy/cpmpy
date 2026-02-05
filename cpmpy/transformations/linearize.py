@@ -281,9 +281,14 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
-        elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
-            raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
-                             f"`cpmpy.transformations.linearize.decompose_linear() first")
+        elif isinstance(cpm_expr, GlobalConstraint):
+            if cpm_expr.name not in supported:
+                raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
+                                 f"`cpmpy.transformations.linearize.decompose_linear() first")
+            else:
+                newlist.append(cpm_expr)
+        else:
+            raise ValueError(f"Unexpected expression {cpm_expr}, if you reach this, please report on github.")
 
     return newlist
 
