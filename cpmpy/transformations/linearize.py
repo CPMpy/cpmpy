@@ -59,13 +59,12 @@ from cpmpy.transformations.get_variables import get_variables
 from .flatten_model import flatten_constraint, get_or_make_var
 from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
-from .int2bool import _encode_int_var, IntVarEnc, IntVarEncDirect
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
+from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.python_builtins import sum as cpm_sum
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
@@ -583,14 +582,10 @@ def only_positive_coefficients(lst_of_expr):
     return newlist
 
 
-def get_linear_decompositions(ivarmap, keep_integer):
+def get_linear_decompositions():
     """
         Implementation of custom linear decompositions for some global constraints.
-        Relies on the "direct encoding" of integer variables to ensure a more efficient decomposition for linear solvers.
-
-        args:
-            ivarmap: map of integer variables to their encodings
-            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
+        Uses (var == val) in sums; no integer encoding.
 
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
@@ -601,62 +596,49 @@ def get_linear_decompositions(ivarmap, keep_integer):
         if expr.has_subexpr():
             return expr.decompose()
 
-        encodings, defining = _encode_integers(expr.args, ivarmap, keep_integer=keep_integer)
-
         lbs, ubs = get_bounds(expr.args)
         lb, ub = min(lbs), max(ubs)
-        return [cpm_sum(enc.eq(val) for enc in encodings) <= 1 for val in range(lb, ub + 1)], defining
+        return [cpm_sum((var == val) for var in expr.args) <= 1 for val in range(lb, ub + 1)], []
 
     # Table
     def decompose_table(expr):
 
         args, arr = expr.args
-        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
-
-        return cp.any(cp.all(enc.eq(v) for enc, v in zip(encodings, row)) for row in arr), defining
+        return cp.any(cp.all((var == v) for var, v in zip(args, row)) for row in arr), []
 
     # Negative table
     def decompose_negtable(expr):
 
         args, arr = expr.args
-        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
-
-        return ~cp.any(cp.all(enc.eq(v) for enc, v in zip(encodings, row)) for row in arr), defining
+        return ~cp.any(cp.all((var == v) for var, v in zip(args, row)) for row in arr), []
 
     # Element
     def decompose_element(expr):
         arr, idx = expr.args
-        if not all(is_num(a) for a in arr):
+        if not all(is_int(a) for a in arr):
             return expr.decompose()
 
         lb, ub = get_bounds(idx)
-        if not (0 <= lb) and (ub < len(arr)):
+        if not (0 <= lb and ub < len(arr)):
             return expr.decompose()
 
-        encodings, defining = _encode_integers([idx], ivarmap, keep_integer=keep_integer)
-        assert len(encodings) == 1
-        enc = encodings[0]
-
-        return cp.sum(val * enc.eq(i) for i, val in enumerate(arr)), defining
+        return cp.sum(val * (idx == i) for i, val in enumerate(arr)), []
 
     # NValue
     def decompose_nvalue(expr):
 
-        encodings, defining = _encode_integers(expr.args, ivarmap, keep_integer=keep_integer)
         lbs, ubs = get_bounds(expr.args)
         lb, ub = min(lbs), max(ubs)
-
-        return cp.sum(cp.any(enc.eq(v) for enc in encodings) for v in range(lb, ub + 1)), defining
+        return cp.sum(cp.any((var == v) for var in expr.args) for v in range(lb, ub + 1)), []
 
     # Count
     def decompose_count(expr):
 
         args, n = expr.args
-        if not is_num(n):
+        if not is_int(n):
             return expr.decompose()
 
-        encodings, defining = _encode_integers(args, ivarmap, keep_integer=keep_integer)
-        return cp.sum(enc.eq(n) for enc in encodings), defining
+        return cp.sum((var == n) for var in args), []
 
     return dict(
         alldifferent=decompose_alldifferent,
@@ -670,89 +652,27 @@ def get_linear_decompositions(ivarmap, keep_integer):
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Set[str]=frozenset(),
                      supported_reified:Set[str]=frozenset(),
-                     csemap:Optional[dict[Expression,Expression]]=None,
-                     ivarmap:Optional[dict[_NumVarImpl, IntVarEnc]]=None,
-                     keep_integer=True):
+                     csemap:Optional[dict[Expression,Expression]]=None):
     """
-        Decompose unsupported global constraints in a linear-friendly way, by encoding the integer variales using a direct Boolean encoding.
-        
+        Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
+
         args:
             lst_of_expr: list of expressions to decompose
             supported: set of supported global constraints and global functions
             supported_reified: set of supported reified global constraints
             csemap: map of expressions to an auxiliary variable
-            ivarmap: map of integer variables to their encodings
-            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
-        
+
         returns:
             list of expressions
     """
+    decompositions = get_linear_decompositions()
+    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap, decompose_custom=decompositions)
 
-    if ivarmap is None:
-        return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap)
-
-    decompositions = get_linear_decompositions(ivarmap, keep_integer)
-    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap,decompose_custom=decompositions)
 
 def decompose_linear_objective(obj: Sequence[Expression],
                                supported: Set[str] = frozenset(),
                                supported_reified: Set[str] = frozenset(),
-                               csemap: Optional[dict[Expression, Expression]] = None,
-                               ivarmap: Optional[dict[_NumVarImpl, IntVarEnc]] = None,
-                               keep_integer=True
-                               ):
-
-    if ivarmap is None:
-        return decompose_objective(obj, supported, supported_reified, csemap=csemap)
-
-    decompositions = get_linear_decompositions(ivarmap, keep_integer)
+                               csemap: Optional[dict[Expression, Expression]] = None):
+    """Decompose objective using linear-friendly (var == val) decompositions."""
+    decompositions = get_linear_decompositions()
     return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompositions)
-
-
-# Utility functions to ease the encoding of linear decompositions
-def _encode_integers(lst_of_ivar, ivarmap, keep_integer) -> tuple[list[IntVarEnc], list[Expression]]:
-    """
-        Encode a list of integer variables using the direct encoding
-
-        args:
-            lst_of_ivar: list of integer variables to encode
-            ivarmap: map of integer variables to their encodings
-            keep_integer: whether to keep the constraint enforcing the integer variable to be equal to the encoding (should be False for pure Boolean solvers)
-
-        returns:
-            tuple of list of encodings and list of domain constraints
-    """
-    encodings, defining = [], []
-    for iv in lst_of_ivar:
-        if isinstance(iv, _BoolVarImpl):
-            encodings.append(DummyEncoding(iv))
-        elif isinstance(iv, _NumVarImpl):
-            enc, domain_constraints = _encode_int_var(ivarmap, iv, encoding="direct")
-            encodings.append(enc)
-            defining += domain_constraints
-            if keep_integer and len(domain_constraints) > 0: # newly encoded variable
-                defining += enc.coerce_to_integer()
-        elif is_num(iv):
-            encodings.append(DummyEncoding(iv))
-        else:
-            raise ValueError(f"Expected integer variable or constant, but got {iv} of type {type(iv)}")
-    
-    return encodings, defining
-
-class DummyEncoding:
-    """
-        Emulates an `class:cpmpy.transformations.int2bool.IntVarEnc` wrapping a constant or Boolean variable.
-        Eases the use of encoding the linear decompositions of global constraints.
-    """
-    def __init__(self, val:int|_BoolVarImpl):
-        self.val = val
-
-    def eq(self, d:int):
-        if is_int(self.val):
-            return BoolVal(self.val == d)
-        elif isinstance(self.val, _BoolVarImpl):
-            if d == 0:
-                return ~self.val
-            if d == 1:
-                return self.val
-            return BoolVal(False)

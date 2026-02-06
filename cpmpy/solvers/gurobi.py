@@ -142,8 +142,6 @@ class CPM_gurobi(SolverInterface):
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
 
-        self._ivarmap = dict() # used for linear decompositions of globals
-
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
         super().__init__(name="gurobi", cpm_model=cpm_model)
@@ -298,9 +296,7 @@ class CPM_gurobi(SolverInterface):
         obj, decomp_cons = decompose_linear_objective(obj,
                                                       supported=self.supported_global_constraints,
                                                       supported_reified=self.supported_reified_global_constraints,
-                                                      csemap=self._csemap,
-                                                      ivarmap=self._ivarmap,
-                                                      keep_integer=True)
+                                                      csemap=self._csemap)
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
@@ -366,9 +362,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
-                                    csemap=self._csemap,
-                                    ivarmap=self._ivarmap,
-                                    keep_integer=True)
+                                    csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
