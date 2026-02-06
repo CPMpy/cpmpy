@@ -986,7 +986,6 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
-
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
@@ -1230,22 +1229,23 @@ def test_objective_numexprs(solver, constraint):
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
 
-    @pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
-    def test_scip_special_cardinality(self):
-        bvs = cp.boolvar(shape=4)
-        sos1 = cp.sum(bvs) <= 1
 
-        model = cp.Model(sos1)
-        s = cp.SolverLookup.get("scip", model)
-        constraints = s.scip_model.getConss()
-        self.assertEquals("SOS1cons", constraints[0].name) # should be translated to SOS1 constraint
-        self.assertTrue(s.solve())
-        self.assertLessEqual(bvs.value().sum(), 1)
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_special_cardinality():
+    bvs = cp.boolvar(shape=4)
+    sos1 = cp.sum(bvs) <= 1
 
-        card = cp.sum(bvs) <= 3
-        model = cp.Model(card)
-        s = cp.SolverLookup.get("scip", model)
-        constraints = s.scip_model.getConss()
-        self.assertEquals("CardinalityCons", constraints[0].name)  # should be translated to SOS1 constraint
-        self.assertTrue(s.solve())
-        self.assertLessEqual(bvs.value().sum(), 3)
+    model = cp.Model(sos1)
+    s = cp.SolverLookup.get("scip", model)
+    constraints = s.scip_model.getConss()
+    assert constraints[0].getConshdlrName() == "SOS1"  # translated to native SOS1
+    assert s.solve()
+    assert bvs.value().sum() <= 1
+
+    card = cp.sum(bvs) <= 3
+    model = cp.Model(card)
+    s = cp.SolverLookup.get("scip", model)
+    constraints = s.scip_model.getConss()
+    assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
+    assert s.solve()
+    assert bvs.value().sum() <= 3
