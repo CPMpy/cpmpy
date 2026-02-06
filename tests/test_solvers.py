@@ -18,6 +18,7 @@ from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
+from cpmpy.solvers.scip import CPM_scip
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
@@ -985,7 +986,6 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
-
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
@@ -1228,3 +1228,24 @@ def test_objective_numexprs(solver, constraint):
         assert constraint.value() > constraint.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_special_cardinality():
+    bvs = cp.boolvar(shape=4)
+    sos1 = cp.sum(bvs) <= 1
+
+    model = cp.Model(sos1)
+    s = cp.SolverLookup.get("scip", model)
+    constraints = s.scip_model.getConss()
+    assert constraints[0].getConshdlrName() == "SOS1"  # translated to native SOS1
+    assert s.solve()
+    assert bvs.value().sum() <= 1
+
+    card = cp.sum(bvs) <= 3
+    model = cp.Model(card)
+    s = cp.SolverLookup.get("scip", model)
+    constraints = s.scip_model.getConss()
+    assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
+    assert s.solve()
+    assert bvs.value().sum() <= 3

@@ -75,6 +75,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
             :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
             Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
         reified: whether the constraint is fully reified
+    
+    `supported` accepts two special cases: 'sum!=' and 'wsum!=' for linear solvers that do support sum!= and wsum!= (e.g. SCIPs AddConsDisjunction)
     """
 
     newlist = []
@@ -244,6 +246,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 # Special case: BV != BV
                 if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
                     newlist.append(lhs + rhs == 1)
+                    continue
+                # Let solver handle linear != natively (e.g. SCIP addConsDisjunction) if supported
+                if not reified and lhs.name in {"sum", "wsum"} and (lhs.name + "!=") in supported and is_num(rhs):
+                    newlist.append(cpm_expr)
+                    continue
 
                 if reified or (isinstance(lhs, (Operator, GlobalConstraint)) and lhs.name not in {"sum","wsum"}):
                     # lhs is sum/wsum and rhs is constant OR
@@ -303,9 +310,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
-        elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
-            raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
-                             f"`cpmpy.transformations.decompose_global.decompose_global() first")
+        elif isinstance(cpm_expr, GlobalConstraint):
+            if cpm_expr.name in supported:
+                newlist.append(cpm_expr)
+            else:
+                raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
+                                f"`cpmpy.transformations.decompose_global.decompose_global() first")
 
     return newlist
 

@@ -43,6 +43,7 @@
         cplex
         hexaly
         rc2
+        scip
 
     =========================
     List of helper submodules
@@ -52,6 +53,7 @@
 
         solver_interface
         utils
+        CPM_scip
 
     =================
     List of functions
@@ -78,3 +80,4 @@ from .pumpkin import CPM_pumpkin
 from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
+from .scip import CPM_scip

@@ -49,6 +49,7 @@ EXCLUDE_OPERATORS = {"pysat": {"mul-int"},  # int2bool but mul, and friends, not
                      "pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
                      "pindakaas": {"mul-int"},
                      "cplex": {"mul-int", "div"},
+                     "scip" : {"mod", "pow"},
                      }
 
 # Variables to use in the rest of the test script
