@@ -676,3 +676,66 @@ def decompose_linear_objective(obj: Sequence[Expression],
     """Decompose objective using linear-friendly (var == val) decompositions."""
     decompositions = get_linear_decompositions()
     return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompositions)
+
+
+def linearize_reified_variables(constraints, min_values=3, csemap=None):
+    """
+    Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
+    has at least min_values such reifications: remove those implications and add
+    sum(BVs)==1 and wsum(values, BVs)==x.
+    
+    Apply after only_implies, before linearize_constraint.
+    """
+    encodings = {}  # var -> list of (val, bv, constraints_index)
+    for idx, c in enumerate(constraints):
+        if c.name != "->":
+            continue
+
+        bv, expr = c.args
+        if expr.name not in ("==", "!="):
+            continue
+
+        lhs, rhs = expr.args
+        if not is_num(rhs):
+            continue
+
+        var = _extract_var_from_lhs(lhs)
+        if var is None:
+            continue
+
+        if expr.name == "==":
+            val = int(rhs)
+            encodings.setdefault(var, []).append((val, bv, idx))
+        elif expr.name == "!=" and isinstance(bv, NegBoolView):
+            bv = bv._bv
+            val = int(rhs)
+            encodings.setdefault(var, []).append((val, bv, idx))
+
+    to_remove = set()
+    added = []
+    for var, triples in encodings.items():
+        distinct_pairs = set((val, bv) for val, bv, _ in triples)
+        if len(distinct_pairs) < min_values:
+            continue
+        for _, _, i in triples:
+            to_remove.add(i)
+        pairs = sorted(distinct_pairs, key=lambda p: p[0])
+        values = [p[0] for p in pairs]
+        bvs = [p[1] for p in pairs]
+        added.append(Comparison("==", Operator("sum", bvs), 1))
+        added.append(Comparison("==", Operator("wsum", [values, bvs]), var))
+
+    to_remove = frozenset(to_remove)
+    newlist = [constraints[i] for i in range(len(constraints)) if i not in to_remove] + added
+    return newlist
+
+
+def _extract_var_from_lhs(lhs):
+    """Extract integer variable from lhs of (x == val) or (x != val). Returns None if not applicable."""
+    if isinstance(lhs, _NumVarImpl) and not lhs.is_bool():
+        return lhs
+    if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
+        arg = lhs.args[0]
+        if isinstance(arg, _NumVarImpl) and not arg.is_bool():
+            return arg
+    return None
