@@ -77,20 +77,19 @@ def numexprs(solver):
             yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
-        elif name == "mul" and "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
-            yield Operator(name, [3, NUM_ARGS[0]])
-            yield Operator(name, NUM_ARGS[:arity])
-            yield Operator(name, NUM_ARGS[:2])
-            if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
-                yield Operator(name, [3, BOOL_ARGS[0]])
-
-        elif name == "mul" and "mul-bool" not in EXCLUDE_OPERATORS.get(solver, {}):
-            yield Operator(name, BOOL_ARGS[:arity])
         elif arity != 0:
             yield Operator(name, NUM_ARGS[:arity])
         else:
             yield Operator(name, NUM_ARGS)
 
+    # Multiplication (GlobalFunction name 'mul') - no longer in Operator.allowed
+    if "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
+        yield cp.Multiplication(3, NUM_ARGS[0])
+        yield cp.Multiplication(NUM_ARGS[0], NUM_ARGS[1])
+    if "mul-bool" not in EXCLUDE_OPERATORS.get(solver, {}):
+        if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
+            yield cp.Multiplication(3, BOOL_ARGS[0])
+        yield cp.Multiplication(BOOL_ARGS[0], BOOL_ARGS[1])
 
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
@@ -275,6 +274,10 @@ def global_functions(solver):
             yield cp.Modulo(NUM_ARGS[0], NUM_ARGS[1])
         elif name == "Power":
             yield cp.Power(NUM_ARGS[0], 3)
+        elif name == "Multiplication":
+            # Skip int*int for solvers that exclude mul-int (e.g. pindakaas); they still get bool*bool from numexprs
+            if not ("mul-int" in EXCLUDE_OPERATORS.get(solver, {})):
+                yield cp.Multiplication(NUM_ARGS[0], NUM_ARGS[1])
         else:
             yield cls(NUM_ARGS)
 

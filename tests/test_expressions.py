@@ -173,7 +173,7 @@ class TestMul:
 
     def test_mul_const(self):
         expr = self.ivar * 10
-        assert isinstance(expr, Operator)
+        assert isinstance(expr, cp.Multiplication)
         assert expr.name == "mul"
         assert self.ivar in set(expr.args)
 
@@ -195,22 +195,43 @@ class TestMul:
     def test_mul_var(self):
         #ivar and bvar
         expr = self.ivar * self.bvar
-        assert isinstance(expr, Operator)
+        assert isinstance(expr, cp.Multiplication)
         assert expr.name == "mul"
         assert self.ivar in set(expr.args)
         assert self.bvar in set(expr.args)
 
         #ivar and ivar
         expr = self.ivar * self.ivar
-        assert isinstance(expr, Operator)
+        assert isinstance(expr, cp.Multiplication)
         assert expr.name == "mul"
         assert self.ivar in set(expr.args)
 
         #bvar and bvar
         expr = self.bvar * self.bvar
-        assert isinstance(expr, Operator)
+        assert isinstance(expr, cp.Multiplication)
         assert expr.name == "mul"
         assert self.bvar in set(expr.args)
+
+    def test_mul_is_lhs_num(self):
+        """Multiplication normalises const to first arg and sets is_lhs_num."""
+        x = cp.intvar(0, 5, name="x")
+        # const * var -> constant first, is_lhs_num True
+        expr = 3 * x
+        assert expr.is_lhs_num is True
+        assert expr.args[0] == 3 and expr.args[1] is x
+        # var * const -> swapped to constant first, is_lhs_num True
+        expr = x * 3
+        assert expr.is_lhs_num is True
+        assert expr.args[0] == 3 and expr.args[1] is x
+        # real coeff: 0.3 * x -> is_lhs_num True (for objectives)
+        expr = 0.3 * x
+        assert expr.is_lhs_num is True
+        assert expr.args[0] == 0.3 and expr.args[1] is x
+        # var * var -> no constant, is_lhs_num False
+        y = cp.intvar(0, 5, name="y")
+        expr = x * y
+        assert expr.is_lhs_num is False
+        assert expr.args[0] is x and expr.args[1] is y
 
     def test_nullarg_mul(self):
         x = intvar(0,5,shape=3, name="x")
@@ -335,13 +356,19 @@ class TestBounds:
         x = intvar(-8,8)
         y = intvar(-4,6)
         for name, test_lb, test_ub in [('mul',-48,48),('sub',-14,12),('sum',-12,14)]:
-            op = Operator(name,[x,y])
+            if name == 'mul':
+                op = cp.Multiplication(x, y)
+            else:
+                op = Operator(name,[x,y])
             lb, ub = op.get_bounds()
             assert test_lb ==lb
             assert test_ub ==ub
             for lhs in inclusive_range(*x.get_bounds()):
                 for rhs in inclusive_range(*y.get_bounds()):
-                    val = Operator(name,[lhs,rhs]).value()
+                    if name == 'mul':
+                        val = lhs * rhs
+                    else:
+                        val = Operator(name,[lhs,rhs]).value()
                     assert val >=lb
                     assert val <=ub
 

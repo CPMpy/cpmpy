@@ -61,6 +61,7 @@
         Minimum
         Maximum
         Abs
+        Multiplication
         Division
         Modulo
         Power
@@ -304,6 +305,83 @@ class Abs(GlobalFunction):
         if ub <= 0:
             return -ub, -lb
         return 0, max(-lb, ub)
+
+
+class Multiplication(GlobalFunction):
+    """
+    Computes the product of two expressions: `x * y`.
+
+    Created when the user writes ``*`` with at least one variable (e.g. ``x * y``, ``2 * x``).
+    Supports decomposition into linear constraints for MIP solvers via :meth:`decompose`.
+    """
+
+    def __init__(self, x: Expression, y: Expression):
+        """
+        Arguments:
+            x (Expression): First factor
+            y (Expression): Second factor
+
+        Normalizes so a constant is first when one factor is numeric (sets .is_lhs_num).
+        """
+        is_lhs_num = False
+        if is_num(x):
+            is_lhs_num = True
+        elif is_num(y):
+            (x, y) = (y, x)
+            is_lhs_num = True
+
+        super().__init__("mul", (x, y))
+        self.is_lhs_num = is_lhs_num
+
+    def __repr__(self):
+        x, y = self.args
+
+        def wrap_bracket(arg):
+            if isinstance(arg, Expression):
+                return f"({arg})"
+            return arg
+
+        return "{} * {}".format(wrap_bracket(x), wrap_bracket(y))
+
+    def __neg__(self):
+        """-(c*x) -> (-c)*x when constant c is first (.is_lhs_num)."""
+        if self.is_lhs_num:
+            return Multiplication(-self.args[0], self.args[1])
+        return super().__neg__()
+
+    def value(self) -> Optional[int]:
+        x, y = argvals(self.args)
+        if x is None or y is None:
+            return None
+        return x * y
+
+    def get_bounds(self) -> tuple[int, int]:
+        """Bounds of the product from bounds of the factors."""
+        lb1, ub1 = get_bounds(self.args[0])
+        lb2, ub2 = get_bounds(self.args[1])
+        candidates = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
+        return min(candidates), max(candidates)
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
+        """
+        Decomposition of Multiplication into linear constraints (e.g. for MIP).
+
+        - If is_lhs_num (const*expr): returns the wsum equivalent and no extra constraints.
+        - If both args are Boolean (0/1): bv*bv equals bv&bv (logical AND), so returns that and no extra constraints.
+        - Otherwise (e.g. int*int): raises NotImplementedError until a full linear decomposition for integer*integer is implemented.
+        """
+        a, b = self.args[0], self.args[1]
+        if self.is_lhs_num:
+            # const*expr -> wsum([const], [expr])
+            return Operator("wsum", ([a], [b])), []
+        if is_boolexpr(a) and is_boolexpr(b):
+            # bool*bool with 0/1 semantics is logical AND
+            return Operator("and", [a, b]), []
+        raise NotImplementedError(
+            "Multiplication.decompose() is not implemented yet; "
+            "integer*integer linear decomposition is not available."
+        )
+
 
 class Division(GlobalFunction):
     """
