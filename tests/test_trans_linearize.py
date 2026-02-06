@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.transformations.flatten_model import flatten_objective
-from cpmpy.transformations.linearize import linearize_constraint, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
+from cpmpy.transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -590,4 +590,48 @@ class TesttestOnlyPositiveBv:
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = only_positive_bv(linearize_constraint([cp.max(~a,b) >= c], supported={"sum", "wsum", "max"}))
         assert str(obj) == "[(max(BV3,b)) >= (c), (BV3) + (a) == 1]"
-        
+
+    def test_linearize_reified_variables_above_threshold(self):
+        """With min_values=3, (a==1)|(a==2)|(a==3) is replaced by encoding constraints."""
+        a = cp.intvar(1, 3, name="a")
+        cons = (a == 1) | (a == 2) | (a == 3)
+        csemap = {}
+        cpm_cons = toplevel_list(cons)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=csemap)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=csemap)
+        n_before = len(cpm_cons)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=3, csemap=csemap)
+        # Should have removed 6 implications (BV->(a==k) and ~BV->(a!=k) for k=1,2,3) and added 2 encoding constraints
+        self.assertEqual(len(cpm_cons), n_before - 6 + 2, "should replace 6 implications with 2 encoding constraints")
+        # Result should contain sum(BVs)==1 and wsum(values, BVs)==a (as linear form)
+        strs = [str(c) for c in cpm_cons]
+        self.assertTrue(any("== 1" in s and "sum(" in s for s in strs), "should have sum(...)==1")
+        self.assertTrue(any("sum(" in s and "a" in s for s in strs), "should have wsum encoding for a")
+
+    def test_linearize_reified_variables_below_threshold(self):
+        """With min_values=3, (a==1)|(a==2) is not replaced."""
+        a = cp.intvar(1, 3, name="a")
+        cons = (a == 1) | (a == 2)
+        csemap = {}
+        cpm_cons = toplevel_list(cons)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=csemap)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=csemap)
+        n_before = len(cpm_cons)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=3, csemap=csemap)
+        self.assertEqual(len(cpm_cons), n_before, "should not replace when distinct (val,bv) < min_values")
+
+    def test_linearize_reified_variables_threshold_two(self):
+        """With min_values=2, (a==1)|(a==2) is replaced."""
+        a = cp.intvar(1, 3, name="a")
+        cons = (a == 1) | (a == 2)
+        csemap = {}
+        cpm_cons = toplevel_list(cons)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=csemap)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=csemap)
+        n_before = len(cpm_cons)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=csemap)
+        self.assertEqual(len(cpm_cons), n_before - 4 + 2, "should replace 4 implications with 2 encoding constraints")
+
