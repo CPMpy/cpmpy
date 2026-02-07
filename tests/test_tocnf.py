@@ -19,6 +19,45 @@ x = cp.intvar(1, 2, name="x")
 y, z = cp.intvar(0, 1, shape=2, name=["y", "z"])
 
 
+def get_cnf_cases():
+    return (
+        cnf
+        for cnf in (
+            a,
+            a | b,
+            a & b,
+            a != b,
+            a == b,
+            a.implies(b),
+            a.implies(b | c),
+            a.implies(b & c),
+            a.implies(b != c),
+            a.implies(b == c),
+            a.implies(b.implies(c)),
+            (b | c).implies(a),
+            (b & c).implies(a),
+            (b != c).implies(a),
+            (b == c).implies(a),
+            (b.implies(c)).implies(a),
+            cp.Xor([a, b]),
+            cp.sum([2 * x + 3 * y]) <= 4,
+            cp.sum([2 * x + 3 * y + 5 * z]) <= 6,
+            cp.sum([2 * x + 3 * cp.intvar(0, 1)]) <= 4,
+            cp.sum([3 * y]) <= 4,  # sat
+            cp.sum([3 * y]) >= 20,  # unsat
+            (a + b + c) == 1,
+            # a * b == 1,  # todo in linearization!
+            # a * b != 1,
+            (a + b + c) != 1,
+            a + b + c > 2,
+            a + b + c <= 2,
+            cp.sum(cp.intvar(lb=2, ub=3, shape=3)) <= 3,
+            (~a & ~b) | (a & b),  # https://github.com/cpmpy/cpmpy/issues/823
+            c | (a & b),  # above minimized
+        )
+    )
+
+
 def get_gcnf_cases():
     p, q = cp.boolvar(shape=2, name=["p", "q"])
     soft = (cp.sum([2 * p + 3 * q]) <= 4, p & q)
@@ -58,81 +97,6 @@ def get_gcnf_cases():
     hard = []
     yield soft, hard
 
-
-cases = [
-    a,
-    a | b,
-    a & b,
-    a != b,
-    a == b,
-    a.implies(b),
-    a.implies(b | c),
-    a.implies(b & c),
-    a.implies(b != c),
-    a.implies(b == c),
-    a.implies(b.implies(c)),
-    (b | c).implies(a),
-    (b & c).implies(a),
-    (b != c).implies(a),
-    (b == c).implies(a),
-    (b.implies(c)).implies(a),
-    cp.Xor([a, b]),
-    cp.sum([2 * x + 3 * y]) <= 4,
-    cp.sum([2 * x + 3 * y + 5 * z]) <= 6,
-    cp.sum([2 * x + 3 * cp.intvar(0, 1)]) <= 4,
-    cp.sum([3 * y]) <= 4,  # sat
-    cp.sum([3 * y]) >= 20,  # unsat
-    (a + b + c) == 1,
-    # a * b == 1,  # todo in linearization!
-    # a * b != 1,
-    (a + b + c) != 1,
-    a + b + c > 2,
-    a + b + c <= 2,
-    cp.sum(cp.intvar(lb=2, ub=3, shape=3)) <= 3,
-    (~a & ~b) | (a & b),  # https://github.com/cpmpy/cpmpy/issues/823
-    c | (a & b),  # above minimized
-] + list(soft + hard for soft, hard in get_gcnf_cases())
-
-
-def get_gcnf_cases():
-    p, q = cp.boolvar(shape=2, name=["p", "q"])
-    soft = (cp.sum([2 * p + 3 * q]) <= 4, p & q)
-    hard = (p,)
-    yield soft, hard
-
-    b = cp.boolvar(name="b")
-    soft = [
-        b.implies(cp.sum([2 * p + 3 * q]) <= 10),
-        b | (p == 0),
-    ]
-    hard = [q >= 1]
-    yield soft, hard
-
-    x, y = cp.intvar(0, 2, shape=2, name=["x", "y"])
-    soft = [(x == 0) | (x == 1), (y == 2)]
-    hard = [y == 1]
-    yield soft, hard
-
-    bs = cp.boolvar(4, name="b")
-    soft = [cp.sum(bs) >= 1, cp.sum(bs) <= 1]
-    hard = []
-    yield soft, hard
-    
-    
-    xs = cp.intvar(0, 2, shape=3, name="x")
-    soft = [cp.sum(xs) >= 2, cp.sum(xs) <= 2, cp.max(xs) < 0]
-    hard = [] 
-    yield soft, hard
-    
-    xs = cp.intvar(0, 2, shape=2, name="x")
-    soft = [cp.max(xs) > 0]
-    hard = [] 
-    yield soft, hard
-    
-    xs = cp.intvar(0, 2, shape=2, name="x")
-    soft = [cp.max(xs) > -1]
-    hard = [] 
-    yield soft, hard
 
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
 class TestCnf:
@@ -155,7 +119,7 @@ class TestCnf:
         assump_model, _, _ = make_assump_model(soft, hard, name="a")
 
         ivarmap = dict()
-        disjoint = False
+        disjoint = True
         print("hard = ", hard)
         print("soft = ", soft)
         gcnf_model, soft_, hard_, assumptions = to_gcnf(
@@ -187,7 +151,7 @@ class TestCnf:
 
     @pytest.mark.parametrize(
         "case",
-        cases,
+        itertools.chain(get_cnf_cases(), (soft + hard for soft, hard in get_gcnf_cases())),
         ids=idfn,
     )
     def test_to_cnf(self, case):
@@ -244,4 +208,3 @@ class TestCnf:
             f"Strict less is intentional ; We didn't find ALL projected solutions with the limit of {projected_solution_limit}, after finding {solution_limit} non-projected solutions"
         )
         return projected_solutions
-

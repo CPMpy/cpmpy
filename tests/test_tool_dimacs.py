@@ -3,11 +3,11 @@ import tempfile
 
 import pytest
 import cpmpy as cp
-from cpmpy.tools.dimacs import read_dimacs, write_dimacs, write_gcnf
+from cpmpy.tools.dimacs import read_dimacs, write_dimacs, write_gdimacs, read_gdimacs
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.pindakaas import CPM_pindakaas
-from test_tocnf import get_gcnf_cases
+from test_tocnf import get_cnf_cases, get_gcnf_cases
 
 def compare_dimacs(a, b):
     def norm(lines):
@@ -27,11 +27,11 @@ class TestCNFTool:
         self.tmpfile.close()
         os.remove(self.tmpfile.name)
 
-    def dimacs_to_model(self, cnf_str):
+    def dimacs_to_model(self, cnf_str, typ="cnf"):
         # return read_dimacs(io.StringIO(cnf_str))
         with open(self.tmpfile.name, "w") as f:
             f.write(cnf_str)
-        return read_dimacs(self.tmpfile.name)
+        return read_dimacs(self.tmpfile.name) if typ == "cnf" else read_gdimacs(self.tmpfile.name)
 
     def test_read_cnf(self):
         model = self.dimacs_to_model("p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
@@ -101,12 +101,25 @@ class TestCNFTool:
             self.dimacs_to_model("p cnf 2 2\n1 2 0\n-1 -2 0\n2")
 
 
-    @pytest.mark.skip(reason="We allow fewer variables, because this is technically correct DIMACS")
     def test_too_few_variables(self):
-        with pytest.raises(AssertionError):
-            self.dimacs_to_model("p cnf 2 1\n1 0")
+        """"Fewer variables is still technically correct DIMACS"""
+        self.dimacs_to_model("p cnf 2 1\n1 0")
     
-class TestDimacs:
+    def test_gdimacs_roundtrip(self):
+        # example from https://satisfiability.org/competition/2011/rules.pdf, but fixed p header vars to 3
+        example = """p gcnf 3 7 4
+{0} 1 2 3 0
+{1} -1 2 0
+{1} -2 3 0
+{2} -3 0
+{3} 2 -3 0
+{3} -2 -3 0
+{4} -2 3 0
+"""
+        m, soft, hard, assumptions = self.dimacs_to_model(example, typ="gcnf")
+        out = write_gdimacs(soft, hard=hard, disjoint=False, canonical=True)
+        assert example == out
+
     def test_gcnf(self):
         x = cp.boolvar(shape=3, name="x")
         def x_(i):
@@ -133,7 +146,7 @@ class TestDimacs:
         ]
 
         compare_dimacs(
-            write_gcnf(soft, hard=hard, name="a", encoding="direct"),
+            write_gdimacs(soft, hard=hard, name="a", encoding="direct"),
             """p gcnf 5 12 4
 {0} 1 2 3 0
 {0} -4 5 0
@@ -151,7 +164,7 @@ class TestDimacs:
 
         # note: 2nd clause of group 4 is merged with 2nd clause of group 1
         compare_dimacs(
-            write_gcnf(soft, hard=hard, name="a", encoding="direct", disjoint=True),
+            write_gdimacs(soft, hard=hard, name="a", encoding="direct", disjoint=True),
             """p gcnf 6 13 4
 {0} 1 2 3 0
 {0} -4 5 0
@@ -169,14 +182,4 @@ class TestDimacs:
 """)
 
 
-    # @pytest.mark.parametrize(
-    #     "case",
-    #     get_gcnf_cases(),
-    # )
-    # def test_normalized_gcnf(self, case):
-    #     print("case", case)
-    #     soft, hard = case
-    #     fname = tempfile.mktemp()
-    #     a = write_gcnf(soft, hard=hard, name="a", normalize=False, fname="/tmp/a.gcnf")
-    #     b = write_gcnf(soft, hard=hard, name="a", normalize=True, fname="/tmp/b.gcnf")
 
