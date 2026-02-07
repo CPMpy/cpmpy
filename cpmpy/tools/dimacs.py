@@ -23,7 +23,7 @@ from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.to_cnf import to_cnf, to_gcnf, _to_clauses
 from cpmpy.transformations.get_variables import get_variables
 
-def write_gcnf(soft, hard=None, name=None, fname=None, encoding="auto", normalize=False):
+def write_gcnf(soft, hard=None, name=None, fname=None, encoding="auto", disjoint=False):
     """
         Writes CPMpy model to GDIMACS format.
         Uses the "to_gcnf" transformation from CPMpy.
@@ -33,7 +33,7 @@ def write_gcnf(soft, hard=None, name=None, fname=None, encoding="auto", normaliz
         :param hard: list of hard constraints
         :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     """
-    _, soft, hard, assumptions = to_gcnf(soft, hard, name=name, encoding=encoding, normalize=normalize)
+    _, soft, hard, assumptions = to_gcnf(soft, hard, name=name, encoding=encoding, disjoint=disjoint)
     return write_dimacs_(hard, groups=zip(assumptions, soft), fname=fname)
 
 def write_dimacs(model, fname=None, encoding="auto"):

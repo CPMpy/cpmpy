@@ -68,115 +68,70 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     return clauses
 
 
-def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="auto", normalize=False):
+def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="auto", disjoint=False):
     """
-    Or `make_assump_cnf`; returns an assumption CNF model, and separately the soft clauses, hard clauses, and assumption variables. Follows https://satisfiability.org/competition/2011/rules.pdf, however, there is no guarantee that the groups are disjoint.
+    Similar to `make_assump_model`, but the returned model is in (grouped) CNF. Separately the soft clauses, hard clauses, and assumption variables. Follows https://satisfiability.org/competition/2011/rules.pdf, however, there is no guarantee that the groups are disjoint.
     """
 
     model, soft_, assump = make_assump_model(soft, hard=hard, name=name)
-    
-    start = time.time()
-    cnf = to_cnf(model.constraints, encoding=encoding, csemap=csemap, ivarmap=ivarmap)
-    end = time.time()
-    print(f"c to_gcnf: converted to CNF in {end - start:.4f} seconds")
 
-    constraints = {
+    cnf = to_cnf(model.constraints, encoding=encoding, csemap=csemap, ivarmap=ivarmap)
+
+    groups = {
         True: [],  # hard clauses
         **{a: [] for a in assump},  # assumption mapped to its soft clauses
     }
-    
-    neg_assump_set = { (~a) for a in assump }
 
-    def add_gcnf_clause(cpm_expr):
+    # create a set for efficiency
+    negative_assumptions = frozenset(~a for a in assump)
+
+    for cpm_expr in cnf:
         for clause in _to_clauses(cpm_expr):
             # assumption var is often the first literal, but this is not guaranteed
-            i = next((i for i, l in enumerate(clause) if l in neg_assump_set), None)
-            if i is None:
-                if normalize:
-                    cl_set = frozenset(clause)
-                    if cl_set in cl_db:
-                        # make new variable for duplicate clause
-                        f = cp.boolvar()
-                        clause = [f]
-                        # then add `f -> c_b` as a hard clause
-                        constraints[True].append([~f] + clause)
-                        # hard clause (w/o assumption var)
-                    else:
-                    # if normalize:
-                        cl_db.add(cl_set)
-                constraints[True].append(clause)
+            assumption = next((lit for lit in clause if lit in negative_assumptions), None)
+            if assumption is None:
+                groups[True].append(clause)
             else:
-                # soft clause
-                assump = clause.pop(i)  # Remove the element at i
-                if normalize:
-                    # clause is a list
-                    cl_set = frozenset(clause)    # Create the set from the remaining elements
-                    if cl_set in cl_db:
-                        # make new variable for duplicate clause
-                        f = cp.boolvar()
-                        # then add `f -> c_b` as a hard clause
-                        constraints[True].append([~f] + clause)
-                        # hard clause (w/o assumption var)
-                        constraints[~assump].append([f])
-                    else:
-                    # if normalize:
-                        cl_db.add(cl_set)
-                        constraints[~assump].append(clause)
+                # soft clause without assumption
+                groups[~assumption].append(clause - {assumption})
+
+    if disjoint:
+        cl_db = set()
+        # to make groups disjoint..
+        for clauses in groups.values():
+            for i, clause in enumerate(clauses):
+                if clause in cl_db:
+                    # replace duplicate clause `C` by new variable `f` and add `f -> C` to hard clauses
+                    f = cp.boolvar()
+                    clauses[i] = [f]
+                    new_clause = frozenset([~f]) | clause
+                    groups[True].append(new_clause)
                 else:
-                    constraints[~assump].append(clause)
-                    
+                    cl_db.add(clause)
 
-    cl_db = set()
-    
-    start = time.time()
-    for c in cnf:
-        add_gcnf_clause(c, cl_db)
-    end = time.time()
-    print(f"c to_gcnf: grouped clauses in {end - start:.4f} seconds")
-
-    # if normalize:
-    #     # to make groups disjoint..
-    #     for (a, g_a), (b, g_b) in all_pairs(constraints.items()):
-    #         for i, c_a in enumerate(g_a):
-    #             for j, c_b in enumerate(g_b):
-    #                 # TODO efficiency, plus account for shuffled literals
-    #                 # ..we find shared clauses between any two groups..
-    #                 if c_a == c_b:
-    #                     # ..in the second group, we replace the clause `c_b` for unit clause `f`
-    #                     f = cp.boolvar()
-    #                     g_b[j] = f
-    #                     # then add `f -> c_b` as a hard clause
-    #                     # add_gcnf_clause(f.implies(c_b))
-    #                     add_gcnf_clause([~f].extend(c_b), cl_db)
-    
     model = cp.Model(cnf)
-    softs = [cp.all(cp.any(c) for c in constraints[a]) for a in assump]
-    hards = [cp.all(cp.any(c) for c in constraints[True])] if constraints[True] else []
+    soft = [cp.all(cp.any(c) for c in groups[a]) for a in assump]
+    hard = [cp.all(cp.any(c) for c in groups[True])] if groups[True] else []
 
-    return (
-        model,
-        softs, 
-        hards,
-        assump,
-    )
+    return (model, soft, hard, assump)
 
 
 def _to_clauses(cons):
-    """Takes some CPMpy constraints in CNF + half-reifications and returns clauses as list of lists"""
+    """Takes some CPMpy constraints in CNF + half-reifications and returns clauses as list of sets of literals"""
     if isinstance(cons, _BoolVarImpl):
-        return [[cons]]
+        return [frozenset([cons])]
     elif isinstance(cons, Operator):
         if cons.name == "or":
-            return [cons.args]
+            return [frozenset(cons.args)]
         elif cons.name == "and":
             return [c_ for c in cons.args for c_ in _to_clauses(c)]
         elif cons.name == "->":
-            return [[~cons.args[0], *c] for c in _to_clauses(cons.args[1])]
+            return [frozenset(~cons.args[0], *c) for c in _to_clauses(cons.args[1])]
         else:
             raise NotImplementedError(f"Unsupported Op {cons.name}")
     elif cons is True:
         return []
     elif cons is False:
-        return [[]]
+        return [frozenset()]
     else:
         raise NotImplementedError(f"Unsupported constraint {cons}")

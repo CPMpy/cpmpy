@@ -135,12 +135,6 @@ def get_gcnf_cases():
     hard = [] 
     yield soft, hard
 
-    # import pickle
-    # with open("/home/hbierlee/utm/Recipe.xml.lzma_1.25.pkl", "rb") as f:
-    #     m = pickle.load(f)
-    # print(m)
-    # yield m.constraints, []
-
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
 class TestCnf:
     def idfn(val):
@@ -162,7 +156,7 @@ class TestCnf:
         assump_model, _, _ = make_assump_model(soft, hard, name="a")
 
         ivarmap = dict()
-        normalize = False
+        disjoint = False
         print("hard = ", hard)
         print("soft = ", soft)
         gcnf_model, soft_, hard_, assumptions = to_gcnf(
@@ -170,7 +164,7 @@ class TestCnf:
             hard,
             name="a",
             ivarmap=ivarmap,
-            normalize=normalize,
+            disjoint=disjoint,
             encoding=ENCODING,
         )
         print("m", gcnf_model)
