@@ -175,34 +175,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 lhs = Operator("wsum", [[-1], [lhs.args[0]]])
                 cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
 
-            elif lhs.name == "mul":
-                # special case for const * iv <comp> rhs
-                if lhs.is_lhs_num:
-                    lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
-                    newlist += linearize_constraint([eval_comparison(cpm_expr.name, lhs, rhs)], supported=supported, reified=reified, csemap=csemap)
-                    continue
-                
-                if "mul" in supported:
-                    newlist.append(cpm_expr)
-                    continue
-
-                # not supported, we have a special decomposition for bv*iv:
-                bv_idx = None
-                if isinstance(lhs.args[0], _BoolVarImpl):
-                    bv_idx = 0
-                elif isinstance(lhs.args[1], _BoolVarImpl):
-                    bv_idx = 1
-
-                if bv_idx is not None:
-                    # bv * iv <comp> rhs, rewrite to (bv -> iv <comp> rhs) & (~bv -> 0 <comp> rhs)
-                    bv, iv = lhs.args[bv_idx], lhs.args[1-bv_idx]
-                    bv_true = bv.implies(eval_comparison(cpm_expr.name, iv, rhs))
-                    bv_false = (~bv).implies(eval_comparison(cpm_expr.name, 0, rhs))
-                    newlist += linearize_constraint(simplify_boolean([bv_true, bv_false]), supported=supported, reified=reified, csemap=csemap)
-                    continue
-                else:
-                    raise NotImplementedError(f"Linearization of integer multiplication {cpm_expr} is not supported")
-
             # linearize unsupported operators
             elif isinstance(lhs, Operator) and lhs.name not in supported:
                 raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
@@ -249,6 +221,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 # Special case: BV != BV
                 if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
                     newlist.append(lhs + rhs == 1)
+                    continue
 
                 if reified or (isinstance(lhs, (Operator, GlobalConstraint)) and lhs.name not in {"sum","wsum"}):
                     # lhs is sum/wsum and rhs is constant OR
@@ -308,9 +281,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
-        elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
-            raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
-                             f"`cpmpy.transformations.decompose_global.decompose_global() first")
+        elif isinstance(cpm_expr, GlobalConstraint):
+            if cpm_expr.name in supported:
+                newlist.append(cpm_expr)
+            else:
+                raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
+                                f"`cpmpy.transformations.decompose_global.decompose_global() first")
 
     return newlist
 

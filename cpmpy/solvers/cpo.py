@@ -598,11 +598,11 @@ class CPM_cpo(SolverInterface):
                 return dom.max(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "abs":
                 return dom.abs(self._cpo_expr(cpm_con.args)[0])
+            elif cpm_con.name == "nvalue":
+                return dom.count_different(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "mul":
                 x, y = self._cpo_expr(cpm_con.args)
                 return x * y
-            elif cpm_con.name == "nvalue":
-                return dom.count_different(self._cpo_expr(cpm_con.args))
             elif cpm_con.name == "div":
                 x,y = self._cpo_expr(cpm_con.args)
                 return x // y

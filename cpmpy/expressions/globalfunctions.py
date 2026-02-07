@@ -368,19 +368,57 @@ class Multiplication(GlobalFunction):
 
         - If is_lhs_num (const*expr): returns the wsum equivalent and no extra constraints.
         - If both args are Boolean (0/1): bv*bv equals bv&bv (logical AND), so returns that and no extra constraints.
-        - Otherwise (e.g. int*int): raises NotImplementedError until a full linear decomposition for integer*integer is implemented.
+        - If one bool and one int: introduces aux z = bv*iv with (bv -> z==iv) & (~bv -> z==0), returns (z, constraints).
+        - If both int: take the factor with smallest domain, encode it with one bool per value, then
+          decompose into b_i*other_int constraints and sum(i*z_i)
         """
         a, b = self.args[0], self.args[1]
         if self.is_lhs_num:
             # const*expr -> wsum([const], [expr])
             return Operator("wsum", ([a], [b])), []
-        if is_boolexpr(a) and is_boolexpr(b):
+        a_bool, b_bool = is_boolexpr(a), is_boolexpr(b)
+        if a_bool and b_bool:
             # bool*bool with 0/1 semantics is logical AND
             return Operator("and", [a, b]), []
-        raise NotImplementedError(
-            "Multiplication.decompose() is not implemented yet; "
-            "integer*integer linear decomposition is not available."
-        )
+
+        if a_bool or b_bool:
+            # bool * int: z = bv*iv via (bv -> z==iv) & (~bv -> z==0)
+            bv, iv = (a, b) if a_bool else (b, a)
+            lb_y, ub_y = get_bounds(iv)
+            lb_z = min(0, lb_y)  # make sure it can take 0
+            ub_z = max(0, ub_y)  # make sure it can take 0
+            z = intvar(lb_z, ub_z)
+            return z, [bv.implies(z == iv), (~bv).implies(z == 0)]
+
+        # int*int linear decomposition:
+        # a*b == sum(i*bv_i)*b with encoding a == sum(i*bv_i) with exactly one bv_i
+        #     == sum(i*(bv_i*b)) 
+        #     == sum(i*z_i) and all_i( (bv_i)->(z_i == b) & (~bv_i)->(z_i == 0) )
+
+        # let a be the one with the smallest domain, leading to the fewest auxiliariy variables
+        lb_a, ub_a = get_bounds(a)
+        lb_b, ub_b = get_bounds(b)
+        if ub_b - lb_b + 1 < ub_a - lb_a + 1:
+            a, b = b, a
+            lb_a, lb_b = lb_b, lb_a
+            ub_a, ub_b = ub_b, ub_a
+
+        # encoding a == sum(i*bv_i) with exactly one bv_i
+        domain = list(range(lb_a, ub_a + 1))
+        bvs = cp.boolvar(shape=(len(domain),))
+        encoding = [cp.sum(bvs) == 1, a == Operator("wsum", (domain, bvs))]
+
+        # encoding z_i == bv_i*b via (bv_i)->(z_i == b) & (~bv_i)->(z_i == 0)
+        z_lb = min(0, lb_b) # make sure it can take 0
+        z_ub = max(0, ub_b) # make sure it can take 0
+        zs = cp.intvar(z_lb, z_ub, shape=(len(domain),))
+        for i, (bv_i, z_i) in enumerate(zip(bvs, zs)):
+            encoding.append(bv_i.implies(z_i == b))
+            encoding.append((~bv_i).implies(z_i == 0))
+
+        # result = sum(i*z_i)
+        result = Operator("wsum", (domain, zs))
+        return result, encoding
 
 
 class Division(GlobalFunction):
