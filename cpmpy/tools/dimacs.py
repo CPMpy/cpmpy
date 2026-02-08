@@ -1,16 +1,16 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 ##
 ## dimacs.py
 ##
 """
-    This file implements helper functions for exporting CPMpy models from and to DIMACS format.
-    DIMACS is a textual format to represent CNF problems.
-    The header of the file should be formatted as ``p cnf <n_vars> <n_constraints>``.
-    If the number of variables and constraints are not given, it is inferred by the parser.
+This file implements helper functions for exporting CPMpy models from and to DIMACS format.
+DIMACS is a textual format to represent CNF problems.
+The header of the file should be formatted as ``p cnf <n_vars> <n_constraints>``.
+If the number of variables and constraints are not given, it is inferred by the parser.
 
-    Each remaining line of the file is formatted as a list of integers.
-    An integer represents a Boolean variable and a negative Boolean variable is represented using a `'-'` sign.
+Each remaining line of the file is formatted as a list of integers.
+An integer represents a Boolean variable and a negative Boolean variable is represented using a `'-'` sign.
 """
 
 import itertools
@@ -24,30 +24,47 @@ from cpmpy.transformations.to_cnf import to_cnf, to_gcnf, _to_clauses
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.tools.explain.marco import make_assump_model
 
+
 def write_gdimacs(soft, hard=None, name=None, fname=None, encoding="auto", disjoint=False, canonical=False):
     """
-        Writes CPMpy model to GDIMACS format.
-        Uses the "to_gcnf" transformation from CPMpy.
-        For GDIMACS, it follows https://satisfiability.org/competition/2011/rules.pdf, however, there is no guarantee that the groups are disjoint, which is a requirement of the format. MUSSER2 is known to give incorrect results if groups are not disjoint.
+    Writes CPMpy constraints to GDIMACS (Grouped DIMACS) format for MUS extraction.
 
-        :param soft: list of soft constraints
-        :param hard: list of hard constraints
-        :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
+    Uses the "to_gcnf" transformation to convert soft and hard constraints into grouped CNF.
+    The GDIMACS format follows the specification at:
+    https://satisfiability.org/competition/2011/rules.pdf
+
+    Each soft constraint is assigned to a separate group. Hard constraints are placed in group {0}.
+    This format is used by MUS (Minimal Unsatisfiable Subset) solvers to find minimal explanations
+    for infeasibility in SAT instances.
+
+    :param soft: list of CPMpy constraints that can be violated (soft constraints)
+    :param hard: list of CPMpy constraints that must be satisfied (hard constraints), optional
+    :param name: prefix for assumption variable names, optional
+    :param fname: file path to write the GDIMACS output, if None returns string
+    :param encoding: encoding for integer variables: "auto", "direct", "order", or "binary"
+    :param disjoint: if True, ensures groups are disjoint by introducing auxiliary variables.
+                    Required by some MUS solvers (e.g., MUSSER2) for correctness.
+    :param canonical: if True, outputs variables in sorted order and literals within clauses
+                     sorted by variable (positive before negative for same variable)
+
+    :return: GDIMACS formatted string
     """
     _, soft, hard, assumptions = to_gcnf(soft, hard, name=name, encoding=encoding, disjoint=disjoint)
     return write_dimacs_(hard, groups=zip(assumptions, soft), fname=fname, canonical=canonical)
 
+
 def write_dimacs(model, fname=None, encoding="auto", canonical=False):
     """
-        Writes CPMpy model to DIMACS format.
-        :param model: a CPMpy model
-        :param fname: optional, file name to write the DIMACS output to
-        :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
+    Writes CPMpy model to DIMACS format.
+    :param model: a CPMpy model
+    :param fname: optional, file name to write the DIMACS output to
+    :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     """
 
     constraints = toplevel_list(model.constraints)
     constraints = to_cnf(constraints, encoding=encoding)
     return write_dimacs_(constraints, fname=fname, canonical=canonical)
+
 
 def write_dimacs_(constraints, groups=None, fname=None, canonical=False):
 
@@ -61,15 +78,14 @@ def write_dimacs_(constraints, groups=None, fname=None, canonical=False):
     if canonical:
         vars.sort(key=lambda x: x.name)
 
-    mapping = { v : i for i, v in enumerate(vars, start=1) }
+    mapping = {v: i for i, v in enumerate(vars, start=1)}
 
     out = ""
     n_clauses = 0
     for group, cons in itertools.chain(
-            zip(itertools.repeat(0), constraints),
-            ((i, constraint) for i, (_, constraint) in enumerate(groups, start=1))
-        ):
-
+        zip(itertools.repeat(0), constraints),
+        ((i, constraint) for i, (_, constraint) in enumerate(groups, start=1)),
+    ):
         clauses = _to_clauses(cons)
         n_clauses += len(clauses)
         for clause in clauses:
@@ -87,14 +103,16 @@ def write_dimacs_(constraints, groups=None, fname=None, canonical=False):
                 elif isinstance(v, _BoolVarImpl):
                     lits.append(mapping[v])
                 else:
-                    raise ValueError(f"Expected Boolean variable in clause, but got {v} which is of type {type(v)}")
+                    raise ValueError(
+                        f"Expected Boolean variable in clause, but got {v} which is of type {type(v)}"
+                    )
 
             if lits is None:
                 continue
 
             if canonical:
-                lits.sort(key=abs)
-            
+                lits.sort(key=lambda x: (abs(x), x))
+
             lits.append(0)
 
             if is_gcnf:
@@ -102,7 +120,9 @@ def write_dimacs_(constraints, groups=None, fname=None, canonical=False):
 
             out += " ".join(str(lit) for lit in lits) + "\n"
 
-    out = f"p {'g' if is_gcnf else ''}cnf {len(vars)} {n_clauses}{f' {len(groups)}' if is_gcnf else ''}\n" + out
+    out = (
+        f"p {'g' if is_gcnf else ''}cnf {len(vars)} {n_clauses}{f' {len(groups)}' if is_gcnf else ''}\n" + out
+    )
 
     if fname is not None:
         with open(fname, "w") as f:
@@ -113,29 +133,44 @@ def write_dimacs_(constraints, groups=None, fname=None, canonical=False):
 
 def read_dimacs(fname):
     """
-        Read a CPMpy model from a DIMACS formatted file strictly following the specification:
-        https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
-        
-        .. note::
-            The p-line has to denote the correct number of variables and clauses
-        
-        :param fname: the name of the DIMACS file
-        :param sep: optional, separator used in the DIMACS file, will try to infer if None
+    Read a CPMpy model from a DIMACS formatted file strictly following the specification:
+    https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
+
+    .. note::
+        The p-line has to denote the correct number of variables and clauses
+
+    :param fname: the name of the DIMACS file
+    :param sep: optional, separator used in the DIMACS file, will try to infer if None
     """
 
     return DimacsReader().read(fname)
 
+
 def read_gdimacs(fname):
+    """
+    Read a CPMpy model from a GDIMACS (Grouped DIMACS) formatted file.
+
+    GDIMACS extends DIMACS CNF format by grouping clauses, typically used for MUS extraction.
+    Format specification: https://satisfiability.org/competition/2011/rules.pdf
+
+    :param fname: path to the GDIMACS file
+
+    :return: tuple (model, soft, hard, assumptions) where:
+             - model: CPMpy Model with all constraints
+             - soft: list of soft constraint groups
+             - hard: list of hard constraints (from group 0)
+             - assumptions: assumption variables for each soft constraint group
+    """
     return GDimacsReader().read(fname)
 
-class DimacsReader:
 
+class DimacsReader:
     def __init__(self):
         self.typ = None
         self.clause = None
         self.clauses = []
         self.n_vars = None
-        self.n_cls = None
+        self.n_clauses = None
         self.bvs = None
 
     def read(self, fname):
@@ -145,7 +180,6 @@ class DimacsReader:
         assert len(self.clauses) == self.n_clauses
         assert self.clause is None, "Untermined final clause"
         return self.to_model()
-
 
     def read_tokens(self, tokens):
         match tokens:
@@ -171,33 +205,23 @@ class DimacsReader:
                 self.clause = None
             else:
                 var = abs(lit) - 1
-                assert var < self.n_vars, "Expected at most {self.n_vars} variables (from p-line) but found literal {i} in clause {line}"
+                assert var < self.n_vars, (
+                    f"Expected at most {self.n_vars} variables (from p-line) but found literal {lit} in clause {' '.join(tokens)}"
+                )
                 bv = self.bvs[var]
                 self.clause.append(bv if lit > 0 else ~bv)
 
+
 class GDimacsReader(DimacsReader):
-
-    def read(self, fname):
-        # TODO how to dedup?
-        with open(fname, "r") as f:
-            for line in f.readlines():
-                self.read_tokens(line.strip().split(" "))
-        assert len(self.clauses) == self.n_clauses
-        assert self.clause is None, "Untermined final clause"
-        return self.to_model()
-
-
-
     def __init__(self):
         super().__init__()
-        self.groups = None
+        self.groups = []
         self.n_groups = None
 
     def read_tokens(self, tokens):
         match tokens:
             case ["p", "gcnf", *params]:
                 self.n_vars, self.n_clauses, self.n_groups = [int(p) for p in params]
-                self.groups = self.n_clauses * []
                 self.bvs = cp.boolvar(shape=(self.n_vars,))
                 self.assumptions = cp.boolvar(shape=(self.n_groups,))
             case [group, *clause] if group.startswith("{"):
@@ -209,11 +233,11 @@ class GDimacsReader(DimacsReader):
     def to_model(self):
         soft = []
         hard = []
-        for k, clauses in itertools.groupby(enumerate(self.clauses), key=lambda clause: self.groups[clause[0]]):
+        for k, clauses in itertools.groupby(
+            enumerate(self.clauses), key=lambda clause: self.groups[clause[0]]
+        ):
             cnf = cp.all(cp.any(clause) for i, clause in clauses)
             (hard if k == 0 else soft).append(cnf)
 
         model, soft, assumptions = make_assump_model(soft, hard=hard)
-        return model, soft, hard, assumptions 
-
-
+        return model, soft, hard, assumptions

@@ -2,15 +2,11 @@
 Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of literals, i.e. Boolean variables or their negation, e.g. from `x xor y` to `(x or ~y) and (~x or y)`) using a back-end encoding library and its transformation pipeline.
 """
 
-import time
-
-from tqdm import tqdm
 import cpmpy as cp
 from ..expressions.variables import _BoolVarImpl
 from ..expressions.core import Operator
 from ..solvers.pindakaas import CPM_pindakaas
 from cpmpy.tools.explain.marco import make_assump_model
-from cpmpy.expressions.utils import all_pairs
 
 
 def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
@@ -126,7 +122,7 @@ def _to_clauses(cons):
         elif cons.name == "and":
             return [c_ for c in cons.args for c_ in _to_clauses(c)]
         elif cons.name == "->":
-            return [frozenset(~cons.args[0], *c) for c in _to_clauses(cons.args[1])]
+            return [frozenset({~cons.args[0]} | c) for c in _to_clauses(cons.args[1])]
         else:
             raise NotImplementedError(f"Unsupported Op {cons.name}")
     elif cons is True:

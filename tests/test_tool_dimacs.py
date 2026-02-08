@@ -9,26 +9,18 @@ from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.pindakaas import CPM_pindakaas
 from test_tocnf import get_cnf_cases, get_gcnf_cases
 
-def compare_dimacs(a, b):
-    def norm(lines):
-        frozenset(frozenset(clause.split(" ")) for clause in lines.split("\n")[:1])
-    # skip the p-line
-    return norm(a) == norm(b)
-
-
 
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
 class TestCNFTool:
-
     def setup_method(self) -> None:
-        self.tmpfile = tempfile.NamedTemporaryFile(mode='w', delete=False)
+        self.tmpfile = tempfile.NamedTemporaryFile(mode="w", delete=False)
 
     def teardown_method(self) -> None:
         self.tmpfile.close()
         os.remove(self.tmpfile.name)
 
-    def dimacs_to_model(self, cnf_str, typ="cnf"):
-        # return read_dimacs(io.StringIO(cnf_str))
+    def dimacs_to_model(self, cnf_str):
+        typ = "gcnf" if "gcnf" in cnf_str else "cnf"
         with open(self.tmpfile.name, "w") as f:
             f.write(cnf_str)
         return read_dimacs(self.tmpfile.name) if typ == "cnf" else read_gdimacs(self.tmpfile.name)
@@ -36,9 +28,9 @@ class TestCNFTool:
     def test_read_cnf(self):
         model = self.dimacs_to_model("p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
         bvs = sorted(get_variables_model(model), key=str)
-        assert str(model) == str(cp.Model(
-            cp.any([~bvs[1], ~bvs[2]]), cp.any([bvs[2], bvs[1],bvs[0]]), ~bvs[0]) \
-                         )
+        assert str(model) == str(
+            cp.Model(cp.any([~bvs[1], ~bvs[2]]), cp.any([bvs[2], bvs[1], bvs[0]]), ~bvs[0])
+        )
 
     def test_empty_formula(self):
         model = self.dimacs_to_model("p cnf 0 0")
@@ -51,26 +43,27 @@ class TestCNFTool:
         assert model.status().exitstatus == ExitStatus.UNSATISFIABLE
 
     def test_with_comments(self):
-        model = self.dimacs_to_model("c this file starts with some comments\nc\np cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
+        model = self.dimacs_to_model(
+            "c this file starts with some comments\nc\np cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n"
+        )
         vars = sorted(get_variables_model(model), key=str)
 
         sols = set()
-        addsol = lambda : sols.add(tuple([v.value() for v in vars]))
+        addsol = lambda: sols.add(tuple([v.value() for v in vars]))
 
         assert model.solveAll(display=addsol) == 2
         assert sols == {(False, False, True), (False, True, False)}
 
     def test_write_cnf(self):
 
-        a,b,c = [cp.boolvar(name=n) for n in "abc"]
+        a, b, c = [cp.boolvar(name=n) for n in "abc"]
 
         m = cp.Model()
-        m += cp.any([a,b,c])
+        m += cp.any([a, b, c])
         m += b.implies(~c)
         m += a <= 0
 
-        compare_dimacs("p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n", write_dimacs(model=m))
-
+        assert write_dimacs(model=m, canonical=True) == "p cnf 3 3\n1 2 3 0\n-2 -3 0\n-1 0\n"
 
     def test_missing_p_line(self):
         with pytest.raises(AssertionError):
@@ -100,11 +93,10 @@ class TestCNFTool:
         with pytest.raises(AssertionError):
             self.dimacs_to_model("p cnf 2 2\n1 2 0\n-1 -2 0\n2")
 
-
     def test_too_few_variables(self):
-        """"Fewer variables is still technically correct DIMACS"""
+        """ "Fewer variables is still technically correct DIMACS"""
         self.dimacs_to_model("p cnf 2 1\n1 0")
-    
+
     def test_gdimacs_roundtrip(self):
         # example from https://satisfiability.org/competition/2011/rules.pdf, but fixed p header vars to 3
         example = """p gcnf 3 7 4
@@ -116,14 +108,15 @@ class TestCNFTool:
 {3} -2 -3 0
 {4} -2 3 0
 """
-        m, soft, hard, assumptions = self.dimacs_to_model(example, typ="gcnf")
+        m, soft, hard, assumptions = self.dimacs_to_model(example)
         out = write_gdimacs(soft, hard=hard, disjoint=False, canonical=True)
         assert example == out
 
     def test_gcnf(self):
-        x = cp.boolvar(shape=3, name="x")
+        x = cp.boolvar(shape=3)
+
         def x_(i):
-            return x[i-1]
+            return x[i - 1]
 
         # example from https://satisfiability.org/competition/2011/rules.pdf
         # c
@@ -145,41 +138,38 @@ class TestCNFTool:
             x_(2).implies(x_(3)),
         ]
 
-        compare_dimacs(
-            write_gdimacs(soft, hard=hard, name="a", encoding="direct"),
-            """p gcnf 5 12 4
+        # compare with (canonicalized) example
+        assert (
+            write_gdimacs(soft, hard=hard, encoding="direct", canonical=True)
+            == """p gcnf 5 12 4
 {0} 1 2 3 0
 {0} -4 5 0
 {0} -2 -4 0
-{0} 4 -5 2 0
-{0} -5 -3 2 0
+{0} 2 4 -5 0
+{0} 2 -3 -5 0
 {0} 3 5 0
 {0} -2 5 0
 {1} -1 2 0
 {1} -2 3 0
 {2} 3 0
-{3} 4 -3 0
+{3} -3 4 0
 {4} -2 3 0
-""")
+"""
+        )
 
         # note: 2nd clause of group 4 is merged with 2nd clause of group 1
-        compare_dimacs(
-            write_gdimacs(soft, hard=hard, name="a", encoding="direct", disjoint=True),
-            """p gcnf 6 13 4
+        assert """p gcnf 6 13 4
 {0} 1 2 3 0
 {0} -4 5 0
 {0} -2 -4 0
-{0} 4 -5 2 0
-{0} -5 -3 2 0
+{0} 2 4 -5 0
+{0} 2 -3 -5 0
 {0} 3 5 0
 {0} -2 5 0
-{0} -6 -2 3 0
+{0} -2 3 -6 0
 {1} -1 2 0
 {1} -2 3 0
 {2} 3 0
-{3} 4 -3 0
+{3} -3 4 0
 {4} 6 0
-""")
-
-
-
+""" == write_gdimacs(soft, hard=hard, name="a", encoding="direct", disjoint=True, canonical=True)
