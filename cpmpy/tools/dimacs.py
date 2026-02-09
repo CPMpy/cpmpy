@@ -17,15 +17,14 @@ import itertools
 
 import cpmpy as cp
 
-from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView, Operator
-
+from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView
 from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.to_cnf import to_cnf, to_gcnf, _to_clauses
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.tools.explain.marco import make_assump_model
 
 
-def write_gdimacs(soft, hard=None, name=None, fname=None, encoding="auto", disjoint=False, canonical=False):
+def write_gdimacs(soft, hard=None, name=None, fname=None, encoding="auto", disjoint=True, canonical=False):
     """
     Writes CPMpy constraints to GDIMACS (Grouped DIMACS) format for MUS extraction.
 
@@ -40,10 +39,11 @@ def write_gdimacs(soft, hard=None, name=None, fname=None, encoding="auto", disjo
     :param soft: list of CPMpy constraints that can be violated (soft constraints)
     :param hard: list of CPMpy constraints that must be satisfied (hard constraints), optional
     :param name: prefix for assumption variable names, optional
-    :param fname: file path to write the GDIMACS output, if None returns string
-    :param encoding: encoding for integer variables: "auto", "direct", "order", or "binary"
+    :param fname: file path to write the GDIMACS output
+    :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     :param disjoint: if True, ensures groups are disjoint by introducing auxiliary variables.
                     Required by some MUS solvers (e.g., MUSSER2) for correctness.
+                    We have seen an overhead of ~25% when enabled.
     :param canonical: if True, outputs variables in sorted order and literals within clauses
                      sorted by variable (positive before negative for same variable)
 
@@ -67,6 +67,7 @@ def write_dimacs(model, fname=None, encoding="auto", canonical=False):
 
 
 def write_dimacs_(constraints, groups=None, fname=None, canonical=False):
+    """Helper function: constraints are assumped to be CNF (i.e. a list of conjunctions of hard clauses), groups are a list of tuples of (assumption variable, soft clauses)"""
 
     # Check explicitly for None, since groups=[] is a GCNF with only hard constraints (the {0} group), while groups=None should be a CNF
     is_gcnf = groups is not None
@@ -131,7 +132,7 @@ def write_dimacs_(constraints, groups=None, fname=None, canonical=False):
     return out
 
 
-def read_dimacs(fname):
+def read_dimacs(fname, name=None):
     """
     Read a CPMpy model from a DIMACS formatted file strictly following the specification:
     https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
@@ -143,7 +144,7 @@ def read_dimacs(fname):
     :param sep: optional, separator used in the DIMACS file, will try to infer if None
     """
 
-    return DimacsReader().read(fname)
+    return DimacsReader(name=name).read(fname)
 
 
 def read_gdimacs(fname):
@@ -165,70 +166,80 @@ def read_gdimacs(fname):
 
 
 class DimacsReader:
-    def __init__(self):
-        self.typ = None
-        self.clause = None
-        self.clauses = []
-        self.n_vars = None
-        self.n_clauses = None
+    def __init__(self, name=None):
+        self.clauses = None
+        self.clause_idx = 0
         self.bvs = None
+        self.name = name
+
+    def n_vars(self):
+        return len(self.bvs)
+
+    def n_clauses(self):
+        return len(self.clauses)
 
     def read(self, fname):
         with open(fname, "r") as f:
             for line in f.readlines():
                 self.read_tokens(line.strip().split(" "))
-        assert len(self.clauses) == self.n_clauses
-        assert self.clause is None, "Untermined final clause"
+        assert self.clause_idx == self.n_clauses(), "Number of clauses did not match the p-line"
         return self.to_model()
+
+    def initialize(self, n_vars, n_clauses):
+        # note: do not use [[]] * n_clauses, it will have n_clauses references to the same list
+        self.clauses = [[] for _ in range(n_clauses)]
+        self.bvs = cp.boolvar(shape=(n_vars,), name=None if self.name is None else self.name)
 
     def read_tokens(self, tokens):
         match tokens:
             case [] | ["c", *_]:
                 pass  # skip empty/comment lines
             case ["p", "cnf", *params]:
-                self.n_vars, self.n_clauses = [int(p) for p in params]
-                self.bvs = cp.boolvar(shape=(self.n_vars,))
+                n_vars, n_clauses = [int(p) for p in params]
+                self.initialize(n_vars, n_clauses)
             case clause:
-                assert self.n_vars is not None
+                assert self.clauses is not None
                 self.read_clause(clause)
 
     def to_model(self):
         return cp.Model([cp.any(clause) for clause in self.clauses])
 
     def read_clause(self, tokens):
-        if self.clause is None:
-            self.clause = []  # distinguish between empty clause and new clause not yet started
         for lit in tokens:
             lit = int(lit.strip())
             if lit == 0:
-                self.clauses.append(self.clause)
-                self.clause = None
+                self.clause_idx += 1
             else:
+                assert self.clause_idx < self.n_clauses(), "Too many clauses"
+
                 var = abs(lit) - 1
-                assert var < self.n_vars, (
-                    f"Expected at most {self.n_vars} variables (from p-line) but found literal {lit} in clause {' '.join(tokens)}"
+                assert var < self.n_vars(), (
+                    f"Expected at most {self.n_vars()} variables (from p-line) but found literal {lit} in clause {' '.join(tokens)}"
                 )
                 bv = self.bvs[var]
-                self.clause.append(bv if lit > 0 else ~bv)
+                self.clauses[self.clause_idx].append(bv if lit > 0 else ~bv)
 
 
 class GDimacsReader(DimacsReader):
     def __init__(self):
         super().__init__()
-        self.groups = []
-        self.n_groups = None
+        self.groups = None
+
+    def n_groups(self):
+        return len(self.groups)
 
     def read_tokens(self, tokens):
         match tokens:
             case ["p", "gcnf", *params]:
-                self.n_vars, self.n_clauses, self.n_groups = [int(p) for p in params]
-                self.bvs = cp.boolvar(shape=(self.n_vars,))
-                self.assumptions = cp.boolvar(shape=(self.n_groups,))
+                n_vars, n_clauses, n_groups = [int(p) for p in params]
+                self.initialize(n_vars, n_clauses)
+                self.groups = [None] * self.n_clauses()
+                self.assumptions = cp.boolvar(shape=(self.n_groups(),))
             case [group, *clause] if group.startswith("{"):
-                self.groups.append(int(tokens[0][1:-1]))  # e.g. {1} 1 -2 3 0
+                group_num = int(tokens[0][1:-1])  # e.g. {1} 1 -2 3 0
+                assert group_num >= 0, f"Group number must be non-negative, but got {group_num}"
+                self.groups[self.clause_idx] = group_num
                 self.read_clause(clause)
-            case tokens:
-                super().read_tokens(tokens)
 
     def to_model(self):
         soft = []

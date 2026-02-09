@@ -140,7 +140,7 @@ class TestCNFTool:
 
         # compare with (canonicalized) example
         assert (
-            write_gdimacs(soft, hard=hard, encoding="direct", canonical=True)
+            write_gdimacs(soft, hard=hard, encoding="direct", canonical=True, disjoint=False)
             == """p gcnf 5 12 4
 {0} 1 2 3 0
 {0} -4 5 0
@@ -173,3 +173,133 @@ class TestCNFTool:
 {3} -3 4 0
 {4} 6 0
 """ == write_gdimacs(soft, hard=hard, name="a", encoding="direct", disjoint=True, canonical=True)
+
+    @pytest.mark.parametrize(
+        "gcnf_str,expected_soft,expected_hard,expected_assumptions,should_solve,extra_check",
+        [
+            # Basic GCNF with hard and soft constraints
+            (
+                """p gcnf 3 5 2
+{0} 1 2 0
+{0} -2 3 0
+{1} 1 -3 0
+{2} 2 3 0
+{2} -1 0
+""",
+                2,
+                1,
+                2,
+                True,
+                None,
+            ),
+            # Non-consecutive group numbers (missing group 2)
+            (
+                """p gcnf 3 5 3
+{0} 1 2 0
+{1} 1 -2 0
+{1} -3 0
+{3} 2 3 0
+{3} -1 -2 0
+""",
+                2,
+                1,
+                2,
+                True,
+                None,
+            ),
+            # Only hard constraints (group 0)
+            (
+                """p gcnf 2 3 0
+{0} 1 2 0
+{0} -1 0
+{0} -2 0
+""",
+                0,
+                1,
+                0,
+                False,
+                None,
+            ),
+            # Single soft constraint group
+            (
+                """p gcnf 2 2 1
+{0} 1 0
+{1} -1 -2 0
+""",
+                1,
+                1,
+                1,
+                True,
+                None,
+            ),
+            # Empty clause in soft group - model solvable but assumption False
+            (
+                """p gcnf 1 2 1
+{0} 1 0
+{1} 0
+""",
+                1,
+                1,
+                1,
+                True,
+                lambda model, soft, hard, assumptions: assumptions[0].value() == False,
+            ),
+            # With comments
+            (
+                """c This is a comment
+c Another comment line
+p gcnf 2 3 1
+c Comment in the middle
+{0} 1 2 0
+{1} -1 0
+{1} -2 0
+""",
+                1,
+                1,
+                1,
+                True,
+                None,
+            ),
+        ],
+        ids=[
+            "basic",
+            "missing_group",
+            "only_hard",
+            "single_group",
+            "empty_clause",
+            "with_comments",
+        ],
+    )
+    def test_read_gcnf_parametrized(
+        self, gcnf_str, expected_soft, expected_hard, expected_assumptions, should_solve, extra_check
+    ):
+        """Parametrized test for reading various GCNF files"""
+        model, soft, hard, assumptions = self.dimacs_to_model(gcnf_str)
+
+        assert len(soft) == expected_soft
+        assert len(hard) == expected_hard
+        assert len(assumptions) == expected_assumptions
+
+        if should_solve:
+            assert model.solve()
+        else:
+            assert not model.solve()
+
+        if extra_check is not None:
+            assert extra_check(model, soft, hard, assumptions)
+
+        print(model)
+        back = write_gdimacs(soft, hard=hard, canonical=True, disjoint=False, name="a")
+        print(back)
+        gcnf_str = "\n".join(l for l in gcnf_str.split("\n") if not l.startswith("c"))
+        assert back == gcnf_str
+
+    def test_read_gcnf_negative_group_number(self):
+        """Test that negative group numbers raise an error"""
+        gcnf_str = """p gcnf 2 3 2
+{0} 1 2 0
+{1} 1 -2 0
+{-1} -1 -2 0
+"""
+        with pytest.raises(AssertionError, match="Group number must be non-negative"):
+            self.dimacs_to_model(gcnf_str)

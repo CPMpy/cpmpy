@@ -9,7 +9,7 @@ from ..solvers.pindakaas import CPM_pindakaas
 from cpmpy.tools.explain.marco import make_assump_model
 
 
-def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
+def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto", name=None):
     """
     Converts all constraints into **Conjunctive Normal Form**
 
@@ -52,7 +52,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
         for lit in clause:
             x = str(lit.var())
             if x not in cpmpy_vars:
-                cpmpy_vars[x] = cp.boolvar()
+                cpmpy_vars[x] = cp.boolvar(name=None if name is None else f"{name}[{x}]")
             elif cpmpy_vars[x] in free_vars:  # cpmpy_vars[x] is only in free_vars if it existed before
                 free_vars.remove(cpmpy_vars[x])
             yield ~cpmpy_vars[x] if lit.is_negated() else cpmpy_vars[x]
@@ -64,7 +64,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     return clauses
 
 
-def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="auto", disjoint=False):
+def to_gcnf(soft, hard=None, name=None, csemap=None, ivarmap=None, encoding="auto", disjoint=True):
     """
     Similar to `make_assump_model`, but the returned model is in (grouped) CNF. Separately the soft clauses, hard clauses, and assumption variables. Follows https://satisfiability.org/competition/2011/rules.pdf, however, there is no guarantee that the groups are disjoint.
     """
