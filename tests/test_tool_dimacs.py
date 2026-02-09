@@ -18,11 +18,15 @@ class TestCNFTool:
         self.tmpfile.close()
         os.remove(self.tmpfile.name)
 
-    def dimacs_to_model(self, cnf_str):
+    def dimacs_to_model(self, cnf_str, **kwargs):
         typ = "gcnf" if "gcnf" in cnf_str else "cnf"
         with open(self.tmpfile.name, "w") as f:
             f.write(cnf_str)
-        return read_dimacs(self.tmpfile.name) if typ == "cnf" else read_gdimacs(self.tmpfile.name)
+        return (
+            read_dimacs(self.tmpfile.name, **kwargs)
+            if typ == "cnf"
+            else read_gdimacs(self.tmpfile.name, **kwargs)
+        )
 
     def test_read_cnf(self):
         model = self.dimacs_to_model("p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
@@ -171,7 +175,7 @@ class TestCNFTool:
 {2} 3 0
 {3} -3 4 0
 {4} 6 0
-""" == write_gdimacs(soft, hard=hard, name="a", encoding="direct", disjoint=True, canonical=True)
+""" == write_gdimacs(soft, hard=hard, encoding="direct", disjoint=True, canonical=True)
 
     @pytest.mark.parametrize(
         "gcnf_str",
@@ -233,13 +237,18 @@ c Comment in the middle
     )
     def test_gdimacs_roundtrip(self, gcnf_str, request):
         """Parametrized test for reading various GCNF files"""
-        model, soft, hard, assumptions = self.dimacs_to_model(gcnf_str)
+        model, soft, hard, assumptions = self.dimacs_to_model(gcnf_str, var_name="x", assumption_name="a")
 
         print(model)
-        back = write_gdimacs(soft, hard=hard, canonical=True, disjoint=False, name="a")
+        back = write_gdimacs(
+            soft,
+            hard=hard,
+            canonical=True,
+            disjoint=False,
+        )
         print(back)
         gcnf_str = "\n".join(l for l in gcnf_str.split("\n") if not l.startswith("c"))
-        if request.node.callspec.id != "missing_group" or True:
+        if request.node.callspec.id != "missing_group":
             assert back == gcnf_str, f"Roundtrip failed from:\n\n{gcnf_str}\nto\n\n{back}"
 
     def test_read_gcnf_negative_group_number(self):

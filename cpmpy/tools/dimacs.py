@@ -24,7 +24,7 @@ from cpmpy.transformations.get_variables import get_variables
 from cpmpy.tools.explain.marco import make_assump_model
 
 
-def write_gdimacs(soft, hard=None, name=None, fname=None, encoding="auto", disjoint=True, canonical=False):
+def write_gdimacs(soft, hard=None, fname=None, encoding="auto", disjoint=True, canonical=False):
     """
     Writes CPMpy constraints to GDIMACS (Grouped DIMACS) format for MUS extraction.
 
@@ -38,7 +38,6 @@ def write_gdimacs(soft, hard=None, name=None, fname=None, encoding="auto", disjo
 
     :param soft: list of CPMpy constraints that can be violated (soft constraints)
     :param hard: list of CPMpy constraints that must be satisfied (hard constraints), optional
-    :param name: prefix for assumption variable names, optional
     :param fname: file path to write the GDIMACS output
     :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     :param disjoint: if True, ensures groups are disjoint by introducing auxiliary variables.
@@ -49,7 +48,7 @@ def write_gdimacs(soft, hard=None, name=None, fname=None, encoding="auto", disjo
 
     :return: GDIMACS formatted string
     """
-    _, soft, hard, assumptions = to_gcnf(soft, hard, name=name, encoding=encoding, disjoint=disjoint)
+    _, soft, hard, assumptions = to_gcnf(soft, hard, encoding=encoding, disjoint=disjoint)
     return write_dimacs_(hard, groups=zip(assumptions, soft), fname=fname, canonical=canonical)
 
 
@@ -58,6 +57,7 @@ def write_dimacs(model, fname=None, encoding="auto", canonical=False):
     Writes CPMpy model to DIMACS format.
     :param model: a CPMpy model
     :param fname: optional, file name to write the DIMACS output to
+    :param name: prefix for variable names, optional
     :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
     """
 
@@ -132,7 +132,7 @@ def write_dimacs_(constraints, groups=None, fname=None, canonical=False):
     return out
 
 
-def read_dimacs(fname, name=None):
+def read_dimacs(fname, var_name=None):
     """
     Read a CPMpy model from a DIMACS formatted file strictly following the specification:
     https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
@@ -141,18 +141,16 @@ def read_dimacs(fname, name=None):
         The p-line has to denote the correct number of variables and clauses
 
     :param fname: the name of the DIMACS file
+    :param name: prefix for variable names, optional
     :param sep: optional, separator used in the DIMACS file, will try to infer if None
     """
 
-    return DimacsReader(name=name).read(fname)
+    return DimacsReader(var_name=var_name).read(fname)
 
 
-def read_gdimacs(fname):
+def read_gdimacs(fname, var_name=None, assumption_name=None):
     """
-    Read a CPMpy model from a GDIMACS (Grouped DIMACS) formatted file.
-
-    GDIMACS extends DIMACS CNF format by grouping clauses, typically used for MUS extraction.
-    Format specification: https://satisfiability.org/competition/2011/rules.pdf
+    Read a CPMpy model from a GDIMACS (Grouped DIMACS) formatted file (strictly following https://satisfiability.org/competition/2011/rules.pdf, except that groups are allowed to have disjoint sets of clauses)
 
     :param fname: path to the GDIMACS file
 
@@ -162,15 +160,15 @@ def read_gdimacs(fname):
              - hard: list of hard constraints (from group 0)
              - assumptions: assumption variables for each soft constraint group
     """
-    return GDimacsReader().read(fname)
+    return GDimacsReader(var_name=var_name, assumption_name=assumption_name).read(fname)
 
 
 class DimacsReader:
-    def __init__(self, name=None):
+    def __init__(self, var_name=None):
         self.clauses = None
         self.clause_idx = 0
         self.bvs = None
-        self.name = name
+        self.var_name = var_name
 
     def n_vars(self):
         return len(self.bvs)
@@ -188,7 +186,7 @@ class DimacsReader:
     def initialize(self, n_vars, n_clauses):
         # note: do not use [[]] * n_clauses, it will have n_clauses references to the same list
         self.clauses = [[] for _ in range(n_clauses)]
-        self.bvs = cp.boolvar(shape=(n_vars,), name=None if self.name is None else self.name)
+        self.bvs = cp.boolvar(shape=(n_vars,), name=self.var_name)
 
     def read_tokens(self, tokens):
         match tokens:
@@ -221,9 +219,10 @@ class DimacsReader:
 
 
 class GDimacsReader(DimacsReader):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, var_name=None, assumption_name=None):
+        super().__init__(var_name=var_name)
         self.groups = None
+        self.assumption_name = assumption_name
 
     def n_groups(self):
         return len(self.groups)
@@ -250,5 +249,5 @@ class GDimacsReader(DimacsReader):
             cnf = cp.all(cp.any(clause) for i, clause in clauses)
             (hard if k == 0 else soft).append(cnf)
 
-        model, soft, assumptions = make_assump_model(soft, hard=hard)
+        model, soft, assumptions = make_assump_model(soft, hard=hard, name=self.assumption_name)
         return model, soft, hard, assumptions
