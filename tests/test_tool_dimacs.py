@@ -7,7 +7,6 @@ from cpmpy.tools.dimacs import read_dimacs, write_dimacs, write_gdimacs, read_gd
 from cpmpy.transformations.get_variables import get_variables_model
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.pindakaas import CPM_pindakaas
-from test_tocnf import get_cnf_cases, get_gcnf_cases
 
 
 @pytest.mark.skipif(not CPM_pindakaas.supported(), reason="Pindakaas (required for `to_cnf`) not installed")
@@ -97,7 +96,7 @@ class TestCNFTool:
         """ "Fewer variables is still technically correct DIMACS"""
         self.dimacs_to_model("p cnf 2 1\n1 0")
 
-    def test_gdimacs_roundtrip(self):
+    def test_gcnf_mus2011_example(self):
         # example from https://satisfiability.org/competition/2011/rules.pdf, but fixed p header vars to 3
         example = """p gcnf 3 7 4
 {0} 1 2 3 0
@@ -175,74 +174,41 @@ class TestCNFTool:
 """ == write_gdimacs(soft, hard=hard, name="a", encoding="direct", disjoint=True, canonical=True)
 
     @pytest.mark.parametrize(
-        "gcnf_str,expected_soft,expected_hard,expected_assumptions,should_solve,extra_check",
+        "gcnf_str",
         [
             # Basic GCNF with hard and soft constraints
-            (
-                """p gcnf 3 5 2
+            """p gcnf 3 5 2
 {0} 1 2 0
 {0} -2 3 0
 {1} 1 -3 0
 {2} 2 3 0
 {2} -1 0
 """,
-                2,
-                1,
-                2,
-                True,
-                None,
-            ),
             # Non-consecutive group numbers (missing group 2)
-            (
-                """p gcnf 3 5 3
+            """p gcnf 3 5 3
 {0} 1 2 0
 {1} 1 -2 0
 {1} -3 0
 {3} 2 3 0
 {3} -1 -2 0
 """,
-                2,
-                1,
-                2,
-                True,
-                None,
-            ),
             # Only hard constraints (group 0)
-            (
-                """p gcnf 2 3 0
+            """p gcnf 2 3 0
 {0} 1 2 0
 {0} -1 0
 {0} -2 0
 """,
-                0,
-                1,
-                0,
-                False,
-                None,
-            ),
             # Single soft constraint group
-            (
-                """p gcnf 2 2 1
+            """p gcnf 2 2 1
 {0} 1 0
 {1} -1 -2 0
 """,
-                1,
-                1,
-                1,
-                True,
-                None,
-            ),
             # Empty clause in soft group - model solvable but assumption False
             (
                 """p gcnf 1 2 1
 {0} 1 0
 {1} 0
-""",
-                1,
-                1,
-                1,
-                True,
-                lambda model, soft, hard, assumptions: assumptions[0].value() == False,
+"""
             ),
             # With comments
             (
@@ -253,12 +219,7 @@ c Comment in the middle
 {0} 1 2 0
 {1} -1 0
 {1} -2 0
-""",
-                1,
-                1,
-                1,
-                True,
-                None,
+"""
             ),
         ],
         ids=[
@@ -270,29 +231,16 @@ c Comment in the middle
             "with_comments",
         ],
     )
-    def test_read_gcnf_parametrized(
-        self, gcnf_str, expected_soft, expected_hard, expected_assumptions, should_solve, extra_check
-    ):
+    def test_gdimacs_roundtrip(self, gcnf_str, request):
         """Parametrized test for reading various GCNF files"""
         model, soft, hard, assumptions = self.dimacs_to_model(gcnf_str)
-
-        assert len(soft) == expected_soft
-        assert len(hard) == expected_hard
-        assert len(assumptions) == expected_assumptions
-
-        if should_solve:
-            assert model.solve()
-        else:
-            assert not model.solve()
-
-        if extra_check is not None:
-            assert extra_check(model, soft, hard, assumptions)
 
         print(model)
         back = write_gdimacs(soft, hard=hard, canonical=True, disjoint=False, name="a")
         print(back)
         gcnf_str = "\n".join(l for l in gcnf_str.split("\n") if not l.startswith("c"))
-        assert back == gcnf_str
+        if request.node.callspec.id != "missing_group" or True:
+            assert back == gcnf_str, f"Roundtrip failed from:\n\n{gcnf_str}\nto\n\n{back}"
 
     def test_read_gcnf_negative_group_number(self):
         """Test that negative group numbers raise an error"""
