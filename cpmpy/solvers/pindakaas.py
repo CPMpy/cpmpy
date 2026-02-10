@@ -137,7 +137,7 @@ class CPM_pindakaas(SolverInterface):
                 user_vars.update(self.ivarmap[x.name].vars())
         return user_vars
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
+    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[List[_BoolVarImpl]] = None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
 
@@ -158,10 +158,7 @@ class CPM_pindakaas(SolverInterface):
         solver_assumptions = None if assumptions is None else self.solver_vars(assumptions)
 
         t = time.time()
-        with self.pdk_solver.solve(
-            time_limit=time_limit,
-            assumptions=solver_assumptions,
-        ) as result:
+        with self.pdk_solver.solve(time_limit=time_limit, assumptions=solver_assumptions) as result:
             self.cpm_status.runtime = time.time() - t
 
             # translate pindakaas result status to cpmpy status
@@ -223,9 +220,7 @@ class CPM_pindakaas(SolverInterface):
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
-                enc, cons = _encode_int_var(
-                    self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding)
-                )
+                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self += cons
             else:
                 enc = self.ivarmap[cpm_var.name]
@@ -246,9 +241,7 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(
-            cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap
-        )
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)
         cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
         return cpm_cons
 
