@@ -48,6 +48,7 @@ class TestSolutionHinting:
         slv.solution_hint([a,b], [False,False])
         assert slv.solve(**args) # should also work with an UNSAT hint
 
-        slv.solution_hint([a,[b]], [[[False]], True]) # check nested lists
-        assert slv.solve(**args)
+        # disabled, does not match type hints of `def solution_hint`
+        # slv.solution_hint([a,[b]], [[[False]], True]) # check nested lists
+        # assert slv.solve(**args)
 
