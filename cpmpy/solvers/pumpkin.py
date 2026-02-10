@@ -355,7 +355,7 @@ class CPM_pumpkin(SolverInterface):
             obj_cons += [ivar == obj_var]
             obj_var = ivar
 
-        self.add(decomp_cons + obj_cons)
+        self.add(safe_cons + decomp_cons + obj_cons)
 
         # save objective function
         self._objective = obj_var
