@@ -129,6 +129,11 @@ class CPM_pumpkin(SolverInterface):
         self._proof = proof
         self.pum_solver = Model(**init_kwargs)
         self.predicate_map = {} # cache predicates for reuse
+        if proof is not None: # Table and friends are not supported when proof logging
+            # see https://github.com/ConSol-Lab/Pumpkin/issues/354
+            self.disabled_global_constraints = {"table", "negative_table", "InDomain"}
+        else:
+            self.disabled_global_constraints = set()
 
         # for objective
         self._objective = None
@@ -379,8 +384,8 @@ class CPM_pumpkin(SolverInterface):
 
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element", "div", "mod"}) # safen toplevel elements, assume total decomposition for partial functions
         cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints,
-                                     supported_reified=self.supported_reified_global_constraints,
+                                     supported=self.supported_global_constraints - self.disabled_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints - self.disabled_global_constraints,
                                      csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
@@ -577,21 +582,21 @@ class CPM_pumpkin(SolverInterface):
 
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args
-                return [constraints.Table(self.to_pum_ivar(arr, tag=tag), 
+                return [constraints.Table(self.to_pum_ivar(arr),
                                           np.array(table).tolist(), # ensure Python list
                                           constraint_tag=tag)
                         ]
             
             elif cpm_expr.name == "negative_table":
                 arr, table = cpm_expr.args
-                return [constraints.NegativeTable(self.to_pum_ivar(arr, tag=tag), 
+                return [constraints.NegativeTable(self.to_pum_ivar(arr),
                                                   np.array(table).tolist(),# ensure Python list
                                                   constraint_tag=tag)
                         ]
             
             elif cpm_expr.name == "InDomain":
                 val, domain = cpm_expr.args
-                return [constraints.Table(self.to_pum_ivar([val], tag=tag),
+                return [constraints.Table(self.to_pum_ivar([val]),
                                           [[d] for d in domain], # each domain value is its own row
                                           constraint_tag=tag)
                         ]
