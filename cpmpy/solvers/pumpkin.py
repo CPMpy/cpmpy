@@ -134,6 +134,10 @@ class CPM_pumpkin(SolverInterface):
         self._objective = None
         self.objective_is_min = True
 
+        # Pumpkin does root-level propagation when adding constraint
+        # can end up in inconsistent state before solving begins
+        self.is_inconsistent = False
+
         # for solution hint
         self._solhint = None
 
@@ -146,6 +150,16 @@ class CPM_pumpkin(SolverInterface):
             Returns the solver's underlying native model (for direct solver access).
         """
         return self.pum_solver
+
+    def _unsat_at_rootlevel(self):
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        self.cpm_status.runtime = 0 # TODO: use post-time instead?
+
+        for var in self.user_vars:
+            var._value = None
+
+        return self._solve_return(self.cpm_status)
 
 
     def solve(self, time_limit:Optional[float]=None, prove=False, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
@@ -166,6 +180,9 @@ class CPM_pumpkin(SolverInterface):
         from pumpkin_solver import BoolExpression as PumpkinBool, IntExpression as PumpkinInt
         from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult
         from pumpkin_solver.optimisation import OptimisationResult, Direction
+
+        if self.is_inconsistent:
+            return self._unsat_at_rootlevel()
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -617,16 +634,24 @@ class CPM_pumpkin(SolverInterface):
         # add new user vars to the set
         get_variables(cpm_expr_orig, collect=self.user_vars)
 
-        for cpm_expr in self.transform(cpm_expr_orig):
-            if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
-                bv, subexpr = cpm_expr.args
-                for pum_cons in self._get_constraint(subexpr):
-                    self.pum_solver.add_implication(pum_cons, self.solver_var(bv))
-            else:
-                for pum_cons in self._get_constraint(cpm_expr):
-                    self.pum_solver.add_constraint(pum_cons)
+        try:
+            for cpm_expr in self.transform(cpm_expr_orig):
+                if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
+                    bv, subexpr = cpm_expr.args
+                    for pum_cons in self._get_constraint(subexpr):
+                        self.pum_solver.add_implication(pum_cons, self.solver_var(bv))
+                else:
+                    for pum_cons in self._get_constraint(cpm_expr):
+                        self.pum_solver.add_constraint(pum_cons)
+            return self
 
-        return self
+        except RuntimeError as e:
+            # Can happen when conflict is found with just root level propagation
+            if e.args[0] == "inconsistency detected":
+                self.is_inconsistent = True
+                return self
+            raise e
+
     __add__ = add # avoid redirect in superclass
 
 
