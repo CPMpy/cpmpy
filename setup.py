@@ -30,7 +30,7 @@ solver_dependencies = {
     "pysdd": ["pysdd>=0.2.11,<=1.0.6"],
     "gcs": ["gcspy==0.1.9"], # first version to pass all tests
     "cpo": ["docplex>=2.28.240,<=2.31.254"],
-    "pumpkin": ["pumpkin-solver==0.2.2"], # CPMpy requires features only available from Pumpkin version >=0.2.2
+    "pumpkin": ["pumpkin-solver==0.3.0"], # CPMpy requires features only available from Pumpkin version >=0.2.2
     "pindakaas": ["pindakaas>=0.2.1,<=0.3.0"],
     "cplex": ["docplex>=2.28.240,<=2.31.254", "cplex>=20.1.0.4,<=22.1.2.0"],
 }

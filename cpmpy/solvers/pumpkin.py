@@ -81,8 +81,8 @@ class CPM_pumpkin(SolverInterface):
         try:
             import pumpkin_solver as psp
             pum_version = CPM_pumpkin.version()
-            if Version(pum_version) < Version("0.2.2"):
-                warnings.warn(f"CPMpy uses features only available from Pumpkin version >=0.2.2 "
+            if Version(pum_version) < Version("0.3.0"):
+                warnings.warn(f"CPMpy uses features only available from Pumpkin version >=0.3.0 "
                               f"but you have version {pum_version}")
                 return False
             return True
