@@ -635,6 +635,8 @@ class CPM_pumpkin(SolverInterface):
 
             :return: self
         """
+        if self.is_inconsistent is True:
+            return self # cannot post any more constraints once inconsistency is reached
 
         # add new user vars to the set
         get_variables(cpm_expr_orig, collect=self.user_vars)
@@ -683,4 +685,5 @@ class CPM_pumpkin(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        self._solhint = {self.solver_var(v) : val for v, val in zip(cpm_vars, vals)} # store for later use in solve
+        if self.is_inconsistent is False: # otherwise, not guaranteed all variables are known
+            self._solhint = {self.solver_var(v) : val for v, val in zip(cpm_vars, vals)} # store for later use in solve
