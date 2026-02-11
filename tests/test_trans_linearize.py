@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
 from cpmpy.transformations.flatten_model import flatten_objective
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
+from cpmpy.transformations.linearize import linearize_constraint, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -114,29 +114,29 @@ class TestTransLinearize:
         assert all(cons_vals)
         # self.assertEqual(str(linearize_constraint(cons)), "[(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1), (a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)]")
 
-    # def test_alldiff(self): -> handled by decompose_linear now
-    #     # alldiff has a specialized linearization
-    #
-    #     x = cp.intvar(1, 5, shape=3, name="x")
-    #     cons = cp.AllDifferent(x)
-    #     lincons = linearize_constraint([cons])
-    #
-    #     def cb():
-    #         assert cons.value()
-    #
-    #     n_sols = cp.Model(lincons).solveAll(display=cb)
-    #     assert n_sols == 5 * 4 * 3
-    #
-    #     # should also work with constants in arguments
-    #     x,y,z = x
-    #     cons = cp.AllDifferent([x,3,y,True,z])
-    #     lincons = linearize_constraint([cons])
-    #
-    #     def cb():
-    #         assert cons.value()
-    #
-    #     n_sols = cp.Model(lincons).solveAll(display=cb)
-    #     assert n_sols == 3 * 2 * 1# 1 and 3 not allowed
+    def test_alldiff(self):
+        # alldiff has a specialized linearization
+    
+        x = cp.intvar(1, 5, shape=3, name="x")
+        cons = cp.AllDifferent(x)
+        lincons = linearize_constraint(decompose_linear([cons]))
+   
+        def cb():
+            assert cons.value()
+    
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+        assert n_sols == 5 * 4 * 3
+    
+        # should also work with constants in arguments
+        x,y,z = x
+        cons = cp.AllDifferent([x,3,y,True,z])
+        lincons = linearize_constraint(decompose_linear([cons]))
+    
+        def cb():
+            assert cons.value()
+    
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+        assert n_sols == 3 * 2 * 1# 1 and 3 not allowed
 
     # def test_issue_580(self): -> Modulo is now a global constraint
     #     x = cp.intvar(1, 5, name='x')
@@ -158,7 +158,7 @@ class TestTransLinearize:
         arr = cp.cpm_array([cp.intvar(0, 5), cp.intvar(0, 5), 5, 4]) # combination of decision variables and constants
         c = cp.AllDifferent(arr)
 
-        linear_c = linearize_constraint([c])
+        linear_c = linearize_constraint(decompose_linear([c]))
         # this triggers an error
         pos_c = only_positive_bv([c])
 

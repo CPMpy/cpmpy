@@ -164,36 +164,36 @@ class TestTransfDecomp:
         bv = cp.boolvar(name="bv")
 
         cons = cp.AllDifferent(x)
-        self.assertSetEqual(set(map(str, decompose_linear([cons]))),
-                            {"and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1])"})
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1])"}
         # second call gives same result (no ivarmap state)
-        self.assertSetEqual(set(map(str, decompose_linear([cons]))),
-                            {"and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1])"})
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1])"}
 
         # nested
         cons = bv == cp.AllDifferent(x)
-        self.assertSetEqual(set(map(str, decompose_linear([cons]))),
-                            {"(bv) == (and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1]))"})
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"(bv) == (and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1]))"}
 
         # test nvalue
         cons = cp.NValue(x) == 8
-        self.assertSetEqual(set(map(str, decompose_linear([cons]))),
-                            {"sum([(a == 1) or (b == 1), (a == 2) or (b == 2), (a == 3) or (b == 3)]) == 8"})
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"sum([(a == 1) or (b == 1), (a == 2) or (b == 2), (a == 3) or (b == 3)]) == 8"}
 
         # test element
         cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
-        self.assertSetEqual(set(map(str, decompose_linear([cons]))),
-                            {"sum([10, 20, 30, 40] * [a == 0, a == 1, a == 2, a == 3]) == 8"})
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"sum([10, 20, 30, 40] * [a == 0, a == 1, a == 2, a == 3]) == 8"}
 
         # test table
         cons = cp.Table(x, [[1,1], [2,3]])
-        self.assertSetEqual(set(map(str, decompose_linear([cons]))),
-                            {'((a == 1) and (b == 1)) or ((a == 2) and (b == 3))'})
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'((a == 1) and (b == 1)) or ((a == 2) and (b == 3))'}
 
         # test count
         cons = cp.Count(x, 2) >= 1
-        self.assertSetEqual(set(map(str, decompose_linear([cons]))),
-                            {'(a == 2) + (b == 2) >= 1'})
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'(a == 2) + (b == 2) >= 1'}
 
     def test_issue_546(self):
         # https://github.com/CPMpy/cpmpy/issues/546
@@ -201,10 +201,10 @@ class TestTransfDecomp:
         arr = x.tolist() + [2]
 
         cons = cp.AllDifferent(arr)
-        self.assertSetEqual(set(map(str, decompose_linear([cons]))),
+        assert set(map(str, decompose_linear([cons]))) == \
                             {'and([sum([a == 1, b == 1, False]) <= 1, '
                              'sum([a == 2, b == 2, True]) <= 1, '
-                             'sum([a == 3, b == 3, False]) <= 1])'})
+                             'sum([a == 3, b == 3, False]) <= 1])'}
 
         # also test full transformation stack
         if "gurobi" in cp.SolverLookup.solvernames():  # otherwise, not supported
