@@ -66,6 +66,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, 
 from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from .int2bool import _encode_int_var
 
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
@@ -623,12 +624,17 @@ def get_linear_decompositions():
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 
-def linearize_reified_variables(constraints, min_values=3, csemap=None):
+def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
     has at least min_values such reifications: remove those implications and add
-    sum(BVs)==1 and wsum(values, BVs)==x.
-    
+    the 'direct' encoding of x.
+
+    If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
+    If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
+    (the domain constraint) is posted; the solver can then choose to eliminate the
+    vars, or post the wsums itself anyway.
+
     Apply after only_implies, before linearize_constraint.
     """
     encodings = {}  # var -> list of (val, bv, constraints_index)
@@ -656,23 +662,38 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None):
             val = int(rhs)
             encodings.setdefault(var, []).append((val, bv, idx))
 
-    to_remove = set()
-    added = []
+    toplevel = []
+    cons_remove_idx = set()
+    my_ivarmap = ivarmap if ivarmap is not None else {}
     for var, triples in encodings.items():
+        # check if we should linearize the reified variables
         distinct_pairs = set((val, bv) for val, bv, _ in triples)
         if len(distinct_pairs) < min_values:
             continue
-        for _, _, i in triples:
-            to_remove.add(i)
-        pairs = sorted(distinct_pairs, key=lambda p: p[0])
-        values = [p[0] for p in pairs]
-        bvs = [p[1] for p in pairs]
-        added.append(Comparison("==", Operator("sum", bvs), 1))
-        added.append(Comparison("==", Operator("wsum", [values, bvs]), var))
 
-    to_remove = frozenset(to_remove)
-    newlist = [constraints[i] for i in range(len(constraints)) if i not in to_remove] + added
-    return newlist
+        enc, _ = _encode_int_var(my_ivarmap, var, "direct")
+        # TEMP: overwrite the freshly created Bools until int2bool does CSE!
+        pairs = sorted(distinct_pairs, key=lambda p: p[0])
+        for val, bv in pairs:
+            enc._xs[enc._offset(val)] = bv
+        
+        # domain and channeling constraints
+        toplevel.extend(enc.encode_domain_constraint()) # with the overwritten Bools
+        if ivarmap is None:
+            # also post the var=wsum mapping
+            terms, k = enc.encode_term()
+            # var == wsum + k :: var - wsum == k
+            ws = [1] + [-w for (w, _) in terms]
+            bs = [var] + [b for (_, b) in terms]
+            toplevel.append(Operator("wsum", (ws, bs)) == k)  
+
+        for _, _, i in triples:
+            cons_remove_idx.add(i)
+
+    if len(cons_remove_idx) > 0:
+        cons_remove_idx = frozenset(cons_remove_idx)
+        constraints = [cons for i, cons in enumerate(constraints) if i not in cons_remove_idx]
+    return constraints + toplevel
 
 
 def _extract_var_from_lhs(lhs):
