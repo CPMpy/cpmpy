@@ -139,10 +139,6 @@ class CPM_pumpkin(SolverInterface):
         self._objective = None
         self.objective_is_min = True
 
-        # Pumpkin does root-level propagation when adding constraint
-        # can end up in inconsistent state before solving begins
-        self.is_inconsistent = False
-
         # for solution hint
         self._solhint = None
 
@@ -186,7 +182,7 @@ class CPM_pumpkin(SolverInterface):
         from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult
         from pumpkin_solver.optimisation import OptimisationResult, Direction
 
-        if self.is_inconsistent:
+        if self.pum_solver.is_inconsistent():
             return self._unsat_at_rootlevel()
 
         # ensure all vars are known to solver
@@ -635,7 +631,7 @@ class CPM_pumpkin(SolverInterface):
 
             :return: self
         """
-        if self.is_inconsistent is True:
+        if self.pum_solver.is_inconsistent():
             return self # cannot post any more constraints once inconsistency is reached
 
         # add new user vars to the set
@@ -655,7 +651,6 @@ class CPM_pumpkin(SolverInterface):
         except RuntimeError as e:
             # Can happen when conflict is found with just root level propagation
             if e.args[0] == "inconsistency detected":
-                self.is_inconsistent = True
                 return self
             raise e
 
@@ -685,5 +680,5 @@ class CPM_pumpkin(SolverInterface):
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """
-        if self.is_inconsistent is False: # otherwise, not guaranteed all variables are known
+        if self.pum_solver.is_inconsistent() is False: # otherwise, not guaranteed all variables are known
             self._solhint = {self.solver_var(v) : val for v, val in zip(cpm_vars, vals)} # store for later use in solve
