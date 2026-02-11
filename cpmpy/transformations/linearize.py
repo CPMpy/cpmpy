@@ -65,7 +65,6 @@ from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
-from ..expressions.python_builtins import sum as cpm_sum
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
 
@@ -487,9 +486,7 @@ def canonical_comparison(lst_of_expr):
                                     if not isinstance(b, _NumVarImpl))
                 
                 # 2) add collected variables to lhs
-                if isinstance(lhs, Operator) and lhs.name == "sum":
-                    lhs = cpm_sum([1 * a for a in lhs.args] + lhs2)
-                elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
+                if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")):
                     lhs = lhs + lhs2
                 else:
                     raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
@@ -598,7 +595,7 @@ def get_linear_decompositions():
 
         lbs, ubs = get_bounds(expr.args)
         lb, ub = min(lbs), max(ubs)
-        return [cpm_sum((var == val) for var in expr.args) <= 1 for val in range(lb, ub + 1)], []
+        return [cp.sum((var == val) for var in expr.args) <= 1 for val in range(lb, ub + 1)], []
 
     # Table
     def decompose_table(expr):

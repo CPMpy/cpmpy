@@ -116,22 +116,22 @@ class TestTransLinearize:
 
     def test_alldiff(self):
         # alldiff has a specialized linearization
-    
+
         x = cp.intvar(1, 5, shape=3, name="x")
         cons = cp.AllDifferent(x)
         lincons = linearize_constraint(decompose_linear([cons]))
-   
+
         def cb():
             assert cons.value()
-    
+
         n_sols = cp.Model(lincons).solveAll(display=cb)
         assert n_sols == 5 * 4 * 3
-    
+
         # should also work with constants in arguments
         x,y,z = x
         cons = cp.AllDifferent([x,3,y,True,z])
         lincons = linearize_constraint(decompose_linear([cons]))
-    
+
         def cb():
             assert cons.value()
     

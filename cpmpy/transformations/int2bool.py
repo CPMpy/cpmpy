@@ -235,13 +235,6 @@ class IntVarEnc(ABC):
                 k += weight
         return k
 
-    def coerce_to_integer(self):
-        """Returns a list of constraints enforcing the encoding to be equal to the integer it encodes"""
-        terms, k = self.encode_term()
-        weights = [w for w, x in terms] + [-1]
-        vars = [x for w,x in terms] + [self._x]
-        return [Operator("wsum", [weights, vars]) == -k]
-
     @abstractmethod
     def encode_domain_constraint(self):
         """

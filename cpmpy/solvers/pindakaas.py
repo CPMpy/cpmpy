@@ -45,7 +45,6 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
 from ..expressions.utils import eval_comparison
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
-from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
 from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool

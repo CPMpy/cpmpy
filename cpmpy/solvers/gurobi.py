@@ -53,8 +53,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, decompose_linear, \
-    decompose_linear_objective
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
