@@ -50,7 +50,7 @@ from datetime import datetime
 # CPMpy
 from cpmpy.tools.benchmark.runner import benchmark_runner
 from cpmpy.tools.benchmark._base import Benchmark, ExitStatus
-from cpmpy.tools.jsplib import read_jsplib
+from cpmpy.tools.io.jsplib import read_jsplib
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 
 

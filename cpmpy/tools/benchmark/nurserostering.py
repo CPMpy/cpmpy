@@ -48,7 +48,7 @@ from datetime import datetime
 # CPMpy
 from cpmpy.tools.benchmark.runner import benchmark_runner
 from cpmpy.tools.benchmark._base import Benchmark, ExitStatus
-from cpmpy.tools.nurserostering import read_nurserostering
+from cpmpy.tools.io.nurserostering import read_nurserostering
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 
 

@@ -51,7 +51,7 @@ from datetime import datetime
 # CPMpy
 from cpmpy.tools.benchmark.runner import benchmark_runner
 from cpmpy.tools.benchmark._base import Benchmark, ExitStatus
-from cpmpy.tools.rcpsp import read_rcpsp
+from cpmpy.tools.io.rcpsp import read_rcpsp
 from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 
 
