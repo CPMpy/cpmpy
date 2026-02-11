@@ -596,7 +596,6 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
             list of expressions
     """
     decompose_custom = get_linear_decompositions()
-    # table: Should we add Gleb's table decomposition? or is it not non-reifiable?
 
     return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
 
@@ -606,7 +605,6 @@ def decompose_linear_objective(obj: Sequence[Expression],
                                csemap: Optional[dict[Expression, Expression]] = None):
     """Decompose objective using linear-friendly (var == val) decompositions."""
     decompose_custom = get_linear_decompositions()
-    # table: Should we add Gleb's table decomposition? or is it not non-reifiable?
 
     return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
 
