@@ -62,8 +62,8 @@ from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, NegativeTable
+from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 
@@ -587,64 +587,11 @@ def get_linear_decompositions():
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
     """
-    # AllDifferent
-    def decompose_alldifferent(expr):
-
-        if expr.has_subexpr():
-            return expr.decompose()
-
-        lbs, ubs = get_bounds(expr.args)
-        lb, ub = min(lbs), max(ubs)
-        return [cp.sum((var == val) for var in expr.args) <= 1 for val in range(lb, ub + 1)], []
-
-    # Table
-    def decompose_table(expr):
-
-        args, arr = expr.args
-        return cp.any(cp.all((var == v) for var, v in zip(args, row)) for row in arr), []
-
-    # Negative table
-    def decompose_negtable(expr):
-
-        args, arr = expr.args
-        return ~cp.any(cp.all((var == v) for var, v in zip(args, row)) for row in arr), []
-
-    # Element
-    def decompose_element(expr):
-        arr, idx = expr.args
-        if not all(is_int(a) for a in arr):
-            return expr.decompose()
-
-        lb, ub = get_bounds(idx)
-        if not (0 <= lb and ub < len(arr)):
-            return expr.decompose()
-
-        return cp.sum(val * (idx == i) for i, val in enumerate(arr)), []
-
-    # NValue
-    def decompose_nvalue(expr):
-
-        lbs, ubs = get_bounds(expr.args)
-        lb, ub = min(lbs), max(ubs)
-        return cp.sum(cp.any((var == v) for var in expr.args) for v in range(lb, ub + 1)), []
-
-    # Count
-    def decompose_count(expr):
-
-        args, n = expr.args
-        if not is_int(n):
-            return expr.decompose()
-
-        return cp.sum((var == n) for var in args), []
-
     return dict(
-        alldifferent=decompose_alldifferent,
-        table=decompose_table,
-        negative_table=decompose_negtable,
-        element=decompose_element,
-        nvalue=decompose_nvalue,
-        count=decompose_count,
+        alldifferent=AllDifferent.decompose_linear,
+        element=Element.decompose_linear,
     )
+    # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Set[str]=frozenset(),
@@ -662,8 +609,13 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         returns:
             list of expressions
     """
-    decompositions = get_linear_decompositions()
-    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap, decompose_custom=decompositions)
+    decompose_custom = dict(
+        alldifferent=AllDifferent.decompose_linear,
+        element=Element.decompose_linear,
+    )
+    # table: Should we add Gleb's table decomposition? or is it not non-reifiable?
+
+    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
 
 
 def decompose_linear_objective(obj: Sequence[Expression],

@@ -228,6 +228,17 @@ class AllDifferent(GlobalConstraint):
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
+    def decompose_linear(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+        """
+        Linear-friendly decomposition using sums over (arg[i] == val) expressions (which will become Boolean variables):
+        at most one integer variable can take each value in the domain.
+        
+        For use with integer linear programming and pb/sat solvers.
+        """
+        lbs, ubs = get_bounds(self.args)
+        lb, ub = min(lbs), max(ubs)
+        return [cp.sum((arg_i == val) for arg_i in self.args) <= 1 for val in range(lb, ub + 1)], []
+
     def value(self) -> Optional[bool]:
         """
         Returns:
@@ -598,6 +609,7 @@ class Table(GlobalConstraint):
             arr, tab = self.args  # the table 'tab' is asserted to only hold constants
             self._has_subexpr = any(a.has_subexpr() for a in arr)
         return self._has_subexpr
+
 
 class ShortTable(GlobalConstraint):
     """

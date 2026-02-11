@@ -183,7 +183,7 @@ class TestTransfDecomp:
         # test element
         cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"sum([10, 20, 30, 40] * [a == 0, a == 1, a == 2, a == 3]) == 8"}
+                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3) 
 
         # test table
         cons = cp.Table(x, [[1,1], [2,3]])
