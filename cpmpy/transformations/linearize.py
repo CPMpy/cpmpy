@@ -579,20 +579,6 @@ def only_positive_coefficients(lst_of_expr):
     return newlist
 
 
-def get_linear_decompositions():
-    """
-        Implementation of custom linear decompositions for some global constraints.
-        Uses (var == val) in sums; no integer encoding.
-
-        returns:
-            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
-    """
-    return dict(
-        alldifferent=AllDifferent.decompose_linear,
-        element=Element.decompose_linear,
-    )
-    # Should we add Gleb's table decomposition? or is it not non-reifiable?
-
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Set[str]=frozenset(),
                      supported_reified:Set[str]=frozenset(),
@@ -609,19 +595,31 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         returns:
             list of expressions
     """
-    decompose_custom = dict(
-        alldifferent=AllDifferent.decompose_linear,
-        element=Element.decompose_linear,
-    )
+    decompose_custom = get_linear_decompositions()
     # table: Should we add Gleb's table decomposition? or is it not non-reifiable?
 
     return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-
 
 def decompose_linear_objective(obj: Sequence[Expression],
                                supported: Set[str] = frozenset(),
                                supported_reified: Set[str] = frozenset(),
                                csemap: Optional[dict[Expression, Expression]] = None):
     """Decompose objective using linear-friendly (var == val) decompositions."""
-    decompositions = get_linear_decompositions()
-    return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompositions)
+    decompose_custom = get_linear_decompositions()
+    # table: Should we add Gleb's table decomposition? or is it not non-reifiable?
+
+    return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+
+def get_linear_decompositions():
+    """
+        Implementation of custom linear decompositions for some global constraints.
+        Uses (var == val) in sums; no integer encoding.
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    return dict(
+        alldifferent=AllDifferent.decompose_linear,
+        element=Element.decompose_linear,
+    )
+    # Should we add Gleb's table decomposition? or is it not non-reifiable?
