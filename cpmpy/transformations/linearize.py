@@ -635,46 +635,31 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     (the domain constraint) is posted; the solver can then choose to eliminate the
     vars, or post the wsums itself anyway.
 
-    Apply after only_implies, before linearize_constraint.
+    Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
-    encodings = {}  # var -> list of (val, bv, constraints_index)
-    for idx, c in enumerate(constraints):
-        if c.name != "->":
-            continue
-
-        bv, expr = c.args
-        if expr.name not in ("==", "!="):
-            continue
-
-        lhs, rhs = expr.args
-        if not is_num(rhs):
-            continue
-
-        var = _extract_var_from_lhs(lhs)
-        if var is None:
-            continue
-
-        if expr.name == "==":
-            val = int(rhs)
-            encodings.setdefault(var, []).append((val, bv, idx))
-        elif expr.name == "!=" and isinstance(bv, NegBoolView):
-            bv = bv._bv
-            val = int(rhs)
-            encodings.setdefault(var, []).append((val, bv, idx))
-
-    toplevel = []
-    cons_remove_idx = set()
+    # Collect bv -> (var == val)'s in csemap
+    var_vals = {}  # var: [val, bv]
+    for expr, bv in csemap.items():
+        if expr.name == '==':
+            var,val = expr.args
+            if isinstance(var, _NumVarImpl) and is_int(val):
+                var_vals.setdefault(var, []).append((val, bv))
+    
+    # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
-    for var, triples in encodings.items():
+    toplevel = []
+    bv_map = {}  # bv -> (var, val)
+    for var, vals in var_vals.items():
         # check if we should linearize the reified variables
-        distinct_pairs = set((val, bv) for val, bv, _ in triples)
-        if len(distinct_pairs) < min_values:
-            continue
+        lb, ub = var.lb, var.ub
+        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
+        if len(vals) < min_values:
+            continue  # do not encode
 
+        # encode the values
         enc, _ = _encode_int_var(my_ivarmap, var, "direct")
         # TEMP: overwrite the freshly created Bools until int2bool does CSE!
-        pairs = sorted(distinct_pairs, key=lambda p: p[0])
-        for val, bv in pairs:
+        for val, bv in vals:
             enc._xs[enc._offset(val)] = bv
         
         # domain and channeling constraints
@@ -686,13 +671,26 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             ws = [1] + [-w for (w, _) in terms]
             bs = [var] + [b for (_, b) in terms]
             toplevel.append(Operator("wsum", (ws, bs)) == k)  
+        
+        # store the bvs that no longer need to be reified
+        for val, bv in vals:
+            bv_map[bv] = (var, val)
 
-        for _, _, i in triples:
-            cons_remove_idx.add(i)
+    if len(bv_map) > 0:
+        # Now clean up and remove the '(var == val) == bv' constraints:
+        newcons = []
+        for con in constraints:
+            if con.name == '==' and con.args[0].name == '==':
+                # potential '(var == val) == bv'
+                lhs,bv = con.args
+                if bv in bv_map:
+                    (var, val) = bv_map[bv]
+                    (lhs_var, lhs_val) = lhs.args
+                    if lhs_val == val and lhs_var == var:
+                        continue  # do not keep
+            newcons.append(con)
+        constraints = newcons
 
-    if len(cons_remove_idx) > 0:
-        cons_remove_idx = frozenset(cons_remove_idx)
-        constraints = [cons for i, cons in enumerate(constraints) if i not in cons_remove_idx]
     return constraints + toplevel
 
 

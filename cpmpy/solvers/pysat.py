@@ -371,9 +371,9 @@ class CPM_pysat(SolverInterface):
         )
         cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=3, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "->", "and", "or"}), csemap=self._csemap)  # the core of the MIP-linearization
         cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
         cpm_cons = only_positive_coefficients(cpm_cons)
