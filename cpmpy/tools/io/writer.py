@@ -45,6 +45,42 @@ _writer_map = {
     # "wcnf": write_wcnf,                            # currently not supported
 }
 
+# Maps each format to the external packages its writer depends on.
+# Used by writer_dependencies() to record provenance in sidecar metadata.
+_writer_deps = {
+    "mps": ["pyscipopt"],
+    "lp": ["pyscipopt"],
+    "cip": ["pyscipopt"],
+    "fzn": ["pyscipopt"],
+    "gms": ["pyscipopt"],
+    "pip": ["pyscipopt"],
+    "dimacs": ["pindakaas"],
+    "opb": [],
+}
+
+
+def writer_dependencies(format: str) -> dict:
+    """Return a dict of ``{package_name: version}`` for the writer's external deps.
+
+    Arguments:
+        format: target format name (e.g., ``"mps"``, ``"dimacs"``, ``"opb"``).
+
+    Returns:
+        dict mapping package names to installed version strings.
+        Packages that are not installed are omitted.
+    """
+    from importlib.metadata import version, PackageNotFoundError
+
+    deps = _writer_deps.get(format, [])
+    result = {}
+    for pkg in deps:
+        try:
+            result[pkg] = version(pkg)
+        except PackageNotFoundError:
+            pass
+    return result
+
+
 def _get_writer(format: str) -> Callable:
     """
     Get the writer function for a given format.

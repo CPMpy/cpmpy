@@ -44,15 +44,24 @@ from typing import Union, Optional
 from cpmpy.expressions.core import BoolVal, Comparison, Operator
 from cpmpy.expressions.variables import _NumVarImpl, _BoolVarImpl, NegBoolView, _IntVarImpl
 from cpmpy.transformations.comparison import only_numexpr_equality
-from cpmpy.transformations.decompose_global import decompose_in_tree
+from cpmpy.transformations.decompose_global import decompose_in_tree, decompose_objective
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.linearize import linearize_constraint, only_positive_bv
+from cpmpy.transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
 from cpmpy.transformations.normalize import toplevel_list
-from cpmpy.transformations.reification import only_implies, reify_rewrite
+from cpmpy.transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from cpmpy.expressions.utils import is_any_list, is_num
 from cpmpy.expressions.globalconstraints import DirectConstraint
 # from cpmpy.expressions.variables import ignore_variable_name_check
+from cpmpy.transformations.safening import no_partial_functions, safen_objective
+
+try:
+    from cpmpy.expressions.variables import _ignore_variable_name_check
+except ImportError:
+    from contextlib import contextmanager
+    @contextmanager
+    def _ignore_variable_name_check():
+        yield
 
 
 _std_open = open
@@ -181,6 +190,14 @@ class _SCIPWriter:
     TODO: code should be reused once SCIP has been added as a solver backend.
     """
 
+     # Globals we keep (decompose_in_tree) and how they are translated:
+    # - "xor": kept; linearize passes it through; we translate to addConsXor() in add().
+    # - "abs": GlobalFunction supported natively (PySCIPOpt addCons(abs(x) <= k)).
+    # SCIP has no native AllDifferent, Circuit, Table, Cumulative, etc.; others are decomposed by decompose_in_tree.
+    supported_global_constraints = frozenset({"xor", "abs"})
+    supported_reified_global_constraints = frozenset()
+
+
     @staticmethod
     def supported():
         # try to import the package
@@ -249,17 +266,23 @@ class _SCIPWriter:
                 are premanently posted to the solver)
         """
 
-        # make objective function non-nested
-        (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += flat_cons
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
+        get_variables(expr, collect=self.user_vars)
 
-        # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj = only_positive_bv_wsum(obj)
+
+        self.add(safe_cons + decomp_cons + flat_cons)
+
+        scip_obj = self._make_numexpr(obj)
         if minimize:
-            self.scip_model.setObjective(obj, sense='minimize')
+            self.scip_model.setObjective(scip_obj, sense='minimize')
         else:
-            self.scip_model.setObjective(obj, sense='maximize')
+            self.scip_model.setObjective(scip_obj, sense='maximize')
 
 
     def _make_numexpr(self, cpm_expr):
@@ -307,15 +330,22 @@ class _SCIPWriter:
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
+
+        _csemap = {}
+
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"alldifferent"}  # alldiff has a specialized MIP decomp in linearize
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum','sub']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub", "mul", "div"})) # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints | {"alldifferent"},
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "mul", "div", "sum!=", "wsum!="}) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
     def _get_constraint_name(self):
@@ -542,7 +572,17 @@ def write_scip(model: cp.Model, fname: Optional[str] = None, format: str = "mps"
         with tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False) as tmp:
             fname = tmp.name
         try:
-            writer.scip_model.writeProblem(fname)
+            writer.scip_model.hideOutput()
+            # Suppress SCIP's C-level "wrote problem to file" message
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            old_stdout = os.dup(1)
+            os.dup2(devnull, 1)
+            try:
+                writer.scip_model.writeProblem(fname)
+            finally:
+                os.dup2(old_stdout, 1)
+                os.close(devnull)
+                os.close(old_stdout)
             _add_header(fname, format, header)
             with open(fname, "r") as f:
                 return f.read()
