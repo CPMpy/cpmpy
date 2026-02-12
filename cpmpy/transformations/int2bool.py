@@ -100,7 +100,7 @@ def _encode_int_var(ivarmap, x, encoding, csemap=None):
         else:
             raise NotImplementedError(encoding)
 
-        return (ivarmap[x.name], ivarmap[x.name].encode_domain_constraint(csemap=csemap))
+        return (ivarmap[x.name], ivarmap[x.name].encode_domain_constraint())
 
 
 def _encode_lin_expr(ivarmap, xs, weights, encoding, cmp=None, csemap=None):
@@ -247,7 +247,7 @@ class IntVarEnc(ABC):
         return k
 
     @abstractmethod
-    def encode_domain_constraint(self, csemap=None):
+    def encode_domain_constraint(self):
         """
         Return domain constraints for the encoding.
 
@@ -295,7 +295,7 @@ class IntVarEncDirect(IntVarEnc):
         # Requires |dom(x)| Boolean equality variables
         super().__init__(x, (x == d for d in _dom(x)), csemap=csemap)
 
-    def encode_domain_constraint(self, csemap=None):
+    def encode_domain_constraint(self):
         """
         Return consistency constraints.
 
@@ -341,7 +341,7 @@ class IntVarEncOrder(IntVarEnc):
         """Create order encoding of integer variable `x`."""
         super().__init__(x, (x >= d for d in itertools.islice(_dom(x), 1, None)), csemap=csemap)
 
-    def encode_domain_constraint(self, csemap=None):
+    def encode_domain_constraint(self):
         """Return order encoding domain constraint (i.e. encoding variables are sorted in descending order e.g. `111000`)."""
         if len(self._xs) <= 1:
             return []
@@ -398,10 +398,10 @@ class IntVarEncLog(IntVarEnc):
         super().__init__(x, (cp.boolvar(name=f"bit({x},{k})") for k in range(bits)), csemap=csemap)
         # TODO possibly...: super().__init__(x,  ((( ((x - x.lb) ** k) % 2) == 0) for k in range(bits)), csemap=csemap)
 
-    def encode_domain_constraint(self, csemap=None):
+    def encode_domain_constraint(self):
         """Return binary encoding domain constraint (i.e. upper bound is respected with `self._x<=self._x.ub`. The lower bound is automatically enforced by offset binary which maps `000.. = self._x.lb`)."""
         # encode directly to avoid bounds check for this seemingly tautological constraint
-        return self.encode_comparison("<=", self._x.ub, check_bounds=False, csemap=csemap)
+        return self.encode_comparison("<=", self._x.ub, check_bounds=False)
 
     def _to_little_endian_offset_binary(self, d):
         """Return offset binary representation of `d` as Booleans in order of increasing significance ("little-endian").
@@ -435,7 +435,7 @@ class IntVarEncLog(IntVarEnc):
         elif cmp in (">=", "<="):
             # TODO lexicographic encoding might be more effective, but currently we just use the PB encoding
             constraint, domain_constraints = _encode_linear(
-                {self._x.name: self}, [self._x], cmp, d, None, check_bounds=check_bounds, csemap=csemap
+                {self._x.name: self}, [self._x], cmp, d, None, check_bounds=check_bounds
             )
             assert domain_constraints == [], (
                 f"{self._x} should have already been encoded, so no domain constraints should be returned"
