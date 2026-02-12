@@ -98,6 +98,7 @@ class TestTransInt2Bool:
         itertools.product(CONSTRAINTS, ENCODINGS),
         ids=idfn,
     )
+    @skip_on_missing_pblib()
     def test_transforms(self, solver, constraint, encoding, setup):
         IntVarEnc.NAMED = True
         user_vars = tuple(get_variables(constraint))
