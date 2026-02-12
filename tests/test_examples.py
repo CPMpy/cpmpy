@@ -27,6 +27,8 @@ SKIPPED_EXAMPLES = [
                     "psplib.py", # randomly fails on github due to file creation
                     "nurserostering.py",
                     "test_incremental_solving.py",  # 30s timeout for some solver
+                    "sudoku_chaos_killer.py", # too slow on github actions
+                    "sudoku_schrodingers_rat.py", # too slow on github actions
                     ]
 
 SKIP_MIP = ['npuzzle.py', 'tst_likevrp.py', 'sudoku_', 'pareto_optimal.py',

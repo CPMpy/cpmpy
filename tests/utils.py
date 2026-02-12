@@ -107,3 +107,9 @@ def skip_on_missing_pblib(skip_on_exception_only:bool=False):
 
 def inclusive_range(lb,ub):
     return range(lb,ub+1)
+
+def lambda_assert(assert_func):
+    return lambda : _lambda_assert(assert_func)
+    
+def _lambda_assert(assert_func):
+    assert assert_func()

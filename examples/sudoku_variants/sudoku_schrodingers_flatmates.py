@@ -1,6 +1,19 @@
 import cpmpy as cp
 import numpy as np
 
+
+""" 
+Puzzle source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000KBK
+
+Rules:
+
+- Schrödinger Sudoku: Place one or two digits from 0-6 in every empty cell. 
+  Every row, column and box must contain each digit 0-6 exactly once.
+- Values: The value of a cell is the sum of its digit(s).
+- Line: Values can't repeat on the line.
+- Schrödingers Flat Mates: Every cell with value 5 must have a cell with value 1 directly above it 
+  and/or a cell with value 9 directly below it.
+"""
 # This cpmpy example solves a sudoku by gdc, which can be found on https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000KBK
 
 # sudoku cells
@@ -11,6 +24,18 @@ schrodinger = cp.intvar(-1,6, shape=(6,6))
 values = cp.intvar(0,11, shape=(6,6))
 
 def schrodinger_flats(cells, schrodinger, values):
+    """
+    schrodinger flatmate rules
+    
+    Args:
+        cells (cp.intvar): cpmpy variable representing the sudoku cells
+        schrodinger (cp.intvar): cpmpy variable representing the schrodinger cells
+        values (cp.intvar): cpmpy variable representing the true values
+
+    Returns:
+        list: list of cpmpy constraints enforcing the schrodinger flatmate rules
+    """
+    
     # go over all cells
     constraints = []
     for r in range(6):
@@ -62,6 +87,15 @@ m = cp.Model(
 )
 
 def regroup_to_blocks(grid):
+    """
+    Regroup the 6x6 grid into its 2x3 blocks.
+    
+    Args:
+        grid (cp.intvar): cpmpy variable representing the 6x6 sudoku grid
+        
+    Returns:
+        list: list of lists representing the 2x3 blocks of the sudoku grid
+    """
     # Create an empty list to store the blocks
     blocks = [[] for _ in range(6)]
 
@@ -95,3 +129,17 @@ print("With these schrödinger cells (-1 if not schrödinger):")
 print(schrodinger.value())
 print("Resulting in these true values:")
 print(values.value())
+
+assert (cells.value() == [[6, 3, 1, 5, 2, 4],
+                          [2, 4, 5, 6, 0, 1],
+                          [4, 5, 3, 0, 1, 6],
+                          [1, 6, 0, 2, 4, 5],
+                          [5, 0, 6, 1, 3, 2],
+                          [3, 1, 2, 4, 6, 0]]).all()
+                          
+assert (schrodinger.value() == [[ 0, -1, -1, -1, -1, -1],
+                                [-1, -1, -1,  3, -1, -1],
+                                [-1,  2, -1, -1, -1, -1],
+                                [-1, -1, -1, -1, -1,  3],
+                                [-1, -1,  4, -1, -1, -1],
+                                [-1, -1, -1, -1,  5, -1]]).all()
