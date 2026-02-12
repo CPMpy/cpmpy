@@ -12,6 +12,7 @@ import pathlib
 import io
 
 from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.dataset.config import get_origins
 
 
 class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -29,6 +30,20 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
     
     name = "mse"
+    description = "MaxSAT Evaluation competition benchmark instances."
+    url = "https://maxsat-evaluations.github.io/"
+    license = ""
+    citation = ""
+    domain = "maximum satisfiability"
+    format = "WCNF"
+    origins = []  # Will be populated from config if available
+
+    @staticmethod
+    def _reader(file_path, open=open):
+        from cpmpy.tools.io.wcnf import read_wcnf
+        return read_wcnf(file_path, open=open)
+
+    reader = _reader
 
     def __init__(
             self, 
@@ -66,6 +81,10 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
         dataset_dir = self.root / self.name / str(year) / track
 
+        # Load origins from config
+        if not self.origins:
+            self.origins = get_origins(self.name)
+        
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
@@ -77,7 +96,37 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
             "year": self.year,
             "track": self.track
         }
-        
+
+    def collect_instance_metadata(self, file) -> dict:
+        """Extract statistics from WCNF header comments.
+
+        WCNF files from MSE contain JSON-like statistics in comment lines:
+        nvars, ncls, nhards, nsofts, total_lits, nsoft_wts, and length stats.
+        """
+        import re
+        result = {}
+        try:
+            with self.open(file) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line.startswith("c"):
+                        break
+                    # Extract all numeric fields from JSON-style comments
+                    for key, meta_key in [
+                        ("nvars", "wcnf_num_variables"),
+                        ("ncls", "wcnf_num_clauses"),
+                        ("nhards", "wcnf_num_hard_clauses"),
+                        ("nsofts", "wcnf_num_soft_clauses"),
+                        ("total_lits", "wcnf_total_literals"),
+                        ("nsoft_wts", "wcnf_num_distinct_weights"),
+                    ]:
+                        match = re.search(rf'"{key}"\s*:\s*(\d+)', line)
+                        if match:
+                            result[meta_key] = int(match.group(1))
+        except Exception:
+            pass
+        return result
+
     def download(self):
 
         url = f"https://www.cs.helsinki.fi/group/coreo/MSE{self.year}-instances/"
@@ -87,7 +136,7 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
         print(f"Downloading MaxSAT Eval {self.year} {self.track} instances from cs.helsinki.fi")
                 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
         except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year} and track {self.track}. Error: {str(e)}")
         

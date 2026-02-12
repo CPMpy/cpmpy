@@ -15,6 +15,7 @@ import io
 
 import cpmpy as cp
 from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.dataset.config import get_origins
 
 # Optional dependencies
 try:
@@ -39,6 +40,20 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
 
     name = "nurserostering"
+    description = "Nurse rostering benchmark instances from schedulingbenchmarks.org."
+    url = "https://schedulingbenchmarks.org/nrp/"
+    license = ""
+    citation = ""
+    domain = "scheduling"
+    format = "NRP text"
+    origins = []  # Will be populated from config if available
+
+    @staticmethod
+    def _reader(file_path, open=open):
+        from cpmpy.tools.io.nurserostering import read_nurserostering
+        return read_nurserostering(file_path, open=open)
+
+    reader = _reader
 
     def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False, sort_key=None):
         """
@@ -59,6 +74,10 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
         dataset_dir = self.root / self.name
 
+        # Load origins from config
+        if not self.origins:
+            self.origins = get_origins(self.name)
+
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
@@ -66,7 +85,24 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         )
 
     def category(self) -> dict:
-        return {} # no categories
+        return {}  # no categories
+
+    def collect_instance_metadata(self, file) -> dict:
+        """Extract scheduling metadata from nurse rostering instance."""
+        try:
+            data = parse_scheduling_period(file)
+            return {
+                "horizon": data["horizon"],
+                "num_staff": len(data["staff"]),
+                "num_shifts": len(data["shifts"]),
+                "num_days_off": len(data.get("days_off", [])),
+                "num_shift_on_requests": len(data.get("shift_on", []) or []),
+                "num_shift_off_requests": len(data.get("shift_off", []) or []),
+                "num_cover_requirements": len(data.get("cover", []) or []),
+            }
+        except Exception:
+            pass
+        return {}
 
     def download(self):
         
@@ -77,7 +113,7 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         print(f"Downloading Nurserostering instances from schedulingbenchmarks.org")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
         except ValueError as e:
             raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
 

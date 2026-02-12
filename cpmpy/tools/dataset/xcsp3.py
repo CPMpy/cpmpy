@@ -11,6 +11,7 @@ import pathlib
 import io
 
 from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.dataset.config import get_origins
 
 
 class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -28,7 +29,46 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
 
     name = "xcsp3"
-    
+    description = "XCSP3 competition benchmark instances for constraint satisfaction and optimization."
+    url = "https://xcsp.org/instances/"
+    license = ""
+    citation = ""
+    domain = "constraint programming"
+    format = "XCSP3"
+    origins = []  # Will be populated from config if available
+
+    @staticmethod
+    def _reader(file_path, open=open):
+        from cpmpy.tools.xcsp3.parser import read_xcsp3
+        return read_xcsp3(file_path, open=open)
+
+    reader = _reader
+
+    def collect_instance_metadata(self, file) -> dict:
+        """Extract instance type (CSP/COP) from XCSP3 XML root element."""
+        import re
+        result = {}
+        try:
+            with self.open(file) as f:
+                # Read only the first few lines to find the root element
+                header = ""
+                for _ in range(10):
+                    line = f.readline()
+                    if not line:
+                        break
+                    header += line
+                    if ">" in line:
+                        break
+                match = re.search(r'type\s*=\s*"([^"]+)"', header)
+                if match:
+                    result["instance_type"] = match.group(1)
+                match = re.search(r'format\s*=\s*"([^"]+)"', header)
+                if match:
+                    result["xcsp_format"] = match.group(1)
+        except Exception:
+            pass
+        return result
+
     def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False):
         """
         Initialize the XCSP3 Dataset.
@@ -45,6 +85,10 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
         if not track:
             raise ValueError("Track must be specified, e.g. COP, CSP, MiniCOP, ...")
 
+        # Load origins from config
+        if not self.origins:
+            self.origins = get_origins(self.name)
+        
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
@@ -66,7 +110,7 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
         print(f"Downloading XCSP3 {self.year} instances from www.cril.univ-artois.fr")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
         except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year}. Error: {str(e)}")
 

@@ -12,6 +12,7 @@ import tarfile
 import io
 
 from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.dataset.config import get_origins
 
 
 class OPBDataset(_Dataset): 
@@ -28,6 +29,20 @@ class OPBDataset(_Dataset):
     """
 
     name = "opb"
+    description = "Pseudo-Boolean Competition benchmark instances."
+    url = "https://www.cril.univ-artois.fr/PB25/"
+    license = ""
+    citation = ""
+    domain = "pseudo-boolean optimization"
+    format = "OPB"
+    origins = []  # Will be populated from config if available
+
+    @staticmethod
+    def _reader(file_path, open=open):
+        from cpmpy.tools.io.opb import read_opb
+        return read_opb(file_path, open=open)
+
+    reader = _reader
 
     def __init__(
             self, 
@@ -68,6 +83,10 @@ class OPBDataset(_Dataset):
 
         dataset_dir = self.root / self.name / str(year) / track / ('selected' if self.competition else 'normalized')
 
+        # Load origins from config
+        if not self.origins:
+            self.origins = get_origins(self.name)
+        
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
@@ -80,9 +99,38 @@ class OPBDataset(_Dataset):
             "track": self.track
         }
 
-    def metadata(self, file) -> dict:
-        # Add the author to the metadata
-        return super().metadata(file) | {'author': str(file).split(os.sep)[-1].split("_")[0],}
+    def collect_instance_metadata(self, file) -> dict:
+        """Extract metadata from OPB filename and file header.
+
+        Parses the `* #variable= ... #constraint= ...` header line and
+        extracts the author from the filename convention (first part before `_`).
+        """
+        import re
+        result = {}
+        # Author from filename
+        filename = pathlib.Path(file).name
+        parts = filename.split("_")
+        if len(parts) > 1:
+            result["author"] = parts[0]
+        # Parse header for variable/constraint counts
+        try:
+            with self.open(file) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line.startswith("*"):
+                        break
+                    var_match = re.search(r'#variable=\s*(\d+)', line)
+                    con_match = re.search(r'#constraint=\s*(\d+)', line)
+                    if var_match:
+                        result["opb_num_variables"] = int(var_match.group(1))
+                    if con_match:
+                        result["opb_num_constraints"] = int(con_match.group(1))
+                    prod_match = re.search(r'#product=\s*(\d+)', line)
+                    if prod_match:
+                        result["opb_num_products"] = int(prod_match.group(1))
+        except Exception:
+            pass
+        return result
                 
     def download(self):
                 
@@ -93,7 +141,7 @@ class OPBDataset(_Dataset):
         print(f"Downloading OPB {self.year} {self.track} {'competition' if self.competition else 'non-competition'} instances from www.cril.univ-artois.fr")
         
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
         except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year}. Error: {str(e)}")
         

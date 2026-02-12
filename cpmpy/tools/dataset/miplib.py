@@ -12,6 +12,7 @@ import pathlib
 import io
 
 from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.dataset.config import get_origins
 
 
 class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -23,6 +24,60 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
   
     name = "miplib"
+    description = "Mixed Integer Programming Library benchmark instances."
+    url = "https://miplib.zib.de/"
+    license = ""
+    citation = ""
+    domain = "mixed integer programming"
+    format = "MPS"
+    origins = []  # Will be populated from config if available
+
+    @staticmethod
+    def _reader(file_path, open=open):
+        from cpmpy.tools.io.scip import read_scip
+        return read_scip(file_path, open=open)
+
+    reader = _reader
+
+    def collect_instance_metadata(self, file) -> dict:
+        """Extract row/column counts from MPS file sections."""
+        result = {}
+        try:
+            with self.open(file) as f:
+                section = None
+                num_rows = 0
+                columns = set()
+                has_objective = False
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith("NAME"):
+                        section = "NAME"
+                    elif stripped == "ROWS":
+                        section = "ROWS"
+                    elif stripped == "COLUMNS":
+                        section = "COLUMNS"
+                    elif stripped in ("RHS", "RANGES", "BOUNDS", "ENDATA"):
+                        section = stripped
+                    elif section == "ROWS" and stripped:
+                        parts = stripped.split()
+                        if parts[0] == "N":
+                            has_objective = True
+                        else:
+                            num_rows += 1
+                    elif section == "COLUMNS" and stripped:
+                        parts = stripped.split()
+                        if parts:
+                            columns.add(parts[0])
+                    elif section in ("RHS", "RANGES", "BOUNDS", "ENDATA"):
+                        pass  # skip to avoid parsing entire file
+                        if section == "ENDATA":
+                            break
+                result["mps_num_rows"] = num_rows
+                result["mps_num_columns"] = len(columns)
+                result["mps_has_objective"] = has_objective
+        except Exception:
+            pass
+        return result
 
     def __init__(
             self, 
@@ -53,6 +108,10 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
         dataset_dir = self.root / self.name / str(year) / track
 
+        # Load origins from config
+        if not self.origins:
+            self.origins = get_origins(self.name)
+
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
@@ -74,7 +133,7 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         print(f"Downloading MIPLib instances from miplib.zib.de")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
         except ValueError as e:
             raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
         
