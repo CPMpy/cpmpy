@@ -10,7 +10,6 @@ from ..expressions.core import BoolVal, Comparison, Expression, Operator
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl
 from ..transformations.flatten_model import get_or_make_var
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar
 from ..expressions.utils import is_int
 
 UNKNOWN_COMPARATOR_ERROR = ValueError("Comparator is not known or should have been simplified by linearize.")
@@ -212,14 +211,17 @@ def _decide_encoding(x, cmp=None, encoding="auto"):
 class IntVarEnc(ABC):
     """Abstract base class for integer variable encodings."""
 
+    NAMED = False
+    """Enable to name the encoding variables semantically for debugging purposes (e.g. `BV[x == 42]` for a direct encoding variable of `x`)"""
+
     def __init__(self, x, x_enc, csemap=None):
         """Create encoding of integer variable `x` over the given Boolean expressions, `x_enc`. E.g. the direct encoding for `x` should provide `x_enc = ( x == 1, x == 2, ..)`. Any literals created (e.g. b == ( x == 1 )`) are added to the `csemap` if provided."""
         self._x = x  # the encoded integer variable
         self._xs = []
         for x_enc_i in x_enc:
             lit, _ = get_or_make_var(x_enc_i, csemap=csemap)
-            # we can remove the definining constraints as the int var will be replaced
-            if lit.name != x_enc_i.name:  # ensure that the original variable's name is never replaced. This can happen for IV's
+            # we can remove the defining constraints as the int var will be replaced
+            if self.__class__.NAMED and lit.name != x_enc_i.name:  # ensure that the original variable's name is never replaced. This can happen for IV's
                 lit.name = f"BV[{x_enc_i}]"
             self._xs.append(lit)
         self._xs = cp.cpm_array(self._xs)

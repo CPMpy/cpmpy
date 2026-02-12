@@ -6,11 +6,11 @@ from cpmpy import SolverLookup
 from cpmpy.expressions.core import BoolVal, Comparison, Operator
 from cpmpy.expressions.utils import argvals
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar, intvar
-from cpmpy.model import Model
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.int2bool import int2bool
+from cpmpy.transformations.int2bool import int2bool, IntVarEnc
 from utils import skip_on_missing_pblib
+
 
 # add some small but non-trivial integer variables (i.e. non-zero lower bounds, domain size not a power of two)
 x = intvar(1, 3, name="x")
@@ -101,6 +101,7 @@ class TestTransInt2Bool:
         ids=idfn,
     )
     def test_transforms(self, solver, constraint, encoding, setup):
+        IntVarEnc.NAMED = True
         user_vars = set(get_variables(constraint))
         ivarmap = dict()
         flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding)
