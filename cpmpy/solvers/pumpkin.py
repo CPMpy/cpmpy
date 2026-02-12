@@ -111,7 +111,7 @@ class CPM_pumpkin(SolverInterface):
             cpm_model: Model(), a CPMpy Model() (optional)
             subsolver: None, not used
             proof (str, optional): path to the proof file
-            seed (int, optional): ranomd seed for the solver
+            seed (int, optional): random seed for the solver
         """
         if not self.supported():
             raise ModuleNotFoundError("CPM_pumpkin: Install the python package 'cpmpy[pumpkin]' to use this solver interface.")
@@ -650,9 +650,9 @@ class CPM_pumpkin(SolverInterface):
 
         except RuntimeError as e:
             # Can happen when conflict is found with just root level propagation
-            if e.args[0] == "inconsistency detected":
+            if self.pum_solver.is_inconsistent():
                 return self
-            raise e
+            raise e # something else happened
 
     __add__ = add # avoid redirect in superclass
 
