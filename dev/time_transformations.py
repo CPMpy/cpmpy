@@ -258,6 +258,7 @@ if __name__ == "__main__":
                         help="Stop transformation pipeline after this step (e.g. flatten_constraint)")
     parser.add_argument("--instances-per-problem", type=int, default=1, metavar="N",
                         help="Max instances per problem type (prefix before first '-'); default 1")
+    parser.add_argument("--download", action="store_true", help="Download the dataset if it doesn't exist")
     args = parser.parse_args()
 
     root = args.root.resolve()
@@ -269,9 +270,10 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        dataset = XCSP3Dataset(root=str(root), year=year, track=track, download=False)
+        dataset = XCSP3Dataset(root=str(root), year=year, track=track, download=args.download)
     except ValueError as e:
         print(f"Dataset not found for track {track}: {e}", file=sys.stderr)
+        print("Use option --download to download the dataset", file=sys.stderr)
         sys.exit(1)
 
     time_transformations(dataset, args.output, args.limit, args.offset, args.stop_after, args.instances_per_problem)
