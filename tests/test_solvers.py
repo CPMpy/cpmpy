@@ -829,18 +829,20 @@ class TestSolvers:
         m += cp.sum(x) <= 2
 
         # old version, does not work anymore
-        self.assertRaises(ValueError, lambda: m.solve(solver="pumpkin", proof_name="test_proof.drcp"))
+        with pytest.raises(ValueError):
+            m.solve(solver="pumpkin", proof_name="test_proof.drcp")
         
         # need to supply proof in constructor
         proof_name=tempfile.NamedTemporaryFile(suffix=".drcp", delete=False).name
         s = cp.SolverLookup.get("pumpkin", m, proof=proof_name)
-        self.assertFalse(s.solve())
+        assert s.solve() is False
         with open(proof_name, "r") as f:
             proof = f.read()
-            self.assertTrue("UNSAT" in proof)
+            assert ("UNSAT" in proof)
 
         # cannot supply proof in solve
-        self.assertRaises(ValueError, s.solve, proof=proof_name)
+        with pytest.raises(ValueError):
+            s.solve(proof=proof_name)
 
 
 @pytest.mark.usefixtures("solver")
