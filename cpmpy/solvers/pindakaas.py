@@ -158,10 +158,7 @@ class CPM_pindakaas(SolverInterface):
         solver_assumptions = None if assumptions is None else self.solver_vars(assumptions)
 
         t = time.time()
-        with self.pdk_solver.solve(
-            time_limit=time_limit,
-            assumptions=solver_assumptions,
-        ) as result:
+        with self.pdk_solver.solve(time_limit=time_limit, assumptions=solver_assumptions) as result:
             self.cpm_status.runtime = time.time() - t
 
             # translate pindakaas result status to cpmpy status
