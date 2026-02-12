@@ -1,4 +1,5 @@
 import pytest
+import itertools
 
 import cpmpy as cp
 
@@ -83,8 +84,6 @@ def setup():
 
 
 class TestTransInt2Bool:
-    import importlib
-    import itertools
 
     def idfn(val):
         if isinstance(val, tuple):
@@ -94,7 +93,6 @@ class TestTransInt2Bool:
             return f"{val}"
 
     @pytest.mark.requires_solver("pindakaas", "pysat")
-    @skip_on_missing_pblib(skip_on_exception_only=True)
     @pytest.mark.parametrize(
         ("constraint", "encoding"),
         itertools.product(CONSTRAINTS, ENCODINGS),
@@ -102,7 +100,7 @@ class TestTransInt2Bool:
     )
     def test_transforms(self, solver, constraint, encoding, setup):
         IntVarEnc.NAMED = True
-        user_vars = set(get_variables(constraint))
+        user_vars = tuple(get_variables(constraint))
         ivarmap = dict()
         flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding, csemap=dict())
 
@@ -120,10 +118,9 @@ class TestTransInt2Bool:
         for c in flat:
             solver.add(c)
 
-        # unfortunately, some tricky edge cases where trivial constraints remove their variables by using the above `add` method
-        # this only happens in this test set-up
-        # to fix this, we add user variables which may have been removed!
-        solver.user_vars |= user_vars
+        # ensure all user vars are known to the CNF solver
+        for x in user_vars:
+            solver.add(x == x)
 
         solver.ivarmap = ivarmap
         solver.solveAll(display=lambda: flat_sols.append(tuple(argvals(user_vars))))
