@@ -823,6 +823,28 @@ class TestSolvers:
         assert m.solve(solver="minizinc")
 
 
+    def test_pumpkin_proof(self):
+        x = cp.intvar(0,10, shape=3)
+        m = cp.Model(cp.AllDifferent(x))
+        m += cp.sum(x) <= 2
+
+        # old version, does not work anymore
+        with pytest.raises(ValueError):
+            m.solve(solver="pumpkin", proof_name="test_proof.drcp")
+        
+        # need to supply proof in constructor
+        proof_name=tempfile.NamedTemporaryFile(suffix=".drcp", delete=False).name
+        s = cp.SolverLookup.get("pumpkin", m, proof=proof_name)
+        assert s.solve() is False
+        with open(proof_name, "r") as f:
+            proof = f.read()
+            assert ("UNSAT" in proof)
+
+        # cannot supply proof in solve
+        with pytest.raises(ValueError):
+            s.solve(proof=proof_name)
+
+
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
     def test_installed_solvers(self, solver):
