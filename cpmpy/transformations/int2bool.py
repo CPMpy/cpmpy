@@ -394,8 +394,12 @@ class IntVarEncLog(IntVarEnc):
     def __init__(self, x, csemap=None):
         """Create binary encoding of integer variable `x`."""
         bits = math.ceil(math.log2(_dom_size(x)))
-        super().__init__(x, (cp.boolvar(name=f"bit({x},{k})") for k in range(bits)), csemap=csemap)
-        # TODO possibly...: super().__init__(x,  ((( ((x - x.lb) ** k) % 2) == 0) for k in range(bits)), csemap=csemap)
+        super().__init__(
+            x,
+            (cp.boolvar(name=f"bit({x},{k})" if self.__class__.NAMED else None) for k in range(bits)),
+            csemap=csemap,
+        )
+        # TODO possibly something like: super().__init__(x,  ((( ((x - x.lb) ** k) % 2) == 1) for k in range(bits)), csemap=csemap)
 
     def encode_domain_constraint(self):
         """Return binary encoding domain constraint (i.e. upper bound is respected with `self._x<=self._x.ub`. The lower bound is automatically enforced by offset binary which maps `000.. = self._x.lb`)."""
