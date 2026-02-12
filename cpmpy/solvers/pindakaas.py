@@ -38,13 +38,12 @@ Module details
 """
 
 import time
-import pkg_resources
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, List
 
 from ..exceptions import NotSupportedError
-from ..expressions.utils import eval_comparison
 from ..expressions.core import BoolVal, Comparison
+from ..expressions.utils import eval_comparison
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
@@ -77,6 +76,9 @@ class CPM_pindakaas(SolverInterface):
 
     """
 
+    supported_global_constraints = frozenset()
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         try:
@@ -89,9 +91,11 @@ class CPM_pindakaas(SolverInterface):
     @staticmethod
     def version() -> Optional[str]:
         """Return the installed version of the solver's Python API."""
+        from importlib.metadata import PackageNotFoundError, version
+
         try:
-            return pkg_resources.get_distribution("pindakaas").version
-        except pkg_resources.DistributionNotFound:
+            return version("pindakaas")
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -101,9 +105,7 @@ class CPM_pindakaas(SolverInterface):
         """
         name = "pindakaas"
         if not self.supported():
-            raise ImportError(
-                f"CPM_{name}: Install the Pindakaas python library `pindakaas` (e.g. `pip install pindakaas`) package to use this solver interface"
-            )
+            raise ModuleNotFoundError(f"CPM_{name}: Install the python package 'cpmpy[pindakaas]' to use this solver interface.")
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError(f"CPM_{name}: only satisfaction, does not support an objective function")
 
@@ -121,7 +123,21 @@ class CPM_pindakaas(SolverInterface):
     def native_model(self):
         return self.pdk_solver
 
-    def solve(self, time_limit=None, assumptions=None):
+    def _int2bool_user_vars(self):
+        # ensure all vars are known to solver
+        self.solver_vars(list(self.user_vars))
+
+        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
+        user_vars = set()
+        for x in self.user_vars:
+            if isinstance(x, _BoolVarImpl):
+                user_vars.add(x)
+            else:
+                # extends set with encoding variables of `x`
+                user_vars.update(self.ivarmap[x.name].vars())
+        return user_vars
+
+    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[List[_BoolVarImpl]] = None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
 
@@ -135,19 +151,7 @@ class CPM_pindakaas(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
-
-        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        user_vars = set()
-        for x in self.user_vars:
-            if isinstance(x, _BoolVarImpl):
-                user_vars.add(x)
-            else:
-                # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
-
-        self.user_vars = user_vars
+        self.user_vars = self._int2bool_user_vars()
 
         if time_limit is not None:
             time_limit = timedelta(seconds=time_limit)
@@ -219,37 +223,28 @@ class CPM_pindakaas(SolverInterface):
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
-                enc, cons = _encode_int_var(
-                    self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding)
-                )
+                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self += cons
             else:
                 enc = self.ivarmap[cpm_var.name]
             return self.solver_vars(enc.vars())
         else:
-            raise TypeError
+            raise TypeError(f"Unexpected type: {cpm_var}")
 
     def transform(self, cpm_expr):
-        cpm_cons = [cpm_expr]
-
-        # eagerly encode integer variables to maximize CSE
-        for x in get_variables(cpm_expr):
-            if (not isinstance(x, _BoolVarImpl)) and isinstance(x, _IntVarImpl):
-                _, cons = _encode_int_var(
-                    self.ivarmap, x, _decide_encoding(x, encoding=self.encoding), csemap=self._csemap
-                )
-                cpm_cons += cons
-
-        cpm_cons = toplevel_list(cpm_cons)
-        cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, csemap=self._csemap)
+        cpm_cons = toplevel_list(cpm_expr)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = decompose_in_tree(
+            cpm_cons,
+            supported=self.supported_global_constraints | {"alldifferent"},  # alldiff has a specialized MIP decomp in linearize
+            supported_reified=self.supported_reified_global_constraints,
+            csemap=self._csemap,
+        )
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(
-            cpm_cons, supported=frozenset({"sum", "wsum", "and", "or"}), csemap=self._csemap
-        )
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)
         cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         return cpm_cons
 
@@ -273,22 +268,34 @@ class CPM_pindakaas(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
+    def _add_clause(self, clause, conditions=[]):
+        """Add a clause implied by conditions; both arguments are lists of CPMpy literals."""
+        if not isinstance(clause, list):
+            raise TypeError
+
+        self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + clause))
+
     def _post_constraint(self, cpm_expr, conditions=[]):
+        if not isinstance(conditions, list):
+            raise TypeError
+
         """Add a single, *transformed* constraint, implied by conditions."""
+        import pindakaas as pdk
+
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
-                self.pdk_solver.add_clause(conditions)
+                self._add_clause([], conditions=conditions)
 
         elif isinstance(cpm_expr, _BoolVarImpl):  # (implied) literal
-            self.pdk_solver.add_clause(conditions + [self.solver_var(cpm_expr)])
+            self._add_clause([cpm_expr], conditions=conditions)
 
         elif cpm_expr.name == "or":  # (implied) clause
-            self.pdk_solver.add_clause(conditions + self.solver_vars(cpm_expr.args))
+            self._add_clause(cpm_expr.args, conditions=conditions)
 
         elif cpm_expr.name == "->":  # implication
             a0, a1 = cpm_expr.args
-            self._post_constraint(a1, conditions=conditions + [~self.solver_var(a0)])
+            self._post_constraint(a1, conditions=conditions + [a0])
 
         elif isinstance(cpm_expr, Comparison):  # Bool linear
             assert cpm_expr.name in {"<=", ">=", "=="}, (
@@ -310,7 +317,21 @@ class CPM_pindakaas(SolverInterface):
 
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=conditions)
+            try:
+                # normalization may raise `pdk.Unsatisfiable`
+                self.pdk_solver.add_encoding(
+                    eval_comparison(cpm_expr.name, lhs, rhs),
+                    # seems pindakaas conditions are the wrong way around
+                    conditions=self.solver_vars([~c for c in conditions]),
+                )
+            except pdk.Unsatisfiable as e:
+                if conditions:
+                    # trivial unsat with conditions does not count; posts ~conditions
+                    # `add_clause` may raise `pdk.Unsatisfiable` too, but the conditions are added to the clause, so no need to catch
+                    self._add_clause([], conditions=conditions)
+                else:
+                    # no conditions means truly unsatisfiable
+                    raise e
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 

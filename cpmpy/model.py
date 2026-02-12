@@ -12,7 +12,7 @@
     the constraints or objective stored in the model.
 
     A model can be solved multiple times, and constraints can be added inbetween solve calls.
-    Note that constraints are added using the ``+=`` operator (implemented by :meth:`__add__() <cpmpy.model.Model.__add__>`).
+    Note that constraints are added using :meth:`.add(...) <cpmpy.model.Model.add>` or using the ``+=`` operator (implemented by :meth:`__add__()`).
 
     See the full list of functions below.
 
@@ -27,6 +27,7 @@
 """
 import copy
 import warnings
+from typing import Optional
 
 import numpy as np
 
@@ -35,7 +36,7 @@ from .expressions.core import Expression
 from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
-from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 
 import pickle
 
@@ -49,9 +50,9 @@ class Model(object):
             Arguments of constructor:
 
             Arguments:
-                `*args`: Expression object(s) or list(s) of Expression objects
-                `minimize`: Expression object representing the objective to minimize
-                `maximize`: Expression object representing the objective to maximize
+                *args (Expression or list[Expression]): The constraints of the model
+                minimize (Expression): The objective to minimize
+                maximize (Expression): The objective to maximize
 
             At most one of minimize/maximize can be set, if none are set, it is assumed to be a satisfaction problem
         """
@@ -85,16 +86,16 @@ class Model(object):
         Add one or more constraints to the model.
 
         Arguments:
-            con (Expression or list): Expression object(s) or list(s) of Expression objects representing constraints
+            con (Expression or list[Expression]): Expression object(s) or list(s) of Expression objects representing constraints
 
         Returns:
-            Model: Returns self to allow for method chaining
+            Model: Returns ``self`` to allow for method chaining
 
         Example:
             .. code-block:: python
 
                 m = Model()
-                m += [x > 0]
+                m.add([x > 0])
         """
         if is_any_list(con):
             # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
@@ -122,7 +123,7 @@ class Model(object):
         """
             Minimize the given objective function
 
-            `minimize()` can be called multiple times, only the last one is stored
+            ``minimize()`` can be called multiple times, only the last one is stored
         """
         self.objective(expr, minimize=True)
 
@@ -130,7 +131,7 @@ class Model(object):
         """
             Maximize the given objective function
 
-            `maximize()` can be called multiple times, only the last one is stored
+            ``maximize()`` can be called multiple times, only the last one is stored
         """
         self.objective(expr, minimize=False)
 
@@ -141,9 +142,9 @@ class Model(object):
 
             Arguments:
                 expr (Expression):      the CPMpy expression that represents the objective function
-                minimize (bool):        whether it is a minimization problem (True) or maximization problem (False)
+                minimize (bool):        whether it is a minimization problem (``True``) or maximization problem (``False``)
 
-            'objective()' can be called multiple times, only the last one is stored
+            ``objective()`` can be called multiple times, only the last one is stored
         """
         self.objective_ = expr
         self.objective_is_min = minimize
@@ -153,7 +154,7 @@ class Model(object):
             Check if the model has an objective function
 
             Returns:
-                bool: True if the model has an objective function, False otherwise
+                bool: ``True`` if the model has an objective function, ``False`` otherwise
         """
         return self.objective_ is not None
 
@@ -162,14 +163,15 @@ class Model(object):
             Returns the value of the objective function of the last solver run on this model
 
             Returns:
-                an integer or 'None' if it is not run or is a satisfaction problem
+                int, optional:  The objective value as an integer or ``None`` if it is not run or is a satisfaction problem
         """
         return self.objective_.value()
 
-    def solve(self, solver=None, time_limit=None, **kwargs):
-        """ Send the model to a solver and get the result.
+    def solve(self, solver:Optional[str]=None, time_limit:Optional[int|float]=None, **kwargs):
+        """ 
+        Send the model to a solver and get the result.
 
-            Run :func:`SolverLookup.solvernames() <cpmpy.solvers.SolverLookup.solvernames>` to find out the valid solver names on your system. (default: None = first available solver)
+        Run :func:`SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` to find out the valid solver names on your system. (default: None = first available solver)
 
         Arguments:
             solver (string or a name in SolverLookup.solvernames() or a SolverInterface class (Class, not object!), optional): 
@@ -180,8 +182,8 @@ class Model(object):
         Returns:
             bool: the computed output:
 
-            - True      if a solution is found (not necessarily optimal, e.g. could be after timeout)
-            - False     if no solution is found
+            - ``True``      if a solution is found (not necessarily optimal, e.g. could be after timeout)
+            - ``False``     if no solution is found
         """
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
@@ -198,7 +200,7 @@ class Model(object):
         self.cpm_status = s.status()
         return ret
 
-    def solveAll(self, solver=None, display=None, time_limit=None, solution_limit=None, **kwargs):
+    def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -206,9 +208,9 @@ class Model(object):
             If at least one solution was found and the solver exhausted all possible solutions, the solver status will be 'Optimal', otherwise 'Feasible'.
 
             Arguments:
-                display:            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                                    default/None: nothing displayed
-                solution_limit:     stop after this many solutions (default: None)
+                display:                            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                                                    default/None: nothing displayed
+                solution_limit (int, optional):     stop after this many solutions (default: None)
 
             Returns:
                 int: number of solutions found (within the time and solution limit)
@@ -263,7 +265,7 @@ class Model(object):
 
     def to_file(self, fname):
         """
-            Serializes this model to a ``.pickle`` format
+            Serializes this model to a `.pickle` format
 
             Arguments:
                 fname (FileDescriptorOrPath): Filename of the resulting serialized model
@@ -278,7 +280,7 @@ class Model(object):
             Reads a Model instance from a binary pickled file
 
             Returns:
-                an object of :class: `Model`
+                an object of :class:`Model`
         """
         with open(fname, "rb") as f:
             m = pickle.load(f)

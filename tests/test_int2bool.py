@@ -1,15 +1,16 @@
 import pytest
 
 import cpmpy as cp
+
+from cpmpy import SolverLookup
+from cpmpy.expressions.core import BoolVal, Comparison, Operator
+from cpmpy.expressions.utils import argvals
+from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar, intvar
+from cpmpy.model import Model
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.expressions.core import Comparison, Operator, BoolVal
-from cpmpy.expressions.utils import argvals
-from cpmpy.model import Model
-from cpmpy import SolverLookup
-
 from cpmpy.transformations.int2bool import int2bool
-from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl, intvar, boolvar
+from utils import skip_on_missing_pblib
 
 # add some small but non-trivial integer variables (i.e. non-zero lower bounds, domain size not a power of two)
 x = intvar(1, 3, name="x")
@@ -20,14 +21,6 @@ p = boolvar(name="p")
 q = boolvar(name="q")
 
 c = intvar(2, 2, name="c")
-
-SOLVERS = [
-    "pindakaas",
-    "pysat",
-]
-SOLVERS = [
-    (name, solver) for name, solver in SolverLookup.base_solvers() if name in SOLVERS and solver.supported()
-]
 
 CONSTRAINTS = [
     # BoolVal(True),  # TODO or tools problem
@@ -54,6 +47,7 @@ CONSTRAINTS = [
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), -10),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),  # where ub(lhs)<rhs
         Comparison(cmp, Operator("wsum", [[2, 3], [x, p]]), 5),  # mix int and bool terms
+        Comparison(cmp, Operator("wsum", [[3], [q]]), 2),
         Comparison(
             cmp,
             Operator(
@@ -99,9 +93,11 @@ class TestTransInt2Bool:
         else:
             return f"{val}"
 
+    @pytest.mark.requires_solver("pindakaas", "pysat")
+    @skip_on_missing_pblib(skip_on_exception_only=True)
     @pytest.mark.parametrize(
-        ("solver", "constraint", "encoding"),
-        itertools.product(SOLVERS, CONSTRAINTS, ENCODINGS),
+        ("constraint", "encoding"),
+        itertools.product(CONSTRAINTS, ENCODINGS),
         ids=idfn,
     )
     def test_transforms(self, solver, constraint, encoding, setup):
@@ -118,8 +114,7 @@ class TestTransInt2Bool:
             display=lambda: cons_sols.append(tuple(argvals(user_vars))),
         )
         cons_sols = sorted(cons_sols)
-        name, solver_class = solver
-        solver = solver_class()
+        solver = SolverLookup().get(solver)
         solver.encoding = encoding
         for c in flat:
             solver.add(c)
@@ -151,19 +146,13 @@ class TestTransInt2Bool:
         slv = cp.solvers.CPM_pindakaas()
         slv.encoding = "direct"
         # assert str(slv.transform((x == 0) )) == "[(EncDir(x)[0]) + (EncDir (x)[1]) == 1, EncDir(x)[0], ~EncDir(x)[1]]"
-        assert (
-            str(slv.transform((x == 0) | (x == 2)))
-            == "[(⟦x == 0⟧) or (⟦x == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1]"
-        )
+        assert str(slv.transform((x == 0) | (x == 2))) == "[(⟦x == 0⟧) or (⟦x == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1]"
 
     def test_int2bool_cse_one_var_order(self):
         x = cp.intvar(0, 2, name="x")
         slv = cp.solvers.CPM_pindakaas()
         slv.encoding = "order"
-        assert (
-            str(slv.transform((x >= 1) | (x >= 2)))
-            == "[(⟦x >= 1⟧) or (⟦x >= 2⟧), sum([1, -1] * (⟦x >= 2⟧, ⟦x >= 1⟧)) <= 0]"
-        )
+        assert str(slv.transform((x >= 1) | (x >= 2))) == "[(⟦x >= 1⟧) or (⟦x >= 2⟧), sum([1, -1] * (⟦x >= 2⟧, ⟦x >= 1⟧)) <= 0]"
         # TODO this could be a CSE improvement?
         # assert str(slv.transform((x >= 1) | (x < 2))) == "[(⟦x == 0⟧) or (⟦x == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1]"
 
@@ -176,4 +165,3 @@ class TestTransInt2Bool:
             str(slv.transform((x == 0) | (y == 2)))
             == "[(⟦x == 0⟧) or (⟦y == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1, sum([⟦y == 0⟧, ⟦y == 1⟧, ⟦y == 2⟧]) == 1]"
         )
-
