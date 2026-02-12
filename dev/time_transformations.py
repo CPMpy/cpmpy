@@ -247,8 +247,6 @@ def step_order_from_records(records):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Time pysat transformations on XCSP3 instances (no solving).")
-    default_root = pathlib.Path(cp.__file__).resolve().parent / "tools" / "xcsp3"
-    parser.add_argument("--root", type=pathlib.Path, default=default_root)
     parser.add_argument("--year", type=int, default=2024)
     parser.add_argument("--track", type=str, default="COP", help="XCSP3 track (e.g. COP, MiniCOP)")
     parser.add_argument("-o", "--output", type=pathlib.Path, default=pathlib.Path("time_transformations.csv"))
@@ -259,9 +257,10 @@ if __name__ == "__main__":
     parser.add_argument("--instances-per-problem", type=int, default=1, metavar="N",
                         help="Max instances per problem type (prefix before first '-'); default 1")
     parser.add_argument("--download", action="store_true", help="Download the dataset if it doesn't exist")
+    parser.add_argument("--data", type=pathlib.Path, default=None, help="Path to the dataset. If combined with --download, the dataset will be downloaded to this path. If not provided, the dataset will be downloaded to / looked for in the current working directory.")
     args = parser.parse_args()
 
-    root = args.root.resolve()
+    root = args.data.resolve() if args.data else pathlib.Path(".").resolve()
     year = args.year
     track = args.track
 
