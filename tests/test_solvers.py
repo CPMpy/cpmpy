@@ -6,11 +6,11 @@ import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
-from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.pindakaas import CPM_pindakaas
+from cpmpy.solvers.pumpkin import CPM_pumpkin
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
@@ -821,6 +821,29 @@ class TestSolvers:
 
         m = cp.Model([x + y == 2, wsum == 9])
         assert m.solve(solver="minizinc")
+
+
+    @pytest.mark.skipif(not CPM_pumpkin.supported(), reason="Gurobi not installed")
+    def test_pumpkin_proof(self):
+        x = cp.intvar(0,10, shape=3)
+        m = cp.Model(cp.AllDifferent(x))
+        m += cp.sum(x) <= 2
+
+        # old version, does not work anymore
+        with pytest.raises(ValueError):
+            m.solve(solver="pumpkin", proof_name="test_proof.drcp")
+        
+        # need to supply proof in constructor
+        proof_name=tempfile.NamedTemporaryFile(suffix=".drcp", delete=False).name
+        s = cp.SolverLookup.get("pumpkin", m, proof=proof_name)
+        assert s.solve() is False
+        with open(proof_name, "r") as f:
+            proof = f.read()
+            assert ("UNSAT" in proof)
+
+        # cannot supply proof in solve
+        with pytest.raises(ValueError):
+            s.solve(proof=proof_name)
 
 
 @pytest.mark.usefixtures("solver")
