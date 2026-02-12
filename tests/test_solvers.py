@@ -6,11 +6,11 @@ import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
-from cpmpy.expressions.core import Operator
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.solvers.pindakaas import CPM_pindakaas
+from cpmpy.solvers.pumpkin import CPM_pumpkin
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.z3 import CPM_z3
 from cpmpy.solvers.minizinc import CPM_minizinc
@@ -823,6 +823,7 @@ class TestSolvers:
         assert m.solve(solver="minizinc")
 
 
+    @pytest.mark.skipif(not CPM_pumpkin.supported(), reason="Gurobi not installed")
     def test_pumpkin_proof(self):
         x = cp.intvar(0,10, shape=3)
         m = cp.Model(cp.AllDifferent(x))
