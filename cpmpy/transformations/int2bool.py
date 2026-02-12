@@ -218,11 +218,10 @@ class IntVarEnc(ABC):
         self._x = x  # the encoded integer variable
         self._xs = []
         for x_enc_i in x_enc:
+            # we can omit the defining constraints as the int var will be replaced
             lit, _ = get_or_make_var(x_enc_i, csemap=csemap)
-            # we can remove the defining constraints as the int var will be replaced
-            if (
-                self.__class__.NAMED and lit.name != x_enc_i.name
-            ):  # ensure that the original variable's name is never replaced. This can happen for IV's
+            # ensure that the original variable's name is never replaced. This can happen for IV's
+            if self.__class__.NAMED and lit.name != x_enc_i.name:
                 lit.name = f"BV[{x_enc_i}]"
             self._xs.append(lit)
         self._xs = cp.cpm_array(self._xs)
