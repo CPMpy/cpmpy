@@ -333,15 +333,28 @@ class Multiplication(GlobalFunction):
         super().__init__("mul", (x, y))
         self.is_lhs_num = is_lhs_num
 
+    def update_args(self, args):
+        """ Allows in-place update of the expression's arguments.
+            Resets all cached computations which depend on the expression tree.
+        """
+        x, y = args
+        is_lhs_num = False
+        if is_num(x):
+            is_lhs_num = True
+        elif is_num(y):
+            (x, y) = (y, x)
+            is_lhs_num = True
+
+        super().update_args((x, y))
+        self.is_lhs_num = is_lhs_num
+
     def __repr__(self):
         x, y = self.args
 
-        def wrap_bracket(arg):
-            if isinstance(arg, Expression):
-                return f"({arg})"
-            return arg
+        if self.is_lhs_num:
+            return "{} * ({})".format(x, y)
 
-        return "{} * {}".format(wrap_bracket(x), wrap_bracket(y))
+        return "({}) * ({})".format(x, y)
 
     def __neg__(self):
         """-(c*x) -> (-c)*x when constant c is first (.is_lhs_num)."""
@@ -390,11 +403,6 @@ class Multiplication(GlobalFunction):
             z = intvar(lb_z, ub_z)
             return z, [bv.implies(z == iv), (~bv).implies(z == 0)]
 
-        # int*int linear decomposition:
-        # a*b == sum(i*bv_i)*b with encoding a == sum(i*bv_i) with exactly one bv_i
-        #     == sum(i*(bv_i*b)) 
-        #     == sum(i*z_i) and all_i( (bv_i)->(z_i == b) & (~bv_i)->(z_i == 0) )
-
         # let a be the one with the smallest domain, leading to the fewest auxiliariy variables
         lb_a, ub_a = get_bounds(a)
         lb_b, ub_b = get_bounds(b)
@@ -402,22 +410,24 @@ class Multiplication(GlobalFunction):
             a, b = b, a
             lb_a, lb_b = lb_b, lb_a
             ub_a, ub_b = ub_b, ub_a
+        dom_a = list(range(lb_a, ub_a + 1))
 
-        # encoding a == sum(i*bv_i) with exactly one bv_i
-        domain = list(range(lb_a, ub_a + 1))
-        bvs = cp.boolvar(shape=(len(domain),))
-        encoding = [cp.sum(bvs) == 1, a == Operator("wsum", (domain, bvs))]
+        # int*int linear decomposition:
+        # a*b == sum_v(v * (a==v)) * b  with 'v' in dom(a)
+        #     == sum_v(v * ((a==v) * b))
+        #     == sum_v(v * z_v) and all_v( (a==v)->(z_v == b) & (a!=v)->(z_v == 0) )
 
-        # encoding z_i == bv_i*b via (bv_i)->(z_i == b) & (~bv_i)->(z_i == 0)
+        # encoding z_v == (a == v)*b via (a==v)->(z_v == b) & (a!=v)->(z_v == 0)
+        encoding = []
         z_lb = min(0, lb_b) # make sure it can take 0
         z_ub = max(0, ub_b) # make sure it can take 0
-        zs = cp.intvar(z_lb, z_ub, shape=(len(domain),))
-        for i, (bv_i, z_i) in enumerate(zip(bvs, zs)):
-            encoding.append(bv_i.implies(z_i == b))
-            encoding.append((~bv_i).implies(z_i == 0))
+        zs = cp.intvar(z_lb, z_ub, shape=(len(dom_a),))
+        for v, z_v in zip(dom_a, zs):
+            encoding.append((a == v).implies(z_v == b))
+            encoding.append((a != v).implies(z_v == 0))
 
         # result = sum(i*z_i)
-        result = Operator("wsum", (domain, zs))
+        result = Operator("wsum", (dom_a, zs))
         return result, encoding
 
 
