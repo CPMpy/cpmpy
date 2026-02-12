@@ -280,8 +280,6 @@ class CPM_pindakaas(SolverInterface):
             raise TypeError
 
         """Add a single, *transformed* constraint, implied by conditions."""
-        import pindakaas as pdk
-
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
@@ -315,23 +313,10 @@ class CPM_pindakaas(SolverInterface):
             else:
                 raise ValueError(f"Trying to encode non (Boolean) linear constraint: {cpm_expr}")
 
+            # Create `pindakaas` Boolean linear expression object
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            try:
-                # normalization may raise `pdk.Unsatisfiable`
-                self.pdk_solver.add_encoding(
-                    eval_comparison(cpm_expr.name, lhs, rhs),
-                    # seems pindakaas conditions are the wrong way around
-                    conditions=self.solver_vars([~c for c in conditions]),
-                )
-            except pdk.Unsatisfiable as e:
-                if conditions:
-                    # trivial unsat with conditions does not count; posts ~conditions
-                    # `add_clause` may raise `pdk.Unsatisfiable` too, but the conditions are added to the clause, so no need to catch
-                    self._add_clause([], conditions=conditions)
-                else:
-                    # no conditions means truly unsatisfiable
-                    raise e
+            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=self.solver_vars(conditions))
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 

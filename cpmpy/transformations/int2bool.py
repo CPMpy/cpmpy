@@ -18,6 +18,13 @@ UNKNOWN_COMPARATOR_ERROR = ValueError("Comparator is not known or should have be
 
 def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto", csemap=None):
     """Convert integer linear constraints to pseudo-boolean constraints. Requires `linearize` transformation."""
+    """Convert integer linear constraints to pseudo-boolean constraints. Requires `linearize` transformation.
+
+    :param: cpm_lst: list of constraints to transform
+    :param: ivarmap: dictonary mapping integer variables to their encoding
+    :param: encoding: choice of encoding: "direct", "order", "binar", or "auto", which makes encoding choices based on constraint comparator and domain size
+    :param: csemap: To enable CSE
+    """
     assert encoding in (
         "auto",
         "direct",
@@ -212,7 +219,8 @@ class IntVarEnc(ABC):
         for x_enc_i in x_enc:
             lit, _ = get_or_make_var(x_enc_i, csemap=csemap)
             # we can remove the definining constraints as the int var will be replaced
-            lit.name = f"⟦{x_enc_i}⟧"
+            if lit.name != x_enc_i.name:  # ensure that the original variable's name is never replaced. This can happen for IV's
+                lit.name = f"BV[{x_enc_i}]"
             self._xs.append(lit)
         self._xs = cp.cpm_array(self._xs)
 
@@ -228,9 +236,10 @@ class IntVarEnc(ABC):
         """Return the integer value of the encoding."""
         terms, k = self.encode_term()
         for weight, lit in terms:
-            if lit is None:
+            a = lit.value()
+            if a is None:
                 return None
-            elif lit.value() is True:
+            elif a is True:
                 k += weight
         return k
 
