@@ -104,7 +104,7 @@ class TestTransInt2Bool:
         IntVarEnc.NAMED = True
         user_vars = set(get_variables(constraint))
         ivarmap = dict()
-        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding)
+        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding, csemap=dict())
 
         cons_sols = []
         flat_sols = []
