@@ -182,15 +182,15 @@ class CPM_pumpkin(SolverInterface):
         from pumpkin_solver import SatisfactionResult, SatisfactionUnderAssumptionsResult
         from pumpkin_solver.optimisation import OptimisationResult, Direction
 
+        if "proof" in kwargs or "prove" in kwargs or "prove_location" in kwargs or "proof_name" in kwargs:
+            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solve."
+                             "`cpmpy.SolverLookup.get('pumpkin', model, proof='path/to/proof.drcp')`")
+
         if self.pum_solver.is_inconsistent():
             return self._unsat_at_rootlevel()
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-
-        if "proof" in kwargs or "prove" in kwargs or "prove_location" in kwargs or "proof_name" in kwargs:
-            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solve."
-                             "`cpmpy.SolverLookup.get('pumpkin', model, proof='path/to/proof.drcp')`")
 
         # parse and dispatch the arguments
         if time_limit is not None and time_limit < 0:
