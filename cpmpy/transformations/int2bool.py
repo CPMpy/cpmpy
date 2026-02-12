@@ -63,9 +63,8 @@ def _encode_expr(ivarmap, expr, encoding, csemap=None):
             return _encode_comparison(ivarmap, lhs, expr.name, rhs, encoding, csemap=csemap)
         elif lhs.name == "sum":
             if len(lhs.args) == 1:
-                return _encode_expr(
-                    ivarmap, Comparison(expr.name, lhs.args[0], rhs), encoding, csemap=csemap
-                )  # even though it seems trivial (to call `_encode_comparison`), using recursion avoids bugs
+                # even though it seems trivial (to call `_encode_comparison`), using recursion avoids bugs
+                return _encode_expr(ivarmap, Comparison(expr.name, lhs.args[0], rhs), encoding, csemap=csemap)
             else:
                 return _encode_linear(ivarmap, lhs.args, expr.name, rhs, encoding, csemap=csemap)
         elif lhs.name == "wsum":
@@ -221,7 +220,9 @@ class IntVarEnc(ABC):
         for x_enc_i in x_enc:
             lit, _ = get_or_make_var(x_enc_i, csemap=csemap)
             # we can remove the defining constraints as the int var will be replaced
-            if self.__class__.NAMED and lit.name != x_enc_i.name:  # ensure that the original variable's name is never replaced. This can happen for IV's
+            if (
+                self.__class__.NAMED and lit.name != x_enc_i.name
+            ):  # ensure that the original variable's name is never replaced. This can happen for IV's
                 lit.name = f"BV[{x_enc_i}]"
             self._xs.append(lit)
         self._xs = cp.cpm_array(self._xs)
