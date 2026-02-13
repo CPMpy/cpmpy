@@ -76,13 +76,6 @@ def numexprs(solver):
         else:
             yield Operator(name, NUM_ARGS)
 
-    yield cp.Multiplication(3, NUM_ARGS[0])
-    yield cp.Multiplication(NUM_ARGS[0], NUM_ARGS[1])
-    if "mul-bool" not in EXCLUDE_OPERATORS.get(solver, {}):
-        if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
-            yield cp.Multiplication(3, BOOL_ARGS[0])
-        yield cp.Multiplication(BOOL_ARGS[0], BOOL_ARGS[1])
-
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
         yield expr
@@ -267,6 +260,12 @@ def global_functions(solver):
             yield cp.Power(NUM_ARGS[0], 3)
         elif name == "Multiplication":
             yield cp.Multiplication(NUM_ARGS[0], NUM_ARGS[1])
+            yield cp.Multiplication(BOOL_ARGS[0], BOOL_ARGS[1])
+            yield cp.Multiplication(3, BOOL_ARGS[0])
+            yield cp.Multiplication(3, NUM_ARGS[0])
+
+            if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
+                yield cp.Multiplication(3, BOOL_ARGS[0])
         else:
             yield cls(NUM_ARGS)
 
