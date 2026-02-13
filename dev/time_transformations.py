@@ -309,11 +309,6 @@ def get_git_tag(repo_root: pathlib.Path) -> str:
         return "unknown"
 
 
-class _StopAfter(BaseException):
-    """Raised to exit the transformation step sequence after a given step (--stop-after)."""
-    pass
-
-
 def step_order_from_records(records):
     """Return ordered list of unique step names (order of first appearance)."""
     step_order = []
