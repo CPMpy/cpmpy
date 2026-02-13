@@ -83,7 +83,7 @@ class CPM_cplex(SolverInterface):
     Documentation of the solver's own Python API:
     https://ibmdecisionoptimization.github.io/docplex-doc/mp/docplex.mp.model.html
     """
-    supported_global_constraints = frozenset({"min", "max", "abs"})
+    supported_global_constraints = frozenset({"min", "max", "abs", "mul"})
 
     @staticmethod
     def supported():
@@ -389,7 +389,7 @@ class CPM_cplex(SolverInterface):
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub", "min", "max", "abs"}), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub"} | self.supported_global_constraints), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 

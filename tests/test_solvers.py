@@ -1039,8 +1039,8 @@ class TestSupportedSolvers:
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
     def test_partial_div_mod(self, solver):
-        if solver in ("pysdd", "pysat", "pindakaas", "pumpkin", "rc2"):  # don't support div or mod with vars
-            return
+        if solver in ("pysdd", "rc2"):  # pysdd: div/mod; rc2: no decision problems (solveAll)
+            pytest.skip("solver does not support this test context")
         if solver == 'cplex':
             pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])

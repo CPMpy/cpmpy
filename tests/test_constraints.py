@@ -34,21 +34,15 @@ NUM_GLOBAL = {
 # Solvers not supporting arithmetic constraints (numeric comparisons)
 SAT_SOLVERS = {"pysdd"}
 
-EXCLUDE_GLOBAL = {"pysat": {"Division", "Modulo", "Power"},  # with int2bool,
-                  "rc2": {"Division", "Modulo", "Power"},
+EXCLUDE_GLOBAL = {
                   "pysdd": NUM_GLOBAL | {"Xor"},
-                  "pindakaas": {"Division", "Modulo", "Power"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
-                  "cplex": {"Division", "Modulo", "Power"}
+                  
                   }
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
-EXCLUDE_OPERATORS = {"pysat": {"mul-int"},  # int2bool but mul, and friends, not linearized
-                     "rc2": {"mul-int"},
-                     "pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
-                     "pindakaas": {"mul-int"},
-                     "cplex": {"mul-int", "div"},
+EXCLUDE_OPERATORS = {"pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
                      }
 
 # Variables to use in the rest of the test script
@@ -77,20 +71,10 @@ def numexprs(solver):
             yield Operator("wsum", [list(range(len(NUM_ARGS))), NUM_ARGS])
             yield Operator("wsum", [[True, BoolVal(False), np.True_], NUM_ARGS]) # bit of everything
             continue
-        elif name == "mul" and "mul-int" not in EXCLUDE_OPERATORS.get(solver, {}):
-            yield Operator(name, [3, NUM_ARGS[0]])
-            yield Operator(name, NUM_ARGS[:arity])
-            yield Operator(name, NUM_ARGS[:2])
-            if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
-                yield Operator(name, [3, BOOL_ARGS[0]])
-
-        elif name == "mul" and "mul-bool" not in EXCLUDE_OPERATORS.get(solver, {}):
-            yield Operator(name, BOOL_ARGS[:arity])
         elif arity != 0:
             yield Operator(name, NUM_ARGS[:arity])
         else:
             yield Operator(name, NUM_ARGS)
-
 
     # boolexprs are also numeric
     for expr in bool_exprs(solver):
@@ -200,8 +184,7 @@ def global_constraints(solver):
             yield cp.Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
             if solver != "pumpkin": # only supports with fixed durations
                 yield cp.Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
-                if solver not in ("pysat", "pindakaas"): # results in unsupported int2bool integer multiplication
-                    yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
+                yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
             continue
 
         elif name == "GlobalCardinalityCount":
@@ -275,6 +258,14 @@ def global_functions(solver):
             yield cp.Modulo(NUM_ARGS[0], NUM_ARGS[1])
         elif name == "Power":
             yield cp.Power(NUM_ARGS[0], 3)
+        elif name == "Multiplication":
+            yield cp.Multiplication(NUM_ARGS[0], NUM_ARGS[1])
+            yield cp.Multiplication(BOOL_ARGS[0], BOOL_ARGS[1])
+            yield cp.Multiplication(3, BOOL_ARGS[0])
+            yield cp.Multiplication(3, NUM_ARGS[0])
+
+            if solver != "minizinc":  # bug in minizinc, see https://github.com/MiniZinc/libminizinc/issues/962
+                yield cp.Multiplication(3, BOOL_ARGS[0])
         else:
             yield cls(NUM_ARGS)
 

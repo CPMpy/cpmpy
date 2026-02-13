@@ -99,7 +99,7 @@ class CPM_minizinc(SolverInterface):
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
                                               "precedence", "no_overlap",
-                                              "min", "max", "abs", "div", "mod", "pow", "element", "count", "nvalue", "among"})
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
 
     required_version = (2, 8, 2)
@@ -753,7 +753,7 @@ class CPM_minizinc(SolverInterface):
             # some names differently (the infix names!)
             printmap = {'and': '/\\', 'or': '\\/',
                         'sum': '+', 'sub': '-',
-                        'mul': '*'}
+                        }
             op_str = expr.name
             expr_bounds = expr.get_bounds()
             if expr_bounds[0] < -2147483646 or expr_bounds[1] > 2147483646:
@@ -843,6 +843,12 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
+
+        elif expr.name == "mul":
+            if expr.is_lhs_num:
+                return "{}*({})".format(args_str[1], args_str[0])
+            else:
+                return "({}) * ({})".format(args_str[1], args_str[0])
 
         elif expr.name == "count":
             vars, val = expr.args

@@ -88,7 +88,7 @@ class CPM_choco(SolverInterface):
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
                                     "lex_lesseq", "lex_less",
-                                    "min", "max", "div", "mod", "pow", "abs", "count", "element", "nvalue", "among"})
+                                    "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
 
     @staticmethod
