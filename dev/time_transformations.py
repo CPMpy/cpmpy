@@ -9,8 +9,13 @@ the time for each transformation. Does not solve the models.
 Output: a single-row CSV with columns date_finished, git_tag, then one column
 per step (aggregated total seconds), step order = order of first appearance in records.
 Also writes time_transformations.records.csv in the same directory: one row per instance, columns instance
-then one per step (same order as in output), values are times for that instance; updated after every instance. Usage:
-  python dev/time_pysat_transformations_xcsp3.py [--root PATH] [--year YEAR] [--track TRACK] [--output CSV]
+then one per step (same order as in output), values are times for that instance; updated after every instance.
+
+Usage:
+  python dev/time_transformations.py [--year YEAR] [--track TRACK] [-o OUTPUT] [--limit LIMIT]
+                                     [--offset OFFSET] [--stop-after STEPNAME] 
+                                     [--instances-per-problem N] [-j WORKERS] 
+                                     [--download] [--data PATH]
 """
 
 import argparse
