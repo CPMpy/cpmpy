@@ -69,6 +69,7 @@ from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarI
 from .int2bool import _encode_int_var
 
 
+
 def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
     """
     Transforms all constraints to a linear form.
