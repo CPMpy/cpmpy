@@ -39,10 +39,9 @@ from cpmpy.tools.xcsp3 import XCSP3Dataset, _parse_xcsp3, _load_xcsp3, decompres
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.normalize import toplevel_list, simplify_boolean
 from cpmpy.transformations.safening import no_partial_functions
-from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_bv_reifies, only_implies
-from cpmpy.transformations.linearize import linearize_constraint, only_positive_coefficients
+from cpmpy.transformations.linearize import linearize_constraint, only_positive_coefficients, decompose_linear
 from cpmpy.transformations.int2bool import int2bool
 from cpmpy.transformations.get_variables import get_variables
 
@@ -101,11 +100,11 @@ def _process_instance(args):
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)
 
-        step = "decompose_in_tree"
+        step = "decompose_linear"
         t0 = time.perf_counter()
-        cpm_expr = decompose_in_tree(
+        cpm_expr = decompose_linear(
             cpm_expr,
-            supported=solver.supported_global_constraints | {"alldifferent"},
+            supported=solver.supported_global_constraints,
             supported_reified=solver.supported_reified_global_constraints,
             csemap=solver._csemap,
         )
