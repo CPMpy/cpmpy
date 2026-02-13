@@ -256,7 +256,7 @@ class _Dataset(ABC):
     #                               Public interface                               #
     # ---------------------------------------------------------------------------- #
 
-    def metadata(self, file: pathlib.Path) -> dict:
+    def instance_metadata(self, file: pathlib.Path) -> dict:
         metadata = self.category() | {
             'dataset': self.name,
             'name': pathlib.Path(file).stem.replace(self.extension, ''),
@@ -319,7 +319,7 @@ class _Dataset(ABC):
         file_path = files[index]
         filename = str(file_path)
 
-        metadata = self.metadata(file=filename)
+        metadata = self.instance_metadata(file=filename)
         if self.target_transform:
             metadata = self.target_transform(metadata)
 
