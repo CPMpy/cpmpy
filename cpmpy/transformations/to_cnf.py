@@ -29,7 +29,8 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
 
     if ivarmap is not None:
         slv.ivarmap = ivarmap
-    slv._csemap = csemap
+    if csemap is not None:
+        slv._csemap = csemap
 
     # the encoded constraints (i.e. `PB`s) will be added to this `pdk.CNF` object
     slv.pdk_solver = pdk.CNF()

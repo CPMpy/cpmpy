@@ -66,6 +66,8 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, 
 from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from .int2bool import _encode_int_var
+
 
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
@@ -621,3 +623,84 @@ def get_linear_decompositions():
         element=Element.decompose_linear,
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
+
+
+def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
+    """
+    Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
+    has at least min_values such reifications: remove those implications and add
+    the 'direct' encoding of x.
+
+    If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
+    If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
+    (the domain constraint) is posted; the solver can then choose to eliminate the
+    vars, or post the wsums itself anyway.
+
+    Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
+    """
+    # Collect bv -> (var == val)'s in csemap
+    var_vals = {}  # var: [val, bv]
+    for expr, bv in csemap.items():
+        if expr.name == '==':
+            var,val = expr.args
+            if isinstance(var, _NumVarImpl) and is_int(val):
+                var_vals.setdefault(var, []).append((val, bv))
+    
+    # Make the integer encodings in integer linear friendly way
+    my_ivarmap = ivarmap if ivarmap is not None else {}
+    toplevel = []
+    bv_map = {}  # bv -> (var, val)
+    for var, vals in var_vals.items():
+        # check if we should linearize the reified variables
+        lb, ub = var.lb, var.ub
+        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
+        if len(vals) < min_values:
+            continue  # do not encode
+
+        # encode the values
+        enc, _ = _encode_int_var(my_ivarmap, var, "direct")
+        # TEMP: overwrite the freshly created Bools until int2bool does CSE!
+        for val, bv in vals:
+            enc._xs[enc._offset(val)] = bv
+        
+        # domain and channeling constraints
+        toplevel.extend(enc.encode_domain_constraint()) # with the overwritten Bools
+        if ivarmap is None:
+            # also post the var=wsum mapping
+            terms, k = enc.encode_term()
+            # var == wsum + k :: var - wsum == k
+            ws = [1] + [-w for (w, _) in terms]
+            bs = [var] + [b for (_, b) in terms]
+            toplevel.append(Operator("wsum", (ws, bs)) == k)  
+        
+        # store the bvs that no longer need to be reified
+        for val, bv in vals:
+            bv_map[bv] = (var, val)
+
+    if len(bv_map) > 0:
+        # Now clean up and remove the '(var == val) == bv' constraints:
+        newcons = []
+        for con in constraints:
+            if con.name == '==' and con.args[0].name == '==':
+                # potential '(var == val) == bv'
+                lhs,bv = con.args
+                if bv in bv_map:
+                    (var, val) = bv_map[bv]
+                    (lhs_var, lhs_val) = lhs.args
+                    if lhs_val == val and lhs_var == var:
+                        continue  # do not keep
+            newcons.append(con)
+        constraints = newcons
+
+    return constraints + toplevel
+
+
+def _extract_var_from_lhs(lhs):
+    """Extract integer variable from lhs of (x == val) or (x != val). Returns None if not applicable."""
+    if isinstance(lhs, _NumVarImpl) and not lhs.is_bool():
+        return lhs
+    if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
+        arg = lhs.args[0]
+        if isinstance(arg, _NumVarImpl) and not arg.is_bool():
+            return arg
+    return None
