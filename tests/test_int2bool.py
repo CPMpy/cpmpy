@@ -1,14 +1,17 @@
 import pytest
 import itertools
 
+import cpmpy as cp
+
 from cpmpy import SolverLookup
 from cpmpy.expressions.core import BoolVal, Comparison, Operator
 from cpmpy.expressions.utils import argvals
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar, intvar
-from cpmpy.model import Model
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.int2bool import int2bool
+from cpmpy.transformations.int2bool import int2bool, IntVarEnc
+from utils import skip_on_missing_pblib
+
 
 # add some small but non-trivial integer variables (i.e. non-zero lower bounds, domain size not a power of two)
 x = intvar(1, 3, name="x")
@@ -95,22 +98,26 @@ class TestTransInt2Bool:
         itertools.product(CONSTRAINTS, ENCODINGS),
         ids=idfn,
     )
+    @skip_on_missing_pblib()
     def test_transforms(self, solver, constraint, encoding, setup):
         user_vars = tuple(get_variables(constraint))
         ivarmap = dict()
-        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding)
+        csemap = dict()
+        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding, csemap=csemap)
 
         cons_sols = []
         flat_sols = []
 
         # "Trusted" solver (not using int2bool)
-        Model(constraint).solveAll(
+        cp.Model(constraint).solveAll(
             solver="ortools",
             display=lambda: cons_sols.append(tuple(argvals(user_vars))),
         )
         cons_sols = sorted(cons_sols)
         solver = SolverLookup().get(solver)
         solver.encoding = encoding
+        solver._csemap = csemap
+        solver.ivarmap = ivarmap
         for c in flat:
             solver.add(c)
 
@@ -134,3 +141,32 @@ class TestTransInt2Bool:
          SOL_IN: {cons_sols}
          SOL_OU: {flat_sols}
         """
+
+class TestCSE:
+
+    def test_int2bool_cse_one_var(self):
+        x = cp.intvar(0, 2, name="x")
+        slv = cp.solvers.CPM_pindakaas()
+        slv.encoding = "direct"
+        assert str(slv.transform((x == 0) | (x == 2))) == "[(BV[x == 0]) or (BV[x == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1]"
+
+    @pytest.mark.skip("aspirational")
+    def test_int2bool_cse_one_var_order(self):
+        x = cp.intvar(0, 2, name="x")
+        slv = cp.solvers.CPM_pindakaas()
+        slv.encoding = "order"
+        assert str(slv.transform((x >= 1) | (x >= 2))) == "[(⟦x >= 1⟧) or (⟦x >= 2⟧), sum([1, -1] * (⟦x >= 2⟧, ⟦x >= 1⟧)) <= 0]"
+        # TODO this could be a CSE improvement?
+        # assert str(slv.transform((x >= 1) | (x < 2))) == "[(⟦x == 0⟧) or (⟦x == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1]"
+
+    @pytest.mark.skip("aspirational")
+    def test_int2bool_cse_two_vars(self):
+        slv = cp.solvers.CPM_pindakaas()
+        x = cp.intvar(0, 2, name="x")
+        y = cp.intvar(0, 2, name="y")
+        slv.encoding = "direct"
+        assert (
+            str(slv.transform((x == 0) | (y == 2)))
+            == "[(⟦x == 0⟧) or (⟦y == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1, sum([⟦y == 0⟧, ⟦y == 1⟧, ⟦y == 2⟧]) == 1]"
+        )
+        # currently: [(BV[x == 0]) or (BV[y == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1, (BV[x == 0]) -> (BV[x == 0]), (~BV[x == 0]) -> (sum([0, 1, 2, -3] * (BV[x == 0], BV[x == 1], BV[x == 2], BV8)) <= -1), (~BV[x == 0]) -> (sum([0, 1, 2, -1] * (BV[x == 0], BV[x == 1], BV[x == 2], BV8)) >= 0), sum([1, -1] * (BV[x == 0], ~BV 8)) <= 0, sum([BV[y == 0], BV[y == 1], BV[y == 2]]) == 1, (BV[y == 2]) -> (BV[y == 2]), (~BV[y == 2]) -> (sum([0, 1, 2, -1] * (BV[y == 0], BV[y == 1], BV[y == 2], BV9)) <= 1), (~BV[y == 2]) -> (sum([0, 1, 2, -3] * (BV[y == 0], BV[y == 1], BV[y == 2], BV9)) >= 0), sum([1, -1] * (BV[y == 2], ~BV9)) <= 0]

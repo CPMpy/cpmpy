@@ -4,7 +4,6 @@ Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of 
 
 import cpmpy as cp
 from ..solvers.pindakaas import CPM_pindakaas
-from ..transformations.get_variables import get_variables
 
 
 def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):

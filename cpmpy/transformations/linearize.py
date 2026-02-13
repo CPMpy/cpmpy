@@ -638,6 +638,10 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
+    # this transformation can only be done if there is a csemap
+    if csemap is None:
+        return constraints
+
     # Collect bv -> (var == val)'s in csemap
     var_vals = {}  # var: [val, bv]
     for expr, bv in csemap.items():
@@ -658,10 +662,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             continue  # do not encode
 
         # encode the values
-        enc, _ = _encode_int_var(my_ivarmap, var, "direct")
-        # TEMP: overwrite the freshly created Bools until int2bool does CSE!
-        for val, bv in vals:
-            enc._xs[enc._offset(val)] = bv
+        enc, _ = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
         
         # domain and channeling constraints
         toplevel.extend(enc.encode_domain_constraint()) # with the overwritten Bools
