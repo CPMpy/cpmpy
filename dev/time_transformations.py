@@ -243,24 +243,32 @@ def time_transformations(dataset, output, limit, offset=0, stop_after=None, inst
         variables_str = f"{stats['n_variables']:,}" if stats['n_variables'] is not None else "N/A"
         return f"runtime={runtime_str}, constraints={constraints_str}, variables={variables_str}"
 
+    def _handle_completed_instance(metadata, result):
+        """Shared post-processing for sequential and parallel execution."""
+        nonlocal n_failed
+        if isinstance(result, tuple) and result[0] is None:
+            n_failed += 1
+            if result[1]:
+                if "\n" in result[1]:
+                    print(f"Transform failed {track}/{metadata['name']}:", file=sys.stderr)
+                    print(result[1], file=sys.stderr)
+                else:
+                    print(f"Load failed {track}/{metadata['name']}: {result[1]}", file=sys.stderr)
+            else:
+                print(f"Transform failed {track}/{metadata['name']}", file=sys.stderr)
+            return
+
+        records_list, stats = result
+        records.extend(records_list)
+        _write_records(records, records_path, records_cols)
+        _write_output(records, output_path, records_cols, existing_output)
+        print(f"Completed transforming {track}/{metadata['name']} ({_format_stats(stats)})")
+
     if workers <= 1:
         # Sequential: no pool, process one by one, write after each
         for path, metadata in filtered:
             result = _process_instance((path, metadata, track, stop_after))
-            if isinstance(result, tuple) and result[0] is None:
-                n_failed += 1
-                if result[1]:
-                    print(f"Load failed {track}/{metadata['name']}: {result[1]}", file=sys.stderr)
-                else:
-                    print(f"Transform failed {track}/{metadata['name']}", file=sys.stderr)
-                    if result[1] and "\n" in result[1]:  # Has traceback
-                        print(result[1], file=sys.stderr)
-                continue
-            records_list, stats = result
-            records.extend(records_list)
-            _write_records(records, records_path, records_cols)
-            _write_output(records, output_path, records_cols, existing_output)
-            print(f"Completed tansforming {track}/{metadata['name']} ({_format_stats(stats)})")
+            _handle_completed_instance(metadata, result)
     else:
         # Parallel: each worker runs in its own process (no shared state)
         with ProcessPoolExecutor(max_workers=workers) as pool:
@@ -273,23 +281,7 @@ def time_transformations(dataset, output, limit, offset=0, stop_after=None, inst
                     n_failed += 1
                     print(f"Worker failed {track}/{metadata['name']}: {e}", file=sys.stderr)
                     continue
-                if isinstance(result, tuple) and result[0] is None:
-                    n_failed += 1
-                    if result[1]:
-                        # Check if it's a traceback (has newlines) or just an error message
-                        if "\n" in result[1]:
-                            print(f"Transform failed {track}/{metadata['name']}:", file=sys.stderr)
-                            print(result[1], file=sys.stderr)
-                        else:
-                            print(f"Load failed {track}/{metadata['name']}: {result[1]}", file=sys.stderr)
-                    else:
-                        print(f"Transform failed {track}/{metadata['name']}", file=sys.stderr)
-                    continue
-                records_list, stats = result
-                records.extend(records_list)
-                _write_records(records, records_path, records_cols)
-                _write_output(records, output_path, records_cols, existing_output)
-                print(f"Completed transforming {track}/{metadata['name']} ({_format_stats(stats)})")
+                _handle_completed_instance(metadata, result)
 
     # Final write (redundant if loop ran, but ensures we have output if no instances completed)
     if records:
