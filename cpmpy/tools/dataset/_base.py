@@ -153,7 +153,7 @@ class _Dataset(ABC):
     description = ""
     url = ""
     license = ""
-    citation = ""
+    citation: List[str] = []
     domain = ""
     format = ""
     reader = None  # callable(file_path, open=open) -> cp.Model
@@ -278,12 +278,17 @@ class _Dataset(ABC):
         """
         Return dataset-level metadata as a dictionary.
         """
+        if isinstance(cls.citation, str):
+            citations = [cls.citation] if cls.citation else []
+        else:
+            citations = list(cls.citation)
+
         return {
             "name": cls.name,
             "description": cls.description,
             "url": cls.url,
             "license": cls.license,
-            "citation": cls.citation,
+            "citation": citations,
             "domain": cls.domain,
             "format": cls.format,
         }

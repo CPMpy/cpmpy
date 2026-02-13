@@ -42,11 +42,15 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
     name = "nurserostering"
     description = "Nurse rostering benchmark instances from schedulingbenchmarks.org."
     url = "https://schedulingbenchmarks.org/nrp/"
-    license = ""
-    citation = ""
+    citation = [
+        "Strandmark, P., Qu, Y. and Curtois, T. First-order linear programming in a column generation-based heuristic approach to the nurse rostering problem. Computers & Operations Research, 2020. 120, p. 104945.",
+        "Demirovic, E., Musliu, N., and Winter, F. Modeling and solving staff scheduling with partial weighted maxSAT. Annals of Operations Research, 2019. 275(1): p. 79-99.",
+        "Smet P. Constraint reformulation for nurse rostering problems, in: PATAT 2018 twelfth international conference on the practice and theory of automated timetabling, Vienna, August, 2018, p. 69-80.",
+        "Rahimian, E., Akartunali, K., and Levine, J. A hybrid integer programming and variable neighbourhood search algorithm to solve nurse rostering problems. European Journal of Operational Research, 2017. 258(2): p. 411-423.",
+    ]
     domain = "scheduling"
     format = "NRP text"
-    origins = []  # Will be populated from config if available
+
 
     @staticmethod
     def _reader(file_path, open=open):
