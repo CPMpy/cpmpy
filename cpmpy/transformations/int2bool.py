@@ -19,8 +19,8 @@ def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto", csemap=None):
     """Convert integer linear constraints to pseudo-boolean constraints. Requires `linearize` transformation.
 
     :param: cpm_lst: list of constraints to transform
-    :param: ivarmap: dictonary mapping integer variables to their encoding
-    :param: encoding: choice of encoding: "direct", "order", "binar", or "auto", which makes encoding choices based on constraint comparator and domain size
+    :param: ivarmap: dictionary mapping integer variables to their encoding
+    :param: encoding: choice of encoding: "direct", "order", "binary", or "auto", which makes encoding choices based on constraint comparator and domain size
     :param: csemap: To enable CSE
     """
     assert encoding in (
@@ -202,7 +202,7 @@ def _decide_encoding(x, cmp=None, encoding="auto"):
         return "binary"
     elif cmp in ("==", "!="):
         return "direct"  # equalities suit the direct encoding
-    else:  # we use the order encoding for inequalities, en when we do not have `cmp`
+    else:  # we use the order encoding for inequalities, and as default when we do not have `cmp`
         return "order"
 
 
