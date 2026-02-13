@@ -190,7 +190,7 @@ class CPM_pindakaas(SolverInterface):
                         )
                     value = result.value(lit)
                     assert value is not None, (
-                        "All user variables should have been assigned, but {cpm_var} (literal {lit}) was not."
+                        f"All user variables should have been assigned, but {cpm_var} (literal {lit}) was not."
                     )
                     cpm_var._value = value
                 self.core = None
@@ -234,7 +234,7 @@ class CPM_pindakaas(SolverInterface):
             cpm_cons,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap
+            csemap=self._csemap,
         )
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
