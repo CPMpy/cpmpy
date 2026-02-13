@@ -49,20 +49,26 @@ General comparisons or expressions
 
 """
 import copy
+import warnings
+from typing import Set, Sequence, Optional
+
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
 from .flatten_model import flatten_constraint, get_or_make_var
+from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
-
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, NegativeTable
+from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
+from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from .int2bool import _encode_int_var
+
+
 
 def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
     """
@@ -215,6 +221,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 # very special case, avoid writing as sum of 1 argument
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
+                if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
+                    continue # skip or([BoolVal(True)])
                 newlist.append(Operator("or", new_expr))
                 continue
 
@@ -270,42 +278,17 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 # supported comparison
                 newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
 
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name in supported:
-            newlist.append(cpm_expr)
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name not in supported:
-            """
-                More efficient implementations possible
-                http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
-                Introduces n^2 new boolean variables
-                Decomposes through bi-partite matching
-            """
-            # TODO check performance of implementation
-            if reified is True:
-                raise ValueError("Linear decomposition of AllDifferent does not work reified. "
-                                 "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
-
-            lbs, ubs = get_bounds(cpm_expr.args)
-            lb, ub = min(lbs), max(ubs)
-            n_vals = (ub-lb) + 1
-
-            x = boolvar(shape=(len(cpm_expr.args), n_vals))
-
-            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
-            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
-
-            # link Boolean matrix and integer variable
-            for arg, row in zip(cpm_expr.args, x):
-                if is_num(arg): # constant, fix directly
-                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
-                else: # ensure result is canonical
-                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
-
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
-        elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
-            raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
-                             f"`cpmpy.transformations.decompose_global.decompose_global() first")
+        elif isinstance(cpm_expr, GlobalConstraint):
+            if cpm_expr.name not in supported:
+                raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
+                                 f"`cpmpy.transformations.linearize.decompose_linear() first")
+            else:
+                newlist.append(cpm_expr)
+        else:
+            raise ValueError(f"Unexpected expression {cpm_expr}, if you reach this, please report on github.")
 
     return newlist
 
@@ -505,9 +488,7 @@ def canonical_comparison(lst_of_expr):
                                     if not isinstance(b, _NumVarImpl))
                 
                 # 2) add collected variables to lhs
-                if isinstance(lhs, Operator) and lhs.name == "sum":
-                    lhs = sum([1 * a for a in lhs.args] + lhs2)
-                elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
+                if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")):
                     lhs = lhs + lhs2
                 else:
                     raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
@@ -598,3 +579,128 @@ def only_positive_coefficients(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
+
+
+def decompose_linear(lst_of_expr: Sequence[Expression],
+                     supported: Set[str]=frozenset(),
+                     supported_reified:Set[str]=frozenset(),
+                     csemap:Optional[dict[Expression,Expression]]=None):
+    """
+        Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
+
+        args:
+            lst_of_expr: list of expressions to decompose
+            supported: set of supported global constraints and global functions
+            supported_reified: set of supported reified global constraints
+            csemap: map of expressions to an auxiliary variable
+
+        returns:
+            list of expressions
+    """
+    decompose_custom = get_linear_decompositions()
+
+    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+
+def decompose_linear_objective(obj: Sequence[Expression],
+                               supported: Set[str] = frozenset(),
+                               supported_reified: Set[str] = frozenset(),
+                               csemap: Optional[dict[Expression, Expression]] = None):
+    """Decompose objective using linear-friendly (var == val) decompositions."""
+    decompose_custom = get_linear_decompositions()
+
+    return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+
+def get_linear_decompositions():
+    """
+        Implementation of custom linear decompositions for some global constraints.
+        Uses (var == val) in sums; no integer encoding.
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    return dict(
+        alldifferent=AllDifferent.decompose_linear,
+        element=Element.decompose_linear,
+    )
+    # Should we add Gleb's table decomposition? or is it not non-reifiable?
+
+
+def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
+    """
+    Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
+    has at least min_values such reifications: remove those implications and add
+    the 'direct' encoding of x.
+
+    If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
+    If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
+    (the domain constraint) is posted; the solver can then choose to eliminate the
+    vars, or post the wsums itself anyway.
+
+    Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
+    """
+    # Collect bv -> (var == val)'s in csemap
+    var_vals = {}  # var: [val, bv]
+    for expr, bv in csemap.items():
+        if expr.name == '==':
+            var,val = expr.args
+            if isinstance(var, _NumVarImpl) and is_int(val):
+                var_vals.setdefault(var, []).append((val, bv))
+    
+    # Make the integer encodings in integer linear friendly way
+    my_ivarmap = ivarmap if ivarmap is not None else {}
+    toplevel = []
+    bv_map = {}  # bv -> (var, val)
+    for var, vals in var_vals.items():
+        # check if we should linearize the reified variables
+        lb, ub = var.lb, var.ub
+        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
+        if len(vals) < min_values:
+            continue  # do not encode
+
+        # encode the values
+        enc, _ = _encode_int_var(my_ivarmap, var, "direct")
+        # TEMP: overwrite the freshly created Bools until int2bool does CSE!
+        for val, bv in vals:
+            enc._xs[enc._offset(val)] = bv
+        
+        # domain and channeling constraints
+        toplevel.extend(enc.encode_domain_constraint()) # with the overwritten Bools
+        if ivarmap is None:
+            # also post the var=wsum mapping
+            terms, k = enc.encode_term()
+            # var == wsum + k :: var - wsum == k
+            ws = [1] + [-w for (w, _) in terms]
+            bs = [var] + [b for (_, b) in terms]
+            toplevel.append(Operator("wsum", (ws, bs)) == k)  
+        
+        # store the bvs that no longer need to be reified
+        for val, bv in vals:
+            bv_map[bv] = (var, val)
+
+    if len(bv_map) > 0:
+        # Now clean up and remove the '(var == val) == bv' constraints:
+        newcons = []
+        for con in constraints:
+            if con.name == '==' and con.args[0].name == '==':
+                # potential '(var == val) == bv'
+                lhs,bv = con.args
+                if bv in bv_map:
+                    (var, val) = bv_map[bv]
+                    (lhs_var, lhs_val) = lhs.args
+                    if lhs_val == val and lhs_var == var:
+                        continue  # do not keep
+            newcons.append(con)
+        constraints = newcons
+
+    return constraints + toplevel
+
+
+def _extract_var_from_lhs(lhs):
+    """Extract integer variable from lhs of (x == val) or (x != val). Returns None if not applicable."""
+    if isinstance(lhs, _NumVarImpl) and not lhs.is_bool():
+        return lhs
+    if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
+        arg = lhs.args[0]
+        if isinstance(arg, _NumVarImpl) and not arg.is_bool():
+            return arg
+    return None

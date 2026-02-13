@@ -3,8 +3,10 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.transformations.flatten_model import flatten_objective
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
+from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
+from cpmpy.transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
+from cpmpy.transformations.normalize import toplevel_list
+from cpmpy.transformations.reification import only_bv_reifies, only_implies
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -119,7 +121,7 @@ class TestTransLinearize:
 
         x = cp.intvar(1, 5, shape=3, name="x")
         cons = cp.AllDifferent(x)
-        lincons = linearize_constraint([cons])
+        lincons = linearize_constraint(decompose_linear([cons]))
 
         def cb():
             assert cons.value()
@@ -130,11 +132,11 @@ class TestTransLinearize:
         # should also work with constants in arguments
         x,y,z = x
         cons = cp.AllDifferent([x,3,y,True,z])
-        lincons = linearize_constraint([cons])
+        lincons = linearize_constraint(decompose_linear([cons]))
 
         def cb():
             assert cons.value()
-
+    
         n_sols = cp.Model(lincons).solveAll(display=cb)
         assert n_sols == 3 * 2 * 1# 1 and 3 not allowed
 
@@ -158,7 +160,7 @@ class TestTransLinearize:
         arr = cp.cpm_array([cp.intvar(0, 5), cp.intvar(0, 5), 5, 4]) # combination of decision variables and constants
         c = cp.AllDifferent(arr)
 
-        linear_c = linearize_constraint([c])
+        linear_c = linearize_constraint(decompose_linear([c]))
         # this triggers an error
         pos_c = only_positive_bv([c])
 
@@ -590,4 +592,47 @@ class TesttestOnlyPositiveBv:
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = only_positive_bv(linearize_constraint([cp.max(~a,b) >= c], supported={"sum", "wsum", "max"}))
         assert str(obj) == "[(max(BV3,b)) >= (c), (BV3) + (a) == 1]"
-        
+
+
+class TestLinearizeReifiedVariablesThreshold:
+    """Tests for linearize_reified_variables with min_values threshold."""
+
+    def setup_method(self):
+        _IntVarImpl.counter = 0
+        _BoolVarImpl.counter = 0
+
+        self.csemap = {}
+        a = cp.intvar(1, 3, name="a")
+        self.a = a
+        cpm_cons = [(a == 1) | (a == 2)]
+        cpm_cons = toplevel_list(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self.csemap)
+        self.cpm_cons = cpm_cons
+
+    def test_linearize_reified_variables_below_threshold(self):
+        """With min_values=3, (a==1)|(a==2) is not replaced."""
+        cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=3, csemap=self.csemap)
+
+        assert str(cpm_cons) == "[(BV0) or (BV1), (a == 1) == (BV0), (a == 2) == (BV1)]"
+
+    def test_linearize_reified_variables_threshold_two(self):
+        """With min_values=2, (a==1)|(a==2) is replaced."""
+        cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap)
+
+        assert str(cpm_cons) == "[(BV0) or (BV1), sum([BV0, BV1, EncDir(a)[2]]) == 1, sum([1, 0, -1, -2] * [a, BV0, BV1, EncDir(a)[2]]) == 1]"
+
+    def test_linearize_reified_variables_ivarmap(self):
+        """With min_values=2, (a==1)|(a==2) is replaced, no channel constraint."""
+        ivarmap = {}
+        cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
+
+        assert str(cpm_cons) == "[(BV0) or (BV1), sum([BV0, BV1, EncDir(a)[2]]) == 1]"
+
+    def test_linearize_reified_variables_ivarmap_xtra(self):
+        """With min_values=2, (a==1)|(a==2) is replaced, other impl present, no channel constraint."""
+        ivarmap = {}
+        cpm_cons = self.cpm_cons
+        cpm_cons += [boolvar(name="aux") == (self.a == 1)]
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
+
+        assert str(cpm_cons) == "[(BV0) or (BV1), (aux) == (a == 1), sum([BV0, BV1, EncDir(a)[2]]) == 1]"
