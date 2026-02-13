@@ -38,8 +38,16 @@ solver_dependencies["all"] = list({pkg for group in solver_dependencies.values()
 
 format_dependencies = {
     "io.mps": ["pyscipopt"],
+    "io.lp": ["pyscipopt"],
+    "io.cip": ["pyscipopt"],
+    "io.fzn": ["pyscipopt"],
+    "io.gms": ["pyscipopt"],
+    "io.pip": ["pyscipopt"],
     "io.scip": ["pyscipopt"],
-    "io.dimacs": ["pyscipopt"],
+    "io.dimacs": solver_dependencies["pindakaas"],  # Required for write_dimacs (uses to_cnf transformation)
+    "io.opb": [],  # No external dependencies
+    "io.wcnf": [],  # No external dependencies
+    "io.xcsp3": ["pycsp3"],
 }
 
 setup(
