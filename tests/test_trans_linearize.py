@@ -619,14 +619,14 @@ class TestLinearizeReifiedVariablesThreshold:
         """With min_values=2, (a==1)|(a==2) is replaced."""
         cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap)
 
-        assert str(cpm_cons) == "[(BV0) or (BV1), sum([BV0, BV1, EncDir(a)[2]]) == 1, sum([1, 0, -1, -2] * [a, BV0, BV1, EncDir(a)[2]]) == 1]"
+        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([1, 0, -1, -2] * [a, BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
 
     def test_linearize_reified_variables_ivarmap(self):
         """With min_values=2, (a==1)|(a==2) is replaced, no channel constraint."""
         ivarmap = {}
         cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
 
-        assert str(cpm_cons) == "[(BV0) or (BV1), sum([BV0, BV1, EncDir(a)[2]]) == 1]"
+        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
 
     def test_linearize_reified_variables_ivarmap_xtra(self):
         """With min_values=2, (a==1)|(a==2) is replaced, other impl present, no channel constraint."""
@@ -635,4 +635,4 @@ class TestLinearizeReifiedVariablesThreshold:
         cpm_cons += [boolvar(name="aux") == (self.a == 1)]
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
 
-        assert str(cpm_cons) == "[(BV0) or (BV1), (aux) == (a == 1), sum([BV0, BV1, EncDir(a)[2]]) == 1]"
+        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), (aux) == (a == 1), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"

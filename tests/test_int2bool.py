@@ -100,7 +100,6 @@ class TestTransInt2Bool:
     )
     @skip_on_missing_pblib()
     def test_transforms(self, solver, constraint, encoding, setup):
-        IntVarEnc.NAMED = True
         user_vars = tuple(get_variables(constraint))
         ivarmap = dict()
         csemap = dict()
@@ -170,15 +169,11 @@ class TestTransInt2Bool:
         assert len(get_variables(with_cse)) < len(get_variables(without_cse))
 
 class TestCSE:
-    def setup_method(self):
-        IntVarEnc.NAMED = True
 
     def test_int2bool_cse_one_var(self):
-        IntVarEnc.NAMED = True
         x = cp.intvar(0, 2, name="x")
         slv = cp.solvers.CPM_pindakaas()
         slv.encoding = "direct"
-        # slv._csemap = None
         assert str(slv.transform((x == 0) | (x == 2))) == "[(BV[x == 0]) or (BV[x == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1]"
 
     @pytest.mark.skip("aspirational")
