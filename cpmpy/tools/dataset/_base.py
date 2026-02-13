@@ -18,15 +18,7 @@ from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def format_bytes(bytes_num):
-    """
-    Format bytes into human-readable string (e.g., KB, MB, GB).
-    """
-    for unit in ['bytes', 'KB', 'MB', 'GB', 'TB']:
-        if bytes_num < 1024.0:
-            return f"{bytes_num:.1f} {unit}"
-        bytes_num /= 1024.0
-
+# tqdm as an optional dependency, provides prettier progress bars
 try:
     from tqdm import tqdm
 except ImportError:
@@ -42,6 +34,16 @@ _MODEL_FEATURE_FIELDS = frozenset({
 
 # Prefixes for format-specific metadata fields (not portable across translations)
 _FORMAT_SPECIFIC_PREFIXES = ("opb_", "wcnf_", "mps_", "xcsp_", "dimacs_")
+
+
+def _format_bytes(bytes_num):
+    """
+    Format bytes into human-readable string (e.g., KB, MB, GB).
+    """
+    for unit in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+        if bytes_num < 1024.0:
+            return f"{bytes_num:.1f} {unit}"
+        bytes_num /= 1024.0
 
 
 def portable_instance_metadata(metadata: dict) -> dict:
@@ -127,6 +129,11 @@ def _extract_model_features(model) -> dict:
         "domain_size_max": max(domain_sizes) if domain_sizes else None,
         "domain_size_mean": round(sum(domain_sizes) / len(domain_sizes), 2) if domain_sizes else None,
     }
+
+
+def extract_model_features(model) -> dict:
+    """Public wrapper for extracting generic CPMpy model features."""
+    return _extract_model_features(model)
 
 
 class _Dataset(ABC):
@@ -260,15 +267,10 @@ class _Dataset(ABC):
         if meta_path.exists():
             with open(meta_path, "r") as f:
                 sidecar = json.load(f)
-            # Handle structured vs flat sidecar format
-            if isinstance(sidecar.get("dataset"), dict):
-                # Structured: flatten instance_metadata and format_metadata
-                metadata.update(sidecar.get("instance_metadata", {}))
-                metadata.update(sidecar.get("format_metadata", {}))
-                metadata.update(sidecar.get("model_features", {}))
-            else:
-                # Legacy flat format
-                metadata.update(sidecar)
+            # Structured: flatten instance_metadata, format_metadata, and model_features
+            metadata.update(sidecar.get("instance_metadata", {}))
+            metadata.update(sidecar.get("format_metadata", {}))
+            metadata.update(sidecar.get("model_features", {}))
         return metadata
 
     @classmethod
@@ -369,15 +371,6 @@ class _Dataset(ABC):
             meta_path = self._metadata_path(file_path)
             if force or not meta_path.exists():
                 files_to_process.append(file_path)
-            else:
-                # Upgrade old flat sidecars to structured format
-                try:
-                    with open(meta_path, "r") as f:
-                        existing = json.load(f)
-                    if not isinstance(existing.get("dataset"), dict):
-                        files_to_process.append(file_path)
-                except (json.JSONDecodeError, IOError):
-                    files_to_process.append(file_path)
 
         if not files_to_process:
             return
@@ -423,24 +416,28 @@ class _Dataset(ABC):
             if "_metadata_error" in instance_meta:
                 sidecar["_metadata_error"] = instance_meta["_metadata_error"]
 
-            # Preserve model features from existing sidecar if present
+            # Preserve previously extracted model features if present.
+            # Otherwise, compute them from the parsed model when possible.
+            model_features = None
             if meta_path.exists():
                 try:
                     with open(meta_path, "r") as f:
                         existing = json.load(f)
                     if "model_features" in existing:
-                        sidecar["model_features"] = existing["model_features"]
-                    else:
-                        # Upgrade: extract flat model features from old-style sidecar
-                        model_feats = {
-                            k: v for k, v in existing.items()
-                            if k in _MODEL_FEATURE_FIELDS
-                            or k in ("_feature_error", "_domain_feature_error")
-                        }
-                        if model_feats:
-                            sidecar["model_features"] = model_feats
+                        model_features = existing["model_features"]
                 except (json.JSONDecodeError, IOError):
                     pass
+
+            if model_features is None:
+                if not callable(self.reader):
+                    raise TypeError(
+                        f"Cannot extract model features for {file_path}: "
+                        "no dataset reader configured. If unexpected, please open an issue on GitHub."
+                    )
+                model = self.reader(str(file_path), open=self.open)
+                model_features = extract_model_features(model)
+        
+            sidecar["model_features"] = model_features
 
             with open(meta_path, "w") as f:
                 json.dump(sidecar, f, indent=2)
@@ -471,7 +468,7 @@ class _Dataset(ABC):
             
             _Dataset._download_sequential(full_url, destination, total_size, desc, chunk_size)
             return pathlib.Path(destination)
-        except (HTTPError, URLError) as e:
+        except (HTTPError, URLError):
             return None
 
     @staticmethod
@@ -617,7 +614,6 @@ class _Dataset(ABC):
                              chunk_size: int = 1024 * 1024):
         """Download file sequentially with progress bar."""
         import sys
-        import os
         
         # Convert to Path if it's a string
         if isinstance(filepath, str):
@@ -664,9 +660,9 @@ class _Dataset(ABC):
                         downloaded += len(chunk)
                         if total_size > 0:
                             percent = (downloaded / total_size) * 100
-                            sys.stdout.write(f"\r\033[KDownloading {desc}: {format_bytes(downloaded)}/{format_bytes(total_size)} ({percent:.1f}%)")
+                            sys.stdout.write(f"\r\033[KDownloading {desc}: {_format_bytes(downloaded)}/{_format_bytes(total_size)} ({percent:.1f}%)")
                         else:
-                            sys.stdout.write(f"\r\033[KDownloading {desc}: {format_bytes(downloaded)}...")
+                            sys.stdout.write(f"\r\033[KDownloading {desc}: {_format_bytes(downloaded)}...")
                         sys.stdout.flush()
                 sys.stdout.write("\n")
                 sys.stdout.flush()
