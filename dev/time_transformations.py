@@ -15,7 +15,7 @@ Usage:
   python dev/time_transformations.py [--year YEAR] [--track TRACK] [-o OUTPUT] [--limit LIMIT]
                                      [--offset OFFSET] [--stop-after STEPNAME] 
                                      [--instances-per-problem N] [-j WORKERS] 
-                                     [--download] [--data PATH]
+                                     [--download] [--data PATH] [-v|--verbose]
 """
 
 import argparse
@@ -206,7 +206,7 @@ def _write_output(records, output_path, records_cols, existing_df=None):
     df.to_csv(output_path, index=False)
 
 
-def time_transformations(dataset, output, limit, offset=0, stop_after=None, instances_per_problem=1, workers=1):
+def time_transformations(dataset, output, limit, offset=0, stop_after=None, instances_per_problem=1, workers=1, verbose=False):
     """Run transformation timing over the dataset; aggregate and append results to output CSV."""
     track = getattr(dataset, "track", "default")
     output_path = pathlib.Path(output)
@@ -262,7 +262,10 @@ def time_transformations(dataset, output, limit, offset=0, stop_after=None, inst
         records.extend(records_list)
         _write_records(records, records_path, records_cols)
         _write_output(records, output_path, records_cols, existing_output)
-        print(f"Completed transforming {track}/{metadata['name']} ({_format_stats(stats)})")
+        if verbose:
+            print(f"Completed transforming {track}/{metadata['name']} ({_format_stats(stats)})")
+        else:
+            print(f"Completed transforming {track}/{metadata['name']}")
 
     if workers <= 1:
         # Sequential: no pool, process one by one, write after each
@@ -333,6 +336,8 @@ if __name__ == "__main__":
                         help="Max instances per problem type (prefix before first '-'); default 1")
     parser.add_argument("-j", "--workers", type=int, default=1, metavar="N",
                         help="Number of parallel workers (default 1). Each worker runs in a separate process.")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Print per-instance runtime/constraints/variables stats.")
     parser.add_argument("--download", action="store_true", help="Download the dataset if it doesn't exist")
     parser.add_argument("--data", type=pathlib.Path, default=None, help="Path to the dataset. If combined with --download, the dataset will be downloaded to this path. If not provided, the dataset will be downloaded to / looked for in the current working directory.")
     args = parser.parse_args()
@@ -352,4 +357,13 @@ if __name__ == "__main__":
         print("Use option --download to download the dataset", file=sys.stderr)
         sys.exit(1)
 
-    time_transformations(dataset, args.output, args.limit, args.offset, args.stop_after, args.instances_per_problem, args.workers)
+    time_transformations(
+        dataset,
+        args.output,
+        args.limit,
+        args.offset,
+        args.stop_after,
+        args.instances_per_problem,
+        args.workers,
+        args.verbose,
+    )
