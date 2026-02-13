@@ -16,7 +16,6 @@ UNKNOWN_COMPARATOR_ERROR = ValueError("Comparator is not known or should have be
 
 
 def int2bool(cpm_lst: List[Expression], ivarmap, encoding="auto", csemap=None):
-    """Convert integer linear constraints to pseudo-boolean constraints. Requires `linearize` transformation."""
     """Convert integer linear constraints to pseudo-boolean constraints. Requires `linearize` transformation.
 
     :param: cpm_lst: list of constraints to transform

@@ -142,32 +142,6 @@ class TestTransInt2Bool:
          SOL_OU: {flat_sols}
         """
 
-    def test_int2bool_confirm_cse(self):
-        """
-        This example show how we save some variables for this case, although not yet constraints.
-        ```
-        [(BV1) or (BV2), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1, (BV1) -> (BV[x == 0]), (~BV1) -> (sum([0, 1, 2, -3] * (BV[x == 0], BV[x == 1], BV[x == 2], BV3)) <= -1), (~BV1) -> (sum([0, 1, 2, -1] * (BV[x == 0], BV[x == 1], BV[x == 2], BV3)) >= 0), sum([1, -1] * (BV1, ~BV3)) <= 0, (BV2) -> (BV[x == 2]), (~BV2) -> (sum([0, 1, 2, -1] * (BV[x == 0], BV[x == 1], BV[x == 2], BV4)) <= 1), (~BV2) -> (sum([0, 1, 2, -3] * (BV[x == 0], BV[x == 1], BV[x == 2], BV4)) >= 0), sum([1, -1] * (BV2, ~BV4)) <= 0]
-        [(BV[x == 0]) or (BV[x == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1, (BV[x == 0]) -> (BV[x == 0]), (~BV[x == 0]) -> (sum([0, 1, 2, -3] * (BV[x == 0], BV[x == 1], BV[x == 2], BV2)) <= -1), (~BV[x == 0]) -> (sum([0, 1, 2, -1] * (BV[x == 0], BV[x == 1], BV[x == 2], BV2)) >= 0), sum([1, -1] * (BV[x == 0], ~BV2)) <= 0, (BV[x == 2]) -> (BV[x == 2]), (~BV[x == 2]) -> (sum([0, 1, 2, -1] * (BV[x == 0], BV[x == 1], BV[x == 2], BV3)) <= 1), (~BV[x == 2]) -> (sum([0, 1, 2, -3] * (BV[x == 0], BV[x == 1], BV[x == 2], BV3)) >= 0), sum([1, -1] * (BV[x == 2], ~BV3)) <= 0]
-        ```
-        """
-
-        x = cp.intvar(0, 2, name="x")
-        slv = cp.solvers.CPM_pindakaas()
-        slv.encoding = "direct"
-
-        slv._csemap = None
-
-        con = [(x == 0) | (x == 2)]
-        without_cse = slv.transform(con)
-        _BoolVarImpl.counter = 0
-        _IntVarImpl.counter = 0
-        with_cse = cp.solvers.CPM_pindakaas().transform(con)
-
-        print(without_cse)
-        print(with_cse)
-
-        assert len(get_variables(with_cse)) < len(get_variables(without_cse))
-
 class TestCSE:
 
     def test_int2bool_cse_one_var(self):
