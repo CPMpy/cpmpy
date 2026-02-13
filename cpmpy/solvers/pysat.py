@@ -60,9 +60,8 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
-from ..transformations.linearize import only_positive_coefficients
+from ..transformations.linearize import only_positive_coefficients, decompose_linear
 from ..expressions.utils import flatlist
-from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint
@@ -364,10 +363,12 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-        cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized MIP decomp in linearize
-                                     supported_reified=self.supported_reified_global_constraints,
-                                     csemap=self._csemap)
+        cpm_cons = decompose_linear(
+            cpm_cons,
+            supported=self.supported_global_constraints,
+            supported_reified=self.supported_reified_global_constraints,
+            csemap=self._csemap
+        )
         cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
