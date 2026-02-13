@@ -103,7 +103,8 @@ class TestTransInt2Bool:
         IntVarEnc.NAMED = True
         user_vars = tuple(get_variables(constraint))
         ivarmap = dict()
-        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding, csemap=dict())
+        csemap = dict()
+        flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding, csemap=csemap)
 
         cons_sols = []
         flat_sols = []
@@ -116,6 +117,8 @@ class TestTransInt2Bool:
         cons_sols = sorted(cons_sols)
         solver = SolverLookup().get(solver)
         solver.encoding = encoding
+        solver._csemap = csemap
+        solver.ivarmap = ivarmap
         for c in flat:
             solver.add(c)
 

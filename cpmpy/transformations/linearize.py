@@ -638,6 +638,10 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
+    # this transformation can only be done if there is a csemap
+    if csemap is None:
+        return constraints
+
     # Collect bv -> (var == val)'s in csemap
     var_vals = {}  # var: [val, bv]
     for expr, bv in csemap.items():
