@@ -335,10 +335,10 @@ def step_order_from_records(records):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Time pysat transformations on XCSP3 instances (no solving).")
-    parser.add_argument("--year", type=int, default=2024)
+    parser.add_argument("--year", type=int, default=2024, help="Year of the dataset (default 2024)")
     parser.add_argument("--track", type=str, default="COP", help="XCSP3 track (e.g. COP, MiniCOP)")
     parser.add_argument("-o", "--output", type=pathlib.Path, default=pathlib.Path("time_transformations.csv"))
-    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--limit", type=int, default=None, help="Limit the number of instances to process (default None)")
     parser.add_argument("--offset", type=int, default=0, help="Skip this many instances before starting")
     parser.add_argument("--stop-after", type=str, default=None, metavar="STEPNAME",
                         help="Stop transformation pipeline after this step (e.g. flatten_constraint)")
