@@ -68,7 +68,7 @@ def portable_instance_metadata(metadata: dict) -> dict:
     }
 
 
-def extract_model_features(model) -> dict:
+def _extract_model_features(model) -> dict:
     """
     Extract generic CP features from a CPMpy Model.
 
@@ -135,6 +135,8 @@ class _Dataset(ABC):
 
     The `_Dataset` class provides a standardized interface for downloading and
     accessing benchmark instances. This class should not be used on its own.
+    Instead have a look at one of the concrete subclasses, providing access to 
+    well-known datasets from the community.
     """
 
     # Extension for metadata sidecar files
@@ -161,6 +163,21 @@ class _Dataset(ABC):
             extension:str=".txt",
             **kwargs
         ):
+        """
+        Constructor for the _Dataset base class.
+
+        Arguments:
+            dataset_dir (str): Path to the dataset directory.
+            transform (callable, optional): Optional transform applied to the instance file path.
+            target_transform (callable, optional): Optional transform applied to the metadata dictionary.
+            download (bool): If True, downloads the dataset if it does not exist locally (default=False).
+            extension (str): Extension of the instance files.
+
+        Raises:
+            ValueError: If the dataset directory does not exist and `download=False`,
+                or if the requested year/track combination is not available.
+            ValueError: If the dataset directory does not contain any instance files.
+        """
         self.dataset_dir = pathlib.Path(dataset_dir)
         self.transform = transform
         self.target_transform = target_transform
@@ -168,32 +185,21 @@ class _Dataset(ABC):
 
         if not self.dataset_dir.exists():
             if not download:
-                raise ValueError(f"Dataset not found. Please set download=True to download the dataset.")
+                raise ValueError("Dataset not found. Please set download=True to download the dataset.")
             else:
                 self.download()
                 self._collect_all_metadata()
                 files = self._list_instances()
                 print(f"Finished downloading {len(files)} instances")
 
-        # Generate sidecar metadata for existing datasets that lack them
-        self._collect_all_metadata()
-
         files = self._list_instances()
         if len(files) == 0:
             raise ValueError(f"Cannot find any instances inside dataset {self.dataset_dir}. Is it a valid dataset? If so, please report on GitHub.")
 
-    @classmethod
-    def dataset_metadata(cls) -> dict:
-        """Return dataset-level metadata as a dictionary."""
-        return {
-            "name": cls.name,
-            "description": cls.description,
-            "url": cls.url,
-            "license": cls.license,
-            "citation": cls.citation,
-            "domain": cls.domain,
-            "format": cls.format,
-        }
+
+    # ---------------------------------------------------------------------------- #
+    #                     Methods to implement in subclasses:                      #
+    # ---------------------------------------------------------------------------- #
 
     @abstractmethod
     def category(self) -> dict:
@@ -208,29 +214,18 @@ class _Dataset(ABC):
     @abstractmethod
     def download(self, *args, **kwargs):
         """
-        How the dataset should be downloaded.
+        Download the dataset.
         """
         pass
 
-    def _list_instances(self) -> list:
-        """
-        List all instance files, excluding metadata sidecar files.
 
-        Returns a sorted list of pathlib.Path objects for all instance files
-        matching the dataset's extension pattern.
-        """
-        return sorted([
-            f for f in self.dataset_dir.rglob(f"*{self.extension}")
-            if f.is_file() and not str(f).endswith(self.METADATA_EXTENSION)
-        ])
+    # ---------------------------------------------------------------------------- #
+    #                        Methods to optionally overwrite                       #
+    # ---------------------------------------------------------------------------- #
 
-    def _metadata_path(self, instance_path) -> pathlib.Path:
-        """Return the path to the .meta.json sidecar file for a given instance."""
-        return pathlib.Path(str(instance_path) + self.METADATA_EXTENSION)
-
-    def collect_instance_metadata(self, file) -> dict:
+    def collect_instance_metadata(self, file: pathlib.Path) -> dict:
         """
-        Override in subclass to provide domain-specific instance metadata.
+        Provide domain-specific instance metadata.
         Called once after download for each instance.
 
         Arguments:
@@ -241,17 +236,139 @@ class _Dataset(ABC):
         """
         return {}
 
+    def collect_instance_features(self, file: pathlib.Path) -> dict:
+        """
+        Collect domain-specific instance features
+        that augment the generic CP features extracted from the model.
+
+        Arguments:
+            file: path to the instance file
+
+        Returns:
+            dict with domain-specific feature fields
+        """
+        return {}
+
+    def open(self, instance) -> io.TextIOBase:
+        """
+        How an instance file from the dataset should be opened.
+        Especially usefull when files come compressed and won't work with
+        python standard library's 'open', e.g. '.xz', '.lzma'.
+        """
+        return open(instance, "r")
+
+
+    # ---------------------------------------------------------------------------- #
+    #                               Public interface                               #
+    # ---------------------------------------------------------------------------- #
+
+    def metadata(self, file: pathlib.Path) -> dict:
+        metadata = self.category() | {
+            'dataset': self.name,
+            'name': pathlib.Path(file).stem.replace(self.extension, ''),
+            'path': file,
+        }
+        # Load sidecar metadata if it exists
+        meta_path = self._metadata_path(file)
+        if meta_path.exists():
+            with open(meta_path, "r") as f:
+                sidecar = json.load(f)
+            # Handle structured vs flat sidecar format
+            if isinstance(sidecar.get("dataset"), dict):
+                # Structured: flatten instance_metadata and format_metadata
+                metadata.update(sidecar.get("instance_metadata", {}))
+                metadata.update(sidecar.get("format_metadata", {}))
+                metadata.update(sidecar.get("model_features", {}))
+            else:
+                # Legacy flat format
+                metadata.update(sidecar)
+        return metadata
+
+    @classmethod
+    def dataset_metadata(cls) -> dict:
+        """
+        Return dataset-level metadata as a dictionary.
+        """
+        return {
+            "name": cls.name,
+            "description": cls.description,
+            "url": cls.url,
+            "license": cls.license,
+            "citation": cls.citation,
+            "domain": cls.domain,
+            "format": cls.format,
+        }
+
+
+    # ---------------------------------------------------------------------------- #
+    #                                   Internals                                  #
+    # ---------------------------------------------------------------------------- #
+
+    # ------------------------------ Instance access ----------------------------- #
+
+    def _list_instances(self) -> list:
+        """
+        List all instance files, excluding metadata sidecar files.
+
+        Returns a sorted list of `pathlib.Path` objects for all instance files
+        matching the dataset's extension pattern.
+        """
+        return sorted([
+            f for f in self.dataset_dir.rglob(f"*{self.extension}")
+            if f.is_file() and not str(f).endswith(self.METADATA_EXTENSION)
+        ])
+
+    def __len__(self) -> int:
+        """Return the total number of instances."""
+        return len(self._list_instances())
+
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        if index < 0 or index >= len(self):
+            raise IndexError("Index out of range")
+
+        files = self._list_instances()
+        file_path = files[index]
+        filename = str(file_path)
+
+        metadata = self.metadata(file=filename)
+        if self.target_transform:
+            metadata = self.target_transform(metadata)
+
+        if self.transform:
+            filename = self.transform(filename)
+            # Let transforms contribute to metadata (e.g. model verification info)
+            if hasattr(self.transform, 'enrich_metadata'):
+                metadata = self.transform.enrich_metadata(filename, metadata)
+
+        return filename, metadata
+
+
+    # ---------------------------- Metadata collection --------------------------- #
+
+    def _metadata_path(self, instance_path: pathlib.Path) -> pathlib.Path:
+        """
+        Return the path to the `.meta.json` sidecar file for a given instance.
+
+        Arguments:
+            instance_path: path to the instance file
+
+        Returns:
+            path to the `.meta.json` sidecar file
+        """
+        return pathlib.Path(str(instance_path) + self.METADATA_EXTENSION)
+
     def _collect_all_metadata(self, force=False):
-        """Collect and store structured metadata sidecar files for all instances.
+        """
+        Collect and store structured metadata sidecar files for all instances.
 
-        Writes a structured ``.meta.json`` sidecar alongside each instance with:
+        Writes a structured `.meta.json` sidecar alongside each instance with:
 
-        - ``dataset``: dataset-level metadata (name, description, url, ...)
-        - ``instance_name``: logical instance name (filename stem)
-        - ``source_file``: path to the instance file
-        - ``category``: dataset category labels (year, track, variant, family)
-        - ``instance_metadata``: portable domain-specific metadata
-        - ``format_metadata``: format-specific metadata from the source format
+        - `dataset`: dataset-level metadata (name, description, url, ...)
+        - `instance_name`: logical instance name (filename stem)
+        - `source_file`: path to the instance file
+        - `category`: dataset category labels (year, track, variant, family)
+        - `instance_metadata`: portable domain-specific metadata
+        - `format_metadata`: format-specific metadata from the source format
 
         Arguments:
             force (bool): If True, re-collect instance metadata even if sidecar
@@ -341,20 +458,7 @@ class _Dataset(ABC):
             with open(meta_path, "w") as f:
                 json.dump(sidecar, f, indent=2)
 
-    def collect_instance_features(self, file) -> dict:
-        """
-        Override in subclass to provide domain-specific instance features
-        that augment the generic CP features extracted from the model.
-
-        Arguments:
-            file: path to the instance file
-
-        Returns:
-            dict with domain-specific feature fields
-        """
-        return {}
-
-    def collect_features(self):
+    def _collect_features(self):
         """
         Extract CP model features for all instances using the dataset's reader.
 
@@ -415,7 +519,7 @@ class _Dataset(ABC):
 
             try:
                 model = self.reader(str(file_path), open=self.open)
-                features = extract_model_features(model)
+                features = _extract_model_features(model)
             except Exception as e:
                 features = {"_feature_error": str(e)}
                 errors.append((str(file_path), str(e)))
@@ -444,59 +548,8 @@ class _Dataset(ABC):
                 f"First error: {errors[0][1]}"
             )
 
-    def open(self, instance) -> io.TextIOBase:
-        """
-        How an instance file from the dataset should be opened.
-        Especially usefull when files come compressed and won't work with
-        python standard library's 'open', e.g. '.xz', '.lzma'.
-        """
-        return open(instance, "r")
-
-    def metadata(self, file) -> dict:
-        metadata = self.category() | {
-            'dataset': self.name,
-            'name': pathlib.Path(file).stem.replace(self.extension, ''),
-            'path': file,
-        }
-        # Load sidecar metadata if it exists
-        meta_path = self._metadata_path(file)
-        if meta_path.exists():
-            with open(meta_path, "r") as f:
-                sidecar = json.load(f)
-            # Handle structured vs flat sidecar format
-            if isinstance(sidecar.get("dataset"), dict):
-                # Structured: flatten instance_metadata and format_metadata
-                metadata.update(sidecar.get("instance_metadata", {}))
-                metadata.update(sidecar.get("format_metadata", {}))
-                metadata.update(sidecar.get("model_features", {}))
-            else:
-                # Legacy flat format
-                metadata.update(sidecar)
-        return metadata
-
-    def __len__(self) -> int:
-        """Return the total number of instances."""
-        return len(self._list_instances())
-
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
-        if index < 0 or index >= len(self):
-            raise IndexError("Index out of range")
-
-        files = self._list_instances()
-        file_path = files[index]
-        filename = str(file_path)
-
-        metadata = self.metadata(file=filename)
-        if self.target_transform:
-            metadata = self.target_transform(metadata)
-
-        if self.transform:
-            filename = self.transform(filename)
-            # Let transforms contribute to metadata (e.g. model verification info)
-            if hasattr(self.transform, 'enrich_metadata'):
-                metadata = self.transform.enrich_metadata(filename, metadata)
-
-        return filename, metadata
+            
+    # ----------------------------- Download methods ----------------------------- #
 
     @staticmethod
     def _try_origin(base_url: str, target: str, destination: str, desc: str, chunk_size: int) -> Optional[pathlib.Path]:
