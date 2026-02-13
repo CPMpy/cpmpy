@@ -236,19 +236,6 @@ class _Dataset(ABC):
         """
         return {}
 
-    def collect_instance_features(self, file: pathlib.Path) -> dict:
-        """
-        Collect domain-specific instance features
-        that augment the generic CP features extracted from the model.
-
-        Arguments:
-            file: path to the instance file
-
-        Returns:
-            dict with domain-specific feature fields
-        """
-        return {}
-
     def open(self, instance) -> io.TextIOBase:
         """
         How an instance file from the dataset should be opened.
@@ -457,96 +444,6 @@ class _Dataset(ABC):
 
             with open(meta_path, "w") as f:
                 json.dump(sidecar, f, indent=2)
-
-    def _collect_features(self):
-        """
-        Extract CP model features for all instances using the dataset's reader.
-
-        Parses each instance into a CPMpy model, extracts generic model features
-        via extract_model_features(), and optionally collects domain-specific
-        features via collect_instance_features().
-
-        Results are stored in the ``model_features`` section of ``.meta.json``
-        sidecar files (structured format) or as flat fields (legacy format).
-        """
-        if self.reader is None:
-            raise ValueError(
-                f"No reader configured for {self.__class__.__name__}. "
-                f"Set the 'reader' class attribute to enable feature extraction."
-            )
-
-        files = self._list_instances()
-
-        # Filter files that need processing
-        files_to_process = []
-        for file_path in files:
-            meta_path = self._metadata_path(file_path)
-            existing = {}
-            if meta_path.exists():
-                with open(meta_path, "r") as f:
-                    existing = json.load(f)
-            # Skip if features already collected
-            if isinstance(existing.get("dataset"), dict):
-                # Structured format — check model_features section
-                if "model_features" in existing:
-                    continue
-            else:
-                # Legacy flat format
-                if "num_variables" in existing:
-                    continue
-            files_to_process.append(file_path)
-
-        if not files_to_process:
-            return
-
-        errors = []
-
-        # Use tqdm for progress if available
-        if tqdm is not None:
-            file_iter = tqdm(files_to_process, desc="Collecting features", unit="instance")
-        else:
-            file_iter = files_to_process
-            print(f"Collecting features for {len(files_to_process)} instances...")
-
-        for file_path in file_iter:
-            meta_path = self._metadata_path(file_path)
-
-            # Load existing sidecar (or empty dict)
-            existing = {}
-            if meta_path.exists():
-                with open(meta_path, "r") as f:
-                    existing = json.load(f)
-
-            try:
-                model = self.reader(str(file_path), open=self.open)
-                features = _extract_model_features(model)
-            except Exception as e:
-                features = {"_feature_error": str(e)}
-                errors.append((str(file_path), str(e)))
-
-            # Collect domain-specific features
-            try:
-                domain_features = self.collect_instance_features(str(file_path))
-                features.update(domain_features)
-            except Exception as e:
-                features["_domain_feature_error"] = str(e)
-
-            # Store features in the appropriate location
-            if isinstance(existing.get("dataset"), dict):
-                # Structured format: store in model_features section
-                existing["model_features"] = features
-            else:
-                # Legacy flat format
-                existing.update(features)
-
-            with open(meta_path, "w") as f:
-                json.dump(existing, f, indent=2)
-
-        if errors:
-            warnings.warn(
-                f"Feature extraction failed for {len(errors)}/{len(files_to_process)} instances. "
-                f"First error: {errors[0][1]}"
-            )
 
             
     # ----------------------------- Download methods ----------------------------- #
