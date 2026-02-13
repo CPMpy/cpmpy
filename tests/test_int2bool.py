@@ -169,16 +169,19 @@ class TestTransInt2Bool:
 
         assert len(get_variables(with_cse)) < len(get_variables(without_cse))
 
-@pytest.mark.skip(
-    "Currently, the expected output is too complex too evaluate, since we are not encoding variables up-front as in the original approach. Once int2bool is better integrated with the other transformations, the output should look like this."
-)
-class Int2BoolCSE:
+class TestCSE:
+    def setup_method(self):
+        IntVarEnc.NAMED = True
+
     def test_int2bool_cse_one_var(self):
+        IntVarEnc.NAMED = True
         x = cp.intvar(0, 2, name="x")
         slv = cp.solvers.CPM_pindakaas()
         slv.encoding = "direct"
-        assert str(slv.transform((x == 0) | (x == 2))) == "[(⟦x == 0⟧) or (⟦x == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1]"
+        # slv._csemap = None
+        assert str(slv.transform((x == 0) | (x == 2))) == "[(BV[x == 0]) or (BV[x == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1]"
 
+    @pytest.mark.skip("aspirational")
     def test_int2bool_cse_one_var_order(self):
         x = cp.intvar(0, 2, name="x")
         slv = cp.solvers.CPM_pindakaas()
@@ -187,6 +190,7 @@ class Int2BoolCSE:
         # TODO this could be a CSE improvement?
         # assert str(slv.transform((x >= 1) | (x < 2))) == "[(⟦x == 0⟧) or (⟦x == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1]"
 
+    @pytest.mark.skip("aspirational")
     def test_int2bool_cse_two_vars(self):
         slv = cp.solvers.CPM_pindakaas()
         x = cp.intvar(0, 2, name="x")
@@ -196,3 +200,4 @@ class Int2BoolCSE:
             str(slv.transform((x == 0) | (y == 2)))
             == "[(⟦x == 0⟧) or (⟦y == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1, sum([⟦y == 0⟧, ⟦y == 1⟧, ⟦y == 2⟧]) == 1]"
         )
+        # currently: [(BV[x == 0]) or (BV[y == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1, (BV[x == 0]) -> (BV[x == 0]), (~BV[x == 0]) -> (sum([0, 1, 2, -3] * (BV[x == 0], BV[x == 1], BV[x == 2], BV8)) <= -1), (~BV[x == 0]) -> (sum([0, 1, 2, -1] * (BV[x == 0], BV[x == 1], BV[x == 2], BV8)) >= 0), sum([1, -1] * (BV[x == 0], ~BV 8)) <= 0, sum([BV[y == 0], BV[y == 1], BV[y == 2]]) == 1, (BV[y == 2]) -> (BV[y == 2]), (~BV[y == 2]) -> (sum([0, 1, 2, -1] * (BV[y == 0], BV[y == 1], BV[y == 2], BV9)) <= 1), (~BV[y == 2]) -> (sum([0, 1, 2, -3] * (BV[y == 0], BV[y == 1], BV[y == 2], BV9)) >= 0), sum([1, -1] * (BV[y == 2], ~BV9)) <= 0]

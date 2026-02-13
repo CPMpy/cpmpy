@@ -662,10 +662,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             continue  # do not encode
 
         # encode the values
-        enc, _ = _encode_int_var(my_ivarmap, var, "direct")
-        # TEMP: overwrite the freshly created Bools until int2bool does CSE!
-        for val, bv in vals:
-            enc._xs[enc._offset(val)] = bv
+        enc, _ = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
         
         # domain and channeling constraints
         toplevel.extend(enc.encode_domain_constraint()) # with the overwritten Bools
