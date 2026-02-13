@@ -15,18 +15,15 @@ then one per step (same order as in output), values are times for that instance;
 
 import argparse
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import pathlib
 import subprocess
 import sys
+import traceback
 import time
 from datetime import datetime, timezone
-from queue import Empty
 
 import pandas as pd
-from tqdm import tqdm
-
-from multiprocessing import Manager
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
@@ -42,84 +39,62 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_bv_reifies, only_implies
 from cpmpy.transformations.linearize import linearize_constraint, only_positive_coefficients
 from cpmpy.transformations.int2bool import int2bool
+from cpmpy.transformations.get_variables import get_variables
 
 
-def _count_constraints(expr):
-    """Return number of constraints in expression/list; None if unknown."""
-    if expr is None:
-        return None
-    if isinstance(expr, (list, tuple)):
-        return len(expr)
-    return 1
-
-
-def _progress_put(queue, instance_id, step, n_constraints=None):
-    """Send progress update to queue; non-blocking to avoid slowing workers."""
-    if queue is not None:
-        try:
-            queue.put_nowait((instance_id, step, n_constraints))
-        except Exception:
-            pass
+def _calc_stats(start_time, cpm_expr):
+    """Calculate stats from current state."""
+    runtime = time.perf_counter() - start_time
+    n_constraints = len(cpm_expr) if isinstance(cpm_expr, (list, tuple)) else 1
+    n_variables = len(get_variables(cpm_expr))
+    return {"runtime": runtime, "n_constraints": n_constraints, "n_variables": n_variables}
 
 
 def _process_instance(args):
-    """Process a single instance; returns list of (instance_id, step, time) or None on failure.
+    """Process a single instance; returns (records, stats) or (None, error_msg) on failure.
     Must be a top-level function for ProcessPoolExecutor pickling.
-    args: (path, metadata, track, stop_after) or (path, metadata, track, stop_after, queue)."""
-    if len(args) == 5:
-        path, metadata, track, stop_after, queue = args
-    else:
-        path, metadata, track, stop_after = args
-        queue = None
-
+    stats: dict with 'runtime', 'n_constraints', 'n_variables'."""
+    path, metadata, track, stop_after = args
     instance_id = f"{track}/{metadata['name']}"
+    start_time = time.perf_counter()
 
     if str(path).endswith(".lzma"):
         path = decompress_lzma(path)
 
-    _progress_put(queue, instance_id, "parse_xcsp3", None)  # show we started
     try:
         records = []
         step = "parse_xcsp3"
         t0 = time.perf_counter()
         parser = _parse_xcsp3(path)
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, None)  # no constraint count after parse
         if stop_after and step == stop_after:
-            return records
+            return records, {"runtime": time.perf_counter() - start_time, "n_constraints": None, "n_variables": None}
         step = "create_model"
         t0 = time.perf_counter()
         model = _load_xcsp3(parser)
         records.append((instance_id, step, time.perf_counter() - t0))
-        original_count = _count_constraints(model.constraints)
-        _progress_put(queue, instance_id, step, original_count)
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, model.constraints)
     except Exception as e:
         return (None, str(e))  # (None, error_msg) for load failure
 
     solver = CPM_pysat(cpm_model=None)
     cpm_expr = model.constraints
-    
-    # Show original model constraint count before transformations begin
-    _progress_put(queue, instance_id, "original_model", original_count)
 
     try:
         step = "toplevel_list"
         t0 = time.perf_counter()
         cpm_expr = toplevel_list(cpm_expr)
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, cpm_expr)
 
         step = "no_partial_functions"
         t0 = time.perf_counter()
         cpm_expr = no_partial_functions(cpm_expr, safen_toplevel={"div", "mod", "element"})
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, cpm_expr)
 
         step = "decompose_in_tree"
         t0 = time.perf_counter()
@@ -130,33 +105,29 @@ def _process_instance(args):
             csemap=solver._csemap,
         )
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, cpm_expr)
 
         step = "flatten_constraint"
         t0 = time.perf_counter()
         cpm_expr = flatten_constraint(cpm_expr, csemap=solver._csemap)
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, cpm_expr)
 
         step = "only_bv_reifies"
         t0 = time.perf_counter()
         cpm_expr = only_bv_reifies(cpm_expr, csemap=solver._csemap)
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, cpm_expr)
 
         step = "only_implies"
         t0 = time.perf_counter()
         cpm_expr = only_implies(cpm_expr, csemap=solver._csemap)
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, cpm_expr)
 
         step = "linearize_constraint"
         t0 = time.perf_counter()
@@ -166,15 +137,13 @@ def _process_instance(args):
             csemap=solver._csemap,
         )
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, cpm_expr)
 
         step = "int2bool"
         t0 = time.perf_counter()
         cpm_expr = int2bool(cpm_expr, solver.ivarmap, encoding=solver.encoding)
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
             return records
 
@@ -182,65 +151,15 @@ def _process_instance(args):
         t0 = time.perf_counter()
         cpm_expr = only_positive_coefficients(cpm_expr)
         records.append((instance_id, step, time.perf_counter() - t0))
-        _progress_put(queue, instance_id, step, _count_constraints(cpm_expr))
         if stop_after and step == stop_after:
-            return records
+            return records, _calc_stats(start_time, cpm_expr)
 
-        return records
+        # Calculate final stats
+        return records, _calc_stats(start_time, cpm_expr)
     except Exception:
-        return (None, None)  # (None, None) for transform failure
-
-
-def _format_short_name(name, max_len=35):
-    """Truncate instance name for display."""
-    return name if len(name) <= max_len else name[: max_len - 3] + "…"
-
-
-def _format_elapsed(seconds):
-    """Format elapsed seconds as human-readable string (e.g. 2.3s, 1m 23s)."""
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    m, s = int(seconds // 60), int(seconds % 60)
-    return f"{m}m {s}s" if s else f"{m}m"
-
-
-def _refresh_progress_display(main_pbar, worker_bars, active_instances, n_workers):
-    """Update worker bars to show active instances, current step, constraint count, and elapsed time."""
-    now = time.time()
-    sorted_active = sorted(active_instances.items(), key=lambda x: x[0])[:n_workers]
-    # Fixed column widths to prevent jumping
-    INSTANCE_WIDTH = 35
-    STEP_WIDTH = 25
-    CONSTRAINTS_WIDTH = 18
-    ELAPSED_WIDTH = 8
-    
-    for i, pbar in enumerate(worker_bars):
-        if i < len(sorted_active):
-            inst_id, (step, start_time, n_constraints) = sorted_active[i]
-            short = _format_short_name(inst_id.split("/")[-1] if "/" in inst_id else inst_id, INSTANCE_WIDTH)
-            elapsed = _format_elapsed(now - start_time)
-            
-            # Format with fixed widths
-            instance_col = f"{short:<{INSTANCE_WIDTH}}"
-            step_col = f"{step:<{STEP_WIDTH}}"
-            # Constraint count: right-aligned number (15 chars) + " constraints" (11 chars) = 26 chars total
-            CONSTRAINTS_FULL_WIDTH = 27
-            if n_constraints is not None:
-                constraints_col = f"{n_constraints:>15,} constraints"
-            else:
-                constraints_col = " " * CONSTRAINTS_FULL_WIDTH
-            elapsed_col = f"{elapsed:>{ELAPSED_WIDTH}}"
-            
-            pbar.set_description_str(
-                f"  ▸ {instance_col} │ {step_col} │ {constraints_col} │ ({elapsed_col})",
-                refresh=True
-            )
-            pbar.n = 0
-            pbar.total = 1
-            pbar.refresh()
-        else:
-            pbar.set_description_str("  ○ idle", refresh=True)
-            pbar.refresh()
+        # Capture full traceback for transform failures
+        tb_str = traceback.format_exc()
+        return (None, tb_str)  # (None, traceback_string) for transform failure
 
 
 def _write_records(records, records_path, records_cols):
@@ -302,10 +221,6 @@ def time_transformations(dataset, output, limit, offset=0, stop_after=None, inst
             filtered.append((path, meta))
     filtered = filtered[offset : offset + limit] if limit is not None else filtered[offset:]
 
-    total = len(filtered)
-    n_workers = max(1, workers)
-    use_progress_bars = total > 0
-
     # Read existing output now so we can append our cumulative row (preserves on interrupt)
     existing_output = None
     if output_path.exists():
@@ -314,117 +229,62 @@ def time_transformations(dataset, output, limit, offset=0, stop_after=None, inst
         except Exception:
             existing_output = None
 
-    # Build task args; add progress queue when we want multi-bar display
-    with Manager() as manager:
-        progress_queue = manager.Queue(maxsize=512) if use_progress_bars else None
-        task_args = [
-            (path, metadata, track, stop_after, progress_queue) if progress_queue else (path, metadata, track, stop_after)
-            for path, metadata in filtered
-        ]
+    task_args = [(path, metadata, track, stop_after) for path, metadata in filtered]
 
-        if workers <= 1:
-            executor_cls = ThreadPoolExecutor
-            max_workers = 1
-        else:
-            executor_cls = ProcessPoolExecutor
-            max_workers = workers
+    def _format_stats(stats):
+        """Format stats for printing."""
+        runtime_str = f"{stats['runtime']:.2f}s" if stats['runtime'] is not None else "N/A"
+        constraints_str = f"{stats['n_constraints']:,}" if stats['n_constraints'] is not None else "N/A"
+        variables_str = f"{stats['n_variables']:,}" if stats['n_variables'] is not None else "N/A"
+        return f"runtime={runtime_str}, constraints={constraints_str}, variables={variables_str}"
 
-        active_instances = {}  # instance_id -> current step
-        worker_bars = []
-
-        with executor_cls(max_workers=max_workers) as pool:
-            future_to_args = {pool.submit(_process_instance, args): args for args in task_args}
-            pending = set(future_to_args)
-
-            # Main progress bar (overall)
-            main_pbar = tqdm(
-                total=total,
-                desc=track,
-                unit="instance",
-                position=0,
-                leave=True,
-                ncols=100,
-            )
-
-            # Worker status bars (UV-style: one per worker slot below main bar)
-            if use_progress_bars and progress_queue is not None:
-                for i in range(n_workers):
-                    wb = tqdm(
-                        total=1,
-                        initial=0,
-                        desc="  ○ idle",
-                        position=1 + i,
-                        leave=False,
-                        bar_format="{desc}",
-                        ncols=100,
-                    )
-                    worker_bars.append(wb)
-
-            try:
-                while pending:
-                    # Wait for any future to complete (short timeout to poll queue).
-                    # When nothing is pending (e.g. total==0), we're done.
-                    done, _ = wait(pending, timeout=0.08)
-
-                    # Drain progress queue
-                    if progress_queue is not None:
-                        now = time.time()
-                        while True:
-                            try:
-                                msg = progress_queue.get_nowait()
-                                instance_id = msg[0]
-                                step = msg[1]
-                                n_constraints = msg[2] if len(msg) >= 3 else None
-                                if instance_id not in active_instances:
-                                    active_instances[instance_id] = (step, now, n_constraints)
-                                else:
-                                    _, start_time, _ = active_instances[instance_id]
-                                    active_instances[instance_id] = (step, start_time, n_constraints)
-                            except Empty:
-                                break
-
-                    # Refresh worker bars
-                    if worker_bars:
-                        _refresh_progress_display(
-                            main_pbar, worker_bars, active_instances, n_workers
-                        )
-
-                    # Process completed futures
-                    for future in done:
-                        pending.discard(future)
-                        args = future_to_args[future]
-                        _, metadata, _, _ = args[:4]
-                        instance_id = f"{track}/{metadata['name']}"
-
-                        try:
-                            result = future.result()
-                        except Exception as e:
-                            n_failed += 1
-                            print(f"Worker failed {instance_id}: {e}", file=sys.stderr)
-                            main_pbar.update(1)
-                            active_instances.pop(instance_id, None)
-                            continue
-
-                        if isinstance(result, tuple) and result[0] is None:
-                            n_failed += 1
-                            if result[1]:
-                                print(f"Load failed {instance_id}: {result[1]}", file=sys.stderr)
-                            else:
-                                print(f"Transform failed {instance_id}", file=sys.stderr)
-                            main_pbar.update(1)
-                            active_instances.pop(instance_id, None)
-                            continue
-
-                        records.extend(result)
-                        active_instances.pop(instance_id, None)
-                        _write_records(records, records_path, records_cols)
-                        _write_output(records, output_path, records_cols, existing_output)
-                        main_pbar.update(1)
-
-            finally:
-                main_pbar.close()
-                for wb in worker_bars:
-                    wb.close()
+    if workers <= 1:
+        # Sequential: no pool, process one by one, write after each
+        for path, metadata in filtered:
+            result = _process_instance((path, metadata, track, stop_after))
+            if isinstance(result, tuple) and result[0] is None:
+                n_failed += 1
+                if result[1]:
+                    print(f"Load failed {track}/{metadata['name']}: {result[1]}", file=sys.stderr)
+                else:
+                    print(f"Transform failed {track}/{metadata['name']}", file=sys.stderr)
+                    if result[1] and "\n" in result[1]:  # Has traceback
+                        print(result[1], file=sys.stderr)
+                continue
+            records_list, stats = result
+            records.extend(records_list)
+            _write_records(records, records_path, records_cols)
+            _write_output(records, output_path, records_cols, existing_output)
+            print(f"Completed tansforming {track}/{metadata['name']} ({_format_stats(stats)})")
+    else:
+        # Parallel: each worker runs in its own process (no shared state)
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            future_to_meta = {pool.submit(_process_instance, args): args for args in task_args}
+            for future in as_completed(future_to_meta):
+                _, metadata, _, _ = future_to_meta[future]
+                try:
+                    result = future.result()
+                except Exception as e:
+                    n_failed += 1
+                    print(f"Worker failed {track}/{metadata['name']}: {e}", file=sys.stderr)
+                    continue
+                if isinstance(result, tuple) and result[0] is None:
+                    n_failed += 1
+                    if result[1]:
+                        # Check if it's a traceback (has newlines) or just an error message
+                        if "\n" in result[1]:
+                            print(f"Transform failed {track}/{metadata['name']}:", file=sys.stderr)
+                            print(result[1], file=sys.stderr)
+                        else:
+                            print(f"Load failed {track}/{metadata['name']}: {result[1]}", file=sys.stderr)
+                    else:
+                        print(f"Transform failed {track}/{metadata['name']}", file=sys.stderr)
+                    continue
+                records_list, stats = result
+                records.extend(records_list)
+                _write_records(records, records_path, records_cols)
+                _write_output(records, output_path, records_cols, existing_output)
+                print(f"Completed transforming {track}/{metadata['name']} ({_format_stats(stats)})")
 
     # Final write (redundant if loop ran, but ensures we have output if no instances completed)
     if records:
