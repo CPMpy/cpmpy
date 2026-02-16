@@ -28,10 +28,7 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     citation = [
         "Gleixner, A., Hendel, G., Gamrath, G., Achterberg, T., Bastubbe, M., Berthold, T., Christophel, P. M., Jarck, K., Koch, T., Linderoth, J., Lubbecke, M., Mittelmann, H. D., Ozyurt, D., Ralphs, T. K., Salvagnin, D., and Shinano, Y. MIPLIB 2017: Data-Driven Compilation of the 6th Mixed-Integer Programming Library. Mathematical Programming Computation, 2021. https://doi.org/10.1007/s12532-020-00194-3.",
     ]
-    domain = "mixed integer programming"
-    format = "MPS"
-
-    
+   
 
     def __init__(
             self, 

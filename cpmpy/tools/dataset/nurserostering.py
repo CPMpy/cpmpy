@@ -47,9 +47,6 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         "Smet P. Constraint reformulation for nurse rostering problems, in: PATAT 2018 twelfth international conference on the practice and theory of automated timetabling, Vienna, August, 2018, p. 69-80.",
         "Rahimian, E., Akartunali, K., and Levine, J. A hybrid integer programming and variable neighbourhood search algorithm to solve nurse rostering problems. European Journal of Operational Research, 2017. 258(2): p. 411-423.",
     ]
-    domain = "scheduling"
-    format = "NRP text"
-
 
     def __init__(self, root: str = ".", transform=None, target_transform=None, download:bool=False, sort_key=None):
         """

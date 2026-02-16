@@ -31,8 +31,6 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
     name = "mse"
     description = "MaxSAT Evaluation competition benchmark instances."
     url = "https://maxsat-evaluations.github.io/"
-    domain = "maximum satisfiability"
-
 
     def __init__(
             self, 

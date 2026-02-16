@@ -30,13 +30,6 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
     name = "xcsp3"
     description = "XCSP3 competition benchmark instances for constraint satisfaction and optimization."
     url = "https://xcsp.org/instances/"
-    domain = "constraint programming"
-    format = "XCSP3"
-
-   
-
-
-
     
 
     def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False):

@@ -24,6 +24,7 @@ try:
 except ImportError:
     tqdm = None
 
+import cpmpy as cp
 
 # Fields produced by extract_model_features() — not portable across format translations
 _MODEL_FEATURE_FIELDS = frozenset({
@@ -154,9 +155,6 @@ class _Dataset(ABC):
     url = ""
     license = ""
     citation: List[str] = []
-    domain = ""
-    format = ""
-    reader = None  # callable(file_path, open=open) -> cp.Model
     
     # Multiple download origins (override in subclasses or via config)
     # Origins are tried in order, falling back to original url if all fail
@@ -210,6 +208,14 @@ class _Dataset(ABC):
     # ---------------------------------------------------------------------------- #
     #                     Methods to implement in subclasses:                      #
     # ---------------------------------------------------------------------------- #
+
+    @staticmethod
+    @abstractmethod
+    def reader(file_path, open=open) -> cp.Model:
+        """
+        Reader for the dataset.
+        """
+        pass
 
     @abstractmethod
     def category(self) -> dict:

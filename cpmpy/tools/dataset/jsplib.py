@@ -37,9 +37,6 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         "T. Yamada, R. Nakano. 'A genetic algorithm applicable to large-scale job-shop problems.', Proceedings of the Second international workshop on parallel problem solving from Nature (PPSN'2). Brussels (Belgium), pp. 281-290, 1992.",
         "E. Taillard. 'Benchmarks for basic scheduling problems', European Journal of Operational Research, Vol. 64, Issue 2, pp. 278-285, 1993.",
     ]
-    domain = "scheduling"
-    format = "JSPLib"
-
 
     def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False):
         """

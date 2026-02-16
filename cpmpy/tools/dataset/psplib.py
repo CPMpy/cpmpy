@@ -21,9 +21,6 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     name = "psplib"
     description = "Project Scheduling Problem Library (RCPSP) benchmark instances."
     url = "https://www.om-db.wi.tum.de/psplib/main.html"
-    domain = "scheduling"
-    format = "PSPLIB SM"
-
 
     def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False):
         """

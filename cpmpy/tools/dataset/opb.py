@@ -30,8 +30,6 @@ class OPBDataset(_Dataset):
     name = "opb"
     description = "Pseudo-Boolean Competition benchmark instances."
     url = "https://www.cril.univ-artois.fr/PB25/"
-    domain = "pseudo-boolean optimization"
-    format = "OPB"
 
     def __init__(
             self, 
