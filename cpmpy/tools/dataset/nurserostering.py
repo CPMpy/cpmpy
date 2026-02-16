@@ -15,7 +15,6 @@ import io
 
 import cpmpy as cp
 from cpmpy.tools.dataset._base import _Dataset
-from cpmpy.tools.dataset.config import get_origins
 
 # Optional dependencies
 try:
@@ -52,14 +51,7 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
     format = "NRP text"
 
 
-    @staticmethod
-    def _reader(file_path, open=open):
-        from cpmpy.tools.io.nurserostering import read_nurserostering
-        return read_nurserostering(file_path, open=open)
-
-    reader = _reader
-
-    def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False, sort_key=None):
+    def __init__(self, root: str = ".", transform=None, target_transform=None, download:bool=False, sort_key=None):
         """
         Initialize the Nurserostering Dataset.
 
@@ -78,21 +70,24 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
         dataset_dir = self.root / self.name
 
-        # Load origins from config
-        if not self.origins:
-            self.origins = get_origins(self.name)
-
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
             download=download, extension=".txt"
         )
 
+    @staticmethod
+    def reader(file_path, open=open):
+        from cpmpy.tools.io.nurserostering import read_nurserostering
+        return read_nurserostering(file_path, open=open)
+
     def category(self) -> dict:
         return {}  # no categories
 
     def collect_instance_metadata(self, file) -> dict:
-        """Extract scheduling metadata from nurse rostering instance."""
+        """
+        Extract scheduling metadata from nurse rostering instance.
+        """
         try:
             data = parse_scheduling_period(file)
             return {
@@ -114,7 +109,7 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         target = "instances1_24.zip" # download full repo...
         target_download_path = self.root / target
 
-        print(f"Downloading Nurserostering instances from schedulingbenchmarks.org")
+        print("Downloading Nurserostering instances from schedulingbenchmarks.org")
 
         try:
             target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
@@ -216,10 +211,15 @@ def parse_scheduling_period(filename: str):
     """
     Parse a nurserostering instance file.
     
-    Args:
-        filename: Path to the nurserostering instance file.
+    Arguments:
+        filename (str): Path to the nurserostering instance file.
     
-    Returns a dictionary with native Python data structures (lists of dicts).
+    Returns:
+        dict: A dictionary with native Python data structures (lists of dicts).
+
+    Raises:
+        ValueError: If the file is not found.
+
     Use to_dataframes() transform to convert to pandas DataFrames if needed.
     Use add_fake_names() transform to add randomly generated names to staff.
     """
@@ -295,7 +295,7 @@ def parse_scheduling_period(filename: str):
                 shift_on=shift_on, shift_off=shift_off, cover=cover)
 
 
-def _add_fake_names(data, seed=0):
+def add_fake_names(data, seed=0):
     """
     Transform function to add randomly generated names to staff using Faker.
     
@@ -316,12 +316,12 @@ def _add_fake_names(data, seed=0):
             )
         )
     
-    Args:
-        data: Dictionary returned by parse_scheduling_period()
-        seed: Random seed for reproducible name generation (default: 0)
+    Arguments:
+        data (dict): Dictionary returned by parse_scheduling_period()
+        seed (int): Random seed for reproducible name generation (default: 0)
     
     Returns:
-        Dictionary with 'name' field added to each staff member
+        dict: Dictionary with 'name' field added to each staff member
     
     Raises:
         ImportError: If Faker is not installed
@@ -339,7 +339,7 @@ def _add_fake_names(data, seed=0):
     return data
 
 
-def _to_dataframes(data):
+def to_dataframes(data):
     """
     Transform function to convert native data structures to pandas DataFrames.
     
@@ -352,11 +352,11 @@ def _to_dataframes(data):
             transform=lambda fname: to_dataframes(parse_scheduling_period(fname))
         )
     
-    Args:
-        data: Dictionary returned by parse_scheduling_period()
+    Arguments:
+        data (dict): Dictionary returned by parse_scheduling_period()
     
     Returns:
-        Dictionary with pandas DataFrames instead of native structures
+        dict: Dictionary with pandas DataFrames instead of native structures
     
     Raises:
         ImportError: If pandas is not installed

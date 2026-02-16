@@ -10,7 +10,6 @@ import io
 import zipfile
 
 from cpmpy.tools.dataset._base import _Dataset
-from cpmpy.tools.dataset.config import get_origins
 
 class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
@@ -22,18 +21,9 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     name = "psplib"
     description = "Project Scheduling Problem Library (RCPSP) benchmark instances."
     url = "https://www.om-db.wi.tum.de/psplib/main.html"
-    license = ""
-    citation = ""
     domain = "scheduling"
     format = "PSPLIB SM"
-    origins = []  # Will be populated from config if available
 
-    @staticmethod
-    def _reader(file_path, open=open):
-        from cpmpy.tools.io.rcpsp import read_rcpsp
-        return read_rcpsp(file_path, open=open)
-
-    reader = _reader
 
     def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False):
         """
@@ -69,15 +59,16 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         
         dataset_dir = self.root / self.name / self.variant / self.family
 
-        # Load origins from config
-        if not self.origins:
-            self.origins = get_origins(self.name)
-
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
             download=download, extension=f".{self.family_codes[self.variant]}"
         )
+
+    @staticmethod
+    def reader(file_path, open=open):
+        from cpmpy.tools.io.rcpsp import read_rcpsp
+        return read_rcpsp(file_path, open=open)
         
     def category(self) -> dict:
         return {
@@ -116,7 +107,10 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
                 elif line.startswith("- doubly constrained"):
                     match = re.search(r':\s*(\d+)', line)
                     if match:
-                        result["num_doubly_constrained_resources"] = int(match.group(1))
+                        result["num_doubly_constrained_resources"] = @staticmethod
+    def reader(file_path, open=open):
+        from cpmpy.tools.io.rcpsp import read_rcpsp
+        return read_rcpsp(file_path, open=open)int(match.group(1))
                 elif line.startswith("PROJECT INFORMATION"):
                     in_project_info = True
                 elif in_project_info and not line.startswith("*") and not line.startswith("pronr"):

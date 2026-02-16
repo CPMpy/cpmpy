@@ -189,6 +189,9 @@ class _Dataset(ABC):
         self.transform = transform
         self.target_transform = target_transform
         self.extension = extension
+        if not self.origins:
+            from cpmpy.tools.dataset.config import get_origins
+            self.origins = get_origins(self.name)
 
         if not self.dataset_dir.exists():
             if not download:

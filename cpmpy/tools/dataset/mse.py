@@ -12,7 +12,6 @@ import pathlib
 import io
 
 from cpmpy.tools.dataset._base import _Dataset
-from cpmpy.tools.dataset.config import get_origins
 
 
 class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -32,18 +31,8 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
     name = "mse"
     description = "MaxSAT Evaluation competition benchmark instances."
     url = "https://maxsat-evaluations.github.io/"
-    license = ""
-    citation = ""
     domain = "maximum satisfiability"
-    format = "WCNF"
-    origins = []  # Will be populated from config if available
 
-    @staticmethod
-    def _reader(file_path, open=open):
-        from cpmpy.tools.io.wcnf import read_wcnf
-        return read_wcnf(file_path, open=open)
-
-    reader = _reader
 
     def __init__(
             self, 
@@ -80,16 +69,18 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
             raise ValueError("Track must be specified, e.g. OPT-LIN, DEC-LIN, ...")
 
         dataset_dir = self.root / self.name / str(year) / track
-
-        # Load origins from config
-        if not self.origins:
-            self.origins = get_origins(self.name)
         
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
             download=download, extension=".wcnf.xz"
         )
+
+
+    @staticmethod
+    def reader(file_path, open=open):
+        from cpmpy.tools.io.wcnf import read_wcnf
+        return read_wcnf(file_path, open=open)
 
     def category(self) -> dict:
         return {
@@ -98,7 +89,8 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
         }
 
     def collect_instance_metadata(self, file) -> dict:
-        """Extract statistics from WCNF header comments.
+        """
+        Extract statistics from WCNF header comments.
 
         WCNF files from MSE contain JSON-like statistics in comment lines:
         nvars, ncls, nhards, nsofts, total_lits, nsoft_wts, and length stats.

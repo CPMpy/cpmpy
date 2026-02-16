@@ -11,7 +11,6 @@ import pathlib
 import io
 
 from cpmpy.tools.dataset._base import _Dataset
-from cpmpy.tools.dataset.config import get_origins
 
 
 class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -31,18 +30,48 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
     name = "xcsp3"
     description = "XCSP3 competition benchmark instances for constraint satisfaction and optimization."
     url = "https://xcsp.org/instances/"
-    license = ""
-    citation = ""
     domain = "constraint programming"
     format = "XCSP3"
-    origins = []  # Will be populated from config if available
 
-    @staticmethod
-    def _reader(file_path, open=open):
+   
+
+
+
+    
+
+    def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False):
+        """
+        Initialize the XCSP3 Dataset.
+        """
+
+        self.root = pathlib.Path(root)
+        self.year = year
+        self.track = track
+
+        dataset_dir = self.root / self.name / str(year) / track
+        
+        if not str(year).startswith('20'):
+            raise ValueError("Year must start with '20'")
+        if not track:
+            raise ValueError("Track must be specified, e.g. COP, CSP, MiniCOP, ...")
+        
+        super().__init__(
+            dataset_dir=dataset_dir,
+            transform=transform, target_transform=target_transform, 
+            download=download, extension=".xml.lzma"
+        )
+
+
+    @classmethod
+    def reader(file_path, open=open):
         from cpmpy.tools.xcsp3.parser import read_xcsp3
         return read_xcsp3(file_path, open=open)
 
-    reader = _reader
+    def category(self) -> dict:
+        return {
+            "year": self.year,
+            "track": self.track
+        }
 
     def collect_instance_metadata(self, file) -> dict:
         """Extract instance type (CSP/COP) from XCSP3 XML root element."""
@@ -69,38 +98,6 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
             pass
         return result
 
-    def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False):
-        """
-        Initialize the XCSP3 Dataset.
-        """
-
-        self.root = pathlib.Path(root)
-        self.year = year
-        self.track = track
-
-        dataset_dir = self.root / self.name / str(year) / track
-        
-        if not str(year).startswith('20'):
-            raise ValueError("Year must start with '20'")
-        if not track:
-            raise ValueError("Track must be specified, e.g. COP, CSP, MiniCOP, ...")
-
-        # Load origins from config
-        if not self.origins:
-            self.origins = get_origins(self.name)
-        
-        super().__init__(
-            dataset_dir=dataset_dir,
-            transform=transform, target_transform=target_transform, 
-            download=download, extension=".xml.lzma"
-        )
-
-    def category(self) -> dict:
-        return {
-            "year": self.year,
-            "track": self.track
-        }
-
     def download(self):
 
         url = "https://www.cril.univ-artois.fr/~lecoutre/compets/"
@@ -124,7 +121,7 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
                     break
             
             if main_folder is None:
-                raise ValueError(f"Could not find main folder in zip file")
+                raise ValueError("Could not find main folder in zip file")
 
             # Extract only files from the specified track
             # Get all unique track names from zip

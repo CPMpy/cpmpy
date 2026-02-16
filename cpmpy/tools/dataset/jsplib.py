@@ -7,17 +7,14 @@ The `metadata` contains usefull information about the current problem instance.
 https://github.com/tamy0612/JSPLIB
 """
 
-import io
 import os
 import json
 import pathlib
-from typing import Tuple, Any
 import zipfile
 import numpy as np
 
 import cpmpy as cp
 from cpmpy.tools.dataset._base import _Dataset
-from cpmpy.tools.dataset.config import get_origins
 
 
 class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -31,18 +28,18 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     name = "jsplib"
     description = "Job Shop Scheduling Problem benchmark library."
     url = "https://github.com/tamy0612/JSPLIB"
-    license = ""
-    citation = ""
+    citation = [
+        "J. Adams, E. Balas, D. Zawack. 'The shifting bottleneck procedure for job shop scheduling.', Management Science, Vol. 34, Issue 3, pp. 391-401, 1988.",
+        "J.F. Muth, G.L. Thompson. 'Industrial scheduling.', Englewood Cliffs, NJ, Prentice-Hall, 1963.",
+        "S. Lawrence. 'Resource constrained project scheduling: an experimental investigation of heuristic scheduling techniques (Supplement).', Graduate School of Industrial Administration. Pittsburgh, Pennsylvania, Carnegie-Mellon University, 1984.",
+        "D. Applegate, W. Cook. 'A computational study of job-shop scheduling.', ORSA Journal on Computer, Vol. 3, Isuue 2, pp. 149-156, 1991.",
+        "R.H. Storer, S.D. Wu, R. Vaccari. 'New search spaces for sequencing problems with applications to job-shop scheduling.', Management Science Vol. 38, Issue 10, pp. 1495-1509, 1992.",
+        "T. Yamada, R. Nakano. 'A genetic algorithm applicable to large-scale job-shop problems.', Proceedings of the Second international workshop on parallel problem solving from Nature (PPSN'2). Brussels (Belgium), pp. 281-290, 1992.",
+        "E. Taillard. 'Benchmarks for basic scheduling problems', European Journal of Operational Research, Vol. 64, Issue 2, pp. 278-285, 1993.",
+    ]
     domain = "scheduling"
     format = "JSPLib"
-    origins = []  # Will be populated from config if available
 
-    @staticmethod
-    def _reader(file_path, open=open):
-        from cpmpy.tools.io.jsplib import read_jsplib
-        return read_jsplib(file_path, open=open)
-
-    reader = _reader
 
     def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False):
         """
@@ -61,30 +58,25 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
         dataset_dir = self.root / self.name
 
-        # Load origins from config
-        if not self.origins:
-            self.origins = get_origins(self.name)
-
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform,
             download=download, extension=""
         )
 
+
+    @staticmethod
+    def reader(file_path, open=open):
+        from cpmpy.tools.io.jsplib import read_jsplib
+        return read_jsplib(file_path, open=open)
+
     def category(self) -> dict:
         return {}  # no categories
 
-    def _list_instances(self):
-        """List JSPLib instances, excluding metadata and JSON files."""
-        return sorted([
-            f for f in self.dataset_dir.rglob("*")
-            if f.is_file()
-            and not str(f).endswith(self.METADATA_EXTENSION)
-            and not str(f).endswith(".json")
-        ])
-
     def collect_instance_metadata(self, file) -> dict:
-        """Extract metadata from instances.json and instance file header."""
+        """
+        Extract metadata from instances.json and instance file header.
+        """
         # Lazy load the source metadata
         if self._source_metadata is None:
             source_path = self.dataset_dir / self._source_metadata_file
@@ -129,24 +121,13 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
                 break
         return result
 
-    def __getitem__(self, index):
-        """Supports both integer index and string name lookup."""
-        if isinstance(index, str):
-            files = self._list_instances()
-            for file_path in files:
-                if file_path.stem == index:
-                    idx = files.index(file_path)
-                    return super().__getitem__(idx)
-            raise IndexError(f"Instance '{index}' not found in dataset")
-        return super().__getitem__(index)
-
     def download(self):
 
         url = "https://github.com/tamy0612/JSPLIB/archive/refs/heads/" # download full repo...
         target = "master.zip"
         target_download_path = self.root / target
 
-        print(f"Downloading JSPLib instances from github.com/tamy0612/JSPLIB")
+        print("Downloading JSPLib instances from github.com/tamy0612/JSPLIB")
 
         try:
             target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
@@ -173,6 +154,18 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     def open(self, instance: os.PathLike) -> callable:
         return open(instance, "r")
 
+    def _list_instances(self):
+        """
+        List JSPLib instances, excluding metadata and JSON files.
+
+        Special overwrite due to JSPLib not using file extensions for its instances.
+        """
+        return sorted([
+            f for f in self.dataset_dir.rglob("*")
+            if f.is_file()
+            and not str(f).endswith(self.METADATA_EXTENSION)
+            and not str(f).endswith(".json")
+        ])
 
 def parse_jsp(filename: str):
     """

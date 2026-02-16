@@ -12,7 +12,6 @@ import tarfile
 import io
 
 from cpmpy.tools.dataset._base import _Dataset
-from cpmpy.tools.dataset.config import get_origins
 
 
 class OPBDataset(_Dataset): 
@@ -31,18 +30,8 @@ class OPBDataset(_Dataset):
     name = "opb"
     description = "Pseudo-Boolean Competition benchmark instances."
     url = "https://www.cril.univ-artois.fr/PB25/"
-    license = ""
-    citation = ""
     domain = "pseudo-boolean optimization"
     format = "OPB"
-    origins = []  # Will be populated from config if available
-
-    @staticmethod
-    def _reader(file_path, open=open):
-        from cpmpy.tools.io.opb import read_opb
-        return read_opb(file_path, open=open)
-
-    reader = _reader
 
     def __init__(
             self, 
@@ -82,16 +71,18 @@ class OPBDataset(_Dataset):
             raise ValueError("Track must be specified, e.g. exact-weighted, exact-unweighted, ...")
 
         dataset_dir = self.root / self.name / str(year) / track / ('selected' if self.competition else 'normalized')
-
-        # Load origins from config
-        if not self.origins:
-            self.origins = get_origins(self.name)
         
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
             download=download, extension=".opb.xz"
         )
+
+
+    @staticmethod
+    def reader(file_path, open=open):
+        from cpmpy.tools.io.opb import read_opb
+        return read_opb(file_path, open=open)
 
     def category(self) -> dict:
         return {
@@ -155,7 +146,7 @@ class OPBDataset(_Dataset):
                     break
 
             if main_folder is None:
-                raise ValueError(f"Could not find main folder in tar file")
+                raise ValueError("Could not find main folder in tar file")
 
             # Extract only files from the specified track
             # Get all unique track names from tar
