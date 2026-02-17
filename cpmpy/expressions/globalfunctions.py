@@ -79,7 +79,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
+from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
 
 class GlobalFunction(Expression):
@@ -186,7 +186,7 @@ class Minimum(GlobalFunction):
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the minimum value, and a list of constraints defining it
         """
         _min = intvar(*self.get_bounds())
-        return _min, [cp.all(_min <= a for a in self.args), cp.any(_min >= a for a in self.args)]
+        return _min, [_min <= a for a in self.args] + [cp.any(_min >= a for a in self.args)]
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -234,7 +234,7 @@ class Maximum(GlobalFunction):
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the maximum value, and a list of constraints defining it
         """
         _max = intvar(*self.get_bounds())
-        return _max, [cp.all(_max >= a for a in self.args), cp.any(_max <= a for a in self.args)]
+        return _max, [_max >= a for a in self.args] + [cp.any(_max <= a for a in self.args)]
 
     def get_bounds(self) -> tuple[int, int]:
         """

@@ -1,10 +1,8 @@
-import unittest
-
 import cpmpy as cp
 from cpmpy.exceptions import NotSupportedError
 
 
-class TestSolveAll(unittest.TestCase):
+class TestSolveAll:
 
 
     def test_solveall_no_obj(self):
@@ -15,7 +13,8 @@ class TestSolveAll(unittest.TestCase):
         for name, solver in cp.SolverLookup.base_solvers():
             if not solver.supported():
                 continue
-
+            if name == "rc2":
+                continue
 
             sols = set()
             add_sol = lambda: sols.add(str([a.value(), b.value()]))
@@ -30,9 +29,9 @@ class TestSolveAll(unittest.TestCase):
                 kwargs['time_limit'] = 5
 
             count = solver.solveAll(**kwargs)
-            self.assertEqual(3, count)
-            self.assertSetEqual(sols,
-                                {"[True, True]", "[True, False]", "[False, True]"})
+            assert 3 == count
+            assert sols == \
+                                {"[True, True]", "[True, False]", "[False, True]"}
 
     def test_solveall_with_obj(self):
 
@@ -51,16 +50,16 @@ class TestSolveAll(unittest.TestCase):
                     kwargs['time_limit'] = 5
 
                 count = m.solveAll(solver=name,**kwargs)
-                self.assertEqual(3, count)
-                self.assertSetEqual(sols,
-                                    {"[1, 0, 0]","[0, 1, 0]","[0, 0, 1]"})
+                assert 3 == count
+                assert sols == \
+                                    {"[1, 0, 0]","[0, 1, 0]","[0, 0, 1]"}
 
 
             except NotSupportedError as e:
                 pass # solver does not support finding all optimal solutions
 
-    def test_solveAll_keywords(self):
+    def test_solve_all_keywords(self):
         a, b = cp.boolvar(shape=2)
         m = cp.Model(a | b)
 
-        self.assertEqual(3, m.solveAll('ortools', log_search_progress=True))
+        assert 3 == m.solveAll('ortools', log_search_progress=True)

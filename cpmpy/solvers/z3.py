@@ -111,7 +111,7 @@ class CPM_z3(SolverInterface):
         - subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_z3: Install the python package 'z3-solver' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_z3: Install the python package 'cpmpy[z3]' to use this solver interface.")
 
         import z3
 

@@ -2,7 +2,21 @@ import cpmpy as cp
 import numpy as np
 from setuptools.namespaces import flatten
 
-# This cpmpy example solves a sudoku by marty_sears, which can be found on https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000JUJ
+"""
+Puzzle source: https://logic-masters.de/Raetselportal/Raetsel/zeigen.php?id=000JUJ
+
+Rules:
+
+- The grid contains the digits 1-6. In each row and column, one digit has been removed, and one digit is repeated. 
+  Eg: 352156 - 4 has been removed, and 5 is repeated.
+- Each digit 1-6 is repeated in exactly one row and one column, and removed in exactly one row and one column. 
+- Digits joined by an X sum to 10.
+- Digits joined by a white dot are consecutive.
+- Digits joined by a black dot are in a 1:2 ratio.
+- Digits in a cage sum to the clue in the corner.
+- Digits on a pink renban form a non-repeating consecutive sequence which can be in any order.
+- Digits an equal distance from the central spot on a lavender zipper line sum to the digit on the central spot.
+"""
 
 # sudoku cells
 cells = cp.intvar(1,6, shape=(6,6))
@@ -14,34 +28,92 @@ removals_rs = cp.intvar(1,6, shape=6)
 removals_cs = cp.intvar(1,6, shape=6)
 
 def white_kropki(a, b):
-    # digits separated by a white dot differ by 1
+    """
+    digits separated by a white dot differ by 1
+    
+    Args:
+        a (cp.intvar): cpmpy variable representing cell a
+        b (cp.intvar): cpmpy variable representing cell b
+        
+    Returns:
+        cpmpy constraint enforcing the white kropki rule
+    """    
     return abs(a-b) == 1
 
 def black_kropki(a, b):
-    # digits separated by a black dot are in a 1:2 ratio
+    """
+    digits separated by a black dot are in a 1:2 ratio
+    
+    Args:
+        a (cp.intvar): cpmpy variable representing cell a
+        b (cp.intvar): cpmpy variable representing cell b
+        
+    Returns:
+        cpmpy constraint enforcing the black kropki rule
+    """
     return  cp.any([a * 2 == b, a == 2 * b])
 
 def zipper(args):
-    # equidistant cells from the middle, sum to the value in the value in the middle
-    assert len(args) % 2 == 1
+    """
+    equidistant cells from the middle, sum to the value in the value in the middle
+    
+    Args:
+        args (list): list of cpmpy variables representing the cells in the zipper line
+        
+    Returns:
+        cpmpy constraint enforcing the zipper rule
+    """
+    assert len(args) % 2 == 1 # line must have odd length
     mid = len(args) // 2
     return cp.all([args[i] + args[len(args)-1-i] == args[mid] for i in range(mid)])
 
 def X(a, b):
-    # digits separated by an X sum to 10
+    """
+    digits separated by an X sum to 10
+    
+    Args:
+        a (cp.intvar): cpmpy variable representing cell a
+        b (cp.intvar): cpmpy variable representing cell b
+        
+    Returns:
+        cpmpy constraint enforcing the X rule
+    """
     return a + b == 10
 
 def renban(args):
-    # digits on a pink renban form a set of consecutive non repeating digits
+    """
+    digits on a pink renban form a set of consecutive non repeating digits
+    
+    Args:
+        args (list): list of cpmpy variables representing the cells in the renban line
+        
+    Returns:
+        cpmpy constraint enforcing the renban rule
+    """
     return cp.all([cp.AllDifferent(args), cp.max(args) - cp.min(args) == len(args) - 1])
 
 def cage(args, total):
-    # digits in a cage sum to the given total
-    # no all different necessary in this puzzle
+    """
+    digits in a cage sum to the given total
+    no all different necessary in this puzzle
+    
+    Args:
+        args (list): list of cpmpy variables representing the cells in the cage
+        total (int): the total sum for the cage
+    """
     return cp.sum(args) == total
 
 def duplicate(array, doppel):
-    # every row and column has one duplicated digit
+    """
+    every row and column has one duplicated digit
+    
+    Args:
+        array (cp.intvar): cpmpy variable representing the cells in the row/column
+        doppel (cp.intvar): cpmpy variable representing the duplicated digit
+        
+    Returns:
+        cpmpy constraint enforcing the duplicate rule
+    """
     all_triplets = [[(a, b, c), (a, c, b), (b,c,a)] for idx, a in enumerate(array) for idx2, b in enumerate(array[idx + 1:]) for c in array[idx+idx2+2:]]
     all_triplets = flatten(all_triplets)
     # any vars in a pair cannot be equal to a third var
@@ -50,7 +122,16 @@ def duplicate(array, doppel):
     return cp.all([(var1 == var2).implies(cp.all([var1==doppel, var1 != var3])) for var1, var2, var3 in all_triplets])
 
 def missing(array, removed):
-    # every row and column has one missing digit
+    """
+    every row and column has one missing digit
+    
+    Args:
+        array (cp.intvar): cpmpy variable representing the cells in the row/column
+        removed (cp.intvar): cpmpy variable representing the removed digit
+        
+    Returns:
+        cpmpy constraint enforcing the missing rule
+    """
     return cp.all([removed != elm for elm in array])
 
 m = cp.Model(

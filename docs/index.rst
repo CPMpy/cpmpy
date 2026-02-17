@@ -37,12 +37,12 @@ Supported solvers
      - 
    * - :doc:`GCS <api/solvers/gcs>`
      - CP
-     - SAT ALLSAT - OPT - PROOF
+     - SAT ISAT ALLSAT - OPT - PROOF
      - pip
      -
    * - :doc:`Choco <api/solvers/choco>`
      - CP
-     - SAT ALLSAT - OPT
+     - SAT ISAT ALLSAT - OPT
      - pip
      - 
    * - :doc:`CP Optimizer <api/solvers/cpo>`
@@ -57,34 +57,39 @@ Supported solvers
      - Communicates through textfiles
    * - :doc:`Z3 <api/solvers/z3>`
      - SMT
-     - SAT ASAT ISAT - OPT IOPT
+     - SAT ASAT ISAT - OPT
      - pip
      - 
    * - :doc:`Hexaly <api/solvers/hexaly>`
      - Global Opt.
-     - SAT ALLSAT - OPT IOPT
+     - SAT ISAT ALLSAT - OPT IOPT
      - pip + local + (aca.) licence
      -
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
-     - SAT - OPT IOPT - PAR
+     - SAT ISAT - OPT IOPT - PAR
      - pip + (aca.) license
      - 
    * - :doc:`CPLEX <api/solvers/cplex>`
      - ILP
+     - SAT - OPT IOPT - PAR
      - pip + local + (aca.) license
      - No
-     - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
      - pip >3.10 (Linux, Win)
      - Manual installation on Mac possible
-   * - :doc:`Pindakaas <api/solvers/pindakaas>`
-     - SAT Encoder
-     - SAT
-     - local install (git + pip > 3.10)
+   * - :doc:`RC2 <api/solvers/rc2>`
+     - MaxSAT
+     - OPT
+     - pip
      - 
+   * - :doc:`Pindakaas <api/solvers/pindakaas>`
+     - SAT
+     - SAT ASAT ISAT
+     - pip
+     - Automatically encodes PB to SAT
    * - :doc:`PySAT <api/solvers/pysat>`
      - SAT
      - SAT ASAT ISAT
@@ -120,6 +125,7 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
    unsat_core_extraction
    developers
    adding_solver
+   testing
 
 Open Source
 -----------
