@@ -75,9 +75,9 @@ def _load_xcsp3(parser: "ParserXCSP3") -> cp.Model:
     return model
 
 _std_open = open
-def read_xcsp3(xcsp3: os.PathLike, open=open) -> cp.Model:
+def load_xcsp3(xcsp3: os.PathLike, open=open) -> cp.Model:
     """
-    Reads in an XCSP3 instance (.xml or .xml.lzma) and returns its matching CPMpy model.
+    Loads an XCSP3 instance (.xml or .xml.lzma) and returns its matching CPMpy model.
 
     Arguments:
         xcsp3 (str or os.PathLike):
@@ -140,6 +140,9 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
+# Backward compatibility alias
+read_xcsp3 = load_xcsp3
 
 if __name__ == "__main__":
     main()

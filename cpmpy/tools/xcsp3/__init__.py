@@ -24,4 +24,4 @@ List of submodules
 
 
 from .dataset import XCSP3Dataset # for easier importing
-from .parser import read_xcsp3
+from .parser import load_xcsp3, read_xcsp3  # read_xcsp3 is alias for backward compatibility

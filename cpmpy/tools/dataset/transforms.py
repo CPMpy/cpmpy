@@ -14,7 +14,7 @@ List of classes
 
     Compose
     Open
-    Parse
+    Load
     Serialize
     Translate
     SaveToFile
@@ -22,14 +22,14 @@ List of classes
 
 Example usage::
 
-    from cpmpy.tools.dataset import MSEDataset, Compose, Parse, Serialize
-    from cpmpy.tools.io.wcnf import read_wcnf
+    from cpmpy.tools.dataset import MSEDataset, Compose, Load, Serialize
+    from cpmpy.tools.io.wcnf import load_wcnf
 
     dataset = MSEDataset(root=".", year=2024, track="exact-weighted")
 
-    # Chain: parse WCNF files, then serialize to DIMACS
+    # Chain: load WCNF files, then serialize to DIMACS
     transform = Compose([
-        Parse(read_wcnf, open=dataset.open),
+        Load(load_wcnf, open=dataset.open),
         Serialize("dimacs"),
     ])
     dataset.transform = transform
@@ -128,7 +128,7 @@ def extract_format_metadata(content, format_name):
 def _enrich_from_model(model, metadata):
     """Add decision variable and objective info from a CPMpy Model to metadata.
 
-    This is called by transforms that produce CPMpy models (Parse, Translate)
+    This is called by transforms that produce CPMpy models (Load, Translate)
     via their ``enrich_metadata`` method. It adds:
 
     - ``decision_variables``: list of dicts with name, type, lb, ub for each variable
@@ -167,7 +167,7 @@ class Compose:
     Transforms that define ``enrich_metadata(data, metadata)`` can contribute
     additional fields to the metadata dictionary. Each sub-transform's
     ``enrich_metadata`` receives the intermediate result *it* produced, so a
-    :class:`Parse` inside ``Compose([Parse(...), Serialize(...)])`` sees the
+    :class:`Load` inside ``Compose([Load(...), Serialize(...)])`` sees the
     CPMpy model, not the final serialized string.
 
     Arguments:
@@ -176,7 +176,7 @@ class Compose:
     Example::
 
         >>> transform = Compose([
-        ...     Parse(read_wcnf, open=dataset.open),
+        ...     Load(load_wcnf, open=dataset.open),
         ...     Serialize("dimacs"),
         ... ])
         >>> dataset = MSEDataset(transform=transform)
@@ -240,47 +240,70 @@ class Open:
         return f"{self.__class__.__name__}(open={self._open})"
 
 
-class Parse:
+class Load:
     """
-    Transform that parses a file path into a CPMpy model using a reader function.
+    Transform that loads a file path into a CPMpy model.
+    
+    Loading always handles reading internally. This transform combines reading
+    (decompressing + reading raw contents) and loading (turning raw contents
+    into a CPMpy model) into a single step.
 
     Implements ``enrich_metadata`` to add model verification information
     (decision variables, objective) to the metadata dictionary. This is
     called automatically by the dataset's ``__getitem__``.
 
     Arguments:
-        reader (callable): A reader function such as ``read_wcnf``, ``read_opb``,
-            ``read_scip``, ``read_dimacs``, etc.
-        open (callable, optional): A callable to open files, passed to the reader
-            as the ``open`` keyword argument. If None, the reader uses its default.
-        **kwargs: Additional keyword arguments passed to the reader.
+        loader (callable): A loader function that takes raw content string and
+            returns a CPMpy model. Can be a dataset's ``loader`` method or a
+            loader function that supports raw strings (e.g., ``load_wcnf``,
+            ``load_opb``, ``load_xcsp3``, etc.).
+        open (callable, optional): A callable to open files for reading.
+            Typically ``dataset.open``. Defaults to Python's built-in ``open``.
+        **kwargs: Additional keyword arguments passed to the loader (if supported).
 
     Example::
 
-        >>> from cpmpy.tools.io.wcnf import read_wcnf
-        >>> dataset = MSEDataset(transform=Parse(read_wcnf, open=dataset.open))
+        >>> # Using dataset's loader method
+        >>> dataset = MSEDataset(transform=Load(dataset.loader, open=dataset.open))
+        >>> model, metadata = dataset[0]
+        
+        >>> # Using a loader function that supports raw strings
+        >>> from cpmpy.tools.io.wcnf import load_wcnf
+        >>> dataset = MSEDataset(transform=Load(load_wcnf, open=dataset.open))
         >>> model, metadata = dataset[0]
         >>> metadata['decision_variables']  # list of variable descriptors
         >>> metadata['objective']           # objective expression string (if any)
     """
 
-    def __init__(self, reader, open=None, **kwargs):
-        self.reader = reader
-        self._open = open
+    def __init__(self, loader, open=None, **kwargs):
+        self.loader = loader
+        self._open = open if open is not None else _builtins_open
         self.kwargs = kwargs
 
     def __call__(self, file_path):
-        if self._open is not None:
-            return self.reader(file_path, open=self._open, **self.kwargs)
-        return self.reader(file_path, **self.kwargs)
+        # Step 1: Reading - decompress and read raw file contents
+        with self._open(file_path) as f:
+            content = f.read()
+        
+        # Step 2: Loading - turn raw contents into CPMpy model
+        # Prepare kwargs, ensuring 'open' doesn't conflict
+        kwargs = {k: v for k, v in self.kwargs.items() if k != 'open'}
+        
+        # Handle both regular functions and classmethods/staticmethods
+        if hasattr(self.loader, '__self__') or isinstance(self.loader, classmethod):
+            # It's a bound method or classmethod, call it directly
+            return self.loader(content, **kwargs)
+        else:
+            # It's a regular function, call it normally
+            return self.loader(content, **kwargs)
 
     def enrich_metadata(self, data, metadata):
         """Add model verification info if data is a CPMpy Model."""
         return _enrich_from_model(data, metadata)
 
     def __repr__(self):
-        reader_name = getattr(self.reader, '__name__', repr(self.reader))
-        return f"{self.__class__.__name__}(reader={reader_name})"
+        loader_name = getattr(self.loader, '__name__', repr(self.loader))
+        return f"{self.__class__.__name__}(loader={loader_name})"
 
 
 class Serialize:
@@ -288,71 +311,119 @@ class Serialize:
     Transform that serializes a CPMpy model to a string in a given format.
 
     Arguments:
-        format (str): Output format name (e.g., ``"dimacs"``, ``"mps"``, ``"opb"``).
-            Must be a format supported by :func:`cpmpy.tools.io.writer.write`.
+        writer (callable or str): Either a writer function (e.g., ``write_dimacs``, ``write_opb``)
+            or a format name string (e.g., ``"dimacs"``, ``"mps"``, ``"opb"``) that will be resolved
+            to the appropriate writer function. If a string, must be a format supported by
+            :func:`cpmpy.tools.io.writer.write`.
         **kwargs: Additional keyword arguments passed to the writer
             (e.g., ``header``, ``verbose``).
 
     Example::
 
+        >>> # Using format name string
         >>> transform = Compose([
-        ...     Parse(read_wcnf, open=dataset.open),
+        ...     Load(load_wcnf, open=dataset.open),
         ...     Serialize("dimacs"),
+        ... ])
+        
+        >>> # Using writer function directly
+        >>> from cpmpy.tools.dimacs import write_dimacs
+        >>> transform = Compose([
+        ...     Load(load_wcnf, open=dataset.open),
+        ...     Serialize(write_dimacs),
         ... ])
     """
 
-    def __init__(self, format, **kwargs):
-        self.format = format
+    def __init__(self, writer, **kwargs):
+        self.writer = writer
         self.kwargs = kwargs
 
     def __call__(self, model):
-        from cpmpy.tools.io.writer import write
-        return write(model, format=self.format, file_path=None, **self.kwargs)
+        # Determine writer function
+        if callable(self.writer):
+            # writer is a callable function
+            return self.writer(model, fname=None, **self.kwargs)
+        else:
+            # writer is a format name string, use unified write function
+            from cpmpy.tools.io.writer import write
+            return write(model, format=self.writer, file_path=None, **self.kwargs)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(format='{self.format}')"
+        if callable(self.writer):
+            writer_name = getattr(self.writer, '__name__', repr(self.writer))
+            return f"{self.__class__.__name__}(writer={writer_name})"
+        else:
+            return f"{self.__class__.__name__}(writer='{self.writer}')"
 
 
 class Translate:
     """
     Transform that translates a file from one format to another.
-    Combines reading (parsing) and writing (serialization) in one step.
+    Combines reading (decompressing + reading raw contents), loading (turning raw
+    contents into a CPMpy model), and writing (serializing the model) in one step.
 
     Implements ``enrich_metadata`` to add model verification information
     from the intermediate CPMpy model to the metadata dictionary.
 
     Arguments:
-        reader (callable): A reader function (e.g., ``read_wcnf``, ``read_opb``).
-        format (str): Output format name (e.g., ``"dimacs"``, ``"mps"``).
-        open (callable, optional): A callable to open compressed files,
-            passed to the reader.
+        loader (callable): A loader function that takes raw content string and
+            returns a CPMpy model. Can be a dataset's ``loader`` method or a
+            loader function that supports raw strings (e.g., ``load_wcnf``,
+            ``read_opb``, ``read_xcsp3``, etc.).
+        writer (callable or str): Either a writer function (e.g., ``write_dimacs``, ``write_opb``)
+            or a format name string (e.g., ``"dimacs"``, ``"mps"``) that will be resolved
+            to the appropriate writer function.
+        open (callable, optional): A callable to open compressed files for reading.
+            Typically ``dataset.open``. Defaults to Python's built-in ``open``.
         **kwargs: Additional keyword arguments passed to the writer.
 
     Example::
 
-        >>> transform = Translate(read_wcnf, "dimacs", open=dataset.open)
+        >>> # Using format name string
+        >>> transform = Translate(dataset.loader, "dimacs", open=dataset.open)
+        >>> dataset = MSEDataset(transform=transform)
+        >>> dimacs_string, metadata = dataset[0]
+        
+        >>> # Using writer function directly
+        >>> from cpmpy.tools.dimacs import write_dimacs
+        >>> transform = Translate(dataset.loader, write_dimacs, open=dataset.open)
         >>> dataset = MSEDataset(transform=transform)
         >>> dimacs_string, metadata = dataset[0]
         >>> metadata['decision_variables']  # from the intermediate model
     """
 
-    def __init__(self, reader, format, open=None, **kwargs):
-        self.reader = reader
-        self.format = format
-        self._open = open
+    def __init__(self, loader, writer, open=None, **kwargs):
+        self.loader = loader
+        self.writer = writer
+        self._open = open if open is not None else _builtins_open
         self.kwargs = kwargs
         self._last_model = None
 
     def __call__(self, file_path):
-        from cpmpy.tools.io.writer import write
-
-        if self._open is not None:
-            model = self.reader(file_path, open=self._open)
+        # Step 1: Reading - decompress and read raw file contents
+        with self._open(file_path) as f:
+            content = f.read()
+        
+        # Step 2: Loading - turn raw contents into CPMpy model
+        loader_kwargs = {k: v for k, v in self.kwargs.items() if k != 'open'}
+        
+        # Handle both regular functions and classmethods/staticmethods
+        if hasattr(self.loader, '__self__') or isinstance(self.loader, classmethod):
+            model = self.loader(content, **loader_kwargs)
         else:
-            model = self.reader(file_path)
+            model = self.loader(content, **loader_kwargs)
 
         self._last_model = model
-        return write(model, format=self.format, file_path=None, **self.kwargs)
+        
+        # Step 3: Writing - serialize model to string
+        writer_kwargs = {k: v for k, v in self.kwargs.items() if k != 'open'}
+        if callable(self.writer):
+            # writer is a callable function
+            return self.writer(model, fname=None, **writer_kwargs)
+        else:
+            # writer is a format name string, use unified write function
+            from cpmpy.tools.io.writer import write
+            return write(model, format=self.writer, file_path=None, **writer_kwargs)
 
     def enrich_metadata(self, data, metadata):
         """Add model verification info from the intermediate model."""
@@ -361,8 +432,12 @@ class Translate:
         return metadata
 
     def __repr__(self):
-        reader_name = getattr(self.reader, '__name__', repr(self.reader))
-        return f"{self.__class__.__name__}(reader={reader_name}, format='{self.format}')"
+        loader_name = getattr(self.loader, '__name__', repr(self.loader))
+        if callable(self.writer):
+            writer_name = getattr(self.writer, '__name__', repr(self.writer))
+            return f"{self.__class__.__name__}(loader={loader_name}, writer={writer_name})"
+        else:
+            return f"{self.__class__.__name__}(loader={loader_name}, writer='{self.writer}')"
 
 
 class SaveToFile:
@@ -389,7 +464,7 @@ class SaveToFile:
     Example::
 
         >>> transform = Compose([
-        ...     Translate(read_wcnf, "dimacs", open=dataset.open),
+        ...     Translate(load_wcnf, "dimacs", open=dataset.open),
         ...     SaveToFile("output/", extension=".cnf", write_metadata=True),
         ... ])
     """
@@ -509,7 +584,7 @@ class Lambda:
     Example::
 
         >>> transform = Compose([
-        ...     Parse(read_wcnf, open=dataset.open),
+        ...     Load(load_wcnf, open=dataset.open),
         ...     Lambda(lambda m: len(m.constraints), name="count_constraints"),
         ... ])
     """

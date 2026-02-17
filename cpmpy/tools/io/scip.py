@@ -65,9 +65,9 @@ except ImportError:
 
 
 _std_open = open
-def read_scip(fname: Union[str, os.PathLike], open=open, assume_integer:bool=False) -> cp.Model:
+def load_scip(fname: Union[str, os.PathLike], open=open, assume_integer:bool=False) -> cp.Model:
     """
-    Read a SCIP-compatible model from a file and return a CPMpy model.
+    Load a SCIP-compatible model from a file and return a CPMpy model.
 
     Arguments:
         fname: The path to the SCIP-compatible file to read.
@@ -631,6 +631,12 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
+# Backward compatibility alias
+read_scip = load_scip
+
+# Backward compatibility alias
+read_scip = load_scip
 
 if __name__ == "__main__":
     main()

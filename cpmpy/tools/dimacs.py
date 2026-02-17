@@ -79,9 +79,9 @@ def write_dimacs(model, fname=None, encoding="auto", header:Optional[str]="DIMAC
     return out
 
 
-def read_dimacs(fname):
+def load_dimacs(fname):
     """
-        Read a CPMpy model from a DIMACS formatted file strictly following the specification:
+        Load a CPMpy model from a DIMACS formatted file strictly following the specification:
         https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
         
         .. note::
@@ -128,6 +128,12 @@ def read_dimacs(fname):
         assert len(m.constraints) == nr_cls, f"Number of clauses was declared in p-line as {nr_cls}, but was {len(m.constraints)}"
 
     return m
+
+# Backward compatibility alias
+read_dimacs = load_dimacs
+
+# Backward compatibility alias
+read_dimacs = load_dimacs
 
 
 

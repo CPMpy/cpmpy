@@ -79,8 +79,23 @@ class OPBDataset(_Dataset):
 
     @staticmethod
     def reader(file_path, open=open):
-        from cpmpy.tools.io.opb import read_opb
-        return read_opb(file_path, open=open)
+        """
+        Reader for OPB dataset.
+        Parses a file path directly into a CPMpy model.
+        For backward compatibility. Consider using read() + load() instead.
+        """
+        from cpmpy.tools.io.opb import load_opb
+        return load_opb(file_path, open=open)
+
+    @staticmethod
+    def loader(content: str):
+        """
+        Loader for OPB dataset.
+        Loads a CPMpy model from raw OPB content string.
+        """
+        from cpmpy.tools.io.opb import load_opb
+        # load_opb already supports raw strings
+        return load_opb(content)
 
     def category(self) -> dict:
         return {

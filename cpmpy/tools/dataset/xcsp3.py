@@ -56,9 +56,24 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
 
 
     @classmethod
-    def reader(file_path, open=open):
-        from cpmpy.tools.xcsp3.parser import read_xcsp3
-        return read_xcsp3(file_path, open=open)
+    def reader(cls, file_path, open=open):
+        """
+        Reader for XCSP3 dataset.
+        Parses a file path directly into a CPMpy model.
+        For backward compatibility. Consider using read() + load() instead.
+        """
+        from cpmpy.tools.xcsp3.parser import load_xcsp3
+        return load_xcsp3(file_path, open=open)
+
+    @classmethod
+    def loader(cls, content: str):
+        """
+        Loader for XCSP3 dataset.
+        Loads a CPMpy model from raw XCSP3 content string.
+        """
+        from cpmpy.tools.xcsp3.parser import load_xcsp3
+        # load_xcsp3 already supports raw strings
+        return load_xcsp3(content)
 
     def category(self) -> dict:
         return {
@@ -143,7 +158,9 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
         # Clean up the zip file
         target_download_path.unlink()
 
-    def open(self, instance: os.PathLike) -> io.TextIOBase:
+
+    @classmethod
+    def open(cls, instance: os.PathLike) -> io.TextIOBase:
         return lzma.open(instance, mode='rt', encoding='utf-8') if str(instance).endswith(".lzma") else open(instance)
 
 

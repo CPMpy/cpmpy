@@ -6,4 +6,6 @@ from .nurserostering import NurseRosteringDataset
 from .xcsp3 import XCSP3Dataset
 from .opb import OPBDataset
 from .mse import MSEDataset
-from .transforms import Compose, Open, Parse, Serialize, Translate, SaveToFile, Lambda, extract_format_metadata
+from .transforms import Compose, Open, Load, Serialize, Translate, SaveToFile, Lambda, extract_format_metadata
+# Backward compatibility alias
+Parse = Load

@@ -120,9 +120,9 @@ def _parse_constraint(line, vars):
     )
 
 _std_open = open
-def read_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
     """
-    Parser for OPB (Pseudo-Boolean) format. Reads in an instance and returns its matching CPMpy model.
+    Loader for OPB (Pseudo-Boolean) format. Loads an instance and returns its matching CPMpy model.
 
     Based on PyPBLib's example parser: https://hardlog.udl.cat/static/doc/pypblib/html/library/index.html#example-from-opb-to-cnf-file
 
@@ -483,6 +483,9 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
+# Backward compatibility alias
+read_opb = load_opb
 
 if __name__ == "__main__":
     main()

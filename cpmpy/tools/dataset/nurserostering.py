@@ -75,8 +75,23 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
     @staticmethod
     def reader(file_path, open=open):
-        from cpmpy.tools.io.nurserostering import read_nurserostering
-        return read_nurserostering(file_path, open=open)
+        """
+        Reader for Nurse Rostering dataset.
+        Parses a file path directly into a CPMpy model.
+        For backward compatibility. Consider using read() + load() instead.
+        """
+        from cpmpy.tools.io.nurserostering import load_nurserostering
+        return load_nurserostering(file_path, open=open)
+
+    @staticmethod
+    def loader(content: str):
+        """
+        Loader for Nurse Rostering dataset.
+        Loads a CPMpy model from raw Nurse Rostering content string.
+        """
+        from cpmpy.tools.io.nurserostering import load_nurserostering
+        # load_nurserostering already supports raw strings
+        return load_nurserostering(content)
 
     def category(self) -> dict:
         return {}  # no categories

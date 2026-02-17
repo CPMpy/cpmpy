@@ -64,8 +64,23 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
     @staticmethod
     def reader(file_path, open=open):
-        from cpmpy.tools.io.jsplib import read_jsplib
-        return read_jsplib(file_path, open=open)
+        """
+        Reader for JSPLib dataset.
+        Parses a file path directly into a CPMpy model.
+        For backward compatibility. Consider using read() + load() instead.
+        """
+        from cpmpy.tools.io.jsplib import load_jsplib
+        return load_jsplib(file_path, open=open)
+
+    @staticmethod
+    def loader(content: str):
+        """
+        Loader for JSPLib dataset.
+        Loads a CPMpy model from raw JSPLib content string.
+        """
+        from cpmpy.tools.io.jsplib import load_jsplib
+        # load_jsplib already supports raw strings
+        return load_jsplib(content)
 
     def category(self) -> dict:
         return {}  # no categories

@@ -214,6 +214,26 @@ class _Dataset(ABC):
     def reader(file_path, open=open) -> cp.Model:
         """
         Reader for the dataset.
+        Parses a file path directly into a CPMpy model.
+        For backward compatibility. Consider using read() + load() instead.
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def loader(content: str) -> cp.Model:
+        """
+        Loader for the dataset.
+        Loads a CPMpy model from raw file content string.
+        
+        This is the "loading" step: turning raw contents into a CPMpy model.
+        The content should be the raw text content of the file (already decompressed).
+        
+        Arguments:
+            content (str): Raw file content string to load into a model.
+            
+        Returns:
+            cp.Model: The loaded CPMpy model.
         """
         pass
 
@@ -252,13 +272,43 @@ class _Dataset(ABC):
         """
         return {}
 
-    def open(self, instance) -> io.TextIOBase:
+    @classmethod
+    def open(cls, instance) -> io.TextIOBase:
         """
         How an instance file from the dataset should be opened.
         Especially usefull when files come compressed and won't work with
         python standard library's 'open', e.g. '.xz', '.lzma'.
         """
         return open(instance, "r")
+
+    def read(self, instance) -> str:    
+        """
+        Read raw file contents from an instance file.
+        Handles decompression automatically via dataset.open().
+        
+        This is the "reading" step: decompressing + reading raw file contents.
+        """
+        with self.open(instance) as f:
+            return f.read()
+
+    def load(self, instance) -> cp.Model:
+        """
+        Load a CPMpy model from an instance file.
+        
+        This is the "loading" step: uses `read()` to handle reading (decompressing + 
+        reading raw contents) and then turns raw contents into a CPMpy model via `loader()`.
+        Loading always handles reading internally by calling `read()`.
+        
+        Arguments:
+            instance: File path to the instance file.
+            
+        Returns:
+            cp.Model: The loaded CPMpy model.
+        """
+        # Step 1: Reading - use read() to decompress and read raw file contents
+        content = self.read(instance)
+        # Step 2: Loading - turn raw contents into CPMpy model
+        return self.loader(content)
 
 
     # ---------------------------------------------------------------------------- #

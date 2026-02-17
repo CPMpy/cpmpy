@@ -39,9 +39,9 @@ def _get_var(i, vars_dict):
     return vars_dict[i]
 
 _std_open = open
-def read_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
     """
-    Parser for WCNF format. Reads in an instance and returns its matching CPMpy model.
+    Loader for WCNF format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
         wcnf (str or os.PathLike):
@@ -96,6 +96,9 @@ def read_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
 
     return model
 
+# Backward compatibility alias
+read_wcnf = load_wcnf
+
 def main():
     parser = argparse.ArgumentParser(description="Parse and solve a WCNF model using CPMpy")
     parser.add_argument("model", help="Path to a WCNF file (or raw WCNF string if --string is given)")
@@ -131,6 +134,9 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
+# Backward compatibility alias
+read_wcnf = load_wcnf
 
 if __name__ == "__main__":
     main()
