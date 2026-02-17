@@ -24,6 +24,7 @@ import cpmpy as cp
 from cpmpy.tools.dimacs import write_dimacs
 from cpmpy.tools.io.scip import write_scip
 from cpmpy.tools.io.opb import write_opb
+from cpmpy.tools.io.utils import get_format
 
 # mapping format names to appropriate writer functions
 _writer_map = {
@@ -110,8 +111,8 @@ def write_formats() -> List[str]:
     .. code-block:: python
 
         from cpmpy.tools.io import write, write_formats, get_extension
-        write(model, format=write_formats()[0])
-        write(model, format=write_formats()[1], file_path=f"model.{get_extension(write_formats()[1])}")
+        write(model, format=write_formats()[0])  # Returns string
+        write(model, f"model.{get_extension(write_formats()[1])}")  # Writes to file, format auto-detected
     """
     return list(_writer_map.keys())
 
@@ -126,18 +127,61 @@ def _create_header(format: str) -> str:
     header += "-"*100 + "\n"
     return header
 
-def write(model: cp.Model, format: str, file_path: Optional[str] = None, verbose: bool = False, header: Optional[str] = None, **kwargs) -> str:
+def _derive_format(file_path: str) -> str:
+    """
+    Derive the format of a file from its path.
+
+    Arguments:
+        file_path (str): The path to the file to derive the format from.
+
+    Raises:
+        ValueError: If the format could not be derived from the file path.
+
+    Returns:
+        The name of the format.
+
+    Example:
+        >>> _derive_format("output.mps")
+        "mps"
+        >>> _derive_format("output.lp.xz")
+        "lp"
+    """
+
+    # Iterate over the file path extensions in reverse order
+    for ext in file_path.split(".")[::-1]:
+        try:
+            return get_format(ext)
+        except (ValueError, KeyError):
+            continue
+
+    raise ValueError(f"No file format provided and could not derive format from file path: {file_path}")
+
+def write(model: cp.Model, file_path: Optional[str] = None, format: Optional[str] = None, verbose: bool = False, header: Optional[str] = None, **kwargs) -> str:
     """
     Write a model to a file.
 
     Arguments:
         model (cp.Model): The model to write.
-        format (str): The format to write the model in.
         file_path (Optional[str]): The path to the file to write the model to. If None, only a string containing the model will be returned.
+        format (Optional[str]): The format to write the model in. If None and file_path is provided, the format will be derived from the file path extension.
         verbose (bool): Whether to print verbose output.
         header (Optional[str]): The header to put at the top of the file. If None, a default header will be created. Pass an empty string to skip adding a header.
         **kwargs: Additional arguments to pass to the writer.
+
+    Raises:
+        ValueError: If the format is not supported or could not be derived from the file path.
+
+    Example:
+        >>> write(model, "output.opb")  # Format auto-detected from .opb
+        >>> write(model, "output.txt", format="opb")  # Format explicitly specified
+        >>> write(model, format="opb")  # Returns string, format must be specified
     """
+
+    # Derive format from file_path if not provided
+    if format is None:
+        if file_path is None:
+            raise ValueError("Either 'format' or 'file_path' must be provided")
+        format = _derive_format(file_path)
 
     writer = _get_writer(format)
 
