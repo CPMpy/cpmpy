@@ -19,6 +19,7 @@ def set_memory_limit(mem_limit):
     if mem_limit is not None:
         soft = max(_mib_as_bytes(mem_limit) - _mib_as_bytes(MEMORY_BUFFER_SOFT), _mib_as_bytes(MEMORY_BUFFER_SOFT))
         hard = max(_mib_as_bytes(mem_limit) - _mib_as_bytes(MEMORY_BUFFER_HARD), _mib_as_bytes(MEMORY_BUFFER_HARD))
+        soft = min(soft, hard)
         if sys.platform != "win32":
             import resource
             resource.setrlimit(resource.RLIMIT_AS, (soft, hard)) # limit memory in number of bytes
@@ -39,7 +40,7 @@ def set_time_limit(time_limit, verbose:bool=False):
     if time_limit is not None:
         if sys.platform != "win32":
             import resource
-            soft = time_limit
+            soft = int(time_limit)
             hard = resource.RLIM_INFINITY
             resource.setrlimit(resource.RLIMIT_CPU, (soft, hard))
         else:

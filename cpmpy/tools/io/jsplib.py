@@ -28,9 +28,9 @@ from typing import Union
 
 
 _std_open = open
-def read_jsplib(jsp: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_jsplib(jsp: Union[str, os.PathLike], open=open) -> cp.Model:
     """
-    Parser for JSPLib format. Reads in an instance and returns its matching CPMpy model.
+    Loader for JSPLib format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
         jsp (str or os.PathLike):
@@ -147,6 +147,12 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
+# Backward compatibility alias
+read_jsplib = load_jsplib
+
+# Backward compatibility alias
+read_jsplib = load_jsplib
 
 if __name__ == "__main__":
     main()

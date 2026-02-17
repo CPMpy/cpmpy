@@ -32,9 +32,9 @@ from cpmpy.tools.dataset.nurserostering import (
 
 
 _std_open = open
-def read_nurserostering(instance: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_nurserostering(instance: Union[str, os.PathLike], open=open) -> cp.Model:
     """
-    Parser for Nurse Rostering format. Reads in an instance and returns its matching CPMpy model.
+    Loader for Nurse Rostering format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
         instance (str or os.PathLike):
@@ -68,6 +68,9 @@ def read_nurserostering(instance: Union[str, os.PathLike], open=open) -> cp.Mode
         # Clean up temporary file if we created one
         if isinstance(instance, str) and not os.path.exists(instance) and os.path.exists(fname):
             os.unlink(fname)
+
+# Backward compatibility alias
+read_nurserostering = load_nurserostering
 
 
 def main():
@@ -105,6 +108,9 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
+# Backward compatibility alias
+read_nurserostering = load_nurserostering
 
 if __name__ == "__main__":
     main()

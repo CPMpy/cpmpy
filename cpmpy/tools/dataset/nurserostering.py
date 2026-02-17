@@ -39,8 +39,16 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
 
     name = "nurserostering"
+    description = "Nurse rostering benchmark instances from schedulingbenchmarks.org."
+    url = "https://schedulingbenchmarks.org/nrp/"
+    citation = [
+        "Strandmark, P., Qu, Y. and Curtois, T. First-order linear programming in a column generation-based heuristic approach to the nurse rostering problem. Computers & Operations Research, 2020. 120, p. 104945.",
+        "Demirovic, E., Musliu, N., and Winter, F. Modeling and solving staff scheduling with partial weighted maxSAT. Annals of Operations Research, 2019. 275(1): p. 79-99.",
+        "Smet P. Constraint reformulation for nurse rostering problems, in: PATAT 2018 twelfth international conference on the practice and theory of automated timetabling, Vienna, August, 2018, p. 69-80.",
+        "Rahimian, E., Akartunali, K., and Levine, J. A hybrid integer programming and variable neighbourhood search algorithm to solve nurse rostering problems. European Journal of Operational Research, 2017. 258(2): p. 411-423.",
+    ]
 
-    def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False, sort_key=None):
+    def __init__(self, root: str = ".", transform=None, target_transform=None, download:bool=False, sort_key=None):
         """
         Initialize the Nurserostering Dataset.
 
@@ -65,8 +73,47 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
             download=download, extension=".txt"
         )
 
+    @staticmethod
+    def reader(file_path, open=open):
+        """
+        Reader for Nurse Rostering dataset.
+        Parses a file path directly into a CPMpy model.
+        For backward compatibility. Consider using read() + load() instead.
+        """
+        from cpmpy.tools.io.nurserostering import load_nurserostering
+        return load_nurserostering(file_path, open=open)
+
+    @staticmethod
+    def loader(content: str):
+        """
+        Loader for Nurse Rostering dataset.
+        Loads a CPMpy model from raw Nurse Rostering content string.
+        """
+        from cpmpy.tools.io.nurserostering import load_nurserostering
+        # load_nurserostering already supports raw strings
+        return load_nurserostering(content)
+
     def category(self) -> dict:
-        return {} # no categories
+        return {}  # no categories
+
+    def collect_instance_metadata(self, file) -> dict:
+        """
+        Extract scheduling metadata from nurse rostering instance.
+        """
+        try:
+            data = parse_scheduling_period(file)
+            return {
+                "horizon": data["horizon"],
+                "num_staff": len(data["staff"]),
+                "num_shifts": len(data["shifts"]),
+                "num_days_off": len(data.get("days_off", [])),
+                "num_shift_on_requests": len(data.get("shift_on", []) or []),
+                "num_shift_off_requests": len(data.get("shift_off", []) or []),
+                "num_cover_requirements": len(data.get("cover", []) or []),
+            }
+        except Exception:
+            pass
+        return {}
 
     def download(self):
         
@@ -74,10 +121,10 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         target = "instances1_24.zip" # download full repo...
         target_download_path = self.root / target
 
-        print(f"Downloading Nurserostering instances from schedulingbenchmarks.org")
+        print("Downloading Nurserostering instances from schedulingbenchmarks.org")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
         except ValueError as e:
             raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
 
@@ -176,10 +223,15 @@ def parse_scheduling_period(filename: str):
     """
     Parse a nurserostering instance file.
     
-    Args:
-        filename: Path to the nurserostering instance file.
+    Arguments:
+        filename (str): Path to the nurserostering instance file.
     
-    Returns a dictionary with native Python data structures (lists of dicts).
+    Returns:
+        dict: A dictionary with native Python data structures (lists of dicts).
+
+    Raises:
+        ValueError: If the file is not found.
+
     Use to_dataframes() transform to convert to pandas DataFrames if needed.
     Use add_fake_names() transform to add randomly generated names to staff.
     """
@@ -255,7 +307,7 @@ def parse_scheduling_period(filename: str):
                 shift_on=shift_on, shift_off=shift_off, cover=cover)
 
 
-def _add_fake_names(data, seed=0):
+def add_fake_names(data, seed=0):
     """
     Transform function to add randomly generated names to staff using Faker.
     
@@ -276,12 +328,12 @@ def _add_fake_names(data, seed=0):
             )
         )
     
-    Args:
-        data: Dictionary returned by parse_scheduling_period()
-        seed: Random seed for reproducible name generation (default: 0)
+    Arguments:
+        data (dict): Dictionary returned by parse_scheduling_period()
+        seed (int): Random seed for reproducible name generation (default: 0)
     
     Returns:
-        Dictionary with 'name' field added to each staff member
+        dict: Dictionary with 'name' field added to each staff member
     
     Raises:
         ImportError: If Faker is not installed
@@ -299,7 +351,7 @@ def _add_fake_names(data, seed=0):
     return data
 
 
-def _to_dataframes(data):
+def to_dataframes(data):
     """
     Transform function to convert native data structures to pandas DataFrames.
     
@@ -312,11 +364,11 @@ def _to_dataframes(data):
             transform=lambda fname: to_dataframes(parse_scheduling_period(fname))
         )
     
-    Args:
-        data: Dictionary returned by parse_scheduling_period()
+    Arguments:
+        data (dict): Dictionary returned by parse_scheduling_period()
     
     Returns:
-        Dictionary with pandas DataFrames instead of native structures
+        dict: Dictionary with pandas DataFrames instead of native structures
     
     Raises:
         ImportError: If pandas is not installed

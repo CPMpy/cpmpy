@@ -19,6 +19,9 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
     
     name = "psplib"
+    description = "Project Scheduling Problem Library (RCPSP) benchmark instances."
+    url = "https://www.om-db.wi.tum.de/psplib/main.html"
+
 
     def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False):
         """
@@ -59,12 +62,88 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
             transform=transform, target_transform=target_transform, 
             download=download, extension=f".{self.family_codes[self.variant]}"
         )
+
+    @staticmethod
+    def reader(file_path, open=open):
+        """
+        Reader for PSPLib dataset.
+        Parses a file path directly into a CPMpy model.
+        For backward compatibility. Consider using read() + load() instead.
+        """
+        from cpmpy.tools.io.rcpsp import load_rcpsp
+        return load_rcpsp(file_path, open=open)
+
+    @staticmethod
+    def loader(content: str):
+        """
+        Loader for PSPLib dataset.
+        Loads a CPMpy model from raw RCPSP content string.
+        """
+        from cpmpy.tools.io.rcpsp import load_rcpsp
+        # load_rcpsp already supports raw strings
+        return load_rcpsp(content)
         
     def category(self) -> dict:
         return {
             "variant": self.variant,
             "family": self.family
         }
+
+    def collect_instance_metadata(self, file) -> dict:
+        """Extract project metadata from SM file header."""
+        import re
+        result = {}
+        try:
+            with self.open(file) as f:
+                lines = f.readlines()
+
+            in_project_info = False
+            in_resource_avail = False
+            for i, raw_line in enumerate(lines):
+                line = raw_line.strip()
+                if line.startswith("jobs"):
+                    match = re.search(r':\s*(\d+)', line)
+                    if match:
+                        result["num_jobs"] = int(match.group(1))
+                elif line.startswith("horizon"):
+                    match = re.search(r':\s*(\d+)', line)
+                    if match:
+                        result["horizon"] = int(match.group(1))
+                elif line.startswith("- renewable"):
+                    match = re.search(r':\s*(\d+)', line)
+                    if match:
+                        result["num_renewable_resources"] = int(match.group(1))
+                elif line.startswith("- nonrenewable"):
+                    match = re.search(r':\s*(\d+)', line)
+                    if match:
+                        result["num_nonrenewable_resources"] = int(match.group(1))
+                elif line.startswith("- doubly constrained"):
+                    match = re.search(r':\s*(\d+)', line)
+                    if match:
+                        result["num_doubly_constrained_resources"] = int(match.group(1))
+                elif line.startswith("PROJECT INFORMATION"):
+                    in_project_info = True
+                elif in_project_info and not line.startswith("*") and not line.startswith("pronr"):
+                    # Data line: pronr #jobs rel.date duedate tardcost MPM-Time
+                    parts = line.split()
+                    if len(parts) >= 6:
+                        result["duedate"] = int(parts[3])
+                        result["tardcost"] = int(parts[4])
+                        result["mpm_time"] = int(parts[5])
+                    in_project_info = False
+                elif line.startswith("RESOURCEAVAILABILITIES"):
+                    in_resource_avail = True
+                elif in_resource_avail and not line.startswith("*") and not line.startswith("R ") and not line.startswith("N "):
+                    # Resource availability values line
+                    parts = line.split()
+                    if parts:
+                        result["resource_availabilities"] = [int(x) for x in parts]
+                    in_resource_avail = False
+                elif line.startswith("PRECEDENCE RELATIONS") or line.startswith("REQUESTS/DURATIONS"):
+                    in_project_info = False
+        except Exception:
+            pass
+        return result
 
     def download(self):
 
@@ -75,7 +154,7 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         print(f"Downloading PSPLib {self.variant} {self.family} instances from www.om-db.wi.tum.de")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
         except ValueError as e:
             raise ValueError(f"No dataset available for variant {self.variant} and family {self.family}. Error: {str(e)}")
         

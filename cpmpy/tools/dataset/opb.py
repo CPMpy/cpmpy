@@ -28,6 +28,8 @@ class OPBDataset(_Dataset):
     """
 
     name = "opb"
+    description = "Pseudo-Boolean Competition benchmark instances."
+    url = "https://www.cril.univ-artois.fr/PB25/"
 
     def __init__(
             self, 
@@ -67,12 +69,33 @@ class OPBDataset(_Dataset):
             raise ValueError("Track must be specified, e.g. exact-weighted, exact-unweighted, ...")
 
         dataset_dir = self.root / self.name / str(year) / track / ('selected' if self.competition else 'normalized')
-
+        
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
             download=download, extension=".opb.xz"
         )
+
+
+    @staticmethod
+    def reader(file_path, open=open):
+        """
+        Reader for OPB dataset.
+        Parses a file path directly into a CPMpy model.
+        For backward compatibility. Consider using read() + load() instead.
+        """
+        from cpmpy.tools.io.opb import load_opb
+        return load_opb(file_path, open=open)
+
+    @staticmethod
+    def loader(content: str):
+        """
+        Loader for OPB dataset.
+        Loads a CPMpy model from raw OPB content string.
+        """
+        from cpmpy.tools.io.opb import load_opb
+        # load_opb already supports raw strings
+        return load_opb(content)
 
     def category(self) -> dict:
         return {
@@ -80,9 +103,38 @@ class OPBDataset(_Dataset):
             "track": self.track
         }
 
-    def metadata(self, file) -> dict:
-        # Add the author to the metadata
-        return super().metadata(file) | {'author': str(file).split(os.sep)[-1].split("_")[0],}
+    def collect_instance_metadata(self, file) -> dict:
+        """Extract metadata from OPB filename and file header.
+
+        Parses the `* #variable= ... #constraint= ...` header line and
+        extracts the author from the filename convention (first part before `_`).
+        """
+        import re
+        result = {}
+        # Author from filename
+        filename = pathlib.Path(file).name
+        parts = filename.split("_")
+        if len(parts) > 1:
+            result["author"] = parts[0]
+        # Parse header for variable/constraint counts
+        try:
+            with self.open(file) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line.startswith("*"):
+                        break
+                    var_match = re.search(r'#variable=\s*(\d+)', line)
+                    con_match = re.search(r'#constraint=\s*(\d+)', line)
+                    if var_match:
+                        result["opb_num_variables"] = int(var_match.group(1))
+                    if con_match:
+                        result["opb_num_constraints"] = int(con_match.group(1))
+                    prod_match = re.search(r'#product=\s*(\d+)', line)
+                    if prod_match:
+                        result["opb_num_products"] = int(prod_match.group(1))
+        except Exception:
+            pass
+        return result
                 
     def download(self):
                 
@@ -93,7 +145,7 @@ class OPBDataset(_Dataset):
         print(f"Downloading OPB {self.year} {self.track} {'competition' if self.competition else 'non-competition'} instances from www.cril.univ-artois.fr")
         
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path))
+            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
         except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year}. Error: {str(e)}")
         
@@ -107,7 +159,7 @@ class OPBDataset(_Dataset):
                     break
 
             if main_folder is None:
-                raise ValueError(f"Could not find main folder in tar file")
+                raise ValueError("Could not find main folder in tar file")
 
             # Extract only files from the specified track
             # Get all unique track names from tar
