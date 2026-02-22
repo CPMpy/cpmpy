@@ -208,13 +208,6 @@ class CPM_pysat(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="pysat:"+subsolver, cpm_model=cpm_model)
 
-    def __del__(self):
-        if self.pysat_solver is not None:
-            self.pysat_solver.delete()  # requires explicit delete
-            self.pysat_solver = None
-        if self.pysat_vpool is not None:
-            self.pysat_vpool = None
-
     @property
     def native_model(self):
         """

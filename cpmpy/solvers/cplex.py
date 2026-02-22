@@ -162,11 +162,6 @@ class CPM_cplex(SolverInterface):
         """
         return self.cplex_model
 
-    def __del__(self):
-        """Release CPLEX resources by calling cplex_model.end()."""
-        if self.cplex_model is not None:
-            self.cplex_model.end()
-
     def solve(self, time_limit:Optional[float]=None, **kwargs):
         """
             Call the cplex solver

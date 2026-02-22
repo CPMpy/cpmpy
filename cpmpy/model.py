@@ -198,7 +198,6 @@ class Model(object):
         ret = s.solve(time_limit=time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
-        del s  # free solver (and its memory)
         return ret
 
     def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
@@ -229,7 +228,6 @@ class Model(object):
         ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
-        del s  # free solver (and its memory)
         return ret
 
     def status(self):

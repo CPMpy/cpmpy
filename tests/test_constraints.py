@@ -299,12 +299,11 @@ def test_bool_constraints(solver, constraint):
     """
         Tests boolean constraint by posting it to the solver and checking the value after solve.
     """
-    m = Model(constraint)
     if ALL_SOLS:
-        n_sols = m.solveAll(solver=solver, display=lambda: verify(constraint))
+        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
         assert n_sols >= 1
     else:
-        assert m.solve(solver=solver)
+        assert SolverLookup.get(solver, Model(constraint)).solve()
         assert argval(constraint)
         assert constraint.value()
 
@@ -314,12 +313,11 @@ def test_comparison_constraints(solver, constraint):
     """
         Tests comparison constraint by posting it to the solver and checking the value after solve.
     """
-    m = Model(constraint)
     if ALL_SOLS:
-        n_sols = m.solveAll(solver=solver, display=lambda: verify(constraint))
+        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display= lambda: verify(constraint))
         assert n_sols >= 1
     else:
-        assert m.solve(solver=solver)
+        assert SolverLookup.get(solver,Model(constraint)).solve()
         assert argval(constraint)
         assert constraint.value()
 
@@ -330,11 +328,10 @@ def test_reify_imply_constraints(solver, constraint):
     """
         Tests boolean expression by posting it to solver and checking the value after solve.
     """
-    m = Model(constraint)
     if ALL_SOLS:
-        n_sols = m.solveAll(solver=solver, display=lambda: verify(constraint))
+        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
         assert n_sols >= 1
     else:
-        assert m.solve(solver=solver)
+        assert SolverLookup.get(solver, Model(constraint)).solve()
         assert argval(constraint)
         assert constraint.value()

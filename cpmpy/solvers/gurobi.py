@@ -152,10 +152,6 @@ class CPM_gurobi(SolverInterface):
         """
         return self.grb_model
 
-    def __del__(self):
-        """Release native model memory by calling grb_model.dispose()."""
-        if self.grb_model is not None:
-            self.grb_model.dispose()
 
     def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
