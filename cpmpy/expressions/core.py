@@ -577,18 +577,6 @@ class Operator(Expression):
     }
     printmap = {'sum': '+', 'sub': '-'}
 
-    def __new__(cls, name=None, arg_list=None):
-        # Called with only cls (e.g. by copy/deepcopy)?
-        if arg_list is None:
-            return super().__new__(cls)
-        # -(c*v) with constant first: return Multiplication(-c, v) instead of Operator('-', [mul])
-        if name == '-' and len(arg_list) == 1:
-            inner = arg_list[0]
-            if getattr(inner, 'name', None) == 'mul' and getattr(inner, 'is_lhs_num', False):
-                from .globalfunctions import Multiplication
-                return Multiplication(-inner.args[0], inner.args[1])
-        return super().__new__(cls)
-
     def __init__(self, name, arg_list):
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
@@ -755,7 +743,7 @@ def _wsum_should(arg):
      all substractions are transformed into less readable wsums)
     """
     name = getattr(arg, 'name', None)
-    return name == 'wsum' or (name == 'mul' and getattr(arg, 'is_lhs_num', False))  # False if attr does not exist
+    return name == 'wsum' or (name == 'mul' and arg.is_lhs_num is False)
 
 def _wsum_make(arg):
     """ Internal helper: prep the arg for wsum
@@ -769,7 +757,7 @@ def _wsum_make(arg):
     elif name == 'sum':
         return [1]*len(arg.args), arg.args
     elif name == 'mul':
-        if getattr(arg, 'is_lhs_num', False):
+        if arg.is_lhs_num is False:
             return [arg.args[0]], [arg.args[1]]
     elif name == '-':
         return [-1], [arg.args[0]]
