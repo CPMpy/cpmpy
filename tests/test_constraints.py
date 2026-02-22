@@ -47,6 +47,7 @@ EXCLUDE_OPERATORS = {"pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [cp.intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
+SMALL_NUM_ARG = [cp.intvar(-2, 2, name=n) for n in "w"]   # Small domain numerical vars
 NN_VAR = cp.intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
 POS_VAR = cp.intvar(1,10, name="s_pos")                # A strictly positive variable
 NUM_VAR = cp.intvar(0, 10, name="l")                   # A numerical variable
@@ -257,7 +258,7 @@ def global_functions(solver):
         elif name == "Modulo":
             yield cp.Modulo(NUM_ARGS[0], NUM_ARGS[1])
         elif name == "Power":
-            yield cp.Power(NUM_ARGS[0], 3)
+            yield cp.Power(SMALL_NUM_ARG[0], 3)
         elif name == "Multiplication":
             yield cp.Multiplication(NUM_ARGS[0], NUM_ARGS[1])
             yield cp.Multiplication(BOOL_ARGS[0], BOOL_ARGS[1])
