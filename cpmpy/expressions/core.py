@@ -743,7 +743,7 @@ def _wsum_should(arg):
      all substractions are transformed into less readable wsums)
     """
     name = getattr(arg, 'name', None)
-    return name == 'wsum' or (name == 'mul' and arg.is_lhs_num is False)
+    return name == 'wsum' or (name == 'mul' and arg.is_lhs_num)
 
 def _wsum_make(arg):
     """ Internal helper: prep the arg for wsum
@@ -757,7 +757,7 @@ def _wsum_make(arg):
     elif name == 'sum':
         return [1]*len(arg.args), arg.args
     elif name == 'mul':
-        if arg.is_lhs_num is False:
+        if arg.is_lhs_num:
             return [arg.args[0]], [arg.args[1]]
     elif name == '-':
         return [-1], [arg.args[0]]
