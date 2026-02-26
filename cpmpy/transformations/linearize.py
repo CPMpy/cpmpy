@@ -640,10 +640,10 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             continue  # do not encode
 
         # encode the values
-        enc, _ = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
+        enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
         
         # domain and channeling constraints
-        toplevel.extend(enc.encode_domain_constraint()) # with the overwritten Bools
+        toplevel.extend(domain_constraint) # with the overwritten Bools
         if ivarmap is None:
             # also post the var=wsum mapping
             terms, k = enc.encode_term()
