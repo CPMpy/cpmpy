@@ -631,3 +631,16 @@ class TestLinearizeReifiedVariablesThreshold:
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
 
         assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), (aux) == (a == 1), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
+
+    def test_linearize_reified_variables_over_multiple_constraints(self):
+        """With min_values=2, (a==1)|(a==2) is replaced, no channel constraint."""
+        ivarmap = {}
+
+        a = self.a
+        out = []
+        for con in [(a == 1) | (a == 2), (a == 3) | (a == 2)]:
+            cpm_cons = toplevel_list(con)
+            cpm_cons = flatten_constraint(con, csemap=self.csemap)
+            out += linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
+
+        assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, (BV[a == 3]) or (BV[a == 2])]"
