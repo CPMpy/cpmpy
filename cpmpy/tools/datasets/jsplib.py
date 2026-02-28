@@ -14,7 +14,7 @@ import zipfile
 import numpy as np
 
 import cpmpy as cp
-from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.datasets._base import _Dataset
 
 
 class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -38,7 +38,7 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         "E. Taillard. 'Benchmarks for basic scheduling problems', European Journal of Operational Research, Vol. 64, Issue 2, pp. 278-285, 1993.",
     ]
 
-    def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False):
+    def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False, metadata_workers: int = 1):
         """
         Initialize the JSPLib Dataset.
 
@@ -58,7 +58,8 @@ class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform,
-            download=download, extension=""
+            download=download, extension="",
+            metadata_workers=metadata_workers
         )
 
 

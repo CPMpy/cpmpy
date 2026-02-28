@@ -14,7 +14,7 @@ import re
 import io
 
 import cpmpy as cp
-from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.datasets._base import _Dataset
 
 # Optional dependencies
 try:
@@ -48,7 +48,7 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         "Rahimian, E., Akartunali, K., and Levine, J. A hybrid integer programming and variable neighbourhood search algorithm to solve nurse rostering problems. European Journal of Operational Research, 2017. 258(2): p. 411-423.",
     ]
 
-    def __init__(self, root: str = ".", transform=None, target_transform=None, download:bool=False, sort_key=None):
+    def __init__(self, root: str = ".", transform=None, target_transform=None, download:bool=False, sort_key=None, metadata_workers: int = 1):
         """
         Initialize the Nurserostering Dataset.
 
@@ -70,7 +70,8 @@ class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
-            download=download, extension=".txt"
+            download=download, extension=".txt",
+            metadata_workers=metadata_workers
         )
 
     @staticmethod

@@ -11,7 +11,7 @@ import zipfile
 import pathlib
 import io
 
-from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.datasets._base import _Dataset
 
 
 class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -35,7 +35,8 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
             root: str = ".", 
             year: int = 2024, track: str = "exact-unweighted", 
             transform=None, target_transform=None, 
-            download: bool = False
+            download: bool = False,
+            metadata_workers: int = 1
         ):
         """
         Constructor for a dataset object of the MIPLib competition.
@@ -62,7 +63,8 @@ class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
-            download=download, extension=".mps.gz"
+            download=download, extension=".mps.gz",
+            metadata_workers=metadata_workers
         )
 
     @staticmethod

@@ -10,7 +10,7 @@ import zipfile
 import pathlib
 import io
 
-from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.datasets._base import _Dataset
 
 
 class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
@@ -32,7 +32,7 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
     url = "https://xcsp.org/instances/"
     
 
-    def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False):
+    def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False, metadata_workers: int = 1):
         """
         Initialize the XCSP3 Dataset.
         """
@@ -51,7 +51,8 @@ class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
-            download=download, extension=".xml.lzma"
+            download=download, extension=".xml.lzma",
+            metadata_workers=metadata_workers
         )
 
 

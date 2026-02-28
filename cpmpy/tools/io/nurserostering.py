@@ -25,7 +25,7 @@ import tempfile
 import cpmpy as cp
 from typing import Union
 
-from cpmpy.tools.dataset.nurserostering import (
+from cpmpy.tools.datasets.nurserostering import (
     parse_scheduling_period,
     nurserostering_model
 )

@@ -11,7 +11,7 @@ import pathlib
 import tarfile
 import io
 
-from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.datasets._base import _Dataset
 
 
 class OPBDataset(_Dataset): 
@@ -37,7 +37,8 @@ class OPBDataset(_Dataset):
             year: int = 2024, track: str = "OPT-LIN", 
             competition: bool = True,
             transform=None, target_transform=None, 
-            download: bool = False
+            download: bool = False,
+            metadata_workers: int = 1
         ):
         """
         Constructor for a dataset object of the PB competition.
@@ -73,7 +74,8 @@ class OPBDataset(_Dataset):
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
-            download=download, extension=".opb.xz"
+            download=download, extension=".opb.xz",
+            metadata_workers=metadata_workers
         )
 
 

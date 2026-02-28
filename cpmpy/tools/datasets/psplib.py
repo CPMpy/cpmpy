@@ -9,7 +9,7 @@ import pathlib
 import io
 import zipfile
 
-from cpmpy.tools.dataset._base import _Dataset
+from cpmpy.tools.datasets._base import _Dataset
 
 class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     """
@@ -23,7 +23,7 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
     url = "https://www.om-db.wi.tum.de/psplib/main.html"
 
 
-    def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False):
+    def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False, metadata_workers: int = 1):
         """
         Constructor for a dataset object for PSPlib.
 
@@ -60,7 +60,8 @@ class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
         super().__init__(
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
-            download=download, extension=f".{self.family_codes[self.variant]}"
+            download=download, extension=f".{self.family_codes[self.variant]}",
+            metadata_workers=metadata_workers
         )
 
     @staticmethod
