@@ -21,3 +21,4 @@ from .rcpsp import load_rcpsp, read_rcpsp  # read_rcpsp is alias
 from .opb import load_opb, read_opb, write_opb  # read_opb is alias
 from .scip import load_scip, read_scip, write_scip  # read_scip is alias
 from .wcnf import load_wcnf, read_wcnf  # read_wcnf is alias
+from .xcsp3 import load_xcsp3
