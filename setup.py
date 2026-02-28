@@ -49,6 +49,7 @@ format_dependencies = {
     "io.wcnf": [],  # No external dependencies
     "io.xcsp3": ["pycsp3"],
 }
+format_dependencies["io.all"] = list({pkg for group in format_dependencies.values() for pkg in group})
 
 setup(
     name='cpmpy',
