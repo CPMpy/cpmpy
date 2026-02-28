@@ -13,10 +13,11 @@ import pathlib
 import io
 import tempfile
 import warnings
-from typing import Any, Optional, Tuple, List
+from typing import Any, Optional, Tuple, List, Union
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+import multiprocessing
 
 # tqdm as an optional dependency, provides prettier progress bars
 try:
@@ -137,6 +138,90 @@ def extract_model_features(model) -> dict:
     return _extract_model_features(model)
 
 
+# Global context for process-based metadata collection workers
+_metadata_worker_context = {}
+
+
+def _init_metadata_worker(context_dict, collect_metadata_func, reader_func, open_func):
+    """Initialize worker process with dataset context."""
+    global _metadata_worker_context
+    _metadata_worker_context = context_dict.copy()
+    _metadata_worker_context['collect_instance_metadata'] = collect_metadata_func
+    _metadata_worker_context['reader'] = reader_func
+    _metadata_worker_context['open_func'] = open_func
+
+
+def _collect_one_metadata_worker(file_path_str):
+    """Worker function for process-based metadata collection."""
+    global _metadata_worker_context
+    file_path = pathlib.Path(file_path_str)
+    dataset_dir = pathlib.Path(_metadata_worker_context['dataset_dir'])
+    meta_path = dataset_dir / (file_path.name + _metadata_worker_context['metadata_extension'])
+    
+    # Collect instance metadata using the provided function
+    collect_metadata = _metadata_worker_context['collect_instance_metadata']
+    try:
+        instance_meta = collect_metadata(str(file_path))
+    except Exception as e:
+        instance_meta = {"_metadata_error": str(e)}
+
+    # Separate portable from format-specific fields
+    portable = portable_instance_metadata(instance_meta)
+    format_specific = {
+        k: v for k, v in instance_meta.items()
+        if k not in portable and not k.startswith("_")
+    }
+
+    # Derive instance name
+    stem = file_path.stem
+    for ext in (".xml", ".wcnf", ".opb"):
+        if stem.endswith(ext):
+            stem = stem[:len(stem) - len(ext)]
+            break
+
+    # Build structured sidecar
+    sidecar = {
+        "dataset": _metadata_worker_context['dataset_metadata'],
+        "instance_name": stem,
+        "source_file": str(file_path.relative_to(dataset_dir)),
+        "category": _metadata_worker_context['category'],
+        "instance_metadata": portable,
+        "format_metadata": format_specific,
+    }
+
+    if "_metadata_error" in instance_meta:
+        sidecar["_metadata_error"] = instance_meta["_metadata_error"]
+
+    # Preserve or compute model features
+    model_features = None
+    if meta_path.exists():
+        try:
+            with open(meta_path, "r") as f:
+                existing = json.load(f)
+            if "model_features" in existing:
+                model_features = existing["model_features"]
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    if model_features is None:
+        reader = _metadata_worker_context['reader']
+        open_func = _metadata_worker_context['open_func']
+        if not callable(reader):
+            raise TypeError(
+                f"Cannot extract model features for {file_path}: "
+                "no dataset reader configured."
+            )
+        model = reader(str(file_path), open=open_func)
+        model_features = extract_model_features(model)
+    
+    sidecar["model_features"] = model_features
+
+    with open(meta_path, "w") as f:
+        json.dump(sidecar, f, indent=2)
+    
+    return str(file_path)
+
+
 class _Dataset(ABC):
     """
     Abstract base class for PyTorch-style datasets of benchmarking instances.
@@ -166,6 +251,7 @@ class _Dataset(ABC):
             transform=None, target_transform=None,
             download: bool = False,
             extension:str=".txt",
+            metadata_workers: int = 1,
             **kwargs
         ):
         """
@@ -177,6 +263,7 @@ class _Dataset(ABC):
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
             extension (str): Extension of the instance files.
+            metadata_workers (int): Number of parallel workers for metadata collection during download (default: 1).
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
@@ -188,7 +275,7 @@ class _Dataset(ABC):
         self.target_transform = target_transform
         self.extension = extension
         if not self.origins:
-            from cpmpy.tools.dataset.config import get_origins
+            from cpmpy.tools.datasets.config import get_origins
             self.origins = get_origins(self.name)
 
         if not self.dataset_dir.exists():
@@ -196,7 +283,7 @@ class _Dataset(ABC):
                 raise ValueError("Dataset not found. Please set download=True to download the dataset.")
             else:
                 self.download()
-                self._collect_all_metadata()
+                self._collect_all_metadata(workers=metadata_workers)
                 files = self._list_instances()
                 print(f"Finished downloading {len(files)} instances")
 
@@ -273,25 +360,36 @@ class _Dataset(ABC):
         return {}
 
     @classmethod
-    def open(cls, instance) -> io.TextIOBase:
+    def open(cls, instance: os.PathLike) -> io.TextIOBase:
         """
         How an instance file from the dataset should be opened.
         Especially usefull when files come compressed and won't work with
         python standard library's 'open', e.g. '.xz', '.lzma'.
+
+        Arguments:
+            instance (os.PathLike): File path to the instance file.
+
+        Returns:
+            io.TextIOBase: The opened file.
         """
         return open(instance, "r")
 
-    def read(self, instance) -> str:    
+    def read(self, instance: os.PathLike) -> str:    
         """
         Read raw file contents from an instance file.
         Handles decompression automatically via dataset.open().
         
         This is the "reading" step: decompressing + reading raw file contents.
+
+        Arguments:
+            instance (os.PathLike): File path to the instance file.
+        Returns:
+            str: The raw file contents.
         """
         with self.open(instance) as f:
             return f.read()
 
-    def load(self, instance) -> cp.Model:
+    def load(self, instance: Union[str, os.PathLike]) -> cp.Model:
         """
         Load a CPMpy model from an instance file.
         
@@ -300,15 +398,28 @@ class _Dataset(ABC):
         Loading always handles reading internally by calling `read()`.
         
         Arguments:
-            instance: File path to the instance file.
+            instance (str or os.PathLike): 
+                - File path to the instance file
+                - OR a string containing the instance content directly
             
         Returns:
             cp.Model: The loaded CPMpy model.
         """
-        # Step 1: Reading - use read() to decompress and read raw file contents
-        content = self.read(instance)
-        # Step 2: Loading - turn raw contents into CPMpy model
+
+        # If instance is a path to a file -> open file
+        if isinstance(instance, (str, os.PathLike)) and os.path.exists(instance):
+           # Reading - use read() to decompress and read raw file contents
+            content = self.read(instance)
+        # If instance is a string containing a model -> use it directly
+        else:
+            content = instance
+
+        # Loading - turn raw contents into CPMpy model
         return self.loader(content)
+
+
+
+        
 
 
     # ---------------------------------------------------------------------------- #
@@ -348,8 +459,6 @@ class _Dataset(ABC):
             "url": cls.url,
             "license": cls.license,
             "citation": citations,
-            "domain": cls.domain,
-            "format": cls.format,
         }
 
 
@@ -410,7 +519,7 @@ class _Dataset(ABC):
         """
         return pathlib.Path(str(instance_path) + self.METADATA_EXTENSION)
 
-    def _collect_all_metadata(self, force=False):
+    def _collect_all_metadata(self, force=False, workers=1):
         """
         Collect and store structured metadata sidecar files for all instances.
 
@@ -426,6 +535,8 @@ class _Dataset(ABC):
         Arguments:
             force (bool): If True, re-collect instance metadata even if sidecar
                 files already exist.
+            workers (int): Number of parallel workers for metadata collection.
+                Default is 1 (sequential). Use >1 for parallel processing.
         """
         files = self._list_instances()
 
@@ -439,72 +550,99 @@ class _Dataset(ABC):
         if not files_to_process:
             return
 
-        # Use tqdm for progress if available
-        if tqdm is not None:
-            file_iter = tqdm(files_to_process, desc="Collecting metadata", unit="file")
+        # Process files sequentially or in parallel
+        if workers <= 1:
+            # Sequential processing
+            if tqdm is not None:
+                file_iter = tqdm(files_to_process, desc="Collecting metadata", unit="file")
+            else:
+                file_iter = files_to_process
+                print(f"Collecting metadata for {len(files_to_process)} instances...")
+
+            for file_path in file_iter:
+                self._collect_one_metadata(file_path)
         else:
-            file_iter = files_to_process
-            print(f"Collecting metadata for {len(files_to_process)} instances...")
+            # Parallel processing with ProcessPoolExecutor for CPU-bound work
+            print(f"Collecting metadata for {len(files_to_process)} instances using {workers} workers...")
+            
+            # Use ProcessPoolExecutor with fork start method (Linux) to allow bound methods
+            # On Linux, fork allows sharing the dataset instance, so bound methods work
+            ctx = multiprocessing.get_context('fork')
+            with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as executor:
+                futures = {executor.submit(self._collect_one_metadata, fp): fp for fp in files_to_process}
+                
+                if tqdm is not None:
+                    iterator = tqdm(as_completed(futures), total=len(futures), desc="Collecting metadata", unit="file")
+                else:
+                    iterator = as_completed(futures)
+                
+                for future in iterator:
+                    try:
+                        future.result()
+                    except Exception as e:
+                        fp = futures[future]
+                        print(f"Error collecting metadata for {fp.name}: {e}")
 
-        for file_path in file_iter:
-            meta_path = self._metadata_path(file_path)
+    def _collect_one_metadata(self, file_path):
+        """Collect metadata for a single instance file."""
+        meta_path = self._metadata_path(file_path)
+        try:
+            instance_meta = self.collect_instance_metadata(str(file_path))
+        except Exception as e:
+            instance_meta = {"_metadata_error": str(e)}
+
+        # Separate portable from format-specific fields
+        portable = portable_instance_metadata(instance_meta)
+        format_specific = {
+            k: v for k, v in instance_meta.items()
+            if k not in portable and not k.startswith("_")
+        }
+
+        # Derive instance name (strip format-specific extensions)
+        stem = file_path.stem
+        for ext in (".xml", ".wcnf", ".opb"):
+            if stem.endswith(ext):
+                stem = stem[:len(stem) - len(ext)]
+                break
+
+        # Build structured sidecar
+        sidecar = {
+            "dataset": self.dataset_metadata(),
+            "instance_name": stem,
+            "source_file": str(file_path.relative_to(self.dataset_dir)),
+            "category": self.category(),
+            "instance_metadata": portable,
+            "format_metadata": format_specific,
+        }
+
+        if "_metadata_error" in instance_meta:
+            sidecar["_metadata_error"] = instance_meta["_metadata_error"]
+
+        # Preserve previously extracted model features if present.
+        # Otherwise, compute them from the parsed model when possible.
+        model_features = None
+        if meta_path.exists():
             try:
-                instance_meta = self.collect_instance_metadata(str(file_path))
-            except Exception as e:
-                instance_meta = {"_metadata_error": str(e)}
+                with open(meta_path, "r") as f:
+                    existing = json.load(f)
+                if "model_features" in existing:
+                    model_features = existing["model_features"]
+            except (json.JSONDecodeError, IOError):
+                pass
 
-            # Separate portable from format-specific fields
-            portable = portable_instance_metadata(instance_meta)
-            format_specific = {
-                k: v for k, v in instance_meta.items()
-                if k not in portable and not k.startswith("_")
-            }
+        if model_features is None:
+            if not callable(self.reader):
+                raise TypeError(
+                    f"Cannot extract model features for {file_path}: "
+                    "no dataset reader configured. If unexpected, please open an issue on GitHub."
+                )
+            model = self.reader(str(file_path), open=self.open)
+            model_features = extract_model_features(model)
+    
+        sidecar["model_features"] = model_features
 
-            # Derive instance name (strip format-specific extensions)
-            stem = file_path.stem
-            for ext in (".xml", ".wcnf", ".opb"):
-                if stem.endswith(ext):
-                    stem = stem[:len(stem) - len(ext)]
-                    break
-
-            # Build structured sidecar
-            sidecar = {
-                "dataset": self.dataset_metadata(),
-                "instance_name": stem,
-                "source_file": str(file_path.relative_to(self.dataset_dir)),
-                "category": self.category(),
-                "instance_metadata": portable,
-                "format_metadata": format_specific,
-            }
-
-            if "_metadata_error" in instance_meta:
-                sidecar["_metadata_error"] = instance_meta["_metadata_error"]
-
-            # Preserve previously extracted model features if present.
-            # Otherwise, compute them from the parsed model when possible.
-            model_features = None
-            if meta_path.exists():
-                try:
-                    with open(meta_path, "r") as f:
-                        existing = json.load(f)
-                    if "model_features" in existing:
-                        model_features = existing["model_features"]
-                except (json.JSONDecodeError, IOError):
-                    pass
-
-            if model_features is None:
-                if not callable(self.reader):
-                    raise TypeError(
-                        f"Cannot extract model features for {file_path}: "
-                        "no dataset reader configured. If unexpected, please open an issue on GitHub."
-                    )
-                model = self.reader(str(file_path), open=self.open)
-                model_features = extract_model_features(model)
-        
-            sidecar["model_features"] = model_features
-
-            with open(meta_path, "w") as f:
-                json.dump(sidecar, f, indent=2)
+        with open(meta_path, "w") as f:
+            json.dump(sidecar, f, indent=2)
 
             
     # ----------------------------- Download methods ----------------------------- #
@@ -592,8 +730,6 @@ class _Dataset(ABC):
     
             if destination is None:
                 temp_destination.close()
-
-            _Dataset._download_sequential(url + target, destination, total_size, desc, chunk_size)
 
             return pathlib.Path(destination)
 
@@ -691,7 +827,7 @@ class _Dataset(ABC):
             if tqdm is not None:
                 if total_size > 0:
                     with tqdm(total=total_size, unit='B', unit_scale=True,
-                             unit_divisor=1024, desc=desc, file=sys.stdout,
+                             unit_divisor=1024, desc=f"Downloading {desc}", file=sys.stdout,
                              miniters=1, dynamic_ncols=True, ascii=False) as pbar:
                         with open(filepath, 'wb') as f:
                             while True:
@@ -703,7 +839,7 @@ class _Dataset(ABC):
                 else:
                     # Unknown size
                     with tqdm(unit='B', unit_scale=True, unit_divisor=1024,
-                             desc=desc, file=sys.stdout, miniters=1,
+                             desc=f"Downloading {desc}", file=sys.stdout, miniters=1,
                              dynamic_ncols=True, ascii=False) as pbar:
                         with open(filepath, 'wb') as f:
                             while True:
