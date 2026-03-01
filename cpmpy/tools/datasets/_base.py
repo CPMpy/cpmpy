@@ -509,18 +509,23 @@ class FileDataset(IndexedDataset):
         return self.loader(content)
 
 
-
-        
-
-
     # ---------------------------------------------------------------------------- #
     #                               Public interface                               #
     # ---------------------------------------------------------------------------- #
 
-    def instance_metadata(self, file: pathlib.Path) -> dict:
+    def instance_metadata(self, file: os.PathLike) -> dict:
+        """
+        Return the metadata for a given instance file.
+
+        Arguments:
+            file (os.PathLike): Path to the instance file.
+
+        Returns:
+            dict: The metadata for the instance.
+        """
         metadata = self.category() | {
             'dataset': self.name,
-            'name': pathlib.Path(file).stem.replace(self.extension, ''),
+            'name': pathlib.Path(file).name.replace(self.extension, ''),
             'path': file,
         }
         # Load sidecar metadata if it exists
@@ -598,19 +603,19 @@ class FileDataset(IndexedDataset):
 
     # ---------------------------- Metadata collection --------------------------- #
 
-    def _metadata_path(self, instance_path: pathlib.Path) -> pathlib.Path:
+    def _metadata_path(self, instance_path: os.PathLike) -> pathlib.Path:
         """
         Return the path to the `.meta.json` sidecar file for a given instance.
 
         Arguments:
-            instance_path: path to the instance file
+            instance_path (os.PathLike): Path to the instance file.
 
         Returns:
-            path to the `.meta.json` sidecar file
+            pathlib.Path: Path to the `.meta.json` sidecar file.
         """
         return pathlib.Path(str(instance_path) + self.METADATA_EXTENSION)
 
-    def _collect_all_metadata(self, force=False, workers=1):
+    def _collect_all_metadata(self, force: bool = False, workers: int = 1):
         """
         Collect and store structured metadata sidecar files for all instances.
 
@@ -901,7 +906,7 @@ class FileDataset(IndexedDataset):
         return downloaded_files
 
     @staticmethod
-    def _download_sequential(url: str, filepath: pathlib.Path, total_size: int, desc: str,
+    def _download_sequential(url: str, filepath: os.PathLike, total_size: int, desc: str,
                              chunk_size: int = 1024 * 1024):
         """Download file sequentially with progress bar."""
         import sys
