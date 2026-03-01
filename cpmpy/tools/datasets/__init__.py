@@ -1,4 +1,9 @@
-from ._base import extract_model_features, portable_instance_metadata, FileDataset
+from ._base import (
+    extract_model_features,
+    expand_varying_kwargs,
+    portable_instance_metadata,
+    FileDataset,
+)
 from .miplib import MIPLibDataset
 from .jsplib import JSPLibDataset
 from .psplib import PSPLibDataset

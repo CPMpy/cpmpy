@@ -20,6 +20,7 @@ import pathlib
 import io
 import tempfile
 import warnings
+from itertools import product
 from typing import Any, Iterator, Optional, Tuple, List, Union, Callable
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
@@ -289,6 +290,45 @@ class IndexedDataset(Dataset):
         for i in range(len(self)):
             yield self[i]
 
+
+def expand_varying_kwargs(
+    vary: Union[str, List[str]],
+    gen_kwargs: dict,
+    mode: str = "zip",
+) -> Iterator[dict]:
+    """
+    Expand gen_kwargs into a sequence of kwargs dicts for varying parameters.
+
+    When ``vary`` is a single string, yields one kwargs dict per value in
+    ``gen_kwargs[vary]``.
+
+    When ``vary`` is a list of strings, each corresponding value in gen_kwargs
+    must be an iterable. Yields one kwargs dict per tuple:
+    - ``mode='zip'``: parallel iteration (zip), all iterables must have same length
+    - ``mode='product'``: Cartesian product over the varying dimensions
+
+    Arguments:
+        vary: Name(s) of keys in gen_kwargs whose values are iterables to vary over.
+        gen_kwargs: Base kwargs; keys in vary are replaced per iteration.
+        mode: ``'zip'`` (default) or ``'product'``.
+
+    Yields:
+        dict: Full kwargs for each generator call.
+    """
+    varying_keys = [vary] if isinstance(vary, str) else list(vary)
+    base_kwargs = {k: v for k, v in gen_kwargs.items() if k not in varying_keys}
+    varying_iters = [gen_kwargs[k] for k in varying_keys]
+
+    if mode == "zip":
+        for values in zip(*varying_iters):
+            yield {**base_kwargs, **dict(zip(varying_keys, values))}
+    elif mode == "product":
+        for values in product(*varying_iters):
+            yield {**base_kwargs, **dict(zip(varying_keys, values))}
+    else:
+        raise ValueError(f"mode must be 'zip' or 'product', got {mode!r}")
+
+
 class IterableDataset(Dataset):
     """
     Abstract base class for iterable datasets.
@@ -307,18 +347,66 @@ class IterableDataset(Dataset):
         pass
 
     @staticmethod
-    def from_generator(generator: callable) -> IterableDataset:
+    def from_generator(
+        generator: Callable,
+        gen_kwargs: Optional[dict] = None,
+        vary: Optional[Union[str, List[str]]] = None,
+        vary_mode: str = "zip",
+    ) -> IterableDataset:
         """
         Create an IterableDataset from a generator.
+
+        Arguments:
+            generator: Callable that returns an iterator yielding (x, y) pairs.
+                When ``vary`` is None, called as ``generator()`` or
+                ``generator(**gen_kwargs)``. When ``vary`` is set, called once
+                per value (or tuple of values) of the varying kwarg(s).
+            gen_kwargs: Optional dict of keyword arguments to pass to the generator.
+            vary: Optional name or list of names of keys in gen_kwargs whose values
+                are iterables. If a single string, the generator is called once per
+                value. If a list of strings, the generator is called once per tuple
+                from zip (default) or product of the iterables.
+            vary_mode: When ``vary`` is a list, ``'zip'`` (parallel iteration,
+                same-length iterables) or ``'product'`` (Cartesian product).
         """
-        class FromGeneratorDataset(IterableDataset):
-            def __init__(self, generator: callable):
-                self.generator = generator
+        gen_kwargs = gen_kwargs or {}
 
-            def __iter__(self):
-                return self.generator()
+        if vary is not None:
+            # Variant: call generator once per expanded kwargs
+            class FromGeneratorVariedDataset(IterableDataset):
+                def __init__(
+                    self,
+                    generator: Callable,
+                    gen_kwargs: dict,
+                    vary: Union[str, List[str]],
+                    vary_mode: str,
+                ):
+                    self.generator = generator
+                    self.gen_kwargs = gen_kwargs
+                    self.vary = vary
+                    self.vary_mode = vary_mode
 
-        return FromGeneratorDataset(generator)
+                def __iter__(self):
+                    for kwargs in expand_varying_kwargs(
+                        self.vary, self.gen_kwargs, mode=self.vary_mode
+                    ):
+                        for item in self.generator(**kwargs):
+                            yield item
+
+            return FromGeneratorVariedDataset(
+                generator, gen_kwargs, vary, vary_mode
+            )
+        else:
+            # Original: single call to generator
+            class FromGeneratorDataset(IterableDataset):
+                def __init__(self, generator: Callable, gen_kwargs: dict):
+                    self.generator = generator
+                    self.gen_kwargs = gen_kwargs
+
+                def __iter__(self):
+                    return self.generator(**self.gen_kwargs)
+
+            return FromGeneratorDataset(generator, gen_kwargs)
 
 class FileDataset(IndexedDataset):
     """
