@@ -42,6 +42,8 @@ import json
 import os
 import re
 
+import cpmpy as cp
+
 _builtins_open = open  # capture before any parameter shadowing
 
 
@@ -125,7 +127,7 @@ def extract_format_metadata(content, format_name):
     return result
 
 
-def _enrich_from_model(model, metadata):
+def metadata_from_model(model):
     """Add decision variable and objective info from a CPMpy Model to metadata.
 
     This is called by transforms that produce CPMpy models (Load, Translate)
@@ -135,22 +137,20 @@ def _enrich_from_model(model, metadata):
     - ``objective``: string representation of the objective expression (if any)
     - ``objective_is_min``: True if minimizing, False if maximizing (if any)
     """
-    if not hasattr(model, 'constraints'):
+    
+    metadata = {}
+
+    if not isinstance(model, cp.Model):
         return metadata  # not a CPMpy Model
 
     from cpmpy.transformations.get_variables import get_variables_model
     from cpmpy.expressions.variables import _BoolVarImpl
 
     variables = get_variables_model(model)
-    metadata['decision_variables'] = [
-        {
-            "name": v.name,
-            "type": "bool" if isinstance(v, _BoolVarImpl) else "int",
-            "lb": int(v.lb),
-            "ub": int(v.ub),
-        }
+    metadata['decision_variables'] = {
+        v.name: v
         for v in variables
-    ]
+    }
 
     if model.objective_ is not None:
         metadata['objective'] = str(model.objective_)

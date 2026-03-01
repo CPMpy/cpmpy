@@ -11,6 +11,7 @@ methods __len__ and __getitem__ for iterating over the dataset).
 Additionaly, it provides a collection of methods and helper functions to adapt the dataset
 to the specific usecase requirements of constraint optimisation benchmarks.
 """
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import json
@@ -305,6 +306,20 @@ class IterableDataset(Dataset):
         """
         pass
 
+    @staticmethod
+    def from_generator(generator: callable) -> IterableDataset:
+        """
+        Create an IterableDataset from a generator.
+        """
+        class FromGeneratorDataset(IterableDataset):
+            def __init__(self, generator: callable):
+                self.generator = generator
+
+            def __iter__(self):
+                return self.generator()
+
+        return FromGeneratorDataset(generator)
+
 class FileDataset(IndexedDataset):
     """
     Abstract base class for PyTorch-style datasets of CO benchmarking instances.
@@ -543,6 +558,9 @@ class FileDataset(IndexedDataset):
     def dataset_metadata(cls) -> dict:
         """
         Return dataset-level metadata as a dictionary.
+
+        Returns:
+            dict: The dataset-level metadata.
         """
         if isinstance(cls.citation, str):
             citations = [cls.citation] if cls.citation else []
@@ -963,7 +981,48 @@ class FileDataset(IndexedDataset):
                 sys.stdout.write("\n")
                 sys.stdout.flush()
 
+def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset:
+    """
+    Create a FileDataset from a list of files.
+    """
+    class FromFilesDataset(FileDataset):
+        def __init__(self, dataset_dir: os.PathLike, extension: str = ".txt"):
+            super().__init__(dataset_dir=dataset_dir, extension=extension)
 
+        @property
+        def name(self) -> str:
+            raise NotImplementedError("Arbitrary file dataset does not support a name. Please implement this method in a subclass, or use a more specific dataset class.")
+
+        @property
+        def description(self) -> str:
+            raise NotImplementedError("Arbitrary file dataset does not support a description. Please implement this method in a subclass, or use a more specific dataset class.")
+
+        @property
+        def url(self) -> str:
+            raise NotImplementedError("Arbitrary file dataset does not support a URL. Please implement this method in a subclass, or use a more specific dataset class.")
+
+        @property
+        def citation(self) -> List[str]:
+            raise NotImplementedError("Arbitrary file dataset does not support a citation. Please implement this method in a subclass, or use a more specific dataset class.")
+
+        def _loader(self, file: os.PathLike) -> cp.Model:
+            raise NotImplementedError("Arbitrary file dataset does not support loading. Please implement this method in a subclass, or use a more specific dataset class.")
+
+        def category(self) -> dict:
+            raise NotImplementedError("Arbitrary file dataset does not support categories. Please implement this method in a subclass, or use a more specific dataset class.")
+
+        def download(self) -> None:
+            raise NotImplementedError("Arbitrary file dataset does not support downloading. Please implement this method in a subclass, or use a more specific dataset class.")
+
+        def instance_metadata(self, file: os.PathLike) -> dict:
+            metadata = {
+                'dataset_dir': str(self.dataset_dir),
+                'name': pathlib.Path(file).name.replace(self.extension, ''),
+                'path': file,
+            }
+            return metadata
+
+    return FromFilesDataset(dataset_dir, extension)
 
 class URLDataset(IndexedDataset):
     """
