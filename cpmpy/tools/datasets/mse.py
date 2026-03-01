@@ -29,9 +29,25 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
     More information on the competition can be found here: https://maxsat-evaluations.github.io/
     """
     
-    name = "mse"
-    description = "MaxSAT Evaluation competition benchmark instances."
-    url = "https://maxsat-evaluations.github.io/"
+    # -------------------------- Dataset-level metadata -------------------------- #
+
+    @property
+    def name(self) -> str:
+        return "maxsateval"
+
+    @property
+    def description(self) -> str:
+        return "MaxSAT Evaluation competition benchmark instances."
+
+    @property
+    def url(self) -> str:
+        return "https://maxsat-evaluations.github.io/"
+
+    @property
+    def citation(self) -> List[str]:
+        return []
+
+    # ---------------------------------------------------------------------------- #
 
     def __init__(
             self, 
@@ -39,37 +55,39 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
             year: int = 2024, track: str = "exact-unweighted", 
             transform=None, target_transform=None, 
             download: bool = False,
+            dataset_dir: Optional[os.PathLike] = None,
             metadata_workers: int = 1
         ):
         """
         Constructor for a dataset object of the MaxSAT Evaluation competition.
 
         Arguments:
-            root (str): Root directory where datasets are stored or will be downloaded to (default="."). 
+            root (str): Root directory where datasets are stored or will be downloaded to (default="."). If `dataset_dir` is provided, this argument is ignored.
             year (int): Competition year of the dataset to use (default=2024).
             track (str): Track name specifying which subset of the competition instances to load (default="exact-unweighted").
             transform (callable, optional): Optional transform applied to the instance file path.
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
-
+            dataset_dir (Optional[os.PathLike]): Path to the dataset directory. If not provided, it will be inferred from the root and year/track.
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
                 or if the requested year/track combination is not available.
         """
 
+        # Dataset-specific attributes
         self.root = pathlib.Path(root)
         self.year = year
         self.track = track
 
-        # Check requested dataset
+        # Check requested dataset is valid
         if not str(year).startswith('20'):
             raise ValueError("Year must start with '20'")
         if not track:
             raise ValueError("Track must be specified, e.g. OPT-LIN, DEC-LIN, ...")
 
-        dataset_dir = self.root / self.name / str(year) / track
-        
+        dataset_dir = pathlib.Path(dataset_dir) / str(year) / track if dataset_dir else self.root / self.name / str(year) / track
+
         super().__init__(
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 

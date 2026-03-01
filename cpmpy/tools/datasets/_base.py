@@ -318,20 +318,35 @@ class FileDataset(IndexedDataset):
     # Extension for metadata sidecar files
     METADATA_EXTENSION = ".meta.json"
 
-    # Dataset-level metadata (override in subclasses)
-    description = ""
-    url = ""
-    license = ""
-    citation: List[str] = []
+    # -------------- Dataset-level metadata (override in subclasses) ------------- #
     
+    @property
+    @abstractmethod
+    def name(self) -> str: pass
+
+    @property
+    @abstractmethod
+    def description(self) -> str: pass
+
+    @property
+    @abstractmethod
+    def url(self) -> str: pass
+
+    @property
+    def citation(self) -> List[str]: 
+        return []
+
     # TODO: remove for now?
     # Multiple download origins (override in subclasses or via config)
     # Origins are tried in order, falling back to original url if all fail
     origins: List[str] = []  # List of URL bases to try before falling back to original url
 
+    # ---------------------------------------------------------------------------- #
+
+
     def __init__(
             self,
-            root: str = ".",
+            dataset_dir: str = ".",
             transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
             extension: str = ".txt",
@@ -342,7 +357,7 @@ class FileDataset(IndexedDataset):
         Constructor for the _Dataset base class.
 
         Arguments:
-            root (str): Path to the dataset directory.
+            dataset_dir (str): Path to the dataset directory.
             transform (callable, optional): Optional transform applied to the instance file path.
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
@@ -355,14 +370,15 @@ class FileDataset(IndexedDataset):
             ValueError: If the dataset directory does not contain any instance files.
         """
 
-        self.dataset_dir = pathlib.Path(root)
+        self.dataset_dir = pathlib.Path(dataset_dir)
         self.extension = extension
 
-        if not self.origins:
-            from cpmpy.tools.datasets.config import get_origins
-            self.origins = get_origins(self.name)
+        # TODO: remove for later?
+        # if not self.origins:
+        #     from cpmpy.tools.datasets.config import get_origins
+        #     self.origins = get_origins(self.name)
 
-        if not self.dataset_dir.exists():
+        if not self._check_exists():
             if not download:
                 raise ValueError("Dataset not found. Please set download=True to download the dataset.")
             else:
@@ -376,6 +392,12 @@ class FileDataset(IndexedDataset):
             raise ValueError(f"Cannot find any instances inside dataset {self.dataset_dir}. Is it a valid dataset? If so, please report on GitHub.")
 
         super().__init__(transform=transform, target_transform=target_transform)
+
+    def _check_exists(self) -> bool:
+        """
+        Check if the dataset exists (has been downloaded).
+        """
+        return self.dataset_dir.exists()
 
     # ---------------------------------------------------------------------------- #
     #                     Methods to implement in subclasses:                      #
