@@ -14,7 +14,7 @@ import io
 
 import cpmpy as cp
 from cpmpy.tools.io.wcnf import load_wcnf
-from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets._base import FileDataset, classproperty
 
 
 class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
@@ -33,19 +33,21 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
     
     # -------------------------- Dataset-level metadata -------------------------- #
 
-    @property
+    _metadata_init_kwargs = {"year": 2024, "track": "exact-unweighted"}
+
+    @classproperty
     def name(self) -> str:
         return "maxsateval"
 
-    @property
+    @classproperty
     def description(self) -> str:
         return "MaxSAT Evaluation competition benchmark instances."
 
-    @property
+    @classproperty
     def url(self) -> str:
         return "https://maxsat-evaluations.github.io/"
 
-    @property
+    @classproperty
     def citation(self) -> List[str]:
         return []
 

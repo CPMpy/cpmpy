@@ -63,6 +63,19 @@ def _format_bytes(bytes_num):
         bytes_num /= 1024.0
 
 
+class classproperty:
+    """
+    Descriptor that makes a method work as a class-level property (no () needed).
+    Similar to @property, but for class methods.
+    """
+
+    def __init__(self, func):
+        self.func = func
+
+    def __get__(self, instance, owner):
+        return self.func(owner)
+
+
 def portable_instance_metadata(metadata: dict) -> dict:
     """
     Filter sidecar metadata to only portable, domain-specific fields.
@@ -423,19 +436,19 @@ class FileDataset(IndexedDataset):
 
     # -------------- Dataset-level metadata (override in subclasses) ------------- #
     
-    @property
+    @classproperty
     @abstractmethod
     def name(self) -> str: pass
 
-    @property
+    @classproperty
     @abstractmethod
     def description(self) -> str: pass
 
-    @property
+    @classproperty
     @abstractmethod
     def url(self) -> str: pass
 
-    @property
+    @classproperty
     def citation(self) -> List[str]: 
         return []
 
@@ -626,8 +639,9 @@ class FileDataset(IndexedDataset):
         Returns:
             dict: The metadata for the instance.
         """
-        metadata = self.category() | {
+        metadata = {
             'dataset': self.name,
+            'category': self.category(),
             'name': pathlib.Path(file).name.replace(self.extension, ''),
             'path': file,
         }
@@ -659,7 +673,6 @@ class FileDataset(IndexedDataset):
             "name": cls.name,
             "description": cls.description,
             "url": cls.url,
-            "license": cls.license,
             "citation": citations,
         }
 
