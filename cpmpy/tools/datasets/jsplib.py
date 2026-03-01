@@ -14,10 +14,10 @@ import zipfile
 import numpy as np
 
 import cpmpy as cp
-from cpmpy.tools.datasets._base import _Dataset
+from cpmpy.tools.datasets._base import FileDataset
 
 
-class JSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
+class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     """
     JSP Dataset in a PyTorch compatible format.

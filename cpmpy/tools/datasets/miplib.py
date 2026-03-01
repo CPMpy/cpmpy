@@ -11,10 +11,10 @@ import zipfile
 import pathlib
 import io
 
-from cpmpy.tools.datasets._base import _Dataset
+from cpmpy.tools.datasets._base import FileDataset
 
 
-class MIPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
+class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     """
     MIPLib Dataset in a PyTorch compatible format.

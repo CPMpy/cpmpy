@@ -3,7 +3,13 @@ Dataset Base Class
 
 This module defines the abstract `_Dataset` class, which serves as the foundation
 for loading and managing benchmark instance collections in CPMpy-based experiments.
-It standardizes how datasets are stored, accessed, and optionally transformed.
+It standardizes how datasets are downloaded, stored, accessed, and optionally transformed.
+
+It provides a Pytorch compatible interface (constructor arguments like "transform" and the
+methods __len__ and __getitem__ for iterating over the dataset).
+
+Additionaly, it provides a collection of methods and helper functions to adapt the dataset
+to the specific usecase requirements of constraint optimisation benchmarks.
 """
 
 from abc import ABC, abstractmethod
@@ -13,11 +19,13 @@ import pathlib
 import io
 import tempfile
 import warnings
-from typing import Any, Optional, Tuple, List, Union
+from typing import Any, Iterator, Optional, Tuple, List, Union, Callable
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import multiprocessing
+
+from altair.utils.schemapi import _passthrough
 
 # tqdm as an optional dependency, provides prettier progress bars
 try:
@@ -27,13 +35,16 @@ except ImportError:
 
 import cpmpy as cp
 
-# Fields produced by extract_model_features() — not portable across format translations
+# TODO: move elsewhere?
+# Fields produced by extract_model_features() (after loading into a CPMpy model) 
+#  - not portable across format translations
 _MODEL_FEATURE_FIELDS = frozenset({
     "num_variables", "num_bool_variables", "num_int_variables",
     "num_constraints", "constraint_types", "has_objective",
     "objective_type", "domain_size_min", "domain_size_max", "domain_size_mean",
 })
 
+# TODO: move elsewhere?
 # Prefixes for format-specific metadata fields (not portable across translations)
 _FORMAT_SPECIFIC_PREFIXES = ("opb_", "wcnf_", "mps_", "xcsp_", "dimacs_")
 
@@ -41,6 +52,8 @@ _FORMAT_SPECIFIC_PREFIXES = ("opb_", "wcnf_", "mps_", "xcsp_", "dimacs_")
 def _format_bytes(bytes_num):
     """
     Format bytes into human-readable string (e.g., KB, MB, GB).
+
+    Used to display download progress.
     """
     for unit in ['bytes', 'KB', 'MB', 'GB', 'TB']:
         if bytes_num < 1024.0:
@@ -49,7 +62,8 @@ def _format_bytes(bytes_num):
 
 
 def portable_instance_metadata(metadata: dict) -> dict:
-    """Filter sidecar metadata to only portable, domain-specific fields.
+    """
+    Filter sidecar metadata to only portable, domain-specific fields.
 
     Strips model features (num_variables, constraint_types, ...),
     format-specific fields (opb_*, wcnf_*, mps_*, ...), and internal
@@ -222,12 +236,81 @@ def _collect_one_metadata_worker(file_path_str):
     return str(file_path)
 
 
-class _Dataset(ABC):
-    """
-    Abstract base class for PyTorch-style datasets of benchmarking instances.
+"""
+dataset.map(transform)
+dataset.filter(predicate)
+dataset.shuffle(seed)
+dataset.split(ratio)
+"""
 
-    The `_Dataset` class provides a standardized interface for downloading and
-    accessing benchmark instances. This class should not be used on its own.
+class Dataset(ABC):
+    """
+    Abstract base class for datasets.
+
+    Each instance in a dataset is characterised by a (x, y) pair of:
+        x: instance reference (e.g., file path, database key, generated seed, ...)
+        y: metadata (solution, features, origin, etc.)
+    """
+
+    def __init__(self, transform: Optional[Callable] = None, target_transform: Optional[Callable] = None):
+        """
+        Arguments:
+            transform (callable, optional): Optional transform applied to the instance reference.
+            target_transform (callable, optional): Optional transform applied to the metadata.
+        """
+        self.transform = transform
+        self.target_transform = target_transform
+
+class IndexedDataset(Dataset):
+    """
+    Abstract base class for indexed datasets.
+    """
+
+    @abstractmethod
+    def __len__(self) -> int:
+        """
+        Return the total number of instances.
+        """
+        pass
+    
+    @abstractmethod
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        """
+        Return the instance and metadata at the given index.
+
+        Returns:
+            x: instance reference (e.g., file path, database key, generated seed, ...)
+            y: metadata (solution, features, origin, etc.)
+        """
+        pass
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
+class IterableDataset(Dataset):
+    """
+    Abstract base class for iterable datasets.
+    """
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[Tuple[Any, Any]]:
+        """
+        Return an iterator over the dataset.
+
+        Returns:
+            Iterator[Tuple[Any, Any]]: Iterator over the dataset, yielding (x, y) pairs of:
+                x: instance reference (e.g., file path, database key, generated seed, ...)
+                y: metadata (solution, features, origin, etc.)
+        """
+        pass
+
+class FileDataset(IndexedDataset):
+    """
+    Abstract base class for PyTorch-style datasets of CO benchmarking instances.
+
+    The `FileDataset` class provides a standardized interface for downloading and
+    accessing file-backed benchmark instances. This class should not be used on its own.
     Instead have a look at one of the concrete subclasses, providing access to 
     well-known datasets from the community.
     """
@@ -241,16 +324,17 @@ class _Dataset(ABC):
     license = ""
     citation: List[str] = []
     
+    # TODO: remove for now?
     # Multiple download origins (override in subclasses or via config)
     # Origins are tried in order, falling back to original url if all fail
     origins: List[str] = []  # List of URL bases to try before falling back to original url
 
     def __init__(
             self,
-            dataset_dir: str = ".",
-            transform=None, target_transform=None,
+            root: str = ".",
+            transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
-            extension:str=".txt",
+            extension: str = ".txt",
             metadata_workers: int = 1,
             **kwargs
         ):
@@ -258,11 +342,11 @@ class _Dataset(ABC):
         Constructor for the _Dataset base class.
 
         Arguments:
-            dataset_dir (str): Path to the dataset directory.
+            root (str): Path to the dataset directory.
             transform (callable, optional): Optional transform applied to the instance file path.
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
-            extension (str): Extension of the instance files.
+            extension (str): Extension of the instance files. Used to filter instance files from the dataset directory.
             metadata_workers (int): Number of parallel workers for metadata collection during download (default: 1).
 
         Raises:
@@ -270,10 +354,10 @@ class _Dataset(ABC):
                 or if the requested year/track combination is not available.
             ValueError: If the dataset directory does not contain any instance files.
         """
-        self.dataset_dir = pathlib.Path(dataset_dir)
-        self.transform = transform
-        self.target_transform = target_transform
+
+        self.dataset_dir = pathlib.Path(root)
         self.extension = extension
+
         if not self.origins:
             from cpmpy.tools.datasets.config import get_origins
             self.origins = get_origins(self.name)
@@ -291,6 +375,7 @@ class _Dataset(ABC):
         if len(files) == 0:
             raise ValueError(f"Cannot find any instances inside dataset {self.dataset_dir}. Is it a valid dataset? If so, please report on GitHub.")
 
+        super().__init__(transform=transform, target_transform=target_transform)
 
     # ---------------------------------------------------------------------------- #
     #                     Methods to implement in subclasses:                      #
@@ -668,7 +753,7 @@ class _Dataset(ABC):
             with urlopen(req) as response:
                 total_size = int(response.headers.get('Content-Length', 0))
             
-            _Dataset._download_sequential(full_url, destination, total_size, desc, chunk_size)
+            FileDataset._download_sequential(full_url, destination, total_size, desc, chunk_size)
             return pathlib.Path(destination)
         except (HTTPError, URLError):
             return None
@@ -714,7 +799,7 @@ class _Dataset(ABC):
         # Try custom origins first if provided
         if origins:
             for origin_url in origins:
-                result = _Dataset._try_origin(origin_url, target, destination, desc, chunk_size)
+                result = FileDataset._try_origin(origin_url, target, destination, desc, chunk_size)
                 if result is not None:
                     return result
 
@@ -726,7 +811,7 @@ class _Dataset(ABC):
             
             # Convert destination to Path for _download_sequential
             download_path = pathlib.Path(destination) if destination is not None else pathlib.Path(temp_destination.name)
-            _Dataset._download_sequential(url + target, download_path, total_size, desc, chunk_size)
+            FileDataset._download_sequential(url + target, download_path, total_size, desc, chunk_size)
     
             if destination is None:
                 temp_destination.close()
@@ -772,7 +857,7 @@ class _Dataset(ABC):
             # Try custom origins first
             if origins:
                 for origin_url in origins:
-                    result = _Dataset._try_origin(origin_url, url_suffix + target, dest_path, desc, chunk_size)
+                    result = FileDataset._try_origin(origin_url, url_suffix + target, dest_path, desc, chunk_size)
                     if result is not None:
                         return result, None
             
@@ -783,7 +868,7 @@ class _Dataset(ABC):
                 with urlopen(req) as response:
                     total_size = int(response.headers.get('Content-Length', 0))
                 
-                _Dataset._download_sequential(full_url, dest_path, total_size, desc, chunk_size)
+                FileDataset._download_sequential(full_url, dest_path, total_size, desc, chunk_size)
                 return pathlib.Path(dest_path), None
             except Exception as e:
                 return None, str(e)
@@ -866,3 +951,25 @@ class _Dataset(ABC):
                         sys.stdout.flush()
                 sys.stdout.write("\n")
                 sys.stdout.flush()
+
+
+
+class URLDataset(IndexedDataset):
+    """
+    Abstract base class for URL-backed datasets.
+
+    Each instance reference is a URL.
+    """
+    pass
+
+class StreamingDataset(IterableDataset):
+    """
+    Abstract base class for streaming datasets.
+    """
+    pass
+
+class GeneratedDataset(IterableDataset):
+    """
+    Abstract base class for generated datasets.
+    """
+    pass

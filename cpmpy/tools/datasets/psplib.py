@@ -9,9 +9,9 @@ import pathlib
 import io
 import zipfile
 
-from cpmpy.tools.datasets._base import _Dataset
+from cpmpy.tools.datasets._base import FileDataset
 
-class PSPLibDataset(_Dataset):  # torch.utils.data.Dataset compatible
+class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     """
     PSPlib Dataset in a PyTorch compatible format.
     

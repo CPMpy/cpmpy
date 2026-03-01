@@ -10,10 +10,11 @@ import zipfile
 import pathlib
 import io
 
-from cpmpy.tools.datasets._base import _Dataset
+import cpmpy as cp
+from cpmpy.tools.datasets._base import FileDataset
 
 
-class XCSP3Dataset(_Dataset):  # torch.utils.data.Dataset compatible
+class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     """
     XCSP3 Dataset in a PyTorch compatible format.

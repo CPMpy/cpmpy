@@ -14,7 +14,7 @@ import re
 import io
 
 import cpmpy as cp
-from cpmpy.tools.datasets._base import _Dataset
+from cpmpy.tools.datasets._base import FileDataset
 
 # Optional dependencies
 try:
@@ -30,7 +30,7 @@ except ImportError:
     _HAS_FAKER = False
 
 
-class NurseRosteringDataset(_Dataset):  # torch.utils.data.Dataset compatible
+class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         
     """
     Nurserostering Dataset in a PyTorch compatible format.

@@ -11,10 +11,10 @@ import pathlib
 import tarfile
 import io
 
-from cpmpy.tools.datasets._base import _Dataset
+from cpmpy.tools.datasets._base import FileDataset
 
 
-class OPBDataset(_Dataset): 
+class OPBDataset(FileDataset): 
     """
     Pseudo Boolean Competition (PB) benchmark dataset.
 

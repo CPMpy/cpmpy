@@ -11,13 +11,14 @@ import zipfile
 import pathlib
 import io
 
-from cpmpy.tools.datasets._base import _Dataset
+import cpmpy as cp
+from cpmpy.tools.datasets._base import FileDataset
 
 
-class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
+class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     """
-    MaxSAT Evaluation (MSE) benchmark dataset.
+    MaxSAT Evaluation benchmark dataset.
 
     Provides access to benchmark instances from the MaxSAT Evaluation 
     competitions. Instances are grouped by `year` and `track` (e.g., 
@@ -41,7 +42,7 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
             metadata_workers: int = 1
         ):
         """
-        Constructor for a dataset object of the MSE competition.
+        Constructor for a dataset object of the MaxSAT Evaluation competition.
 
         Arguments:
             root (str): Root directory where datasets are stored or will be downloaded to (default="."). 
@@ -167,6 +168,6 @@ class MSEDataset(_Dataset):  # torch.utils.data.Dataset compatible
 
 
 if __name__ == "__main__":
-    dataset = MSEDataset(year=2024, track="exact-weighted", download=True)
+    dataset = MaxSATEvalDataset(year=2024, track="exact-weighted", download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:", dataset[0])
