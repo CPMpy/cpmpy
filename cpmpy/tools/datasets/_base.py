@@ -405,23 +405,10 @@ class FileDataset(IndexedDataset):
 
     @staticmethod
     @abstractmethod
-    def reader(file_path, open=open) -> cp.Model:
+    def _loader(content: str) -> cp.Model:
         """
-        Reader for the dataset.
-        Parses a file path directly into a CPMpy model.
-        For backward compatibility. Consider using read() + load() instead.
-        """
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def loader(content: str) -> cp.Model:
-        """
-        Loader for the dataset.
-        Loads a CPMpy model from raw file content string.
-        
-        This is the "loading" step: turning raw contents into a CPMpy model.
-        The content should be the raw text content of the file (already decompressed).
+        Loader for the dataset. Loads a CPMpy model from raw file content string.
+        The content will be the raw text content of the file (already decompressed).
         
         Arguments:
             content (str): Raw file content string to load into a model.
@@ -477,17 +464,15 @@ class FileDataset(IndexedDataset):
             instance (os.PathLike): File path to the instance file.
 
         Returns:
-            io.TextIOBase: The opened file.
+            io.TextIOBase: The opened file handle.
         """
         return open(instance, "r")
 
     def read(self, instance: os.PathLike) -> str:    
         """
         Read raw file contents from an instance file.
-        Handles decompression automatically via dataset.open().
+        Handles optional decompression automatically via dataset.open().
         
-        This is the "reading" step: decompressing + reading raw file contents.
-
         Arguments:
             instance (os.PathLike): File path to the instance file.
         Returns:
@@ -500,9 +485,8 @@ class FileDataset(IndexedDataset):
         """
         Load a CPMpy model from an instance file.
         
-        This is the "loading" step: uses `read()` to handle reading (decompressing + 
-        reading raw contents) and then turns raw contents into a CPMpy model via `loader()`.
-        Loading always handles reading internally by calling `read()`.
+        Uses `.read()` to handle reading (decompressing + reading raw contents) and then turns 
+        raw contents into a CPMpy model via `.loader()`.
         
         Arguments:
             instance (str or os.PathLike): 

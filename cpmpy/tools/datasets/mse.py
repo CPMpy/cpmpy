@@ -7,11 +7,13 @@ https://maxsat-evaluations.github.io/
 
 import os
 import lzma
+from typing import List, Optional
 import zipfile
 import pathlib
 import io
 
 import cpmpy as cp
+from cpmpy.tools.io.wcnf import load_wcnf
 from cpmpy.tools.datasets._base import FileDataset
 
 
@@ -97,23 +99,11 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
 
     @staticmethod
-    def reader(file_path, open=open):
+    def _loader(content: str) -> cp.Model:
         """
-        Reader for MSE dataset.
-        Parses a file path directly into a CPMpy model.
-        For backward compatibility. Consider using read() + load() instead.
-        """
-        from cpmpy.tools.io.wcnf import load_wcnf
-        return load_wcnf(file_path, open=open)
-
-    @staticmethod
-    def loader(content: str):
-        """
-        Loader for MSE dataset.
+        Loader for MaxSAT Evaluation dataset.
         Loads a CPMpy model from raw WCNF content string.
         """
-        from cpmpy.tools.io.wcnf import load_wcnf
-        # load_wcnf already supports raw strings
         return load_wcnf(content)
 
     def category(self) -> dict:
@@ -154,7 +144,6 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         return result
 
     def download(self):
-
         url = f"https://www.cs.helsinki.fi/group/coreo/MSE{self.year}-instances/"
         target = f"mse{str(self.year)[2:]}-{self.track}.zip"
         target_download_path = self.root / target

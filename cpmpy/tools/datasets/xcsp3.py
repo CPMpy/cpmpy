@@ -57,18 +57,8 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
         )
 
 
-    @classmethod
-    def reader(cls, file_path, open=open):
-        """
-        Reader for XCSP3 dataset.
-        Parses a file path directly into a CPMpy model.
-        For backward compatibility. Consider using read() + load() instead.
-        """
-        from cpmpy.tools.xcsp3.parser import load_xcsp3
-        return load_xcsp3(file_path, open=open)
-
-    @classmethod
-    def loader(cls, content: str):
+    @staticmethod
+    def _loader(content: str) -> cp.Model:
         """
         Loader for XCSP3 dataset.
         Loads a CPMpy model from raw XCSP3 content string.
