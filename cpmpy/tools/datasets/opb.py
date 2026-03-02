@@ -12,16 +12,17 @@ import tarfile
 import io
 
 from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.metadata import FeaturesInfo, FieldInfo
 
 
-class OPBDataset(FileDataset): 
+class OPBDataset(FileDataset):
     """
     Pseudo Boolean Competition (PB) benchmark dataset.
 
-    Provides access to benchmark instances from the Pseudo Boolean 
-    competitions. Instances are grouped by `year` and `track` (e.g., 
-    `"OPT-LIN"`, `"DEC-LIN"`) and stored as `.opb.xz` files. 
-    If the dataset is not available locally, it can be automatically 
+    Provides access to benchmark instances from the Pseudo Boolean
+    competitions. Instances are grouped by `year` and `track` (e.g.,
+    `"OPT-LIN"`, `"DEC-LIN"`) and stored as `.opb.xz` files.
+    If the dataset is not available locally, it can be automatically
     downloaded and extracted.
 
     More information on the competition can be found here: https://www.cril.univ-artois.fr/PB25/
@@ -29,7 +30,22 @@ class OPBDataset(FileDataset):
 
     name = "opb"
     description = "Pseudo-Boolean Competition benchmark instances."
-    url = "https://www.cril.univ-artois.fr/PB25/"
+    homepage = "https://www.cril.univ-artois.fr/PB25/"
+    citation = [
+        "Berre, D. L., Parrain, A. The Pseudo-Boolean Evaluation 2011. JSAT, 7(1), 2012.",
+    ]
+
+    version = "2024"
+    license = "competition-specific"
+    domain = "pseudo_boolean"
+    tags = ["optimization", "pseudo-boolean", "opb", "combinatorial"]
+    language = "OPB"
+    features = FeaturesInfo({
+        "author":              ("str", "Author extracted from filename convention"),
+        "opb_num_variables":   ("int", "Number of Boolean variables (from OPB header)"),
+        "opb_num_constraints": ("int", "Number of constraints (from OPB header)"),
+        "opb_num_products":    FieldInfo("int", "Number of non-linear product terms (from OPB header)", nullable=True),
+    })
 
     def __init__(
             self, 

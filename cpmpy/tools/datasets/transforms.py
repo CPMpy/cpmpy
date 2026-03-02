@@ -127,6 +127,15 @@ def extract_format_metadata(content, format_name):
     return result
 
 
+def _enrich_from_model(model, metadata):
+    """Merge model features into an InstanceInfo, returning the updated copy."""
+    from cpmpy.tools.datasets.metadata import InstanceInfo
+    new_fields = metadata_from_model(model)
+    if isinstance(metadata, InstanceInfo):
+        return metadata | new_fields
+    return InstanceInfo({**metadata, **new_fields})
+
+
 def metadata_from_model(model):
     """Add decision variable and objective info from a CPMpy Model to metadata.
 

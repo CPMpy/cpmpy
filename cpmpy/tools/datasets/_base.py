@@ -37,18 +37,16 @@ except ImportError:
 
 import cpmpy as cp
 
-# TODO: move elsewhere?
-# Fields produced by extract_model_features() (after loading into a CPMpy model) 
-#  - not portable across format translations
-_MODEL_FEATURE_FIELDS = frozenset({
-    "num_variables", "num_bool_variables", "num_int_variables",
-    "num_constraints", "constraint_types", "has_objective",
-    "objective_type", "domain_size_min", "domain_size_max", "domain_size_mean",
-})
+from .metadata import (
+    InstanceInfo, DatasetInfo, FeaturesInfo, FieldInfo,
+    _MODEL_FEATURE_FIELDS, _FORMAT_SPECIFIC_PREFIXES,
+)
 
-# TODO: move elsewhere?
-# Prefixes for format-specific metadata fields (not portable across translations)
-_FORMAT_SPECIFIC_PREFIXES = ("opb_", "wcnf_", "mps_", "xcsp_", "dimacs_")
+# Re-export constants for backward compatibility with code that imports from _base
+__all__ = [
+    "_MODEL_FEATURE_FIELDS", "_FORMAT_SPECIFIC_PREFIXES",
+    "InstanceInfo", "DatasetInfo", "FeaturesInfo", "FieldInfo",
+]
 
 
 def _format_bytes(bytes_num):
@@ -71,6 +69,7 @@ class classproperty:
 
     def __init__(self, func):
         self.func = func
+        self.__isabstractmethod__ = getattr(func, '__isabstractmethod__', False)
 
     def __get__(self, instance, owner):
         return self.func(owner)
@@ -435,7 +434,7 @@ class FileDataset(IndexedDataset):
     METADATA_EXTENSION = ".meta.json"
 
     # -------------- Dataset-level metadata (override in subclasses) ------------- #
-    
+
     @classproperty
     @abstractmethod
     def name(self) -> str: pass
@@ -446,18 +445,63 @@ class FileDataset(IndexedDataset):
 
     @classproperty
     @abstractmethod
-    def url(self) -> str: pass
+    def homepage(self) -> str: pass
 
     @classproperty
-    def citation(self) -> List[str]: 
+    def citation(self) -> List[str]:
         return []
 
-    # TODO: remove for now?
+    # Optional enrichment — all have sensible defaults, zero lines required
+    version: Optional[str] = None                          # e.g. "2024", "1.0.0"
+    license: Optional[Union[str, List[str]]] = None        # e.g. "MIT", ["CC BY 4.0"]
+    domain: str = "constraint_programming"                 # e.g. "scheduling", "sat"
+    tags: List[str] = []                                   # e.g. ["optimization", "scheduling"]
+    language: Optional[str] = None                         # e.g. "XCSP3", "OPB", "JSPLib"
+    features: Optional[FeaturesInfo] = None                # domain_metadata field schema
+    release_notes: Optional[dict] = None                   # {version: changelog}
+
     # Multiple download origins (override in subclasses or via config)
-    # Origins are tried in order, falling back to original url if all fail
-    origins: List[str] = []  # List of URL bases to try before falling back to original url
+    # Origins are tried in order, falling back to homepage if all fail
+    origins: List[str] = []
 
     # ---------------------------------------------------------------------------- #
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Auto-merge ``features`` when a subclass declares only its *new* fields.
+
+        If a subclass explicitly defines ``features``, it is merged with the
+        nearest ancestor's ``features`` so the subclass only needs to list
+        what is new.  The subclass fields take precedence over inherited ones.
+
+        .. code-block:: python
+
+            class MyJSPDataset(JSPLibDataset):
+                # No need to repeat {jobs, machines, optimum, ...} — they are
+                # inherited and merged in automatically.
+                features = FeaturesInfo({"difficulty": ("float", "Computed difficulty score")})
+
+                def collect_instance_metadata(self, file):
+                    meta = super().collect_instance_metadata(file)
+                    meta["difficulty"] = ...
+                    return meta
+
+        To *replace* rather than extend the parent schema, explicitly set
+        ``features`` to the complete schema you want (the auto-merge still
+        runs, but if you start from scratch the parent's fields will be
+        absent from the parent's FeaturesInfo and won't be merged).
+        Alternatively, set ``features = None`` to clear the schema entirely.
+        """
+        super().__init_subclass__(**kwargs)
+        subclass_features = cls.__dict__.get("features")
+        if subclass_features is None:
+            return
+        # Walk the MRO to find the nearest ancestor that has features defined
+        for base in cls.__mro__[1:]:
+            parent_features = base.__dict__.get("features")
+            if parent_features is not None:
+                cls.features = parent_features | subclass_features
+                return
 
 
     def __init__(
@@ -622,22 +666,27 @@ class FileDataset(IndexedDataset):
             content = instance
 
         # Loading - turn raw contents into CPMpy model
-        return self.loader(content)
+        return self._loader(content)
 
 
     # ---------------------------------------------------------------------------- #
     #                               Public interface                               #
     # ---------------------------------------------------------------------------- #
 
-    def instance_metadata(self, file: os.PathLike) -> dict:
+    def instance_metadata(self, file: os.PathLike) -> InstanceInfo:
         """
         Return the metadata for a given instance file.
+
+        Returns an :class:`~metadata.InstanceInfo`, which is a ``dict`` subclass
+        so all existing ``meta['year']``, ``meta.get('jobs')`` access is unchanged.
+        Structured access via ``info.domain_metadata``, ``info.model_features``,
+        ``info.id``, etc. is additive.
 
         Arguments:
             file (os.PathLike): Path to the instance file.
 
         Returns:
-            dict: The metadata for the instance.
+            InstanceInfo: The metadata for the instance.
         """
         metadata = {
             'dataset': self.name,
@@ -654,27 +703,68 @@ class FileDataset(IndexedDataset):
             metadata.update(sidecar.get("instance_metadata", {}))
             metadata.update(sidecar.get("format_metadata", {}))
             metadata.update(sidecar.get("model_features", {}))
-        return metadata
+        return InstanceInfo(metadata)
 
     @classmethod
-    def dataset_metadata(cls) -> dict:
+    def dataset_metadata(cls) -> DatasetInfo:
         """
-        Return dataset-level metadata as a dictionary.
+        Return dataset-level metadata as a :class:`~metadata.DatasetInfo`.
+
+        :class:`~metadata.DatasetInfo` is a ``dict`` subclass, so existing
+        ``dataset_metadata()['name']`` access continues to work unchanged.
+        New structured access (``dataset_metadata().card()``,
+        ``dataset_metadata().to_croissant()``, etc.) is additive.
 
         Returns:
-            dict: The dataset-level metadata.
+            DatasetInfo: The dataset-level metadata.
         """
         if isinstance(cls.citation, str):
             citations = [cls.citation] if cls.citation else []
         else:
             citations = list(cls.citation)
 
-        return {
+        # Serialise FeaturesInfo to a plain dict so the DatasetInfo is JSON-safe
+        # (the DatasetInfo.features property reconstructs FeaturesInfo on access)
+        features_dict = None
+        if cls.features is not None:
+            features_dict = cls.features.to_dict()
+
+        return DatasetInfo({
             "name": cls.name,
             "description": cls.description,
-            "url": cls.url,
+            "url": cls.homepage,        # backward-compat key
+            "homepage": cls.homepage,   # HuggingFace / TFDS naming
             "citation": citations,
-        }
+            "version": cls.version,
+            "license": cls.license,
+            "domain": cls.domain,
+            "tags": list(cls.tags),
+            "language": cls.language,
+            "features": features_dict,
+            "release_notes": cls.release_notes,
+        })
+
+    @classmethod
+    def card(cls, format: str = "markdown") -> str:
+        """
+        Generate a dataset card for this dataset.
+
+        Shorthand for ``cls.dataset_metadata().card(format=format)``.
+
+        Follows HuggingFace Hub convention: YAML frontmatter (machine-readable)
+        followed by a markdown body (human-readable).
+
+        Parameters
+        ----------
+        format:
+            Only ``"markdown"`` is currently supported.
+
+        Returns
+        -------
+        str
+            The dataset card as a string.
+        """
+        return cls.dataset_metadata().card(format=format)
 
 
     # ---------------------------------------------------------------------------- #

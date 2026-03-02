@@ -10,17 +10,39 @@ import io
 import zipfile
 
 from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.metadata import FeaturesInfo, FieldInfo
+
 
 class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     """
     PSPlib Dataset in a PyTorch compatible format.
-    
+
     More information on PSPlib can be found here: https://www.om-db.wi.tum.de/psplib/main.html
     """
-    
+
     name = "psplib"
     description = "Project Scheduling Problem Library (RCPSP) benchmark instances."
-    url = "https://www.om-db.wi.tum.de/psplib/main.html"
+    homepage = "https://www.om-db.wi.tum.de/psplib/main.html"
+    citation = [
+        "Kolisch, R., Sprecher, A. PSPLIB - A project scheduling problem library. European Journal of Operational Research, 96(1), 205-216, 1997.",
+    ]
+
+    version = "1.0.0"
+    license = "academic-use"
+    domain = "scheduling"
+    tags = ["optimization", "project-scheduling", "rcpsp", "scheduling", "combinatorial"]
+    language = "PSPLIB"
+    features = FeaturesInfo({
+        "num_jobs":                        ("int",  "Number of jobs (activities) in the project"),
+        "horizon":                         ("int",  "Planning horizon (maximum makespan upper bound)"),
+        "num_renewable_resources":         ("int",  "Number of renewable resource types"),
+        "num_nonrenewable_resources":      FieldInfo("int",  "Number of non-renewable resource types", nullable=True),
+        "num_doubly_constrained_resources":FieldInfo("int",  "Number of doubly-constrained resource types", nullable=True),
+        "duedate":                         FieldInfo("int",  "Project due date", nullable=True),
+        "tardcost":                        FieldInfo("int",  "Tardiness cost per unit time", nullable=True),
+        "mpm_time":                        FieldInfo("int",  "Minimum project makespan (MPM)", nullable=True),
+        "resource_availabilities":         FieldInfo("list", "Available units per resource type", nullable=True),
+    })
 
 
     def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False, metadata_workers: int = 1):

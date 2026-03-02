@@ -12,13 +12,14 @@ import io
 
 import cpmpy as cp
 from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 
 class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     """
     XCSP3 Dataset in a PyTorch compatible format.
-    
+
     Arguments:
         root (str): Root directory containing the XCSP3 instances (if 'download', instances will be downloaded to this location)
         year (int): Competition year (2022, 2023 or 2024)
@@ -30,7 +31,20 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     name = "xcsp3"
     description = "XCSP3 competition benchmark instances for constraint satisfaction and optimization."
-    url = "https://xcsp.org/instances/"
+    homepage = "https://xcsp.org/instances/"
+    citation = [
+        "Audemard, G., Boussemart, F., Lecoutre, C., Piette, C., Tabary, S. XCSP3: An Integrated Format for Benchmarking Combinatorial Constrained Problems. arXiv:2009.00514, 2020.",
+    ]
+
+    version = "2024"
+    license = "competition-specific"
+    domain = "constraint_programming"
+    tags = ["satisfaction", "optimization", "xcsp3", "combinatorial"]
+    language = "XCSP3"
+    features = FeaturesInfo({
+        "instance_type": ("str", "Problem type declared in the XML root element (CSP, COP, WCSP, …)"),
+        "xcsp_format":   ("str", "XCSP format version string from the XML header"),
+    })
     
 
     def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False, metadata_workers: int = 1):

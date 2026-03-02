@@ -15,6 +15,7 @@ import io
 
 import cpmpy as cp
 from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 # Optional dependencies
 try:
@@ -40,13 +41,24 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     name = "nurserostering"
     description = "Nurse rostering benchmark instances from schedulingbenchmarks.org."
-    url = "https://schedulingbenchmarks.org/nrp/"
+    homepage = "https://schedulingbenchmarks.org/nrp/"
     citation = [
         "Strandmark, P., Qu, Y. and Curtois, T. First-order linear programming in a column generation-based heuristic approach to the nurse rostering problem. Computers & Operations Research, 2020. 120, p. 104945.",
         "Demirovic, E., Musliu, N., and Winter, F. Modeling and solving staff scheduling with partial weighted maxSAT. Annals of Operations Research, 2019. 275(1): p. 79-99.",
         "Smet P. Constraint reformulation for nurse rostering problems, in: PATAT 2018 twelfth international conference on the practice and theory of automated timetabling, Vienna, August, 2018, p. 69-80.",
         "Rahimian, E., Akartunali, K., and Levine, J. A hybrid integer programming and variable neighbourhood search algorithm to solve nurse rostering problems. European Journal of Operational Research, 2017. 258(2): p. 411-423.",
     ]
+
+    version = "1.0.0"
+    license = "academic-use"
+    domain = "scheduling"
+    tags = ["satisfaction", "nurse-rostering", "scheduling", "timetabling"]
+    language = "NRP-XML"
+    features = FeaturesInfo({
+        "horizon":    ("int", "Planning horizon in days"),
+        "num_staff":  ("int", "Number of nurses / staff members"),
+        "num_shifts": ("int", "Number of distinct shift types"),
+    })
 
     def __init__(self, root: str = ".", transform=None, target_transform=None, download:bool=False, sort_key=None, metadata_workers: int = 1):
         """

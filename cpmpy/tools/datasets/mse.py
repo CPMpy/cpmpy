@@ -7,14 +7,15 @@ https://maxsat-evaluations.github.io/
 
 import os
 import lzma
-from typing import List, Optional
+from typing import Optional
 import zipfile
 import pathlib
 import io
 
 import cpmpy as cp
 from cpmpy.tools.io.wcnf import load_wcnf
-from cpmpy.tools.datasets._base import FileDataset, classproperty
+from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 
 class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
@@ -22,34 +23,35 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
     """
     MaxSAT Evaluation benchmark dataset.
 
-    Provides access to benchmark instances from the MaxSAT Evaluation 
-    competitions. Instances are grouped by `year` and `track` (e.g., 
-    `"exact-unweighted"`, `"exact-weighted"`) and stored as `.wcnf.xz` files. 
-    If the dataset is not available locally, it can be automatically 
+    Provides access to benchmark instances from the MaxSAT Evaluation
+    competitions. Instances are grouped by `year` and `track` (e.g.,
+    `"exact-unweighted"`, `"exact-weighted"`) and stored as `.wcnf.xz` files.
+    If the dataset is not available locally, it can be automatically
     downloaded and extracted.
 
     More information on the competition can be found here: https://maxsat-evaluations.github.io/
     """
-    
+
     # -------------------------- Dataset-level metadata -------------------------- #
 
-    _metadata_init_kwargs = {"year": 2024, "track": "exact-unweighted"}
+    name = "maxsateval"
+    description = "MaxSAT Evaluation competition benchmark instances."
+    homepage = "https://maxsat-evaluations.github.io/"
+    citation = []
 
-    @classproperty
-    def name(self) -> str:
-        return "maxsateval"
-
-    @classproperty
-    def description(self) -> str:
-        return "MaxSAT Evaluation competition benchmark instances."
-
-    @classproperty
-    def url(self) -> str:
-        return "https://maxsat-evaluations.github.io/"
-
-    @classproperty
-    def citation(self) -> List[str]:
-        return []
+    version = "2024"
+    license = "competition-specific"
+    domain = "max_sat"
+    tags = ["optimization", "max-sat", "weighted-max-sat", "wcnf"]
+    language = "WCNF"
+    features = FeaturesInfo({
+        "wcnf_num_variables":        ("int", "Number of propositional variables"),
+        "wcnf_num_clauses":          ("int", "Total number of clauses (hard + soft)"),
+        "wcnf_num_hard_clauses":     ("int", "Number of hard clauses"),
+        "wcnf_num_soft_clauses":     ("int", "Number of soft clauses"),
+        "wcnf_total_literals":       ("int", "Total number of literals across all clauses"),
+        "wcnf_num_distinct_weights": ("int", "Number of distinct soft clause weights"),
+    })
 
     # ---------------------------------------------------------------------------- #
 

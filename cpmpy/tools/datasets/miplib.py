@@ -21,13 +21,19 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     More information on MIPLib can be found here: https://miplib.zib.de/
     """
-  
+
     name = "miplib"
     description = "Mixed Integer Programming Library benchmark instances."
-    url = "https://miplib.zib.de/"
+    homepage = "https://miplib.zib.de/"
     citation = [
         "Gleixner, A., Hendel, G., Gamrath, G., Achterberg, T., Bastubbe, M., Berthold, T., Christophel, P. M., Jarck, K., Koch, T., Linderoth, J., Lubbecke, M., Mittelmann, H. D., Ozyurt, D., Ralphs, T. K., Salvagnin, D., and Shinano, Y. MIPLIB 2017: Data-Driven Compilation of the 6th Mixed-Integer Programming Library. Mathematical Programming Computation, 2021. https://doi.org/10.1007/s12532-020-00194-3.",
     ]
+
+    version = "2017"
+    license = "CC BY 4.0"
+    domain = "mip"
+    tags = ["optimization", "mixed-integer-programming", "mip", "combinatorial"]
+    language = "MPS"
    
 
     def __init__(

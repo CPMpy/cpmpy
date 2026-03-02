@@ -15,6 +15,7 @@ import numpy as np
 
 import cpmpy as cp
 from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.metadata import FeaturesInfo, FieldInfo
 
 
 class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
@@ -27,7 +28,7 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     name = "jsplib"
     description = "Job Shop Scheduling Problem benchmark library."
-    url = "https://github.com/tamy0612/JSPLIB"
+    homepage = "https://github.com/tamy0612/JSPLIB"
     citation = [
         "J. Adams, E. Balas, D. Zawack. 'The shifting bottleneck procedure for job shop scheduling.', Management Science, Vol. 34, Issue 3, pp. 391-401, 1988.",
         "J.F. Muth, G.L. Thompson. 'Industrial scheduling.', Englewood Cliffs, NJ, Prentice-Hall, 1963.",
@@ -37,6 +38,19 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         "T. Yamada, R. Nakano. 'A genetic algorithm applicable to large-scale job-shop problems.', Proceedings of the Second international workshop on parallel problem solving from Nature (PPSN'2). Brussels (Belgium), pp. 281-290, 1992.",
         "E. Taillard. 'Benchmarks for basic scheduling problems', European Journal of Operational Research, Vol. 64, Issue 2, pp. 278-285, 1993.",
     ]
+
+    version = "1.0.0"
+    license = "MIT"
+    domain = "scheduling"
+    tags = ["optimization", "job-shop-scheduling", "scheduling", "combinatorial"]
+    language = "JSPLib"
+    features = FeaturesInfo({
+        "jobs":                 ("int", "Number of jobs"),
+        "machines":             ("int", "Number of machines"),
+        "optimum":              FieldInfo("int",  "Known optimal makespan, if available", nullable=True),
+        "bounds":               FieldInfo("dict", "Upper/lower bounds on the optimal makespan", nullable=True),
+        "instance_description": FieldInfo("str",  "Human-readable description from file header comments", nullable=True),
+    })
 
     def __init__(self, root: str = ".", transform=None, target_transform=None, download: bool = False, metadata_workers: int = 1):
         """
@@ -62,19 +76,8 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             metadata_workers=metadata_workers
         )
 
-
     @staticmethod
-    def reader(file_path, open=open):
-        """
-        Reader for JSPLib dataset.
-        Parses a file path directly into a CPMpy model.
-        For backward compatibility. Consider using read() + load() instead.
-        """
-        from cpmpy.tools.io.jsplib import load_jsplib
-        return load_jsplib(file_path, open=open)
-
-    @staticmethod
-    def loader(content: str):
+    def _loader(content: str):
         """
         Loader for JSPLib dataset.
         Loads a CPMpy model from raw JSPLib content string.
