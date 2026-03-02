@@ -39,7 +39,13 @@ _SYSTEM_KEYS: frozenset = frozenset({"dataset", "category", "name", "path"})
 _MODEL_FEATURE_FIELDS: frozenset = frozenset({
     "num_variables", "num_bool_variables", "num_int_variables",
     "num_constraints", "constraint_types", "has_objective",
-    "objective_type", "domain_size_min", "domain_size_max", "domain_size_mean",
+    "objective_type", "objective", "objective_is_min",
+    "domain_size_min", "domain_size_max", "domain_size_mean",
+})
+
+# Live Python objects added by Load — not JSON-serialisable, excluded from exports
+_MODEL_OBJECT_KEYS: frozenset = frozenset({
+    "decision_variables",
 })
 
 # Prefixes for format-specific metadata (not portable across translations)
@@ -298,12 +304,14 @@ class InstanceInfo(dict):
         These are format-independent, problem-level fields such as
         ``jobs``, ``machines``, ``optimum``, ``horizon``, ``num_staff``, etc.
 
-        Excludes system keys, CP model statistics, and format-specific fields.
+        Excludes system keys, CP model statistics, live model objects, and
+        format-specific fields.
         """
         return {
             k: v for k, v in self.items()
             if k not in _SYSTEM_KEYS
             and k not in _MODEL_FEATURE_FIELDS
+            and k not in _MODEL_OBJECT_KEYS
             and not any(k.startswith(p) for p in _FORMAT_SPECIFIC_PREFIXES)
         }
 
@@ -318,6 +326,31 @@ class InstanceInfo(dict):
         ``domain_size_mean``.
         """
         return {k: v for k, v in self.items() if k in _MODEL_FEATURE_FIELDS}
+
+    @property
+    def model_objects(self) -> dict:
+        """
+        Live Python objects added by the ``Load`` transform.
+
+        Currently contains:
+
+        - ``decision_variables``: ``{name: CPMpy_variable}`` mapping for every
+          decision variable in the loaded model.
+
+        These objects are **not JSON-serialisable** and are excluded from
+        ``domain_metadata``, ``to_croissant_example()``, and ``to_gbd_features()``.
+        They are available only in-memory after a ``Load`` transform has run.
+
+        .. code-block:: python
+
+            dataset.transform = Load(dataset.loader, open=dataset.open)
+            model, info = dataset[0]
+
+            vars = info.model_objects["decision_variables"]
+            model.solve()
+            print({name: v.value() for name, v in vars.items()})
+        """
+        return {k: v for k, v in self.items() if k in _MODEL_OBJECT_KEYS}
 
     @property
     def format_metadata(self) -> dict:
