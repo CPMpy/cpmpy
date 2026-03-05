@@ -1,7 +1,5 @@
 from ._base import (
-    extract_model_features,
     expand_varying_kwargs,
-    portable_instance_metadata,
     FileDataset,
 )
 from .metadata import (
