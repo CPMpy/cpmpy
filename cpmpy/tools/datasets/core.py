@@ -1,8 +1,12 @@
 """
-Dataset Base Class
+Dataset Base Classes
 
-This module defines the abstract `_Dataset` class, which serves as the foundation
-for loading and managing benchmark instance collections in CPMpy-based experiments.
+This module defines multiple abstract datasets, a hierarchy of classes which together
+serve as the foundation for competition and application oriented benchmarking datasets.
+
+They enable the loading and managing of well-known benchmark instance collections 
+from the Constraint Optimisation (CO) community.
+
 It standardizes how datasets are downloaded, stored, accessed, and optionally transformed.
 
 It provides a Pytorch compatible interface (constructor arguments like "transform" and the
@@ -10,6 +14,84 @@ methods __len__ and __getitem__ for iterating over the dataset).
 
 Additionaly, it provides a collection of methods and helper functions to adapt the dataset
 to the specific usecase requirements of constraint optimisation benchmarks.
+
+To implement a new dataset, one needs to subclass one of the abstract dataset classes,
+and provide implementation for the following methods:
+- _loader: loads a CPMpy model from a string representation of the instance (file)
+- category: return a dictionary of category labels, describing to which subset the dataset has been restricted (year, track, ...)
+- download: download the dataset (helper function :func:`_download_file` is provided)
+
+Some optional methods to overwrite are:
+- collect_instance_metadata: collect metadata about individual instances (e.g. number of variables, constraints, ...), potentially domain specific 
+- open: how to open the instance file (e.g. for compressed files, use .xz, .lzma, .gz, ...)
+
+Datasets must also implement the following dataset metadata attributes:
+- name: the name of the dataset
+- description: a short description of the dataset
+- homepage: a URL to the homepage of the dataset
+- citation: a list of citations for the dataset
+
+Optional dataset schema metadata:
+- features: a :class:`FeaturesInfo` schema describing domain-level instance fields
+  (for example ``jobs``, ``machines``, ``optimum``, ``horizon``).
+  This schema is exposed in dataset-level metadata and used by dataset cards and
+  export formats (e.g. Croissant) to document the meaning and types of fields in
+  instance metadata.
+
+``features`` is optional. Default behavior is ``features = None``:
+- dataset cards are still generated, but the "Instance Features (Domain Metadata)"
+  section is omitted.
+- Croissant export is still generated with core fields (``id``, ``name``, ``path``)
+  and standard CP model feature fields; only domain-specific schema fields from
+  ``features`` are omitted.
+- instance metadata collection and loading behavior are unchanged; ``features``
+  only documents schema and export metadata.
+
+Feature inheritance and extension:
+- child dataset classes may declare only new fields in ``features``; these are
+  merged with inherited fields from the nearest ancestor defining ``features``.
+- child fields override inherited fields with the same name.
+- to use a completely custom schema, define the full ``features`` object in the
+  child class.
+
+All parts for which an implementation must be provided are marked with an @abstractmethod decorator, 
+raising a NotImplementedError if not overwritten.
+
+Datasets files should be downloaded as-is, without any preprocessing or decompression. Upon initial download,
+instance-level metadata gets auto collected and stored in a JSON sidecar file. All subsequent accesses to the dataset
+will use the sidecar file to avoid re-collecting the metadata.
+
+Iterating over the dataset is done in the same way as a PyTorch dataset. It returns 2-tuples (x,y) of:
+- x: instance reference (a file path is the only supported type at the moment)
+- y: metadata (solution, features, origin, etc.)
+
+Example:
+
+.. code-block:: python
+
+    dataset = MyDataset(download=True)
+    for x, y in dataset:
+        print(x, y)
+
+The dataset also supports PyTorch-style transforms and target transforms.
+
+.. code-block:: python
+    from cpmpy.tools.io import load_wcnf
+    from cpmpy.tools.datasets.metadata import to_croissant
+
+    dataset = MyDataset(download=True, transform=load_wcnf(x), target_transform=to_croissant)
+    for model, croissant_record in dataset:
+        ...
+
+For advanced operations on the datasets, like filtering, mapping, splitting, shuffling, sorting, etc., 
+make use of the PyTorch tooling ecosystem (thanks to our compatible interface).
+
+Example:
+.. code-block:: python
+    dataset = MyDataset(download=True, transform=load_wcnf(x), target_transform=to_croissant)
+    
+    from torch.utils.data import random_split
+    train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
 """
 from __future__ import annotations
 
@@ -27,7 +109,9 @@ from urllib.request import HTTPError, Request, urlopen
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import multiprocessing
 
-from altair.utils.schemapi import _passthrough
+from libraries.cpmpy.cpmpy.tools.datasets import FeaturesInfo
+from libraries.cpmpy.cpmpy.tools.datasets.metadata import DatasetInfo, InstanceInfo
+from libraries.cpmpy.cpmpy.tools.datasets.utils import extract_model_features, portable_instance_metadata
 
 # tqdm as an optional dependency, provides prettier progress bars
 try:
@@ -36,17 +120,6 @@ except ImportError:
     tqdm = None
 
 import cpmpy as cp
-
-from .metadata import (
-    InstanceInfo, DatasetInfo, FeaturesInfo, FieldInfo,
-    _MODEL_FEATURE_FIELDS, _FORMAT_SPECIFIC_PREFIXES,
-)
-
-# Re-export constants for backward compatibility with code that imports from _base
-__all__ = [
-    "_MODEL_FEATURE_FIELDS", "_FORMAT_SPECIFIC_PREFIXES",
-    "InstanceInfo", "DatasetInfo", "FeaturesInfo", "FieldInfo",
-]
 
 
 def _format_bytes(bytes_num):
@@ -74,197 +147,38 @@ class classproperty:
     def __get__(self, instance, owner):
         return self.func(owner)
 
-
-def portable_instance_metadata(metadata: dict) -> dict:
-    """
-    Filter sidecar metadata to only portable, domain-specific fields.
-
-    Strips model features (num_variables, constraint_types, ...),
-    format-specific fields (opb_*, wcnf_*, mps_*, ...), and internal
-    error fields (starting with ``_``).
-
-    Keeps domain-specific metadata that is independent of the file format,
-    such as ``jobs``, ``machines``, ``optimum``, ``horizon``, ``bounds``, etc.
-
-    Arguments:
-        metadata (dict): Full sidecar metadata dictionary.
-
-    Returns:
-        dict with only portable fields.
-    """
-    return {
-        k: v for k, v in metadata.items()
-        if not k.startswith("_")
-        and k not in _MODEL_FEATURE_FIELDS
-        and not any(k.startswith(p) for p in _FORMAT_SPECIFIC_PREFIXES)
-    }
-
-
-def _extract_model_features(model) -> dict:
-    """
-    Extract generic CP features from a CPMpy Model.
-
-    Arguments:
-        model: a cpmpy.Model instance
-
-    Returns:
-        dict with keys: num_variables, num_bool_variables, num_int_variables,
-        num_constraints, constraint_types, has_objective, objective_type,
-        domain_size_min, domain_size_max, domain_size_mean
-    """
-    from cpmpy.transformations.get_variables import get_variables_model
-    from cpmpy.expressions.variables import _BoolVarImpl
-    from cpmpy.expressions.core import Expression
-    from cpmpy.expressions.utils import is_any_list
-
-    variables = get_variables_model(model)
-
-    num_bool = sum(1 for v in variables if isinstance(v, _BoolVarImpl))
-    num_int = len(variables) - num_bool
-
-    # Domain sizes (lb/ub available on all variable types)
-    domain_sizes = [int(v.ub) - int(v.lb) + 1 for v in variables] if variables else []
-
-    # Constraint types: collect .name from top-level constraints
-    constraint_type_counts = {}
-
-    def _count_constraints(c):
-        if is_any_list(c):
-            for sub in c:
-                _count_constraints(sub)
-        elif isinstance(c, Expression):
-            name = c.name
-            constraint_type_counts[name] = constraint_type_counts.get(name, 0) + 1
-
-    for c in model.constraints:
-        _count_constraints(c)
-
-    num_constraints = sum(constraint_type_counts.values())
-
-    # Objective
-    has_obj = model.objective_ is not None
-    obj_type = "none"
-    if has_obj:
-        obj_type = "min" if model.objective_is_min else "max"
-
-    return {
-        "num_variables": len(variables),
-        "num_bool_variables": num_bool,
-        "num_int_variables": num_int,
-        "num_constraints": num_constraints,
-        "constraint_types": constraint_type_counts,
-        "has_objective": has_obj,
-        "objective_type": obj_type,
-        "domain_size_min": min(domain_sizes) if domain_sizes else None,
-        "domain_size_max": max(domain_sizes) if domain_sizes else None,
-        "domain_size_mean": round(sum(domain_sizes) / len(domain_sizes), 2) if domain_sizes else None,
-    }
-
-
-def extract_model_features(model) -> dict:
-    """Public wrapper for extracting generic CPMpy model features."""
-    return _extract_model_features(model)
-
-
-# Global context for process-based metadata collection workers
-_metadata_worker_context = {}
-
-
-def _init_metadata_worker(context_dict, collect_metadata_func, reader_func, open_func):
-    """Initialize worker process with dataset context."""
-    global _metadata_worker_context
-    _metadata_worker_context = context_dict.copy()
-    _metadata_worker_context['collect_instance_metadata'] = collect_metadata_func
-    _metadata_worker_context['reader'] = reader_func
-    _metadata_worker_context['open_func'] = open_func
-
-
-def _collect_one_metadata_worker(file_path_str):
-    """Worker function for process-based metadata collection."""
-    global _metadata_worker_context
-    file_path = pathlib.Path(file_path_str)
-    dataset_dir = pathlib.Path(_metadata_worker_context['dataset_dir'])
-    meta_path = dataset_dir / (file_path.name + _metadata_worker_context['metadata_extension'])
-    
-    # Collect instance metadata using the provided function
-    collect_metadata = _metadata_worker_context['collect_instance_metadata']
-    try:
-        instance_meta = collect_metadata(str(file_path))
-    except Exception as e:
-        instance_meta = {"_metadata_error": str(e)}
-
-    # Separate portable from format-specific fields
-    portable = portable_instance_metadata(instance_meta)
-    format_specific = {
-        k: v for k, v in instance_meta.items()
-        if k not in portable and not k.startswith("_")
-    }
-
-    # Derive instance name
-    stem = file_path.stem
-    for ext in (".xml", ".wcnf", ".opb"):
-        if stem.endswith(ext):
-            stem = stem[:len(stem) - len(ext)]
-            break
-
-    # Build structured sidecar
-    sidecar = {
-        "dataset": _metadata_worker_context['dataset_metadata'],
-        "instance_name": stem,
-        "source_file": str(file_path.relative_to(dataset_dir)),
-        "category": _metadata_worker_context['category'],
-        "instance_metadata": portable,
-        "format_metadata": format_specific,
-    }
-
-    if "_metadata_error" in instance_meta:
-        sidecar["_metadata_error"] = instance_meta["_metadata_error"]
-
-    # Preserve or compute model features
-    model_features = None
-    if meta_path.exists():
-        try:
-            with open(meta_path, "r") as f:
-                existing = json.load(f)
-            if "model_features" in existing:
-                model_features = existing["model_features"]
-        except (json.JSONDecodeError, IOError):
-            pass
-
-    if model_features is None:
-        reader = _metadata_worker_context['reader']
-        open_func = _metadata_worker_context['open_func']
-        if not callable(reader):
-            raise TypeError(
-                f"Cannot extract model features for {file_path}: "
-                "no dataset reader configured."
-            )
-        model = reader(str(file_path), open=open_func)
-        model_features = extract_model_features(model)
-    
-    sidecar["model_features"] = model_features
-
-    with open(meta_path, "w") as f:
-        json.dump(sidecar, f, indent=2)
-    
-    return str(file_path)
-
-
-"""
-dataset.map(transform)
-dataset.filter(predicate)
-dataset.shuffle(seed)
-dataset.split(ratio)
-"""
-
 class Dataset(ABC):
     """
-    Abstract base class for datasets.
+    Abstract base class for CO datasets.
 
     Each instance in a dataset is characterised by a (x, y) pair of:
         x: instance reference (e.g., file path, database key, generated seed, ...)
         y: metadata (solution, features, origin, etc.)
     """
+    
+
+    # -------------- Dataset-level metadata (override in subclasses) ------------- #
+
+    @classproperty
+    @abstractmethod
+    def name(self) -> str: pass
+
+    @classproperty
+    @abstractmethod
+    def description(self) -> str: pass
+
+    @classproperty
+    @abstractmethod
+    def homepage(self) -> str: pass
+
+    @classproperty
+    def citation(self) -> List[str]:
+        return []
+
+    # OPTIONAL
+    features: Optional[FeaturesInfo] = None                # domain_metadata field schema
+    
+    # ---------------------------------------------------------------------------- #
 
     def __init__(self, transform: Optional[Callable] = None, target_transform: Optional[Callable] = None):
         """
@@ -275,9 +189,121 @@ class Dataset(ABC):
         self.transform = transform
         self.target_transform = target_transform
 
+    def __init_subclass__(cls, **kwargs):
+        """
+        Auto-merge ``features`` when a subclass declares only its *new* fields.
+
+        If a subclass explicitly defines ``features``, it is merged with the
+        nearest ancestor's ``features`` so the subclass only needs to list
+        what is new.  The subclass fields take precedence over inherited ones.
+
+        .. code-block:: python
+
+            class MyJSPDataset(JSPLibDataset):
+                # No need to repeat {jobs, machines, optimum, ...} — they are
+                # inherited and merged in automatically.
+                features = FeaturesInfo({"difficulty": ("float", "Computed difficulty score")})
+
+                def collect_instance_metadata(self, file):
+                    meta = super().collect_instance_metadata(file)
+                    meta["difficulty"] = ...
+                    return meta
+
+        To *replace* rather than extend the parent schema, explicitly set
+        ``features`` to the complete schema you want (the auto-merge still
+        runs, but if you start from scratch the parent's fields will be
+        absent from the parent's FeaturesInfo and won't be merged).
+        Alternatively, set ``features = None`` to clear the schema entirely.
+        """
+        super().__init_subclass__(**kwargs)
+        subclass_features = cls.__dict__.get("features")
+        if subclass_features is None:
+            return
+        # Walk the MRO to find the nearest ancestor that has features defined
+        for base in cls.__mro__[1:]:
+            parent_features = base.__dict__.get("features")
+            if parent_features is not None:
+                cls.features = parent_features | subclass_features
+                return
+
+
+    # ---------------------------------------------------------------------------- #
+    #                     Methods to implement in subclasses:                      #
+    # ---------------------------------------------------------------------------- #
+
+    @abstractmethod
+    def instance_metadata(self, instance) -> InstanceInfo:
+        """
+        Return the metadata for a given instance file.
+
+        Returns an :class:`~metadata.InstanceInfo`, which is a ``dict`` subclass
+        so all existing ``meta['year']``, ``meta.get('jobs')`` access is unchanged.
+        Structured access via ``info.domain_metadata``, ``info.model_features``,
+        ``info.id``, etc. is additive.
+        """
+        pass
+
+
+    # ---------------------------------------------------------------------------- #
+    #                               Public interface                               #
+    # ---------------------------------------------------------------------------- #
+
+    @classmethod
+    def dataset_metadata(cls) -> DatasetInfo:
+        """
+        Return dataset-level metadata as a :class:`~metadata.DatasetInfo`.
+
+        :class:`~metadata.DatasetInfo` is the dataset metadata object.
+        It offers dict-compatible access for straightforward key-based usage
+        (for example ``dataset_metadata()['name']``), and also provides richer
+        helper methods such as ``dataset_metadata().card()`` and
+        ``dataset_metadata().to_croissant()``.
+
+        Returns:
+            DatasetInfo: The dataset-level metadata.
+        """
+        if isinstance(cls.citation, str):
+            citations = [cls.citation] if cls.citation else []
+        else:
+            citations = list(cls.citation)
+
+        return DatasetInfo({
+            "name": cls.name,
+            "description": cls.description,
+            "homepage": cls.homepage,
+            "citation": citations,
+            "features": cls.features,
+        })
+
+    @classmethod
+    def card(cls, format: str = "markdown") -> str:
+        """
+        Generate a dataset card for this dataset.
+
+        Shorthand for ``cls.dataset_metadata().card(format=format)``.
+
+        Follows HuggingFace Hub convention: YAML frontmatter (machine-readable)
+        followed by a markdown body (human-readable).
+
+        Arguments:
+            format (str): Only ``"markdown"`` is currently supported.
+
+        Returns:
+            str: The dataset card as a string.
+        """
+        return cls.dataset_metadata().card(format=format)
+
+
 class IndexedDataset(Dataset):
     """
     Abstract base class for indexed datasets.
+
+    Indexed datasets are datasets where the instances are indexed by a unique identifier and 
+    can be accessed by that identifier. For example its positional index within the dataset.
+
+    Implementing this class requires implementing the following methods:
+    - __len__: return the total number of instances
+    - __getitem__: return the instance and metadata at the given index / identifier
     """
 
     @abstractmethod
@@ -290,7 +316,7 @@ class IndexedDataset(Dataset):
     @abstractmethod
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """
-        Return the instance and metadata at the given index.
+        Return the instance and metadata at the given index / identifier.
 
         Returns:
             x: instance reference (e.g., file path, database key, generated seed, ...)
@@ -299,6 +325,9 @@ class IndexedDataset(Dataset):
         pass
 
     def __iter__(self):
+        """
+        Iterate over the dataset.
+        """
         for i in range(len(self)):
             yield self[i]
 
@@ -344,6 +373,13 @@ def expand_varying_kwargs(
 class IterableDataset(Dataset):
     """
     Abstract base class for iterable datasets.
+
+    Iterable datasets are datasets where the instances are iterable and can be accessed by an iterator.
+    The dataset does not provide random access to the instances through an index or identifier.
+    An example is a generator function that yields the instances based on a random seed.
+
+    Implementing this class requires implementing the following method:
+    - __iter__: return an iterator over the dataset
     """
 
     @abstractmethod
@@ -368,6 +404,32 @@ class IterableDataset(Dataset):
         """
         Create an IterableDataset from a generator.
 
+        Wraps a Python generator function into an ``IterableDataset``.
+        The method determines the number of ``generator(...)`` calls and their
+        keyword arguments from ``gen_kwargs`` and ``vary``.
+
+        ``gen_kwargs`` is the source of truth:
+        keys are parameter names of ``generator``, values are argument values.
+        ``vary`` selects which of these keys should be expanded.
+
+        Behavior summary:
+        - ``vary is None``:
+          one call -> ``generator(**gen_kwargs)``.
+        - ``vary`` is one key (e.g. ``"n"``):
+          one call per value in ``gen_kwargs["n"]``, while all other
+          keyword arguments from ``gen_kwargs`` are passed unchanged.
+        - ``vary`` is multiple keys (e.g. ``["n", "seed"]``):
+          one call per tuple of values for those keys, while all non-varied
+          keyword arguments from ``gen_kwargs`` are passed unchanged. 
+          Two options for the varying:
+            - ``vary_mode="zip"``: parallel iteration
+            - ``vary_mode="product"``: Cartesian product
+
+        Important:
+        - Every key mentioned in ``vary`` must already exist in ``gen_kwargs``.
+        - If a key is varied, its value in ``gen_kwargs`` must be iterable.
+        - Non-varied keys are reused unchanged for every generator call.
+
         Arguments:
             generator: Callable that returns an iterator yielding (x, y) pairs.
                 When ``vary`` is None, called as ``generator()`` or
@@ -380,6 +442,111 @@ class IterableDataset(Dataset):
                 from zip (default) or product of the iterables.
             vary_mode: When ``vary`` is a list, ``'zip'`` (parallel iteration,
                 same-length iterables) or ``'product'`` (Cartesian product).
+
+        Examples:
+
+            .. code-block:: python
+
+                def gen_graph_coloring(num_instances, n_vertices, edge_prob, seed):
+                    import random
+                    rng = random.Random(seed)
+                    for i in range(num_instances):
+                        x = {
+                            "problem": "graph_coloring",
+                            "n_vertices": n_vertices,
+                            "edge_prob": edge_prob,
+                            "instance_seed": rng.randint(0, 10**9),
+                        }
+                        y = {"family": "gc", "name": f"gc_{n_vertices}_{i}"}
+                        yield x, y
+
+            Fixed kwargs (single call):
+
+                .. code-block:: python
+
+                    ds = IterableDataset.from_generator(
+                        gen_graph_coloring,
+                        gen_kwargs={
+                            "num_instances": 3,
+                            "n_vertices": 40,
+                            "edge_prob": 0.2,
+                            "seed": 7,
+                        },
+                    )
+                    # Calls gen_graph_coloring(...) once with fixed kwargs
+
+            Vary one kwarg:
+
+                .. code-block:: python
+
+                    ds = IterableDataset.from_generator(
+                        gen_graph_coloring,
+                        gen_kwargs={
+                            "num_instances": 3,
+                            "n_vertices": 40,
+                            "edge_prob": [0.1, 0.2, 0.3],
+                            "seed": 7,
+                        },
+                        vary="edge_prob",
+                    )
+                    # Calls:
+                    #   gen_graph_coloring(..., edge_prob=0.1, ...)
+                    #   gen_graph_coloring(..., edge_prob=0.2, ...)
+                    #   gen_graph_coloring(..., edge_prob=0.3, ...)
+                    # Other kwargs (num_instances, n_vertices, seed) stay fixed.
+
+            Vary multiple kwargs with zip (default):
+
+                .. code-block:: python
+
+                    def gen_rcpsp_like(num_instances, n_jobs, n_resources, tightness, seed):
+                        import random
+                        rng = random.Random(seed)
+                        for i in range(num_instances):
+                            x = {
+                                "problem": "rcpsp",
+                                "n_jobs": n_jobs,
+                                "n_resources": n_resources,
+                                "tightness": tightness,
+                                "instance_seed": rng.randint(0, 10**9),
+                            }
+                            y = {"family": "rcpsp", "name": f"j{n_jobs}_r{n_resources}_{i}"}
+                            yield x, y
+
+                    ds = IterableDataset.from_generator(
+                        gen_rcpsp_like,
+                        gen_kwargs={
+                            "num_instances": 2,
+                            "n_jobs": [30, 60],
+                            "n_resources": [4, 8],
+                            "tightness": [0.6, 0.8],
+                            "seed": 11,
+                        },
+                        vary=["n_jobs", "n_resources", "tightness"],
+                        vary_mode="zip",
+                    )
+                    # Calls:
+                    #   gen_rcpsp_like(..., n_jobs=30, n_resources=4, tightness=0.6, ...)
+                    #   gen_rcpsp_like(..., n_jobs=60, n_resources=8, tightness=0.8, ...)
+                    # Non-varied kwargs (num_instances, seed) are reused in both calls.
+
+            Vary multiple kwargs with Cartesian product::
+
+                .. code-block:: python
+
+                    ds = IterableDataset.from_generator(
+                        gen_rcpsp_like,
+                        gen_kwargs={
+                            "num_instances": 1,
+                            "n_jobs": [30, 60],
+                            "n_resources": [4, 8],
+                            "tightness": [0.6, 0.8],
+                            "seed": 11,
+                        },
+                        vary=["n_jobs", "n_resources", "tightness"],
+                        vary_mode="product",
+                    )
+                    # Calls all 2 x 2 x 2 = 8 combinations
         """
         gen_kwargs = gen_kwargs or {}
 
@@ -422,87 +589,19 @@ class IterableDataset(Dataset):
 
 class FileDataset(IndexedDataset):
     """
-    Abstract base class for PyTorch-style datasets of CO benchmarking instances.
+    Abstract base class for PyTorch-style datasets of file-based CO benchmarking sets.
 
     The `FileDataset` class provides a standardized interface for downloading and
     accessing file-backed benchmark instances. This class should not be used on its own.
-    Instead have a look at one of the concrete subclasses, providing access to 
-    well-known datasets from the community.
+    Either have a look at one of the concrete subclasses, providing access to 
+    well-known datasets from the community, or use this class as the base for your own dataset.
+
+    For a more detailed authoring guide (design patterns, metadata conventions,
+    and implementation checklist), see :ref:`datasets_advanced_authoring`.
     """
 
     # Extension for metadata sidecar files
     METADATA_EXTENSION = ".meta.json"
-
-    # -------------- Dataset-level metadata (override in subclasses) ------------- #
-
-    @classproperty
-    @abstractmethod
-    def name(self) -> str: pass
-
-    @classproperty
-    @abstractmethod
-    def description(self) -> str: pass
-
-    @classproperty
-    @abstractmethod
-    def homepage(self) -> str: pass
-
-    @classproperty
-    def citation(self) -> List[str]:
-        return []
-
-    # Optional enrichment — all have sensible defaults, zero lines required
-    version: Optional[str] = None                          # e.g. "2024", "1.0.0"
-    license: Optional[Union[str, List[str]]] = None        # e.g. "MIT", ["CC BY 4.0"]
-    domain: str = "constraint_programming"                 # e.g. "scheduling", "sat"
-    tags: List[str] = []                                   # e.g. ["optimization", "scheduling"]
-    language: Optional[str] = None                         # e.g. "XCSP3", "OPB", "JSPLib"
-    features: Optional[FeaturesInfo] = None                # domain_metadata field schema
-    release_notes: Optional[dict] = None                   # {version: changelog}
-
-    # Multiple download origins (override in subclasses or via config)
-    # Origins are tried in order, falling back to homepage if all fail
-    origins: List[str] = []
-
-    # ---------------------------------------------------------------------------- #
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Auto-merge ``features`` when a subclass declares only its *new* fields.
-
-        If a subclass explicitly defines ``features``, it is merged with the
-        nearest ancestor's ``features`` so the subclass only needs to list
-        what is new.  The subclass fields take precedence over inherited ones.
-
-        .. code-block:: python
-
-            class MyJSPDataset(JSPLibDataset):
-                # No need to repeat {jobs, machines, optimum, ...} — they are
-                # inherited and merged in automatically.
-                features = FeaturesInfo({"difficulty": ("float", "Computed difficulty score")})
-
-                def collect_instance_metadata(self, file):
-                    meta = super().collect_instance_metadata(file)
-                    meta["difficulty"] = ...
-                    return meta
-
-        To *replace* rather than extend the parent schema, explicitly set
-        ``features`` to the complete schema you want (the auto-merge still
-        runs, but if you start from scratch the parent's fields will be
-        absent from the parent's FeaturesInfo and won't be merged).
-        Alternatively, set ``features = None`` to clear the schema entirely.
-        """
-        super().__init_subclass__(**kwargs)
-        subclass_features = cls.__dict__.get("features")
-        if subclass_features is None:
-            return
-        # Walk the MRO to find the nearest ancestor that has features defined
-        for base in cls.__mro__[1:]:
-            parent_features = base.__dict__.get("features")
-            if parent_features is not None:
-                cls.features = parent_features | subclass_features
-                return
-
 
     def __init__(
             self,
@@ -510,11 +609,10 @@ class FileDataset(IndexedDataset):
             transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
             extension: str = ".txt",
-            metadata_workers: int = 1,
             **kwargs
         ):
         """
-        Constructor for the _Dataset base class.
+        Constructor for the FileDataset base class.
 
         Arguments:
             dataset_dir (str): Path to the dataset directory.
@@ -522,7 +620,12 @@ class FileDataset(IndexedDataset):
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
             extension (str): Extension of the instance files. Used to filter instance files from the dataset directory.
-            metadata_workers (int): Number of parallel workers for metadata collection during download (default: 1).
+            **kwargs: Advanced options. Currently supports:
+                - metadata_workers (int): Number of parallel workers for
+                  metadata collection during initial download (default: 1).
+                - ignore_sidecar (bool): If True, do not read/write metadata
+                  sidecars and collect metadata on demand at iteration time
+                  using ``collect_instance_metadata()`` (default: False).
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
@@ -533,17 +636,17 @@ class FileDataset(IndexedDataset):
         self.dataset_dir = pathlib.Path(dataset_dir)
         self.extension = extension
 
-        # TODO: remove for later?
-        # if not self.origins:
-        #     from cpmpy.tools.datasets.config import get_origins
-        #     self.origins = get_origins(self.name)
+        # Advanced options
+        metadata_workers = kwargs.pop("metadata_workers", 1)
+        self._ignore_sidecar = kwargs.pop("ignore_sidecar", False)
 
         if not self._check_exists():
             if not download:
                 raise ValueError("Dataset not found. Please set download=True to download the dataset.")
             else:
                 self.download()
-                self._collect_all_metadata(workers=metadata_workers)
+                if not self._ignore_sidecar:
+                    self._collect_all_metadata(workers=metadata_workers)
                 files = self._list_instances()
                 print(f"Finished downloading {len(files)} instances")
 
@@ -579,7 +682,7 @@ class FileDataset(IndexedDataset):
         pass
 
     @abstractmethod
-    def category(self) -> dict:
+    def categories(self) -> dict:
         """
         Labels to distinguish instances into categories matching to those of the dataset.
         E.g.
@@ -641,6 +744,11 @@ class FileDataset(IndexedDataset):
         with self.open(instance) as f:
             return f.read()
 
+
+    # ---------------------------------------------------------------------------- #
+    #                               Public interface                               #
+    # ---------------------------------------------------------------------------- #
+
     def load(self, instance: Union[str, os.PathLike]) -> cp.Model:
         """
         Load a CPMpy model from an instance file.
@@ -668,12 +776,7 @@ class FileDataset(IndexedDataset):
         # Loading - turn raw contents into CPMpy model
         return self._loader(content)
 
-
-    # ---------------------------------------------------------------------------- #
-    #                               Public interface                               #
-    # ---------------------------------------------------------------------------- #
-
-    def instance_metadata(self, file: os.PathLike) -> InstanceInfo:
+    def instance_metadata(self, instance: os.PathLike) -> InstanceInfo:
         """
         Return the metadata for a given instance file.
 
@@ -691,80 +794,25 @@ class FileDataset(IndexedDataset):
         metadata = {
             'dataset': self.name,
             'category': self.category(),
-            'name': pathlib.Path(file).name.replace(self.extension, ''),
-            'path': file,
+            'name': pathlib.Path(instance).name.replace(self.extension, ''),
+            'path': instance,
         }
-        # Load sidecar metadata if it exists
-        meta_path = self._metadata_path(file)
-        if meta_path.exists():
-            with open(meta_path, "r") as f:
-                sidecar = json.load(f)
-            # Structured: flatten instance_metadata, format_metadata, and model_features
-            metadata.update(sidecar.get("instance_metadata", {}))
-            metadata.update(sidecar.get("format_metadata", {}))
-            metadata.update(sidecar.get("model_features", {}))
-        return InstanceInfo(metadata)
 
-    @classmethod
-    def dataset_metadata(cls) -> DatasetInfo:
-        """
-        Return dataset-level metadata as a :class:`~metadata.DatasetInfo`.
-
-        :class:`~metadata.DatasetInfo` is a ``dict`` subclass, so existing
-        ``dataset_metadata()['name']`` access continues to work unchanged.
-        New structured access (``dataset_metadata().card()``,
-        ``dataset_metadata().to_croissant()``, etc.) is additive.
-
-        Returns:
-            DatasetInfo: The dataset-level metadata.
-        """
-        if isinstance(cls.citation, str):
-            citations = [cls.citation] if cls.citation else []
+        # Advanced mode: bypass sidecars and collect metadata on demand.
+        if self._ignore_sidecar:
+            metadata.update(self.collect_instance_metadata(file=str(instance)))
+            return InstanceInfo(metadata)
         else:
-            citations = list(cls.citation)
-
-        # Serialise FeaturesInfo to a plain dict so the DatasetInfo is JSON-safe
-        # (the DatasetInfo.features property reconstructs FeaturesInfo on access)
-        features_dict = None
-        if cls.features is not None:
-            features_dict = cls.features.to_dict()
-
-        return DatasetInfo({
-            "name": cls.name,
-            "description": cls.description,
-            "url": cls.homepage,        # backward-compat key
-            "homepage": cls.homepage,   # HuggingFace / TFDS naming
-            "citation": citations,
-            "version": cls.version,
-            "license": cls.license,
-            "domain": cls.domain,
-            "tags": list(cls.tags),
-            "language": cls.language,
-            "features": features_dict,
-            "release_notes": cls.release_notes,
-        })
-
-    @classmethod
-    def card(cls, format: str = "markdown") -> str:
-        """
-        Generate a dataset card for this dataset.
-
-        Shorthand for ``cls.dataset_metadata().card(format=format)``.
-
-        Follows HuggingFace Hub convention: YAML frontmatter (machine-readable)
-        followed by a markdown body (human-readable).
-
-        Parameters
-        ----------
-        format:
-            Only ``"markdown"`` is currently supported.
-
-        Returns
-        -------
-        str
-            The dataset card as a string.
-        """
-        return cls.dataset_metadata().card(format=format)
+            # Load sidecar metadata if it exists
+            meta_path = self._metadata_path(instance)
+            if meta_path.exists():
+                with open(meta_path, "r") as f:
+                    sidecar = json.load(f)
+                # Structured: flatten instance_metadata, format_metadata, and model_features
+                metadata.update(sidecar.get("instance_metadata", {}))
+                metadata.update(sidecar.get("format_metadata", {}))
+                metadata.update(sidecar.get("model_features", {}))
+            return InstanceInfo(metadata)
 
 
     # ---------------------------------------------------------------------------- #
@@ -786,10 +834,15 @@ class FileDataset(IndexedDataset):
         ])
 
     def __len__(self) -> int:
-        """Return the total number of instances."""
+        """
+        Return the total number of instances.
+        """
         return len(self._list_instances())
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        """
+        Return the instance and metadata at the given index.
+        """
         if index < 0 or index >= len(self):
             raise IndexError("Index out of range")
 
@@ -912,10 +965,10 @@ class FileDataset(IndexedDataset):
 
         # Build structured sidecar
         sidecar = {
-            "dataset": self.dataset_metadata(),
+            "dataset": self.dataset_metadata().to_jsonable(),
             "instance_name": stem,
             "source_file": str(file_path.relative_to(self.dataset_dir)),
-            "category": self.category(),
+            "categories": self.categories(),
             "instance_metadata": portable,
             "format_metadata": format_specific,
         }
@@ -953,39 +1006,11 @@ class FileDataset(IndexedDataset):
     # ----------------------------- Download methods ----------------------------- #
 
     @staticmethod
-    def _try_origin(base_url: str, target: str, destination: str, desc: str, chunk_size: int) -> Optional[pathlib.Path]:
-        """
-        Try to download a file from a specific origin URL.
-        
-        Arguments:
-            base_url (str): Base URL to try
-            target (str): Target filename
-            destination (str): Destination path
-            desc (str): Description for progress bar
-            chunk_size (int): Chunk size for download
-            
-        Returns:
-            pathlib.Path if successful, None if failed
-        """
-        try:
-            full_url = base_url.rstrip('/') + '/' + target.lstrip('/')
-            req = Request(full_url)
-            with urlopen(req) as response:
-                total_size = int(response.headers.get('Content-Length', 0))
-            
-            FileDataset._download_sequential(full_url, destination, total_size, desc, chunk_size)
-            return pathlib.Path(destination)
-        except (HTTPError, URLError):
-            return None
-
-    @staticmethod
     def _download_file(url: str, target: str, destination: Optional[str] = None,
                         desc: str = None,
-                        chunk_size: int = 1024 * 1024,
-                        origins: Optional[List[str]] = None) -> os.PathLike:
+                        chunk_size: int = 1024 * 1024) -> os.PathLike:
         """
         Download a file from a URL with progress bar and speed information.
-        Supports multiple origins with fallback.
 
         This method provides a reusable download function with progress updates
         similar to pip and uv, showing download progress, speed, and ETA.
@@ -997,7 +1022,6 @@ class FileDataset(IndexedDataset):
             desc (str, optional): Description to show in the progress bar.
                                   If None, uses the filename.
             chunk_size (int): Size of each chunk for download in bytes (default=1MB).
-            origins (List[str], optional): List of alternative URL bases to try first.
 
         Returns:
             str: The destination path where the downloaded file is saved.
@@ -1016,14 +1040,6 @@ class FileDataset(IndexedDataset):
             if dest_dir:
                 os.makedirs(dest_dir, exist_ok=True)
 
-        # Try custom origins first if provided
-        if origins:
-            for origin_url in origins:
-                result = FileDataset._try_origin(origin_url, target, destination, desc, chunk_size)
-                if result is not None:
-                    return result
-
-        # Fall back to original URL
         try:
             req = Request(url + target)
             with urlopen(req) as response:
@@ -1040,79 +1056,6 @@ class FileDataset(IndexedDataset):
 
         except (HTTPError, URLError) as e:
             raise ValueError(f"Failed to download file from {url + target}. Error: {str(e)}")
-
-    @staticmethod
-    def _download_parallel(urls_and_targets: List[Tuple[str, str]], base_url: str, 
-                           destination_dir: str, desc_prefix: str = "Downloading",
-                           chunk_size: int = 1024 * 1024,
-                           max_workers: Optional[int] = None,
-                           origins: Optional[List[str]] = None) -> List[pathlib.Path]:
-        """
-        Download multiple files in parallel from a base URL.
-        
-        Arguments:
-            urls_and_targets (List[Tuple[str, str]]): List of (url_suffix, target_filename) tuples
-            base_url (str): Base URL for downloads (used as fallback)
-            destination_dir (str): Directory to save files
-            desc_prefix (str): Prefix for progress bar descriptions
-            chunk_size (int): Chunk size for downloads
-            max_workers (int, optional): Maximum number of parallel workers. Defaults to min(32, num_files)
-            origins (List[str], optional): List of alternative URL bases to try first
-            
-        Returns:
-            List[pathlib.Path]: List of downloaded file paths
-        """
-        os.makedirs(destination_dir, exist_ok=True)
-        
-        if max_workers is None:
-            max_workers = min(32, len(urls_and_targets))
-        
-        downloaded_files = []
-        errors = []
-        
-        def download_one(url_suffix: str, target: str) -> Tuple[Optional[pathlib.Path], Optional[str]]:
-            dest_path = os.path.join(destination_dir, target)
-            desc = f"{desc_prefix} {target}"
-            
-            # Try custom origins first
-            if origins:
-                for origin_url in origins:
-                    result = FileDataset._try_origin(origin_url, url_suffix + target, dest_path, desc, chunk_size)
-                    if result is not None:
-                        return result, None
-            
-            # Fall back to original URL
-            try:
-                full_url = base_url.rstrip('/') + '/' + url_suffix.lstrip('/') + target
-                req = Request(full_url)
-                with urlopen(req) as response:
-                    total_size = int(response.headers.get('Content-Length', 0))
-                
-                FileDataset._download_sequential(full_url, dest_path, total_size, desc, chunk_size)
-                return pathlib.Path(dest_path), None
-            except Exception as e:
-                return None, str(e)
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(download_one, url_suffix, target): (url_suffix, target)
-                for url_suffix, target in urls_and_targets
-            }
-            
-            for future in as_completed(futures):
-                url_suffix, target = futures[future]
-                result, error = future.result()
-                if result is not None:
-                    downloaded_files.append(result)
-                else:
-                    errors.append((target, error))
-        
-        if errors:
-            error_msg = f"Failed to download {len(errors)}/{len(urls_and_targets)} files. "
-            error_msg += f"First error: {errors[0][0]} - {errors[0][1]}"
-            warnings.warn(error_msg)
-        
-        return downloaded_files
 
     @staticmethod
     def _download_sequential(url: str, filepath: os.PathLike, total_size: int, desc: str,
@@ -1172,6 +1115,69 @@ class FileDataset(IndexedDataset):
                 sys.stdout.write("\n")
                 sys.stdout.flush()
 
+    @staticmethod
+    def _download_parallel(urls_and_targets: List[Tuple[str, str]], base_url: str, 
+                           destination_dir: str, desc_prefix: str = "Downloading",
+                           chunk_size: int = 1024 * 1024,
+                           max_workers: Optional[int] = None) -> List[pathlib.Path]:
+        """
+        Download multiple files in parallel from a base URL.
+        
+        Arguments:
+            urls_and_targets (List[Tuple[str, str]]): List of (url_suffix, target_filename) tuples
+            base_url (str): Base URL for downloads (used as fallback)
+            destination_dir (str): Directory to save files
+            desc_prefix (str): Prefix for progress bar descriptions
+            chunk_size (int): Chunk size for downloads
+            max_workers (int, optional): Maximum number of parallel workers. Defaults to min(32, num_files)
+            
+        Returns:
+            List[pathlib.Path]: List of downloaded file paths
+        """
+        os.makedirs(destination_dir, exist_ok=True)
+        
+        if max_workers is None:
+            max_workers = min(32, len(urls_and_targets))
+        
+        downloaded_files = []
+        errors = []
+        
+        def download_one(url_suffix: str, target: str) -> Tuple[Optional[pathlib.Path], Optional[str]]:
+            dest_path = os.path.join(destination_dir, target)
+            desc = f"{desc_prefix} {target}"
+
+            try:
+                full_url = base_url.rstrip('/') + '/' + url_suffix.lstrip('/') + target
+                req = Request(full_url)
+                with urlopen(req) as response:
+                    total_size = int(response.headers.get('Content-Length', 0))
+                
+                FileDataset._download_sequential(full_url, dest_path, total_size, desc, chunk_size)
+                return pathlib.Path(dest_path), None
+            except Exception as e:
+                return None, str(e)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(download_one, url_suffix, target): (url_suffix, target)
+                for url_suffix, target in urls_and_targets
+            }
+            
+            for future in as_completed(futures):
+                url_suffix, target = futures[future]
+                result, error = future.result()
+                if result is not None:
+                    downloaded_files.append(result)
+                else:
+                    errors.append((target, error))
+        
+        if errors:
+            error_msg = f"Failed to download {len(errors)}/{len(urls_and_targets)} files. "
+            error_msg += f"First error: {errors[0][0]} - {errors[0][1]}"
+            warnings.warn(error_msg)
+        
+        return downloaded_files
+
 def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset:
     """
     Create a FileDataset from a list of files.
@@ -1215,6 +1221,7 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
 
     return FromFilesDataset(dataset_dir, extension)
 
+# Not implemented yet
 class URLDataset(IndexedDataset):
     """
     Abstract base class for URL-backed datasets.
@@ -1223,12 +1230,14 @@ class URLDataset(IndexedDataset):
     """
     pass
 
+# Not implemented yet
 class StreamingDataset(IterableDataset):
     """
     Abstract base class for streaming datasets.
     """
     pass
 
+# Not implemented yet
 class GeneratedDataset(IterableDataset):
     """
     Abstract base class for generated datasets.
