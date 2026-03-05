@@ -944,10 +944,12 @@ class FileDataset(IndexedDataset):
     def _collect_one_metadata(self, file_path):
         """Collect metadata for a single instance file."""
         meta_path = self._metadata_path(file_path)
+        metadata_error = None
         try:
             instance_meta = self.collect_instance_metadata(str(file_path))
         except Exception as e:
-            instance_meta = {"_metadata_error": str(e)}
+            instance_meta = {}
+            metadata_error = str(e)
 
         # Separate portable from format-specific fields
         portable = portable_instance_metadata(instance_meta)
@@ -973,8 +975,8 @@ class FileDataset(IndexedDataset):
             "format_metadata": format_specific,
         }
 
-        if "_metadata_error" in instance_meta:
-            sidecar["_metadata_error"] = instance_meta["_metadata_error"]
+        if metadata_error is not None:
+            sidecar["_metadata_error"] = metadata_error
 
         # Preserve previously extracted model features if present.
         # Otherwise, compute them from the parsed model when possible.

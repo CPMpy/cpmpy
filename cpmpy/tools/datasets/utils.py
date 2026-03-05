@@ -1,11 +1,8 @@
 """
-Dataset utilities: generic download manager.
-
-Downloads one or multiple files from URLs. Supports optional parallel downloads
-via a configurable worker count. How files are fetched (HTTP, progress bars,
-chunking) is encapsulated here; datasets only pass (url, destination) and options.
+Dataset utilities.
 """
 
+import json
 import pathlib
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -13,8 +10,187 @@ from typing import List, Tuple, Union
 from urllib.request import Request, urlopen
 
 
+from .metadata import (
+    InstanceInfo, DatasetInfo, FeaturesInfo, FieldInfo,
+    _MODEL_FEATURE_FIELDS, _FORMAT_SPECIFIC_PREFIXES,
+)
+
+
+def portable_instance_metadata(metadata: dict) -> dict:
+    """
+    Filter metadata to only portable, domain-specific fields.
+
+    Strips model features (num_variables, constraint_types, ...) and
+    format-specific fields (opb_*, wcnf_*, mps_*, ...) linked to a specific
+    file format.
+
+    Keeps domain-specific metadata that is independent of the file format,
+    such as ``jobs``, ``machines``, ``optimum``, ``horizon``, ``bounds``, etc.
+
+    Arguments:
+        metadata (dict): Full sidecar metadata dictionary.
+
+    Returns:
+        dict with only portable fields.
+    """
+    return {
+        k: v for k, v in metadata.items()
+        if not k.startswith("_")
+        and k not in _MODEL_FEATURE_FIELDS
+        and not any(k.startswith(p) for p in _FORMAT_SPECIFIC_PREFIXES)
+    }
+
+def extract_model_features(model) -> dict:
+    """
+    Extract generic CP features from a CPMpy Model.
+
+    Arguments:
+        model: a cpmpy.Model instance
+
+    Returns:
+        dict with keys: num_variables, num_bool_variables, num_int_variables,
+        num_constraints, constraint_types, has_objective, objective_type,
+        domain_size_min, domain_size_max, domain_size_mean
+    """
+    from cpmpy.transformations.get_variables import get_variables_model
+    from cpmpy.expressions.variables import _BoolVarImpl
+    from cpmpy.expressions.core import Expression
+    from cpmpy.expressions.utils import is_any_list
+
+    variables = get_variables_model(model)
+
+    num_bool = sum(1 for v in variables if isinstance(v, _BoolVarImpl))
+    num_int = len(variables) - num_bool
+
+    # Domain sizes (lb/ub available on all variable types)
+    domain_sizes = [int(v.ub) - int(v.lb) + 1 for v in variables] if variables else []
+
+    # Constraint types: collect .name from top-level constraints
+    constraint_type_counts = {}
+
+    def _count_constraints(c):
+        if is_any_list(c):
+            for sub in c:
+                _count_constraints(sub)
+        elif isinstance(c, Expression):
+            name = c.name
+            constraint_type_counts[name] = constraint_type_counts.get(name, 0) + 1
+
+    for c in model.constraints:
+        _count_constraints(c)
+
+    num_constraints = sum(constraint_type_counts.values())
+
+    # Objective
+    has_obj = model.objective_ is not None
+    obj_type = "none"
+    if has_obj:
+        obj_type = "min" if model.objective_is_min else "max"
+
+    return {
+        "num_variables": len(variables),
+        "num_bool_variables": num_bool,
+        "num_int_variables": num_int,
+        "num_constraints": num_constraints,
+        "constraint_types": constraint_type_counts,
+        "has_objective": has_obj,
+        "objective_type": obj_type,
+        "domain_size_min": min(domain_sizes) if domain_sizes else None,
+        "domain_size_max": max(domain_sizes) if domain_sizes else None,
+        "domain_size_mean": round(sum(domain_sizes) / len(domain_sizes), 2) if domain_sizes else None,
+    }
+
+
+def _init_metadata_worker(context_dict, collect_metadata_func, reader_func, open_func):
+    """Initialize worker process with dataset context."""
+    global _metadata_worker_context
+    _metadata_worker_context = context_dict.copy()
+    _metadata_worker_context['collect_instance_metadata'] = collect_metadata_func
+    _metadata_worker_context['reader'] = reader_func
+    _metadata_worker_context['open_func'] = open_func
+
+
+def _collect_one_metadata_worker(file_path_str):
+    """Worker function for process-based metadata collection."""
+    global _metadata_worker_context
+    file_path = pathlib.Path(file_path_str)
+    dataset_dir = pathlib.Path(_metadata_worker_context['dataset_dir'])
+    meta_path = dataset_dir / (file_path.name + _metadata_worker_context['metadata_extension'])
+    
+    # Collect instance metadata using the provided function
+    collect_metadata = _metadata_worker_context['collect_instance_metadata']
+    metadata_error = None
+    try:
+        instance_meta = collect_metadata(str(file_path))
+    except Exception as e:
+        instance_meta = {}
+        metadata_error = str(e)
+
+    # Separate portable from format-specific fields
+    portable = portable_instance_metadata(instance_meta)
+    format_specific = {
+        k: v for k, v in instance_meta.items()
+        if k not in portable and not k.startswith("_")
+    }
+
+    # Derive instance name
+    stem = file_path.stem
+    for ext in (".xml", ".wcnf", ".opb"):
+        if stem.endswith(ext):
+            stem = stem[:len(stem) - len(ext)]
+            break
+
+    # Build structured sidecar
+    sidecar = {
+        "dataset": _metadata_worker_context['dataset_metadata'],
+        "instance_name": stem,
+        "source_file": str(file_path.relative_to(dataset_dir)),
+        "category": _metadata_worker_context['category'],
+        "instance_metadata": portable,
+        "format_metadata": format_specific,
+    }
+
+    if metadata_error is not None:
+        sidecar["_metadata_error"] = metadata_error
+
+    # Preserve or compute model features
+    model_features = None
+    if meta_path.exists():
+        try:
+            with open(meta_path, "r") as f:
+                existing = json.load(f)
+            if "model_features" in existing:
+                model_features = existing["model_features"]
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    if model_features is None:
+        reader = _metadata_worker_context['reader']
+        open_func = _metadata_worker_context['open_func']
+        if not callable(reader):
+            raise TypeError(
+                f"Cannot extract model features for {file_path}: "
+                "no dataset reader configured."
+            )
+        model = reader(str(file_path), open=open_func)
+        model_features = extract_model_features(model)
+    
+    sidecar["model_features"] = model_features
+
+    with open(meta_path, "w") as f:
+        json.dump(sidecar, f, indent=2)
+    
+    return str(file_path)
+
+
+# ---------------------------------------------------------------------------- #
+#                              Download utilities.                             #
+# ---------------------------------------------------------------------------- #
+
 def _get_content_length(url: str) -> int:
-    """Return Content-Length for url, or 0 if unknown."""
+    """
+    Return Content-Length for url, or 0 if unknown.
+    """
     try:
         req = Request(url)
         req.get_method = lambda: "HEAD"
@@ -22,7 +198,6 @@ def _get_content_length(url: str) -> int:
             return int(resp.headers.get("Content-Length", 0))
     except Exception:
         return 0
-
 
 def _download_url(
     url: str,
@@ -42,8 +217,8 @@ def _download_url(
         desc = destination.name
     total_size = _get_content_length(url)
     if _sequential_impl is None:
-        from cpmpy.tools.dataset._base import _Dataset
-        _sequential_impl = _Dataset._download_sequential
+        from cpmpy.tools.datasets.core import FileDataset
+        _sequential_impl = FileDataset._download_sequential
     _sequential_impl(url, destination, total_size, desc, chunk_size)
     return destination
 
