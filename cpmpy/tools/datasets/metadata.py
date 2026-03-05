@@ -1,6 +1,11 @@
 """
 Structured Metadata Classes for CPMpy Datasets
 
+When iterating over a dataset, 2-tuples (instance, metadata) are returned.
+The metadata is a subclass of the standard python dictionary. It has additional
+methods that aid in managing the metadata and help convert it to different formats, 
+like Croissant, GBD, Dataset Cards, etc.
+
 Provides:
 - :class:`FieldInfo`     — schema for one domain metadata field
 - :class:`FeaturesInfo`  — schema for all domain metadata fields of a dataset
@@ -33,7 +38,7 @@ from typing import Any, Dict, List, Optional, Union
 # ---------------------------------------------------------------------------
 
 # System-level keys added by instance_metadata() — not domain metadata
-_SYSTEM_KEYS: frozenset = frozenset({"dataset", "category", "name", "path"})
+_SYSTEM_KEYS: frozenset = frozenset({"id", "dataset", "categories", "name", "path"})
 
 # Fields produced by extract_model_features() (requires full CPMpy model parse)
 _MODEL_FEATURE_FIELDS: frozenset = frozenset({
@@ -45,10 +50,10 @@ _MODEL_FEATURE_FIELDS: frozenset = frozenset({
 
 # Live Python objects added by Load — not JSON-serialisable, excluded from exports
 _MODEL_OBJECT_KEYS: frozenset = frozenset({
-    "decision_variables",
+    "variables",
 })
 
-# Prefixes for format-specific metadata (not portable across translations)
+# Prefixes for format-specific metadata (not portable across format translations)
 _FORMAT_SPECIFIC_PREFIXES: tuple = ("opb_", "wcnf_", "mps_", "xcsp_", "dimacs_")
 
 
@@ -64,20 +69,24 @@ class FieldInfo:
     Inspired by HuggingFace ``Value`` and TFDS ``FeatureConnector``, but
     intentionally simpler — no serialisation semantics needed for CO benchmarks.
 
-    Parameters
-    ----------
-    dtype:
-        Data type string: ``"int"``, ``"float"``, ``"str"``, ``"bool"``,
-        ``"dict"``, or ``"list"``.
-    description:
-        Human-readable description of the field.
-    nullable:
-        Whether the field may be absent / ``None`` for some instances.
-    example:
-        Optional example value (used in documentation / cards).
+    Arguments:
+
+        dtype (str or type): Canonical dtype string, schema.org dtype string,
+        or Python type.
+        Accepted canonical strings are ``"int"``, ``"float"``, ``"str"``,
+        ``"bool"``, ``"dict"``, and ``"list"``. Accepted schema.org strings
+        are ``"sc:Integer"``, ``"sc:Float"``, ``"sc:Text"``,
+        ``"sc:Boolean"``, ``"sc:StructuredValue"``, and ``"sc:ItemList"``.
+        Accepted Python types are ``int``, ``float``, ``str``, ``bool``,
+        ``dict``, and ``list``.
+        Values are normalised to the canonical string representation at
+        construction time.
+        description (str): Human-readable description of the field.
+        nullable (bool): Whether the field may be absent / ``None`` for some instances.
+        example (Any): Optional example value (used in documentation / cards).
     """
 
-    dtype: str
+    dtype: Any
     description: str = ""
     nullable: bool = True
     example: Any = None
@@ -85,9 +94,49 @@ class FieldInfo:
     # Maps internal dtype strings → schema.org types (for Croissant export)
     _DTYPE_TO_SCHEMA_ORG: Dict[str, str] = None  # populated below as class var
 
+    def __post_init__(self):
+        self.dtype = self.normalize_dtype(self.dtype)
+
     def schema_org_type(self) -> str:
         """Return the schema.org dataType string for use in Croissant fields."""
         return _DTYPE_TO_SCHEMA_ORG.get(self.dtype, "sc:Text")
+
+    @classmethod
+    def normalize_dtype(cls, dtype: Any) -> str:
+        """
+        Normalise a dtype specification to a canonical dtype string.
+
+        Accepts canonical string dtypes, schema.org dtype strings, and selected
+        builtin Python types.
+        Raises when a dtype cannot be normalised.
+        """
+        if isinstance(dtype, str):
+            if dtype in _DTYPE_TO_SCHEMA_ORG:
+                return dtype
+            mapped_schema_dtype = _SCHEMA_ORG_TO_DTYPE.get(dtype)
+            if mapped_schema_dtype is not None:
+                return mapped_schema_dtype
+            known = ", ".join(sorted(_DTYPE_TO_SCHEMA_ORG.keys()))
+            known_schema = ", ".join(sorted(_SCHEMA_ORG_TO_DTYPE.keys()))
+            raise ValueError(
+                f"Unknown dtype string {dtype!r}. "
+                f"Use a canonical dtype ({known}) or schema.org dtype ({known_schema})."
+            )
+
+        if isinstance(dtype, type):
+            mapped = _PY_TYPE_TO_DTYPE.get(dtype)
+            if mapped is not None:
+                return mapped
+            known_types = ", ".join(t.__name__ for t in _PY_TYPE_TO_DTYPE)
+            raise TypeError(
+                f"Cannot normalise Python type {dtype!r} to a dataset dtype. "
+                f"Known Python types: {known_types}."
+            )
+
+        raise TypeError(
+            "dtype must be a canonical dtype string, schema.org dtype string, "
+            f"or Python type, got {type(dtype).__name__}."
+        )
 
     @classmethod
     def coerce(cls, value: Any) -> "FieldInfo":
@@ -96,20 +145,23 @@ class FieldInfo:
 
         Accepted forms:
 
-        - ``FieldInfo(...)``     — returned as-is
-        - ``"int"``              — treated as ``FieldInfo(dtype="int")``
-        - ``("int", "desc")``   — ``FieldInfo(dtype="int", description="desc")``
-        - ``("int", "desc", False)`` — adds ``nullable=False``
+        - ``FieldInfo(...)``                        — returned as-is
+        - ``"int"``, ``"sc:Integer"``, or ``int``   — treated as ``FieldInfo(dtype=...)``
+        - ``("int", "desc")``                       — ``FieldInfo(dtype="int", description="desc")``
+        - ``("sc:Text", "desc")``                   — ``FieldInfo(dtype="sc:Text", description="desc")``
+        - ``(int, "desc")``                         — ``FieldInfo(dtype=int, description="desc")``
+        - ``("int", "desc", False)``                — adds ``nullable=False``
         """
         if isinstance(value, cls):
             return value
-        if isinstance(value, str):
+        if isinstance(value, (str, type)):
             return cls(dtype=value)
         if isinstance(value, tuple):
             return cls(*value)
         raise TypeError(
             f"Cannot coerce {value!r} to FieldInfo. "
-            "Use a FieldInfo, a dtype string, or a (dtype, description[, nullable]) tuple."
+            "Use a FieldInfo, a dtype string or Python type, "
+            "or a (dtype, description[, nullable]) tuple."
         )
 
     def to_dict(self) -> dict:
@@ -128,6 +180,19 @@ _DTYPE_TO_SCHEMA_ORG: Dict[str, str] = {
     "bool":  "sc:Boolean",
     "dict":  "sc:StructuredValue",
     "list":  "sc:ItemList",
+}
+
+_PY_TYPE_TO_DTYPE: Dict[type, str] = {
+    int: "int",
+    float: "float",
+    str: "str",
+    bool: "bool",
+    dict: "dict",
+    list: "list",
+}
+
+_SCHEMA_ORG_TO_DTYPE: Dict[str, str] = {
+    schema_type: dtype for dtype, schema_type in _DTYPE_TO_SCHEMA_ORG.items()
 }
 
 
@@ -240,9 +305,9 @@ class InstanceInfo(dict):
     """
     Per-instance metadata dict with structured access.
 
-    Inherits from ``dict`` for full backward compatibility — all existing
-    ``meta['year']``, ``meta.get('jobs')``, ``for k, v in meta.items()``
-    usage continues unchanged.
+    Inherits from ``dict`` and supports normal dictionary access patterns
+    such as ``meta['year']``, ``meta.get('jobs')``, and
+    ``for k, v in meta.items()``.
 
     Structured access is additive:
 
@@ -250,19 +315,21 @@ class InstanceInfo(dict):
 
         file, info = dataset[0]
 
-        # Backward-compatible dict access (unchanged):
-        info['year']
+        # Dict access:
+        info['name']
         info.get('jobs', 0)
+        info['categories']['year']
 
         # New structured properties:
         info.id                  # "jsplib/abz5"
+        info.category            # {"year": 2024, "track": "CSP", ...}
         info.domain_metadata     # {"jobs": 10, "machines": 5, ...}
         info.model_features      # {"num_variables": 100, ...}
         info.format_metadata     # {"opb_num_variables": 12, ...}
 
         # Standards converters:
-        info.to_croissant_example()
-        info.to_gbd_features()
+        info.to_croissant()
+        info.to_gbd()
     """
 
     @property
@@ -270,12 +337,22 @@ class InstanceInfo(dict):
         """
         Stable instance identifier.
 
-        Format: ``"dataset/cat_val1/cat_val2/.../instance_name"``
+        Uses explicit ``id`` when present (recommended for dataset-defined
+        identifiers). Otherwise falls back to:
+        ``"dataset/cat_val1/cat_val2/.../instance_name"``.
+
+        For file-based datasets, ``id`` is typically set to the instance
+        reference returned as the first element of the dataset ``(x, y)``
+        tuple.
 
         Example: ``"xcsp3/2024/CSP/AverageAvoiding-20_c24"``
         """
+        explicit = self.get("id")
+        if explicit:
+            return str(explicit)
+
         parts = [str(self.get("dataset", ""))]
-        cat = self.get("category", {})
+        cat = self.get("categories", {})
         if isinstance(cat, dict):
             parts += [str(v) for v in cat.values()]
         parts.append(str(self.get("name", "")))
@@ -292,9 +369,9 @@ class InstanceInfo(dict):
         return self.get("dataset", "")
 
     @property
-    def category(self) -> dict:
+    def categories(self) -> dict:
         """Category dict (year, track, variant, family, …)."""
-        return self.get("category", {})
+        return self.get("categories", {})
 
     @property
     def domain_metadata(self) -> dict:
@@ -392,9 +469,9 @@ class InstanceInfo(dict):
     def __ror__(self, other: dict) -> "InstanceInfo":
         return InstanceInfo(super().__ror__(other))
 
-    def to_croissant_example(self) -> dict:
+    def to_croissant(self) -> dict:
         """
-        Convert to a Croissant-compatible example record.
+        Convert to a Croissant-compatible record.
 
         Returns a flat dict with ``id``, domain metadata, and model features.
         """
@@ -403,19 +480,24 @@ class InstanceInfo(dict):
         record.update(self.model_features)
         return record
 
-    def to_gbd_features(self) -> dict:
+    def to_gbd(self) -> dict:
         """
         Convert to a GBD-style (Global Benchmark Database) feature record.
 
         GBD uses hash-based instance IDs; here we use the path-based ``.id``
         property as a stable identifier instead.
+
+        .. note::
+
+            In the future, hash-based instance IDs coming from GBD might be added.
+            For now, this has to bed added manually.
         """
         record: dict = {
             "id": self.id,
             "filename": self.get("name", ""),
             "dataset": self.get("dataset", ""),
         }
-        record.update(self.category)
+        record.update(self.categories)
         record.update(self.domain_metadata)
         record.update(self.model_features)
         return record
@@ -474,41 +556,9 @@ class DatasetInfo(dict):
         return self.get("description", "")
 
     @property
-    def url(self) -> str:
-        """Homepage URL (backward-compat alias for :attr:`homepage`)."""
-        return self.get("url", "") or self.get("homepage", "")
-
-    @property
     def homepage(self) -> str:
         """Homepage URL (HuggingFace / TFDS naming convention)."""
         return self.get("homepage", "") or self.get("url", "")
-
-    @property
-    def version(self) -> Optional[str]:
-        return self.get("version")
-
-    @property
-    def license(self) -> Optional[Union[str, List[str]]]:
-        return self.get("license")
-
-    @property
-    def domain(self) -> str:
-        """Primary problem domain (e.g. ``"scheduling"``, ``"sat"``, ``"cp"``)."""
-        return self.get("domain", "constraint_programming")
-
-    @property
-    def tags(self) -> List[str]:
-        return self.get("tags", [])
-
-    @property
-    def language(self) -> Optional[str]:
-        """
-        Problem format / modelling language (e.g. ``"XCSP3"``, ``"OPB"``, ``"JSPLib"``).
-
-        Analogous to HuggingFace's ``language`` field, but for CO format languages
-        rather than human languages.
-        """
-        return self.get("language")
 
     @property
     def features(self) -> Optional[FeaturesInfo]:
@@ -528,27 +578,36 @@ class DatasetInfo(dict):
             return FeaturesInfo.from_dict(raw)
         return None
 
-    @property
-    def release_notes(self) -> Optional[Dict[str, str]]:
+    # -- JSON serialisation ---------------------------------------------------
+
+    def to_jsonable(self) -> dict:
         """
-        Version changelog dict: ``{version_string: description}``.
+        Return a JSON-serialisable plain dict representation.
 
-        Inspired by TFDS ``BuilderConfig.release_notes``.
-
-        Example::
-
-            release_notes = {
-                "1.0.0": "Initial release.",
-                "1.1.0": "Added 2024 track instances.",
-            }
+        In particular, this serialises ``features`` (when present) to a plain
+        dict via :meth:`FeaturesInfo.to_dict`.
         """
-        return self.get("release_notes")
+        data = dict(self)
+        feats = data.get("features")
+        if isinstance(feats, FeaturesInfo):
+            data["features"] = feats.to_dict()
+        return data
+
+    def to_json(self, **kwargs) -> str:
+        """
+        Return this metadata as a JSON string.
+
+        Arguments:
+            **kwargs: forwarded to :func:`json.dumps`.
+        """
+        import json
+        return json.dumps(self.to_jsonable(), **kwargs)
 
     # -- Card generation ------------------------------------------------------
 
     def card(self, format: str = "markdown") -> str:
         """
-        Generate a dataset card.
+        Generate a Dataset Card.
 
         Follows the HuggingFace Hub convention: a YAML frontmatter block
         (machine-readable) followed by a markdown body (human-readable).
@@ -739,29 +798,29 @@ class DatasetInfo(dict):
 # Standalone adapter functions (for use as target_transform)
 # ---------------------------------------------------------------------------
 
-def to_croissant_example(metadata: dict) -> dict:
+def to_croissant(metadata: dict) -> dict:
     """
-    Convert instance metadata to a Croissant example record.
+    Convert instance metadata to a Croissant record.
 
     Usable as a ``target_transform``::
 
-        from cpmpy.tools.datasets.metadata import to_croissant_example
-        dataset = JSPLibDataset(root="data", target_transform=to_croissant_example)
+        from cpmpy.tools.datasets.metadata import to_croissant
+        dataset = JSPLibDataset(root="data", target_transform=to_croissant)
         for instance, record in dataset:
             print(record["id"], record["jobs"])
     """
-    return InstanceInfo(metadata).to_croissant_example()
+    return InstanceInfo(metadata).to_croissant()
 
 
-def to_gbd_features(metadata: dict) -> dict:
+def to_gbd(metadata: dict) -> dict:
     """
     Convert instance metadata to a GBD-style feature record.
 
     Usable as a ``target_transform``::
 
-        from cpmpy.tools.datasets.metadata import to_gbd_features
-        dataset = JSPLibDataset(root="data", target_transform=to_gbd_features)
+        from cpmpy.tools.datasets.metadata import to_gbd
+        dataset = JSPLibDataset(root="data", target_transform=to_gbd)
         for instance, record in dataset:
             print(record["id"], record["num_constraints"])
     """
-    return InstanceInfo(metadata).to_gbd_features()
+    return InstanceInfo(metadata).to_gbd()

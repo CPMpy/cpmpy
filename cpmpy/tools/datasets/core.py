@@ -792,6 +792,7 @@ class FileDataset(IndexedDataset):
             InstanceInfo: The metadata for the instance.
         """
         metadata = {
+            'id': str(instance),
             'dataset': self.name,
             'category': self.category(),
             'name': pathlib.Path(instance).name.replace(self.extension, ''),
@@ -1215,6 +1216,7 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
 
         def instance_metadata(self, file: os.PathLike) -> dict:
             metadata = {
+                'id': str(file),
                 'dataset_dir': str(self.dataset_dir),
                 'name': pathlib.Path(file).name.replace(self.extension, ''),
                 'path': file,
