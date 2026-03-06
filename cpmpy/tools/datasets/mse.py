@@ -14,7 +14,7 @@ import io
 
 import cpmpy as cp
 from cpmpy.tools.io.wcnf import load_wcnf
-from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.core import FileDataset
 from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 
@@ -62,7 +62,7 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
             transform=None, target_transform=None, 
             download: bool = False,
             dataset_dir: Optional[os.PathLike] = None,
-            metadata_workers: int = 1
+            **kwargs
         ):
         """
         Constructor for a dataset object of the MaxSAT Evaluation competition.
@@ -98,7 +98,7 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
             download=download, extension=".wcnf.xz",
-            metadata_workers=metadata_workers
+            **kwargs
         )
 
 
@@ -115,6 +115,9 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
             "year": self.year,
             "track": self.track
         }
+
+    def categories(self) -> dict:
+        return self.category()
 
     def collect_instance_metadata(self, file) -> dict:
         """
@@ -155,7 +158,7 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
         print(f"Downloading MaxSAT Eval {self.year} {self.track} instances from cs.helsinki.fi")
                 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
         except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year} and track {self.track}. Error: {str(e)}")
         

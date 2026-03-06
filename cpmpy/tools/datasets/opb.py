@@ -11,7 +11,7 @@ import pathlib
 import tarfile
 import io
 
-from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.core import FileDataset
 from cpmpy.tools.datasets.metadata import FeaturesInfo, FieldInfo
 
 
@@ -54,7 +54,7 @@ class OPBDataset(FileDataset):
             competition: bool = True,
             transform=None, target_transform=None, 
             download: bool = False,
-            metadata_workers: int = 1
+            **kwargs
         ):
         """
         Constructor for a dataset object of the PB competition.
@@ -91,22 +91,11 @@ class OPBDataset(FileDataset):
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
             download=download, extension=".opb.xz",
-            metadata_workers=metadata_workers
+            **kwargs
         )
 
-
     @staticmethod
-    def reader(file_path, open=open):
-        """
-        Reader for OPB dataset.
-        Parses a file path directly into a CPMpy model.
-        For backward compatibility. Consider using read() + load() instead.
-        """
-        from cpmpy.tools.io.opb import load_opb
-        return load_opb(file_path, open=open)
-
-    @staticmethod
-    def loader(content: str):
+    def _loader(content: str):
         """
         Loader for OPB dataset.
         Loads a CPMpy model from raw OPB content string.
@@ -121,7 +110,10 @@ class OPBDataset(FileDataset):
             "track": self.track
         }
 
-    def collect_instance_metadata(self, file) -> dict:
+    def categories(self) -> dict:
+        return self.category()
+
+    def collect_instance_metadata(self, file: os.PathLike) -> dict:
         """Extract metadata from OPB filename and file header.
 
         Parses the `* #variable= ... #constraint= ...` header line and
@@ -163,7 +155,7 @@ class OPBDataset(FileDataset):
         print(f"Downloading OPB {self.year} {self.track} {'competition' if self.competition else 'non-competition'} instances from www.cril.univ-artois.fr")
         
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
         except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year}. Error: {str(e)}")
         

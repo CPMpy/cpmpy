@@ -11,7 +11,7 @@ import pathlib
 import io
 
 import cpmpy as cp
-from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.core import FileDataset
 from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 
@@ -47,7 +47,7 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
     })
     
 
-    def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False, metadata_workers: int = 1):
+    def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False, **kwargs):
         """
         Initialize the XCSP3 Dataset.
         """
@@ -67,7 +67,7 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
             download=download, extension=".xml.lzma",
-            metadata_workers=metadata_workers
+            **kwargs
         )
 
 
@@ -86,6 +86,9 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
             "year": self.year,
             "track": self.track
         }
+
+    def categories(self) -> dict:
+        return self.category()
 
     def collect_instance_metadata(self, file) -> dict:
         """Extract instance type (CSP/COP) from XCSP3 XML root element."""
@@ -121,7 +124,7 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
         print(f"Downloading XCSP3 {self.year} instances from www.cril.univ-artois.fr")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
         except ValueError as e:
             raise ValueError(f"No dataset available for year {self.year}. Error: {str(e)}")
 

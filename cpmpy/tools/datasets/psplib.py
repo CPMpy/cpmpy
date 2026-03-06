@@ -9,7 +9,7 @@ import pathlib
 import io
 import zipfile
 
-from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.core import FileDataset
 from cpmpy.tools.datasets.metadata import FeaturesInfo, FieldInfo
 
 
@@ -45,7 +45,7 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     })
 
 
-    def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False, metadata_workers: int = 1):
+    def __init__(self, root: str = ".", variant: str = "rcpsp", family: str = "j30", transform=None, target_transform=None, download: bool = False, **kwargs):
         """
         Constructor for a dataset object for PSPlib.
 
@@ -83,7 +83,7 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
             download=download, extension=f".{self.family_codes[self.variant]}",
-            metadata_workers=metadata_workers
+            **kwargs
         )
 
     @staticmethod
@@ -97,7 +97,7 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         return load_rcpsp(file_path, open=open)
 
     @staticmethod
-    def loader(content: str):
+    def _loader(content: str):
         """
         Loader for PSPLib dataset.
         Loads a CPMpy model from raw RCPSP content string.
@@ -111,6 +111,9 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             "variant": self.variant,
             "family": self.family
         }
+
+    def categories(self) -> dict:
+        return self.category()
 
     def collect_instance_metadata(self, file) -> dict:
         """Extract project metadata from SM file header."""
@@ -177,7 +180,7 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         print(f"Downloading PSPLib {self.variant} {self.family} instances from www.om-db.wi.tum.de")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
         except ValueError as e:
             raise ValueError(f"No dataset available for variant {self.variant} and family {self.family}. Error: {str(e)}")
         

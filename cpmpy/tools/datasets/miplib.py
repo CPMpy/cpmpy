@@ -11,7 +11,7 @@ import zipfile
 import pathlib
 import io
 
-from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.core import FileDataset
 
 
 class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
@@ -42,7 +42,7 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             year: int = 2024, track: str = "exact-unweighted", 
             transform=None, target_transform=None, 
             download: bool = False,
-            metadata_workers: int = 1
+            **kwargs
         ):
         """
         Constructor for a dataset object of the MIPLib competition.
@@ -70,7 +70,7 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             dataset_dir=dataset_dir, 
             transform=transform, target_transform=target_transform, 
             download=download, extension=".mps.gz",
-            metadata_workers=metadata_workers
+            **kwargs
         )
 
     @staticmethod
@@ -84,7 +84,7 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         return load_scip(file_path, open=open)
 
     @staticmethod
-    def loader(content: str):
+    def _loader(content: str):
         """
         Loader for MIPLib dataset.
         Loads a CPMpy model from raw MPS/LP content string.
@@ -109,6 +109,9 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             "year": self.year,
             "track": self.track
         }
+
+    def categories(self) -> dict:
+        return self.category()
     
     def download(self):
         
@@ -119,7 +122,7 @@ class MIPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         print("Downloading MIPLib instances from miplib.zib.de")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
         except ValueError as e:
             raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
         

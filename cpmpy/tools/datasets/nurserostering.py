@@ -14,7 +14,7 @@ import re
 import io
 
 import cpmpy as cp
-from cpmpy.tools.datasets._base import FileDataset
+from cpmpy.tools.datasets.core import FileDataset
 from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 # Optional dependencies
@@ -60,7 +60,7 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         "num_shifts": ("int", "Number of distinct shift types"),
     })
 
-    def __init__(self, root: str = ".", transform=None, target_transform=None, download:bool=False, sort_key=None, metadata_workers: int = 1):
+    def __init__(self, root: str = ".", transform=None, target_transform=None, download:bool=False, sort_key=None, **kwargs):
         """
         Initialize the Nurserostering Dataset.
 
@@ -83,7 +83,7 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
             dataset_dir=dataset_dir,
             transform=transform, target_transform=target_transform, 
             download=download, extension=".txt",
-            metadata_workers=metadata_workers
+            **kwargs
         )
 
     @staticmethod
@@ -97,7 +97,7 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         return load_nurserostering(file_path, open=open)
 
     @staticmethod
-    def loader(content: str):
+    def _loader(content: str):
         """
         Loader for Nurse Rostering dataset.
         Loads a CPMpy model from raw Nurse Rostering content string.
@@ -108,6 +108,9 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
 
     def category(self) -> dict:
         return {}  # no categories
+
+    def categories(self) -> dict:
+        return self.category()
 
     def collect_instance_metadata(self, file) -> dict:
         """
@@ -137,7 +140,7 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         print("Downloading Nurserostering instances from schedulingbenchmarks.org")
 
         try:
-            target_download_path = self._download_file(url, target, destination=str(target_download_path), origins=self.origins)
+            target_download_path = self._download_file(url, target, destination=str(target_download_path))
         except ValueError as e:
             raise ValueError(f"No dataset available on {url}. Error: {str(e)}")
 
