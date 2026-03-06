@@ -142,7 +142,7 @@ def metadata_from_model(model):
     This is called by transforms that produce CPMpy models (Load, Translate)
     via their ``enrich_metadata`` method. It adds:
 
-    - ``decision_variables``: list of dicts with name, type, lb, ub for each variable
+    - ``variables``: ``{name: CPMpy_variable}`` mapping for every decision variable
     - ``objective``: string representation of the objective expression (if any)
     - ``objective_is_min``: True if minimizing, False if maximizing (if any)
     """
@@ -156,7 +156,7 @@ def metadata_from_model(model):
     from cpmpy.expressions.variables import _BoolVarImpl
 
     variables = get_variables_model(model)
-    metadata['decision_variables'] = {
+    metadata['variables'] = {
         v.name: v
         for v in variables
     }
@@ -280,7 +280,7 @@ class Load:
         >>> from cpmpy.tools.io.wcnf import load_wcnf
         >>> dataset = MSEDataset(transform=Load(load_wcnf, open=dataset.open))
         >>> model, metadata = dataset[0]
-        >>> metadata['decision_variables']  # list of variable descriptors
+        >>> metadata['variables']  # list of variable descriptors
         >>> metadata['objective']           # objective expression string (if any)
     """
 
@@ -398,7 +398,7 @@ class Translate:
         >>> transform = Translate(dataset.loader, write_dimacs, open=dataset.open)
         >>> dataset = MSEDataset(transform=transform)
         >>> dimacs_string, metadata = dataset[0]
-        >>> metadata['decision_variables']  # from the intermediate model
+        >>> metadata['variables']  # from the intermediate model
     """
 
     def __init__(self, loader, writer, open=None, **kwargs):

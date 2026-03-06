@@ -111,6 +111,7 @@ import multiprocessing
 
 from .metadata import FeaturesInfo, DatasetInfo, InstanceInfo
 from .utils import extract_model_features, portable_instance_metadata
+from .transforms import _enrich_from_model
 
 # tqdm as an optional dependency, provides prettier progress bars
 try:
@@ -859,6 +860,9 @@ class FileDataset(IndexedDataset):
             # Let transforms contribute to metadata (e.g. model verification info)
             if hasattr(self.transform, 'enrich_metadata'):
                 metadata = self.transform.enrich_metadata(filename, metadata)
+            elif isinstance(filename, cp.Model):
+                # Transform returned a CPMpy model (e.g. dataset.load); enrich from model
+                metadata = _enrich_from_model(filename, metadata)
 
         return filename, metadata
 

@@ -411,7 +411,7 @@ class InstanceInfo(dict):
 
         Currently contains:
 
-        - ``decision_variables``: ``{name: CPMpy_variable}`` mapping for every
+        - ``variables``: ``{name: CPMpy_variable}`` mapping for every
           decision variable in the loaded model.
 
         These objects are **not JSON-serialisable** and are excluded from
@@ -423,7 +423,7 @@ class InstanceInfo(dict):
             dataset.transform = Load(dataset.loader, open=dataset.open)
             model, info = dataset[0]
 
-            vars = info.model_objects["decision_variables"]
+            vars = info.model_objects["variables"]
             model.solve()
             print({name: v.value() for name, v in vars.items()})
         """
