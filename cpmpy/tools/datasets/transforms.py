@@ -515,7 +515,7 @@ class SaveToFile:
         if not self.write_metadata or self._last_path is None:
             return metadata
 
-        from cpmpy.tools.dataset._base import portable_instance_metadata
+        from cpmpy.tools.datasets.utils import portable_instance_metadata
 
         sidecar = {}
 
