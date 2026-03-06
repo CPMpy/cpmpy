@@ -25,7 +25,7 @@ import re
 import sys
 import argparse
 from io import StringIO
-from typing import Union
+from typing import Union, Optional, Callable
 from functools import reduce
 from operator import mul
 
@@ -33,10 +33,14 @@ from operator import mul
 import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list,simplify_boolean
 from cpmpy.transformations.safening import no_partial_functions, safen_objective
-from cpmpy.transformations.decompose_global import decompose_in_tree, decompose_objective
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
-from cpmpy.transformations.linearize import linearize_constraint, only_positive_bv_wsum
+from cpmpy.transformations.linearize import (
+    decompose_linear,
+    decompose_linear_objective,
+    linearize_constraint,
+    only_positive_bv_wsum,
+)
 from cpmpy.transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.variables import _IntVarImpl, NegBoolView, _BoolVarImpl
@@ -201,7 +205,7 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
 
     return model
 
-def write_opb(model, fname=None, encoding="auto", header=None):
+def write_opb(model, fname=None, encoding="auto", header=None, open=None):
     """
     Export a CPMpy model to the OPB (Pseudo-Boolean) format.
 
@@ -216,6 +220,10 @@ def write_opb(model, fname=None, encoding="auto", header=None):
         encoding (str, optional): The encoding used for `int2bool`. Options: ("auto", "direct", "order", "binary").
         header (str, optional): Optional header text to add as OPB comments. If provided, each line
             will be prefixed with "* ".
+        open (callable, optional): Callable to open the file for writing (default: builtin ``open``).
+            Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
+            in loaders and allows custom compression or I/O (e.g.
+            ``lambda p, mode='w': lzma.open(p, 'wt')``).
 
     Returns:
         str or None: The OPB string if `fname` is None, otherwise nothing (writes to file).
@@ -277,9 +285,9 @@ def write_opb(model, fname=None, encoding="auto", header=None):
     contents = "\n".join(out)
     if fname is None:
         return contents
-    else:
-        with open(fname, "w") as f:
-            f.write(contents)
+    opener = open if open is not None else _std_open
+    with opener(fname, "w") as f:
+        f.write(contents)
 
 def _normalized_comparison(lst_of_expr):
     """
@@ -373,9 +381,13 @@ def _transform(cpm_expr, csemap, ivarmap, encoding="auto"):
 
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-    cpm_cons = decompose_in_tree(cpm_cons,
-        supported={"alldifferent"},  # alldiff has a specialized MIP decomp in linearize
-        csemap=csemap
+    # Use linear-specific decompositions (e.g. AllDifferent.decompose_linear)
+    # before linearization, consistent with MIP backends.
+    cpm_cons = decompose_linear(
+        cpm_cons,
+        supported=frozenset(),
+        supported_reified=frozenset(),
+        csemap=csemap,
     )
     cpm_cons = simplify_boolean(cpm_cons)
     cpm_cons = flatten_constraint(cpm_cons, csemap=csemap)  # flat normal form
@@ -395,8 +407,12 @@ def _transform_objective(expr, csemap, ivarmap, encoding="auto"):
 
     # transform objective
     obj, safe_cons = safen_objective(expr)
-    obj, decomp_cons = decompose_objective(obj, supported={"alldifferent"},
-                                            csemap=csemap)
+    obj, decomp_cons = decompose_linear_objective(
+        obj,
+        supported=frozenset(),
+        supported_reified=frozenset(),
+        csemap=csemap,
+    )
     obj, flat_cons = flatten_objective(obj, csemap=csemap)
     obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
