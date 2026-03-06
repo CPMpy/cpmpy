@@ -1,14 +1,18 @@
-from ._base import (
+from .core import (
     expand_varying_kwargs,
     FileDataset,
+)
+from .utils import (
+    extract_model_features,
+    portable_instance_metadata,
 )
 from .metadata import (
     InstanceInfo,
     DatasetInfo,
     FeaturesInfo,
     FieldInfo,
-    to_croissant_example,
-    to_gbd_features,
+    to_croissant,
+    to_gbd,
 )
 
 __all__ = [
@@ -22,8 +26,8 @@ __all__ = [
     "DatasetInfo",
     "FeaturesInfo",
     "FieldInfo",
-    "to_croissant_example",
-    "to_gbd_features",
+    "to_croissant",
+    "to_gbd",
     # Datasets
     "MIPLibDataset",
     "JSPLibDataset",
@@ -32,6 +36,7 @@ __all__ = [
     "XCSP3Dataset",
     "OPBDataset",
     "MaxSATEvalDataset",
+    "SATDataset",
     # Transforms
     "Compose",
     "Open",
@@ -50,6 +55,7 @@ from .nurserostering import NurseRosteringDataset
 from .xcsp3 import XCSP3Dataset
 from .opb import OPBDataset
 from .mse import MaxSATEvalDataset
+from .sat import SATDataset
 from .transforms import Compose, Open, Load, Serialize, Translate, SaveToFile, Lambda, extract_format_metadata
 # Backward compatibility alias
 Parse = Load

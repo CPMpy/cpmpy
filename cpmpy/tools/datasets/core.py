@@ -109,9 +109,8 @@ from urllib.request import HTTPError, Request, urlopen
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import multiprocessing
 
-from libraries.cpmpy.cpmpy.tools.datasets import FeaturesInfo
-from libraries.cpmpy.cpmpy.tools.datasets.metadata import DatasetInfo, InstanceInfo
-from libraries.cpmpy.cpmpy.tools.datasets.utils import extract_model_features, portable_instance_metadata
+from .metadata import FeaturesInfo, DatasetInfo, InstanceInfo
+from .utils import extract_model_features, portable_instance_metadata
 
 # tqdm as an optional dependency, provides prettier progress bars
 try:
@@ -851,7 +850,7 @@ class FileDataset(IndexedDataset):
         file_path = files[index]
         filename = str(file_path)
 
-        metadata = self.instance_metadata(file=filename)
+        metadata = self.instance_metadata(filename)
         if self.target_transform:
             metadata = self.target_transform(metadata)
 
