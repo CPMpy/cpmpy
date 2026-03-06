@@ -9,7 +9,7 @@ Tools (:mod:`cpmpy.tools`)
    :maxdepth: 1
    :caption: Tools:
 
-   tools/dataset
+   tools/datasets
    tools/readers
    tools/writers
    tools/benchmarks
