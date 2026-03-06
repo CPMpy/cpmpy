@@ -21,7 +21,7 @@ from typing import Callable, Optional, List
 from functools import partial
 
 import cpmpy as cp
-from cpmpy.tools.dimacs import write_dimacs
+from .dimacs import write_dimacs
 from cpmpy.tools.io.scip import write_scip
 from cpmpy.tools.io.opb import write_opb
 from cpmpy.tools.io.utils import get_format

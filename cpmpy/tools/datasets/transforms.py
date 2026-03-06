@@ -336,7 +336,7 @@ class Serialize:
         ... ])
         
         >>> # Using writer function directly
-        >>> from cpmpy.tools.dimacs import write_dimacs
+        >>> from cpmpy.tools.io.dimacs import write_dimacs
         >>> transform = Compose([
         ...     Load(load_wcnf, open=dataset.open),
         ...     Serialize(write_dimacs),
@@ -394,7 +394,7 @@ class Translate:
         >>> dimacs_string, metadata = dataset[0]
         
         >>> # Using writer function directly
-        >>> from cpmpy.tools.dimacs import write_dimacs
+        >>> from cpmpy.tools.io.dimacs import write_dimacs
         >>> transform = Translate(dataset.loader, write_dimacs, open=dataset.open)
         >>> dataset = MSEDataset(transform=transform)
         >>> dimacs_string, metadata = dataset[0]

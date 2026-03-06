@@ -15,7 +15,7 @@ List of functions
 from typing import Callable, List, Optional
 
 import cpmpy as cp
-from cpmpy.tools.dimacs import load_dimacs
+from .dimacs import load_dimacs
 from cpmpy.tools.io.scip import load_scip
 from cpmpy.tools.io.wcnf import load_wcnf
 from cpmpy.tools.io.opb import load_opb

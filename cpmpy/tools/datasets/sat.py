@@ -77,7 +77,7 @@ class SATDataset(FileDataset):
 
     @staticmethod
     def _loader(content: str):
-        from cpmpy.tools.dimacs import load_dimacs
+        from cpmpy.tools.io.dimacs import load_dimacs
         with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".cnf") as tmp:
             tmp.write(content)
             tmp_path = tmp.name
