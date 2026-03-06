@@ -39,7 +39,7 @@ import numpy as np
 import cpmpy as cp
 import warnings
 
-from typing import Union, Optional
+from typing import Union, Optional, Callable
 
 from cpmpy.expressions.core import BoolVal, Comparison, Operator
 from cpmpy.expressions.variables import _NumVarImpl, _BoolVarImpl, NegBoolView, _IntVarImpl
@@ -566,7 +566,7 @@ def _add_header(fname: os.PathLike, format: str, header: Optional[str] = None):
         f.writelines(lines)
 
 
-def write_scip(model: cp.Model, fname: Optional[str] = None, format: str = "mps", header: Optional[str] = None, verbose: bool = False) -> str:
+def write_scip(model: cp.Model, fname: Optional[str] = None, format: str = "mps", header: Optional[str] = None, verbose: bool = False, open: Optional[Callable] = None) -> str:
     """
     Write a CPMpy model to file using a SCIP provided writer.
     Supported formats include: 
@@ -579,41 +579,55 @@ def write_scip(model: cp.Model, fname: Optional[str] = None, format: str = "mps"
 
     More formats can be supported upon the installation of additional dependencies (like SIMPL).
     For more information, see the SCIP documentation: https://pyscipopt.readthedocs.io/en/latest/tutorials/readwrite.html
+
+    Arguments:
+        model: CPMpy model to write.
+        fname: Path to write to. If None, the file content is returned as a string.
+        format: Output format (e.g. "mps", "lp", "cip", "fzn", "gms", "pip").
+        header: Optional header text to prepend (format-dependent comment style).
+        verbose: If True, allow SCIP to print progress.
+        open: Optional callable to open the file for writing (default: builtin ``open``).
+            Called as ``open(fname, "w")``. Mirrors the ``open=`` argument in loaders and
+            allows custom compression or I/O (e.g.
+            ``lambda p, mode='w': lzma.open(p, 'wt')``).
+
+    Returns:
+        The file content as a string (whether written to ``fname`` or not).
     """
 
     # FZN format supports satisfaction problems (no objective), others may require it
     #require_obj = format != "fzn"
     require_obj = False
     writer = _to_writer(model, problem_name="CPMpy Model", require_objective=require_obj)
-    
-    # Decide where to write
-    if fname is None:
-        with tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False) as tmp:
-            fname = tmp.name
-        try:
+
+    opener = open if open is not None else _std_open
+
+    # Always write via SCIP to a temp file, then add header and get content
+    with tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False) as tmp:
+        tmp_fname = tmp.name
+    try:
+        if not verbose:
             writer.scip_model.hideOutput()
-            # Suppress SCIP's C-level "wrote problem to file" message
-            devnull = os.open(os.devnull, os.O_WRONLY)
-            old_stdout = os.dup(1)
-            os.dup2(devnull, 1)
-            try:
-                writer.scip_model.writeProblem(fname)
-            finally:
-                os.dup2(old_stdout, 1)
-                os.close(devnull)
-                os.close(old_stdout)
-            _add_header(fname, format, header)
-            with open(fname, "r") as f:
-                return f.read()
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        old_stdout = os.dup(1)
+        os.dup2(devnull, 1)
+        try:
+            writer.scip_model.writeProblem(tmp_fname, verbose=verbose)
         finally:
-            os.remove(fname)
-    else:
-        if not verbose: writer.scip_model.hideOutput()
-        writer.scip_model.writeProblem(fname, verbose=verbose)
-        if not verbose: writer.scip_model.hideOutput(quiet=False)
-        _add_header(fname, format, header)
-        with open(fname, "r") as f:
-            return f.read()
+            os.dup2(old_stdout, 1)
+            os.close(devnull)
+            os.close(old_stdout)
+        if not verbose:
+            writer.scip_model.hideOutput(quiet=False)
+        _add_header(tmp_fname, format, header)
+        with _std_open(tmp_fname, "r") as f:
+            content = f.read()
+        if fname is not None:
+            with opener(fname, "w") as f:
+                f.write(content)
+        return content
+    finally:
+        os.remove(tmp_fname)
 
 def main():
     parser = argparse.ArgumentParser(description="Parse and solve a SCIP compatible model using CPMpy")
