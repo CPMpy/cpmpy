@@ -54,6 +54,7 @@ from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import *
+from ..expressions.globalfunctions import Multiplication
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -82,7 +83,7 @@ class CPM_exact(SolverInterface):
     https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
-    supported_global_constraints = frozenset()
+    supported_global_constraints = frozenset({"mul"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -539,8 +540,8 @@ class CPM_exact(SolverInterface):
         self.xct_solver.addRightReification(head, sign, xct_cfvars, self.fix(xct_rhs))
 
     @staticmethod
-    def is_multiplication(cpm_expr): # helper function
-        return isinstance(cpm_expr, Operator) and cpm_expr.name == 'mul'
+    def is_multiplication(cpm_expr):  # helper function (Multiplication is GlobalFunction name 'mul')
+        return isinstance(cpm_expr, Multiplication)
 
     def add(self, cpm_expr_orig):
         """
@@ -571,8 +572,7 @@ class CPM_exact(SolverInterface):
             if isinstance(cpm_expr, Comparison):
                 lhs, rhs = cpm_expr.args
                 if cpm_expr.name == "==":
-                    assert isinstance(lhs, Operator)
-                    # can be sum, wsum or mul
+                    # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
                     if lhs.name == "mul":
                         if is_num(rhs): # make dummy var
                             rhs = cp.intvar(rhs, rhs)
@@ -582,7 +582,7 @@ class CPM_exact(SolverInterface):
                         self.xct_solver.addMultiplication(self.solver_vars(lhs.args), True, xct_rhs, True, xct_rhs)
 
                     else:
-                        assert lhs.name == "sum" or lhs.name == "wsum"
+                        assert isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")
                         xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                         self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
 

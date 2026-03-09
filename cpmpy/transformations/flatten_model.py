@@ -508,9 +508,14 @@ def normalized_numexpr(expr, csemap=None):
         # so reify and return the boolvar
         return get_or_make_var(expr, csemap=csemap)
 
+    # rewrite const*a into a weighted sum, so it can be used as objective
+    elif expr.name == "mul" and getattr(expr, "is_lhs_num", False):
+        w, e = expr.args
+        return normalized_numexpr(Operator("wsum", ([w], [e])), csemap=csemap)
+
     elif isinstance(expr, Operator):
-        # rewrite -a, const*a and a*const into a weighted sum, so it can be used as objective
-        if expr.name == '-' or (expr.name == 'mul' and _wsum_should(expr)):
+        # rewrite -a into a weighted sum, so it can be used as objective
+        if expr.name == '-':
             return normalized_numexpr(Operator("wsum", _wsum_make(expr)), csemap=csemap)
 
         if not expr.has_subexpr():

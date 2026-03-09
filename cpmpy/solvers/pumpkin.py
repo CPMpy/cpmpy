@@ -72,7 +72,7 @@ class CPM_pumpkin(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "cumulative", "no_overlap", "table", "negative_table", "InDomain",
-                                              "min", "max", "abs", "div", "element"})
+                                              "min", "max", "abs", "mul", "div", "element"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -409,15 +409,18 @@ class CPM_pumpkin(SolverInterface):
             lhs, rhs = cpm_expr.args
             assert is_num(rhs), "rhs of comparison must be a constant to be a predicate"
 
-            if isinstance(lhs, Operator): # can be sum with single arg
+            if isinstance(lhs, Operator):  # can be sum with single arg
                 if lhs.name == "sum" and len(lhs.args) == 1:
                     lhs = lhs.args[0]
                 elif lhs.name == "wsum" and len(lhs.args[0]) == 1:
                     lhs = lhs.args[0][0] * lhs.args[1][0]
-                elif lhs.name == "mul" and is_num(lhs.args[0]):
+                else:
+                    raise ValueError(f"Lhs of predicate should be a sum with 1 argument or wsum with 1 arg, but got {lhs}")
+            elif lhs.name == 'mul':
+                if lhs.is_lhs_num:
                     lhs = lhs.args[0] * lhs.args[1]
                 else:
-                    raise ValueError(f"Lhs of predicate should be a sum with 1 argument, wsum with 1 arg, or mul with const, but got {lhs}")
+                    raise ValueError(f"Lhs of predicate should be a mul with const, but got {lhs}")
 
             if cpm_expr.name == "==": comp = Comparator.Equal
             if cpm_expr.name == "<=": comp = Comparator.LessThanOrEqual
@@ -448,9 +451,9 @@ class CPM_pumpkin(SolverInterface):
             return self.solver_var(cpm_var).as_integer()
         elif is_num(cpm_var):
             return self.solver_var(intvar(cpm_var, cpm_var))
-        # can also be a scaled variable (multiplication view)
-        elif isinstance(cpm_var, Operator) and cpm_var.name == "mul":
-            const, cpm_var = cpm_var.args
+        # can also be a scaled variable (Multiplication with constant first)
+        elif cpm_var.name == "mul" and cpm_var.is_lhs_num:
+            const, cpm_var = cpm_var.args[0], cpm_var.args[1]
             if not is_num(const):
                 raise ValueError(f"Cannot create view from non-constant multiplier {const} * {cpm_var}")
             return self.to_pum_ivar(cpm_var).scaled(const)
@@ -490,8 +493,8 @@ class CPM_pumpkin(SolverInterface):
                 return True
             if cpm_expr.name == "wsum" and len(cpm_expr.args[0]) == 1:
                 return True
-            if cpm_expr.name == "mul" and is_num(cpm_expr.args[0]):
-                return True
+        elif cpm_expr.name == 'mul' and cpm_expr.is_lhs_num:
+            return True
         return False
 
     def _get_constraint(self, cpm_expr, tag=None):
