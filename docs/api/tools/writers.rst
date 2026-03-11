@@ -20,6 +20,7 @@ A unified ``write()`` function auto-detects the format from the file extension:
     model = cp.Model([x + y <= 5], minimize=x + y)
 
     write(model, "output.opb")          # format from extension
+    write(model, "output.wcnf")
     write(model, "output.mps")
     write(model, "output.cnf")
 
@@ -47,6 +48,10 @@ Supported Formats
      - ``.cnf``
      - :func:`write_dimacs <cpmpy.tools.io.dimacs.write_dimacs>`
      - —
+  * - WCNF
+    - ``.wcnf``
+    - :func:`write_dimacs <cpmpy.tools.io.dimacs.write_dimacs>`
+    - —
    * - MPS
      - ``.mps``
      - :func:`write_scip <cpmpy.tools.io.scip.write_scip>`
@@ -91,6 +96,7 @@ given, making them suitable for use inside dataset transforms.
 
     write_dimacs(model, "output.cnf")
     cnf_string = write_dimacs(model)
+    write_dimacs(model, "output.wcnf")
 
 Compressed output
 -----------------
@@ -156,7 +162,7 @@ Listing Available Formats
 
     from cpmpy.tools.io import write_formats
     print(write_formats())
-    # ['mps', 'lp', 'cip', 'fzn', 'gms', 'pip', 'dimacs', 'opb']
+    # ['mps', 'lp', 'cip', 'fzn', 'gms', 'pip', 'dimacs', 'opb', 'wcnf']
 
 Converting Between Formats
 ---------------------------

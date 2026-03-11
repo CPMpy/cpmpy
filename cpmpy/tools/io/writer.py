@@ -43,7 +43,7 @@ _writer_map = {
     # "zpl": partial(write_scip, format="zpl"),      # requires SIMPL, not included in pip package
     "dimacs": write_dimacs,
     "opb": write_opb,
-    # "wcnf": write_wcnf,                            # currently not supported
+    "wcnf": write_dimacs,
 }
 
 # Maps each format to the external packages its writer depends on.
@@ -56,6 +56,7 @@ _writer_deps = {
     "gms": ["pyscipopt"],
     "pip": ["pyscipopt"],
     "dimacs": ["pindakaas"],
+    "wcnf": ["pindakaas"],
     "opb": [],
 }
 

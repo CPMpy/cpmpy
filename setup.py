@@ -46,7 +46,7 @@ format_dependencies = {
     "io.scip": ["pyscipopt"],
     "io.dimacs": solver_dependencies["pindakaas"],  # Required for write_dimacs (uses to_cnf transformation)
     "io.opb": [],  # No external dependencies
-    "io.wcnf": [],  # No external dependencies
+    "io.wcnf": solver_dependencies["pindakaas"],  # Required for write(..., format="wcnf") via DIMACS writer path
     "io.xcsp3": ["pycsp3"],
 }
 format_dependencies["io.all"] = list({pkg for group in format_dependencies.values() for pkg in group})

@@ -24,7 +24,7 @@ to instructions on how to write your own dataset class.
 | Format | Extension | Load | Write | Domain |
 |--------|-----------|------|-------|--------|
 | **OPB** | `.opb` | ✅ | ✅ | Pseudo-Boolean optimization |
-| **WCNF** | `.wcnf` | ✅ | — | MaxSAT |
+| **WCNF** | `.wcnf` | ✅ | ✅ | MaxSAT |
 | **DIMACS** | `.cnf` | ✅ | ✅ | SAT |
 | **MPS** | `.mps` | ✅ | ✅ | Mixed integer programming |
 | **LP** | `.lp` | ✅ | ✅ | Linear/integer programming |
@@ -329,7 +329,7 @@ that you can assign to `dataset.transform` (or use inside `Compose`):
 |--------|---------|
 | **`Load`** | Load a file path into a CPMpy model. Accepts a custom `open` callable (e.g. for compressed files) and implements `enrich_metadata` to add `model_features` and `model_objects` to the instance metadata. |
 | **`Open`** | Open a file path and return its raw text contents (with optional custom `open` for decompression). No parsing. |
-| **`Serialize`** | Turn a CPMpy model into a string in a given format (e.g. `"opb"`, `"dimacs"`, `"mps"` or a writer function). |
+| **`Serialize`** | Turn a CPMpy model into a string in a given format (e.g. `"opb"`, `"wcnf"`, `"dimacs"`, `"mps"` or a writer function). |
 | **`Translate`** | Load from one format and serialize to another in one step (e.g. XCSP3 → OPB). Uses a custom `open` for reading and enriches metadata from the intermediate model. |
 | **`SaveToFile`** | Write the transform output (e.g. a string) to a file under a given directory; optional `.meta.json` sidecar. |
 | **`Compose`** | Chain several transforms; each step's output is passed to the next, and each step's `enrich_metadata` (if present) is called with its own output. |
@@ -363,7 +363,7 @@ for opb_string, info in dataset:
     print(len(opb_string), "bytes")
 ```
 
-`Translate` accepts a format name string (`"opb"`, `"dimacs"`, `"mps"`, …) or a
+`Translate` accepts a format name string (`"opb"`, `"wcnf"`, `"dimacs"`, `"mps"`, …) or a
 writer function directly. Under the hood it loads the instance into a CPMpy model
 and serializes it to the target format.
 
