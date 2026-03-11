@@ -242,27 +242,29 @@ the dataset as a whole. More info on metadata can be found in ...
 
 ### Loading instances into CPMpy models
 
-Use the dataset's `load` as the `transform` argument (PyTorch-style): 
+Use an IO loader as the `transform` argument (PyTorch-style): 
 
 ```python
 from cpmpy.tools.datasets import XCSP3Dataset
+from cpmpy.tools.io import load_xcsp3
 
 dataset = XCSP3Dataset(root="./data", year=2024, track="CSP", download=True, 
-                       transform=dataset.load)
+                       transform=load_xcsp3)
 
 for model, info in dataset:
     model.solve()
 ```
 
-Alternatively, call `load` on demand inside the loop:
+Alternatively, call an IO loader on demand inside the loop:
 
 ```python
 from cpmpy.tools.datasets import XCSP3Dataset
+from cpmpy.tools.io import load_xcsp3
 
 dataset = XCSP3Dataset(root="./data", year=2024, track="CSP", download=True)
 
 for file_path, info in dataset:
-    model = dataset.load(file_path)
+    model = load_xcsp3(file_path, open=dataset.open)
     model.solve()
 ```
 
@@ -280,11 +282,12 @@ loading the instance into a CPMpy model, and calling a writer (or the unified
 ```python
 from cpmpy.tools.datasets import XCSP3Dataset
 from cpmpy.tools.io import write
+from cpmpy.tools.io import load_xcsp3
 
 dataset = XCSP3Dataset(root="./data", year=2024, track="CSP", download=True)
 
 for file_path, info in dataset:
-    model = dataset.load(file_path)
+    model = load_xcsp3(file_path, open=dataset.open)
     opb_string = write(model, format="opb")   # or write(model, "out.opb")
     print(info.id, len(opb_string), "bytes")
 ```
@@ -304,14 +307,14 @@ yourself, or use the `SaveToFile` helper in the pipeline; see
 ```python
 from pathlib import Path
 from cpmpy.tools.datasets import XCSP3Dataset
-from cpmpy.tools.io import write
+from cpmpy.tools.io import write, load_xcsp3
 
 dataset = XCSP3Dataset(root="./data", year=2024, track="CSP", download=True)
 out_dir = Path("./translated")
 out_dir.mkdir(parents=True, exist_ok=True)
 
 for file_path, info in dataset:
-    model = dataset.load(file_path)
+    model = load_xcsp3(file_path, open=dataset.open)
     out_path = out_dir / f"{info.id.replace('/', '_')}.opb"
     write(model, str(out_path))   # format inferred from extension
     print("Saved:", out_path)
@@ -337,9 +340,10 @@ Example — load with custom `open` and metadata enrichment:
 ```python
 from cpmpy.tools.datasets import XCSP3Dataset
 from cpmpy.tools.datasets.transforms import Load
+from cpmpy.tools.io import load_xcsp3
 
 dataset = XCSP3Dataset(root="./data", year=2024, track="CSP", download=True)
-dataset.transform = Load(dataset.load, open=dataset.open)
+dataset.transform = Load(load_xcsp3, open=dataset.open)
 for model, info in dataset:
     # info.model_features, info.model_objects are populated by Load
     model.solve()
@@ -350,9 +354,10 @@ Example — translate to another format on the fly:
 ```python
 from cpmpy.tools.datasets import XCSP3Dataset
 from cpmpy.tools.datasets.transforms import Translate
+from cpmpy.tools.io import load_xcsp3
 
 dataset = XCSP3Dataset(root="./data", year=2024, track="CSP", download=True)
-dataset.transform = Translate(dataset.load, "opb", open=dataset.open)
+dataset.transform = Translate(load_xcsp3, "opb", open=dataset.open)
 
 for opb_string, info in dataset:
     print(len(opb_string), "bytes")
@@ -371,7 +376,7 @@ from cpmpy.tools.datasets.transforms import Compose, Translate, SaveToFile
 dataset = XCSP3Dataset(root="./data", year=2024, track="CSP", download=True)
 
 dataset.transform = Compose([
-    Translate(dataset.load, "opb", open=dataset.open),
+    Translate(load_xcsp3, "opb", open=dataset.open),
     SaveToFile("./translated/", extension=".opb", write_metadata=True),
 ])
 
@@ -386,9 +391,10 @@ Example — load to model, then serialize to string (Compose):
 
 ```python
 from cpmpy.tools.datasets.transforms import Compose, Load, Serialize
+from cpmpy.tools.io import load_xcsp3
 
 dataset.transform = Compose([
-    Load(dataset.load, open=dataset.open),
+    Load(load_xcsp3, open=dataset.open),
     Serialize("opb"),
 ])
 
@@ -439,20 +445,21 @@ The four metadata partitions:
 | `domain_metadata` | Problem-level, format-independent fields (`jobs`, `machines`, `horizon`, …) | ✅ |
 | `format_metadata` | Format-specific fields (`opb_*`, `wcnf_*`, `mps_*`, `xcsp_*`, `dimacs_*`) | ✅ |
 | `model_features` | CP model statistics: variable counts, constraint counts, objective info | ✅ |
-| `model_objects` | Live CPMpy objects: `variables` map — **only in-memory when the transform returns a CPMpy model (e.g. `dataset.load`, `Load`, `Translate`)** | ❌ |
+| `model_objects` | Live CPMpy objects: `variables` map — **only in-memory when the transform returns a CPMpy model (e.g. `load_*`, `Load`, `Translate`)** | ❌ |
 
 ### Reading solution values from metadata
 
-Any dataset loader that returns a CPMpy model (including using the dataset's `load`
-as the transform) populates `info.model_objects["variables"]` with a
+Any transform that returns a CPMpy model (including `cpmpy.tools.io.load_*`
+functions used as dataset transforms) populates `info.model_objects["variables"]` with a
 `{name: CPMpy_variable}` mapping. After solving, you can read values directly
 from that map without needing a separate reference to the variables:
 
 ```python
 from cpmpy.tools.datasets import JSPLibDataset
+from cpmpy.tools.io import load_jsplib
 
 dataset = JSPLibDataset(root="./data")
-dataset.transform = dataset.load
+dataset.transform = load_jsplib
 
 for model, info in dataset:
     if model.solve():
@@ -576,7 +583,7 @@ class TranslateToOPB:
 
 
 dataset = JSPLibDataset(root="./data")
-dataset.transform = TranslateToOPB(dataset.load, open=dataset.open)
+dataset.transform = TranslateToOPB(load_jsplib, open=dataset.open)
 
 for opb_string, info in dataset:
     print(info["jobs"])               # domain field: carried forward
@@ -702,7 +709,6 @@ The `cr:recordSet` describes the shape of each instance (e.g. one row per file);
 Subclass `FileDataset` and implement four things:
 
 ```python
-import cpmpy as cp
 from cpmpy.tools.datasets import FileDataset
 
 
@@ -723,11 +729,9 @@ class MyDataset(FileDataset):
             metadata_workers=metadata_workers,
         )
 
-    @staticmethod
-    def _loader(content: str) -> cp.Model:
-        """Parse raw file content and return a CPMpy model."""
-        # ... your parsing logic here ...
-        return cp.Model()
+    def parse(self, instance):
+        """Optional parse-first hook for non-model datasets."""
+        return self.read(instance)
 
     def category(self) -> dict:
         """Return category labels (e.g. year/track). Empty dict if none."""
@@ -931,7 +935,7 @@ with the output that step produced, so each transform sees its own output:
 from cpmpy.tools.datasets.transforms import Compose, Load, Serialize
 
 dataset.transform = Compose([
-    Load(dataset.load, open=dataset.open),     # file_path → CPMpy model
+    Load(load_xcsp3, open=dataset.open),       # file_path → CPMpy model
     Serialize("opb"),                          # CPMpy model → OPB string
 ])
 

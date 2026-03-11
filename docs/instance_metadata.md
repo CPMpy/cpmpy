@@ -188,9 +188,10 @@ else:
 
 ```python
 from cpmpy.tools.datasets.transforms import Translate, extract_format_metadata
+from cpmpy.tools.io import load_opb
 
 dataset = OPBDataset(root="./data", download=True)
-dataset.transform = Translate(dataset.load, "dimacs", open=dataset.open)
+dataset.transform = Translate(load_opb, "dimacs", open=dataset.open)
 
 for dimacs_string, info in dataset:
     # At this point info still has the old opb_* fields from the original file.
@@ -246,8 +247,8 @@ any additional fields you want to attach at the same time.
 
 ## Level 5 — Model objects and printing solution values
 
-When you set the dataset's transform to the dataset's loader (e.g.
-`dataset.transform = dataset.load`), each instance is loaded into a CPMpy
+When you set the dataset's transform to an IO loader (e.g.
+`dataset.transform = load_jsplib`), each instance is loaded into a CPMpy
 model and that model is the iteration value. But where do the *variable names*
 go? The model holds CPMpy variable objects, but the connection between a
 variable's string name and its object is not always easy to recover after the
@@ -260,9 +261,10 @@ the variable objects:
 
 ```python
 from cpmpy.tools.datasets import JSPLibDataset
+from cpmpy.tools.io import load_jsplib
 
 dataset = JSPLibDataset(root="./data", download=True)
-dataset.transform = dataset.load
+dataset.transform = load_jsplib
 
 for model, info in dataset:
     print(f"Solving {info['name']} ({info['jobs']}×{info['machines']})…")
@@ -346,7 +348,7 @@ class TranslateToOPB:
 
 
 dataset = JSPLibDataset(root="./data")
-dataset.transform = TranslateToOPB(dataset.load, open=dataset.open)
+dataset.transform = TranslateToOPB(load_jsplib, open=dataset.open)
 
 for opb_string, info in dataset:
     print(info["jobs"])               # domain field — carried forward automatically
@@ -361,9 +363,10 @@ the previous one, and each step's `enrich_metadata` is called with the output
 
 ```python
 from cpmpy.tools.datasets.transforms import Compose, Load, Serialize, SaveToFile
+from cpmpy.tools.io import load_jsplib
 
 dataset.transform = Compose([
-    Load(dataset.load, open=dataset.open),
+    Load(load_jsplib, open=dataset.open),
     # ↑ file path → CPMpy model; enrich_metadata adds model_features and
     #   variables to the metadata
 
@@ -654,10 +657,11 @@ into a DataFrame or a database insert:
 
 ```python
 from cpmpy.tools.datasets.metadata import to_croissant
+from cpmpy.tools.io import load_jsplib
 
 dataset = JSPLibDataset(
     root="./data",
-    transform=dataset.load,  # populate model_features
+    transform=load_jsplib,  # populate model_features
     target_transform=to_croissant,
 )
 
@@ -693,3 +697,102 @@ print(df.describe())
 | Dataset card (Markdown) | `MyDataset.card()` |
 | Croissant descriptor (JSON-LD) | `MyDataset.dataset_metadata().to_croissant()` |
 | ML-ready records per instance | `target_transform=to_croissant` or `to_gbd` |
+
+
+---
+
+ Here's the full analysis of all 519 failures across all translation jobs:
+
+  ────────────────────────────────────────
+
+
+
+  Overall Breakdown
+
+
+  ┌────────────────────────────┬───────┬─────┬─────────────────┐
+  │ Reason                     │ Count │ %   │ Status          │
+  ├────────────────────────────┼───────┼─────┼─────────────────┤
+  │ TIMEOUT (walltime limit)   │ 267   │ 51% │ Expected        │
+  │ MEMOUT (memory limit)      │ 182   │ 35% │ Expected        │
+  │ BUG: pindakaas `_set_option` │ 70    │ 14% │ Stale / fixable │
+  │ Total                      │ 519   │     │                 │
+  └────────────────────────────┴───────┴─────┴─────────────────┘
+
+  449 out of 519 failures (86%) are expected timeout/memout. Only 70 are "real" errors.
+
+  ────────────────────────────────────────
+
+
+
+  Per-Job Breakdown
+
+
+  ┌──────────────────────────┬────┬────┬───────┬───────┐
+  │ Job                      │ TO │ MO │ Other │ Total │
+  ├──────────────────────────┼────┼────┼───────┼───────┤
+  │ nurserostering -> dimacs │ 0  │ 7  │ 0     │ 7     │
+  │ nurserostering -> mps    │ 5  │ 1  │ 0     │ 6     │
+  │ nurserostering -> opb    │ 3  │ 2  │ 0     │ 5     │
+  │ opb DEC-LIN -> dimacs    │ 1  │ 22 │ 0     │ 23    │
+  │ opb DEC-LIN -> opb       │ 5  │ 0  │ 0     │ 5     │
+  │ opb OPT-LIN -> dimacs    │ 13 │ 21 │ 0     │ 34    │
+  │ opb OPT-LIN -> opb       │ 14 │ 4  │ 0     │ 18    │
+  │ xcsp3 COP -> dimacs      │ 28 │ 91 │ 0     │ 119   │
+  │ xcsp3 COP -> mps         │ 57 │ 7  │ 0     │ 64    │
+  │ xcsp3 COP -> opb         │ 51 │ 10 │ 0     │ 61    │
+  │ xcsp3 CSP -> dimacs      │ 10 │ 0  │ 70    │ 80    │
+  │ xcsp3 CSP -> mps         │ 52 │ 1  │ 0     │ 53    │
+  │ xcsp3 CSP -> opb         │ 28 │ 16 │ 0     │ 44    │
+  └──────────────────────────┴────┴────┴───────┴───────┘
+
+
+  ────────────────────────────────────────
+
+
+
+  The 70 Unexpected Failures: pindakaas `_set_option`
+
+  All 70 unexpected failures are xcsp3 CSP -> dimacs and all fail with the same error:
+
+  AttributeError: 'CaDiCaL' object has no attribute '_set_option'
+
+  This is caused by line 118 in libraries/cpmpy/cpmpy/solvers/pindakaas.py:
+
+   libraries/cpmpy/cpmpy/solvers/pindakaas.py lines 115-118
+
+          self.encoding = "auto"
+          self.pdk_solver = pdk.solver.CaDiCaL()
+          # TODO workaround for upstream issue https://github.com/pindakaashq/pindakaas/issues/189
+          self.pdk_solver._set_option("factor", 0)
+
+  However, these are stale failures. I verified that the currently installed pindakaas (0.4.1) now supports _set_option -- it works fine. These 70 instances failed during an
+   earlier run when an older pindakaas build was installed. The COP -> dimacs translations were retried after the fix and no longer show this error, but these 70 CSP ->
+  dimacs instances were never retried.
+  If you re-run the CSP -> dimacs translation, these 70 should succeed (unless they hit timeout/memout).
+  The 70 affected instances span 13 problem families: AverageAvoiding (9), FastMatrixMultiplication (7), Fillomino (6), HyperSudoku (2), MisteryShopper (10),
+  PoolBallTriangle (4), Soccer (2), SocialGolfers (2), SolitairePattern (5), Subisomorphism (1), Takuzu (8), WordSquare-hak (5), WordSquare-tab (9).
+
+  ────────────────────────────────────────
+
+
+
+  Key Observations
+
+  1. DIMACS is the hardest target format -- it has the most memouts (especially COP: 91 memout vs 7-10 for mps/opb), because CNF encoding explodes the representation size
+     for integer-domain constraints.
+  2. MPS has more timeouts than OPB -- COP: 57 TO for mps vs 51 for opb; CSP: 52 TO for mps vs 28 for opb. This is because the MPS pipeline goes through SCIP's C API
+     (overhead of constructing a SCIP model object, then serializing), while OPB writes directly to text.
+  3. No segfaults, no linearization errors, no other bugs in the current failure set. All "real" failures are resource exhaustion.
+
+
+  ⬢ To-do All done
+    ☒ Gather all failures across all jobs and formats, categorize by root cause
+    ☒ Identify non-timeout/non-memout failures and analyze their causes
+    ☒ Present summary statistics
+
+
+---
+
+ python scripts/translate_all.py --config translate_table_all.yaml --execution-mode himec --out-root ./transform_results --workers 30 --memory-limit-mb 160
+00 --time-limit 1200 --format dimacs --retry-failed
