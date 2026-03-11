@@ -124,7 +124,7 @@ class CPM_gcs(SolverInterface):
         except PackageNotFoundError:
             return None
 
-    def __init__(self, cpm_model=None, subsolver=None):
+    def __init__(self, cpm_model=None, subsolver=None, proof=None):
         """
         Constructor of the native solver object
 
@@ -142,8 +142,8 @@ class CPM_gcs(SolverInterface):
         # initialise the native solver object
         self.gcs = gcspy.GCS()
         self.objective_var = None
-        self.proof_location = None
-        self.proof_name = None
+        self._proof = proof
+
         self.proof_check_timeout = True
         self.veripb_return_code = False
 
@@ -179,33 +179,28 @@ class CPM_gcs(SolverInterface):
             Returns: 
                 whether a solution was found.
         """
+        if "proof" in kwargs or "prove" in kwargs or "prove_location" in kwargs or "proof_name" in kwargs:
+            raise ValueError("Proof-file should be supplied in the constructor, not as a keyword argument to solve."
+                             "`cpmpy.SolverLookup.get('gcs', model, proof='path/to/proof')`")
+
+        if verify is True and self._proof is None:
+            raise ValueError("Verify was set to True, but no proof name was supplied.")
+
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
         
-        # If we're verifying we must be proving
-        prove |= verify
-        # Set default proof name to name of file containing __main__
-        if prove and proof_name is None:
-            if hasattr(sys.modules['__main__'], "__file__"):
-                self.proof_name = path.splitext(path.basename(sys.modules['__main__'].__file__))[0]
-            else:
-                self.proof_name = "gcs_proof"
-        else:
-            self.proof_name = proof_name
-        self.proof_location = proof_location
-     
         # set time limit
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
-                 
+
         # call the solver, with parameters    
         self.gcs_result = self.gcs.solve(
             all_solutions=self.has_objective(), 
             timeout=time_limit,
             callback=None,
-            prove=prove,
-            proof_name=self.proof_name,
-            proof_location=proof_location,
+            prove=self._proof is not None,
+            proof_name=self._proof,
+            proof_location=".",
             **kwargs)
 
         # new status, translate runtime
@@ -331,7 +326,7 @@ class CPM_gcs(SolverInterface):
             solution_limit=solution_limit, 
             callback=sol_callback, 
             prove=prove, 
-            proof_name=proof_name, 
+            proof_name=self._proof,
             proof_location=proof_location, **kwargs)
 
         # new status, get runtime
@@ -701,6 +696,15 @@ class CPM_gcs(SolverInterface):
 
         return self
     __add__ = add  # avoid redirect in superclass
+
+    def get_proof_files(self) -> tuple[str,str,str]:
+        """
+        Returns a tuple with the proof files generated during the last solve call.
+        - opb file
+        - veripb proof file
+        - varmap linking Boolean variables to CP variables
+        """
+        return (f"{self._proof}.opb", f"{self._proof}.pbp", f"{self._proof}.varmap")
 
 
         

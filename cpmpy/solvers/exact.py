@@ -115,7 +115,7 @@ class CPM_exact(SolverInterface):
             return None
 
 
-    def __init__(self, cpm_model=None, subsolver=None, **kwargs):
+    def __init__(self, cpm_model=None, subsolver=None, proof=None, **kwargs):
         """
         Constructor of the native solver object
 
@@ -125,6 +125,7 @@ class CPM_exact(SolverInterface):
         Arguments:
             cpm_model: Model(), a CPMpy Model() (optional)
             subsolver: None
+            proof: None, path to proof file when proof-logging (will be appended with .proof and .formula)
 
         Exact takes options at initialization instead of solving.
         The Exact solver parameters are defined by https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
@@ -135,11 +136,14 @@ class CPM_exact(SolverInterface):
             raise ModuleNotFoundError("CPM_exact: Install the python package 'cpmpy[exact]' to use this solver interface.")
         
         assert subsolver is None, "Exact does not allow subsolvers."
+        self._proof = proof
 
         from exact import Exact as xct
         # initialise the native solver object
         options = list(kwargs.items()) # options is a list of string-pairs, e.g. [("verbosity","1")]
         options = [(opt[0], str(opt[1])) for opt in options] # Ensure values are also strings
+        if proof is not None:
+            options += [('proof-log', proof)]
         self.xct_solver = xct(options)
 
         # can override encoding of variables
@@ -666,3 +670,12 @@ class CPM_exact(SolverInterface):
         vals = flatlist(vals)
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
         self.xct_solver.setSolutionHints(list(zip(self.solver_vars(cpm_vars), vals)))
+
+    def get_proof_files(self) -> tuple[str,str]:
+        """
+        Returns the list of VeriPb proof-files generated:
+        """
+        if self._proof is None:
+            raise ValueError("No proof name provided at construction time of the solver. Use cpmpy.SolverLookup.get('exact', model, proof=...)")
+
+        return (f"{self._proof}.formula", f"{self._proof}.proof")
