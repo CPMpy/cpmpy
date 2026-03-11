@@ -6,7 +6,6 @@ https://www.om-db.wi.tum.de/psplib/getdata_sm.html
 
 import os
 import pathlib
-import io
 import zipfile
 
 from cpmpy.tools.datasets.core import FileDataset
@@ -27,11 +26,6 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         "Kolisch, R., Sprecher, A. PSPLIB - A project scheduling problem library. European Journal of Operational Research, 96(1), 205-216, 1997.",
     ]
 
-    version = "1.0.0"
-    license = "academic-use"
-    domain = "scheduling"
-    tags = ["optimization", "project-scheduling", "rcpsp", "scheduling", "combinatorial"]
-    language = "PSPLIB"
     features = FeaturesInfo({
         "num_jobs":                        ("int",  "Number of jobs (activities) in the project"),
         "horizon":                         ("int",  "Planning horizon (maximum makespan upper bound)"),
@@ -86,25 +80,11 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-    @staticmethod
-    def reader(file_path, open=open):
+    def parse(self, instance: os.PathLike):
         """
-        Reader for PSPLib dataset.
-        Parses a file path directly into a CPMpy model.
-        For backward compatibility. Consider using read() + load() instead.
+        Parse a PSPLIB RCPSP instance into job data and capacities.
         """
-        from cpmpy.tools.io.rcpsp import load_rcpsp
-        return load_rcpsp(file_path, open=open)
-
-    @staticmethod
-    def _loader(content: str):
-        """
-        Loader for PSPLib dataset.
-        Loads a CPMpy model from raw RCPSP content string.
-        """
-        from cpmpy.tools.io.rcpsp import load_rcpsp
-        # load_rcpsp already supports raw strings
-        return load_rcpsp(content)
+        return parse_rcpsp(instance)
         
     def category(self) -> dict:
         return {
@@ -203,3 +183,20 @@ if __name__ == "__main__":
     dataset = PSPLibDataset(variant="rcpsp", family="j30", download=True)
     print("Dataset size:", len(dataset))
     print("Instance 0:", dataset[0])
+
+
+def parse_rcpsp(filename: str):
+    """
+    Parse an RCPSP instance into tabular task data and resource capacities.
+    """
+    from cpmpy.tools.io.rcpsp import _parse_rcpsp
+    with open(filename, "r") as f:
+        return _parse_rcpsp(f)
+
+
+def model_rcpsp(job_data, capacities):
+    """
+    Build a CPMpy RCPSP model from parsed task data and capacities.
+    """
+    from cpmpy.tools.io.rcpsp import _model_rcpsp
+    return _model_rcpsp(job_data=job_data, capacities=capacities)

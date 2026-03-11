@@ -420,7 +420,8 @@ class InstanceInfo(dict):
 
         .. code-block:: python
 
-            dataset.transform = Load(dataset.loader, open=dataset.open)
+            from cpmpy.tools.io import load_jsplib
+            dataset.transform = Load(load_jsplib, open=dataset.open)
             model, info = dataset[0]
 
             vars = info.model_objects["variables"]

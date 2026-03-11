@@ -10,7 +10,6 @@ import lzma
 import os
 import pathlib
 import re
-import tempfile
 from urllib.request import Request, urlopen
 
 from cpmpy.tools.datasets.core import FileDataset
@@ -29,11 +28,7 @@ class SATDataset(FileDataset):
     description = "SAT competition benchmark instances (DIMACS CNF) from benchmark-database.de."
     homepage = "https://benchmark-database.de/"
     citation = []
-    version = "2025"
-    license = "competition-specific"
-    domain = "sat"
-    tags = ["satisfaction", "sat", "cnf", "dimacs"]
-    language = "DIMACS-CNF"
+    
     features = FeaturesInfo({
         "dimacs_num_variables": ("int", "Number of propositional variables from DIMACS p-line"),
         "dimacs_num_clauses": ("int", "Number of clauses from DIMACS p-line"),
@@ -74,17 +69,6 @@ class SATDataset(FileDataset):
             extension=".cnf.xz",
             **kwargs,
         )
-
-    @staticmethod
-    def _loader(content: str):
-        from cpmpy.tools.io.dimacs import load_dimacs
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".cnf") as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
-        try:
-            return load_dimacs(tmp_path)
-        finally:
-            os.unlink(tmp_path)
 
     def category(self) -> dict:
         return {"track": self.track, "context": self.context}

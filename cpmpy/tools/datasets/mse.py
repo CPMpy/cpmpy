@@ -12,8 +12,6 @@ import zipfile
 import pathlib
 import io
 
-import cpmpy as cp
-from cpmpy.tools.io.wcnf import load_wcnf
 from cpmpy.tools.datasets.core import FileDataset
 from cpmpy.tools.datasets.metadata import FeaturesInfo
 
@@ -39,11 +37,6 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
     homepage = "https://maxsat-evaluations.github.io/"
     citation = []
 
-    version = "2024"
-    license = "competition-specific"
-    domain = "max_sat"
-    tags = ["optimization", "max-sat", "weighted-max-sat", "wcnf"]
-    language = "WCNF"
     features = FeaturesInfo({
         "wcnf_num_variables":        ("int", "Number of propositional variables"),
         "wcnf_num_clauses":          ("int", "Total number of clauses (hard + soft)"),
@@ -101,14 +94,6 @@ class MaxSATEvalDataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-
-    @staticmethod
-    def _loader(content: str) -> cp.Model:
-        """
-        Loader for MaxSAT Evaluation dataset.
-        Loads a CPMpy model from raw WCNF content string.
-        """
-        return load_wcnf(content)
 
     def category(self) -> dict:
         return {

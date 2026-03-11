@@ -17,7 +17,6 @@ to the specific usecase requirements of constraint optimisation benchmarks.
 
 To implement a new dataset, one needs to subclass one of the abstract dataset classes,
 and provide implementation for the following methods:
-- _loader: loads a CPMpy model from a string representation of the instance (file)
 - category: return a dictionary of category labels, describing to which subset the dataset has been restricted (year, track, ...)
 - download: download the dataset (helper function :func:`_download_file` is provided)
 
@@ -79,7 +78,7 @@ The dataset also supports PyTorch-style transforms and target transforms.
     from cpmpy.tools.io import load_wcnf
     from cpmpy.tools.datasets.metadata import to_croissant
 
-    dataset = MyDataset(download=True, transform=load_wcnf(x), target_transform=to_croissant)
+    dataset = MyDataset(download=True, transform=load_wcnf, target_transform=to_croissant)
     for model, croissant_record in dataset:
         ...
 
@@ -88,7 +87,7 @@ make use of the PyTorch tooling ecosystem (thanks to our compatible interface).
 
 Example:
 .. code-block:: python
-    dataset = MyDataset(download=True, transform=load_wcnf(x), target_transform=to_croissant)
+    dataset = MyDataset(download=True, transform=load_wcnf, target_transform=to_croissant)
     
     from torch.utils.data import random_split
     train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
@@ -596,6 +595,17 @@ class FileDataset(IndexedDataset):
     Either have a look at one of the concrete subclasses, providing access to 
     well-known datasets from the community, or use this class as the base for your own dataset.
 
+    Two dataset styles are supported:
+
+    - Model-defined instances: files directly encode variables/constraints/objective
+      (for example XCSP3, OPB, DIMACS, FlatZinc). In this case, users typically
+      pass a loader from ``cpmpy.tools.io`` as ``transform``.
+    - Data-only instances: files encode problem data for a fixed family, but no
+      model. In this case, subclasses should override ``parse()`` and users can
+      enable ``parse=True`` to obtain parsed intermediate data structures
+      (for example table/dict structures for RCPSP-style scheduling data), then
+      build a model separately or via a transform.
+
     For a more detailed authoring guide (design patterns, metadata conventions,
     and implementation checklist), see :ref:`datasets_advanced_authoring`.
     """
@@ -608,6 +618,7 @@ class FileDataset(IndexedDataset):
             dataset_dir: str = ".",
             transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
+            parse: bool = False,
             extension: str = ".txt",
             **kwargs
         ):
@@ -619,6 +630,9 @@ class FileDataset(IndexedDataset):
             transform (callable, optional): Optional transform applied to the instance file path.
             target_transform (callable, optional): Optional transform applied to the metadata dictionary.
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
+            parse (bool): If True, run ``self.parse(instance_path)`` before
+                applying ``transform``. Intended for data-only datasets that do
+                not directly encode a CPMpy model in the source file.
             extension (str): Extension of the instance files. Used to filter instance files from the dataset directory.
             **kwargs: Advanced options. Currently supports:
                 - metadata_workers (int): Number of parallel workers for
@@ -635,6 +649,7 @@ class FileDataset(IndexedDataset):
 
         self.dataset_dir = pathlib.Path(dataset_dir)
         self.extension = extension
+        self._parse = parse
 
         # Advanced options
         metadata_workers = kwargs.pop("metadata_workers", 1)
@@ -666,20 +681,6 @@ class FileDataset(IndexedDataset):
     #                     Methods to implement in subclasses:                      #
     # ---------------------------------------------------------------------------- #
 
-    @staticmethod
-    @abstractmethod
-    def _loader(content: str) -> cp.Model:
-        """
-        Loader for the dataset. Loads a CPMpy model from raw file content string.
-        The content will be the raw text content of the file (already decompressed).
-        
-        Arguments:
-            content (str): Raw file content string to load into a model.
-            
-        Returns:
-            cp.Model: The loaded CPMpy model.
-        """
-        pass
 
     @abstractmethod
     def categories(self) -> dict:
@@ -744,37 +745,30 @@ class FileDataset(IndexedDataset):
         with self.open(instance) as f:
             return f.read()
 
+    def parse(self, instance: os.PathLike):
+        """
+        Parse an instance file into intermediate data structures.
+
+        Override this for datasets whose files contain problem data but not an
+        explicit model. Typical outputs are structures like tables, arrays, and
+        dictionaries that can then be passed to a separate model-construction
+        function.
+
+        Default behavior is ``read(instance)``, i.e. return raw text content.
+
+        Arguments:
+            instance (os.PathLike): File path to the instance file.
+
+        Returns:
+            The parsed intermediate data structure(s).
+        """
+        return self.read(instance)
+
 
     # ---------------------------------------------------------------------------- #
     #                               Public interface                               #
     # ---------------------------------------------------------------------------- #
 
-    def load(self, instance: Union[str, os.PathLike]) -> cp.Model:
-        """
-        Load a CPMpy model from an instance file.
-        
-        Uses `.read()` to handle reading (decompressing + reading raw contents) and then turns 
-        raw contents into a CPMpy model via `.loader()`.
-        
-        Arguments:
-            instance (str or os.PathLike): 
-                - File path to the instance file
-                - OR a string containing the instance content directly
-            
-        Returns:
-            cp.Model: The loaded CPMpy model.
-        """
-
-        # If instance is a path to a file -> open file
-        if isinstance(instance, (str, os.PathLike)) and os.path.exists(instance):
-           # Reading - use read() to decompress and read raw file contents
-            content = self.read(instance)
-        # If instance is a string containing a model -> use it directly
-        else:
-            content = instance
-
-        # Loading - turn raw contents into CPMpy model
-        return self._loader(content)
 
     def instance_metadata(self, instance: os.PathLike) -> InstanceInfo:
         """
@@ -855,16 +849,41 @@ class FileDataset(IndexedDataset):
         if self.target_transform:
             metadata = self.target_transform(metadata)
 
+        data = filename
+
+        # Built-in parse stage: parse the instance file into intermediate data structures.
+        # Mostly meant for datasets where files represent data and modeling is separate.
+        if self._parse:
+            data = self.parse(data)
+
         if self.transform:
-            filename = self.transform(filename)
+            # TODO revisit this flow of execution
+            if isinstance(data, (str, os.PathLike)):
+                # Convenience for io loaders: pass dataset.open when supported.
+                try:
+                    data = self.transform(data, open=self.open)
+                except TypeError:
+                    data = self.transform(data)
+            else:
+                try:
+                    data = self.transform(data)
+                except TypeError as exc:
+                    # Convenience for parse-first datasets where parse() returns
+                    # tuples and model builders take positional args.
+                    if isinstance(data, tuple):
+                        data = self.transform(*data)
+                    else:
+                        raise exc
             # Let transforms contribute to metadata (e.g. model verification info)
             if hasattr(self.transform, 'enrich_metadata'):
-                metadata = self.transform.enrich_metadata(filename, metadata)
-            elif isinstance(filename, cp.Model):
-                # Transform returned a CPMpy model (e.g. dataset.load); enrich from model
-                metadata = _enrich_from_model(filename, metadata)
+                metadata = self.transform.enrich_metadata(data, metadata)
+            elif isinstance(data, cp.Model):
+                # Transform returned a CPMpy model; enrich metadata from model details.
+                metadata = _enrich_from_model(data, metadata)
+        elif isinstance(data, cp.Model):
+            metadata = _enrich_from_model(data, metadata)
 
-        return filename, metadata
+        return data, metadata
 
 
     # ---------------------------- Metadata collection --------------------------- #
@@ -1207,9 +1226,6 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
         @property
         def citation(self) -> List[str]:
             raise NotImplementedError("Arbitrary file dataset does not support a citation. Please implement this method in a subclass, or use a more specific dataset class.")
-
-        def _loader(self, file: os.PathLike) -> cp.Model:
-            raise NotImplementedError("Arbitrary file dataset does not support loading. Please implement this method in a subclass, or use a more specific dataset class.")
 
         def category(self) -> dict:
             raise NotImplementedError("Arbitrary file dataset does not support categories. Please implement this method in a subclass, or use a more specific dataset class.")

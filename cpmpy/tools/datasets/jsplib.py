@@ -39,11 +39,6 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         "E. Taillard. 'Benchmarks for basic scheduling problems', European Journal of Operational Research, Vol. 64, Issue 2, pp. 278-285, 1993.",
     ]
 
-    version = "1.0.0"
-    license = "MIT"
-    domain = "scheduling"
-    tags = ["optimization", "job-shop-scheduling", "scheduling", "combinatorial"]
-    language = "JSPLib"
     features = FeaturesInfo({
         "jobs":                 ("int", "Number of jobs"),
         "machines":             ("int", "Number of machines"),
@@ -76,15 +71,11 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-    @staticmethod
-    def _loader(content: str):
+    def parse(self, instance: os.PathLike):
         """
-        Loader for JSPLib dataset.
-        Loads a CPMpy model from raw JSPLib content string.
+        Parse a JSPLib instance into task routing and durations.
         """
-        from cpmpy.tools.io.jsplib import load_jsplib
-        # load_jsplib already supports raw strings
-        return load_jsplib(content)
+        return parse_jsp(instance)
 
     def category(self) -> dict:
         return {}  # no categories
@@ -211,7 +202,7 @@ def parse_jsp(filename: str):
         return task_to_machines, task_durations
 
 
-def jobshop_model(task_to_machines, task_durations):
+def model_jobshop(task_to_machines, task_durations):
 
     """
     Create a CPMpy model for the Jobshop problem.

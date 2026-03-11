@@ -10,7 +10,6 @@ import zipfile
 import pathlib
 import io
 
-import cpmpy as cp
 from cpmpy.tools.datasets.core import FileDataset
 from cpmpy.tools.datasets.metadata import FeaturesInfo
 
@@ -36,11 +35,6 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
         "Audemard, G., Boussemart, F., Lecoutre, C., Piette, C., Tabary, S. XCSP3: An Integrated Format for Benchmarking Combinatorial Constrained Problems. arXiv:2009.00514, 2020.",
     ]
 
-    version = "2024"
-    license = "competition-specific"
-    domain = "constraint_programming"
-    tags = ["satisfaction", "optimization", "xcsp3", "combinatorial"]
-    language = "XCSP3"
     features = FeaturesInfo({
         "instance_type": ("str", "Problem type declared in the XML root element (CSP, COP, WCSP, …)"),
         "xcsp_format":   ("str", "XCSP format version string from the XML header"),
@@ -70,16 +64,6 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-
-    @staticmethod
-    def _loader(content: str) -> cp.Model:
-        """
-        Loader for XCSP3 dataset.
-        Loads a CPMpy model from raw XCSP3 content string.
-        """
-        from cpmpy.tools.xcsp3.parser import load_xcsp3
-        # load_xcsp3 already supports raw strings
-        return load_xcsp3(content)
 
     def category(self) -> dict:
         return {

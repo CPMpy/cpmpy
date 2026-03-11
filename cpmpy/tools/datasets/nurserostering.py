@@ -49,11 +49,6 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
         "Rahimian, E., Akartunali, K., and Levine, J. A hybrid integer programming and variable neighbourhood search algorithm to solve nurse rostering problems. European Journal of Operational Research, 2017. 258(2): p. 411-423.",
     ]
 
-    version = "1.0.0"
-    license = "academic-use"
-    domain = "scheduling"
-    tags = ["satisfaction", "nurse-rostering", "scheduling", "timetabling"]
-    language = "NRP-XML"
     features = FeaturesInfo({
         "horizon":    ("int", "Planning horizon in days"),
         "num_staff":  ("int", "Number of nurses / staff members"),
@@ -86,25 +81,11 @@ class NurseRosteringDataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-    @staticmethod
-    def reader(file_path, open=open):
+    def parse(self, instance: os.PathLike):
         """
-        Reader for Nurse Rostering dataset.
-        Parses a file path directly into a CPMpy model.
-        For backward compatibility. Consider using read() + load() instead.
+        Parse a nurse rostering instance into native Python data structures.
         """
-        from cpmpy.tools.io.nurserostering import load_nurserostering
-        return load_nurserostering(file_path, open=open)
-
-    @staticmethod
-    def _loader(content: str):
-        """
-        Loader for Nurse Rostering dataset.
-        Loads a CPMpy model from raw Nurse Rostering content string.
-        """
-        from cpmpy.tools.io.nurserostering import load_nurserostering
-        # load_nurserostering already supports raw strings
-        return load_nurserostering(content)
+        return parse_scheduling_period(instance)
 
     def category(self) -> dict:
         return {}  # no categories
@@ -416,7 +397,7 @@ def to_dataframes(data):
     return result
 
 
-def nurserostering_model(horizon, shifts, staff, days_off, shift_on, shift_off, cover):
+def model_nurserostering(horizon, shifts, staff, days_off, shift_on, shift_off, cover):
     """
     Create a CPMpy model for nurserostering.
     
@@ -521,7 +502,7 @@ if __name__ == "__main__":
     data, metadata = dataset[0]
     print(data)
 
-    model, nurse_view = nurserostering_model(**data)
+    model, nurse_view = model_nurserostering(**data)
     assert model.solve()
 
     print(f"Found optimal solution with penalty of {model.objective_value()}")

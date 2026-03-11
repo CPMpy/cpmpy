@@ -263,8 +263,8 @@ class Load:
 
     Arguments:
         loader (callable): A loader function that takes raw content string and
-            returns a CPMpy model. Can be a dataset's ``loader`` method or a
-            loader function that supports raw strings (e.g., ``load_wcnf``,
+            returns a CPMpy model. Usually imported from ``cpmpy.tools.io`` and
+            supporting raw string input (e.g., ``load_wcnf``,
             ``load_opb``, ``load_xcsp3``, etc.).
         open (callable, optional): A callable to open files for reading.
             Typically ``dataset.open``. Defaults to Python's built-in ``open``.
@@ -272,11 +272,7 @@ class Load:
 
     Example::
 
-        >>> # Using dataset's loader method
-        >>> dataset = MSEDataset(transform=Load(dataset.loader, open=dataset.open))
-        >>> model, metadata = dataset[0]
-        
-        >>> # Using a loader function that supports raw strings
+        >>> # Using an io loader function
         >>> from cpmpy.tools.io.wcnf import load_wcnf
         >>> dataset = MSEDataset(transform=Load(load_wcnf, open=dataset.open))
         >>> model, metadata = dataset[0]
@@ -376,9 +372,9 @@ class Translate:
 
     Arguments:
         loader (callable): A loader function that takes raw content string and
-            returns a CPMpy model. Can be a dataset's ``loader`` method or a
-            loader function that supports raw strings (e.g., ``load_wcnf``,
-            ``read_opb``, ``read_xcsp3``, etc.).
+            returns a CPMpy model. Usually imported from ``cpmpy.tools.io`` and
+            supporting raw string input (e.g., ``load_wcnf``, ``load_opb``,
+            ``load_xcsp3``, etc.).
         writer (callable or str): Either a writer function (e.g., ``write_dimacs``, ``write_opb``)
             or a format name string (e.g., ``"dimacs"``, ``"mps"``) that will be resolved
             to the appropriate writer function.
@@ -388,14 +384,15 @@ class Translate:
 
     Example::
 
+        >>> from cpmpy.tools.io.wcnf import load_wcnf
         >>> # Using format name string
-        >>> transform = Translate(dataset.loader, "dimacs", open=dataset.open)
+        >>> transform = Translate(load_wcnf, "dimacs", open=dataset.open)
         >>> dataset = MSEDataset(transform=transform)
         >>> dimacs_string, metadata = dataset[0]
         
         >>> # Using writer function directly
         >>> from cpmpy.tools.io.dimacs import write_dimacs
-        >>> transform = Translate(dataset.loader, write_dimacs, open=dataset.open)
+        >>> transform = Translate(load_wcnf, write_dimacs, open=dataset.open)
         >>> dataset = MSEDataset(transform=transform)
         >>> dimacs_string, metadata = dataset[0]
         >>> metadata['variables']  # from the intermediate model

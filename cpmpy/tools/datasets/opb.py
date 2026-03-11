@@ -35,11 +35,6 @@ class OPBDataset(FileDataset):
         "Berre, D. L., Parrain, A. The Pseudo-Boolean Evaluation 2011. JSAT, 7(1), 2012.",
     ]
 
-    version = "2024"
-    license = "competition-specific"
-    domain = "pseudo_boolean"
-    tags = ["optimization", "pseudo-boolean", "opb", "combinatorial"]
-    language = "OPB"
     features = FeaturesInfo({
         "author":              ("str", "Author extracted from filename convention"),
         "opb_num_variables":   ("int", "Number of Boolean variables (from OPB header)"),
@@ -93,16 +88,6 @@ class OPBDataset(FileDataset):
             download=download, extension=".opb.xz",
             **kwargs
         )
-
-    @staticmethod
-    def _loader(content: str):
-        """
-        Loader for OPB dataset.
-        Loads a CPMpy model from raw OPB content string.
-        """
-        from cpmpy.tools.io.opb import load_opb
-        # load_opb already supports raw strings
-        return load_opb(content)
 
     def category(self) -> dict:
         return {
