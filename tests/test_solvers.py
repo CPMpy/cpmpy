@@ -1237,6 +1237,28 @@ class TestSupportedSolvers:
         assert model.solve(solver)
         assert model.solveAll(solver, **kwargs) == 2
 
+    def test_prooflogging(self, solver):
+
+        cls = cp.SolverLookup.lookup(solver)
+        args = inspect.signature(cls.__init__)
+        if "proof" not in args.parameters.keys():
+            pytest.skip(reason=f"{solver} does not support prooflogging")
+
+        x,y,z = cp.intvar(1,5,shape=3)
+        m = cp.Model(x < y, y < z, z < x)
+
+        prooffile = tempfile.NamedTemporaryFile(delete=False)
+        solver = cp.SolverLookup.get(solver, m, proof=f"{solver}_proof")
+        assert solver.solve() is False
+
+        for file in solver.get_proof_files():
+            with open(file, "r") as f:
+                print(f"Reading {file}")
+                proof = f.read()
+                print(proof)
+                assert len(proof) > 0, f"proof file {file} is empty"
+
+
 
 @pytest.mark.generate_constraints.with_args(numexprs)
 def test_objective_numexprs(solver, constraint):
