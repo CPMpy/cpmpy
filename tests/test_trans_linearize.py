@@ -645,7 +645,6 @@ class TestLinearizeReifiedVariablesThreshold:
         a = self.a
         out = []
         for con in [(a == 1) | (a != 2), (a == 3) | (a == 2)]:
-            cpm_cons = toplevel_list(con)
             cpm_cons = flatten_constraint(con, csemap=self.csemap)
             out += linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
 
