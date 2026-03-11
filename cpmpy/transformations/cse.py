@@ -1,8 +1,8 @@
 import warnings
 from math import floor, ceil
 
-from ..expressions.core import Expression
-from ..expressions.variables import _NumVarImpl, boolvar, intvar
+from ..expressions.core import Expression, Comparison
+from ..expressions.variables import _NumVarImpl, boolvar, intvar, _BoolVarImpl
 from ..expressions.utils import is_int
 
 
@@ -54,15 +54,29 @@ class CSEMap:
         """
 
         if expr.is_bool():
-            if expr in self._bool_map:                
-                return self._bool_map[expr]
-            var = boolvar()
-            self._bool_map[expr] = var
-            return var, [expr == var]
+            negate = False
+
+            # normalization, we don't store var != val in the csemap
+            if isinstance(expr, Comparison) and expr.name == "!=":
+                lhs, rhs = expr.args
+                if isinstance(lhs, _NumVarImpl) and is_int(rhs):
+                    expr = lhs == rhs # negate the comparison
+                    negate = True
+
+            if expr in self._bool_map:
+                var, cons = self._bool_map[expr], []
+
+            else: # unknown expression, make new var
+                var = boolvar()
+                self._bool_map[expr] = var
+                cons = expr == var
+
+            return var if negate is False else ~var, cons
         
         else:
             if expr in self._int_map:
-                return self._int_map[expr]
+                return self._int_map[expr], []
+
             lb, ub = expr.get_bounds()
             if not is_int(lb) or not is_int(ub):
                 warnings.warn(f"CPMpy only uses integer variables, but found expression ({expr}) with domain {lb}({type(lb)}"
