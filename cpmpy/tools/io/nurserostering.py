@@ -27,7 +27,7 @@ from typing import Union
 
 from cpmpy.tools.datasets.nurserostering import (
     parse_scheduling_period,
-    nurserostering_model
+    model_nurserostering
 )
 
 
@@ -61,7 +61,7 @@ def load_nurserostering(instance: Union[str, os.PathLike], open=open) -> cp.Mode
         data = parse_scheduling_period(fname)
         
         # Create the CPMpy model using the existing model builder
-        model, _ = nurserostering_model(**data)
+        model, _ = model_nurserostering(**data)
         
         return model
     finally:
