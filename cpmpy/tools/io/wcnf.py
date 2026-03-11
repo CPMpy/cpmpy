@@ -56,7 +56,7 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
     # If wcnf is a path to a file -> open file
     if isinstance(wcnf, (str, os.PathLike)) and os.path.exists(wcnf):
         if open is not None:
-            f = open(wcnf)
+            f = open(wcnf, "rt")
         else:
             f = _std_open(wcnf, "rt")
     # If wcnf is a string containing a model -> create a memory-mapped file
@@ -66,12 +66,15 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
     model = cp.Model()
     vars = {}
     soft_terms = []
-
     for raw in f:
         line = raw.strip()
 
         # Empty line or a comment -> skip
         if not line or line.startswith("c"):
+            continue
+
+        # Problem line: ignore header
+        if line.startswith("p"):
             continue
 
         # Hard clause
