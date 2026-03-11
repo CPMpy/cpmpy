@@ -1,4 +1,3 @@
-import unittest
 import cpmpy as cp
 
 
@@ -100,6 +99,3 @@ class TestToCnf:
         assert len(sols) < 100, sols
         return sols
 
-
-if __name__ == "__main__":
-    unittest.main()

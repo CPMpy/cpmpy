@@ -5,7 +5,6 @@ Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of 
 import cpmpy as cp
 from typing import Optional
 from ..solvers.pindakaas import CPM_pindakaas
-from ..transformations.get_variables import get_variables
 from .cse import CSEMap
 
 def to_cnf(constraints, csemap:Optional[CSEMap]=None, ivarmap=None, encoding="auto"):
@@ -30,7 +29,8 @@ def to_cnf(constraints, csemap:Optional[CSEMap]=None, ivarmap=None, encoding="au
 
     if ivarmap is not None:
         slv.ivarmap = ivarmap
-    slv._csemap = csemap
+    if csemap is not None:
+        slv._csemap = csemap
 
     # the encoded constraints (i.e. `PB`s) will be added to this `pdk.CNF` object
     slv.pdk_solver = pdk.CNF()

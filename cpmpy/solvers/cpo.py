@@ -74,7 +74,7 @@ class CPM_cpo(SolverInterface):
 
     supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",
                                               'cumulative', 'no_overlap',
-                                              "min", "max", "abs", "div", "mod", "pow", "element", "nvalue"})
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "nvalue"})
     supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
 
     _docp = None  # Static attribute to hold the docplex.cp module
@@ -505,14 +505,10 @@ class CPM_cpo(SolverInterface):
                 x = self._cpo_expr(cpm_con.args[1])
                 return dom.scal_prod(w,x)
 
-            # 'sub'/2, 'mul'/2
-            elif arity == 2 or cpm_con.name == "mul":
-                assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
+            # 'sub'/2
+            elif cpm_con.name == 'sub':
                 x, y = self._cpo_expr(cpm_con.args)
-                if cpm_con.name == 'sub':
-                    return x - y
-                elif cpm_con.name == "mul":
-                    return x * y
+                return x - y
             # '-'/1
             elif cpm_con.name == "-":
                 return -self._cpo_expr(cpm_con.args[0])
@@ -604,6 +600,9 @@ class CPM_cpo(SolverInterface):
                 return dom.abs(self._cpo_expr(cpm_con.args)[0])
             elif cpm_con.name == "nvalue":
                 return dom.count_different(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == "mul":
+                x, y = self._cpo_expr(cpm_con.args)
+                return x * y
             elif cpm_con.name == "div":
                 x,y = self._cpo_expr(cpm_con.args)
                 return x // y

@@ -54,12 +54,12 @@ from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import *
+from ..expressions.globalfunctions import Multiplication
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -83,7 +83,7 @@ class CPM_exact(SolverInterface):
     https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
 
-    supported_global_constraints = frozenset()
+    supported_global_constraints = frozenset({"mul"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -442,10 +442,10 @@ class CPM_exact(SolverInterface):
 
         # transform objective
         obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(obj,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
+        obj, decomp_cons = decompose_linear_objective(obj,
+                                                      supported=self.supported_global_constraints,
+                                                      supported_reified=self.supported_reified_global_constraints,
+                                                      csemap=self._csemap)
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
@@ -513,13 +513,14 @@ class CPM_exact(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"}) # linearize and decompose expects safe exprs
-        cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized linear decomp
-                                     supported_reified = self.supported_reified_global_constraints,
-                                     csemap=self._csemap)
+        cpm_cons = decompose_linear(cpm_cons,
+                                    supported=self.supported_global_constraints,
+                                    supported_reified = self.supported_reified_global_constraints,
+                                    csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","->","mul"}), csemap=self._csemap)  # the core of the MIP-linearization
@@ -539,8 +540,8 @@ class CPM_exact(SolverInterface):
         self.xct_solver.addRightReification(head, sign, xct_cfvars, self.fix(xct_rhs))
 
     @staticmethod
-    def is_multiplication(cpm_expr): # helper function
-        return isinstance(cpm_expr, Operator) and cpm_expr.name == 'mul'
+    def is_multiplication(cpm_expr):  # helper function (Multiplication is GlobalFunction name 'mul')
+        return isinstance(cpm_expr, Multiplication)
 
     def add(self, cpm_expr_orig):
         """
@@ -571,8 +572,7 @@ class CPM_exact(SolverInterface):
             if isinstance(cpm_expr, Comparison):
                 lhs, rhs = cpm_expr.args
                 if cpm_expr.name == "==":
-                    assert isinstance(lhs, Operator)
-                    # can be sum, wsum or mul
+                    # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
                     if lhs.name == "mul":
                         if is_num(rhs): # make dummy var
                             rhs = cp.intvar(rhs, rhs)
@@ -582,7 +582,7 @@ class CPM_exact(SolverInterface):
                         self.xct_solver.addMultiplication(self.solver_vars(lhs.args), True, xct_rhs, True, xct_rhs)
 
                     else:
-                        assert lhs.name == "sum" or lhs.name == "wsum"
+                        assert isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")
                         xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                         self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
 
