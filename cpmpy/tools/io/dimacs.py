@@ -13,6 +13,8 @@
     An integer represents a Boolean variable and a negative Boolean variable is represented using a `'-'` sign.
 """
 
+import os
+
 import cpmpy as cp
 
 from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl
@@ -26,7 +28,7 @@ from cpmpy.transformations.flatten_model import flatten_objective
 from cpmpy.transformations.linearize import decompose_linear_objective, only_positive_coefficients_
 from cpmpy.transformations.int2bool import _encode_lin_expr
 
-from typing import Optional, Callable
+from typing import Optional, Callable, Union
 import builtins
 
 
@@ -163,7 +165,7 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
     return out
 
 
-def load_dimacs(fname, open=None):
+def load_dimacs(dimacs: Union[str, os.PathLike], open=None):
     """
         Load a CPMpy model from a DIMACS formatted file strictly following the specification:
         https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
@@ -171,15 +173,20 @@ def load_dimacs(fname, open=None):
         .. note::
             The p-line has to denote the correct number of variables and clauses
 
-        :param fname: the name of the DIMACS file
+        :param dimacs:
+            - A file path to a DIMACS/WCNF file
+            - OR a string containing DIMACS/WCNF content directly
         :param open: optional callable to open the file for reading (default: builtin ``open``).
             Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.cnf.xz``.
     """
     if open is None:
         open = builtins.open
 
-    with open(fname, "r") as f:
-        lines = f.readlines()
+    if isinstance(dimacs, (str, os.PathLike)) and os.path.exists(dimacs):
+        with open(dimacs, "r") as f:
+            lines = f.readlines()
+    else:
+        lines = str(dimacs).splitlines()
 
     # Auto-detect weighted instances:
     # - explicit `p wcnf ...` header
@@ -218,7 +225,7 @@ def load_dimacs(fname, open=None):
 
     if is_weighted:
         from cpmpy.tools.io.wcnf import load_wcnf
-        return load_wcnf(fname, open=open)
+        return load_wcnf(dimacs, open=open)
 
     # CNF parse (strict with p-line counts when present, inferred otherwise)
     m = cp.Model()
