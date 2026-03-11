@@ -3,10 +3,11 @@ Transform constraints to **Conjunctive Normal Form** (i.e. an `and` of `or`s of 
 """
 
 import cpmpy as cp
+from typing import Optional
 from ..solvers.pindakaas import CPM_pindakaas
+from .cse import CSEMap
 
-
-def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
+def to_cnf(constraints, csemap:Optional[CSEMap]=None, ivarmap=None, encoding="auto"):
     """
     Converts all constraints into **Conjunctive Normal Form**
 

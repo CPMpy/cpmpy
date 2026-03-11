@@ -1,0 +1,102 @@
+import warnings
+from math import floor, ceil
+
+from ..expressions.core import Expression, Comparison
+from ..expressions.variables import _NumVarImpl, boolvar, intvar, _BoolVarImpl
+from ..expressions.utils import is_int
+
+
+class CSEMap:
+    """
+        Class implementing a mapping from cpmpy Expressions to auxiliary variables.
+    """
+
+    def __init__(self):
+        self._int_map = dict()
+        self._bool_map = dict()
+
+    def get(self, expr):
+        if expr.is_bool():
+            return self._bool_map.get(expr, None)
+        return self._int_map.get(expr, None)
+    
+    def set(self, expr, value):
+        if expr.is_bool():
+            self._bool_map[expr] = value
+        else:
+            self._int_map[expr] = value
+
+    def __len__(self):
+        return len(self._int_map) + len(self._bool_map)
+
+    def __contains__(self, expr):
+        return expr in self._int_map or expr in self._bool_map
+
+    def __getitem__(self, expr):
+        return self.get(expr)
+
+    def __setitem__(self, expr, value):
+        if expr.is_bool():
+            self._bool_map[expr] = value
+        else:
+            self._int_map[expr] = value
+
+
+    def get_or_make_var(self, expr:Expression) -> tuple[_NumVarImpl, list[Expression]]:
+        """
+            Get or make an auxiliary variable for the given expression.
+            
+            args:
+                expr (Expression): the expression to get or make a variable for
+
+            returns:
+                a tuple containing the auxiliary variable and the constraints to enforce the auxiliary variable to be equal to the expression
+        """
+
+        if expr.is_bool():
+            negate = False
+
+            # normalization, we don't store var != val in the csemap
+            if isinstance(expr, Comparison) and expr.name == "!=":
+                lhs, rhs = expr.args
+                if isinstance(lhs, _NumVarImpl) and is_int(rhs):
+                    expr = lhs == rhs # negate the comparison
+                    negate = True
+
+            if expr in self._bool_map:
+                var, cons = self._bool_map[expr], []
+
+            else: # unknown expression, make new var
+                var = boolvar()
+                self._bool_map[expr] = var
+                cons = expr == var
+
+            return var if negate is False else ~var, cons
+        
+        else:
+            if expr in self._int_map:
+                return self._int_map[expr], []
+
+            lb, ub = expr.get_bounds()
+            if not is_int(lb) or not is_int(ub):
+                warnings.warn(f"CPMpy only uses integer variables, but found expression ({expr}) with domain {lb}({type(lb)}"
+                            f" - {ub}({type(ub)}. CPMpy will rewrite this constriants with integer bounds instead.")
+                lb, ub = floor(lb), ceil(ub)            
+            var = intvar(lb, ub)
+            self._int_map[expr] = var
+            return var, [expr == var]
+
+    def get_reified_predicates(self) -> dict[_BoolVarImpl, list[tuple[int, _BoolVarImpl]]]:
+        """
+        Find all reified predicates in the csemap, i.e., whenever var == val was used in a subexpression
+
+        Returns:
+        """
+        var_vals = dict()
+        for expr, bv in self._bool_map.items():
+            if expr.name == '==':
+                var,val = expr.args
+                if isinstance(var, _NumVarImpl) and is_int(val):
+                    var_vals.setdefault(var, []).append((val, bv))
+
+        return var_vals

@@ -60,17 +60,17 @@ from .flatten_model import flatten_constraint, get_or_make_var
 from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
-
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, NegativeTable
 from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 from .int2bool import _encode_int_var
+from .cse import CSEMap
 
 
 
-def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
+def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap:Optional[CSEMap]=None):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -270,7 +270,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
     return newlist
 
-def only_positive_bv(lst_of_expr, csemap=None):
+def only_positive_bv(lst_of_expr, csemap:Optional[CSEMap]=None):
     """
         Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
         Comparisons are expected to be linearized. Only apply after applying :func:`linearize_constraint(cpm_expr) <linearize_constraint>`.
@@ -562,7 +562,7 @@ def only_positive_coefficients(lst_of_expr):
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Set[str]=frozenset(),
                      supported_reified:Set[str]=frozenset(),
-                     csemap:Optional[dict[Expression,Expression]]=None):
+                     csemap:Optional[CSEMap]=None):
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
 
@@ -582,7 +582,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
 def decompose_linear_objective(obj: Sequence[Expression],
                                supported: Set[str] = frozenset(),
                                supported_reified: Set[str] = frozenset(),
-                               csemap: Optional[dict[Expression, Expression]] = None):
+                               csemap: Optional[CSEMap] = None):
     """Decompose objective using linear-friendly (var == val) decompositions."""
     decompose_custom = get_linear_decompositions()
 
@@ -621,13 +621,8 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         return constraints
 
     # Collect bv -> (var == val)'s in csemap
-    var_vals = {}  # var: [val, bv]
-    for expr, bv in csemap.items():
-        if expr.name == '==':
-            var,val = expr.args
-            if isinstance(var, _NumVarImpl) and is_int(val):
-                var_vals.setdefault(var, []).append((val, bv))
-    
+    var_vals = csemap.get_reified_predicates()  # var: [val, bv]
+
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
     toplevel = []
@@ -641,7 +636,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
 
         # encode the values
         enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
-        
+
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
         if ivarmap is None:
@@ -650,8 +645,8 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             # var == wsum + k :: var - wsum == k
             ws = [1] + [-w for (w, _) in terms]
             bs = [var] + [b for (_, b) in terms]
-            toplevel.append(Operator("wsum", (ws, bs)) == k)  
-        
+            toplevel.append(Operator("wsum", (ws, bs)) == k)
+
         # store the bvs that no longer need to be reified
         for val, bv in vals:
             bv_map[bv] = (var, val)
@@ -660,9 +655,11 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         # Now clean up and remove the '(var == val) == bv' constraints:
         newcons = []
         for con in constraints:
-            if con.name == '==' and con.args[0].name == '==':
+            if con.name == '==' and (con.args[0].name == '==' or con.args[0].name == "!="):
                 # potential '(var == val) == bv'
                 lhs,bv = con.args
+                if isinstance(bv, NegBoolView):
+                    bv = bv._bv # operate on the inner bool var
                 if bv in bv_map:
                     (var, val) = bv_map[bv]
                     (lhs_var, lhs_val) = lhs.args

@@ -27,13 +27,14 @@ from ..expressions.core import Expression
 from ..expressions.variables import NDVarArray
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import all as cpm_all
+from .cse import CSEMap
 
 
 def decompose_in_tree(lst_of_expr: Sequence[Expression],
                       supported: Set[str] = set(),
                       supported_reified: Set[str] = set(),
                       _toplevel=None, nested=False,
-                      csemap: Optional[Dict[Expression, Expression]] = None,
+                      csemap: Optional[CSEMap] = None,
                       decompose_custom: Optional[Dict[str, Callable]]= None) -> List[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
@@ -74,7 +75,7 @@ def decompose_in_tree(lst_of_expr: Sequence[Expression],
 
 def decompose_objective(expr: Expression, supported: Set[str] = set(),
                         supported_reified: Set[str] = set(),
-                        csemap: Optional[Dict[Expression, Expression]] = None,
+                        csemap: Optional[CSEMap] = None,
                         decompose_custom: Optional[Dict[str, Callable]]=None) -> Tuple[Expression, List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver
@@ -110,7 +111,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray],
                        supported: Set[str],
                        supported_reified: Set[str],
                        is_toplevel: bool,
-                       csemap: Optional[Dict[Expression, Expression]]=None,
+                       csemap: Optional[CSEMap] = None,
                        decompose_custom:Optional[Dict[str, Callable]]=None) -> Tuple[bool, List[Expression], List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver, recursive internal version.
@@ -171,7 +172,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray],
             if is_supported is False:
                 if has_csemap and expr in csemap:
                     # we might have already decomposed it previously
-                    newexpr = csemap[expr]
+                    newexpr = csemap.get(expr)
                 else:
                     if decompose_custom is not None and expr.name in decompose_custom:
                         newexpr, define = decompose_custom[expr.name](expr)
@@ -193,7 +194,7 @@ def _decompose_in_tree(lst_of_expr: Union[Sequence[Expression], NDVarArray],
                             toplevel.extend(rec_toplevel)
 
                     if has_csemap:
-                        csemap[expr] = newexpr
+                        csemap.set(expr, newexpr) # save the decomposed expression to the CSEMap for next time
 
                 newlist.append(newexpr)
                 changed = True

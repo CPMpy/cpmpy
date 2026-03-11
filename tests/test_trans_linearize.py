@@ -3,6 +3,7 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.transformations.decompose_global import decompose_in_tree
@@ -596,41 +597,46 @@ class TestLinearizeReifiedVariablesThreshold:
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
-        self.csemap = {}
+        self.csemap = CSEMap()
         a = cp.intvar(1, 3, name="a")
         self.a = a
-        cpm_cons = [(a == 1) | (a == 2)]
+        cpm_cons = [(a == 1) | (a != 2)]
         cpm_cons = toplevel_list(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self.csemap)
         self.cpm_cons = cpm_cons
 
     def test_linearize_reified_variables_below_threshold(self):
-        """With min_values=3, (a==1)|(a==2) is not replaced."""
+        """With min_values=3, (a==1)|(a!=2) is not replaced."""
         cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=3, csemap=self.csemap)
 
-        assert str(cpm_cons) == "[(BV0) or (BV1), (a == 1) == (BV0), (a == 2) == (BV1)]"
+        assert str(cpm_cons) == "[(BV0) or (~BV1), (a == 1) == (BV0), (a != 2) == (~BV1)]"
 
     def test_linearize_reified_variables_threshold_two(self):
-        """With min_values=2, (a==1)|(a==2) is replaced."""
+        """With min_values=2, (a==1)|(a!=2) is replaced."""
         cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap)
 
-        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([1, 0, -1, -2] * [a, BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
+        assert str(cpm_cons) == ("[(BV[a == 1]) or (~BV[a == 2]), "
+                                 "sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, "
+                                 "sum([1, 0, -1, -2] * [a, BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]")
 
     def test_linearize_reified_variables_ivarmap(self):
-        """With min_values=2, (a==1)|(a==2) is replaced, no channel constraint."""
+        """With min_values=2, (a==1)|(a!=2) is replaced, no channel constraint."""
         ivarmap = {}
         cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
 
-        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
+        assert str(cpm_cons) == ("[(BV[a == 1]) or (~BV[a == 2]), "
+                                 "sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]")
 
     def test_linearize_reified_variables_ivarmap_xtra(self):
-        """With min_values=2, (a==1)|(a==2) is replaced, other impl present, no channel constraint."""
+        """With min_values=2, (a==1)|(a!=2) is replaced, other impl present, no channel constraint."""
         ivarmap = {}
         cpm_cons = self.cpm_cons
         cpm_cons += [boolvar(name="aux") == (self.a == 1)]
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
 
-        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), (aux) == (a == 1), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
+        assert str(cpm_cons) == ("[(BV[a == 1]) or (~BV[a == 2]), "
+                                 "(aux) == (a == 1), "
+                                 "sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]")
 
     def test_linearize_reified_variables_over_multiple_constraints(self):
         """With min_values=2, (a==1)|(a==2) is replaced, no channel constraint."""
@@ -638,9 +644,10 @@ class TestLinearizeReifiedVariablesThreshold:
 
         a = self.a
         out = []
-        for con in [(a == 1) | (a == 2), (a == 3) | (a == 2)]:
-            cpm_cons = toplevel_list(con)
+        for con in [(a == 1) | (a != 2), (a == 3) | (a == 2)]:
             cpm_cons = flatten_constraint(con, csemap=self.csemap)
             out += linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
 
-        assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, (BV[a == 3]) or (BV[a == 2])]"
+        assert str(out) == ("[(BV[a == 1]) or (~BV[a == 2]), "
+                            "sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, "
+                            "(BV[a == 3]) or (BV[a == 2])]")
