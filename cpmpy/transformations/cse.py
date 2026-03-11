@@ -85,3 +85,18 @@ class CSEMap:
             var = intvar(lb, ub)
             self._int_map[expr] = var
             return var, [expr == var]
+
+    def get_reified_predicates(self) -> dict[_BoolVarImpl, list[tuple[int, _BoolVarImpl]]]:
+        """
+        Find all reified predicates in the csemap, i.e., whenever var == val was used in a subexpression
+
+        Returns:
+        """
+        var_vals = dict()
+        for expr, bv in self._bool_map.items():
+            if expr.name == '==':
+                var,val = expr.args
+                if isinstance(var, _NumVarImpl) and is_int(val):
+                    var_vals.setdefault(var, []).append((val, bv))
+
+        return var_vals

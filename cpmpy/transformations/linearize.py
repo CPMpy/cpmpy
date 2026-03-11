@@ -621,12 +621,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         return constraints
 
     # Collect bv -> (var == val)'s in csemap
-    var_vals = {}  # var: [val, bv]
-    for expr, bv in csemap.items():
-        if expr.name == '==':
-            var,val = expr.args
-            if isinstance(var, _NumVarImpl) and is_int(val):
-                var_vals.setdefault(var, []).append((val, bv))
+    var_vals = csemap.get_reified_predicates()  # var: [val, bv]
 
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
@@ -660,9 +655,11 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         # Now clean up and remove the '(var == val) == bv' constraints:
         newcons = []
         for con in constraints:
-            if con.name == '==' and con.args[0].name == '==':
+            if con.name == '==' and (con.args[0].name == '==' or con.args[0].name == "!="):
                 # potential '(var == val) == bv'
                 lhs,bv = con.args
+                if isinstance(bv, NegBoolView):
+                    bv = bv._bv # operate on the inner bool var
                 if bv in bv_map:
                     (var, val) = bv_map[bv]
                     (lhs_var, lhs_val) = lhs.args
