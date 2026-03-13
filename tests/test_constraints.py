@@ -195,7 +195,7 @@ def global_constraints(solver):
             demand = [11, 4, 8, 7]
             is_present = [cp.boolvar(), cp.boolvar(), True, False]
             cap = 10
-            expr = cls(s, dur, e, demand, cap, is_present)
+            yield cls(s, dur, e, demand, cap, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
@@ -221,7 +221,7 @@ def global_constraints(solver):
             e = cp.intvar(0, 10, shape=4, name="end")
             dur = [1, 4, 3, 2]
             is_present = [cp.boolvar(), cp.boolvar(), True, False]
-            expr = cls(s, dur, e, is_present)
+            yield cls(s, dur, e, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
             cnts = cp.intvar(0,10,shape=3)
