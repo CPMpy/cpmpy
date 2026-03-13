@@ -61,6 +61,7 @@
         Minimum
         Maximum
         Abs
+        Multiplication
         Division
         Modulo
         Power
@@ -79,7 +80,7 @@ import cpmpy as cp
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator
 from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
+from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
 
 class GlobalFunction(Expression):
@@ -304,6 +305,131 @@ class Abs(GlobalFunction):
         if ub <= 0:
             return -ub, -lb
         return 0, max(-lb, ub)
+
+
+class Multiplication(GlobalFunction):
+    """
+    Computes the product of two expressions: `x * y`.
+
+    Created when the user writes ``*`` with at least one variable (e.g. ``x * y``, ``2 * x``).
+    Supports decomposition into linear constraints for MIP solvers via :meth:`decompose`.
+    """
+
+    def __init__(self, x: Expression, y: Expression):
+        """
+        Arguments:
+            x (Expression): First factor
+            y (Expression): Second factor
+
+        Normalizes so a constant is first when one factor is numeric (sets .is_lhs_num).
+        """
+        is_lhs_num = False
+        if is_num(x):
+            is_lhs_num = True
+        elif is_num(y):
+            (x, y) = (y, x)
+            is_lhs_num = True
+
+        super().__init__("mul", (x, y))
+        self.is_lhs_num = is_lhs_num
+
+    def update_args(self, args):
+        """ Allows in-place update of the expression's arguments.
+            Resets all cached computations which depend on the expression tree.
+        """
+        x, y = args
+        is_lhs_num = False
+        if is_num(x):
+            is_lhs_num = True
+        elif is_num(y):
+            (x, y) = (y, x)
+            is_lhs_num = True
+
+        super().update_args((x, y))
+        self.is_lhs_num = is_lhs_num
+
+    def __repr__(self):
+        x, y = self.args
+
+        if self.is_lhs_num:
+            return "{} * ({})".format(x, y)
+
+        return "({}) * ({})".format(x, y)
+
+    def __neg__(self):
+        """-(c*x) -> (-c)*x when constant c is first (.is_lhs_num)."""
+        if self.is_lhs_num:
+            return Multiplication(-self.args[0], self.args[1])
+        return super().__neg__()
+
+    def value(self) -> Optional[int]:
+        x, y = argvals(self.args)
+        if x is None or y is None:
+            return None
+        return x * y
+
+    def get_bounds(self) -> tuple[int, int]:
+        """Bounds of the product from bounds of the factors."""
+        lb1, ub1 = get_bounds(self.args[0])
+        lb2, ub2 = get_bounds(self.args[1])
+        candidates = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
+        return min(candidates), max(candidates)
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
+        """
+        Decomposition of Multiplication into linear constraints (e.g. for MIP).
+
+        - If is_lhs_num (const*expr): returns the wsum equivalent and no extra constraints.
+        - If both args are Boolean (0/1): bv*bv equals bv&bv (logical AND), so returns that and no extra constraints.
+        - If one bool and one int: introduces aux z = bv*iv with (bv -> z==iv) & (~bv -> z==0), returns (z, constraints).
+        - If both int: take the factor with smallest domain, encode it with one bool per value, then
+          decompose into b_i*other_int constraints and sum(i*z_i)
+        """
+        a, b = self.args[0], self.args[1]
+        if self.is_lhs_num:
+            # const*expr -> wsum([const], [expr])
+            return Operator("wsum", ([a], [b])), []
+        a_bool, b_bool = is_boolexpr(a), is_boolexpr(b)
+        if a_bool and b_bool:
+            # bool*bool with 0/1 semantics is logical AND
+            return Operator("and", [a, b]), []
+
+        if a_bool or b_bool:
+            # bool * int: z = bv*iv via (bv -> z==iv) & (~bv -> z==0)
+            bv, iv = (a, b) if a_bool else (b, a)
+            lb_y, ub_y = get_bounds(iv)
+            lb_z = min(0, lb_y)  # make sure it can take 0
+            ub_z = max(0, ub_y)  # make sure it can take 0
+            z = intvar(lb_z, ub_z)
+            return z, [bv.implies(z == iv), (~bv).implies(z == 0)]
+
+        # let a be the one with the smallest domain, leading to the fewest auxiliariy variables
+        lb_a, ub_a = get_bounds(a)
+        lb_b, ub_b = get_bounds(b)
+        if ub_b - lb_b + 1 < ub_a - lb_a + 1:
+            a, b = b, a
+            lb_a, lb_b = lb_b, lb_a
+            ub_a, ub_b = ub_b, ub_a
+        dom_a = list(range(lb_a, ub_a + 1))
+
+        # int*int linear decomposition:
+        # a*b == sum_v(v * (a==v)) * b  with 'v' in dom(a)
+        #     == sum_v(v * ((a==v) * b))
+        #     == sum_v(v * z_v) and all_v( (a==v)->(z_v == b) & (a!=v)->(z_v == 0) )
+
+        # encoding z_v == (a == v)*b via (a==v)->(z_v == b) & (a!=v)->(z_v == 0)
+        encoding = []
+        z_lb = min(0, lb_b) # make sure it can take 0
+        z_ub = max(0, ub_b) # make sure it can take 0
+        zs = cp.intvar(z_lb, z_ub, shape=(len(dom_a),))
+        for v, z_v in zip(dom_a, zs):
+            encoding.append((a == v).implies(z_v == b))
+            encoding.append((a != v).implies(z_v == 0))
+
+        # result = sum(i*z_i)
+        result = Operator("wsum", (dom_a, zs))
+        return result, encoding
+
 
 class Division(GlobalFunction):
     """

@@ -1,5 +1,3 @@
-import unittest
-
 import numpy as np
 import pytest
 
@@ -7,7 +5,7 @@ from cpmpy import *
 from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact, CPM_choco, CPM_hexaly
 
 
-class TestDirectORTools(unittest.TestCase):
+class TestDirectORTools:
 
     def test_direct_automaton(self):
         trans_vars = boolvar(shape=4, name="trans")
@@ -24,11 +22,11 @@ class TestDirectORTools(unittest.TestCase):
         model += DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
                                   novar=[1, 2, 3])  # optional, what not to scan for vars
 
-        self.assertEqual(model.solveAll(), 6)
+        assert model.solveAll() == 6
 
 
 @pytest.mark.skipif(not CPM_exact.supported(), reason="Exact not installed")
-class TestDirectExact(unittest.TestCase):
+class TestDirectExact:
 
     def test_direct_left_reif(self):
         x,y = boolvar(2)
@@ -38,12 +36,12 @@ class TestDirectExact(unittest.TestCase):
         # add x -> y>=1
         model += DirectConstraint("addRightReification", (x, 1, [(1, y)], 1), novar=[1,3])
         print(model)
-        self.assertEqual(model.solveAll(), 3)
+        assert model.solveAll() == 3
 
 
 @pytest.mark.skipif(not CPM_pysat.supported(),
                     reason="PySAT not installed")
-class TestDirectPySAT(unittest.TestCase):
+class TestDirectPySAT:
 
     def test_direct_clause(self):
         x,y = boolvar(2)
@@ -52,12 +50,12 @@ class TestDirectPySAT(unittest.TestCase):
 
         model += DirectConstraint("add_clause", [x, y])
 
-        self.assertTrue(model.solve())
-        self.assertTrue(x.value() or y.value())
+        assert model.solve()
+        assert x.value() or y.value()
 
 @pytest.mark.skipif(not CPM_pysdd.supported(),
                     reason="PySDD not installed")
-class TestDirectPySDD(unittest.TestCase):
+class TestDirectPySDD:
 
     def test_direct_clause(self):
         x,y = boolvar(2)
@@ -66,12 +64,12 @@ class TestDirectPySDD(unittest.TestCase):
 
         model += DirectConstraint("conjoin", (x, y))
 
-        self.assertTrue(model.solve())
-        self.assertTrue(x.value() or y.value())
+        assert model.solve()
+        assert x.value() or y.value()
 
 @pytest.mark.skipif(not CPM_z3.supported(),
                     reason="Z3py not installed")
-class TestDirectZ3(unittest.TestCase):
+class TestDirectZ3:
 
     def test_direct_clause(self):
         iv = intvar(1,9, shape=3)
@@ -80,12 +78,12 @@ class TestDirectZ3(unittest.TestCase):
 
         model += DirectConstraint("Distinct", iv)
 
-        self.assertTrue(model.solve())
-        self.assertTrue(AllDifferent(iv).value())
+        assert model.solve()
+        assert AllDifferent(iv).value()
 
 @pytest.mark.skipif(not CPM_minizinc.supported(),
                     reason="MinZinc not installed")
-class TestDirectMiniZinc(unittest.TestCase):
+class TestDirectMiniZinc:
 
     def test_direct_clause(self):
         iv = intvar(1,9, shape=3)
@@ -99,13 +97,13 @@ class TestDirectMiniZinc(unittest.TestCase):
         # this just to demonstrate, there are no 0's in the domains...
         model += DirectConstraint("alldifferent_except_0", iv)
 
-        self.assertTrue(model.solve())
-        self.assertTrue(AllDifferent(iv).value())
+        assert model.solve()
+        assert AllDifferent(iv).value()
 
 
 @pytest.mark.skipif(not CPM_gurobi.supported(),
                     reason="Gurobi not installed")
-class TestDirectGurobi(unittest.TestCase):
+class TestDirectGurobi:
 
     def test_direct_poly(self):
 
@@ -119,17 +117,17 @@ class TestDirectGurobi(unittest.TestCase):
         model += DirectConstraint("addGenConstrPoly", (x, y, p),
                                   novar=[2])  # optional, what not to scan for vars
 
-        self.assertTrue(model.solve())
+        assert model.solve()
 
         x_val = x.value()
         x_terms = [x_val**3, x_val**2, x_val**1, x_val**0]
         poly_val = sum(np.array(p)*x_terms)
 
-        self.assertEqual(y.value(), poly_val)
+        assert y.value() == poly_val
 
 @pytest.mark.skipif(not CPM_choco.supported(),
                     reason="pychoco not installed")
-class TestDirectChoco(unittest.TestCase):
+class TestDirectChoco:
 
     def test_direct_global(self):
         iv = intvar(1,9, shape=3)
@@ -139,12 +137,12 @@ class TestDirectChoco(unittest.TestCase):
         model += DirectConstraint("increasing", iv)
         model += iv[1] < iv[0]
 
-        self.assertFalse(model.solve())
+        assert not model.solve()
 
 
 @pytest.mark.skipif(not CPM_hexaly.supported(),
                     reason="hexaly is not installed")
-class TestDirectHexaly(unittest.TestCase):
+class TestDirectHexaly:
 
     def test_direct_distance(self):
 
@@ -155,5 +153,4 @@ class TestDirectHexaly(unittest.TestCase):
         model += DirectConstraint("dist",(a,b)) >= 3 # model distance between two variables
         assert model.solve()
 
-        self.assertGreaterEqual(abs(a.value() - b.value()),3)
-
+        assert abs(a.value() - b.value()) >=3

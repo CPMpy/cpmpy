@@ -19,6 +19,7 @@ class TestRC2Transform(unittest.TestCase):
         self.xs = cp.boolvar(3)
         self.ys = cp.intvar(1, 4, shape=3)
         self.rc2 = CPM_rc2()
+        self.rc2.encoding = "direct"
     
     def test_rc2_solver_creation(self):
         """Test that RC2 solver can be created and accessed via SolverLookup"""

@@ -82,7 +82,7 @@ class CPM_ortools(SolverInterface):
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
                                               "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional"
-                                              "min", "max", "abs", "div", "mod", "pow", "element"})
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
