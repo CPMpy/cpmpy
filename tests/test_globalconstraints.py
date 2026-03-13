@@ -1104,6 +1104,24 @@ class TestGlobal:
         assert expr.value()
         assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
 
+        # weird cases, allow negative duration or demand when task is not present
+        expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, False])
+        assert cp.Model(expr).solve()
+        assert cp.Model(expr.decompose()).solve()
+
+        expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, True])
+        assert cp.Model(expr).solve() is False
+        assert cp.Model(expr.decompose()).solve() is False
+
+        expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, False])
+        assert cp.Model(expr).solve()
+        assert cp.Model(expr.decompose()).solve()
+
+        expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, True])
+        assert cp.Model(expr).solve() is False
+        assert cp.Model(expr.decompose()).solve() is False
+
+
     def test_optional_no_overlap(self):
         start = cp.intvar(0, 10, shape=4, name="start")
         duration = [1, 4, 6, 2]
