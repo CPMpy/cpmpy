@@ -1088,6 +1088,35 @@ class TestGlobal:
         assert cp.Model(bv == expr).solve()
         assert not bv.value()
 
+    def test_optional_cumulative(self):
+        start = cp.intvar(0, 10, shape=4, name="start")
+        duration = [1, 4, 3, 2]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        demand = [11, 4, 8, 7]
+        is_present = cp.boolvar(shape=4)
+        capacity = 10
+        expr = cp.CumulativeOptional(start, duration, end, demand, capacity, is_present)
+        assert cp.Model(expr).solve()
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+        # also test decomposition
+        assert cp.Model(expr.decompose()).solve()
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+
+    def test_optional_no_overlap(self):
+        start = cp.intvar(0, 10, shape=4, name="start")
+        duration = [1, 4, 6, 2]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        is_present = cp.boolvar(shape=4)
+        expr = cp.NoOverlapOptional(start, duration, end, is_present)
+        assert cp.Model(expr).solve()
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+        # also test decomposition
+        assert cp.Model(expr.decompose()).solve()
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
 
 
     def test_ite(self):
