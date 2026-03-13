@@ -215,20 +215,24 @@ def implies(expr, other):
 
 # Specific stuff for scheduling constraints
 
-def get_nonneg_args(args):
+def get_nonneg_args(args, is_present=None):
     """
         Replace arguments with negative lowerbound with their nonnegative counterpart
     """
+    if is_present is None:
+        is_present = [True] * len(args)
+    assert len(args) == len(is_present), f"Args and is_present must have the same length but got {len(args)} and {len(is_present)}"
+
     lbs, ubs = zip(*[get_bounds(arg) for arg in args])
     new_args = []
     cons = []
-    for lb, ub, arg in zip(lbs, ubs, args):
+    for lb, ub, arg, p in zip(lbs, ubs, args, is_present):
         if lb < 0:
             if ub >= 0:
                 iv = cp.intvar(0, ub)
             else: # ub < 0  
                 iv = cp.intvar(0,0)
-            cons.append(arg == iv) # will always be False if ub < 0
+            cons.append(implies(p, arg == iv)) # will always be False if ub < 0
             new_args.append(iv)
         else:
             new_args.append(arg)
