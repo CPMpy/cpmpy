@@ -256,7 +256,7 @@ class TestArrayExpressions:
         y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.sum(axis=0))
         model.solve()
-        res = x.value().sum(axis=0) # ensure we mimimc numpy
+        res = x.value().sum(axis=0)
         assert all(y.value() == res)
 
     def test_prod(self):
@@ -290,7 +290,7 @@ class TestArrayExpressions:
         y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.max(axis=0))
         model.solve()
-        res = x.value().max(axis=0) # ensure we mimic numpy
+        res = x.value().max(axis=0)
         assert all(y.value() == res)
 
     def test_min(self):
@@ -304,7 +304,7 @@ class TestArrayExpressions:
         y = intvar(0, 1000, shape=10, name="y")
         model = cp.Model(y == x.min(axis=0))
         model.solve()
-        res = x.value().min(axis=0) # ensure we mimic numpy
+        res = x.value().min(axis=0)
         assert all(y.value() == res)
 
     def test_any(self):
@@ -319,7 +319,7 @@ class TestArrayExpressions:
         y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.any(axis=0))
         model.solve()
-        res = x.value().any(axis=0) # ensure we mimimc numpy
+        res = x.value().any(axis=0)
         assert all(y.value() == res)
         
 
@@ -335,7 +335,7 @@ class TestArrayExpressions:
         y = boolvar(shape=10, name="y")
         model = cp.Model(y == x.all(axis=0))
         model.solve()
-        res = x.value().all(axis=0) # ensure we mimimc numpy
+        res = x.value().all(axis=0)
         assert all(y.value() == res)
 
     def test_multidim(self):
