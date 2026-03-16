@@ -1,0 +1,27 @@
+name: "Linting"
+on: [push]
+jobs:
+  run_mypy:
+    name: "Mypy Static Type Checks"
+    runs-on: ubuntu-latest
+    steps:
+      # To use this repository's private action,
+      # you must check out the repository
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install Mypy
+        run: pip install mypy
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install ".[mypy]"
+          pip install pypblib  # dependency of pysat for PB constraints
+      - name: Run Mypy
+        uses: liskin/gh-problem-matcher-wrap@v2 # wrap mypy output as annotations
+        with:   
+          linters: mypy     
+          command: mypy --show-column-numbers -p cpmpy
