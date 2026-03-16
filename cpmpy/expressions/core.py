@@ -149,7 +149,7 @@ class Expression(object):
         self._override_print = override_print
         self._full_print = full_print
 
-    def __str__(self):
+    def __str__(self) -> str:
         if not hasattr(self, "desc") or self._override_print is False:
             return self.__repr__()
         out = self.desc
