@@ -545,39 +545,40 @@ class CPM_cpo(SolverInterface):
             elif cpm_con.name == "negative_table":
                 arr, table = self._cpo_expr(cpm_con.args)
                 return dom.forbidden_assignments(arr, table)
-            elif cpm_con.name == "cumulative":
-                start, dur, end, height, capacity = cpm_con.args
-                if end is None:
-                    end = [None for _ in range(len(start))] # easier to handle the task-making below
-                height, height_cons = get_nonneg_args(height)
-                cons = self._cpo_expr(height_cons)
-                docp = self.get_docp()
+            elif cpm_con.name == "cumulative" or cpm_con.name == "cumulative_optional":
+                if cpm_con.name == "cumulative_optional":
+                    start, dur, end, height, capacity, is_present = cpm_con.args
+                else:
+                    start, dur, end, height, capacity = cpm_con.args
+                    is_present = None
+
+                tasks, cons = self._make_tasks(start, dur, end, is_present)
+
+                height, height_cons = get_nonneg_args(height, is_present)
+                cons += self._cpo_expr(height_cons)
+
                 total_usage = []
-                for s, d, e, h in zip(start, dur, end, height):
-                    task, task_cons = self._make_task(s, d, e)
-                    cons += task_cons
+                for task, height in zip(tasks, height):
                     if task is None: # can happen with 0 duration tasks
                         continue
                     else:
-                        task_height = dom.pulse(task, get_bounds(h))
-                        cons += [self._cpo_expr(h) == dom.height_at_start(task, task_height)]
+                        task_height = dom.pulse(task, get_bounds(height))
+                        cons += [self._cpo_expr(height) == dom.height_at_start(task, task_height)]
                         total_usage.append(task_height)
+               
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
-            elif cpm_con.name == "no_overlap":
+            elif cpm_con.name == "no_overlap" or cpm_con.name == "no_overlap_optional":
+                if cpm_con.name == "no_overlap_optional":
+                    start, dur, end, is_present = cpm_con.args
+                else:
+                    start, dur, end = cpm_con.args
+                    is_present = None
+
                 start, dur, end  = cpm_con.args
-                if end is None:
-                    end = [None for _ in range(len(start))] # easier to handle the task-making below
-                cons = []
-                tasks = []
-                for s, d, e in zip(start, dur, end):
-                    task, task_cons = self._make_task(s, d, e)
-                    cons += task_cons
-                    if task is None: # can happen with 0 duration tasks
-                        continue
-                    else:
-                        tasks.append(task)
+                tasks, cons = self._make_tasks(start, dur, end, is_present)
                 return cons + [dom.no_overlap(tasks)]
+            
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
                 return cpm_con.callSolver(self, self.cpo_model)
@@ -615,20 +616,39 @@ class CPM_cpo(SolverInterface):
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
 
-    def _make_task(self, start, dur, end):
+    def _make_tasks(self, start, dur, end, is_present):
         """
-            Helper function to create task objects and additional constraints enforcing task-relation
+            Helper function to create list of task objects and additional constraints enforcing task-relation
+        """
+        if end is None:
+            end = [None for _ in range(len(start))] # easier to handle the task-making below
+        if is_present is None:
+            is_present = [None] * len(start) # eases handling below
+        
+        tasks, extra_cons = [], []
+        for s, d, e, p in zip(start, dur, end, is_present):
+            task, task_cons = self._make_task(s, d, e, p)
+            tasks.append(task)
+            extra_cons += task_cons
+        return tasks, extra_cons
+
+    def _make_task(self, start, dur, end, is_present):
+        """
+            Helper function to create a task object and additional constraints enforcing task-relation
         """
         dom = self.get_docp().modeler
         docp = self.get_docp()
+        is_optional = is_present is not None
+        if not is_optional:
+            is_present = BoolVal(True) # eases handling below
 
         lb, ub = get_bounds(dur)
         extra_cons = []
         if lb < 0 and ub < 0: # duration is always negative
-            return None, [False]
+            return None, [~is_present] # task is not present
         else:
             new_dur = intvar(0, ub)
-            extra_cons += [self.solver_var(new_dur) == self._cpo_expr(dur)]
+            extra_cons += self._cpo_expr([is_present.implies(new_dur == dur)])
             dur = new_dur
             lb = 0 # update lb for next check below
 
@@ -636,16 +656,20 @@ class CPM_cpo(SolverInterface):
             if end is None: # nothing to enforce
                 return None, []
             cpo_s, cpo_e = self._cpo_expr([start, end])
-            return None, extra_cons + [cpo_s == cpo_e] # no task, just enforce 0 duration
+            return None, extra_cons + self._cpo_expr([is_present.implies(start == end)]) # no task, just enforce 0 duration
 
         # Normal setting
         if end is None: # no end provided by user
             cpo_s, cpo_d = self._cpo_expr([start, dur])
-            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur))
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur), optional=is_optional)
+            if is_optional: # enforce presence of task
+                extra_cons += [docp.presence_of(task) == self.solver_var(is_present)]
             return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
         else:
             cpo_s, cpo_d, cpo_e = self._cpo_expr([start, dur, end])
-            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end))
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end), optional=is_optional)
+            if is_optional: # enforce presence of task
+                extra_cons += [docp.presence_of(task) == self.solver_var(is_present)]
             return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
 
 
