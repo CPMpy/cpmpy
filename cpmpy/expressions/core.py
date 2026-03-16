@@ -34,7 +34,7 @@
     `sum([x,y,z])`               `Operator("sum", [x, y, z])`                  
     `sum([c0*x, c1*y, c2*z])`    `Operator("wsum", [[c0, c1, c2], [x, y, z]])` 
     `x - y`                      `Operator("sum", [x, -y])`                    
-    `x * y`                      `Operator("mul", [x, y])`                     
+    `x * y`                      `globalfunctions.Multiplication(x, y)`
     `x // y`                     `globalfunctions.Division([x, y])` (integer division, rounding towards zero)
     `x % y`                      `globalfunctions.Modulo([x, y])` (remainder after integer division)
     `x ** y`                     `globalfunctions.Power([x, y])`
@@ -342,22 +342,16 @@ class Expression(object):
         # return Operator("sub", [other, self])
         return (-self).__radd__(other)
     
-    # multiplication, puts the 'constant' (other) first
+    # multiplication: use GlobalFunction Multiplication so it can be decomposed (e.g. to linear)
     def __mul__(self, other):
         if is_num(other) and other == 1:
             return self
-        # this unnecessarily complicates wsum creation
-        #if is_num(other) and other == 0:
-        #    return other
-        return Operator("mul", [self, other])
+        return cp.Multiplication(self, other)
 
     def __rmul__(self, other):
         if is_num(other) and other == 1:
             return self
-        # this unnecessarily complicates wsum creation
-        #if is_num(other) and other == 0:
-        #    return other
-        return Operator("mul", [other, self])
+        return cp.Multiplication(other, self)
 
     # matrix multipliciation TODO?
     #object.__matmul__(self, other)
@@ -400,10 +394,7 @@ class Expression(object):
 
     # unary mathematical operators
     def __neg__(self):
-        # special case, -(w*x) -> -w*x
-        if self.name == 'mul' and is_num(self.args[0]):
-            return Operator(self.name, [-self.args[0], self.args[1]])
-        elif self.name == 'wsum':
+        if self.name == 'wsum':
             # negate the constant weights
             return Operator(self.name, [[-a for a in self.args[0]], self.args[1]])
         return Operator("-", [self])
@@ -582,10 +573,9 @@ class Operator(Expression):
         'sum': (0, False),
         'wsum': (2, False),
         'sub': (2, False), # x - y
-        'mul': (2, False),
         '-':   (1, False), # -x
     }
-    printmap = {'sum': '+', 'sub': '-', 'mul': '*'}
+    printmap = {'sum': '+', 'sub': '-'}
 
     def __init__(self, name, arg_list):
         # sanity checks
@@ -640,16 +630,6 @@ class Operator(Expression):
                     i += l
                 i += 1
 
-        # another cleanup, translate -(v*c) to v*-c
-        if hasattr(arg_list[0], 'name'):
-            if name == '-' and arg_list[0].name == 'mul' and len(arg_list[0].args) == 2:
-                mul_args = arg_list[0].args
-                if is_num(mul_args[0]):
-                    name = 'mul'
-                    arg_list = (-mul_args[0], mul_args[1])
-                elif is_num(mul_args[1]):
-                    name = 'mul'
-                    arg_list = (mul_args[0], -mul_args[1])
 
         super().__init__(name, arg_list)
 
@@ -701,7 +681,6 @@ class Operator(Expression):
             if round(val) == val: # it is an integer
                 return int(val)
             return val # can be a float
-        elif self.name == "mul": return arg_vals[0] * arg_vals[1]
         elif self.name == "sub": return arg_vals[0] - arg_vals[1]
         elif self.name == "-":   return -arg_vals[0]
 
@@ -721,11 +700,6 @@ class Operator(Expression):
         """
         if self.is_bool():
             return 0, 1 #boolean
-        elif self.name == 'mul':
-            lb1, ub1 = get_bounds(self.args[0])
-            lb2, ub2 = get_bounds(self.args[1])
-            bounds = [lb1 * lb2, lb1 * ub2, ub1 * lb2, ub1 * ub2]
-            lowerbound, upperbound = min(bounds), max(bounds)
         elif self.name == 'sum':
             lbs, ubs = get_bounds(self.args)
             lowerbound, upperbound = sum(lbs), sum(ubs)
@@ -758,37 +732,34 @@ class Operator(Expression):
             #overflow happened
             raise OverflowError(f'Overflow when calculating bounds, your expression exceeds integer bounds: {self}')
         return lowerbound, upperbound
+
+
 def _wsum_should(arg):
     """ Internal helper: should the arg be in a wsum instead of sum
 
     True if the arg is already a wsum,
-    or if it is a product of a constant and an expression 
+    or if it is a Multiplication with is_lhs_num
     (negation '-' does not mean it SHOULD be a wsum, because then
      all substractions are transformed into less readable wsums)
     """
-    return isinstance(arg, Operator) and \
-           (arg.name == 'wsum' or \
-            (arg.name == 'mul' and len(arg.args) == 2 and \
-             any(is_num(a) for a in arg.args)
-            ) )
+    name = getattr(arg, 'name', None)
+    return name == 'wsum' or (name == 'mul' and arg.is_lhs_num)
 
 def _wsum_make(arg):
     """ Internal helper: prep the arg for wsum
 
-    returns ([weights], [expressions]) where 'weights' are constants
-    call only if arg is Operator
+    returns ([weights], [expressions]) where 'weights' are constants.
+    Handles Operator (wsum, sum, -) and Multiplication (name 'mul', constant lhs when is_lhs_num).
     """
-    if arg.name == 'wsum':
+    name = getattr(arg, 'name', None)
+    if name == 'wsum':
         return arg.args
-    elif arg.name == 'sum':
+    elif name == 'sum':
         return [1]*len(arg.args), arg.args
-    elif arg.name == 'mul':
-        if is_num(arg.args[0]):
+    elif name == 'mul':
+        if arg.is_lhs_num:
             return [arg.args[0]], [arg.args[1]]
-        elif is_num(arg.args[1]):
-            return [arg.args[1]], [arg.args[0]]
-        # else falls through to default below
-    elif arg.name == '-':
+    elif name == '-':
         return [-1], [arg.args[0]]
     # default
     return [1], [arg]

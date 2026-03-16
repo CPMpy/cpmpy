@@ -3,8 +3,11 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
-from cpmpy.transformations.flatten_model import flatten_objective
-from cpmpy.transformations.linearize import linearize_constraint, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
+from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
+from cpmpy.transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
+from cpmpy.transformations.decompose_global import decompose_in_tree
+from cpmpy.transformations.normalize import toplevel_list
+from cpmpy.transformations.reification import only_bv_reifies, only_implies
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 
@@ -73,8 +76,6 @@ class TestTransLinearize:
         assert str(linearize_constraint([a.implies(x+y+z > 0)])) == "[(a) -> (sum([x, y, z]) >= 1)]"
         # test sub
         assert str(linearize_constraint([Operator("sub",[x,y]) >= z])) == "[sum([1, -1, -1] * [x, y, z]) >= 0]"
-        # test mul
-        assert str(linearize_constraint([3 * x > 2])) == "[sum([3] * [x]) >= 3]"
         # test <
         assert (str(linearize_constraint([x + y  < z]))) == "[sum([1, 1, -1] * [x, y, z]) <= -1]"
         # test >
@@ -119,7 +120,7 @@ class TestTransLinearize:
 
         x = cp.intvar(1, 5, shape=3, name="x")
         cons = cp.AllDifferent(x)
-        lincons = linearize_constraint([cons])
+        lincons = linearize_constraint(decompose_linear([cons]))
 
         def cb():
             assert cons.value()
@@ -130,11 +131,11 @@ class TestTransLinearize:
         # should also work with constants in arguments
         x,y,z = x
         cons = cp.AllDifferent([x,3,y,True,z])
-        lincons = linearize_constraint([cons])
+        lincons = linearize_constraint(decompose_linear([cons]))
 
         def cb():
             assert cons.value()
-
+    
         n_sols = cp.Model(lincons).solveAll(display=cb)
         assert n_sols == 3 * 2 * 1# 1 and 3 not allowed
 
@@ -158,7 +159,7 @@ class TestTransLinearize:
         arr = cp.cpm_array([cp.intvar(0, 5), cp.intvar(0, 5), 5, 4]) # combination of decision variables and constants
         c = cp.AllDifferent(arr)
 
-        linear_c = linearize_constraint([c])
+        linear_c = linearize_constraint(decompose_linear([c]))
         # this triggers an error
         pos_c = only_positive_bv([c])
 
@@ -195,41 +196,38 @@ class TestTransLinearize:
         b = cp.boolvar(name="b")
 
         def assert_cons_is_true(cons):
+            if isinstance(cons, list):
+                return lambda : all(map(assert_cons_is_true, cons))
             return lambda : _assert_cons_is_true(cons)
             
         def _assert_cons_is_true(cons):
             assert (cons.value())
-
+        
         cons = b * x == y
-        bt,bf = linearize_constraint([cons])
-        assert str(bt) == "(b) -> (sum([1, -1] * [x, y]) == 0)"
-        assert str(bf) == "(~b) -> (sum([y]) == 0)"
-
-        cp.Model([bt,bf]).solveAll(display=assert_cons_is_true(cons))
+        cons = linearize_constraint(decompose_in_tree([cons]))
+        #assert str(cons) == "[(b) -> (sum([1, -1] * [x, y]) == 0), (~b) -> (sum([y]) == 0)]"
+        # TODO: there is a missed opportunity here in that 'b*x' first creates an auxiliary
+        # To avoid that, we would have to reintroduce decompose_comparison()...
+        assert str(cons) == "[sum([1, -1] * [IV5, y]) == 0, (b) -> (sum([1, -1] * [IV5, x]) == 0), (~b) -> (sum([IV5]) == 0)]"
+        cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
 
         cons = x * b == y
-        bt,bf = linearize_constraint([cons])
-        assert str(bt) == "(b) -> (sum([1, -1] * [x, y]) == 0)"
-        assert str(bf) == "(~b) -> (sum([y]) == 0)"
-
-        cp.Model([bt,bf]).solveAll(display=assert_cons_is_true(cons))
+        cons = linearize_constraint(decompose_in_tree([cons]))
+        assert str(cons) == "[sum([1, -1] * [IV6, y]) == 0, (b) -> (sum([1, -1] * [IV6, x]) == 0), (~b) -> (sum([IV6]) == 0)]"
+        cp.Model(cons).solveAll(display=assert_cons_is_true(cons))
 
         cons = a.implies(b * x <= y)
-        lin_cons = linearize_constraint([cons])
-        assert str(lin_cons[0]) == "(a) -> (sum([1, -1, -15] * [x, y, ~b]) <= 0)"
-        assert str(lin_cons[1]) == "(a) -> (sum([1, 5] * [y, b]) >= 0)"
-
+        lin_cons = linearize_constraint(decompose_in_tree([cons]))
+        assert str(lin_cons) == "[(a) -> (sum([1, -1] * [IV7, y]) <= 0), (b) -> (sum([1, -1] * [IV7, x]) == 0), (~b) -> (sum([IV7]) == 0)]"
         lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
-        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cp.all(lin_cons)))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(lin_cons))
         assert lin_cnt == cons_cnt
 
         cons = a.implies(b * x >= y)
-        lin_cons = linearize_constraint([cons])
-        assert str(lin_cons[0]) == "(a) -> (sum([1, -1, 15] * [x, y, ~b]) >= 0)"
-        assert str(lin_cons[1]) == "(a) -> (sum([1, -10] * [y, b]) <= 0)"
-
+        lin_cons = linearize_constraint(decompose_in_tree([cons]))
+        assert str(lin_cons) == "[(a) -> (sum([1, -1] * [IV9, y]) >= 0), (b) -> (sum([1, -1] * [IV9, x]) == 0), (~b) -> (sum([IV9]) == 0)]"
         lin_cnt = cp.Model(lin_cons).solveAll(display=assert_cons_is_true(cons))
-        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(cp.all(lin_cons)))
+        cons_cnt = cp.Model(cons).solveAll(display=assert_cons_is_true(lin_cons))
         assert lin_cnt == cons_cnt
 
 
@@ -300,7 +298,6 @@ class TestConstRhs:
         rhs = intvar(0, 10, name="r")
 
         cons = [cp.max([a,b,c]) <= rhs]
-        print(linearize_constraint(cons, supported={"max"}))
         cons = linearize_constraint(cons, supported={"max"})[0]
         assert "(max(a,b,c)) <= (r)" == str(cons)
 
@@ -590,4 +587,60 @@ class TesttestOnlyPositiveBv:
         a, b, c = [cp.boolvar(name=n) for n in "abc"]
         obj = only_positive_bv(linearize_constraint([cp.max(~a,b) >= c], supported={"sum", "wsum", "max"}))
         assert str(obj) == "[(max(BV3,b)) >= (c), (BV3) + (a) == 1]"
-        
+
+
+class TestLinearizeReifiedVariablesThreshold:
+    """Tests for linearize_reified_variables with min_values threshold."""
+
+    def setup_method(self):
+        _IntVarImpl.counter = 0
+        _BoolVarImpl.counter = 0
+
+        self.csemap = {}
+        a = cp.intvar(1, 3, name="a")
+        self.a = a
+        cpm_cons = [(a == 1) | (a == 2)]
+        cpm_cons = toplevel_list(cpm_cons)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self.csemap)
+        self.cpm_cons = cpm_cons
+
+    def test_linearize_reified_variables_below_threshold(self):
+        """With min_values=3, (a==1)|(a==2) is not replaced."""
+        cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=3, csemap=self.csemap)
+
+        assert str(cpm_cons) == "[(BV0) or (BV1), (a == 1) == (BV0), (a == 2) == (BV1)]"
+
+    def test_linearize_reified_variables_threshold_two(self):
+        """With min_values=2, (a==1)|(a==2) is replaced."""
+        cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap)
+
+        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([1, 0, -1, -2] * [a, BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
+
+    def test_linearize_reified_variables_ivarmap(self):
+        """With min_values=2, (a==1)|(a==2) is replaced, no channel constraint."""
+        ivarmap = {}
+        cpm_cons = linearize_reified_variables(self.cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
+
+        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
+
+    def test_linearize_reified_variables_ivarmap_xtra(self):
+        """With min_values=2, (a==1)|(a==2) is replaced, other impl present, no channel constraint."""
+        ivarmap = {}
+        cpm_cons = self.cpm_cons
+        cpm_cons += [boolvar(name="aux") == (self.a == 1)]
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
+
+        assert str(cpm_cons) == "[(BV[a == 1]) or (BV[a == 2]), (aux) == (a == 1), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1]"
+
+    def test_linearize_reified_variables_over_multiple_constraints(self):
+        """With min_values=2, (a==1)|(a==2) is replaced, no channel constraint."""
+        ivarmap = {}
+
+        a = self.a
+        out = []
+        for con in [(a == 1) | (a == 2), (a == 3) | (a == 2)]:
+            cpm_cons = toplevel_list(con)
+            cpm_cons = flatten_constraint(con, csemap=self.csemap)
+            out += linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=ivarmap)
+
+        assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, (BV[a == 3]) or (BV[a == 2])]"

@@ -45,11 +45,10 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
 from ..expressions.utils import eval_comparison
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
-from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
 from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool
-from ..transformations.linearize import linearize_constraint
+from ..transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear
 from ..transformations.normalize import simplify_boolean, toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies
 from ..transformations.safening import no_partial_functions
@@ -115,6 +114,8 @@ class CPM_pindakaas(SolverInterface):
         self.ivarmap = dict()  # for the integer to boolean encoders
         self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
+        # TODO workaround for upstream issue https://github.com/pindakaashq/pindakaas/issues/189
+        self.pdk_solver._set_option("factor", 0)
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
         super().__init__(name=name, cpm_model=cpm_model)
@@ -137,7 +138,7 @@ class CPM_pindakaas(SolverInterface):
                 user_vars.update(self.ivarmap[x.name].vars())
         return user_vars
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
+    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[List[_BoolVarImpl]] = None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
 
@@ -158,10 +159,7 @@ class CPM_pindakaas(SolverInterface):
         solver_assumptions = None if assumptions is None else self.solver_vars(assumptions)
 
         t = time.time()
-        with self.pdk_solver.solve(
-            time_limit=time_limit,
-            assumptions=solver_assumptions,
-        ) as result:
+        with self.pdk_solver.solve(time_limit=time_limit, assumptions=solver_assumptions) as result:
             self.cpm_status.runtime = time.time() - t
 
             # translate pindakaas result status to cpmpy status
@@ -194,7 +192,7 @@ class CPM_pindakaas(SolverInterface):
                         )
                     value = result.value(lit)
                     assert value is not None, (
-                        "All user variables should have been assigned, but {cpm_var} (literal {lit}) was not."
+                        f"All user variables should have been assigned, but {cpm_var} (literal {lit}) was not."
                     )
                     cpm_var._value = value
                 self.core = None
@@ -223,9 +221,7 @@ class CPM_pindakaas(SolverInterface):
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
-                enc, cons = _encode_int_var(
-                    self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding)
-                )
+                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self += cons
             else:
                 enc = self.ivarmap[cpm_var.name]
@@ -236,20 +232,19 @@ class CPM_pindakaas(SolverInterface):
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-        cpm_cons = decompose_in_tree(
+        cpm_cons = decompose_linear(
             cpm_cons,
-            supported=self.supported_global_constraints | {"alldifferent"},  # alldiff has a specialized MIP decomp in linearize
+            supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
             csemap=self._csemap,
         )
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(
-            cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap
-        )
-        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)
+        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         return cpm_cons
 
     def add(self, cpm_expr_orig):
@@ -284,8 +279,6 @@ class CPM_pindakaas(SolverInterface):
             raise TypeError
 
         """Add a single, *transformed* constraint, implied by conditions."""
-        import pindakaas as pdk
-
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
@@ -319,23 +312,10 @@ class CPM_pindakaas(SolverInterface):
             else:
                 raise ValueError(f"Trying to encode non (Boolean) linear constraint: {cpm_expr}")
 
+            # Create `pindakaas` Boolean linear expression object
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            try:
-                # normalization may raise `pdk.Unsatisfiable`
-                self.pdk_solver.add_encoding(
-                    eval_comparison(cpm_expr.name, lhs, rhs),
-                    # seems pindakaas conditions are the wrong way around
-                    conditions=self.solver_vars([~c for c in conditions]),
-                )
-            except pdk.Unsatisfiable as e:
-                if conditions:
-                    # trivial unsat with conditions does not count; posts ~conditions
-                    # `add_clause` may raise `pdk.Unsatisfiable` too, but the conditions are added to the clause, so no need to catch
-                    self._add_clause([], conditions=conditions)
-                else:
-                    # no conditions means truly unsatisfiable
-                    raise e
+            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=self.solver_vars(conditions))
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 

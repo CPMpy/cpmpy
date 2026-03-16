@@ -5,6 +5,7 @@ from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import flatlist
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl  # to reset counters
+from cpmpy.transformations.linearize import decompose_linear
 
 
 class TestTransfDecomp:
@@ -157,3 +158,59 @@ class TestTransfDecomp:
                              '(x[0]) + (x[1]) >= 3', 'x[0] != 0'}
 
 
+    def test_decompose_linear(self):
+
+        x = cp.intvar(1,3, shape=2, name=("a","b"))
+        bv = cp.boolvar(name="bv")
+
+        cons = cp.AllDifferent(x)
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1])"}
+        # second call gives same result (no ivarmap state)
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1])"}
+
+        # nested
+        cons = bv == cp.AllDifferent(x)
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"(bv) == (and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1]))"}
+
+        # test nvalue
+        cons = cp.NValue(x) == 8
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"sum([(a == 1) or (b == 1), (a == 2) or (b == 2), (a == 3) or (b == 3)]) == 8"}
+
+        # test element
+        cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3) 
+
+        # test table
+        cons = cp.Table(x, [[1,1], [2,3]])
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'((a == 1) and (b == 1)) or ((a == 2) and (b == 3))'}
+
+        # test count
+        cons = cp.Count(x, 2) >= 1
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'(a == 2) + (b == 2) >= 1'}
+
+    def test_issue_546(self):
+        # https://github.com/CPMpy/cpmpy/issues/546
+        x = cp.intvar(1,3,shape=2, name=tuple("ab"))
+        arr = x.tolist() + [2]
+
+        cons = cp.AllDifferent(arr)
+        assert set(map(str, decompose_linear([cons]))) == \
+                            {'and([sum([a == 1, b == 1, False]) <= 1, '
+                             'sum([a == 2, b == 2, True]) <= 1, '
+                             'sum([a == 3, b == 3, False]) <= 1])'}
+
+        # also test full transformation stack
+        if "gurobi" in cp.SolverLookup.solvernames():  # otherwise, not supported
+            model = cp.Model(cons)
+            model.solve(solver="gurobi")
+
+        if "exact" in cp.SolverLookup.solvernames():  # otherwise, not supported
+            model = cp.Model(cons)
+            model.solve(solver="exact")
