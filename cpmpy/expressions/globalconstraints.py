@@ -1344,9 +1344,9 @@ class CumulativeOptional(GlobalConstraint):
         """
         start, dur, end, demand, capacity, is_present= self.args
         if end is None:
-            return f"Cumulative({start}, {dur}, {demand}, {capacity}, {is_present})"
+            return f"CumulativeOptional({start}, {dur}, {demand}, {capacity}, {is_present})"
         else:
-            return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity}, {is_present})"
+            return f"CumulativeOptional({start}, {dur}, {end}, {demand}, {capacity}, {is_present})"
 
 class NoOverlap(GlobalConstraint):
     """
