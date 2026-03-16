@@ -19,9 +19,8 @@ jobs:
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install ".[mypy]"
-          pip install pypblib  # dependency of pysat for PB constraints
       - name: Run Mypy
         uses: liskin/gh-problem-matcher-wrap@v2 # wrap mypy output as annotations
         with:   
           linters: mypy     
-          command: mypy --show-column-numbers -p cpmpy
+          run: mypy --show-column-numbers -p cpmpy
