@@ -218,10 +218,13 @@ def implies(expr, other):
 def get_nonneg_args(args, condition=None):
     """
         Replace arguments with negative lowerbound with their nonnegative counterpart
+        arguments:
+            - args: list of expressions
+            - condition: list of boolean expressions, indicating whether the argument is present or not (e.g., optional tasks)
     """
     if condition is None:
         condition = [True] * len(args)
-    assert len(args) == len(condition), f"Args and is_present must have the same length but got {len(args)} and {len(is_present)}"
+    assert len(args) == len(condition), f"Args and is_present must have the same length but got {len(args)} and {len(condition)}"
 
     lbs, ubs = zip(*[get_bounds(arg) for arg in args])
     new_args = []
