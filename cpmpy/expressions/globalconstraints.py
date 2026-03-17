@@ -133,6 +133,8 @@
 import copy
 import warnings
 from typing import cast, Literal, Union, Optional, Sequence, Any
+from cpmpy.solvers.solver_interface import SolverInterface
+from cpmpy.transformations import safening
 import numpy as np
 
 import cpmpy as cp
@@ -533,7 +535,7 @@ class Inverse(GlobalConstraint):
             if lb >= 0 and ub < len(rev): # safe, index is within bounds
                 constraining.append(rev[x] == i)
             else: # partial! need safening here
-                is_defined, total_expr, toplevel = cp.transformations.safening._safen_range(rev[x], (0, len(rev)-1), 1)
+                is_defined, total_expr, toplevel = safening._safen_range(rev[x], (0, len(rev)-1), 1)
                 constraining += [is_defined, total_expr == i]
                 defining += toplevel
         
@@ -1017,13 +1019,16 @@ class Cumulative(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
 
+        demand_list = []
         if is_any_list(demand):
-            if len(demand) != len(start):
-                raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand)} and {len(start)}")
+            demand_list = list(cast(Sequence[Expression], demand))
+            if len(demand_list) != len(start):
+                raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand_list)} and {len(start)}")
         else: # constant demand
-            demand = [demand] * len(start)
+            demand = cast(Expression, demand)
+            demand_list = [demand] * len(start)
 
-        super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, list(demand), capacity])
+        super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, demand_list, capacity])
 
     
     def decompose(self, how:str="auto") -> tuple[Sequence[Expression], Sequence[Expression]]:

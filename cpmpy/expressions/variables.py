@@ -453,12 +453,6 @@ class NDVarArray(np.ndarray, Expression):
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
 
-    @property
-    def args(self):
-        """ The constructor for NDVarArray never gets called, so _args is never initialised
-        """
-        return self # we can just return self
-
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
@@ -486,6 +480,11 @@ class NDVarArray(np.ndarray, Expression):
             self.name = "NDVarArray"
             self.update_args(self)
         return super().__repr__()
+    
+    def __hash__(self) -> int:  # type: ignore[override]
+        # Explicitly use Expression's hash implementation
+        # (np.ndarray sets __hash__ = None, which conflicts with Expression.__hash__)
+        return hash(self.__repr__())
 
     def __getitem__(self, index):
         # array access, check if variables are used in the indexing
