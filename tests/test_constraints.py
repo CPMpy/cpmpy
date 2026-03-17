@@ -43,6 +43,7 @@ EXCLUDE_GLOBAL = {
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
 EXCLUDE_OPERATORS = {"pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
+                     "scip" : {"mod", "pow"},
                      }
 
 # Variables to use in the rest of the test script

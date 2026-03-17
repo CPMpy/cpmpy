@@ -81,6 +81,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
             :class:`~cpmpy.expressions.globalconstraints.AllDifferent` has a special linearization and is decomposed as such if not in `supported`.
             Any other unsupported global constraint should be decomposed using :func:`cpmpy.transformations.decompose_global.decompose_in_tree()`
         reified: whether the constraint is fully reified
+    
+    `supported` accepts two special cases: 'sum!=' and 'wsum!=' for linear solvers that do support sum!= and wsum!= (e.g. SCIPs AddConsDisjunction)
     """
 
     newlist = []
