@@ -132,9 +132,7 @@
 """
 import copy
 import warnings
-from typing import cast, Literal, Union, Optional, Sequence, Any
-from cpmpy.solvers.solver_interface import SolverInterface
-from cpmpy.transformations import safening
+from typing import cast, Literal, Union, Optional, Sequence, Any, TYPE_CHECKING
 import numpy as np
 
 import cpmpy as cp
@@ -143,6 +141,9 @@ from .core import Expression, BoolVal
 from .variables import cpm_array, intvar, boolvar
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr
 from .globalfunctions import * # XXX make this file backwards compatible
+
+if TYPE_CHECKING:
+    from cpmpy.solvers.solver_interface import SolverInterface
 
 
 # Base class GlobalConstraint
@@ -522,6 +523,8 @@ class Inverse(GlobalConstraint):
         Returns:
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
+
+        from cpmpy.transformations import safening
 
         fwd, rev = self.args
         rev = cpm_array(rev)
@@ -1715,7 +1718,7 @@ class DirectConstraint(Expression):
         """
         return True
 
-    def callSolver(self, CPMpy_solver:"SolverInterface", Native_solver:Any):
+    def callSolver(self, CPMpy_solver: "SolverInterface", Native_solver: Any):
         """
             Call the `directname()` function of the native solver,
             with stored arguments replacing CPMpy variables with solver variables as needed.
