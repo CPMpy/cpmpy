@@ -1267,3 +1267,23 @@ def test_scip_special_cardinality():
     assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
     assert s.solve()
     assert bvs.value().sum() <= 3
+
+
+from cpmpy.solvers.highs import CPM_highs
+
+
+@pytest.mark.skipif(not CPM_highs.supported(), reason="HiGHS (highspy) not installed")
+def test_highs_basic_ilp():
+    # simple ILP: 0 <= x <= 10, 0 <= y <= 10, x + 2y >= 10, minimize x + y
+    x = cp.intvar(0, 10, name="x")
+    y = cp.intvar(0, 10, name="y")
+
+    m = cp.Model([x + 2 * y >= 10], minimize=x + y)
+
+    s = SolverLookup.get("highs", m)
+    assert s.solve()
+
+    # check variable types and a feasible objective
+    assert 0 <= x.value() <= 10
+    assert 0 <= y.value() <= 10
+    assert x.value() + 2 * y.value() >= 10
