@@ -30,12 +30,11 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import *
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
-from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.globalfunctions import GlobalFunction, Multiplication, Division
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
+from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -58,11 +57,11 @@ class CPM_scip(SolverInterface):
     The `DirectConstraint`, when used, calls a function on the `scip_model` object.
     """
 
-    # Globals we keep (decompose_in_tree) and how they are translated:
-    # - "xor": kept; linearize passes it through; we translate to addConsXor() in add().
-    # - "abs": GlobalFunction supported natively (PySCIPOpt addCons(abs(x) <= k)).
-    # SCIP has no native AllDifferent, Circuit, Table, Cumulative, etc.; others are decomposed by decompose_in_tree.
-    supported_global_constraints = frozenset({"xor", "abs"})
+    # Globals we keep and how they are translated in add():
+    # - "xor": addConsXor();
+    # - "abs": addCons(abs(x) <= k); 
+    # - "mul", "div": addCons(mul,div == rhs).
+    supported_global_constraints = frozenset({"xor", "abs", "mul", "div"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -246,10 +245,12 @@ class CPM_scip(SolverInterface):
         get_variables(expr, collect=self.user_vars)
 
         obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(obj,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
+        obj, decomp_cons = decompose_linear_objective(
+            obj,
+            supported=self.supported_global_constraints,
+            supported_reified=self.supported_reified_global_constraints,
+            csemap=self._csemap,
+        )
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj = only_positive_bv_wsum(obj)
 
@@ -298,9 +299,16 @@ class CPM_scip(SolverInterface):
         if cpm_expr.name == "wsum":
             return scip.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
-        # abs (GlobalFunction; PySCIPOpt supports abs() in constraints/objective)
-        if isinstance(cpm_expr, GlobalFunction) and cpm_expr.name == "abs":
-            return abs(self._make_numexpr(cpm_expr.args[0]))
+        # GlobalFunction: abs, mul, div (PySCIPOpt supports these in constraints/objective)
+        if isinstance(cpm_expr, GlobalFunction):
+            if cpm_expr.name == "abs":
+                return abs(self._make_numexpr(cpm_expr.args[0]))
+            if cpm_expr.name == "mul":
+                a, b = self._make_numexpr(cpm_expr.args[0]), self._make_numexpr(cpm_expr.args[1])
+                return a * b
+            if cpm_expr.name == "div":
+                a, b = self._make_numexpr(cpm_expr.args[0]), self._make_numexpr(cpm_expr.args[1])
+                return a / b
 
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
 
@@ -321,16 +329,14 @@ class CPM_scip(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
-        cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | {"alldifferent"},
-                                     supported_reified=self.supported_reified_global_constraints,
-                                     csemap=self._csemap)
+        cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "mul", "div", "sum!=", "wsum!="}) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "->", "sum!=", "wsum!="}) | self.supported_global_constraints, csemap=self._csemap)
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
@@ -388,23 +394,8 @@ class CPM_scip(SolverInterface):
                     sciplhs = self._make_numexpr(lhs)
                     self.scip_model.addCons(sciplhs >= sciprhs)
                 elif cpm_expr.name == '==':
-                    if isinstance(lhs, _NumVarImpl) \
-                            or (lhs_is_operator and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")) \
-                            or (isinstance(lhs, GlobalFunction) and lhs.name == "abs"):
-                        sciplhs = self._make_numexpr(lhs)
-                        self.scip_model.addCons(sciplhs == sciprhs)
-                    elif lhs_is_operator and lhs.name == 'mul':
-                        scp_vars = self.solver_vars(lhs.args)
-                        scp_lhs = scp_vars[0] * scp_vars[1]
-                        for v in scp_vars[2:]:
-                            scp_lhs *= v
-                        self.scip_model.addCons(scp_lhs == sciprhs)
-                    elif lhs_is_operator and lhs.name == 'div':
-                        a, b = self.solver_vars(lhs.args)
-                        self.scip_model.addCons(a / b == sciprhs)
-                    else:
-                        raise NotImplementedError(
-                            "Not a known supported scip comparison '{}' {}".format(getattr(lhs, 'name', lhs), cpm_expr))
+                    sciplhs = self._make_numexpr(lhs)
+                    self.scip_model.addCons(sciplhs == sciprhs)
                 else:
                     raise NotImplementedError(
                         "Not a known supported scip comparison '{}' {}".format(cpm_expr.name, cpm_expr))
@@ -417,25 +408,17 @@ class CPM_scip(SolverInterface):
                 lhs, rhs = sub_expr.args
                 lhs_is_globalfunc = isinstance(lhs, GlobalFunction)
                 lhs_is_operator = isinstance(lhs, Operator)
-                # cond -> (abs(x) <= rhs) is equivalent to cond -> (x <= rhs and x >= -rhs)
-                if lhs_is_globalfunc and lhs.name == "abs" and sub_expr.name == "<=":
-                    (arg,) = lhs.args
-                    self.add([cond.implies(arg <= rhs), cond.implies(arg >= -rhs)])
-                    continue
-                # cond -> (abs(x) >= rhs) means when cond, x >= rhs or x <= -rhs
-                if lhs_is_globalfunc and lhs.name == "abs" and sub_expr.name == ">=":
-                    (arg,) = lhs.args
-                    self.add([cond.implies((arg >= rhs) | (arg <= -rhs))])
-                    continue
-                # cond -> (abs(x) == rhs) means when cond, x == rhs or x == -rhs
-                if lhs_is_globalfunc and lhs.name == "abs" and sub_expr.name == "==":
-                    (arg,) = lhs.args
-                    self.add([cond.implies((arg == rhs) | (arg == -rhs))])
-                    continue
                 if lhs_is_globalfunc and lhs.name == "abs":
-                    raise NotImplementedError(
-                        f"Reified abs with {sub_expr.name} not supported in SCIP"
-                    )
+                    (arg,) = lhs.args
+                    if sub_expr.name == "<=":
+                        self.add([cond.implies(arg <= rhs), cond.implies(arg >= -rhs)])
+                    elif sub_expr.name == ">=":
+                        self.add([cond.implies((arg >= rhs) | (arg <= -rhs))])
+                    elif sub_expr.name == "==":
+                        self.add([cond.implies((arg == rhs) | (arg == -rhs))])
+                    else:
+                        raise NotImplementedError(f"Reified abs with {sub_expr.name} not supported in SCIP")
+                    continue
 
                 assert isinstance(lhs, _NumVarImpl) or (lhs_is_operator and lhs.name in ("sum", "wsum")), f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
                 assert is_num(rhs), f"linearize should only leave constants on rhs of comparison but got {rhs}"
