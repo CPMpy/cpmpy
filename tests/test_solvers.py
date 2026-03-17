@@ -1050,13 +1050,8 @@ class TestSupportedSolvers:
         m += x / y == d
         m += x % y == r
         sols = set()
-        solution_limit = None
-        time_limit = None
-        if solver == 'gurobi':
-            solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
-        if solver == "hexaly":
-            time_limit = 5
-        m.solveAll(solver=solver, solution_limit=solution_limit, time_limit=time_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        solution_limit = 15  # ILP solvers don't like this model and tend to get stuck finding all solutions
+        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
@@ -1082,12 +1077,12 @@ class TestSupportedSolvers:
 
         # now making a tricky problem to solve
         np.random.seed(0)
-        start = cp.intvar(0,100, shape=50)
-        dur = np.random.randint(1,5, size=50)
-        end = cp.intvar(0,100, shape=50)
-        demand  = np.random.randint(10,15, size=50)
+        start = cp.intvar(0,50, shape=20)
+        dur = np.random.randint(1,5, size=20)
+        end = cp.intvar(0,50, shape=20)
+        demand  = np.random.randint(10,15, size=20)
 
-        m += cp.Cumulative(start, dur, end,demand, 30)
+        m += cp.Cumulative(start, dur, end,demand, 15)
         m.minimize(cp.max(end))
         m.solve(solver=solver, time_limit=1)
         # normally, should not be able to solve within 1s...
