@@ -115,7 +115,6 @@ class CPM_pindakaas(SolverInterface):
         self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
         # TODO workaround for upstream issue https://github.com/pindakaashq/pindakaas/issues/189
-        self.pdk_solver._set_option("factor", 0)
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
         super().__init__(name=name, cpm_model=cpm_model)
