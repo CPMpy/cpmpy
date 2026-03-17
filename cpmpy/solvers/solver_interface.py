@@ -327,6 +327,14 @@ class SolverInterface(object):
         """
         raise NotSupportedError("Solver does not support unsat core extraction")
 
+    def get_proof_files(self):
+        """
+        For use when solving using proof-logging.
+        Returns a list of filenames where the proof was stored.
+
+        Depending on the proof-format used, a solver may use multiple proof files for a single solve-call
+        """
+        raise NotSupportedError("Solver does not support proof logging")
 
     # shared helper functions
 

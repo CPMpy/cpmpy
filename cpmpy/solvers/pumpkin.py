@@ -685,3 +685,9 @@ class CPM_pumpkin(SolverInterface):
         """
         if self.pum_solver.is_inconsistent() is False: # otherwise, not guaranteed all variables are known
             self._solhint = {self.solver_var(v) : val for v, val in zip(cpm_vars, vals)} # store for later use in solve
+
+    def get_proof_files(self) -> tuple[str]:
+        """
+        Returns the path where the proof is stored.
+        """
+        return (self._proof,)
