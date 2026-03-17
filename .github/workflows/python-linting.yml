@@ -21,4 +21,4 @@ jobs:
         uses: liskin/gh-problem-matcher-wrap@v2 # wrap mypy output as annotations
         with:   
           linters: mypy     
-          run: mypy --show-column-numbers -p cpmpy ./tests
+          run: mypy --show-column-numbers cpmpy tests
