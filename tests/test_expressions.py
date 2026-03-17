@@ -91,6 +91,9 @@ class TestWeightedSum:
         expr2 = 3 + self.ivs[0] * 4
         assert isinstance(expr2, Operator)
         assert expr2.name == 'sum'
+        expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
+        assert isinstance(expr, Operator)
+        assert expr.name == 'sum'
 
     def test_weightedadd_iv(self):
 
@@ -126,11 +129,6 @@ class TestWeightedSum:
         expr4 = - self.ivs[0] + self.ivs[1] * 4 - 6 * self.ivs[2]
         assert isinstance(expr4, Operator)
         assert expr4.name == 'wsum'
-
-    def test_weightedadd_int(self):
-        expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
-        assert isinstance(expr, Operator)
-        assert expr.name == 'sum'
 
     def test_weightedadd_sub(self):
         expr = self.ivs[0] * 4 - 5 * self.ivs[1]
