@@ -1038,6 +1038,18 @@ class TestSupportedSolvers:
     def test_false(self, solver):
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
+
+    def test_bva_min(self, solver):
+        import cpmpy as cp
+
+        x = cp.intvar(1, 5, name='x')
+        y = cp.intvar(1, 5, name='y')
+        d = cp.intvar(0, 5, name='d')
+        m = cp.Model(x // y == d)
+
+        # Crashes on second iteration of solveAll
+        m.solveAll(solver='pindakaas')
+
     def test_partial_div_mod(self, solver):
         if solver in ("pysdd", "rc2"):  # pysdd: div/mod; rc2: no decision problems (solveAll)
             pytest.skip("solver does not support this test context")
