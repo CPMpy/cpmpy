@@ -34,6 +34,7 @@
         minizinc
         cpo
         gurobi
+        highs
         exact
         z3
         pysat
