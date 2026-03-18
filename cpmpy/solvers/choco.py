@@ -64,7 +64,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
 from ..transformations.reification import reify_rewrite
-from ..exceptions import ChocoBoundsException, NotSupportedError
+from ..exceptions import NotSupportedError
 
 
 class CPM_choco(SolverInterface):
@@ -388,10 +388,8 @@ class CPM_choco(SolverInterface):
     def _to_var(self, val):
         from pychoco.variables.intvar import IntVar
         if is_int(val):
-            # Choco accepts only int32, not int64
-            if val < -2147483646 or val > 2147483646:
-                raise ChocoBoundsException(
-                    "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
+            if not isinstance(val, BoolVal) and (val < -2147483646 or val > 2147483646):
+                raise OverflowError("Choco accepts only int32 bounds, not int64.")
             return self.chc_model.intvar(int(val), int(val))  # convert to "variable"
         elif isinstance(val, _NumVarImpl):
             return self.solver_var(val)  # use variable
@@ -623,13 +621,13 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == 'short_table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = cpm_expr.args
-                table = np.array(table)
-                table[table == STAR] = np.nan
-                table = table.astype(float) # nan's require float dtype
+                np_table = np.array(table)
+                mask = np_table == STAR
                 # Choco requires a wildcard value not present in dom of args,
                 # take value lower than anything else
-                chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
-                chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
+                chc_star = int(np.min(np_table[~mask].astype(int)))-1
+                np_table[mask] = chc_star
+                chc_table = np_table.astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
             elif cpm_expr.name == "regular":
                 from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
