@@ -132,6 +132,7 @@
 """
 import copy
 import warnings
+from collections.abc import Sequence as AbcSequence
 from typing import cast, Literal, Union, Optional, Sequence, Any, TYPE_CHECKING
 import numpy as np
 
@@ -1023,12 +1024,11 @@ class Cumulative(GlobalConstraint):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
 
         demand_list = []
-        if is_any_list(demand):
-            demand_list = list(cast(Sequence[Expression], demand))
+        if isinstance(demand, AbcSequence):
+            demand_list = list(demand)
             if len(demand_list) != len(start):
                 raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand_list)} and {len(start)}")
         else: # constant demand
-            demand = cast(Expression, demand)
             demand_list = [demand] * len(start)
 
         super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, demand_list, capacity])
