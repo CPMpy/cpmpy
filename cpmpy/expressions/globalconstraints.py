@@ -137,9 +137,9 @@ import numpy as np
 
 import cpmpy as cp
 
-from .core import Expression, BoolVal
-from .variables import cpm_array, intvar, boolvar
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, ListLike
+from .core import Expression, BoolVal, ExprLike, ListLike
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl
+from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr
 from .globalfunctions import * # XXX make this file backwards compatible
 
 if TYPE_CHECKING:
@@ -996,14 +996,14 @@ class Cumulative(GlobalConstraint):
     Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
     Supports both varying demand across tasks or equal demand for all jobs.
     """
-    def __init__(self, start: ListLike[Expression|int], duration: ListLike[Expression|int], end: Optional[ListLike[Expression|int]] = None, demand: Optional[ListLike[Expression|int]|Expression|int] = None, capacity: Optional[Expression|int] = None):
+    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, demand: Optional[ListLike[ExprLike]|ExprLike] = None, capacity: Optional[ExprLike] = None):
         """
             Arguments:
-                start (Sequence[Expression]): List of Expression objects representing the start times of the tasks
-                duration (Sequence[Expression]): List of Expression objects representing the durations of the tasks
-                end (Sequence[Expression] | None): optional, list of Expression objects representing the end times of the tasks
-                demand (Sequence[Expression] | Expression | None): List of Expression objects or single Expression to indicate constant demand for all tasks
-                capacity (Expression | None): Expression object representing the capacity of the resource
+                start (ListLike[ExprLike]): Start times of the tasks
+                duration (ListLike[ExprLike]): Durations of the tasks
+                end (ListLike[ExprLike] | None): Optional end times of the tasks
+                demand (ListLike[ExprLike] | ExprLike | None): Per-task demands or a single constant demand
+                capacity (ExprLike | None): Capacity of the resource
         """
 
         if not is_any_list(start):
@@ -1172,12 +1172,12 @@ class NoOverlap(GlobalConstraint):
         - start + duration == end
     """
 
-    def __init__(self, start: Sequence[Expression], duration: Sequence[Expression], end: Optional[Sequence[Expression]] = None):
+    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None):
         """
         Arguments:
-            start (Sequence[Expression]): List of Expression objects representing the start times of the tasks
-            duration (Sequence[Expression]): List of Expression objects representing the durations of the tasks
-            end (Sequence[Expression] | None): optional, list of Expression objects representing the end times of the tasks
+            start (ListLike[ExprLike]): Start times of the tasks
+            duration (ListLike[ExprLike]): Durations of the tasks
+            end (ListLike[ExprLike] | None): Optional end times of the tasks
         """
        
         if not is_any_list(start):

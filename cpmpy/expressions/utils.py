@@ -34,13 +34,8 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TypeVar, TypeGuard, Union
+from typing import TypeGuard, Union
 from cpmpy.exceptions import IncompleteFunctionError
-
-
-T = TypeVar("T")
-ListLike = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
-
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
