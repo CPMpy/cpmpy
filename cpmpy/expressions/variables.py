@@ -453,6 +453,15 @@ class NDVarArray(np.ndarray, Expression):
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
 
+    def __array_finalize__(self, obj):
+        # numpy view/slice creation hook: __init__ is not always called
+        if obj is None:
+            return
+        if not hasattr(self, "name"):
+            self.name = "NDVarArray"
+        if not hasattr(self, "_args"):
+            self._args = self
+
     def is_bool(self):
         """ is it a Boolean (return type) Operator?
         """
