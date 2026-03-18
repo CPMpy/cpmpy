@@ -577,7 +577,7 @@ class CPM_cpo(SolverInterface):
                         continue
                     else:
                         tasks.append(task)
-                return cons + [dom.no_overlap(tasks)]
+                return cons + [dom.no_overlap(tasks)] if len(tasks) > 0 else []
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
                 return cpm_con.callSolver(self, self.cpo_model)
