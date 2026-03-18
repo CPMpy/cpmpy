@@ -34,7 +34,12 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
+from typing import TypeVar, TypeGuard, Union
 from cpmpy.exceptions import IncompleteFunctionError
+
+
+T = TypeVar("T")
+ListLike = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
 
 
 def is_bool(arg):
@@ -91,7 +96,7 @@ def is_pure_list(arg):
     return isinstance(arg, (list, tuple))
 
 
-def is_any_list(arg):
+def is_any_list(arg) -> TypeGuard[list | tuple | np.ndarray]:
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))

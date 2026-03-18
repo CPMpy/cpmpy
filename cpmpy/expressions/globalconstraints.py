@@ -132,7 +132,6 @@
 """
 import copy
 import warnings
-from collections.abc import Sequence as AbcSequence
 from typing import cast, Literal, Union, Optional, Sequence, Any, TYPE_CHECKING
 import numpy as np
 
@@ -140,7 +139,7 @@ import cpmpy as cp
 
 from .core import Expression, BoolVal
 from .variables import cpm_array, intvar, boolvar
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr
+from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, ListLike
 from .globalfunctions import * # XXX make this file backwards compatible
 
 if TYPE_CHECKING:
@@ -997,7 +996,7 @@ class Cumulative(GlobalConstraint):
     Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
     Supports both varying demand across tasks or equal demand for all jobs.
     """
-    def __init__(self, start: Sequence[Expression], duration: Sequence[Expression], end: Optional[Sequence[Expression]] = None, demand: Optional[Union[Sequence[Expression],Expression]] = None, capacity: Optional[Expression] = None):
+    def __init__(self, start: ListLike[Expression|int], duration: ListLike[Expression|int], end: Optional[ListLike[Expression|int]] = None, demand: Optional[ListLike[Expression|int]|Expression|int] = None, capacity: Optional[Expression|int] = None):
         """
             Arguments:
                 start (Sequence[Expression]): List of Expression objects representing the start times of the tasks
@@ -1013,9 +1012,9 @@ class Cumulative(GlobalConstraint):
             raise TypeError("duration should be a list")
         if end is not None and not is_any_list(end):
             raise TypeError("end should be a list if it is provided")
-        if demand is None:
+        if demand is None:  # marked optional due to 'end' being optional and parameters after that must be optional too
             raise TypeError("demand should be provided but was None")
-        if capacity is None:
+        if capacity is None:  # marked optional due to 'end' being optional and parameters after that must be optional too
             raise TypeError("capacity should be provided but was None")
         
         if len(start) != len(duration):
@@ -1024,7 +1023,7 @@ class Cumulative(GlobalConstraint):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
 
         demand_list = []
-        if isinstance(demand, AbcSequence):
+        if is_any_list(demand):
             demand_list = list(demand)
             if len(demand_list) != len(start):
                 raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand_list)} and {len(start)}")
