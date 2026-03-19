@@ -1472,7 +1472,7 @@ class NoOverlapOptional(GlobalConstraint):
         
         super().__init__("no_overlap_optional", [start, duration, end, is_present])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[ExprLike], list[ExprLike]]:
         """
         Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
         
@@ -1491,7 +1491,7 @@ class NoOverlapOptional(GlobalConstraint):
             cons += [implies(p1 & p2, (e1 <= s2) | (e2 <= s1))]
         return cons, []
 
-    def value(self):
+    def value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
