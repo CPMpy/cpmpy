@@ -195,7 +195,10 @@ class TestCardinality:
             cp.boolvar().implies(sum(bvs) <= 2),
             sum(bvs) >= 2, # followed by non-implied
         ])
-        m.solve("pysat:minicard")
+        assert m.solve("pysat:minicard")
+
+        # Implied cardinality constraints are not handled natively
+        assert cp.Model(cp.boolvar().implies(sum(cp.boolvar(3)) <= 2)).solve("pysat:minicard")
 
     @skip_on_missing_pblib()
     def test_pysat_linearize_example(self):
