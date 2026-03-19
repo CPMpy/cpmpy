@@ -39,7 +39,7 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
@@ -154,12 +154,13 @@ class CPM_pindakaas(SolverInterface):
 
         self.user_vars = self._int2bool_user_vars()
 
+        time_limit_delta: Optional[timedelta] = None
         if time_limit is not None:
-            time_limit = timedelta(seconds=time_limit)
-        solver_assumptions = None if assumptions is None else self.solver_vars(assumptions)
+            time_limit_delta = timedelta(seconds=time_limit)
+        solver_assumptions: Optional[List[Any]] = None if assumptions is None else self.solver_vars(assumptions)
 
         t = time.time()
-        with self.pdk_solver.solve(time_limit=time_limit, assumptions=solver_assumptions) as result:
+        with self.pdk_solver.solve(time_limit=time_limit_delta, assumptions=solver_assumptions) as result:
             self.cpm_status.runtime = time.time() - t
 
             # translate pindakaas result status to cpmpy status
@@ -206,6 +207,7 @@ class CPM_pindakaas(SolverInterface):
                     cpm_var._value = None
                 # we have to save the unsat core here, as the result object does not live beyond this solve call
                 if assumptions is not None:
+                    assert solver_assumptions is not None and len(assumptions) == len(solver_assumptions), "Number of assumptions and solver assumptions must match"
                     self.core = [x for x, s_x in zip(assumptions, solver_assumptions) if result.failed(s_x)]
 
         return has_sol

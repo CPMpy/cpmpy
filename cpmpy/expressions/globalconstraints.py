@@ -134,15 +134,18 @@
 """
 import copy
 import warnings
-from typing import cast, Literal, Union, Optional, Sequence, Any
+from typing import cast, Literal, Union, Optional, Sequence, Any, TYPE_CHECKING
 import numpy as np
 
 import cpmpy as cp
 
-from .core import Expression, BoolVal
-from .variables import cpm_array, intvar, boolvar
+from .core import Expression, BoolVal, ExprLike, ListLike
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 from .globalfunctions import * # XXX make this file backwards compatible
+
+if TYPE_CHECKING:
+    from cpmpy.solvers.solver_interface import SolverInterface
 
 
 # Base class GlobalConstraint
@@ -523,6 +526,10 @@ class Inverse(GlobalConstraint):
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
+        # we try to avoid in-function imports (needed when cyclic dependency),
+        # but decompose is typically only called once anyway, so here it is acceptable
+        from cpmpy.transformations import safening
+
         fwd, rev = self.args
         rev = cpm_array(rev)
 
@@ -535,7 +542,7 @@ class Inverse(GlobalConstraint):
             if lb >= 0 and ub < len(rev): # safe, index is within bounds
                 constraining.append(rev[x] == i)
             else: # partial! need safening here
-                is_defined, total_expr, toplevel = cp.transformations.safening._safen_range(rev[x], (0, len(rev)-1), 1)
+                is_defined, total_expr, toplevel = safening._safen_range(rev[x], (0, len(rev)-1), 1)
                 constraining += [is_defined, total_expr == i]
                 defining += toplevel
         
@@ -993,14 +1000,16 @@ class Cumulative(GlobalConstraint):
     Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlap` when demand and capacity are equal to 1.
     Supports both varying demand across tasks or equal demand for all jobs.
     """
-    def __init__(self, start: Sequence[Expression], duration: Sequence[Expression], end: Optional[Sequence[Expression]] = None, demand: Optional[Union[Sequence[Expression],Expression]] = None, capacity: Optional[Expression] = None):
+    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, demand: Optional[ListLike[ExprLike]|ExprLike] = None, capacity: Optional[ExprLike] = None):
         """
             Arguments:
-                start (Sequence[Expression]): List of Expression objects representing the start times of the tasks
-                duration (Sequence[Expression]): List of Expression objects representing the durations of the tasks
-                end (Sequence[Expression] | None): optional, list of Expression objects representing the end times of the tasks
-                demand (Sequence[Expression] | Expression | None): List of Expression objects or single Expression to indicate constant demand for all tasks
-                capacity (Expression | None): Expression object representing the capacity of the resource
+                start (ListLike[ExprLike]): Start times of the tasks
+                duration (ListLike[ExprLike]): Durations of the tasks
+                end (ListLike[ExprLike] | None): Optional end times of the tasks
+                demand (ListLike[ExprLike] | ExprLike): Per-task demands or a single constant demand, required
+                capacity (ExprLike): Capacity of the resource, required
+            
+            Technical note: demand/capacity marked as Optional because it comes after an Optional argument
         """
 
         if not is_any_list(start):
@@ -1009,9 +1018,9 @@ class Cumulative(GlobalConstraint):
             raise TypeError("duration should be a list")
         if end is not None and not is_any_list(end):
             raise TypeError("end should be a list if it is provided")
-        if demand is None:
+        if demand is None:  # marked optional due to 'end' being optional and parameters after that must be optional too
             raise TypeError("demand should be provided but was None")
-        if capacity is None:
+        if capacity is None:  # marked optional due to 'end' being optional and parameters after that must be optional too
             raise TypeError("capacity should be provided but was None")
         
         if len(start) != len(duration):
@@ -1019,13 +1028,15 @@ class Cumulative(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
 
+        demand_list = []
         if is_any_list(demand):
-            if len(demand) != len(start):
-                raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand)} and {len(start)}")
+            demand_list = list(demand)
+            if len(demand_list) != len(start):
+                raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand_list)} and {len(start)}")
         else: # constant demand
-            demand = [demand] * len(start)
+            demand_list = [demand] * len(start)
 
-        super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, list(demand), capacity])
+        super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, demand_list, capacity])
 
     
     def decompose(self, how:str="auto") -> tuple[Sequence[Expression], Sequence[Expression]]:
@@ -1355,12 +1366,12 @@ class NoOverlap(GlobalConstraint):
         - start + duration == end
     """
 
-    def __init__(self, start: Sequence[Expression], duration: Sequence[Expression], end: Optional[Sequence[Expression]] = None):
+    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None):
         """
         Arguments:
-            start (Sequence[Expression]): List of Expression objects representing the start times of the tasks
-            duration (Sequence[Expression]): List of Expression objects representing the durations of the tasks
-            end (Sequence[Expression] | None): optional, list of Expression objects representing the end times of the tasks
+            start (ListLike[ExprLike]): Start times of the tasks
+            duration (ListLike[ExprLike]): Durations of the tasks
+            end (ListLike[ExprLike] | None): Optional end times of the tasks
         """
        
         if not is_any_list(start):
@@ -1994,7 +2005,7 @@ class DirectConstraint(Expression):
         """
         return True
 
-    def callSolver(self, CPMpy_solver:"SolverInterface", Native_solver:Any):
+    def callSolver(self, CPMpy_solver: "SolverInterface", Native_solver: Any):
         """
             Call the `directname()` function of the native solver,
             with stored arguments replacing CPMpy variables with solver variables as needed.

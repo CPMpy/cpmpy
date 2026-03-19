@@ -87,11 +87,17 @@
 import copy
 import warnings
 from types import GeneratorType
+from typing import TypeAlias, TypeVar, Union
 import numpy as np
 import cpmpy as cp
 
 from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import IncompleteFunctionError, TypeError
+
+# Common typing helpers
+T = TypeVar("T")
+ListLike: TypeAlias = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
+ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
 
 
 class Expression(object):

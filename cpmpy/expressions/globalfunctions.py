@@ -790,7 +790,7 @@ class Element(GlobalFunction):
         """
         return f"{self.args[0]}[{self.args[1]}]"
 
-def element(arg_list: list[Expression]) -> Element:
+def element(arg_list) -> Element:
     """
     DEPRECATED: Use Element(arr,idx) instead of element([arr,idx]).
 

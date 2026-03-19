@@ -1,10 +1,11 @@
 import pytest
 import itertools
+from typing import cast
 
 import cpmpy as cp
 
 from cpmpy import SolverLookup
-from cpmpy.expressions.core import BoolVal, Comparison, Operator
+from cpmpy.expressions.core import BoolVal, Comparison, Expression, Operator
 from cpmpy.expressions.utils import argvals
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar, intvar
 from cpmpy.transformations.flatten_model import flatten_constraint
@@ -30,7 +31,7 @@ CONSTRAINTS = [
     ~p,
     p.implies(q),
 ] + [
-    con if antecedent is True else antecedent.implies(con)
+    con if antecedent is True else cast(Expression, antecedent).implies(con)
     for cmp in (
         ">=",
         "<=",
