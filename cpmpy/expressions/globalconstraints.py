@@ -965,7 +965,10 @@ class Xor(GlobalConstraint):
         return decomp, []
 
     def value(self):
-        return sum(argvals(self.args)) % 2 == 1
+        vals = argvals(self.args)
+        if any(x is None for x in vals):
+            return None
+        return sum(vals) % 2 == 1
 
     def __repr__(self):
         if len(self.args) == 2:
@@ -1133,13 +1136,14 @@ class Cumulative(GlobalConstraint):
         start, dur, end, demand, capacity = self.args
         
         start, dur, demand, capacity = argvals([start, dur, demand, capacity])
+        if any(a is None for a in flatlist([start, dur, demand, capacity])):
+            return None
         if end is None:
             end = [s + d for s,d in zip(start, dur)]
         else:
             end = argvals(end)
-
-        if any(a is None for a in flatlist([start, dur, end, demand, capacity])):
-            return None
+            if any(e is None for e in end):
+                return None
                 
         if any(d < 0 for d in dur):
             return False

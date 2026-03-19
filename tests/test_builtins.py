@@ -10,6 +10,9 @@ iv = cp.intvar(-8, 8, shape=5)
 class TestBuiltin:
 
     def test_max(self):
+        assert isinstance(max(iv), GlobalFunction)
+        assert isinstance(cp.max(iv), GlobalFunction)
+
         constraints = [cp.max(iv) + 9 <= 8]
         model = cp.Model(constraints)
         assert model.solve()
@@ -23,6 +26,9 @@ class TestBuiltin:
         assert cp.max(iv).value() != 4
 
     def test_min(self):
+        assert isinstance(min(iv), GlobalFunction)
+        assert isinstance(cp.min(iv), GlobalFunction)
+        
         constraints = [cp.min(iv) + 9 == 8]
         model = cp.Model(constraints)
         assert model.solve()

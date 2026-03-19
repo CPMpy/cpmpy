@@ -64,7 +64,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions
 from ..transformations.reification import reify_rewrite
-from ..exceptions import ChocoBoundsException, NotSupportedError
+from ..exceptions import NotSupportedError
 
 
 class CPM_choco(SolverInterface):
@@ -388,10 +388,8 @@ class CPM_choco(SolverInterface):
     def _to_var(self, val):
         from pychoco.variables.intvar import IntVar
         if is_int(val):
-            # Choco accepts only int32, not int64
-            if val < -2147483646 or val > 2147483646:
-                raise ChocoBoundsException(
-                    "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
+            if not isinstance(val, BoolVal) and (val < -2147483646 or val > 2147483646):
+                raise OverflowError("Choco accepts only int32 bounds, not int64.")
             return self.chc_model.intvar(int(val), int(val))  # convert to "variable"
         elif isinstance(val, _NumVarImpl):
             return self.solver_var(val)  # use variable
@@ -623,13 +621,13 @@ class CPM_choco(SolverInterface):
             elif cpm_expr.name == 'short_table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = cpm_expr.args
-                table = np.array(table)
-                table[table == STAR] = np.nan
-                table = table.astype(float) # nan's require float dtype
+                np_table = np.array(table)
+                mask = np_table == STAR
                 # Choco requires a wildcard value not present in dom of args,
                 # take value lower than anything else
-                chc_star = int(min(np.nanmin(table), *get_bounds(array)[0]) -1) # should be an int
-                chc_table = np.nan_to_num(table, nan=chc_star).astype(int).tolist()
+                chc_star = int(np.min(np_table[~mask].astype(int)))-1
+                np_table[mask] = chc_star
+                chc_table = np_table.astype(int).tolist()
                 return self.chc_model.table(self.solver_vars(array), chc_table, universal_value=chc_star, algo="STR2+")
             elif cpm_expr.name == "regular":
                 from pychoco.objects.automaton.finite_automaton import FiniteAutomaton
@@ -652,26 +650,23 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.member(expr, table)
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = cpm_expr.args
-                # Choco allows negative durations, but this does not match CPMpy spec
-                dur, extra_cons = get_nonneg_args(dur)
-                # Choco allows negative demand, but this does not match CPMpy spec
-                demand, demand_cons = get_nonneg_args(demand)
-                extra_cons += demand_cons
-                # start, end, demand and cap should be var
-                if end is None:
-                    start, demand, cap = self._to_vars([start, demand, cap])
-                    end = [None for _ in range(len(start))]
-                else:
-                    start, end, demand, cap = self._to_vars([start, end, demand, cap])
-                # duration can be var or int
-                dur = self.solver_vars(dur)
-                # Create task variables. Choco can create them only one by one
-                tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
+                # Choco allows negative durations and demand, but this does not match CPMpy spec
+                extra_cons = [d >= 0 for d in dur if get_bounds(d)[0] < 0]
+                extra_cons += [h >= 0 for h in demand if get_bounds(h)[0] < 0]
+                if end is not None: # enforce end == start + duration
+                    extra_cons += [s + d == e for s,d,e in zip(start, dur, end)]
+                
+                # start, demand and capacity should be vars
+                chc_start, chc_demand, chc_cap = self._to_vars([start, demand, cap])
+                chc_dur = self.solver_vars(dur)
+                # Create task variables
+                tasks = [self.chc_model.task(s, d) for s, d in zip(chc_start, chc_dur)]
 
-                chc_cumulative = self.chc_model.cumulative(tasks, demand, cap)
-                if len(extra_cons): # replace some negative durations, part of constraint
-                    return self.chc_model.and_([chc_cumulative] + [self._get_constraint(c) for c in extra_cons])
-                return chc_cumulative
+                chc_cumulative = self.chc_model.cumulative(tasks, chc_demand, chc_cap)
+                if len(extra_cons): # wrap extra constraints in conjunction
+                    return self.chc_model.and_([chc_cumulative] + [self._get_constraint(c) for c in self.transform(extra_cons)])
+                else:
+                    return chc_cumulative
             elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
                 start, dur, end = cpm_expr.args
                 return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))

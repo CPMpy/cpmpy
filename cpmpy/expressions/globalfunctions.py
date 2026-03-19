@@ -718,11 +718,14 @@ class Element(GlobalFunction):
         vidx = argval(idx)
         if vidx is None:
             return None
+        varr = argvals(arr)
+        if any(v is None for v in varr):
+            return None
 
-        if vidx < 0 or vidx >= len(arr):
-            raise IncompleteFunctionError(f"Index {vidx} out of range for array of length {len(arr)} while calculating value for expression {self}"
+        if vidx < 0 or vidx >= len(varr):
+            raise IncompleteFunctionError(f"Index {vidx} out of range for array of length {len(varr)} while calculating value for expression {self}"
                                             + "\n Use argval(expr) to get the value of expr with relational semantics.")
-        return argval(arr[vidx])  # can be None
+        return varr[vidx]  # can be None
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
