@@ -1447,7 +1447,7 @@ class NoOverlapOptional(GlobalConstraint):
         if the task is not present, it does not enforce any of the above.
     """
     
-    def __init__(self, start: ListLike[Expression], duration: ListLike[Expression], end: Optional[ListLike[Expression]] = None, is_present: Optional[ListLike[Expression]] = None):
+    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[ExprLike]] = None):
         """
         Arguments:
             start (ListLike[Expression]): List of Expression objects representing the start times of the tasks
@@ -1460,10 +1460,10 @@ class NoOverlapOptional(GlobalConstraint):
             raise TypeError("start should be a list")
         if not is_any_list(duration):
             raise TypeError("duration should be a list")
-        if is_present is None or not is_any_list(is_present):
-            raise ValueError("is_present should be provided and should be a list")
         if end is not None and not is_any_list(end):
             raise TypeError("end should be a list if it is provided")
+        if is_present is None or not is_any_list(is_present):
+            raise ValueError("is_present should be provided and should be a list")
         
         if len(start) != len(duration):
             raise ValueError("Start and duration should have equal length")
@@ -1474,7 +1474,7 @@ class NoOverlapOptional(GlobalConstraint):
         
         super().__init__("no_overlap_optional", [start, duration, end, is_present])
 
-    def decompose(self) -> tuple[list[ExprLike], list[ExprLike]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
         
