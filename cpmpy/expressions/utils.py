@@ -34,8 +34,10 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TypeGuard, Union
+from typing import TypeGuard, Union, Optional
 from cpmpy.exceptions import IncompleteFunctionError
+from cpmpy.expressions.core import ListLike, ExprLike
+
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
@@ -215,7 +217,7 @@ def implies(expr, other):
 
 # Specific stuff for scheduling constraints
 
-def get_nonneg_args(args, condition=None):
+def get_nonneg_args(args:ListLike[ExprLike], condition:Optional[ListLike[ExprLike]]=None) -> tuple[list[ExprLike], list[ExprLike]] :
     """
         Replace arguments with negative lowerbound with their nonnegative counterpart
         arguments:
