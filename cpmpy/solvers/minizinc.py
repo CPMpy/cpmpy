@@ -70,7 +70,7 @@ from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
+from ..expressions.utils import is_num, is_any_list, argvals, argval
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -712,12 +712,9 @@ class CPM_minizinc(SolverInterface):
             start, dur, end, demand, capacity = expr.args
 
             global_str = "cumulative({},{},{},{})"
-            # ensure duration is non-negative
-            dur, extra_cons = get_nonneg_args(dur)
-            # ensure demand is non-negative
-            demand, demand_cons = get_nonneg_args(demand)
-            extra_cons += demand_cons
-
+            # ensure duration and demands are non-negative
+            extra_cons = [d >= 0 for d in dur] + [h >= 0 for h in demand]
+        
             if end is not None:
                 extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
@@ -732,7 +729,7 @@ class CPM_minizinc(SolverInterface):
             start, dur, end = expr.args
             global_str = "disjunctive({},{})"
             # ensure duration is non-negative
-            dur, extra_cons = get_nonneg_args(dur)
+            extra_cons = [d >= 0 for d in dur]
             if end is not None:
                 extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
