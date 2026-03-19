@@ -1167,17 +1167,6 @@ class Cumulative(GlobalConstraint):
                 return False
 
         return True
-    
-    def __repr__(self) -> str:
-        """
-        Returns:
-            str: String representation of the cumulative constraint
-        """
-        start, dur, end, demand, capacity = self.args
-        if end is None:
-            return f"Cumulative({start}, {dur}, {demand}, {capacity})"
-        else:
-            return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity})"
 
 class CumulativeOptional(GlobalConstraint):
     """
@@ -1371,16 +1360,6 @@ class CumulativeOptional(GlobalConstraint):
 
         return True
 
-    def __repr__(self) -> str:
-        """
-        Returns:
-            str: String representation of the cumulative constraint
-        """
-        start, dur, end, demand, capacity, is_present= self.args
-        if end is None:
-            return f"CumulativeOptional({start}, {dur}, {demand}, {capacity}, {is_present})"
-        else:
-            return f"CumulativeOptional({start}, {dur}, {end}, {demand}, {capacity}, {is_present})"
 
 class NoOverlap(GlobalConstraint):
     """
@@ -1452,17 +1431,6 @@ class NoOverlap(GlobalConstraint):
             if s1 + d1 > s2 and s2 + d2 > s1:
                 return False
         return True
-    
-    def __repr__(self) -> str:
-        """
-        Returns:
-            str: String representation of the NoOverlap constraint
-        """
-        start, dur, end = self.args
-        if end is None:
-            return f"NoOverlap({start}, {dur})"
-        else:
-            return f"NoOverlap({start}, {dur}, {end})"
 
 class NoOverlapOptional(GlobalConstraint):
     """
@@ -1545,17 +1513,6 @@ class NoOverlapOptional(GlobalConstraint):
             if p1 and p2 and (s1 + d1 > s2) and (s2 + d2 > s1):
                 return False
         return True
-
-    def __repr__(self) -> str:
-        """
-        Returns:
-            str: String representation of the NoOverlapOptional constraint
-        """
-        start, dur, end, is_present = self.args
-        if end is None:
-            return f"NoOverlapOptional({start}, {dur}, {is_present})"
-        else:
-            return f"NoOverlapOptional({start}, {dur}, {end}, {is_present})"
     
 class Precedence(GlobalConstraint):
     """
