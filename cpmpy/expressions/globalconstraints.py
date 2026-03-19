@@ -132,7 +132,7 @@
 """
 import copy
 import warnings
-from typing import cast, Literal, Union, Optional, Sequence, Any, TYPE_CHECKING
+from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
 
 import cpmpy as cp
@@ -215,7 +215,7 @@ class AllDifferent(GlobalConstraint):
     Enforces that all arguments have a different (distinct) value
     """
 
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to be different from each other
@@ -262,7 +262,7 @@ class AllDifferentExceptN(GlobalConstraint):
         n (int or list[int]): Value or list of values that are excluded from satisfying the alldifferent condition
     """
 
-    def __init__(self, arr: Sequence[Expression], n: Union[int, list[int]]):
+    def __init__(self, arr: ListLike[ExprLike], n: int|list[int]):
         """
         Arguments:
             arr (Sequence[Expression]): List of expressions to be different from each other, except those equal to a value in n
@@ -307,7 +307,7 @@ class AllDifferentExcept0(AllDifferentExceptN):
     """
     Enforces that all arguments, except those equal to 0, have a different (distinct) value.
     """
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to be different from each other, except those equal to 0
@@ -329,7 +329,7 @@ class AllEqual(GlobalConstraint):
     """
     Enforces that all arguments have the same value
     """
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to have the same value
@@ -362,7 +362,7 @@ class AllEqualExceptN(GlobalConstraint):
     Enforces that all arguments, except those equal to a value in n, have the same value.
     """
 
-    def __init__(self, arr: Sequence[Expression], n: Union[int, list[int]]):
+    def __init__(self, arr: ListLike[ExprLike], n: int|list[int]):
         """
         Arguments:
             arr (Sequence[Expression]): List of expressions to have the same value, except those equal to a value in n
@@ -415,7 +415,7 @@ class Circuit(GlobalConstraint):
     """
     Enforces that the sequence of variables form a circuit, where x[i] = j means that node j is the successor of node i.
     """
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions representing the successors of the nodes to form the circuit
@@ -506,7 +506,7 @@ class Inverse(GlobalConstraint):
 
     Also known as channeling / assignment constraint.
     """
-    def __init__(self, fwd: Sequence[Expression], rev: Sequence[Expression]):
+    def __init__(self, fwd: ListLike[ExprLike], rev: ListLike[ExprLike]):
         """
         Arguments:
             fwd (Sequence[Expression]): List of expressions representing the forward function
@@ -566,7 +566,7 @@ class Table(GlobalConstraint):
     """
     Enforces that the values of the variables in 'array' correspond to a row in 'table'.
     """
-    def __init__(self, array: Sequence[Expression], table: Union[list[list[int]], np.ndarray]):
+    def __init__(self, array: ListLike[Expression], table: list[list[int]] | np.ndarray):
         """
         Arguments:
             array (Sequence[Expression]): List of expressions representing the array of variables
@@ -623,7 +623,7 @@ class ShortTable(GlobalConstraint):
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
     """
-    def __init__(self, array: Sequence[Expression], table: Union[list[list[int|Literal["*"]]], np.ndarray]):
+    def __init__(self, array: ListLike[Expression], table: list[list[int|Literal["*"]]] | np.ndarray):
         """
         Arguments:
             array (Sequence[Expression]): List of expressions representing the array of variables
@@ -678,7 +678,7 @@ class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
     """
-    def __init__(self, array: Sequence[Expression], table: Union[list[list[int]], np.ndarray]):
+    def __init__(self, array: ListLike[Expression], table: list[list[int]] | np.ndarray):
         """
         Arguments:
             array (Sequence[Expression]): List of expressions representing the array of variables
@@ -749,7 +749,7 @@ class Regular(GlobalConstraint):
                    start = "A",
                    accepting = ["C"])
     """
-    def __init__(self, array: Sequence[Expression], transitions: list[tuple[int|str, int, int|str]], start: int|str, accepting: list[int|str]):
+    def __init__(self, array: ListLike[Expression], transitions: list[tuple[int|str, int, int|str]], start: int|str, accepting: list[int|str]):
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
@@ -833,7 +833,13 @@ class IfThenElse(GlobalConstraint):
     Enforces a conditional expression of the form: if condition then if_true else if_false.
     `condition`, `if_true` and `if_false` are be boolean expressions.
     """
-    def __init__(self, condition: Expression, if_true: Expression, if_false: Expression):
+    def __init__(self, condition: ExprLike, if_true: ExprLike, if_false: ExprLike):
+        """
+        Arguments:
+            condition (ExprLike): Boolean expression or constant
+            if_true (ExprLike): Boolean expression or constant
+            if_false (ExprLike): Boolean expression or constant
+        """
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
                             f"{condition, if_true, if_false}")
@@ -879,7 +885,7 @@ class InDomain(GlobalConstraint):
     Enforces the expression is assigned to a value in the given domain.
     """
 
-    def __init__(self, expr: Expression, arr: list[int]):
+    def __init__(self, expr: ExprLike, arr: Iterable[int|np.integer]):
         """
         Arguments:
             expr (Expression): Expression to be assigned to a value in the given domain
@@ -936,10 +942,10 @@ class Xor(GlobalConstraint):
     Equivalent to `sum(args) % 2 == 1`
     """
 
-    def __init__(self, arg_list: Sequence[Expression]):
+    def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
-            arg_list (Sequence[Expression]): List of Boolean expressions to be xor'ed
+            arg_list (Sequence[Expression]): List of Boolean expressions or constants, to be xor'ed
         """
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
@@ -1265,7 +1271,7 @@ class Precedence(GlobalConstraint):
         - X = [4,1,2,1,3] also satisfies the precedence, as values not appearing in P can appear in any order.
         - X = [2,1,3] does not satisfy the precedence, as 1 does not appear before 2.
     """
-    def __init__(self, vars: Sequence[Expression], precedence: list[int]):
+    def __init__(self, vars: ListLike[ExprLike], precedence: ListLike[int|np.integer]):
         """
         Arguments:
             vars (Sequence[Expression]): List of Expression objects representing the variables
@@ -1324,7 +1330,7 @@ class GlobalCardinalityCount(GlobalConstraint):
     Enforces that the number of occurrences of each value `vals[i]` in the list of variables `vars` is equal to `occ[i]`.
     """
 
-    def __init__(self, vars: Sequence[Expression], vals: list[int], occ: Sequence[Expression], closed: bool = False):
+    def __init__(self, vars: ListLike[ExprLike], vals: ListLike[int|np.integer], occ: ListLike[ExprLike], closed: bool = False):
         """
         Arguments:
             vars (Sequence[Expression]): List of Expression objects representing the variables
@@ -1379,7 +1385,7 @@ class Increasing(GlobalConstraint):
     Enforces that the expressions are assigned to (non-strictly) increasing values.
     """
 
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to be assigned to increasing values
@@ -1412,7 +1418,7 @@ class Decreasing(GlobalConstraint):
     Enforces that the expressions are assigned to (non-strictly) decreasing values.
     """
 
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to be assigned to decreasing values
@@ -1445,7 +1451,7 @@ class IncreasingStrict(GlobalConstraint):
     Enforces that the expressions are assigned to strictly increasing values.
     """
 
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to be assigned to strictly increasing values
@@ -1479,7 +1485,7 @@ class DecreasingStrict(GlobalConstraint):
     Enforces that the expressions are assigned to strictly decreasing values.
     """
 
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to be assigned to strictly decreasing values
@@ -1512,7 +1518,7 @@ class LexLess(GlobalConstraint):
     """ 
     Enforces that the first list is lexicographically smaller than the second list.
     """
-    def __init__(self, list1: Sequence[Expression], list2: Sequence[Expression]):
+    def __init__(self, list1: ListLike[ExprLike], list2: ListLike[ExprLike]):
         """
         Arguments:
             list1 (Sequence[Expression]): First list of expressions to be compared lexicographically
@@ -1574,7 +1580,7 @@ class LexLessEq(GlobalConstraint):
     """
     Enforces that the first list is lexicographically smaller than or equal to the second list.
     """
-    def __init__(self, list1: Sequence[Expression], list2: Sequence[Expression]):
+    def __init__(self, list1: ListLike[ExprLike], list2: ListLike[ExprLike]):
         """
         Arguments:
             list1 (Sequence[Expression]): First list of expressions to be compared lexicographically
@@ -1632,7 +1638,7 @@ class LexChainLess(GlobalConstraint):
     """
     Enforces that all rows of the matrix are lexicographically ordered.
     """
-    def __init__(self, X: Sequence[Sequence[Expression]]):
+    def __init__(self, X: ListLike[ListLike[ExprLike]]):
         """
         Arguments:
             X (Sequence[Sequence[Expression]]): Matrix of expressions to be compared lexicographically
@@ -1667,7 +1673,7 @@ class LexChainLessEq(GlobalConstraint):
     """ 
     Enforces that all rows of the matrix are lexicographically ordered (less or equal)
     """
-    def __init__(self, X: Sequence[Sequence[Expression]]):
+    def __init__(self, X: ListLike[ListLike[ExprLike]]):
         """
         Arguments:
             X (Sequence[Sequence[Expression]]): Matrix of expressions to be compared lexicographically
@@ -1707,7 +1713,7 @@ class DirectConstraint(Expression):
         If you want/need to use what the solver returns (e.g. an identifier for use in other constraints),
         then use :func:`~cpmpy.expressions.variables.directvar` instead, or access the solver object from the solver interface directly.
     """
-    def __init__(self, name:str, arguments:tuple[Expression, ...], novar:Optional[Sequence[int]]=None):
+    def __init__(self, name: str, arguments: tuple[Any, ...], novar: Optional[ListLike[int]] = None):
         """
             name: name of the solver function that you wish to call
             arguments: tuple of arguments to pass to the solver function with name 'name'
