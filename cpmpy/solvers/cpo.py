@@ -554,6 +554,7 @@ class CPM_cpo(SolverInterface):
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
 
+                # usage constraints
                 height, height_cons = get_nonneg_args(height, is_present)
                 cons += self._cpo_expr(height_cons)
 
@@ -625,10 +626,15 @@ class CPM_cpo(SolverInterface):
         """
         if end is None:
             end = [None for _ in range(len(start))] # easier to handle the task-making below
+
+        # CPO crashes if size of interval is negative
+        dur, dur_cons = get_nonneg_args(dur, is_present)
+        extra_cons = self._cpo_expr(dur_cons)
+
         if is_present is None:
             is_present = [None] * len(start) # eases handling below
-        
-        tasks, extra_cons = [], []
+
+        tasks = []
         for s, d, e, p in zip(start, dur, end, is_present):
             task, task_cons = self._make_task(s, d, e, p)
             tasks.append(task)
@@ -639,6 +645,7 @@ class CPM_cpo(SolverInterface):
         """
             Helper function to create a task object and additional constraints enforcing task-relation
         """
+        assert get_bounds(dur)[0] >= 0, "cpo does not support intervals with negative duration, use `utils.get_nonneg_args` first"
         dom = self.get_docp().modeler
         docp = self.get_docp()
         is_optional = is_present is not None
@@ -647,8 +654,6 @@ class CPM_cpo(SolverInterface):
 
         lb, ub = get_bounds(dur)
         extra_cons = []
-        extra_cons += self._cpo_expr([implies(is_present, dur >= 0)])
-
         if lb == 0 == ub:
             if end is None: # nothing to enforce
                 return None, []
