@@ -483,7 +483,7 @@ class CPM_pysat(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):  # has to match parent types
         """
         PySAT supports warmstarting the solver with a feasible solution
 
@@ -491,7 +491,7 @@ class CPM_pysat(SolverInterface):
 
         Note: our PySAT interface currently does not support solution hinting for integer variables
 
-        :param cpm_vars: list of CPMpy variables
+        :param cpm_vars: list of Boolean variables
         :param vals: list of (corresponding) values for the variables
         """
 

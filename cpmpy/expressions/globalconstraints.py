@@ -524,6 +524,8 @@ class Inverse(GlobalConstraint):
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
+        # we try to avoid in-function imports (needed when cyclic dependency),
+        # but decompose is typically only called once anyway, so here it is acceptable
         from cpmpy.transformations import safening
 
         fwd, rev = self.args
@@ -1002,8 +1004,10 @@ class Cumulative(GlobalConstraint):
                 start (ListLike[ExprLike]): Start times of the tasks
                 duration (ListLike[ExprLike]): Durations of the tasks
                 end (ListLike[ExprLike] | None): Optional end times of the tasks
-                demand (ListLike[ExprLike] | ExprLike | None): Per-task demands or a single constant demand
-                capacity (ExprLike | None): Capacity of the resource
+                demand (ListLike[ExprLike] | ExprLike): Per-task demands or a single constant demand, required
+                capacity (ExprLike): Capacity of the resource, required
+            
+            Technical note: demand/capacity marked as Optional because it comes after an Optional argument
         """
 
         if not is_any_list(start):
