@@ -1184,12 +1184,12 @@ class CumulativeOptional(GlobalConstraint):
         Supports both varying demand across tasks or equal demand for all jobs.
     """
 
-    def __init__(self, start: ListLike[Expression], 
-                       duration: ListLike[Expression], 
-                       end: Optional[ListLike[Expression]] = None, 
-                       demand: Optional[ListLike[Expression]|Expression] = None, 
-                       capacity: Optional[Expression] = None, 
-                       is_present: Optional[ListLike[Expression]] = None):
+    def __init__(self, start: ListLike[ExprLike], 
+                       duration: ListLike[ExprLike], 
+                       end: Optional[ListLike[ExprLike]] = None, 
+                       demand: Optional[ListLike[ExprLike]|ExprLike] = None, 
+                       capacity: Optional[ExprLike] = None, 
+                       is_present: Optional[ListLike[ExprLike]] = None):
         """
             Arguments:
                 start (ListLike[ExprLike]): Start times of the tasks
@@ -1221,16 +1221,18 @@ class CumulativeOptional(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
 
+        demand_list = []
         if is_any_list(demand):
-            if len(demand) != len(start):
-                raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand)} and {len(start)}")
+            demand_list = list(demand)
+            if len(demand_list) != len(start):
+                raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand_list)} and {len(start)}")
         else: # constant demand
-            demand = [demand] * len(start)
+            demand_list = [demand] * len(start)
 
         super().__init__("cumulative_optional", [list(start), list(duration), list(end) if end is not None else None, 
-                                                 list(demand), capacity, list(is_present)])
+                                                 demand_list, capacity, list(is_present)])
 
-    def decompose(self, how:str="auto") -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
         """
         Decompose the Cumulative constraint
         Support time-based decomposition or task-based decomposition.
@@ -1240,7 +1242,7 @@ class CumulativeOptional(GlobalConstraint):
             how (str): how the cumulative constraint should be decomposed, can be "time", "task", or "auto" (default)
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
         if how not in ["time", "task", "auto"]:
@@ -1277,14 +1279,14 @@ class CumulativeOptional(GlobalConstraint):
         return cons
 
     
-    def _task_decomposition(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def _task_decomposition(self) -> tuple[list[Expression], list[Expression]]:
         """
         Task-based decomposition of the cumulative constraint.
         Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
         International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, duration, end, demand, capacity, is_present = self.args
         
@@ -1305,14 +1307,14 @@ class CumulativeOptional(GlobalConstraint):
 
         return cons, []
 
-    def _time_decomposition(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def _time_decomposition(self) -> tuple[list[Expression], list[Expression]]:
         """
         Time-resource decomposition of the cumulative constraint.
         Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
         International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, duration, end, demand, capacity, is_present = self.args
 
