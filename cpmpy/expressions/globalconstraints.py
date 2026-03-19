@@ -1195,12 +1195,23 @@ class CumulativeOptional(GlobalConstraint):
         Supports both varying demand across tasks or equal demand for all jobs.
     """
 
-    def __init__(self, start: Sequence[Expression], 
-                       duration: Sequence[Expression], 
-                       end: Optional[Sequence[Expression]] = None, 
-                       demand: Optional[Union[Sequence[Expression],Expression]] = None, 
+    def __init__(self, start: ListLike[Expression], 
+                       duration: ListLike[Expression], 
+                       end: Optional[ListLike[Expression]] = None, 
+                       demand: Optional[ListLike[Expression]|Expression] = None, 
                        capacity: Optional[Expression] = None, 
-                       is_present: Optional[Sequence[Expression]] = None):
+                       is_present: Optional[ListLike[Expression]] = None):
+        """
+            Arguments:
+                start (ListLike[ExprLike]): Start times of the tasks
+                duration (ListLike[ExprLike]): Durations of the tasks
+                end (ListLike[ExprLike] | None): Optional end times of the tasks
+                demand (ListLike[ExprLike] | ExprLike): Per-task demands or a single constant demand, required
+                capacity (ExprLike): Capacity of the resource, required
+                is_present (ListLike[ExprLike]): Presence of the tasks
+            
+            Technical note: demand/capacity marked as Optional because it comes after an Optional argument
+        """
         if not is_any_list(start):
             raise TypeError("start should be a list")
         if not is_any_list(duration):
@@ -1467,13 +1478,13 @@ class NoOverlapOptional(GlobalConstraint):
         if the task is not present, it does not enforce any of the above.
     """
     
-    def __init__(self, start: Sequence[Expression], duration: Sequence[Expression], end: Optional[Sequence[Expression]] = None, is_present: Optional[Sequence[Expression]] = None):
+    def __init__(self, start: ListLike[Expression], duration: ListLike[Expression], end: Optional[ListLike[Expression]] = None, is_present: Optional[ListLike[Expression]] = None):
         """
         Arguments:
-            start (Sequence[Expression]): List of Expression objects representing the start times of the tasks
-            duration (Sequence[Expression]): List of Expression objects representing the durations of the tasks
-            end (Sequence[Expression] | None): optional, list of Expression objects representing the end times of the tasks
-            is_present (Sequence[Expression]): List of Boolean Expression objects representing the presence of the tasks
+            start (ListLike[Expression]): List of Expression objects representing the start times of the tasks
+            duration (ListLike[Expression]): List of Expression objects representing the durations of the tasks
+            end (ListLike[Expression] | None): optional, list of Expression objects representing the end times of the tasks
+            is_present (ListLike[Expression]): List of Boolean Expression objects representing the presence of the tasks
         """
        
         if not is_any_list(start):
