@@ -215,10 +215,10 @@ class AllDifferent(GlobalConstraint):
     Enforces that all arguments have a different (distinct) value
     """
 
-    def __init__(self, *args: ExprLike):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
-            args (Sequence[Expression]): List of expressions to be different from each other
+            args (ListLike[ExprLike]): List of expressions or constants to be different from each other
         """
         super().__init__("alldifferent", flatlist(args))
 
@@ -265,8 +265,8 @@ class AllDifferentExceptN(GlobalConstraint):
     def __init__(self, arr: ListLike[ExprLike], n: int|list[int]):
         """
         Arguments:
-            arr (Sequence[Expression]): List of expressions to be different from each other, except those equal to a value in n
-            n (int or list[int]): Value or list of values that are excluded from the distinctness constraint
+            arr (ListLike[ExprLike]): List/tuple/ndarray of expressions to be different from each other, except those equal to a value in n
+            n (int | list[int]): Value or list of values that are excluded from the distinctness constraint
         """
         flatarr = flatlist(arr)
         if not is_any_list(n):
@@ -307,10 +307,10 @@ class AllDifferentExcept0(AllDifferentExceptN):
     """
     Enforces that all arguments, except those equal to 0, have a different (distinct) value.
     """
-    def __init__(self, *args: ExprLike):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
-            args (Sequence[Expression]): List of expressions to be different from each other, except those equal to 0
+            args (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to 0
         """
         super().__init__(flatlist(args), 0)
 
@@ -329,10 +329,10 @@ class AllEqual(GlobalConstraint):
     """
     Enforces that all arguments have the same value
     """
-    def __init__(self, *args: ExprLike):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
-            args (Sequence[Expression]): List of expressions to have the same value
+            args (ListLike[ExprLike]): List of expressions or constants to have the same value
         """
         super().__init__("allequal", flatlist(args))
 
@@ -365,8 +365,8 @@ class AllEqualExceptN(GlobalConstraint):
     def __init__(self, arr: ListLike[ExprLike], n: int|list[int]):
         """
         Arguments:
-            arr (Sequence[Expression]): List of expressions to have the same value, except those equal to a value in n
-            n (int or list[int]): Value or list of values that are excluded from the equality constraint
+            arr (ListLike[ExprLike]): List/tuple/ndarray of expressions to have the same value, except those equal to a value in n
+            n (int | list[int]): Value or list of values that are excluded from the equality constraint
         """
         flatarr = flatlist(arr)
         if not is_any_list(n):
@@ -415,10 +415,10 @@ class Circuit(GlobalConstraint):
     """
     Enforces that the sequence of variables form a circuit, where x[i] = j means that node j is the successor of node i.
     """
-    def __init__(self, *args: ExprLike):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
-            args (Sequence[Expression]): List of expressions representing the successors of the nodes to form the circuit
+            args (ListLike[ExprLike]): List of expressions or constants representing the successors of the nodes to form the circuit
         """
         flatargs = flatlist(args)
         if len(flatargs) < 2:
@@ -509,8 +509,8 @@ class Inverse(GlobalConstraint):
     def __init__(self, fwd: ListLike[ExprLike], rev: ListLike[ExprLike]):
         """
         Arguments:
-            fwd (Sequence[Expression]): List of expressions representing the forward function
-            rev (Sequence[Expression]): List of expressions representing the reverse function
+            fwd (ListLike[ExprLike]): List/tuple/ndarray of expressions representing the forward function
+            rev (ListLike[ExprLike]): List/tuple/ndarray of expressions representing the reverse function
         """
         if len(fwd) != len(rev):
             raise ValueError("Length of fwd and rev must be equal for Inverse constraint")
@@ -566,11 +566,11 @@ class Table(GlobalConstraint):
     """
     Enforces that the values of the variables in 'array' correspond to a row in 'table'.
     """
-    def __init__(self, array: ListLike[Expression], table: list[list[int]] | np.ndarray):
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
-            array (Sequence[Expression]): List of expressions representing the array of variables
-            table (list[list[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
+            array (ListLike[Expression]): List/tuple/ndarray of expressions representing the array of variables
+            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
@@ -623,11 +623,11 @@ class ShortTable(GlobalConstraint):
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
     """
-    def __init__(self, array: ListLike[Expression], table: list[list[int|Literal["*"]]] | np.ndarray):
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
         """
         Arguments:
-            array (Sequence[Expression]): List of expressions representing the array of variables
-            table (list[list[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
+            array (ListLike[Expression]): List/tuple/ndarray of expressions representing the array of variables
+            table (ListLike[ListLike[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
                 STAR represents a wildcard (corresponding variable can take any value).
         """
         array = flatlist(array)
@@ -678,11 +678,11 @@ class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
     """
-    def __init__(self, array: ListLike[Expression], table: list[list[int]] | np.ndarray):
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
-            array (Sequence[Expression]): List of expressions representing the array of variables
-            table (list[list[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
+            array (ListLike[Expression]): List/tuple/ndarray of expressions representing the array of variables
+            table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
@@ -749,7 +749,14 @@ class Regular(GlobalConstraint):
                    start = "A",
                    accepting = ["C"])
     """
-    def __init__(self, array: ListLike[Expression], transitions: list[tuple[int|str, int, int|str]], start: int|str, accepting: list[int|str]):
+    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: int|str, accepting: ListLike[int|str]):
+        """
+        Arguments:
+            array (ListLike[Expression]): List/tuple/ndarray of expressions representing the input sequence
+            transitions (ListLike[tuple[int | str, int, int | str]]): Transition triples (source, value, destination)
+            start (int | str): Starting node id
+            accepting (ListLike[int | str]): List/tuple/ndarray of accepting node ids
+        """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of a regular constraint should only contain variables/expressions")
@@ -888,8 +895,8 @@ class InDomain(GlobalConstraint):
     def __init__(self, expr: ExprLike, arr: Iterable[int|np.integer]):
         """
         Arguments:
-            expr (Expression): Expression to be assigned to a value in the given domain
-            arr (list[int]): List of integers representing the domain
+            expr (ExprLike): Expression or constant to be assigned to a value in the given domain
+            arr (Iterable[int | np.integer]): Iterable of integer constants representing the domain
         """
         if not all(is_int(x) for x in arr):
             raise TypeError("The second argument of an InDomain constraint should be a list of integer constants")
@@ -945,7 +952,7 @@ class Xor(GlobalConstraint):
     def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
-            arg_list (Sequence[Expression]): List of Boolean expressions or constants, to be xor'ed
+            arg_list (ListLike[ExprLike]): List/tuple/ndarray of Boolean expressions or constants, to be xor'ed
         """
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
@@ -1274,8 +1281,8 @@ class Precedence(GlobalConstraint):
     def __init__(self, vars: ListLike[ExprLike], precedence: ListLike[int|np.integer]):
         """
         Arguments:
-            vars (Sequence[Expression]): List of Expression objects representing the variables
-            precedence (list[int]): List of integers representing the precedence
+            vars (ListLike[ExprLike]): List/tuple/ndarray of expressions representing the variables
+            precedence (ListLike[int | np.integer]): List/tuple/ndarray of integer precedence values
         """
         if not is_any_list(vars):
             raise TypeError("Precedence expects a list of variables as first argument, but got", vars)
@@ -1333,9 +1340,9 @@ class GlobalCardinalityCount(GlobalConstraint):
     def __init__(self, vars: ListLike[ExprLike], vals: ListLike[int|np.integer], occ: ListLike[ExprLike], closed: bool = False):
         """
         Arguments:
-            vars (Sequence[Expression]): List of Expression objects representing the variables
-            vals (list[int]): List of integers representing the values
-            occ (Sequence[Expression]): List of Expression objects representing the number of occurrences of each value
+            vars (ListLike[ExprLike]): List/tuple/ndarray of expressions representing the variables
+            vals (ListLike[int | np.integer]): List/tuple/ndarray of integer values
+            occ (ListLike[ExprLike]): List/tuple/ndarray of expressions representing the number of occurrences of each value
             closed (bool): Whether the constraint is closed, if true, `vars` can only take values in `vals`
         """
         if not is_any_list(vars):
@@ -1385,10 +1392,10 @@ class Increasing(GlobalConstraint):
     Enforces that the expressions are assigned to (non-strictly) increasing values.
     """
 
-    def __init__(self, *args: ExprLike):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
-            args (Sequence[Expression]): List of expressions to be assigned to increasing values
+            args (ListLike[ExprLike]): List of expressions or constants to be assigned to increasing values
         """
         super().__init__("increasing", flatlist(args))
 
@@ -1418,10 +1425,10 @@ class Decreasing(GlobalConstraint):
     Enforces that the expressions are assigned to (non-strictly) decreasing values.
     """
 
-    def __init__(self, *args: ExprLike):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
-            args (Sequence[Expression]): List of expressions to be assigned to decreasing values
+            args (ListLike[ExprLike]): List of expressions or constants to be assigned to decreasing values
         """
         super().__init__("decreasing", flatlist(args))
 
@@ -1451,10 +1458,10 @@ class IncreasingStrict(GlobalConstraint):
     Enforces that the expressions are assigned to strictly increasing values.
     """
 
-    def __init__(self, *args: ExprLike):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
-            args (Sequence[Expression]): List of expressions to be assigned to strictly increasing values
+            args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly increasing values
         """
         super().__init__("strictly_increasing", flatlist(args))
 
@@ -1485,10 +1492,10 @@ class DecreasingStrict(GlobalConstraint):
     Enforces that the expressions are assigned to strictly decreasing values.
     """
 
-    def __init__(self, *args: ExprLike):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
-            args (Sequence[Expression]): List of expressions to be assigned to strictly decreasing values
+            args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly decreasing values
         """
         super().__init__("strictly_decreasing", flatlist(args))
 
@@ -1521,8 +1528,8 @@ class LexLess(GlobalConstraint):
     def __init__(self, list1: ListLike[ExprLike], list2: ListLike[ExprLike]):
         """
         Arguments:
-            list1 (Sequence[Expression]): First list of expressions to be compared lexicographically
-            list2 (Sequence[Expression]): Second list of expressions to be compared lexicographically
+            list1 (ListLike[ExprLike]): First list/tuple/ndarray of expressions to be compared lexicographically
+            list2 (ListLike[ExprLike]): Second list/tuple/ndarray of expressions to be compared lexicographically
         """ 
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLess must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
@@ -1583,8 +1590,8 @@ class LexLessEq(GlobalConstraint):
     def __init__(self, list1: ListLike[ExprLike], list2: ListLike[ExprLike]):
         """
         Arguments:
-            list1 (Sequence[Expression]): First list of expressions to be compared lexicographically
-            list2 (Sequence[Expression]): Second list of expressions to be compared lexicographically
+            list1 (ListLike[ExprLike]): First list/tuple/ndarray of expressions to be compared lexicographically
+            list2 (ListLike[ExprLike]): Second list/tuple/ndarray of expressions to be compared lexicographically
         """
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLessEq must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
@@ -1641,7 +1648,7 @@ class LexChainLess(GlobalConstraint):
     def __init__(self, X: ListLike[ListLike[ExprLike]]):
         """
         Arguments:
-            X (Sequence[Sequence[Expression]]): Matrix of expressions to be compared lexicographically
+            X (ListLike[ListLike[ExprLike]]): Matrix (list/tuple/ndarray) of expressions to be compared lexicographically
         """
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
@@ -1676,7 +1683,7 @@ class LexChainLessEq(GlobalConstraint):
     def __init__(self, X: ListLike[ListLike[ExprLike]]):
         """
         Arguments:
-            X (Sequence[Sequence[Expression]]): Matrix of expressions to be compared lexicographically
+            X (ListLike[ListLike[ExprLike]]): Matrix (list/tuple/ndarray) of expressions to be compared lexicographically
         """
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
@@ -1715,9 +1722,9 @@ class DirectConstraint(Expression):
     """
     def __init__(self, name: str, arguments: tuple[Any, ...], novar: Optional[ListLike[int]] = None):
         """
-            name: name of the solver function that you wish to call
-            arguments: tuple of arguments to pass to the solver function with name 'name'
-            novar: list of indices (offset 0) of arguments in `arguments` that contain no variables,
+            name (str): Name of the solver function that you wish to call
+            arguments (tuple[Any, ...]): Tuple of arguments to pass to the solver function with name `name`
+            novar (Optional[ListLike[int]]): List/tuple/ndarray of indices (offset 0) of arguments in `arguments` that contain no variables,
                    that can be passed 'as is' without scanning for variables
         """
         if not isinstance(arguments, tuple):
