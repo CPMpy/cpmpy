@@ -28,15 +28,19 @@ Internal utilities for expression handling.
         eval_comparison
         get_bounds     
 """
+from __future__ import annotations  # treat annotations lazy (as string)
 
 import cpmpy as cp
 import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TypeGuard, Union, Optional
+from typing import TYPE_CHECKING, TypeGuard, Union, Optional
 from cpmpy.exceptions import IncompleteFunctionError
-from cpmpy.expressions.core import ListLike, ExprLike
+
+if TYPE_CHECKING:
+    # only import for type checking
+    from cpmpy.expressions.core import ListLike, ExprLike
 
 
 def is_bool(arg):
