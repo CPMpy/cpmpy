@@ -1055,7 +1055,7 @@ class Cumulative(GlobalConstraint):
         if how not in ["time", "task", "auto"]:
             raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
 
-        start, *args = self.args
+        start= self.args[0]
 
         lbs, ubs = get_bounds(start)
         horizon = max(ubs) - min(lbs)
@@ -1242,7 +1242,19 @@ class CumulativeOptional(GlobalConstraint):
         Returns:
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        return Cumulative.decompose(self, how) # re-use heuristic selection of decomposition
+
+        if how not in ["time", "task", "auto"]:
+            raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
+
+        start, *args = self.args
+
+        lbs, ubs = get_bounds(start)
+        horizon = max(ubs) - min(lbs)
+        if (how == "time") or (how == "auto" and len(start) <= horizon):
+            return self._time_decomposition()
+        elif (how == "task") or (how == "auto" and len(start) > horizon):
+            return self._task_decomposition()
+        raise Exception # should not be reached
 
     def _consistency_constraints(self) -> list[Expression]:
         """
