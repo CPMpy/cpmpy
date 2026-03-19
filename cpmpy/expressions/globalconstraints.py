@@ -1435,7 +1435,6 @@ class NoOverlap(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end = self.args
         start, dur, end = argvals(self.args)
         if end is None:
             if any(s is None for s in start) or any(d is None for d in dur):
