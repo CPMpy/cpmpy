@@ -183,14 +183,14 @@ class GlobalConstraint(Expression):
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of a Boolean global constraint.
         Numerical global constraints should reimplement this.
         """
         return 0, 1
 
-    def negate(self):
+    def negate(self) -> Expression:
         """
         Returns the negation of this global constraint.
         Defaults to ~self, but subclasses can implement a better version,
@@ -200,7 +200,7 @@ class GlobalConstraint(Expression):
 
 
 # Global Constraints (with Boolean return type)
-def alldifferent(args: Sequence[Expression]):
+def alldifferent(args):
     """
     .. deprecated:: 0.9.0
           Please use :class:`AllDifferent` instead.
@@ -607,11 +607,11 @@ class Table(GlobalConstraint):
             return None
         return arrval in tab
 
-    def negate(self):
+    def negate(self) -> Expression:
         return NegativeTable(self.args[0], self.args[1])
 
     # specialisation to avoid recursing over big tables
-    def has_subexpr(self):
+    def has_subexpr(self) -> bool:
         if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
             arr, tab = self.args  # the table 'tab' is asserted to only hold constants
             self._has_subexpr = any(a.has_subexpr() for a in arr)
@@ -668,7 +668,7 @@ class ShortTable(GlobalConstraint):
         return False
 
     # specialisation to avoid recursing over big tables
-    def has_subexpr(self):
+    def has_subexpr(self) -> bool:
         if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
             arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
             self._has_subexpr = any(a.has_subexpr() for a in arr)
@@ -721,13 +721,13 @@ class NegativeTable(GlobalConstraint):
         return arrval not in tab
 
     # specialisation to avoid recursing over big tables
-    def has_subexpr(self):
+    def has_subexpr(self) -> bool:
         if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
             arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
             self._has_subexpr = any(a.has_subexpr() for a in arr)
         return self._has_subexpr
 
-    def negate(self):
+    def negate(self) -> Expression:
         return Table(self.args[0], self.args[1])
     
 
@@ -865,11 +865,11 @@ class IfThenElse(GlobalConstraint):
             condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
         return [condition.implies(if_true), (~condition).implies(if_false)], []
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         condition, if_true, if_false = self.args
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
-    def negate(self):
+    def negate(self) -> Expression:
         return IfThenElse(self.args[0], self.args[2], self.args[1])
 
 
@@ -920,10 +920,10 @@ class InDomain(GlobalConstraint):
             return None
         return exprval in arr
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{} in {}".format(self.args[0], self.args[1])
 
-    def negate(self):
+    def negate(self) -> Expression:
         lb, ub = get_bounds(self.args[0])
         return InDomain(self.args[0],
                         [v for v in range(lb,ub+1) if v not in set(self.args[1])])
@@ -964,15 +964,18 @@ class Xor(GlobalConstraint):
             decomp = Xor(decomp + self.args[2:]).decompose()[0]
         return decomp, []
 
-    def value(self):
-        return sum(argvals(self.args)) % 2 == 1
+    def value(self) -> Optional[bool]:
+        vals = argvals(self.args)
+        if any(v is None for v in vals):
+            return None
+        return sum(vals) % 2 == 1
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if len(self.args) == 2:
             return "{} xor {}".format(*self.args)
         return "xor({})".format(self.args)
 
-    def negate(self):
+    def negate(self) -> Expression:
         # negate one of the arguments, ideally a variable
         new_args = None
         for i, a in enumerate(self.args):
@@ -1721,7 +1724,7 @@ class DirectConstraint(Expression):
         """
         return True
 
-    def callSolver(self, CPMpy_solver: "SolverInterface", Native_solver: Any):
+    def callSolver(self, CPMpy_solver: "SolverInterface", Native_solver: Any) -> Any:
         """
             Call the `directname()` function of the native solver,
             with stored arguments replacing CPMpy variables with solver variables as needed.
