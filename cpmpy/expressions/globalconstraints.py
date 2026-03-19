@@ -524,6 +524,8 @@ class Inverse(GlobalConstraint):
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
+        # we try to avoid in-function imports (needed when cyclic dependency),
+        # but decompose is typically only called once anyway, so here it is acceptable
         from cpmpy.transformations import safening
 
         fwd, rev = self.args
