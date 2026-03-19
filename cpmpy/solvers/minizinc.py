@@ -823,7 +823,7 @@ class CPM_minizinc(SolverInterface):
                                                         self._convert_expression(fal))
 
         elif expr.name == "gcc":
-            #assert isinstance(expr, GlobalCardinalityCount)
+            assert isinstance(expr, GlobalCardinalityCount)  # typecheck that it has a .closed()
             vars, vals, occ = expr.args
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals)
