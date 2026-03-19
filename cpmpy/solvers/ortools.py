@@ -596,7 +596,6 @@ class CPM_ortools(SolverInterface):
 
                 if end is None: # need to make the end-variables ourself
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-                    self.add([s + d == e for s,d,e in zip(start, dur, end)])
 
                 # ensure demand is non-negative
                 demand, demand_cons = get_nonneg_args(demand)
@@ -614,7 +613,6 @@ class CPM_ortools(SolverInterface):
 
                 if end is None: # need to make the end-variables ourself
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-                    self.add([implies(p, s + d == e) for s,d,e,p in zip(start, dur, end,is_present)])
 
                 # ensure demand is non-negative
                 demand, demand_cons = get_nonneg_args(demand, is_present)
@@ -632,7 +630,6 @@ class CPM_ortools(SolverInterface):
 
                 if end is None: # need to make the end-variables ourself
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-                    self.add([s + d == e for s,d,e in zip(start, dur, end)])
 
                 start, dur, end = self.solver_vars([start, dur, end])
                 intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, dur, end)]
@@ -645,7 +642,6 @@ class CPM_ortools(SolverInterface):
 
                 if end is None: # need to make the end-variables ourself
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-                    self.add([s + d == e for s,d,e in zip(start, dur, end)])
 
                 start, dur, end, is_present = self.solver_vars([start, dur, end, is_present])
                 is_present = [bool(p) if is_bool(p) else p for p in is_present] # convert BoolVals
