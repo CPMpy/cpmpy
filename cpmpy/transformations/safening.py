@@ -215,7 +215,7 @@ def _no_partial_functions(lst_of_expr: Union[Sequence[Expression], NDVarArray],
     nbc = [expr for lst in nbc_for_each_expr for expr in lst] # merge remaining nbc expressions
     return changed, new_lst, toplevel, nbc
 
-def _safen_range(partial_expr, safe_range, idx_to_safen):
+def _safen_range(partial_expr:Expression, safe_range:tuple[int,int], idx_to_safen:int) -> tuple[_BoolVarImpl, Expression, list[Expression]]:
     """
         Replace partial function `cpm_expr` that has potentially unsafe argument at `idx_to_safen`,
         by a total function using a safe argument with domain `safe_range`. Also returns
@@ -248,7 +248,7 @@ def _safen_range(partial_expr, safe_range, idx_to_safen):
     return is_defined, total_expr, toplevel
 
 
-def _safen_hole(cpm_expr, exclude, idx_to_safen):
+def _safen_hole(cpm_expr, exclude, idx_to_safen) -> tuple[_BoolVarImpl, _NumVarImpl, list[Expression]]:
     """
         Safen expression where a single value of an argument can cause undefinedness.
         Examples include `div` where 0 has to be removed from the denominator
