@@ -132,7 +132,7 @@
 """
 import copy
 import warnings
-from typing import cast, Literal, Union, Optional, Sequence, Any, TYPE_CHECKING
+from typing import cast, Literal, Union, Optional, Sequence, Any, TYPE_CHECKING, overload
 import numpy as np
 
 import cpmpy as cp
@@ -215,7 +215,11 @@ class AllDifferent(GlobalConstraint):
     Enforces that all arguments have a different (distinct) value
     """
 
-    def __init__(self, *args: Expression):
+    @overload
+    def __init__(self, args: ListLike[ExprLike], /): ...  # recommended use  # '/' is just an annotation, tells mypy its positional only
+    @overload
+    def __init__(self, *args: ExprLike): ...  # historically acceptable use
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):  # shared implementation of the two above overloads
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to be different from each other
