@@ -312,13 +312,13 @@ def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None):
 def __is_flat_var(arg):
     """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
     """
-    return is_num(arg) or isinstance(arg, _NumVarImpl)
+    return is_num(arg) or isinstance(arg, _NumVarImpl) or arg is None
 
 def __is_flat_var_or_list(arg):
     """ True if the variable is a numeric constant, or a _NumVarImpl (incl subclasses)
         or a list of __is_flat_var_or_list, or it is a wildcard as used in the ShortTable global constraint
     """
-    return is_num(arg) or isinstance(arg, _NumVarImpl) or \
+    return is_num(arg) or isinstance(arg, _NumVarImpl) or arg is None or \
            is_any_list(arg) and all(__is_flat_var_or_list(el) for el in arg) or \
            is_star(arg)
 
