@@ -487,10 +487,10 @@ class Circuit(GlobalConstraint):
         idx = 0
         visited = set()
         arr = argvals(self.args)
+        if any(a is None for a in arr):
+            return None
 
         while idx not in visited:
-            if idx is None:
-                return None # not assigned
             if not (0 <= idx < len(arr)):
                 return False # out of bounds
             visited.add(idx)
@@ -965,10 +965,10 @@ class Xor(GlobalConstraint):
         return decomp, []
 
     def value(self) -> Optional[bool]:
-        vals = argvals(self.args)
-        if any(v is None for v in vals):
+        arrvals = argvals(self.args)
+        if any(a is None for a in arrvals):
             return None
-        return sum(vals) % 2 == 1
+        return sum(arrvals) % 2 == 1
 
     def __repr__(self) -> str:
         if len(self.args) == 2:
@@ -1136,13 +1136,14 @@ class Cumulative(GlobalConstraint):
         start, dur, end, demand, capacity = self.args
         
         start, dur, demand, capacity = argvals([start, dur, demand, capacity])
+        if any(a is None for a in flatlist([start, dur, demand, capacity])):
+            return None
         if end is None:
             end = [s + d for s,d in zip(start, dur)]
         else:
             end = argvals(end)
-
-        if any(a is None for a in flatlist([start, dur, end, demand, capacity])):
-            return None
+            if any(a is None for a in end):
+                return None
                 
         if any(d < 0 for d in dur):
             return False
