@@ -164,7 +164,7 @@ class GlobalConstraint(Expression):
         """
         return True
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
             Returns a decomposition into (a conjunction of) smaller constraints.
 
@@ -179,7 +179,7 @@ class GlobalConstraint(Expression):
             (especially, don't create Booleans but use (iv == v) expressions instead, better for common subexpression elimination!)
 
             Returns:
-                tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+                tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
@@ -222,16 +222,16 @@ class AllDifferent(GlobalConstraint):
         """
         super().__init__("alldifferent", flatlist(args))
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the AllDifferent global constraint using pairwise disequality constraints.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         return [var1 != var2 for var1, var2 in all_pairs(self.args)], []
 
-    def decompose_linear(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
         """
         Linear-friendly decomposition using sums over (arg[i] == val) expressions (which will become Boolean variables):
         at most one integer variable can take each value in the domain.
@@ -274,12 +274,12 @@ class AllDifferentExceptN(GlobalConstraint):
             n = [n] # ensure n is a list of ints
         super().__init__("alldifferent_except_n", [flatarr, n])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the AllDifferentExceptN global constraint using pairwise constraints.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         cons = []
         arr, n = self.args
@@ -336,12 +336,12 @@ class AllEqual(GlobalConstraint):
         """
         super().__init__("allequal", flatlist(args))
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the AllEqual global constraint using cascaded equality constraints.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
         return [x == y for x, y in zip(self.args[:-1], self.args[1:])], []
@@ -374,12 +374,12 @@ class AllEqualExceptN(GlobalConstraint):
             n = [n] # ensure n is a list of ints
         super().__init__("allequal_except_n", [flatarr, n])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the AllEqualExceptN global constraint using pairwise constraints.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
         arr, n = self.args
@@ -425,13 +425,13 @@ class Circuit(GlobalConstraint):
             raise ValueError('Circuit constraint must be given a minimum of 2 variables')
         super().__init__("circuit", flatargs)
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
             Decomposition of the Circuit global constraint using auxiliary variables to reprsent the order in which we visit all the nodes.
             Auxiliary variables are defined in the defining part of the decomposition, which is alwasy enforced top-level.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         succ = cpm_array(self.args)
         n = len(succ)
@@ -516,12 +516,12 @@ class Inverse(GlobalConstraint):
             raise ValueError("Length of fwd and rev must be equal for Inverse constraint")
         super().__init__("inverse", [fwd, rev])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Inverse global constraint using Element global function constraints, and explicit safening.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
         # we try to avoid in-function imports (needed when cyclic dependency),
@@ -586,12 +586,12 @@ class Table(GlobalConstraint):
             
         super().__init__("table", [array, table])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Table global constraint. Enforces at least one row of the table is assigned to the array.
         "
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self.args
         return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
@@ -640,12 +640,12 @@ class ShortTable(GlobalConstraint):
             raise TypeError(f"elements in argument `table` should be integer or {STAR}")
         super().__init__("short_table", [array, table])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the ShortTable global constraint. Enforces at least one row of the table is assigned to the array.
         "
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self.args
         return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
@@ -698,13 +698,13 @@ class NegativeTable(GlobalConstraint):
             
         super().__init__("negative_table", [array, table])
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the NegativeTable global constraint. 
         Enforces that the values of the variables in 'array' do not correspond to any row in 'table'.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self.args
         return [cp.all(cp.any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
@@ -775,14 +775,14 @@ class Regular(GlobalConstraint):
         # normalize node_ids to be 0..n-1, allows for smaller domains
         self.node_map = {n: i for i, n in enumerate(self.nodes)}
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Regular global constraint. 
         Encodes the automaton by encoding the transition table into `class:cpmpy.expressions.globalconstraints.Table` constraints.
         Then enforces that the last state is accepting.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         # Decompose to transition table using Table constraints
         
@@ -801,7 +801,7 @@ class Regular(GlobalConstraint):
         state_vars = intvar(0, sink, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        defining = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
+        defining: list[Expression] = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]
         # define the rest of the automaton using transition table
         defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
         
@@ -852,13 +852,13 @@ class IfThenElse(GlobalConstraint):
         else:
             return if_false
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the IfThenElse global constraint.
         Enforces that the condition is satisfied.
         "
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         condition, if_true, if_false = self.args
         if is_bool(condition):
@@ -889,13 +889,13 @@ class InDomain(GlobalConstraint):
             raise TypeError("The second argument of an InDomain constraint should be a list of integer constants")
         super().__init__("InDomain", [expr, arr])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the InDomain global constraint.
         Enforces that the expression is assigned to a value in the given domain.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         expr, arr = self.args
         lb, ub = get_bounds(expr)
@@ -950,13 +950,13 @@ class Xor(GlobalConstraint):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
         super().__init__("xor", list(arg_list))
 
-    def decompose(self):
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Xor global constraint.
         Recursively decomposes the constraint into a chain of binary xor-constraints, represented using a sum.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
         decomp = [sum(self.args[:2]) == 1]
@@ -1040,7 +1040,7 @@ class Cumulative(GlobalConstraint):
         super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, demand_list, capacity])
 
     
-    def decompose(self, how:str="auto") -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
         """
         Decompose the Cumulative constraint
         Support time-based decomposition or task-based decomposition.
@@ -1050,7 +1050,7 @@ class Cumulative(GlobalConstraint):
             how (str): how the cumulative constraint should be decomposed, can be "time", "task", or "auto" (default)
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
         if how not in ["time", "task", "auto"]:
@@ -1066,14 +1066,14 @@ class Cumulative(GlobalConstraint):
             return self._task_decomposition()
         raise Exception
 
-    def _task_decomposition(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def _task_decomposition(self) -> tuple[list[Expression], list[Expression]]:
         """
         Task-based decomposition of the cumulative constraint.
         Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
         International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, duration, end, demand, capacity = self.args
 
@@ -1099,14 +1099,14 @@ class Cumulative(GlobalConstraint):
 
         return cons, []
 
-    def _time_decomposition(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def _time_decomposition(self) -> tuple[list[Expression], list[Expression]]:
         """
         Time-resource decomposition of the cumulative constraint.
         Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
         International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, duration, end, demand, capacity = self.args
 
@@ -1202,12 +1202,12 @@ class NoOverlap(GlobalConstraint):
         
         super().__init__("no_overlap", [list(start), list(duration), list(end) if end is not None else None])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, dur, end = self.args
         cons = [d >= 0 for d in dur]
@@ -1278,14 +1278,14 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of values as second argument, but got", precedence)
         super().__init__("precedence", [list(vars), list(precedence)])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition based on:
         Law, Yat Chiu, and Jimmy HM Lee. "Global constraints for integer and set value precedence."
         Principles and Practice of Constraint Programming–CP 2004: 10th International Conference, CP 2004
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
 
         args, precedence = self.args
@@ -1344,7 +1344,7 @@ class GlobalCardinalityCount(GlobalConstraint):
         super().__init__("gcc", [list(vars), list(vals), list(occ)])
         self.closed = closed
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the GlobalCardinalityCount constraint.
         Uses a conjunction of Count global function constraints.
@@ -1387,12 +1387,12 @@ class Increasing(GlobalConstraint):
         """
         super().__init__("increasing", flatlist(args))
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Increasing constraint.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
         return [args[i] <= args[i+1] for i in range(len(args)-1)], []
@@ -1420,12 +1420,12 @@ class Decreasing(GlobalConstraint):
         """
         super().__init__("decreasing", flatlist(args))
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Decreasing constraint.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
         return [args[i] >= args[i+1] for i in range(len(args)-1)], []
@@ -1453,12 +1453,12 @@ class IncreasingStrict(GlobalConstraint):
         """
         super().__init__("strictly_increasing", flatlist(args))
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the IncreasingStrict constraint.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
         return [args[i] < args[i+1] for i in range(len(args)-1)], []
@@ -1487,12 +1487,12 @@ class DecreasingStrict(GlobalConstraint):
         """
         super().__init__("strictly_decreasing", flatlist(args))
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the DecreasingStrict constraint.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
         return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
@@ -1523,7 +1523,7 @@ class LexLess(GlobalConstraint):
             raise ValueError(f"The 2 lists given in LexLess must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
         super().__init__("lex_less", [list1, list2])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
 
@@ -1541,7 +1541,7 @@ class LexLess(GlobalConstraint):
         subsequent positions.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         X, Y = cpm_array(self.args)
 
@@ -1585,7 +1585,7 @@ class LexLessEq(GlobalConstraint):
             raise ValueError(f"The 2 lists given in LexLessEq must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
         super().__init__("lex_lesseq", [list1, list2])
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Implementation inspired by Hakan Kjellerstrand (http://hakank.org/cpmpy/cpmpy_hakank.py)
 
@@ -1603,7 +1603,7 @@ class LexLessEq(GlobalConstraint):
         subsequent positions.
 
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         X, Y = cpm_array(self.args)
 
@@ -1643,12 +1643,12 @@ class LexChainLess(GlobalConstraint):
             raise ValueError(f"The matrix given in LexChainLess must be 2D, but got {Xarr.ndim} dimensions")
         super().__init__("lex_chain_less", Xarr.tolist())
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the LexChainLess constraint.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         X = self.args
         return [LexLess(prev_row, curr_row) for prev_row, curr_row in zip(X, X[1:])], []
@@ -1678,7 +1678,7 @@ class LexChainLessEq(GlobalConstraint):
             raise ValueError(f"The matrix given in LexChainLessEq must be 2D, but got {Xarr.ndim} dimensions")
         super().__init__("lex_chain_lesseq", Xarr.tolist())
 
-    def decompose(self) -> tuple[Sequence[Expression], Sequence[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """ Decompose to a series of LexLessEq constraints between subsequent rows
         """
         X = self.args
