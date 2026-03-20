@@ -5,17 +5,18 @@
 from copy import copy
 import numpy as np
 
-from ..expressions.variables import boolvar, intvar, NDVarArray
+from ..expressions.variables import boolvar, intvar, NDVarArray, _BoolVarImpl, _NumVarImpl
 from ..expressions.core import Expression, BoolVal, ListLike, ExprLike
 from ..expressions.utils import get_bounds, is_any_list
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.python_builtins import all as cpm_all
-from typing import Optional, cast, AbstractSet, Any
+from typing import Optional, cast, AbstractSet, Any, Sequence, Union
 
-def no_partial_functions(lst_of_expr:list[ExprLike], 
+
+def no_partial_functions(lst_of_expr:Sequence[Expression],
                          _toplevel: Optional[list[ExprLike]]=None, 
                          _nbc: Optional[list[ExprLike]] = None, 
-                         safen_toplevel: Optional[AbstractSet[str]]=None) -> list[ExprLike]:
+                         safen_toplevel: Optional[AbstractSet[str]]=None) -> list[Expression]:
     """
         A partial function is a function whose output is not defined for all possible inputs.
 
@@ -72,15 +73,17 @@ def no_partial_functions(lst_of_expr:list[ExprLike],
     assert _toplevel is None, "no_partial_functions:  argument '_toplevel' is deprecated, do not use/modify it"
     assert _nbc is None, "no_partial_functions:  argument '_nbc' is deprecated, do not use/modify it"
 
-    changed, new_lst, todo_toplevel = _no_partial_functions(lst_of_expr, safen_toplevel=safen_toplevel)
+    changed, new_lst, todo_toplevel, nbc = _no_partial_functions(lst_of_expr, is_toplevel=True, safen_toplevel=safen_toplevel)
     if not changed:
         return list(lst_of_expr) # return original list
 
+    todo_toplevel = todo_toplevel + nbc
     # new toplevel constraints may need to be safened too
     while len(todo_toplevel):
-        changed, decomp, next_toplevel = _no_partial_functions(todo_toplevel, safen_toplevel=safen_toplevel)
+        changed, decomp, next_toplevel, next_nbc = _no_partial_functions(todo_toplevel, is_toplevel=True, safen_toplevel=safen_toplevel)
         if not changed:
             new_lst.extend(todo_toplevel)
+            new_lst.extend(nbc)
             break
 
         # changed, loop again
@@ -90,40 +93,34 @@ def no_partial_functions(lst_of_expr:list[ExprLike],
     return new_lst
     
 
-def _no_partial_functions(lst_of_expr:ListLike[ExprLike], 
-                          toplevel: Optional[list[ExprLike]]=None, 
-                          nbc: Optional[list[ExprLike]] = None, 
-                          safen_toplevel: Optional[AbstractSet[str]] = None) -> tuple[bool,list[ExprLike], list[ExprLike]]:
+def _no_partial_functions(lst_of_expr: Union[Sequence[Expression], NDVarArray],
+                          is_toplevel: bool,
+                          safen_toplevel: Optional[AbstractSet[str]] = None) -> tuple[bool,list[Expression], list[Expression], list[Expression]]:
     """
         Safen a list of expressions by replacing partial functions with total functions.
 
         INTERNAL function, not guaranteed to remain backward compatible.
 
         :param lst_of_expr: list of CPMpy expressions
-        :param _toplevel: list of new expressions to put toplevel (used internally)
-        :param _nbc: list of new expressions to put in nearest Boolean context (used internally)
         :param safen toplevel: list of expression types that need to be safened, even when toplevel. Used when
                                  a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`).
 
-        :returns: tuple of (list of safened expressions, list of toplevel constraints)
+        :returns: ``(changed, new_lst, toplevel, nbc)`` where:
+        - ``changed`` is True if a partial function was safened was done (or a recursive call changed something).
+        - ``new_lst`` is the safened list of expressions (same length as ``lst_of_expr``).
+        - ``toplevel`` is the list of auxiliary constraints to post at top level.
+        - ``nbc`` is the list of expressions to put in nearest Boolean context.
     """
 
-    if toplevel is None:
-        is_toplevel = True
-        toplevel = []
-        assert nbc is None, "nbc must be None when is_toplevel is True"
-        nbc = toplevel # we start at toplevel, with the nearest Boolean context being toplevel
-    else:
-        is_toplevel = False
-
-    assert nbc is not None # for mypy
+    toplevel: list[Expression] = []
+    nbc_for_each_expr : list[list[Expression]] = [[] for _ in range(len(lst_of_expr))] # TODO? make tuples instead?
         
     if safen_toplevel is None:
         safen_toplevel = frozenset()
     
     changed = False
     new_lst: list[Any] = [] # TODO: because of is_any_list, can be many things...
-    for cpm_expr in lst_of_expr:
+    for i, cpm_expr in enumerate(lst_of_expr):
 
         if is_any_list(cpm_expr):
             assert not is_toplevel, "Lists in lists is only allowed for arguments (e.g. of global constrainst)." \
@@ -135,35 +132,36 @@ def _no_partial_functions(lst_of_expr:ListLike[ExprLike],
             elif isinstance(cpm_expr, np.ndarray) and cpm_expr.dtype != object:
                 pass  # only constants, nothing to do
             else:
-                rec_changed, rec_expr, rec_toplevel = _no_partial_functions(list(cpm_expr), toplevel=toplevel, nbc=nbc, safen_toplevel=safen_toplevel)
+                rec_changed, rec_expr, rec_toplevel, rec_nbc = _no_partial_functions(list(cpm_expr), is_toplevel=False, safen_toplevel=safen_toplevel)
                 if rec_changed:
                     cpm_expr = rec_expr
                     toplevel.extend(rec_toplevel)
+                    nbc_for_each_expr[i].extend(rec_nbc)
                     changed = True
             new_lst.append(cpm_expr)
             continue
 
         # if an expression, safen its arguments first
         if isinstance(cpm_expr, Expression) and cpm_expr.has_subexpr():
-            if cpm_expr.is_bool() and not is_toplevel: 
-                # current Boolean expression will serve as the nearest Boolean context
-                nbc = []
 
-            rec_changed, newargs, rec_toplevel = _no_partial_functions(cpm_expr.args, toplevel=toplevel, nbc=nbc, safen_toplevel=safen_toplevel)
+            rec_changed, newargs, rec_toplevel, rec_nbc= _no_partial_functions(cpm_expr.args, is_toplevel=False, safen_toplevel=safen_toplevel)
             if rec_changed:
                 cpm_expr = copy(cpm_expr)
                 cpm_expr.update_args(newargs)
                 toplevel.extend(rec_toplevel)
+                nbc_for_each_expr[i].extend(rec_nbc)
                 changed = True
 
         if hasattr(cpm_expr, "args"): # expression with some arguments (not a variable or a constant)
 
             assert isinstance(cpm_expr, Expression)
+            guard: Optional[_BoolVarImpl | BoolVal] = None # for mypy
 
-            if cpm_expr.is_bool() and nbc is not toplevel and len(nbc) > 0:
+            if cpm_expr.is_bool() and not is_toplevel and len(nbc_for_each_expr[i]) > 0: # filled nbc in recursive call
                 # add guards to this Boolean expression
-                cpm_expr = cpm_all(nbc) & cpm_expr
-            
+                cpm_expr = cpm_all(nbc_for_each_expr[i]) & cpm_expr
+                nbc_for_each_expr[i] = [] # handled, no need to bring to previous rec level
+
             # else, global function, which may need to be safened
             elif isinstance(cpm_expr, GlobalFunction) and cpm_expr.name == "element":
                 if is_toplevel and cpm_expr.name not in safen_toplevel: # no need to safen
@@ -176,7 +174,7 @@ def _no_partial_functions(lst_of_expr:ListLike[ExprLike],
                 if lb < 0 or ub >= len(arr): # index can be out of bounds
                     guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(0, len(arr)-1), idx_to_safen=1)
 
-                    nbc.append(guard)  # guard must be added to nearest Boolean context
+                    nbc_for_each_expr[i].append(guard)  # guard must be added to nearest Boolean context
                     toplevel += extra_cons  # any additional constraint that must be true
                     cpm_expr = output_expr  # replace partial function by this (total) new output expression
                     changed = True
@@ -201,7 +199,7 @@ def _no_partial_functions(lst_of_expr:ListLike[ExprLike],
                     else:  # proper hole
                         guard, output_expr, extra_cons = _safen_hole(cpm_expr, exclude=0, idx_to_safen=idx_to_safen)
 
-                    nbc.append(guard)  # guard must be added to nearest Boolean context
+                    nbc_for_each_expr[i].append(guard)  # guard must be added to nearest Boolean context
                     toplevel += extra_cons  # any additional constraint that must be true
                     cpm_expr = output_expr  # replace partial function by this (total) new output expression
                     changed = True
@@ -213,8 +211,9 @@ def _no_partial_functions(lst_of_expr:ListLike[ExprLike],
         # constants, variables, other expressions are left as is
         new_lst.append(cpm_expr)
 
-    assert is_toplevel or len(new_lst) == len(lst_of_expr), f"Nested safening should not change the number of expressions\n{lst_of_expr}\n{new_lst}"
-    return changed, new_lst, toplevel
+    assert len(new_lst) == len(lst_of_expr), f"Nested safening should not change the number of expressions\n{lst_of_expr}\n{new_lst}"
+    nbc = [expr for lst in nbc_for_each_expr for expr in lst] # merge remaining nbc expressions
+    return changed, new_lst, toplevel, nbc
 
 def _safen_range(partial_expr, safe_range, idx_to_safen):
     """
