@@ -55,14 +55,17 @@
     Module details
     ==============
 """
+from __future__ import annotations
+
 import math
 from collections.abc import Iterable
 import warnings # for deprecation warning
 from functools import reduce
+from typing import Any, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
-from .core import Expression, Operator
+from .core import Expression, ListLike, Operator
 from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
 _BV_PREFIX = "BV"
@@ -78,7 +81,18 @@ def BoolVar(shape=1, name=None):
     return boolvar(shape=shape, name=name)
 
 
-def boolvar(shape=1, name=None):
+@overload
+def boolvar(shape: int | np.integer | tuple[int | np.integer, ...],
+            name: Optional[str | ListLike[str]] = ...
+           ) -> NDVarArray: ...
+@overload
+def boolvar(shape: Literal[1] = ...,  # special case: a shape of =1 returns a single variable
+            name: Optional[str | ListLike[str]] = ...
+           ) -> _BoolVarImpl: ...
+
+def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
+            name: Optional[str | ListLike[str]] = None
+           ) -> _BoolVarImpl | NDVarArray:
     """
     Create Boolean decision variables that take either the value `True` or `False`.
 
@@ -151,6 +165,15 @@ def IntVar(lb, ub, shape=1, name=None):
     return intvar(lb, ub, shape=shape, name=name)
 
 
+@overload
+def intvar(lb: int, ub: int, shape: Literal[1] = ...,  # special case: a shape of =1 returns a single variable
+           name: Optional[str | ListLike[str]] = ...
+          ) -> _IntVarImpl: ...
+@overload
+def intvar(lb: int, ub: int,
+           shape: int | np.integer | tuple[int | np.integer, ...] = ...,
+           name: Optional[str | ListLike[str]] = ...
+          ) -> NDVarArray: ...
 def intvar(lb, ub, shape=1, name=None):
     """
     Integer decision variables are constructed by specifying the lowest (lb) value
