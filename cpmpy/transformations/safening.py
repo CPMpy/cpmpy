@@ -160,7 +160,7 @@ def _no_partial_functions(lst_of_expr:ListLike[ExprLike],
 
             assert isinstance(cpm_expr, Expression)
 
-            if cpm_expr.is_bool() and len(nbc) != 0:
+            if cpm_expr.is_bool() and nbc is not toplevel and len(nbc) > 0:
                 # add guards to this Boolean expression
                 cpm_expr = cpm_all(nbc) & cpm_expr
             
