@@ -433,51 +433,23 @@ class Circuit(GlobalConstraint):
         Returns:
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        succ = cpm_array(self.args)
-        n = len(succ)
-        order = intvar(0,n-1, shape=n)
-        defining: list[Expression] = []
-        value: list[Expression] = []
 
-        # We define the auxiliary order variables to represent the order we visit all the nodes.
-        # `order[i] == succ[order[i - 1]]`
-        # These constraints need to be in the defining part, since they define our auxiliary vars
-        # However, this would make it impossible for ~circuit to be satisfied in some cases,
-        # because there does not always exist a valid ordering
-        # This happens when the variables in succ don't take values in the domain of 'order',
-        # i.e. for succ = [9,-1,0], there is no valid ordering, but we satisfy ~circuit(succ)
-        # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
-        # TODO at some point: do not introduce these auxiliary variables ourselves, rely on cse instead. 
-        # Blocking factor: need safening and decomposing of global constraints to be integrated.
-        # accumulator = 0
-        # for i = 0..n-1:
-        #    accumulator = succ[accumulator]  # creates an element global function
-        # return [0 == accumulator, cp.AllDiff(succ), cp.all(succ >= 0), cp.all(succ <= n)], []
+        # construct the chain of neighbors
+        succ = cp.cpm_array(self.args)
+        order = [succ[0]]
+        for i in range(1, len(succ)):
+            order.append(succ[order[i - 1]])
 
+        # element constraints can be partial
+        from cpmpy.transformations.safening import _no_partial_functions
+        _, safe_order, toplevel, nbc = _no_partial_functions(order, is_toplevel=False) # will always safen elements, even if toplevel...
 
-        lbs, ubs = get_bounds(succ)
-        if min(lbs) > 0 or max(ubs) < n - 1:
-            # no way this can be a circuit
-            return [BoolVal(False)], []
-        elif min(lbs) >= 0 and max(ubs) < n:
-            # there always exists a valid ordering, since our bounds are tight
-            a = BoolVal(True)
-        else:
-            # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
-            a = boolvar()
-            defining += [a == ((cp.Minimum(succ) >= 0) & (cp.Maximum(succ) < n))]
-            for i in range(n):
-                defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
+        value = [safe_order[-1] == 0, # return to start node
+                 cp.AllDifferent(safe_order),  # type: ignore # ensure no subcircuits
+                 cp.AllDifferent(succ) # redundant constraints, results in better decomposition
+                ]
 
-        value += [AllDifferent(succ)]  # different successors
-        value += [AllDifferent(order)]  # different orders
-        value += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
-        defining += [a.implies(order[0] == succ[0])]
-        for i in range(1, n):
-            defining += [a.implies(
-                order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
-        
-        return value, defining
+        return value + nbc, toplevel
 
     def value(self) -> Optional[bool]:
         """
@@ -531,20 +503,12 @@ class Inverse(GlobalConstraint):
         fwd, rev = self.args
         rev = cpm_array(rev)
 
-        constraining, defining = [], []
-        for i,x in enumerate(fwd):
-            if is_num(x) and not 0 <= x < len(rev): 
-                return [cp.BoolVal(False)], [] # can never satisfy the Inverse constraint
-           
-            lb, ub = get_bounds(x)
-            if lb >= 0 and ub < len(rev): # safe, index is within bounds
-                constraining.append(rev[x] == i)
-            else: # partial! need safening here
-                is_defined, total_expr, toplevel = safening._safen_range(rev[x], (0, len(rev)-1), 1)
-                constraining += [is_defined, total_expr == i]
-                defining += toplevel
+        constraining = [rev[x] == i for i,x in enumerate(fwd)]
+        # Element constraints can be partial, so run safening transformation
+        _, constraining, defining, nbc = safening._no_partial_functions(constraining, is_toplevel=False, 
+                                                                        safen_toplevel=frozenset(("element",))) # TODO, how to know if element should be safened?
         
-        return constraining, defining
+        return constraining + nbc, defining
 
     def value(self) -> Optional[bool]:
         """
