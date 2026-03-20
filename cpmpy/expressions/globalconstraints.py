@@ -216,9 +216,9 @@ class AllDifferent(GlobalConstraint):
     """
 
     @overload
-    def __init__(self, args: ListLike[ExprLike], /) -> None: ...  # recommended use  # '/' is just an annotation, tells mypy its positional only
+    def __init__(self, args: ListLike[ExprLike], /): ...  # recommended use  # '/' is just an annotation, tells mypy its positional only
     @overload
-    def __init__(self, *args: ExprLike) -> None: ...  # historically acceptable use
+    def __init__(self, *args: ExprLike): ...  # historically acceptable use
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):  # shared implementation of the two above overloads
         """
         Arguments:
