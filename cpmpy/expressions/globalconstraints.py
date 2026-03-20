@@ -116,8 +116,10 @@
         InDomain
         Xor
         Cumulative
-        Precedence
+        CumulativeOptional
         NoOverlap
+        NoOverlapOptional
+        Precedence
         GlobalCardinalityCount
         Increasing
         Decreasing
@@ -139,7 +141,7 @@ import cpmpy as cp
 
 from .core import Expression, BoolVal, ExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr
+from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 from .globalfunctions import * # XXX make this file backwards compatible
 
 if TYPE_CHECKING:
@@ -1056,7 +1058,7 @@ class Cumulative(GlobalConstraint):
         if how not in ["time", "task", "auto"]:
             raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
 
-        start, duration, end, demand, capacity = self.args
+        start= self.args[0]
 
         lbs, ubs = get_bounds(start)
         horizon = max(ubs) - min(lbs)
@@ -1064,7 +1066,25 @@ class Cumulative(GlobalConstraint):
             return self._time_decomposition()
         elif (how == "task") or (how == "auto" and len(start) > horizon):
             return self._task_decomposition()
-        raise Exception
+        raise Exception # should not be reached
+
+    def _consistency_constraints(self) -> list[Expression]:
+        """
+        Helper function to enforce consistency constraints, used in the decomposition.
+
+        Consistency constraints enforce that:
+        - duration >= 0
+        - demand >= 0
+        - start + duration == end
+        """
+        start, duration, end, demand, capacity = self.args
+        cons = [d >= 0 for d in duration]  # enforce non-negative durations
+        cons += [h >= 0 for h in demand]  # enforce non-negative demand
+
+        if end is not None:
+            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
+
+        return cons
 
     def _task_decomposition(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1077,14 +1097,9 @@ class Cumulative(GlobalConstraint):
         """
         start, duration, end, demand, capacity = self.args
 
-        cons = [d >= 0 for d in duration]  # enforce non-negative durations
-        cons += [h >= 0 for h in demand]  # enforce non-negative demand
-
-        # set duration of tasks, only if end is user-provided
+        cons = self._consistency_constraints()
         if end is None:
             end = [start[i] + duration[i] for i in range(len(start))]
-        else:
-            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
 
         # demand doesn't exceed capacity
         # tasks are uninterruptible, so we only need to check each starting point of each task
@@ -1110,15 +1125,10 @@ class Cumulative(GlobalConstraint):
         """
         start, duration, end, demand, capacity = self.args
 
-        cons = [d >= 0 for d in duration] # enforce non-negative durations
-        cons += [h >= 0 for h in demand] # enforce non-negative demand
-
-        # set duration of tasks, only if end is user-provided
+        cons = self._consistency_constraints()
         if end is None:
             end = [start[i] + duration[i] for i in range(len(start))]
-        else:
-            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
-
+            
         # demand doesn't exceed capacity
         # for each time-step, we check if the running demand does not exceed the capacity
         lbs, ubs = get_bounds(start)
@@ -1161,17 +1171,201 @@ class Cumulative(GlobalConstraint):
                 return False
 
         return True
+
+class CumulativeOptional(GlobalConstraint):
+    """
+        Generalization of the Cumulative constraint which allows for optional tasks.
+        A task is only scheduled if the corresponing is_present variable is set to True.
+
+        If the task is present, the constraint enforces that:
+        - duration >= 0
+        - demand >= 0
+        - start + duration == end
+
+        If the task is not present, the constraint does not enforce any of the above.
+
+        Equivalent to :class:`~cpmpy.expressions.globalconstraints.NoOverlapOptional` when demand and capacity are equal to 1.
+        Supports both varying demand across tasks or equal demand for all jobs.
+    """
+
+    def __init__(self, start: ListLike[ExprLike], 
+                       duration: ListLike[ExprLike], 
+                       end: Optional[ListLike[ExprLike]] = None, 
+                       demand: Optional[ListLike[ExprLike]|ExprLike] = None, 
+                       capacity: Optional[ExprLike] = None, 
+                       is_present: Optional[ListLike[ExprLike]] = None):
+        """
+            Arguments:
+                start (ListLike[ExprLike]): Start times of the tasks
+                duration (ListLike[ExprLike]): Durations of the tasks
+                end (ListLike[ExprLike] | None): Optional end times of the tasks
+                demand (ListLike[ExprLike] | ExprLike): Per-task demands or a single constant demand, required
+                capacity (ExprLike): Capacity of the resource, required
+                is_present (ListLike[ExprLike]): Presence of the tasks
+            
+            Technical note: demand/capacity marked as Optional because it comes after an Optional argument
+        """
+        if not is_any_list(start):
+            raise TypeError("start should be a list")
+        if not is_any_list(duration):
+            raise TypeError("duration should be a list")
+        if end is not None and not is_any_list(end):
+            raise TypeError("end should be a list if it is provided")
+        if demand is None:
+            raise TypeError("demand should be provided but was None")
+        if capacity is None:
+            raise TypeError("capacity should be provided but was None")
+        if is_present is None:
+            raise TypeError("is_present should be provided but was None")
+        
+        if len(start) != len(duration):
+            raise ValueError("Start and duration should have equal length")
+        if len(start) != len(is_present):
+            raise ValueError("Start and is_present should have equal length")
+        if end is not None and len(start) != len(end):
+            raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
+
+        demand_list = []
+        if is_any_list(demand):
+            demand_list = list(demand)
+            if len(demand_list) != len(start):
+                raise ValueError(f"Demand should be supplied for each task or be single constant, but got {len(demand_list)} and {len(start)}")
+        else: # constant demand
+            demand_list = [demand] * len(start)
+
+        super().__init__("cumulative_optional", [list(start), list(duration), list(end) if end is not None else None, 
+                                                 demand_list, capacity, list(is_present)])
+
+    def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
+        """
+        Decompose the Cumulative constraint
+        Support time-based decomposition or task-based decomposition.
+        By default, we heuristically select the best decomposition based on the number of tasks and the horizon.
+
+        Arguments:
+            how (str): how the cumulative constraint should be decomposed, can be "time", "task", or "auto" (default)
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+
+        if how not in ["time", "task", "auto"]:
+            raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
+
+        start, *args = self.args
+
+        lbs, ubs = get_bounds(start)
+        horizon = max(ubs) - min(lbs)
+        if (how == "time") or (how == "auto" and len(start) <= horizon):
+            return self._time_decomposition()
+        elif (how == "task") or (how == "auto" and len(start) > horizon):
+            return self._task_decomposition()
+        raise Exception # should not be reached
+
+    def _consistency_constraints(self) -> list[Expression]:
+        """
+        Helper function to enforce concistency constraints, used in the decomposition.
+        
+        Consistency constraints enforce that:
+        - duration >= 0 if the task is present
+        - demand >= 0 if the task is present
+        - start + duration == end if the task is present
+        """
+
+        start, duration, end, demand, capacity, is_present = self.args
+        cons = [implies(p,d >= 0) for d, p in zip(duration, is_present)]  # enforce non-negative durations when present
+        cons += [implies(p,h >= 0) for h, p in zip(demand, is_present)]  # enforce non-negative demand when present
+
+        # set duration of tasks, only if end is user-provided and the task is present
+        if end is not None:
+            cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
+
+        return cons
+
     
-    def __repr__(self) -> str:
+    def _task_decomposition(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Task-based decomposition of the cumulative constraint.
+        Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+        International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, duration, end, demand, capacity, is_present = self.args
+        
+        cons = self._consistency_constraints()
+        if end is None:
+            end = [start[i] + duration[i] for i in range(len(start))]
+
+        # demand of tasks that are present doesn't exceed capacity
+        # tasks are uninterruptible, so we only need to check each starting point of each task
+        # I.e., for each task, we check if it can be started, given the tasks that are already running.
+        for t in range(len(start)):
+            demand_at_start_of_t = []
+            for j in range(len(start)):
+                if t != j:
+                    demand_at_start_of_t += [demand[j] * (is_present[j] & (start[j] <= start[t]) & (end[j] > start[t]))]
+
+            cons += [implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity)]
+
+        return cons, []
+
+    def _time_decomposition(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Time-resource decomposition of the cumulative constraint.
+        Schutt, Andreas, et al. "Why cumulative decomposition is not as bad as it sounds."
+        International Conference on Principles and Practice of Constraint Programming. Springer, Berlin, Heidelberg, 2009.
+        
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, duration, end, demand, capacity, is_present = self.args
+
+        cons = self._consistency_constraints()
+        if end is None:
+            end = [start[i] + duration[i] for i in range(len(start))]
+
+        # demand of tasks that are presentdoesn't exceed capacity
+        # for each time-step, we check if the running demand does not exceed the capacity
+        lbs, ubs = get_bounds(start)
+        lb, ub = min(lbs), max(ubs)
+        for t in range(lb,ub+1):
+            cons += [cp.sum(d * (present & (s <= t) & (e > t)) for s,e,d,present in zip(start, end, demand, is_present)) <= capacity]
+
+        return cons, []
+
+    def value(self) -> Optional[bool]:
         """
         Returns:
-            str: String representation of the cumulative constraint
-        """
-        start, dur, end, demand, capacity = self.args
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """        
+        start, dur, end, demand, capacity, is_present = argvals(self.args)
         if end is None:
-            return f"Cumulative({start}, {dur}, {demand}, {capacity})"
+            end = [s + d for s,d in zip(start, dur)]
         else:
-            return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity})"
+            end = argvals(end)
+
+        if any(a is None for a in flatlist([start, dur, end, demand, capacity, is_present])):
+            return None
+                
+        if any(p and d < 0 for d,p in zip(dur, is_present)):
+            return False
+        if any(p and s + d != e for s,d,e,p in zip(start, dur, end, is_present)):
+            return False
+
+        if any(p and d < 0 for d,p in zip(demand, is_present)):
+            return False
+
+        # ensure demand doesn't exceed capacity
+        lb, ub = min(start), max(end)
+        start, end, present = np.array(start), np.array(end), np.array(is_present) # eases check below
+        for t in range(lb, ub+1):
+            if capacity < sum(demand * (present & (start <= t) & (end > t))):
+                return False
+
+        return True
+
 
 class NoOverlap(GlobalConstraint):
     """
@@ -1243,18 +1437,89 @@ class NoOverlap(GlobalConstraint):
             if s1 + d1 > s2 and s2 + d2 > s1:
                 return False
         return True
+
+class NoOverlapOptional(GlobalConstraint):
+    """
+        Generalization of the NoOverlap constraint which allows for optional tasks.
+        A task is only scheduled if the corresponing is_present variable is set to True.
+
+        The constraint enforces that all present tasks are scheduled without overlapping, and for each present task, the constraint enforces that:
+        - duration >= 0
+        - demand >= 0
+        - start + duration == end
+
+        if the task is not present, it does not enforce any of the above.
+    """
     
-    def __repr__(self) -> str:
+    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[ExprLike]] = None):
+        """
+        Arguments:
+            start (ListLike[Expression]): List of Expression objects representing the start times of the tasks
+            duration (ListLike[Expression]): List of Expression objects representing the durations of the tasks
+            end (ListLike[Expression] | None): optional, list of Expression objects representing the end times of the tasks
+            is_present (ListLike[Expression]): List of Boolean Expression objects representing the presence of the tasks
+        """
+       
+        if not is_any_list(start):
+            raise TypeError("start should be a list")
+        if not is_any_list(duration):
+            raise TypeError("duration should be a list")
+        if end is not None and not is_any_list(end):
+            raise TypeError("end should be a list if it is provided")
+        if is_present is None or not is_any_list(is_present):
+            raise ValueError("is_present should be provided and should be a list")
+        
+        if len(start) != len(duration):
+            raise ValueError("Start and duration should have equal length")
+        if len(start) != len(is_present):
+            raise ValueError("Start and is_present should have equal length")
+        if end is not None and len(start) != len(end):
+            raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
+        
+        super().__init__("no_overlap_optional", [start, duration, end, is_present])
+
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
+        
+        Returns:
+            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        start, dur, end, is_present = self.args
+        cons = [implies(p, d >= 0) for d, p in zip(dur, is_present)]
+        
+        if end is None:
+            end = [s+d for s,d in zip(start, dur)]
+        else: # can use the expression directly below
+            cons += [implies(p, s + d == e) for s,d,e,p in zip(start, dur, end, is_present)]
+            
+        for (s1, e1, p1), (s2, e2, p2) in all_pairs(zip(start, end, is_present)):
+            cons += [implies(p1 & p2, (e1 <= s2) | (e2 <= s1))]
+        return cons, []
+
+    def value(self) -> Optional[bool]:
         """
         Returns:
-            str: String representation of the NoOverlap constraint
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end = self.args
+        start, dur, end, is_present = argvals(self.args)
         if end is None:
-            return f"NoOverlap({start}, {dur})"
+            if any(s is None for s in start) or any(d is None for d in dur):
+                return None
+            end = [s + d for s,d in zip(start, dur)]
         else:
-            return f"NoOverlap({start}, {dur}, {end})"
-
+            if any(s is None for s in start) or any(d is None for d in dur) or any(e is None for e in end) or any(p is None for p in is_present):
+                return None
+       
+        if any(p and d < 0 for d,p in zip(dur, is_present)):
+            return False
+        if any(p and s + d != e for s,d,e,p in zip(start, dur, end, is_present)):
+            return False
+        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,dur,is_present)):
+            if p1 and p2 and (s1 + d1 > s2) and (s2 + d2 > s1):
+                return False
+        return True
+    
 class Precedence(GlobalConstraint):
     """
     Enforces a precedence relationship between a set of variables.
