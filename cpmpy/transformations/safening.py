@@ -11,7 +11,7 @@ from ..expressions.utils import get_bounds, is_num, is_any_list
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.python_builtins import all as cpm_all
-from typing import Optional, Sequence, cast, AbstractSet, Union
+from typing import Optional, Sequence, cast, AbstractSet, Union, Any
 
 def no_partial_functions(lst_of_expr:list[ExprLike], 
                          _toplevel: Optional[list[ExprLike]]=None, 
@@ -116,12 +116,14 @@ def _no_partial_functions(lst_of_expr:ListLike[ExprLike],
         nbc = toplevel # we start at toplevel, with the nearest Boolean context being toplevel
     else:
         is_toplevel = False
+
+    assert nbc is not None # for mypy
         
     if safen_toplevel is None:
         safen_toplevel = frozenset()
     
     changed = False
-    new_lst: list[ExprLike | ListLike[ExprLike]] = []
+    new_lst: list[Any] = [] # TODO: because of is_any_list, can be many things...
     for cpm_expr in lst_of_expr:
 
         if is_any_list(cpm_expr):
@@ -159,7 +161,7 @@ def _no_partial_functions(lst_of_expr:ListLike[ExprLike],
 
             assert isinstance(cpm_expr, Expression)
 
-            if cpm_expr.is_bool() and nbc is not None and len(nbc) != 0: # not None check for mypy
+            if cpm_expr.is_bool() and len(nbc) != 0:
                 # add guards to this Boolean expression
                 cpm_expr = cpm_all(nbc) & cpm_expr
             
@@ -212,6 +214,7 @@ def _no_partial_functions(lst_of_expr:ListLike[ExprLike],
         # constants, variables, other expressions are left as is
         new_lst.append(cpm_expr)
 
+    assert is_toplevel or len(new_lst) == len(lst_of_expr), f"Nested safening should not change the number of expressions\n{lst_of_expr}\n{new_lst}"
     return changed, new_lst, toplevel
 
 def _safen_range(partial_expr, safe_range, idx_to_safen):
