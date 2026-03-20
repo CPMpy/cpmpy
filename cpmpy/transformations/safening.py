@@ -88,7 +88,7 @@ def no_partial_functions(lst_of_expr:Sequence[Expression],
 
         # changed, loop again
         new_lst.extend(decomp)
-        todo_toplevel = next_toplevel # toplevel constraints may have introduced nested lists or ands
+        todo_toplevel = next_toplevel + next_nbc # toplevel constraints may have introduced nested lists or ands
 
     return new_lst
     
