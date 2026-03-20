@@ -297,12 +297,22 @@ def _safen_hole(cpm_expr, exclude, idx_to_safen) -> tuple[_BoolVarImpl, _NumVarI
     return is_defined, output_var, toplevel
 
 
-def safen_objective(expr):
+def safen_objective(expr: Expression) -> tuple[ExprLike, list[Expression]]:
+    """
+    Safen any partial functions in the objective function expression.
+
+    Arguments:
+        expr (Expression): objective expression (e.g. ``x // y``, ``arr[x] + arr[y]``).
+
+    Returns:
+        tuple[Expression, list[Expression]]
+        safe_expr (Expression): the safened objective expression
+        toplevel (list[Expression]): the list of auxiliary constraints to post at top level.
+    """
     if is_any_list(expr):
         raise ValueError(f"Expected numerical expression as objective but got a list {expr}")
 
-    toplevel, nbc = [],[]
-    safe_expr = no_partial_functions([expr], _toplevel=toplevel, _nbc=nbc)
+    _, safe_expr, toplevel, nbc = _no_partial_functions((expr,), is_toplevel=True)
     assert len(safe_expr) == 1
     return safe_expr[0], toplevel + nbc
 
