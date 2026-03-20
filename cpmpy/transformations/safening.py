@@ -18,56 +18,56 @@ def no_partial_functions(lst_of_expr:Sequence[Expression],
                          _nbc: Optional[list[ExprLike]] = None, 
                          safen_toplevel: Optional[AbstractSet[str]]=None) -> list[Expression]:
     """
-        A partial function is a function whose output is not defined for all possible inputs.
+    A partial function is a function whose output is not defined for all possible inputs.
 
-        In CPMpy, this is the case for the following 3 numeric functions:
+    In CPMpy, this is the case for the following 3 numeric functions:
 
-        - (Integer) division ``x // y``: undefined when y=0
-        - Modulo ``x mod y``: undefined when y=0
-        - Element ``Arr[idx]``: undefined when idx is not in the range of Arr
+    - (Integer) division ``x // y``: undefined when y=0
+    - Modulo ``x mod y``: undefined when y=0
+    - Element ``Arr[idx]``: undefined when idx is not in the range of Arr
 
-        A toplevel constraint must always be true, so constraint solvers simply propagate the 'unsafe'
-        value(s) away. However, CPMpy allows arbitrary nesting and reification of constraints, so an
-        expression like ``b <-> (Arr[idx] == 5)`` is allowed, even when variable `idx` goes outside the bounds of `Arr`.
-        Should `idx` be restricted to be in-bounds? and what value should 'b' take if it is out-of-bounds?
+    A toplevel constraint must always be true, so constraint solvers simply propagate the 'unsafe'
+    value(s) away. However, CPMpy allows arbitrary nesting and reification of constraints, so an
+    expression like ``b <-> (Arr[idx] == 5)`` is allowed, even when variable `idx` goes outside the bounds of `Arr`.
+    Should `idx` be restricted to be in-bounds? and what value should 'b' take if it is out-of-bounds?
 
-        This transformation will transform a partial function (e.g. Arr[idx]) into a total function
-        following the **relational semantics** as discussed in:
-            Frisch, Alan M., and Peter J. Stuckey. "The proper treatment of undefinedness in
-            constraint languages." International Conference on Principles and Practice of Constraint
-            Programming. Berlin, Heidelberg: Springer Berlin Heidelberg, 2009.
+    This transformation will transform a partial function (e.g. Arr[idx]) into a total function
+    following the **relational semantics** as discussed in:
+        Frisch, Alan M., and Peter J. Stuckey. "The proper treatment of undefinedness in
+        constraint languages." International Conference on Principles and Practice of Constraint
+        Programming. Berlin, Heidelberg: Springer Berlin Heidelberg, 2009.
 
-        Under the relational semantic, an 'undefined' output for a (numerical) expression should
-        propagate to `False` in the nearest Boolean parent expression. In the above example: `idx` should
-        be allowed to take a value outside the bounds of `Arr`, and `b` should be False in that case.
+    Under the relational semantic, an 'undefined' output for a (numerical) expression should
+    propagate to `False` in the nearest Boolean parent expression. In the above example: `idx` should
+    be allowed to take a value outside the bounds of `Arr`, and `b` should be False in that case.
 
-        To enable this, we want to rewrite an expression like ``b <-> (partial == 5)`` to something like
-        ``b <-> (is_defined & (total == 5))``. The key idea is to create a copy of the potentially unsafe
-        argument, that can only take 'safe' values. Using this new argument in the original expression results
-        in a total function. We now have the original argument variable, which is decoupled from the expression,
-        and a new 'safe' argument variable which is used in the expression. The `is_defined` flag serves two
-        purposes: it represents whether the original argument has a safe value; and if it is true the new
-        argument must equal the original argument so the two are coupled again. If `is_defined` is false, the new
-        argument remains decoupled (can take any value, as will the function's output).
+    To enable this, we want to rewrite an expression like ``b <-> (partial == 5)`` to something like
+    ``b <-> (is_defined & (total == 5))``. The key idea is to create a copy of the potentially unsafe
+    argument, that can only take 'safe' values. Using this new argument in the original expression results
+    in a total function. We now have the original argument variable, which is decoupled from the expression,
+    and a new 'safe' argument variable which is used in the expression. The `is_defined` flag serves two
+    purposes: it represents whether the original argument has a safe value; and if it is true the new
+    argument must equal the original argument so the two are coupled again. If `is_defined` is false, the new
+    argument remains decoupled (can take any value, as will the function's output).
 
-        .. warning::
-            Under the relational semantics, ``b <-> ~(partial==5)`` and ``b <-> (partial!=5)`` mean
-            different things! The second is ``b <-> (is_defined & (total!=5))`` the first is
-            ``b <-> (~is_defined | (total!=5))``.
-
-
-        A clever observation of the implementation below is that for the above 3 expressions, the 'safe'
-        domain of a potentially unsafe argument (y or idx) is either one 'trimmed' continuous domain
-        (for idx and in case y = [0..n] or [-n..0]), or two 'trimmed' continuous domains (for y=[-n..m]).
-        Furthermore, the reformulation for these two cases can be done generically, without needing
-        to know the specifics of the partial function being made total.
+    .. warning::
+        Under the relational semantics, ``b <-> ~(partial==5)`` and ``b <-> (partial!=5)`` mean
+        different things! The second is ``b <-> (is_defined & (total!=5))`` the first is
+        ``b <-> (~is_defined | (total!=5))``.
 
 
-        :param list_of_expr: list of CPMpy expressions
-        :param _toplevel: list of new expressions to put toplevel (used internally)
-        :param _nbc: list of new expressions to put in nearest Boolean context (used internally)
-        :param safen toplevel: list of expression types that need to be safened, even when toplevel. Used when
-                                 a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`).
+    A clever observation of the implementation below is that for the above 3 expressions, the 'safe'
+    domain of a potentially unsafe argument (y or idx) is either one 'trimmed' continuous domain
+    (for idx and in case y = [0..n] or [-n..0]), or two 'trimmed' continuous domains (for y=[-n..m]).
+    Furthermore, the reformulation for these two cases can be done generically, without needing
+    to know the specifics of the partial function being made total.
+    
+    Arguments:
+        lst_of_expr (list[Expression]): list of CPMpy expressions
+        _toplevel (list[Expression]): DEPRECATED
+        _nbc (list[Expression]): DEPRECATED
+        safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
+                                    a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`).
     """
 
     assert _toplevel is None, "no_partial_functions:  argument '_toplevel' is deprecated, do not use/modify it"
@@ -97,19 +97,22 @@ def _no_partial_functions(lst_of_expr: Union[Sequence[Expression], NDVarArray],
                           is_toplevel: bool,
                           safen_toplevel: Optional[AbstractSet[str]] = None) -> tuple[bool,list[Expression], list[Expression], list[Expression]]:
     """
-        Safen a list of expressions by replacing partial functions with total functions.
+    Safen a list of expressions by replacing partial functions with total functions.
 
-        INTERNAL function, not guaranteed to remain backward compatible.
+    INTERNAL function, not guaranteed to remain backward compatible.
 
-        :param lst_of_expr: list of CPMpy expressions
-        :param safen toplevel: list of expression types that need to be safened, even when toplevel. Used when
-                                 a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`).
+    Arguments:
+        lst_of_expr (list[Expression]): list of CPMpy expressions
+        is_toplevel (bool): whether ``lst_of_expr`` is the toplevel list of constraints.
+        safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
+                                        a solver does not support unsafe values in its API (e.g., OR-Tools for `div`).
 
-        :returns: ``(changed, new_lst, toplevel, nbc)`` where:
-        - ``changed`` is True if a partial function was safened was done (or a recursive call changed something).
-        - ``new_lst`` is the safened list of expressions (same length as ``lst_of_expr``).
-        - ``toplevel`` is the list of auxiliary constraints to post at top level.
-        - ``nbc`` is the list of expressions to put in nearest Boolean context.
+    Returns:
+        tuple[bool, list[Expression], list[Expression], list[Expression]]
+        changed (bool): True if a partial function was safened was done (or a recursive call changed something).
+        new_lst (list[Expression]): the safened list of expressions (same length as ``lst_of_expr``).
+        toplevel (list[Expression]): the list of auxiliary constraints to post at top level.
+        nbc (list[Expression]): the list of expressions to put in nearest Boolean context.
     """
 
     toplevel: list[Expression] = []
@@ -217,18 +220,23 @@ def _no_partial_functions(lst_of_expr: Union[Sequence[Expression], NDVarArray],
 
 def _safen_range(partial_expr:Expression, safe_range:tuple[int,int], idx_to_safen:int) -> tuple[_BoolVarImpl, Expression, list[Expression]]:
     """
-        Replace partial function `cpm_expr` that has potentially unsafe argument at `idx_to_safen`,
-        by a total function using a safe argument with domain `safe_range`. Also returns
-        a Boolean flag indicating whether the original argument's value is in the safe range
-        (for use in the nearest Boolean context), and a list of toplevel constraints that help
-        define the new total function.
+    Replace partial function `cpm_expr` that has potentially unsafe argument at `idx_to_safen`,
+    by a total function using a safe argument with domain `safe_range`. Also returns
+    a Boolean flag indicating whether the original argument's value is in the safe range
+    (for use in the nearest Boolean context), and a list of toplevel constraints that help
+    define the new total function.
 
-        An example is `Element` where the index should be within the array's range.
+    An example is `Element` where the index should be within the array's range.
 
-        :param partial_expr: The partial function expression to make total
-        :param safe_range: The range of safe argument values
-        :param idx_to_safen: The index of the potentially unsafe argument in the expression
+    Arguments:
+        partial_expr (Expression): The partial function expression to make total
+        safe_range (tuple[int,int]): The range of safe argument values
+        idx_to_safen (int): The index of the potentially unsafe argument in the expression
 
+    Returns:
+        is_defined (bool): The guard indicating whether the original argument's value is in the safe range
+        total_expr (Expression): The new total function expression
+        toplevel (list[Expression]): The list of auxiliary constraints to post at top level.
     """
     safe_lb, safe_ub = safe_range
 
