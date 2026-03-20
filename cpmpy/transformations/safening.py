@@ -5,13 +5,12 @@
 from copy import copy
 import numpy as np
 
-from ..expressions.variables import _NumVarImpl, boolvar, intvar, NDVarArray, cpm_array
-from ..expressions.core import Expression, Operator, BoolVal, ListLike, ExprLike
-from ..expressions.utils import get_bounds, is_num, is_any_list
-from ..expressions.globalfunctions import GlobalFunction, Element
-from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.variables import boolvar, intvar, NDVarArray
+from ..expressions.core import Expression, BoolVal, ListLike, ExprLike
+from ..expressions.utils import get_bounds, is_any_list
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.python_builtins import all as cpm_all
-from typing import Optional, Sequence, cast, AbstractSet, Union, Any
+from typing import Optional, cast, AbstractSet, Any
 
 def no_partial_functions(lst_of_expr:list[ExprLike], 
                          _toplevel: Optional[list[ExprLike]]=None, 
