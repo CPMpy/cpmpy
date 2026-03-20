@@ -143,6 +143,7 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     if shape == 1:
         if name is not None and _is_invalid_name(name):
             raise ValueError(_VAR_ERR)
+        assert isinstance(name, str), f"_BoolVarImpl: with shape=1, name should be a single string, got {name}"
         return _BoolVarImpl(name=name)
 
     # collect the `names` of each individual decision variable
@@ -297,7 +298,9 @@ class NullShapeError(Exception):
     """
     Error returned when providing an empty or size 0 shape for numpy arrays of variables
     """
-    def __init__(self, shape, message="Shape should be non-zero"):
+    def __init__(self, shape: Optional[int|np.integer|tuple[int|np.integer, ...]], 
+                 message: str = "Shape should be non-zero"
+                ):
         self.shape = shape
         self.message = message
         super().__init__(self.message)
@@ -314,45 +317,45 @@ class _NumVarImpl(Expression):
     including bounds checking and value management. It should not be instantiated
     directly, but rather through the helper functions :func:`~cpmpy.expressions.variables.intvar` and :func:`~cpmpy.expressions.variables.boolvar`.
     """
-    def __init__(self, lb, ub, name):
+    def __init__(self, lb: int, ub: int, name: str):
         assert (is_num(lb) and is_num(ub))
         assert (lb <= ub)
         self.lb = lb
         self.ub = ub
         self.name = name
-        self._value = None
+        self._value: Optional[int] = None
 
-    def has_subexpr(self):
+    def has_subexpr(self) -> bool:
         """Does it contains nested Expressions?
            Is of importance when deciding whether transformation/decomposition is needed.
         """
         return False
 
-    def is_bool(self):
+    def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
         """
         return False
 
-    def value(self):
+    def value(self) -> Optional[int]:
         """ the value obtained in the last solve call
             (or 'None')
         """
         return self._value
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """ the lower and upper bounds"""
         return self.lb, self.ub
 
-    def clear(self):
+    def clear(self) -> None:
         """ clear the value obtained from the last solve call
         """
         self._value = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.name
 
     # for sets/dicts. Because names are unique, so is the str repr
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
 
@@ -365,7 +368,7 @@ class _IntVarImpl(_NumVarImpl):
     """
     counter = 0
 
-    def __init__(self, lb, ub, name=None):
+    def __init__(self, lb: int, ub: int, name: Optional[str] = None):
         assert is_int(lb), "IntVar lowerbound must be integer {} {}".format(type(lb), lb)
         assert is_int(ub), "IntVar upperbound must be integer {} {}".format(type(ub), ub)
 
@@ -376,7 +379,7 @@ class _IntVarImpl(_NumVarImpl):
         super().__init__(int(lb), int(ub), name=name) # explicit cast: can be numpy
 
     # special casing for intvars (and boolvars)
-    def __abs__(self):
+    def __abs__(self) -> Expression:
         if self.lb >= 0:
             # no-op
             return self
@@ -392,7 +395,7 @@ class _BoolVarImpl(_IntVarImpl):
     """
     counter = 0
 
-    def __init__(self, lb=0, ub=1, name=None):
+    def __init__(self, lb:int=0, ub:int=1, name:Optional[str]=None):
         assert(lb == 0 or lb == 1)
         assert(ub == 0 or ub == 1)
 
@@ -401,20 +404,20 @@ class _BoolVarImpl(_IntVarImpl):
             _BoolVarImpl.counter = _BoolVarImpl.counter + 1 # static counter
         _IntVarImpl.__init__(self, lb, ub, name=name)
 
-    def is_bool(self):
+    def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
         """
         return True
 
-    def __invert__(self):
+    def __invert__(self) -> Expression:
         return NegBoolView(self)
 
-    def __abs__(self):
+    def __abs__(self) -> Expression:
         return self
 
     # when redefining __eq__, must redefine custom__hash__
     # https://stackoverflow.com/questions/53518981/inheritance-hash-sets-to-none-in-a-subclass
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
 
@@ -426,7 +429,7 @@ class NegBoolView(_BoolVarImpl):
 
         Do not create this object directly, use the `~` operator instead: `~bv`
     """
-    def __init__(self, bv):
+    def __init__(self, bv: _BoolVarImpl):
         #assert(isinstance(bv, _BoolVarImpl))
         self._bv = bv
         # as it is always created using the ~ operator (only available for _BoolVarImpl)
@@ -434,7 +437,7 @@ class NegBoolView(_BoolVarImpl):
         # __init__ from _IntVarImpl
         _IntVarImpl.__init__(self, 1-bv.ub, 1-bv.lb, name=str(self))
 
-    def value(self):
+    def value(self) -> Optional[bool]:
         """ the negation of the value obtained in the last solve call by the viewed variable
             (or 'None')
         """
@@ -443,15 +446,15 @@ class NegBoolView(_BoolVarImpl):
             return None
         return not v
 
-    def clear(self):
+    def clear(self) -> None:
         """ clear, for the viewed variable, the value obtained from the last solve call
         """
         self._bv.clear()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "~{}".format(self._bv.name)
 
-    def __invert__(self):
+    def __invert__(self) -> Expression:
         return self._bv
 
 
@@ -485,24 +488,24 @@ class NDVarArray(np.ndarray, Expression):
         if not hasattr(self, "_args"):
             self._args = self
 
-    def is_bool(self):
+    def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
         """
         return False
 
-    def value(self):
+    def value(self):  # TODO: can't type like other Expressions...? its an np.array, not just a value
         """ the values, for each of the stored variables, obtained in the last solve call
             (or 'None')
         """
         return np.reshape([x.value() for x in self], self.shape)
 
-    def clear(self):
+    def clear(self) -> None:
         """ clear, for each of the stored variables, the value obtained from the last solve call
         """
         for e in self.flat:
             e.clear()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
             some ways in which np creates this object does not call
             the constructor, so the Expression does not have 'args'
@@ -518,7 +521,7 @@ class NDVarArray(np.ndarray, Expression):
         # (np.ndarray sets __hash__ = None, which conflicts with Expression.__hash__)
         return hash(self.__repr__())
 
-    def __getitem__(self, index):
+    def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing
 
         # index is single expression: direct element
@@ -662,7 +665,7 @@ class NDVarArray(np.ndarray, Expression):
 
         return cpm_array(np.apply_along_axis(cp.all, axis=axis, arr=self))
 
-    def get_bounds(self):
+    def get_bounds(self):  # TODO: can't type like other Expressions...? its an np.array, not just a value
         lbs, ubs = zip(*[get_bounds(e) for e in self])
         return cpm_array(lbs), cpm_array(ubs)
 
@@ -779,7 +782,9 @@ class NDVarArray(np.ndarray, Expression):
     #object.__matmul__(self, other)
 
 
-def _gen_var_names(name, shape):
+def _gen_var_names(name: Optional[str|ListLike[str]],
+                   shape: int|np.integer|tuple[int|np.integer, ...]
+                  ) -> list[Optional[str]]:
     """
     Helper function to collect the name of all decision variables (in np.ndindex(shape) order)
 
@@ -803,7 +808,7 @@ def _gen_var_names(name, shape):
     else:
         raise TypeError(f"Unsupported type for name: {type(name)}")
 
-def _genname(basename, idxs):
+def _genname(basename: Optional[str], idxs: tuple[int|np.integer, ...]) -> Optional[str]:
     """
     Helper function to 'name' array variables
     - idxs: list of indices, one for every dimension of the array
@@ -820,6 +825,9 @@ def _genname(basename, idxs):
     stridxs = ",".join(map(str, idxs))
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
 
-def _is_invalid_name(name):
-    return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
+def _is_invalid_name(name: Any) -> bool:
+    if isinstance(name, str):
+        return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
+    # rest invalid indeed
+    return True
 
