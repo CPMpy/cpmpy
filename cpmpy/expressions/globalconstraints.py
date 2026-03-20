@@ -262,11 +262,11 @@ class AllDifferentExceptN(GlobalConstraint):
         n (int or list[int]): Value or list of values that are excluded from satisfying the alldifferent condition
     """
 
-    def __init__(self, arr: ListLike[ExprLike], n: int|list[int]):
+    def __init__(self, arr: ListLike[ExprLike], n: int|np.integer|list[int|np.integer]):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to a value in n
-            n (int | list[int]): Value or list of values that are excluded from the distinctness constraint
+            n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the distinctness constraint
         """
         flatarr = flatlist(arr)
         if not is_any_list(n):
@@ -362,11 +362,11 @@ class AllEqualExceptN(GlobalConstraint):
     Enforces that all arguments, except those equal to a value in n, have the same value.
     """
 
-    def __init__(self, arr: ListLike[ExprLike], n: int|list[int]):
+    def __init__(self, arr: ListLike[ExprLike], n: int|np.integer|list[int|np.integer]):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to have the same value, except those equal to a value in n
-            n (int | list[int]): Value or list of values that are excluded from the equality constraint
+            n (int | np.integer | list[int | np.integer]): Value or list of values that are excluded from the equality constraint
         """
         flatarr = flatlist(arr)
         if not is_any_list(n):
