@@ -461,7 +461,7 @@ class Circuit(GlobalConstraint):
             return [BoolVal(False)], []
         elif min(lbs) >= 0 and max(ubs) < n:
             # there always exists a valid ordering, since our bounds are tight
-            a = BoolVal(True)
+            a: Expression = BoolVal(True)
         else:
             # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
             a = boolvar()
