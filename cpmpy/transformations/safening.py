@@ -11,9 +11,12 @@ from ..expressions.utils import get_bounds, is_num, is_any_list
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.python_builtins import all as cpm_all
-from typing import Optional, Sequence, cast
+from typing import Optional, Sequence, cast, AbstractSet, Union
 
-def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=frozenset()):
+def no_partial_functions(lst_of_expr:list[ExprLike], 
+                         _toplevel: Optional[list[ExprLike]]=None, 
+                         _nbc: Optional[list[ExprLike]] = None, 
+                         safen_toplevel: Optional[AbstractSet[str]]=None) -> list[ExprLike]:
     """
         A partial function is a function whose output is not defined for all possible inputs.
 
@@ -88,10 +91,10 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
     return new_lst
     
 
-def _no_partial_functions(lst_of_expr: ListLike[ExprLike], 
-                          toplevel: Optional[ListLike[ExprLike]]=None, 
-                          nbc: Optional[ListLike[ExprLike]] = None, 
-                          safen_toplevel: frozenset[str] = frozenset()) -> tuple[ListLike[ExprLike], ListLike[ExprLike]]:
+def _no_partial_functions(lst_of_expr:ListLike[ExprLike], 
+                          toplevel: Optional[list[ExprLike]]=None, 
+                          nbc: Optional[list[ExprLike]] = None, 
+                          safen_toplevel: Optional[AbstractSet[str]] = None) -> tuple[bool,list[ExprLike], list[ExprLike]]:
     """
         Safen a list of expressions by replacing partial functions with total functions.
 
@@ -108,29 +111,30 @@ def _no_partial_functions(lst_of_expr: ListLike[ExprLike],
 
     if toplevel is None:
         is_toplevel = True
-        toplevel: list[ExprLike] = []
+        toplevel = []
+        assert nbc is None, "nbc must be None when is_toplevel is True"
+        nbc = toplevel # we start at toplevel, with the nearest Boolean context being toplevel
     else:
         is_toplevel = False
         
-    if is_toplevel:
-        assert nbc is None, "nbc must be None when is_toplevel is True"
-        nbc = toplevel # we start at toplevel, with the nearest Boolean context being toplevel
+    if safen_toplevel is None:
+        safen_toplevel = frozenset()
     
     changed = False
-    new_lst = []
+    new_lst: list[ExprLike | ListLike[ExprLike]] = []
     for cpm_expr in lst_of_expr:
 
         if is_any_list(cpm_expr):
             assert not is_toplevel, "Lists in lists is only allowed for arguments (e.g. of global constrainst)." \
                                     "Make sure to run func:`cpmpy.transformations.normalize.toplevel_list` first."
 
-            cpm_expr = cast(Sequence[Expression], cpm_expr)  # TODO: avoid is_any_list()
+            cpm_expr = cast(ListLike[Expression], cpm_expr)  # TODO: avoid is_any_list()
             if isinstance(cpm_expr, NDVarArray) and not cpm_expr.has_subexpr():
                 pass  # no subexpressions, nothing to do
             elif isinstance(cpm_expr, np.ndarray) and cpm_expr.dtype != object:
                 pass  # only constants, nothing to do
             else:
-                rec_changed, rec_expr, rec_toplevel = _no_partial_functions(cpm_expr, toplevel=toplevel, nbc=nbc, safen_toplevel=safen_toplevel)
+                rec_changed, rec_expr, rec_toplevel = _no_partial_functions(list(cpm_expr), toplevel=toplevel, nbc=nbc, safen_toplevel=safen_toplevel)
                 if rec_changed:
                     cpm_expr = rec_expr
                     toplevel.extend(rec_toplevel)
@@ -155,7 +159,7 @@ def _no_partial_functions(lst_of_expr: ListLike[ExprLike],
 
             assert isinstance(cpm_expr, Expression)
 
-            if cpm_expr.is_bool() and len(nbc) != 0:
+            if cpm_expr.is_bool() and nbc is not None and len(nbc) != 0: # not None check for mypy
                 # add guards to this Boolean expression
                 cpm_expr = cpm_all(nbc) & cpm_expr
             
