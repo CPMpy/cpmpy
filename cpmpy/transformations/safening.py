@@ -256,17 +256,22 @@ def _safen_range(partial_expr:Expression, safe_range:tuple[int,int], idx_to_safe
     return is_defined, total_expr, toplevel
 
 
-def _safen_hole(cpm_expr, exclude, idx_to_safen) -> tuple[_BoolVarImpl, _NumVarImpl, list[Expression]]:
+def _safen_hole(cpm_expr: Expression, exclude: int, idx_to_safen: int) -> tuple[_BoolVarImpl, _NumVarImpl, list[Expression]]:
     """
-        Safen expression where a single value of an argument can cause undefinedness.
-        Examples include `div` where 0 has to be removed from the denominator
+    Safen expression where a single value of an argument can cause undefinedness.
+    Examples include `div` where 0 has to be removed from the denominator
 
-        Constructs an expression for each interval of safe values, and
-        introduces a new `output_var` variable
+    Constructs an expression for each interval of safe values, and introduces a new `output_var` variable.
 
-        :param cpm_expr: The numerical expression to safen
-        :param exclude: The domain value to exclude
-        :param idx_to_safen: The index of unsafe argument in the expression
+    Arguments:
+        cpm_expr (Expression): The numerical expression to safen
+        exclude (int): The domain value to exclude
+        idx_to_safen (int): The index of unsafe argument in the expression
+
+    Returns:
+        is_defined (bool): The guard indicating whether the original argument's value is safe
+        output_var (Expression): The new total function expression
+        toplevel (list[Expression]): The list of auxiliary constraints to post at top level.
     """
     orig_arg = cpm_expr.args[idx_to_safen]
     orig_lb, orig_ub = get_bounds(orig_arg)
