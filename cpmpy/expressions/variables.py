@@ -65,7 +65,7 @@ from typing import Any, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
-from .core import Expression, ListLike, Operator
+from .core import Expression, ExprLike, ListLike, Operator
 from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
 
 _BV_PREFIX = "BV"
@@ -257,7 +257,7 @@ def cparray(arr):
     return cpm_array(arr)
 
 
-def cpm_array(arr):
+def cpm_array(arr: ListLike[ExprLike]) -> NDVarArray:
     """
     N-dimensional wrapper, to wrap standard numpy arrays or lists.
 
