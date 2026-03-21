@@ -20,6 +20,7 @@
         abs
 """
 import builtins  # to use the original Python-builtins
+import numpy as np
 
 from .utils import is_false_cst, is_true_cst, is_any_list
 from .variables import NDVarArray, cpm_array
@@ -118,10 +119,13 @@ def max(*iterable, **kwargs):
     """
     if len(iterable) == 1:
         iterable = tuple(iterable[0])
-    if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return builtins.max(iterable, **kwargs)
 
-    assert len(kwargs)==0, "max over decision variables does not support keyword arguments"
+    if isinstance(iterable, np.ndarray) and iterable.dtype != object:
+        return np.asarray(iterable).max(**kwargs)  # makes sure its a plain np.array
+    if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
+        return builtins.max(iterable, **kwargs)  # shortcut to Python max
+
+    assert len(kwargs)==0, "max over expressions does not support keyword arguments"
     return Maximum(iterable)
 
 
@@ -135,10 +139,13 @@ def min(*iterable, **kwargs):
     """
     if len(iterable) == 1:
         iterable = tuple(iterable[0])
-    if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return builtins.min(iterable, **kwargs)
 
-    assert len(kwargs)==0, "min over decision variables does not support keyword arguments"
+    if isinstance(iterable, np.ndarray) and iterable.dtype != object:
+        return np.asarray(iterable).min(**kwargs)  # makes sure its a plain np.array
+    if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
+        return builtins.min(iterable, **kwargs)  # shortcut to Python min
+
+    assert len(kwargs)==0, "min over expressions does not support keyword arguments"
     return Minimum(iterable)
 
 
@@ -149,11 +156,15 @@ def sum(iterable, **kwargs):
         if iterable does not contain CPMpy expressions, the built-in is called
         checks if all constants and uses built-in sum() in that case
     """
-    iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
-    if not builtins.any(isinstance(elem, Expression) for elem in iterable):
-        return builtins.sum(iterable, **kwargs)
+    if isinstance(iterable, np.ndarray):
+        if iterable.dtype != object:
+            return np.asarray(iterable).sum(**kwargs)  # makes sure its a plain np.array
+    else:
+        iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
+        if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
+            return builtins.sum(iterable, **kwargs)
 
-    assert len(kwargs)==0, "sum over decision variables does not support keyword arguments"
+    assert len(kwargs)==0, "sum over expressions does not support keyword arguments"
     return Operator("sum", iterable)
 
 
@@ -172,5 +183,3 @@ def abs(element):
         return Abs(element)
     
     return builtins.abs(element)
-
-    

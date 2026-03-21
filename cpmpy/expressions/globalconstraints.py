@@ -215,7 +215,7 @@ class AllDifferent(GlobalConstraint):
     Enforces that all arguments have a different (distinct) value
     """
 
-    def __init__(self, *args: Expression):
+    def __init__(self, *args: ExprLike|ListLike[ExprLike]):
         """
         Arguments:
             args (Sequence[Expression]): List of expressions to be different from each other

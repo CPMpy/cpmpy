@@ -65,8 +65,8 @@ from typing import Any, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
-from .core import Expression, ExprLike, ListLike, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
+from .core import BoolVal, Expression, ExprLike, ListLike
+from .utils import is_num, is_int, is_boolexpr, get_bounds
 
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
@@ -104,7 +104,8 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
 
             - If `name` is None, a name of the form ``BV<unique number>`` will be assigned to the variables.
             - If `name` is a string, it will be used as the suffix of the variable names.
-            - If `name` is a list/tuple/array of strings, they will be assigned to the variable names accordingly.
+            - If `name` is a list/tuple/array of strings, it must match the shape of the variables,
+                             and they will be assigned to the variable names accordingly.
 
     Notes:
 
@@ -119,7 +120,8 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
         
         .. code-block:: python
 
-            x = boolvar(name="x")
+            x = boolvar()              # auto name BV<n> (unique counter)
+            x = boolvar(name="x")      # user-chosen name
         
         Creating a vector of Boolean variables:
         
@@ -291,6 +293,8 @@ def cpm_array(arr: ListLike[ExprLike]) -> NDVarArray:
     elif not arr.flags['FORC']:   # Ensure the array is contiguous
         arr = np.ascontiguousarray(arr)
     
+    # XXX, should we check all elements of arr are ExprLike?
+    
     order = 'F' if arr.flags['F_CONTIGUOUS'] else 'C'
     return NDVarArray(shape=arr.shape, dtype=arr.dtype, buffer=arr, order=order)
 
@@ -459,13 +463,16 @@ class NegBoolView(_BoolVarImpl):
         return self._bv
 
 
-# subclass numericexpression for operators (first), ndarray for all the rest
-class NDVarArray(np.ndarray, Expression):
+class NDVarArray(np.ndarray):
     """
-    N-dimensional numpy array of variables.
+    N-dimensional numpy array of ExprLike's (the name of this class is historically misleading...).
 
     Do not create this object directly, use one of the functions in this module
+
+    ``_has_subexpr`` caches :meth:`has_subexpr` (``None`` = not computed yet; ``True`` / ``False`` = cached).
     """
+    _has_subexpr: Optional[bool] = None  # will be overwritten in instance, here for type hinting
+
     def __init__(self, shape, **kwargs):
         # bit ugly, but np.int and np.bool do not play well with > overloading
         if np.issubdtype(self.dtype, np.integer):
@@ -473,9 +480,7 @@ class NDVarArray(np.ndarray, Expression):
         elif np.issubdtype(self.dtype, np.bool_):
             self.astype(bool)
 
-        # TODO: global name?
-        # this is nice and sneaky, 'self' is the list_of_arguments!
-        Expression.__init__(self, "NDVarArray", self)
+        self._has_subexpr = None
         # no need to call ndarray __init__ method as specified in the np.ndarray documentation:
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
@@ -484,17 +489,22 @@ class NDVarArray(np.ndarray, Expression):
         # numpy view/slice creation hook: __init__ is not always called
         if obj is None:
             return
-        if not hasattr(self, "name"):
-            self.name = "NDVarArray"
-        if not hasattr(self, "_args"):
-            self._args = self
+        # Views must recompute has_subexpr (content may differ from parent cache)
+        self._has_subexpr = None
 
-    def is_bool(self) -> bool:
-        """ is it a Boolean (return type) Operator?
-        """
+    def has_subexpr(self) -> bool:
+        """True if :meth:`flat` has an :class:`Expression` that is not a variable (:class:`_NumVarImpl`) or :class:`~cpmpy.expressions.core.BoolVal`."""
+        if self._has_subexpr is not None:
+            return self._has_subexpr
+
+        for e in self.flat:
+            if isinstance(e, Expression) and not isinstance(e, (_NumVarImpl, BoolVal)):
+                self._has_subexpr = True
+                return True
+        self._has_subexpr = False
         return False
 
-    def value(self):  # TODO: can't type like other Expressions...? its an np.array, not just a value
+    def value(self) -> np.ndarray:
         """ the values, for each of the stored variables, obtained in the last solve call
             (or 'None')
         """
@@ -507,20 +517,7 @@ class NDVarArray(np.ndarray, Expression):
             e.clear()
 
     def __repr__(self) -> str:
-        """
-            some ways in which np creates this object does not call
-            the constructor, so the Expression does not have 'args'
-            set..
-        """
-        if not hasattr(self, "_args"):
-            self.name = "NDVarArray"
-            self.update_args(self)
-        return super().__repr__()
-    
-    def __hash__(self) -> int:  # type: ignore[override]
-        # Explicitly use Expression's hash implementation
-        # (np.ndarray sets __hash__ = None, which conflicts with Expression.__hash__)
-        return hash(self.__repr__())
+        return np.ndarray.__repr__(self)
 
     def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing
