@@ -141,9 +141,10 @@ def boolvar(shape: int|np.integer|tuple[int|np.integer, ...] = 1,
     if shape == 0 or shape is None:
         raise NullShapeError(shape)
     if shape == 1:
-        if name is not None and _is_invalid_name(name):
-            raise ValueError(_VAR_ERR)
-        assert isinstance(name, str), f"_BoolVarImpl: with shape=1, name should be a single string, got {name}"
+        if name is not None:
+            assert isinstance(name, str), f"name must be a string, got {name}"
+            if _is_invalid_name(name):
+                raise ValueError(_VAR_ERR)
         return _BoolVarImpl(name=name)
 
     # collect the `names` of each individual decision variable
