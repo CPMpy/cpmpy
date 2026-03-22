@@ -426,25 +426,25 @@ class BoolVal(Expression):
         Wrapper for python or numpy BoolVals
     """
 
-    def __init__(self, arg):
+    def __init__(self, arg: bool|np.bool_) -> None:
         assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
         super(BoolVal, self).__init__("boolval", [bool(arg)])
 
-    def value(self):
+    def value(self) -> bool:
         return self.args[0]
 
-    def __invert__(self):
+    def __invert__(self) -> Expression:
         return BoolVal(not self.args[0])
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Called to implement truth value testing and the built-in operation bool(), return stored value"""
         return self.args[0]
 
-    def __int__(self):
+    def __int__(self) -> int:
         """Called to implement conversion to numerical"""
         return int(self.args[0])
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         v = int(self.args[0])
         return (v,v)
 
@@ -520,7 +520,7 @@ class BoolVal(Expression):
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other):
+    def implies(self, other: Expression) -> Expression:
         if self.args[0]:
             return other
         else:
@@ -595,7 +595,7 @@ class Operator(Expression):
         """
         Arguments:
             name (str): Operator name (one of :attr:`Operator.allowed`)
-            arg_list (ListLike[ExprLike]): List of expressions or constants to count in
+            arg_list (Sequence[ExprLike | ListLike[ExprLike]]): List of expressions/constants or other lists of expressions/constants
         """
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
