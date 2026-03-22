@@ -87,7 +87,7 @@
 import copy
 import warnings
 from types import GeneratorType
-from typing import TypeAlias, TypeVar, Union
+from typing import Any, Optional, TypeAlias, TypeVar, Union
 import numpy as np
 import cpmpy as cp
 
@@ -532,25 +532,33 @@ class Comparison(Expression):
     """
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
-    def __init__(self, name, left, right):
+    def __init__(self, name: str, left: ExprLike, right: ExprLike) -> None:
+        """
+        Arguments:
+            name (str): Comparison operator (one of :attr:`Comparison.allowed`)
+            left (ExprLike): Left-hand side (expression or constant)
+            right (ExprLike): Right-hand side (expression or constant)
+        
+        We expect at least one of the two to be an Expression.
+        """
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if all(isinstance(x, Expression) for x in self.args):
             return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
         # if not: prettier printing without braces
         return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
     
-    def __bool__(self):
+    def __bool__(self) -> bool:
         # will be called when comparing elements in a container, but always with `==`
         if self.name == "==":
             return repr(self.args[0]) == repr(self.args[1])
-        super().__bool__() # default to exception
+        return super().__bool__() # default to exception
 
     # return the value of the expression
     # optional, default: None
-    def value(self):
+    def value(self) -> Optional[bool]:
         arg_vals = argvals(self.args)
 
         if any(a is None for a in arg_vals): return None
@@ -583,9 +591,15 @@ class Operator(Expression):
     }
     printmap = {'sum': '+', 'sub': '-'}
 
-    def __init__(self, name, arg_list):
+    def __init__(self, name: str, arg_list) -> None:
+        """
+        Arguments:
+            name (str): Operator name (one of :attr:`Operator.allowed`)
+            arg_list (ListLike[ExprLike]): List of expressions or constants to count in
+        """
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
+        assert is_any_list(arg_list), f"Operator: arg_list must be a list of expressions or constants, got {arg_list}"
         arity, is_bool_op = Operator.allowed[name]
         if is_bool_op:
             #only boolean arguments allowed
@@ -627,6 +641,7 @@ class Operator(Expression):
         # (this is actually against our design principle of creating
         #  expressions the way the user wrote them)
         if arity == 0:
+            arg_list = list(arg_list)  # make sure its a writable list
             i = 0 # length can change
             while i < len(arg_list):
                 if isinstance(arg_list[i], Operator) and arg_list[i].name == name:
@@ -639,12 +654,12 @@ class Operator(Expression):
 
         super().__init__(name, arg_list)
 
-    def is_bool(self):
+    def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
         """
         return Operator.allowed[self.name][1]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         printname = self.name
         if printname in Operator.printmap:
             printname = Operator.printmap[printname]
@@ -670,8 +685,10 @@ class Operator(Expression):
 
         return "{}({})".format(self.name, self.args)
 
-    def value(self):
-
+    def value(self) -> Optional[int]:
+        """
+        Returns the value of the expression (or None if not everything has a value).
+        """
         if self.name == "wsum":
             # wsum: arg0 is list of constants, no .value() use as is
             arg_vals = [self.args[0], argvals(self.args[1])]
@@ -698,7 +715,7 @@ class Operator(Expression):
 
         return None # default
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns an estimate of lower and upper bound of the expression.
         These bounds are safe: all possible values for the expression agree with the bounds.
@@ -711,7 +728,6 @@ class Operator(Expression):
             lowerbound, upperbound = sum(lbs), sum(ubs)
         elif self.name == 'wsum':
             weights, vars = self.args
-            bounds = []
             lowerbound, upperbound = 0,0
             #this may seem like too many lines, but avoiding np.sum avoids overflowing things at int32 bounds
             for w, (lb, ub) in zip(weights, [get_bounds(arg) for arg in vars]):
@@ -740,7 +756,7 @@ class Operator(Expression):
         return lowerbound, upperbound
 
 
-def _wsum_should(arg):
+def _wsum_should(arg) -> bool:
     """ Internal helper: should the arg be in a wsum instead of sum
 
     True if the arg is already a wsum,
@@ -751,7 +767,7 @@ def _wsum_should(arg):
     name = getattr(arg, 'name', None)
     return name == 'wsum' or (name == 'mul' and arg.is_lhs_num)
 
-def _wsum_make(arg):
+def _wsum_make(arg) -> tuple[list[int], list[ExprLike]]:
     """ Internal helper: prep the arg for wsum
 
     returns ([weights], [expressions]) where 'weights' are constants.
