@@ -412,7 +412,7 @@ class Multiplication(GlobalFunction):
             a, b = b, a
             lb_a, lb_b = lb_b, lb_a
             ub_a, ub_b = ub_b, ub_a
-        dom_a = list(range(lb_a, ub_a + 1))
+        dom_a = list[ExprLike](range(lb_a, ub_a + 1))
 
         # int*int linear decomposition:
         # a*b == sum_v(v * (a==v)) * b  with 'v' in dom(a)

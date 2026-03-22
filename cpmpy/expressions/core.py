@@ -87,7 +87,7 @@
 import copy
 import warnings
 from types import GeneratorType
-from typing import Any, Optional, TypeAlias, TypeVar, Union
+from typing import Any, Optional, TypeAlias, TypeVar, Union, Sequence
 import numpy as np
 import cpmpy as cp
 
@@ -591,7 +591,7 @@ class Operator(Expression):
     }
     printmap = {'sum': '+', 'sub': '-'}
 
-    def __init__(self, name: str, arg_list) -> None:
+    def __init__(self, name: str, arg_list: Sequence[ExprLike | ListLike[ExprLike]]) -> None:
         """
         Arguments:
             name (str): Operator name (one of :attr:`Operator.allowed`)
@@ -621,20 +621,21 @@ class Operator(Expression):
                 all(not is_num(a) for a in arg_list) and \
                 any(_wsum_should(a) for a in arg_list):
             we = [_wsum_make(a) for a in arg_list]
-            w = [wi for w, _ in we for wi in w]
-            e = [ei for _, e in we for ei in e]
+            w: ListLike[ExprLike] = [wi for w, _ in we for wi in w]
+            e: ListLike[ExprLike] = [ei for _, e in we for ei in e]
             name = 'wsum'
             arg_list = [w, e]
 
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
+            assert isinstance(arg_list[0], (list, tuple, np.ndarray)), "wsum: arg0 has to be a list-like"
             assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
-            weights = []
-            for w in arg_list[0]:
-                if is_int(w):
-                    weights.append(int(w)) # bool or int, simplifies things later on
+            weights: list[ExprLike] = []
+            for a in arg_list[0]:
+                if isinstance(a, (bool, int, np.integer, np.bool_, BoolVal)):
+                    weights.append(int(a)) # bool or int, simplifies things later on
                 else:
-                    weights.append(w) # can be float
+                    weights.append(a) # can be float
             arg_list = (weights, arg_list[1])
 
         # small cleanup: nested n-ary operators are merged into the toplevel
@@ -644,10 +645,11 @@ class Operator(Expression):
             arg_list = list(arg_list)  # make sure its a writable list
             i = 0 # length can change
             while i < len(arg_list):
-                if isinstance(arg_list[i], Operator) and arg_list[i].name == name:
+                a = arg_list[i]
+                if isinstance(a, Operator) and a.name == name:
                     # merge args in at this position
-                    l = len(arg_list[i].args)
-                    arg_list[i:i+1] = arg_list[i].args
+                    l = len(a.args)
+                    arg_list[i:i+1] = a.args
                     i += l
                 i += 1
 
