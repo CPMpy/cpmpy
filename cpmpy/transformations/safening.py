@@ -322,7 +322,10 @@ def safen_objective(expr: Expression) -> tuple[ExprLike, list[Expression]]:
     if is_any_list(expr):
         raise ValueError(f"Expected numerical expression as objective but got a list {expr}")
 
-    _, safe_expr, toplevel, nbc = _no_partial_functions((expr,), is_toplevel=False)
-    assert len(safe_expr) == 1
-    return safe_expr[0], toplevel + nbc
+    changed, safe_expr, toplevel, nbc = _no_partial_functions((expr,), is_toplevel=False, safen_toplevel=frozenset())
+    if changed:
+        assert len(safe_expr) == 1, f"Safening should not alter the number of expressions"
+        return safe_expr[0], toplevel + nbc
+    else:
+        return expr, []
 
