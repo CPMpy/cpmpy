@@ -966,7 +966,7 @@ class TestGlobal:
     def test_cumulative_subexpr(self):
         start = cp.intvar(0,10, shape=3)
         cons = cp.Cumulative(start+start, [1,2,3], None, [1,2,3], 3)
-        self.assertTrue(cp.Model(cons).solve())
+        assert cp.Model(cons).solve() is True
 
     def test_cumulative_decomposition_capacity(self):
         import numpy as np
