@@ -353,7 +353,6 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
     grb_model = s.grb_model
 
     # Force all hard constraints into the IIS (1 = force in, 0 = force out, -1 (default) = soft)
-    grb_model.update()
     for hard_constraint in grb_model.getConstrs():
         hard_constraint.IISConstrForce = 1
     for hard_constraint in grb_model.getGenConstrs():
