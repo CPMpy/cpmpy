@@ -13,7 +13,7 @@ from ..expressions.python_builtins import all as cpm_all
 from typing import Optional, cast, AbstractSet, Any, Sequence, Union
 
 
-def no_partial_functions(lst_of_expr:Sequence[Expression],
+def no_partial_functions(lst_of_expr: list[Expression],
                         _toplevel: Optional[Any]=None, 
                         _nbc: Optional[Any] = None, 
                         safen_toplevel: Optional[AbstractSet[str]]=None) -> list[Expression]:
@@ -76,7 +76,7 @@ def no_partial_functions(lst_of_expr:Sequence[Expression],
 
     changed, new_lst, todo_toplevel, nbc = _no_partial_functions(lst_of_expr, is_toplevel=True, safen_toplevel=safen_toplevel)
     if not changed:
-        return list(lst_of_expr) # return original list
+        return lst_of_expr # return original list
 
     todo_toplevel = todo_toplevel + nbc
     # new toplevel constraints may need to be safened too
