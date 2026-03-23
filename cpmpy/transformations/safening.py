@@ -127,7 +127,6 @@ def _no_partial_functions(lst_of_expr, is_toplevel, safen_toplevel) -> tuple[boo
             assert not is_toplevel, "Lists in lists is only allowed for arguments (e.g. of global constrainst)." \
                                     "Make sure to run func:`cpmpy.transformations.normalize.toplevel_list` first."
 
-            cpm_expr = cast(ListLike[Expression], cpm_expr)  # TODO: avoid is_any_list()
             if isinstance(cpm_expr, NDVarArray) and not cpm_expr.has_subexpr():
                 pass  # no subexpressions, nothing to do
             elif isinstance(cpm_expr, np.ndarray) and cpm_expr.dtype != object:
