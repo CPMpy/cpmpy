@@ -67,7 +67,8 @@ def no_partial_functions(lst_of_expr:Sequence[Expression],
         _toplevel (list[Expression]): DEPRECATED
         _nbc (list[Expression]): DEPRECATED
         safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
-                                    a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`).
+                                    a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`), 
+                                    or when the solver does not support the global function, and it needs to be decomposed.
     """
 
     assert _toplevel is None, "no_partial_functions:  argument '_toplevel' is deprecated, do not use/modify it"
