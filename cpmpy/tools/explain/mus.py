@@ -331,7 +331,7 @@ def optimal_mus_naive(soft, hard=[], weights=None, solver="ortools", hs_solver="
     return ocus_naive(soft, hard, weights, meta_constraint=True, solver=solver, hs_solver=hs_solver)
 
 
-def mus_iis(soft, hard=[], solver="gurobi", time_limit=None, mem_limit=None):
+def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
     """
         Compute a MUS using an IIS (Irreducible Inconsistent Subsystem) algorithm.
 
@@ -342,7 +342,6 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None, mem_limit=None):
         :param hard: hard constraints, optional, list of expressions
         :param solver: which ILP solver to use (only 'gurobi' supported)
         :param time_limit: maximum time in seconds for IIS computation (None = no limit)
-        :param mem_limit: maximum memory in GB for IIS computation (None = no limit)
     """
     assert solver == "gurobi", f"Only Gurobi supported as IIS solver, but was given {solver}"
 
@@ -369,8 +368,6 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None, mem_limit=None):
     import gurobipy
     if time_limit is not None:
         grb_model.Params.TimeLimit = time_limit
-    if mem_limit is not None:
-        grb_model.Params.MemLimit = mem_limit
     try:
         grb_model.computeIIS()
     except gurobipy.GurobiError as e:
