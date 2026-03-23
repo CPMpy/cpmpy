@@ -114,8 +114,7 @@ class TestEncodePseudoBooleanConstraint(unittest.TestCase):
         
         pb_clauses = solver._pysat_pseudoboolean(cons2, conditional=sel_var)
         
-        # this testcase depends on the PR to PBLIB: https://github.com/rjungbeck/pypblib/pull/6, otherwise will be [[3, -4], [1, -4], [2, -4], [-4]]
-        self.assertEqual(str(pb_clauses), "[[-4]]")
+        self.assertEqual(str(pb_clauses), "[[3, -4], [1, -4], [2, -4], [-4]]")
         
         # trivially sat constraint
         cons3 = sum(self.bv*[2,1,1]) >= 0
