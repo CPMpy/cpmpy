@@ -1073,7 +1073,10 @@ class Cumulative(GlobalConstraint):
         if how not in ["time", "task", "auto"]:
             raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
 
-        start, duration, end, demand, capacity = self.args
+        if self.end_is_none:
+            start, duration, demand, capacity = self.args
+        else:
+            start, duration, end, demand, capacity = self.args
 
         lbs, ubs = get_bounds(start)
         horizon = max(ubs) - min(lbs)
