@@ -105,9 +105,10 @@ def comp_constraints(solver):
                     continue
                 for x,y in [(numexpr,rhs), (rhs,numexpr)]:
                     # check if the constraint we are trying to construct is always UNSAT
-                    if any(eval_comparison(comp_name, xb,yb) for xb in get_bounds(x) for yb in get_bounds(y)):
+                    if any(eval_comparison(comp_name, xb,yb) for xb in get_bounds(x) for yb in get_bounds(y)) \
+                       and not isinstance(x, (int, BoolVal)):
                         yield Comparison(comp_name, x, y)
-                    else: # impossible comparison, skip
+                    else: # impossible or invalid comparison, skip
                         pass
 
 # Generate all possible boolean expressions
@@ -333,5 +334,5 @@ def test_reify_imply_constraints(solver, constraint):
         assert n_sols >= 1
     else:
         assert SolverLookup.get(solver, Model(constraint)).solve()
+        assert constraint.value()  # can trigger IncompleteFunctionError, should we catch it?
         assert argval(constraint)
-        assert constraint.value()
