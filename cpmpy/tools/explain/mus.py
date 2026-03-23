@@ -369,6 +369,8 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None, mem_limit=None):
     import gurobipy
     if time_limit is not None:
         grb_model.Params.TimeLimit = time_limit
+    if mem_limit is not None:
+        grb_model.Params.MemLimit = mem_limit
     try:
         grb_model.computeIIS()
     except gurobipy.GurobiError as e:
