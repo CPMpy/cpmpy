@@ -358,10 +358,12 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
     for hard_constraint in grb_model.getGenConstrs():
         hard_constraint.IISGenConstrForce = 1
 
-    # Add all assumptions (and thus each group) as soft constraints
-    for assumption in assumptions:
-        grb_assumption = s.solver_var(assumption)
-        grb_model.addConstr(grb_assumption >= 1, name=assumption.name)
+    # Add each assumption as a single soft constraint which enables its group
+    # We use Gurobi directly here (as opposed to e.g. `s+=a>=1`) in order to gain access to the returned Gurobi constraints
+    grb_assumptions = grb_model.addConstrs(s.solver_var(a) >= 1 for a in assumptions)
+
+    # Gurobi returns its own `tupledict`; we only need the constraints/values
+    grb_assumptions = grb_assumptions.values()
 
     # Safe to import gurobipy since instantiating the Gurobi solver succeeded
     import gurobipy
@@ -375,5 +377,5 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
         raise
 
     # Find which assumption is in the IIS/MUS
-    return [con for assumption, con in zip(assumptions, soft) if grb_model.getConstrByName(assumption.name).IISConstr]
+    return [soft for soft, grb_assumption in zip(soft, grb_assumptions) if grb_assumption.IISConstr]
 
