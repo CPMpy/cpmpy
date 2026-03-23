@@ -18,9 +18,13 @@ pip install cpmpy[gurobi, choco, exact] # installs 3 additional solving backends
 
 An overview of the available backends can be found [here](index.rst#supported-solvers).
 
-CPMpy requires python version  3.8 or higher.
+CPMpy requires python version  3.10 or higher.
 
 See [installation instructions](./installation_instructions.rst) for more details. 
+
+```{warning}
+CPMpy does not enforce hard version upper limits on its dependencies. For settings where robustness and reproducability are of great importance, have a look at the above detailed installation instructions.
+```
 
 ## Using the library
 
@@ -596,9 +600,9 @@ for solvername in cp.SolverLookup.solvernames() # all solvers (+subsolvers) inst
 ```
 
 ```{Note}
-For solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
+For solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. Most solvers can easily be installed through `pip install cpmpy[<solver_name>]`. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
 ```console
-    Exception: CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.
+    ModuleNotFoundError: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
 ```
 
 

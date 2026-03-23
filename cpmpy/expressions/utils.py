@@ -34,8 +34,8 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
+from typing import TypeGuard, Union
 from cpmpy.exceptions import IncompleteFunctionError
-
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
@@ -91,7 +91,7 @@ def is_pure_list(arg):
     return isinstance(arg, (list, tuple))
 
 
-def is_any_list(arg):
+def is_any_list(arg) -> TypeGuard[list | tuple | np.ndarray]:
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))

@@ -77,7 +77,7 @@ class CPM_z3(SolverInterface):
         Terminology note: a 'model' for z3 is a solution!
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mod"})
+    supported_global_constraints = frozenset({"alldifferent", "xor", "ite", "div", "mul", "mod"})
     supported_reified_global_constraints = supported_global_constraints
 
     @staticmethod
@@ -111,7 +111,7 @@ class CPM_z3(SolverInterface):
         - subsolver: None
         """
         if not self.supported():
-            raise ModuleNotFoundError("CPM_z3: Install the python package 'z3-solver' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_z3: Install the python package 'cpmpy[z3]' to use this solver interface.")
 
         import z3
 
@@ -498,6 +498,14 @@ class CPM_z3(SolverInterface):
                 # minimic modulo with integer division (round towards o)
                 x,y = self._z3_expr(cpm_con.args)
                 return z3.If(z3.And(x >= 0), x % y, -(-x % y))
+            
+            elif cpm_con.name == "mul":
+                x, y = self._z3_expr(cpm_con.args)
+                if isinstance(x, z3.BoolRef):
+                    x = z3.If(x, 1, 0)
+                if isinstance(y, z3.BoolRef):
+                    y = z3.If(y, 1, 0)
+                return x * y
 
             elif cpm_con.name == "div":
                 # z3 rounds towards negative infinity, need this hack when result is negative

@@ -1,4 +1,3 @@
-import unittest
 import pytest
 import tempfile
 import os
@@ -10,22 +9,20 @@ from cpmpy.expressions.utils import flatlist
 from cpmpy.expressions.variables import NullShapeError, _IntVarImpl, _BoolVarImpl, NegBoolView, NDVarArray
 
 
-class TestModel(unittest.TestCase):
+class TestModel:
     
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.tempdir = tempfile.mkdtemp()
         print(self.tempdir)
-        return super().setUp()
     
-    def tearDown(self) -> None:
+    def teardown_method(self) -> None:
         os.rmdir(self.tempdir)
-        return super().tearDown()
 
     def test_ndarray(self):
         iv = cp.intvar(1,9, shape=3)
         m = cp.Model( iv > 3 )
         m += (iv[0] == 5)
-        self.assertTrue(m.solve())
+        assert m.solve()
 
     def test_empty(self):
         m = cp.Model()
@@ -41,7 +38,7 @@ class TestModel(unittest.TestCase):
 
         with pytest.warns(UserWarning):
             loaded = cp.Model.from_file(fname)
-            self.assertTrue(loaded.solve())
+            assert loaded.solve()
         os.remove(fname)
 
     def test_io_counters(self):
@@ -54,13 +51,13 @@ class TestModel(unittest.TestCase):
         m += (iv[0] == 5)
         m.to_file(fname)
 
-        self.assertEqual(_BoolVarImpl.counter, 1)
-        self.assertEqual(_IntVarImpl.counter, 3)
+        assert _BoolVarImpl.counter == 1
+        assert _IntVarImpl.counter == 3
         _BoolVarImpl.counter = 0  # don't try this at home
         _IntVarImpl.counter = 0  # don't try this at home
         loaded = cp.Model.from_file(fname)
-        self.assertEqual(_BoolVarImpl.counter, 1)
-        self.assertEqual(_IntVarImpl.counter, 3)
+        assert _BoolVarImpl.counter == 1
+        assert _IntVarImpl.counter == 3
         os.remove(fname)
 
     def test_copy(self):
@@ -75,15 +72,15 @@ class TestModel(unittest.TestCase):
         print(memodict)
         m_dcopy.solve()
 
-        self.assertTrue(cons1.value())
-        self.assertTrue(cons2.value())
+        assert cons1.value()
+        assert cons2.value()
 
         m.solve()
 
         m2 = m.copy()
 
-        self.assertTrue(m2.constraints[0].value())
-        self.assertTrue(m2.constraints[1].value())
+        assert m2.constraints[0].value()
+        assert m2.constraints[1].value()
 
 
     def test_deepcopy(self):
@@ -99,20 +96,20 @@ class TestModel(unittest.TestCase):
         m_dcopy = copy.deepcopy(m, memodict)
         m_dcopy.solve()
 
-        self.assertIsNone(cons1.value())
-        self.assertIsNone(cons2.value())
-        self.assertIsNone(cons3.value())
+        assert cons1.value() is None
+        assert cons2.value() is None
+        assert cons3.value() is None
 
         m.solve()
 
         m2 = copy.deepcopy(m)
 
         for cons in flatlist(m2.constraints):
-            self.assertTrue(cons.value())
+            assert cons.value()
 
 
     def test_unknown_solver(self):
 
         model = cp.Model(cp.any(cp.boolvar(shape=3)))
 
-        self.assertRaises(ValueError, lambda : model.solve(solver="notasolver"))
+        pytest.raises(ValueError, lambda : model.solve(solver="notasolver"))

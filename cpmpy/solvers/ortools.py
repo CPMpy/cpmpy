@@ -82,7 +82,7 @@ class CPM_ortools(SolverInterface):
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
                                               "inverse", "no_overlap", "regular",
-                                              "min", "max", "abs", "div", "mod", "pow", "element"})
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -123,7 +123,7 @@ class CPM_ortools(SolverInterface):
             subsolver: None, not used
         """
         if not self.supported():
-            raise ModuleNotFoundError("CPM_ortools: Install the python package 'ortools' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_ortools: Install the python package 'cpmpy[ortools]' to use this solver interface.")
 
         from ortools.sat.python import cp_model as ort
 

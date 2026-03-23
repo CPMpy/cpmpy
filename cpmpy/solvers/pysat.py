@@ -58,14 +58,13 @@ import warnings
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView
+from ..expressions.variables import _NumVarImpl, _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
-from ..transformations.linearize import only_positive_coefficients
+from ..transformations.linearize import only_positive_coefficients, decompose_linear
 from ..expressions.utils import flatlist
-from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
-from ..transformations.linearize import linearize_constraint
+from ..transformations.linearize import linearize_constraint, linearize_reified_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
 from ..transformations.safening import no_partial_functions
@@ -364,16 +363,19 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-        cpm_cons = decompose_in_tree(cpm_cons,
-                                     supported=self.supported_global_constraints | {"alldifferent"}, # alldiff has a specialized MIP decomp in linearize
-                                     supported_reified=self.supported_reified_global_constraints,
-                                     csemap=self._csemap)
+        cpm_cons = decompose_linear(
+            cpm_cons,
+            supported=self.supported_global_constraints,
+            supported_reified=self.supported_reified_global_constraints,
+            csemap=self._csemap
+        )
         cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "->", "and", "or"}), csemap=self._csemap)  # the core of the MIP-linearization
-        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding)
+        cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
@@ -481,7 +483,7 @@ class CPM_pysat(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars:List[_BoolVarImpl], vals:List[bool]):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):  # has to match parent types
         """
         PySAT supports warmstarting the solver with a feasible solution
 
@@ -489,7 +491,7 @@ class CPM_pysat(SolverInterface):
 
         Note: our PySAT interface currently does not support solution hinting for integer variables
 
-        :param cpm_vars: list of CPMpy variables
+        :param cpm_vars: list of Boolean variables
         :param vals: list of (corresponding) values for the variables
         """
 

@@ -68,7 +68,8 @@ from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
-from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount
+from ..expressions.globalfunctions import Multiplication
 from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
@@ -99,7 +100,7 @@ class CPM_minizinc(SolverInterface):
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
                                               "precedence", "no_overlap",
-                                              "min", "max", "abs", "div", "mod", "pow", "element", "count", "nvalue", "among"})
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
 
     required_version = (2, 8, 2)
@@ -261,7 +262,7 @@ class CPM_minizinc(SolverInterface):
                           has to be one of solvernames()
         """
         if not self.installed():
-            raise ModuleNotFoundError("CPM_minizinc: Install the python package 'minizinc' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_minizinc: Install the python package 'cpmpy[minizinc]' to use this solver interface.")
         elif not self.executable_installed():
             raise ModuleNotFoundError("CPM_minizinc: Install the MiniZinc executable and make it available in path.")
         elif self.outdated():
@@ -753,7 +754,7 @@ class CPM_minizinc(SolverInterface):
             # some names differently (the infix names!)
             printmap = {'and': '/\\', 'or': '\\/',
                         'sum': '+', 'sub': '-',
-                        'mul': '*'}
+                        }
             op_str = expr.name
             expr_bounds = expr.get_bounds()
             if expr_bounds[0] < -2147483646 or expr_bounds[1] > 2147483646:
@@ -822,6 +823,7 @@ class CPM_minizinc(SolverInterface):
                                                         self._convert_expression(fal))
 
         elif expr.name == "gcc":
+            assert isinstance(expr, GlobalCardinalityCount)  # typecheck that it has a .closed()
             vars, vals, occ = expr.args
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals)
@@ -844,6 +846,13 @@ class CPM_minizinc(SolverInterface):
         elif expr.name == "abs":
             return "abs({})".format(args_str[0])
 
+        elif expr.name == "mul":
+            assert isinstance(expr, Multiplication)
+            if expr.is_lhs_num:
+                return "{}*({})".format(args_str[1], args_str[0])
+            else:
+                return "({}) * ({})".format(args_str[1], args_str[0])
+
         elif expr.name == "count":
             vars, val = expr.args
             vars = self._convert_expression(vars)
@@ -858,14 +867,14 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "InDomain":
             # InDomain(expr, domain_list) - convert domain_list to a set
-            expr_str = self._convert_expression(expr.args[0])
+            arg0_str = self._convert_expression(expr.args[0])
             domain = expr.args[1]
             # Convert domain list to set format
             if is_any_list(domain):
                 domain_str = "{" + ",".join(self._convert_expression(d) for d in domain) + "}"
             else:
                 domain_str = self._convert_expression(domain)
-            return "({} in {})".format(expr_str, domain_str)
+            return "({} in {})".format(arg0_str, domain_str)
 
         elif expr.name == "regular":
             # regular(array, transitions, start, accepting)
