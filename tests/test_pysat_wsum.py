@@ -104,14 +104,14 @@ class TestEncodePseudoBooleanConstraint:
         pb_clauses = solver._pysat_pseudoboolean(cons1, conditional=sel_var)
         
         # Check the result
-        self.assertEqual(str(pb_clauses), "[[5], [-5, 6], [3, 6], [-5, 3, 7], [2, 6], [-5, 2, 7], [3, 2, 7], [-5, 3, 2, 8], [1, 9], [-7, 9], [1, -7, 10], [-10, -4]]")
+        assert pb_clauses == [[5], [-5, 6], [3, 6], [-5, 3, 7], [2, 6], [-5, 2, 7], [3, 2, 7], [-5, 3, 2, 8], [1, 9], [-7, 9], [1, -7, 10], [-10, -4]]
         
         # trivially unsat constraint
         cons2 = sum(self.bv*[2,1,1]) >= 10
         
         pb_clauses = solver._pysat_pseudoboolean(cons2, conditional=sel_var)
         
-        self.assertEqual(str(pb_clauses), "[[3, -4], [1, -4], [2, -4], [-4]]")
+        assert pb_clauses == [[3, -4], [1, -4], [2, -4], [-4]]
         
         # trivially sat constraint
         cons3 = sum(self.bv*[2,1,1]) >= 0
@@ -119,7 +119,7 @@ class TestEncodePseudoBooleanConstraint:
         pb_clauses = solver._pysat_pseudoboolean(cons3, conditional=sel_var)
         
         # no clauses expected
-        self.assertEqual(str(pb_clauses), "[]")
+        assert pb_clauses == []
         
         
         
