@@ -42,21 +42,19 @@
         CPM_cpo
 """
 
-import time
 from typing import Optional
 import warnings
-import pkg_resources
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds
+from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.safening import no_partial_functions
 
 
@@ -73,6 +71,11 @@ class CPM_cpo(SolverInterface):
     https://ibmdecisionoptimization.github.io/docplex-doc/cp/docplex.cp.modeler.py.html#module-docplex.cp.modeler
 
     """
+
+    supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",
+                                              'cumulative', 'no_overlap',
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "nvalue"})
+    supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
 
     _docp = None  # Static attribute to hold the docplex.cp module
 
@@ -117,11 +120,13 @@ class CPM_cpo(SolverInterface):
 
         For CPO, two version numbers get returned: ``<docplex version>/<solver version>``
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
             import docplex.cp as docp
-            s = docp.solver.solver.CpoSolver(docp.model.CpoModel())
-            return f"{pkg_resources.get_distribution('docplex').version}/{s.get_solver_version()}"
-        except (pkg_resources.DistributionNotFound, ModuleNotFoundError):
+            cpo_version = docp.solver.solver.CpoSolver(docp.model.CpoModel()).get_solver_version()
+            docplex_version = version("docplex")
+            return f"{docplex_version}/{cpo_version}"
+        except (PackageNotFoundError, ModuleNotFoundError):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -133,11 +138,11 @@ class CPM_cpo(SolverInterface):
             subsolver: str, name of a subsolver (optional)
         """
         if not self.installed():
-            raise Exception("CPM_cpo: Install the python package 'docplex'")
+            raise ModuleNotFoundError("CPM_cpo: Install the python package 'cpmpy[cpo]' to use this solver interface.")
 
         if not self.license_ok():
-            raise Exception("You need to install the CPLEX Optimization Studio to use this solver. "
-                            "Also make sure that the binary is in your path")
+            raise ModuleNotFoundError("CPM_cpo: You also need to install the CPLEX Optimization Studio to use this solver. "
+                                      "Also make sure that the binary is in your path")
 
         docp = self.get_docp()
         assert subsolver is None
@@ -151,7 +156,7 @@ class CPM_cpo(SolverInterface):
         """
         return self.cpo_model
     
-    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
             Call the CP Optimizer solver
 
@@ -253,7 +258,7 @@ class CPM_cpo(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             A shorthand to (efficiently) compute all (optimal) solutions, map them to CPMpy and optionally display the solutions.
 
@@ -379,14 +384,25 @@ class CPM_cpo(SolverInterface):
             
                 technical side note: any constraints created during conversion of the objective are permanently posted to the solver
         """
+
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        self.add(decomp_cons)
+
         dom = self.get_docp().modeler
         if self.has_objective():
             self.cpo_model.remove(self.cpo_model.get_objective_expression())
-        expr = self._cpo_expr(expr)
+
+        cpo_obj = self._cpo_expr(obj)
         if minimize:
-            self.cpo_model.add(dom.minimize(expr))
+            self.cpo_model.add(dom.minimize(cpo_obj))
         else:
-            self.cpo_model.add(dom.maximize(expr))
+            self.cpo_model.add(dom.maximize(cpo_obj))
 
     def has_objective(self):
         return self.cpo_model.get_objective() is not None
@@ -409,11 +425,10 @@ class CPM_cpo(SolverInterface):
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
-        # count is only supported with a constant to be counted, so we decompose
-        supported = {"alldifferent", 'inverse', 'nvalue', 'element', 'table', 'indomain',
-                     "negative_table", "gcc", 'max', 'min', 'abs', 'cumulative', 'no_overlap'}
-        supported_reified = {"alldifferent", 'table', 'indomain', "negative_table"} # global functions by default here
-        cpm_cons = decompose_in_tree(cpm_cons, supported=supported, supported_reified=supported_reified, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         # no flattening required
         return cpm_cons
 
@@ -490,20 +505,10 @@ class CPM_cpo(SolverInterface):
                 x = self._cpo_expr(cpm_con.args[1])
                 return dom.scal_prod(w,x)
 
-            # 'sub'/2, 'mul'/2, 'div'/2, 'pow'/2, 'm2od'/2
-            elif arity == 2 or cpm_con.name == "mul":
-                assert len(cpm_con.args) == 2, "Currently only support multiplication with 2 vars"
+            # 'sub'/2
+            elif cpm_con.name == 'sub':
                 x, y = self._cpo_expr(cpm_con.args)
-                if cpm_con.name == 'sub':
-                    return x - y
-                elif cpm_con.name == "mul":
-                    return x * y
-                elif cpm_con.name == "div":
-                    return x // y
-                elif cpm_con.name == "pow":
-                    return x ** y
-                elif cpm_con.name == "mod":
-                    return x % y
+                return x - y
             # '-'/1
             elif cpm_con.name == "-":
                 return -self._cpo_expr(cpm_con.args[0])
@@ -542,37 +547,36 @@ class CPM_cpo(SolverInterface):
                 return dom.forbidden_assignments(arr, table)
             elif cpm_con.name == "cumulative":
                 start, dur, end, height, capacity = cpm_con.args
+                if end is None:
+                    end = [None for _ in range(len(start))] # easier to handle the task-making below
+                height, height_cons = get_nonneg_args(height)
+                cons = self._cpo_expr(height_cons)
                 docp = self.get_docp()
                 total_usage = []
-                cons = []
                 for s, d, e, h in zip(start, dur, end, height):
-                    bounds_d = get_bounds(d)
-                    # Special case for tasks with duration 0
-                    # -> cpo immediately returns UNSAT if done through tasks
-                    if bounds_d[1] == bounds_d[0] == 0:
-                        cpo_s, cpo_e = self.solver_vars([s, e])
-                        cons += [cpo_s == cpo_e] # enforce 0 duration
-                        # no restrictions on height due to zero duration and thus no contribution to capacity
+                    task, task_cons = self._make_task(s, d, e)
+                    cons += task_cons
+                    if task is None: # can happen with 0 duration tasks
                         continue
-                    # Normal setting
-                    cpo_s, cpo_d, cpo_e, cpo_h = self.solver_vars([s, d, e, h])                   
-                    task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
-                    task_height = dom.pulse(task, get_bounds(h))
-                    cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
-                    cons += [cpo_h == dom.height_at_start(task, task_height)]
-                    total_usage.append(task_height)
-                cons += [dom.sum(total_usage) <= self.solver_var(capacity)]
+                    else:
+                        task_height = dom.pulse(task, get_bounds(h))
+                        cons += [self._cpo_expr(h) == dom.height_at_start(task, task_height)]
+                        total_usage.append(task_height)
+                cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
             elif cpm_con.name == "no_overlap":
                 start, dur, end  = cpm_con.args
-                docp = self.get_docp()
+                if end is None:
+                    end = [None for _ in range(len(start))] # easier to handle the task-making below
                 cons = []
                 tasks = []
                 for s, d, e in zip(start, dur, end):
-                    cpo_s, cpo_d, cpo_e = self.solver_vars([s, d, e])
-                    task = docp.expression.interval_var(start=get_bounds(s), size=get_bounds(d), end=get_bounds(e))
-                    tasks.append(task)
-                    cons += [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
+                    task, task_cons = self._make_task(s, d, e)
+                    cons += task_cons
+                    if task is None: # can happen with 0 duration tasks
+                        continue
+                    else:
+                        tasks.append(task)
                 return cons + [dom.no_overlap(tasks)]
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
@@ -596,8 +600,53 @@ class CPM_cpo(SolverInterface):
                 return dom.abs(self._cpo_expr(cpm_con.args)[0])
             elif cpm_con.name == "nvalue":
                 return dom.count_different(self._cpo_expr(cpm_con.args))
+            elif cpm_con.name == "mul":
+                x, y = self._cpo_expr(cpm_con.args)
+                return x * y
+            elif cpm_con.name == "div":
+                x,y = self._cpo_expr(cpm_con.args)
+                return x // y
+            elif cpm_con.name == "mod":
+                x,y = self._cpo_expr(cpm_con.args)
+                return x % y
+            elif cpm_con.name == "pow":
+                x,y = self._cpo_expr(cpm_con.args)
+                return x ** y
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
+
+    def _make_task(self, start, dur, end):
+        """
+            Helper function to create task objects and additional constraints enforcing task-relation
+        """
+        dom = self.get_docp().modeler
+        docp = self.get_docp()
+
+        lb, ub = get_bounds(dur)
+        extra_cons = []
+        if lb < 0 and ub < 0: # duration is always negative
+            return None, [False]
+        else:
+            new_dur = intvar(0, ub)
+            extra_cons += [self.solver_var(new_dur) == self._cpo_expr(dur)]
+            dur = new_dur
+            lb = 0 # update lb for next check below
+
+        if lb == 0 == ub:
+            if end is None: # nothing to enforce
+                return None, []
+            cpo_s, cpo_e = self._cpo_expr([start, end])
+            return None, extra_cons + [cpo_s == cpo_e] # no task, just enforce 0 duration
+
+        # Normal setting
+        if end is None: # no end provided by user
+            cpo_s, cpo_d = self._cpo_expr([start, dur])
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur))
+            return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
+        else:
+            cpo_s, cpo_d, cpo_e = self._cpo_expr([start, dur, end])
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end))
+            return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
 
 
 # solvers are optional, so this file should be interpretable

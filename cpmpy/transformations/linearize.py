@@ -49,28 +49,28 @@ General comparisons or expressions
 
 """
 import copy
+import warnings
+from typing import Set, AbstractSet, Sequence, Optional
+
 import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
-from cpmpy.transformations.reification import only_implies
-
-
-from .decompose_global import decompose_in_tree
-
 from .flatten_model import flatten_constraint, get_or_make_var
+from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
-from .. import Abs
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_bool, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_int
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, NegativeTable
+from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
+from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from .int2bool import _encode_int_var
 
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl, intvar
 
-def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, csemap=None):
+
+def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=False, csemap=None):
     """
     Transforms all constraints to a linear form.
     This function assumes all constraints are in 'flat normal form' with only boolean variables on the lhs of an implication.
@@ -128,14 +128,40 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                             continue
                         elif is_false_cst(lin):
                             indicator_constraints=[] # do not add any constraints
-                            newlist+=linearize_constraint([~cond], supported=supported, csemap=csemap) # post linear version of unary constraint
+                            newlist += linearize_constraint([~cond], supported=supported, csemap=csemap, reified=reified) # post linear version of unary constraint
                             break # do not need to add other
-                        else:
+                        elif "->" in supported and not reified:
                             indicator_constraints.append(cond.implies(lin)) # Add indicator constraint
+                        else: # need to linearize the implication constraint itself
+                            # either -> is not supported, or we are in a reified context (nested -> constraints are not linear)
+                            assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
+                            if lin.args[0].name not in {"sum", "wsum"}:
+                                assert lin.args[0].name in supported, f"Unexpected rhs of implication: {lin}, it is not supported ({supported})"
+                                indicator_constraints.append(cond.implies(lin))
+                                continue
+
+                            # need to write as big-M
+                            assert lin.args[0].name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as rhs of implication constraint, but got {lin}"
+                            assert is_num(lin.args[1])
+                            lb, ub = get_bounds(lin.args[0])
+                            if lin.name == "<=":
+                                M = lin.args[1] - ub # subtracting M from lhs will always satisfy the implied constraint
+                                lin.args[0] += M * ~cond
+                                indicator_constraints.append(lin)
+                            elif lin.name == ">=":
+                                M = lin.args[1] - lb # adding M to lhs will always satisfy the implied constraint
+                                lin.args[0] += M * ~cond
+                                indicator_constraints.append(lin)
+                            elif lin.name == "==":
+                                indicator_constraints += linearize_constraint([cond.implies(lin.args[0] <= lin.args[1]),
+                                                                               cond.implies(lin.args[0] >= lin.args[1])],
+                                                                              supported=supported, reified=reified, csemap=csemap)
+                            else:
+                                raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
                     newlist+=indicator_constraints
 
                     # ensure no new solutions are created
-                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr))
+                    new_vars = set(get_variables(lin_sub)) - set(get_variables(sub_expr)) - {cond, ~cond}
                     newlist += linearize_constraint([(~cond).implies(nv == nv.lb) for nv in new_vars], supported=supported, reified=reified, csemap=csemap)
 
             else: # supported operator
@@ -157,140 +183,13 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
 
             # linearize unsupported operators
             elif isinstance(lhs, Operator) and lhs.name not in supported:
-
-                if lhs.name == "mul" and is_num(lhs.args[0]):
-                    lhs = Operator("wsum",[[lhs.args[0]], [lhs.args[1]]])
-                    cpm_expr = eval_comparison(cpm_expr.name, lhs, rhs)
-
-                elif lhs.name == "pow" and "pow" not in supported:
-                    if "mul" not in supported:
-                        raise NotImplementedError("Cannot linearize power without multiplication")
-                    if not is_int(lhs.args[1]) or lhs.args[1] < 0:
-                        raise NotImplementedError("Cannot linearize power with non-integer or negative exponent")
-                    # only `POW(b,n) == IV` supported, with n being a non-negative integer, post as b*b*...*b (n times) == IV
-                    x, n = lhs.args
-                    new_lhs = 1
-                    for exp in range(n):
-                        new_lhs, new_cons = get_or_make_var(x * new_lhs, csemap=csemap)
-                        newlist.extend(new_cons)
-                    cpm_expr = eval_comparison(cpm_expr.name, new_lhs, rhs)
-
-
-                elif lhs.name == "mod" and "mod" not in supported:
-                    if "mul" not in supported and not is_num(lhs.args[1]):
-                        raise NotImplementedError("Cannot linearize modulo without multiplication")
-
-
-                    if cpm_expr.name != "==":
-                        new_rhs, newcons = get_or_make_var(lhs, csemap=csemap)
-                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
-                        newlist += linearize_constraint(newcons, supported=supported, reified=reified, csemap=csemap)
-                        continue
-                    else:
-                        # mod != remainder after division because defined on integer div (rounding towards 0)
-                        #   e.g., 7 % -5 = 2 and -7 % 5 = -2
-                        # implement x % y == z as k * y + z == x with |z| < |y| and sign(x) = sign(z)
-                        # https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
-                        x, y = lhs.args
-                        lby, uby = get_bounds(y)
-                        if lby <= 0 <= uby:
-                            raise ValueError("Attempting linearization of unsafe modulo, safen expression first (cpmpy/transformations/safen.py)")
-
-                        # k * y + z == x
-                        k = intvar(*get_bounds((x - rhs) // y))
-                        mult_res, side_cons = get_or_make_var(k * y, csemap=csemap)
-                        cpm_expr = (mult_res + rhs) == x
-                        # |z| < |y|
-                        abs_of_z, new_cons = get_or_make_var(abs(rhs), csemap=csemap)
-                        side_cons += new_cons
-                        # TODO: do the following in constructor of abs instead?
-                        # we know y is strictly positive or negative due to safening.
-                        if lby >= 0:
-                            side_cons.append(abs_of_z < y)
-                        if uby <= 0:
-                            side_cons.append(abs_of_z < -y)
-                        # sign(x) = sign(z)
-                        lbx, ubx = get_bounds(x)
-                        if lbx >= 0:
-                            side_cons.append(rhs >= 0)
-                        elif ubx <= 0:
-                            side_cons.append(rhs <= 0)
-                        else: # x can be pos or neg
-                            x_is_pos = cp.boolvar()
-                            x_is_neg = ~x_is_pos
-                            side_cons += [
-                                x_is_pos.implies(x >= 0), x_is_neg.implies(x < 0),
-                                x_is_pos.implies(rhs >= 0), x_is_neg.implies(rhs <= 0)
-                            ]
-
-                        side_cons = toplevel_list(side_cons) # get rid of bools that may result from the above
-                        newlist += linearize_constraint(side_cons, supported, reified=reified, csemap=csemap)
-
-                elif lhs.name == 'div' and 'div' not in supported:
-                    if "mul" not in supported:
-                        raise NotImplementedError("Cannot linearize division without multiplication")
-
-                    if cpm_expr.name != "==":
-                        new_rhs, newcons = get_or_make_var(lhs, csemap=csemap)
-                        newlist.append(eval_comparison(cpm_expr.name, new_rhs, rhs))
-                        newlist += linearize_constraint(newcons, supported=supported, reified=reified, csemap=csemap)
-                        continue
-
-                    else:
-                        # integer division, rounding towards zero
-                        # x / y = z implemented as x = y * z + r with r the remainder and |r| < |y|
-                        #      r can be positive or negative, so also ensure that |y| * |z| <= |x|
-                        a, b = lhs.args
-                        lb, ub = get_bounds(b)
-                        if lb <= 0 <= ub:
-                            raise ValueError("Attempting linearization of unsafe division, safen expression first (cpmpy/transformations/safen.py)")
-
-                        r = intvar(*get_bounds(a % b)) # r is the remainder, reuse our bound calculations
-                        mult_res, side_cons = get_or_make_var(b * rhs, csemap=csemap)
-                        cpm_expr = eval_comparison(cpm_expr.name, a, mult_res + r)
-
-                        # need absolute values of variables later
-                        abs_of_a, side_cons_a = get_or_make_var(abs(a), csemap=csemap)
-                        abs_of_b, side_cons_b = get_or_make_var(abs(b), csemap=csemap)
-                        abs_of_rhs, side_cons_rhs = get_or_make_var(abs(rhs), csemap=csemap)
-                        abs_of_r, side_cons_r = get_or_make_var(abs(r), csemap=csemap)
-                        side_cons += side_cons_a + side_cons_b + side_cons_rhs + side_cons_r
-                        # |r| < |b|
-                        side_cons.append(abs_of_r < abs_of_b)
-
-                        # ensure we round towards zero
-                        mul_abs, extra_cons = get_or_make_var(abs_of_b * abs_of_rhs, csemap=csemap)
-                        side_cons += extra_cons + [mul_abs <= abs_of_a]
-                        newlist += linearize_constraint(side_cons, supported=supported, reified=reified, csemap=csemap)
-
-                else:
-                    raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
-                                                            f" be any of {supported | {'sub'} } but is {lhs}. "
-                                                            f"Please report on github")
-
-            elif isinstance(lhs, GlobalFunction) and lhs.name == "abs" and "abs" not in supported:
-                if cpm_expr.name != "==": # TODO: remove this restriction, requires comparison flipping
-                    newvar, newcons = get_or_make_var(lhs, csemap=csemap)
-                    newlist += linearize_constraint(newcons, supported=supported, reified=reified, csemap=csemap)
-                    cpm_expr = eval_comparison(cpm_expr.name, newvar, rhs)
-                else:
-                    x = lhs.args[0]
-                    lb, ub = get_bounds(x)
-                    if lb >= 0:  # always positive
-                        newlist.append(x == rhs)
-                    elif ub <= 0:  # always negative
-                        newlist.append(x + rhs == 0)
-                    else:
-                        lhs_is_pos = cp.boolvar()
-                        newcons = [lhs_is_pos.implies(x >= 0), (~lhs_is_pos).implies(x <= -1),
-                                   lhs_is_pos.implies(x == rhs), (~lhs_is_pos).implies(x + rhs == 0)]
-                        newlist += linearize_constraint(newcons, supported=supported, reified=reified, csemap=csemap)
-                    continue # all should be linear now
-
+                raise TransformationNotImplementedError(f"lhs of constraint {cpm_expr} cannot be linearized, should"
+                                                        f" be any of {supported | {'sub'} } but is {lhs}. "
+                                                        f"Please report on github")
 
             elif isinstance(lhs, GlobalFunction) and lhs.name not in supported:
                 raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
-                                 "`cpmpy.transformations.decompose_global.decompose_global() first")
+                                 "`cpmpy.transformations.decompose_global.decompose_in_tree() first")
 
             [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
             lhs, rhs = cpm_expr.args
@@ -299,6 +198,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                 # very special case, avoid writing as sum of 1 argument
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
                 assert len(new_expr) == 1
+                if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
+                    continue # skip or([BoolVal(True)])
                 newlist.append(Operator("or", new_expr))
                 continue
 
@@ -328,6 +229,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                 # Special case: BV != BV
                 if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
                     newlist.append(lhs + rhs == 1)
+                    continue
 
                 if reified or (isinstance(lhs, (Operator, GlobalConstraint)) and lhs.name not in {"sum","wsum"}):
                     # lhs is sum/wsum and rhs is constant OR
@@ -354,42 +256,17 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum"}, reified=False, c
                 # supported comparison
                 newlist.append(eval_comparison(cpm_expr.name, lhs, rhs))
 
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name in supported:
-            newlist.append(cpm_expr)
-        elif cpm_expr.name == "alldifferent" and cpm_expr.name not in supported:
-            """
-                More efficient implementations possible
-                http://yetanothermathprogrammingconsultant.blogspot.com/2016/05/all-different-and-mixed-integer.html
-                Introduces n^2 new boolean variables
-                Decomposes through bi-partite matching
-            """
-            # TODO check performance of implementation
-            if reified is True:
-                raise ValueError("Linear decomposition of AllDifferent does not work reified. "
-                                 "Ensure 'alldifferent' is not in the 'supported_nested' set of 'decompose_in_tree'")
-
-            lbs, ubs = get_bounds(cpm_expr.args)
-            lb, ub = min(lbs), max(ubs)
-            n_vals = (ub-lb) + 1
-
-            x = boolvar(shape=(len(cpm_expr.args), n_vals))
-
-            newlist += [sum(row) == 1 for row in x]   # each var has exactly one value
-            newlist += [sum(col) <= 1 for col in x.T] # each value can be taken at most once
-
-            # link Boolean matrix and integer variable
-            for arg, row in zip(cpm_expr.args, x):
-                if is_num(arg): # constant, fix directly
-                    newlist.append(Operator("sum", [row[arg-lb]]) == 1) # ensure it is linear
-                else: # ensure result is canonical
-                    newlist.append(sum(np.arange(lb, ub + 1) * row) + -1 * arg == 0)
-
         elif isinstance(cpm_expr, (DirectConstraint, BoolVal)):
             newlist.append(cpm_expr)
 
-        elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
-            raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
-                             f"`cpmpy.transformations.decompose_global.decompose_global() first")
+        elif isinstance(cpm_expr, GlobalConstraint):
+            if cpm_expr.name not in supported:
+                raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run "
+                                 f"`cpmpy.transformations.linearize.decompose_linear() first")
+            else:
+                newlist.append(cpm_expr)
+        else:
+            raise ValueError(f"Unexpected expression {cpm_expr}, if you reach this, please report on github.")
 
     return newlist
 
@@ -589,9 +466,7 @@ def canonical_comparison(lst_of_expr):
                                     if not isinstance(b, _NumVarImpl))
                 
                 # 2) add collected variables to lhs
-                if isinstance(lhs, Operator) and lhs.name == "sum":
-                    lhs = sum([1 * a for a in lhs.args] + lhs2)
-                elif isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name == "wsum"):
+                if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")):
                     lhs = lhs + lhs2
                 else:
                     raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
@@ -630,9 +505,18 @@ def canonical_comparison(lst_of_expr):
 
     return newlist
 
+def only_positive_coefficients_(ws, xs):
+    """
+    Helper function to replace Boolean terms with negative coefficients with terms with positive coefficients (including 0) in Boolean linear expressions, given as a list of coefficients `ws` and a list of Boolean variables `xs`. Returns new non-negative coefficients and variables, and a constant term to be added.
+    """
+    indices = {i for i, (w, x) in enumerate(zip(ws, xs)) if w < 0 and isinstance(x, _BoolVarImpl)}
+    nw, na = zip(*[(-w, ~x) if i in indices else (w, x) for i, (w, x) in enumerate(zip(ws, xs))])
+    constant = sum(ws[i] for i in indices)
+    return nw, na, constant
+
 def only_positive_coefficients(lst_of_expr):
     """
-        Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients by negating its literal.
+        Replaces Boolean terms with negative coefficients in linear constraints with terms with positive coefficients (including 0) by negating its literal.
         This can simplify a `wsum` into `sum`.
         `cpm_expr` is expected to be a canonical comparison.
         Only apply after applying :func:`canonical_comparison(cpm_expr) <canonical_comparison>`
@@ -650,9 +534,8 @@ def only_positive_coefficients(lst_of_expr):
             # :: ... + c*~b + ... <= k+c
             if lhs.name == "wsum":
                 weights, args = lhs.args
-                idxes = {i for i, (w, a) in enumerate(zip(weights, args)) if w < 0 and isinstance(a, _BoolVarImpl)}
-                nw, na = zip(*[(-w, ~a) if i in idxes else (w, a) for i, (w, a) in enumerate(zip(weights, args))])
-                rhs += sum(-weights[i] for i in idxes)
+                nw, na, k = only_positive_coefficients_(weights, args)
+                rhs -= k
 
                 # Simplify wsum to sum if all weights are 1
                 if all(w == 1 for w in nw):
@@ -674,3 +557,139 @@ def only_positive_coefficients(lst_of_expr):
             newlist.append(cpm_expr)
 
     return newlist
+
+
+def decompose_linear(lst_of_expr: Sequence[Expression],
+                     supported: Optional[AbstractSet[str]] = None,
+                     supported_reified: Optional[AbstractSet[str]] = None,
+                     csemap: Optional[dict[Expression, Expression]] = None):
+    """
+        Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
+
+        args:
+            lst_of_expr: list of expressions to decompose
+            supported: set of supported global constraints and global functions
+            supported_reified: set of supported reified global constraints
+            csemap: map of expressions to an auxiliary variable
+
+        returns:
+            list of expressions
+    """
+    if supported is None:
+        supported = frozenset[str]()
+    if supported_reified is None:
+        supported_reified = frozenset[str]()
+
+    decompose_custom = get_linear_decompositions()
+
+    return decompose_in_tree(lst_of_expr, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+
+def decompose_linear_objective(obj: Expression,
+                               supported: Optional[AbstractSet[str]] = None,
+                               supported_reified: Optional[AbstractSet[str]] = None,
+                               csemap: Optional[dict[Expression, Expression]] = None):
+    """Decompose objective using linear-friendly (var == val) decompositions."""
+    if supported is None:
+        supported = frozenset[str]()
+    if supported_reified is None:
+        supported_reified = frozenset[str]()
+
+    decompose_custom = get_linear_decompositions()
+
+    return decompose_objective(obj, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+
+def get_linear_decompositions():
+    """
+        Implementation of custom linear decompositions for some global constraints.
+        Uses (var == val) in sums; no integer encoding.
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    return dict(
+        alldifferent=AllDifferent.decompose_linear,
+        element=Element.decompose_linear,
+    )
+    # Should we add Gleb's table decomposition? or is it not non-reifiable?
+
+
+def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
+    """
+    Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
+    has at least min_values such reifications: remove those implications and add
+    the 'direct' encoding of x.
+
+    If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
+    If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
+    (the domain constraint) is posted; the solver can then choose to eliminate the
+    vars, or post the wsums itself anyway.
+
+    Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
+    """
+    # this transformation can only be done if there is a csemap
+    if csemap is None:
+        return constraints
+
+    # Collect bv -> (var == val)'s in csemap
+    var_vals = {}  # var: [val, bv]
+    for expr, bv in csemap.items():
+        if expr.name == '==':
+            var,val = expr.args
+            if isinstance(var, _NumVarImpl) and is_int(val):
+                var_vals.setdefault(var, []).append((val, bv))
+    
+    # Make the integer encodings in integer linear friendly way
+    my_ivarmap = ivarmap if ivarmap is not None else {}
+    toplevel = []
+    bv_map = {}  # bv -> (var, val)
+    for var, vals in var_vals.items():
+        # check if we should linearize the reified variables
+        lb, ub = var.lb, var.ub
+        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
+        if len(vals) < min_values:
+            continue  # do not encode
+
+        # encode the values
+        enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
+        
+        # domain and channeling constraints
+        toplevel.extend(domain_constraint) # with the overwritten Bools
+        if ivarmap is None:
+            # also post the var=wsum mapping
+            terms, k = enc.encode_term()
+            # var == wsum + k :: var - wsum == k
+            ws = [1] + [-w for (w, _) in terms]
+            bs = [var] + [b for (_, b) in terms]
+            toplevel.append(Operator("wsum", (ws, bs)) == k)  
+        
+        # store the bvs that no longer need to be reified
+        for val, bv in vals:
+            bv_map[bv] = (var, val)
+
+    if len(bv_map) > 0:
+        # Now clean up and remove the '(var == val) == bv' constraints:
+        newcons = []
+        for con in constraints:
+            if con.name == '==' and con.args[0].name == '==':
+                # potential '(var == val) == bv'
+                lhs,bv = con.args
+                if bv in bv_map:
+                    (var, val) = bv_map[bv]
+                    (lhs_var, lhs_val) = lhs.args
+                    if lhs_val == val and lhs_var == var:
+                        continue  # do not keep
+            newcons.append(con)
+        constraints = newcons
+
+    return constraints + toplevel
+
+
+def _extract_var_from_lhs(lhs):
+    """Extract integer variable from lhs of (x == val) or (x != val). Returns None if not applicable."""
+    if isinstance(lhs, _NumVarImpl) and not lhs.is_bool():
+        return lhs
+    if isinstance(lhs, Operator) and lhs.name == "sum" and len(lhs.args) == 1:
+        arg = lhs.args[0]
+        if isinstance(arg, _NumVarImpl) and not arg.is_bool():
+            return arg
+    return None

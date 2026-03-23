@@ -34,8 +34,8 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
+from typing import TypeGuard, Union
 from cpmpy.exceptions import IncompleteFunctionError
-
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
@@ -91,7 +91,7 @@ def is_pure_list(arg):
     return isinstance(arg, (list, tuple))
 
 
-def is_any_list(arg):
+def is_any_list(arg) -> TypeGuard[list | tuple | np.ndarray]:
     """ is it a list or tuple or numpy array?
     """
     return isinstance(arg, (list, tuple, np.ndarray))
@@ -212,6 +212,27 @@ def implies(expr, other):
         return cp.BoolVal(True)
     else:
         return expr.implies(other)
+
+# Specific stuff for scheduling constraints
+
+def get_nonneg_args(args):
+    """
+        Replace arguments with negative lowerbound with their nonnegative counterpart
+    """
+    lbs, ubs = zip(*[get_bounds(arg) for arg in args])
+    new_args = []
+    cons = []
+    for lb, ub, arg in zip(lbs, ubs, args):
+        if lb < 0:
+            if ub >= 0:
+                iv = cp.intvar(0, ub)
+            else: # ub < 0  
+                iv = cp.intvar(0,0)
+            cons.append(arg == iv) # will always be False if ub < 0
+            new_args.append(iv)
+        else:
+            new_args.append(arg)
+    return new_args, cons
 
 # Specific stuff for ShortTabel global (should this be in globalconstraints.py instead?)
 STAR = "*" # define constant here

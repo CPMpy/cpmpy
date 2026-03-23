@@ -44,10 +44,9 @@
     ==============
 """
 from functools import reduce
-from typing import Optional
-import pkg_resources
+from typing import Optional, List
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
@@ -56,6 +55,8 @@ from ..expressions.utils import is_bool, argval, argvals
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
+from ..transformations.safening import no_partial_functions
+
 
 class CPM_pysdd(SolverInterface):
     """
@@ -73,6 +74,9 @@ class CPM_pysdd(SolverInterface):
     https://pysdd.readthedocs.io/en/latest/classes/SddManager.html
     """
 
+    supported_global_constraints = frozenset({"xor"})
+    supported_reified_global_constraints = frozenset({"xor"})
+
     @staticmethod
     def supported():
         # try to import the package
@@ -89,9 +93,10 @@ class CPM_pysdd(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('pysdd').version
-        except pkg_resources.DistributionNotFound:
+            return version('pysdd')
+        except PackageNotFoundError:
             return None
 
 
@@ -109,7 +114,7 @@ class CPM_pysdd(SolverInterface):
             subsolver: None
         """
         if not self.supported():
-            raise Exception("CPM_pysdd: Install the python package 'pysdd' to use this solver interface")
+            raise ModuleNotFoundError("CPM_pysdd: Install the python package 'cpmpy[pysdd]' to use this solver interface.") 
         if cpm_model and cpm_model.objective_ is not None:
             raise NotSupportedError("CPM_pysdd: only satisfaction, does not support an objective function")
 
@@ -130,7 +135,7 @@ class CPM_pysdd(SolverInterface):
         """
         return self.pysdd_root
 
-    def solve(self, time_limit=None, assumptions=None):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
         """
             See if an arbitrary model exists
 
@@ -181,7 +186,7 @@ class CPM_pysdd(SolverInterface):
 
         return has_sol
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
@@ -295,7 +300,11 @@ class CPM_pysdd(SolverInterface):
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = decompose_in_tree(cpm_cons,supported={'xor'}, supported_reified={'xor'}, csemap=self._csemap) #keep unsupported xor for error message purposes.
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = simplify_boolean(cpm_cons)  # for cleaning (BE >= 0) and such
         return cpm_cons
 

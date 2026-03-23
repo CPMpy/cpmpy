@@ -20,19 +20,19 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 
 
 solver_dependencies = {
-    "ortools": ["ortools"],
-    "z3": ["z3-solver"],
+    "ortools": ["ortools>=9.3.10497,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
+    "z3": ["z3-solver>=4.8.15.0"],
     "choco": ["pychoco>=0.2.1"],
-    "exact": ["exact>=2.1.0"],
-    "minizinc": ["minizinc"],
-    "pysat": ["python-sat"],
-    "gurobi": ["gurobipy"],
-    "pysdd": ["pysdd"],
-    "gcs": ["gcspy"],
-    "cpo": ["docplex"],
-    "pumpkin": ["pumpkin-solver>=0.2.1"],
-    "pindakaas": ["pindakaas>=0.2.1"],
-    "cplex": ["docplex", "cplex"],
+    "exact": ["exact>=2.1.0"], # older versions (<2.2.1) are bugged on py3.13
+    "minizinc": ["minizinc>=0.7.0"],
+    "pysat": ["python-sat>=1.8.dev4"],
+    "gurobi": ["gurobipy>=11.0.0"],
+    "pysdd": ["pysdd>=0.2.11"],
+    "gcs": ["gcspy>=0.1.9"], # first version to pass all tests
+    "cpo": ["docplex>=2.28.240"],
+    "pumpkin": ["pumpkin-solver>=0.3.0"], # CPMpy requires features only available from Pumpkin version >=0.3.0
+    "pindakaas": ["pindakaas>=0.4.1"],
+    "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
@@ -50,9 +50,10 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'ortools>=9.9',
+        'ortools>=9.3.10497,!=9.9.*,!=9.10.*,!=9.11.*',
         'numpy>=1.5',
         'setuptools',
+        'packaging', # to check solver versions
     ],
     extras_require={
         # Solvers
@@ -70,14 +71,13 @@ setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.8'
+    python_requires='>=3.10'
 )

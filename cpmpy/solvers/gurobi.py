@@ -42,23 +42,21 @@
     ==============
 """
 
-from typing import Optional
-import pkg_resources
+from typing import Optional, List
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
 from ..expressions.utils import argvals, argval
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum
+from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 
 try:
     import gurobipy as gp
@@ -80,6 +78,9 @@ class CPM_gurobi(SolverInterface):
     Documentation of the solver's own Python API:
     https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
+
+    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "pow"})
+    supported_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -117,9 +118,10 @@ class CPM_gurobi(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('gurobipy').version
-        except pkg_resources.DistributionNotFound:
+            return version("gurobipy")
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -131,9 +133,9 @@ class CPM_gurobi(SolverInterface):
             subsolver: None, not used
         """
         if not self.installed():
-            raise Exception("CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.") 
         elif not self.license_ok():
-            raise Exception("CPM_gurobi: A problem occured during license check. Make sure your license is activated!")
+            raise ModuleNotFoundError("CPM_gurobi: No license found or a problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
@@ -151,12 +153,13 @@ class CPM_gurobi(SolverInterface):
         return self.grb_model
 
 
-    def solve(self, time_limit=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
         """
             Call the gurobi solver
 
             Arguments:
-                time_limit (float, optional):  maximum solve time in seconds 
+                time_limit (float, optional):  maximum solve time in seconds
+                solution_callback:             Gurobi callback function
                 **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -284,18 +287,26 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr, csemap=self._csemap)
-        flat_obj = only_positive_bv_wsum(flat_obj)  # remove negboolviews
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created variables
-        self += flat_cons
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_linear_objective(obj,
+                                                      supported=self.supported_global_constraints,
+                                                      supported_reified=self.supported_reified_global_constraints,
+                                                      csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+
+        self.add(safe_cons + decomp_cons + flat_cons)
 
         # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        grb_obj = self._make_numexpr(obj)
         if minimize:
-            self.grb_model.setObjective(obj, sense=GRB.MINIMIZE)
+            self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
         else:
-            self.grb_model.setObjective(obj, sense=GRB.MAXIMIZE)
+            self.grb_model.setObjective(grb_obj, sense=GRB.MAXIMIZE)
         self.grb_model.update()
 
     def has_objective(self):
@@ -329,7 +340,6 @@ class CPM_gurobi(SolverInterface):
 
         raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
-
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -347,16 +357,19 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div"})  # linearize expects safe exprs
-        supported = {"min", "max", "abs", "alldifferent"} # alldiff has a specialized MIP decomp in linearize
-        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
+        cpm_cons = decompose_linear(cpm_cons,
+                                    supported=self.supported_global_constraints,
+                                    supported_reified=self.supported_reified_global_constraints,
+                                    csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","->","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
@@ -479,7 +492,7 @@ class CPM_gurobi(SolverInterface):
       return self
     __add__ = add  # avoid redirect in superclass
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         Gurobi supports warmstarting the solver with a (in)feasible solution.
         The provided value will affect branching heurstics during solving, making it more likely the final solution will contain the provided assignment.
@@ -499,7 +512,7 @@ class CPM_gurobi(SolverInterface):
         for cpm_var, val in zip(cpm_vars, vals):
             self.solver_var(cpm_var).setAttr("VarHintVal", val)
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
 
