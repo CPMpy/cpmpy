@@ -547,29 +547,29 @@ class CPM_cpo(SolverInterface):
                 return dom.forbidden_assignments(arr, table)
             elif cpm_con.name == "cumulative" or cpm_con.name == "cumulative_optional":
                 if cpm_con.name == "cumulative_optional":
-                    start, dur, end, height, capacity, is_present = cpm_con.args
+                    start, dur, end, demand_lst, capacity, is_present = cpm_con.args
                 else:
-                    start, dur, end, height, capacity = cpm_con.args
+                    start, dur, end, demand_lst, capacity = cpm_con.args
                     is_present = None
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
 
                 # usage constraints
-                height, height_cons = get_nonneg_args(height, is_present)
-                cons += self._cpo_expr(height_cons)
+                demand_lst, demand_cons = get_nonneg_args(demand_lst, is_present)
+                cons += self._cpo_expr(demand_cons)
 
                 total_usage = []
-                for i, (task, height) in enumerate(zip(tasks, height)):
+                for i, (task, h) in enumerate(zip(tasks, demand_lst)):
                     if task is None: # can happen with 0 duration tasks
                         continue
                     else:
-                        task_height = dom.pulse(task, get_bounds(height))
+                        task_demand = dom.pulse(task, get_bounds(h))
                         if is_present is not None:
                             cons += [dom.if_then(self.solver_var(is_present[i]),
-                                                 self._cpo_expr(height) == dom.height_at_start(task, task_height))]
+                                                 self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
                         else:
-                            cons += [self._cpo_expr(height) == dom.height_at_start(task, task_height)]
-                        total_usage.append(task_height)
+                            cons += [self._cpo_expr(h) == dom.height_at_start(task, task_demand)]
+                        total_usage.append(task_demand)
                
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
