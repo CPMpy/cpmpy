@@ -330,6 +330,52 @@ def optimal_mus_naive(soft, hard=[], weights=None, solver="ortools", hs_solver="
     """
     return ocus_naive(soft, hard, weights, meta_constraint=True, solver=solver, hs_solver=hs_solver)
 
-   
 
+def mus_iis(soft, hard=[], solver="gurobi", time_limit=None, mem_limit=None):
+    """
+        Compute a MUS using an IIS (Irreducible Inconsistent Subsystem) algorithm.
+
+        Uses indicator variables to group linear constraints so that each CPMpy
+        soft constraint is treated as a group of linear constraints.
+
+        :param soft: soft constraints, list of expressions
+        :param hard: hard constraints, optional, list of expressions
+        :param solver: which ILP solver to use (only 'gurobi' supported)
+        :param time_limit: maximum time in seconds for IIS computation (None = no limit)
+        :param mem_limit: maximum memory in GB for IIS computation (None = no limit)
+    """
+    assert solver == "gurobi", f"Only Gurobi supported as IIS solver, but was given {solver}"
+
+    # Create indicator variables and model with hard + (indicator -> soft)
+    m, soft, assumptions = make_assump_model(soft, hard)
+
+    # Instantiate solver (will check if solver is installed and licensed)
+    s = cp.SolverLookup.get(solver, m)
+    grb_model = s.grb_model
+
+    # Force all hard constraints into the IIS (1 = force in, 0 = force out, -1 (default) = soft)
+    grb_model.update()
+    for hard_constraint in grb_model.getConstrs():
+        hard_constraint.IISConstrForce = 1
+    for hard_constraint in grb_model.getGenConstrs():
+        hard_constraint.IISGenConstrForce = 1
+
+    # Add all assumptions (and thus each group) as soft constraints
+    for assumption in assumptions:
+        grb_assumption = s.solver_var(assumption)
+        grb_model.addConstr(grb_assumption >= 1, name=assumption.name)
+
+    # Safe to import gurobipy since instantiating the Gurobi solver succeeded
+    import gurobipy
+    if time_limit is not None:
+        grb_model.Params.TimeLimit = time_limit
+    try:
+        grb_model.computeIIS()
+    except gurobipy.GurobiError as e:
+        if e.errno == gurobipy.GRB.Error.IIS_NOT_INFEASIBLE:
+            raise AssertionError("MUS: model must be UNSAT")
+        raise
+
+    # Find which assumption is in the IIS/MUS
+    return [con for assumption, con in zip(assumptions, soft) if grb_model.getConstrByName(assumption.name).IISConstr]
 
