@@ -74,6 +74,9 @@ def no_partial_functions(lst_of_expr: list[Expression],
     assert _toplevel is None, "no_partial_functions:  argument '_toplevel' is deprecated, do not use/modify it"
     assert _nbc is None, "no_partial_functions:  argument '_nbc' is deprecated, do not use/modify it"
 
+    if safen_toplevel is None:
+        safen_toplevel = frozenset()
+
     changed, new_lst, todo_toplevel, nbc = _no_partial_functions(lst_of_expr, is_toplevel=True, safen_toplevel=safen_toplevel)
     if not changed:
         return lst_of_expr # return original list
@@ -94,9 +97,7 @@ def no_partial_functions(lst_of_expr: list[Expression],
     return new_lst
     
 
-def _no_partial_functions(lst_of_expr: Union[Sequence[Expression], NDVarArray],
-                          is_toplevel: bool,
-                          safen_toplevel: Optional[AbstractSet[str]] = None) -> tuple[bool,list[Expression], list[Expression], list[Expression]]:
+def _no_partial_functions(lst_of_expr, is_toplevel, safen_toplevel) -> tuple[bool,list[Expression], list[Expression], list[Expression]]:
     """
     Safen a list of expressions by replacing partial functions with total functions.
 
@@ -117,10 +118,7 @@ def _no_partial_functions(lst_of_expr: Union[Sequence[Expression], NDVarArray],
     """
 
     toplevel: list[Expression] = []
-    nbc_for_each_expr : list[list[Expression]] = [[] for _ in range(len(lst_of_expr))] # TODO? make tuples instead?
-        
-    if safen_toplevel is None:
-        safen_toplevel = frozenset()
+    nbc_for_each_expr : list[list[Expression]] = [[] for _ in range(len(lst_of_expr))]
     
     changed = False
     new_lst: list[Any] = [] # TODO: because of is_any_list, can be many things...
