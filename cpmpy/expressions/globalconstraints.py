@@ -1050,7 +1050,11 @@ class Cumulative(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, demand_list, capacity])
+        self.end_is_none = end is None
+        if end is None:
+            super(Cumulative, self).__init__("cumulative", [list(start), list(duration), demand_list, capacity])
+        else:
+            super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end), demand_list, capacity])
 
     
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
@@ -1069,7 +1073,10 @@ class Cumulative(GlobalConstraint):
         if how not in ["time", "task", "auto"]:
             raise ValueError(f"how can only be time, task, or auto (default), but got {how}")
 
-        start, duration, end, demand, capacity = self.args
+        if self.end_is_none:
+            start, duration, demand, capacity = self.args
+        else:
+            start, duration, end, demand, capacity = self.args
 
         lbs, ubs = get_bounds(start)
         horizon = max(ubs) - min(lbs)
@@ -1088,16 +1095,17 @@ class Cumulative(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity = self.args
+        cons = []
 
-        cons = [d >= 0 for d in duration]  # enforce non-negative durations
-        cons += [h >= 0 for h in demand]  # enforce non-negative demand
-
-        # set duration of tasks, only if end is user-provided
-        if end is None:
+        if self.end_is_none:
+            start, duration, demand, capacity = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
+            start, duration, end, demand, capacity = self.args
             cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
+
+        cons += [d >= 0 for d in duration]  # enforce non-negative durations
+        cons += [h >= 0 for h in demand]  # enforce non-negative demand
 
         # demand doesn't exceed capacity
         # tasks are uninterruptible, so we only need to check each starting point of each task
@@ -1121,15 +1129,13 @@ class Cumulative(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity = self.args
+        cons = []
 
-        cons = [d >= 0 for d in duration] # enforce non-negative durations
-        cons += [h >= 0 for h in demand] # enforce non-negative demand
-
-        # set duration of tasks, only if end is user-provided
-        if end is None:
+        if self.end_is_none:
+            start, duration, demand, capacity = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
+            start, duration, end, demand, capacity = self.args
             cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
 
         # demand doesn't exceed capacity
@@ -1146,16 +1152,15 @@ class Cumulative(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end, demand, capacity = self.args
-        
-        start, dur, demand, capacity = argvals([start, dur, demand, capacity])
-        if any(a is None for a in flatlist([start, dur, demand, capacity])):
-            return None
-        if end is None:
-            end = [s + d for s,d in zip(start, dur)]
+
+        if self.end_is_none:
+            start, dur, demand, capacity = argvals(self.args)
+            if any(a is None for a in [start, dur, demand, capacity]):
+                return None
+            end = [start[i] + dur[i] for i in range(len(start))]
         else:
-            end = argvals(end)
-            if any(a is None for a in end):
+            start, dur, end, demand, capacity = argvals(self.args)
+            if any(a is None for a in [start, dur, end, demand, capacity]):
                 return None
                 
         if any(d < 0 for d in dur):
@@ -1168,23 +1173,12 @@ class Cumulative(GlobalConstraint):
 
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
-        start, end = np.array(start), np.array(end) # eases check below
+        np_start, np_end = np.array(start), np.array(end) # eases check below
         for t in range(lb, ub+1):
-            if capacity < sum(demand * ((start <= t) & (end > t))):
+            if capacity < sum(demand * ((np_start <= t) & (np_end > t))):
                 return False
 
         return True
-    
-    def __repr__(self) -> str:
-        """
-        Returns:
-            str: String representation of the cumulative constraint
-        """
-        start, dur, end, demand, capacity = self.args
-        if end is None:
-            return f"Cumulative({start}, {dur}, {demand}, {capacity})"
-        else:
-            return f"Cumulative({start}, {dur}, {end}, {demand}, {capacity})"
 
 class NoOverlap(GlobalConstraint):
     """
@@ -1213,7 +1207,11 @@ class NoOverlap(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap", [list(start), list(duration), list(end) if end is not None else None])
+        self.end_is_none = end is None
+        if end is None:
+            super().__init__("no_overlap", [list(start), list(duration)])
+        else:
+            super().__init__("no_overlap", [list(start), list(duration), list(end)])
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1222,13 +1220,16 @@ class NoOverlap(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, dur, end = self.args
-        cons = [d >= 0 for d in dur]
+        cons = []
+
+        if self.end_is_none:
+            start, duration = self.args
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end = self.args
+            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
         
-        if end is None:
-            end = [s+d for s,d in zip(start, dur)]
-        else: # can use the expression directly below
-            cons += [s + d == e for s,d,e in zip(start, dur, end)]
+        cons += [d >= 0 for d in duration]
             
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons += [(e1 <= s2) | (e2 <= s1)]
@@ -1239,13 +1240,14 @@ class NoOverlap(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end = argvals(self.args)
-        if end is None:
-            if any(s is None for s in start) or any(d is None for d in dur):
+        if self.end_is_none:
+            start, dur = argvals(self.args)
+            if any(a is None for a in start+dur):
                 return None
             end = [s + d for s,d in zip(start, dur)]
         else:
-            if any(s is None for s in start) or any(d is None for d in dur) or any(e is None for e in end):
+            start, dur, end = argvals(self.args)
+            if any(a is None for a in [start, dur, end]):
                 return None
        
         if any(d < 0 for d in dur):
@@ -1256,17 +1258,6 @@ class NoOverlap(GlobalConstraint):
             if s1 + d1 > s2 and s2 + d2 > s1:
                 return False
         return True
-    
-    def __repr__(self) -> str:
-        """
-        Returns:
-            str: String representation of the NoOverlap constraint
-        """
-        start, dur, end = self.args
-        if end is None:
-            return f"NoOverlap({start}, {dur})"
-        else:
-            return f"NoOverlap({start}, {dur}, {end})"
 
 class Precedence(GlobalConstraint):
     """

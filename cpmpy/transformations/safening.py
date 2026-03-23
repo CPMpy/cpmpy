@@ -78,6 +78,7 @@ def no_partial_functions(lst_of_expr, _toplevel=None, _nbc=None, safen_toplevel=
     new_lst = []
     for cpm_expr in lst_of_expr:
 
+        # leaf node: constant, variable (or None, in case of Cumulative with no end provided)
         if is_num(cpm_expr) or isinstance(cpm_expr, _NumVarImpl):
             new_lst.append(cpm_expr)
 
