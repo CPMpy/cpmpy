@@ -87,7 +87,6 @@ def no_partial_functions(lst_of_expr: list[Expression],
         changed, decomp, next_toplevel, next_nbc = _no_partial_functions(todo_toplevel, is_toplevel=True, safen_toplevel=safen_toplevel)
         if not changed:
             new_lst.extend(todo_toplevel)
-            new_lst.extend(nbc)
             break
 
         # changed, loop again
