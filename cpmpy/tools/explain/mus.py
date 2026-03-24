@@ -353,18 +353,17 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
     grb_model = s.grb_model
 
     # Force all hard constraints into the IIS (1 = force in, 0 = force out, -1 (default) = soft)
-    grb_model.update()
+    # Force also all assumptions `s -> c` for assumption `s` and all constraints `c` in its group
+    grb_model.update()  # update required ; otherwise `getConstrs` can return empty
     for hard_constraint in grb_model.getConstrs():
         hard_constraint.IISConstrForce = 1
-    for hard_constraint in grb_model.getGenConstrs():
+    for hard_constraint in grb_model.getGenConstrs():  # CPMpy also posts general constraints
         hard_constraint.IISGenConstrForce = 1
 
-    # Add each assumption as a single soft constraint which enables its group
+    # Add each assumption as a single soft constraint `s>=1` which activates each constraint `c` in its group via hard constraint `s -> c`
     # We use Gurobi directly here (as opposed to e.g. `s+=a>=1`) in order to gain access to the returned Gurobi constraints
-    grb_assumptions = grb_model.addConstrs(s.solver_var(a) >= 1 for a in assumptions)
-
-    # Gurobi returns its own `tupledict`; we only need the constraints/values
-    grb_assumptions = grb_assumptions.values()
+    # Gurobi returns its own `tupledict`, we just need the constraint (i.e. values)
+    grb_assumptions = grb_model.addConstrs((s.solver_var(assumptions[i]) >= 1 for i in range(len(assumptions)))).values()
 
     # Safe to import gurobipy since instantiating the Gurobi solver succeeded
     import gurobipy
