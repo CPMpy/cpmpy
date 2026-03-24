@@ -345,7 +345,7 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
     """
     assert solver == "gurobi", f"Only Gurobi supported as IIS solver, but was given {solver}"
 
-    # Create indicator variables and model with hard + (indicator -> soft)
+    # Create assumption variables and model with hard + (assumption -> soft)
     m, soft, assumptions = make_assump_model(soft, hard)
 
     # Instantiate solver (will check if solver is installed and licensed)
@@ -360,13 +360,11 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
     for hard_constraint in grb_model.getGenConstrs():  # CPMpy also posts general constraints
         hard_constraint.IISGenConstrForce = 1
 
-    # Add each assumption as a single soft constraint `s>=1` which activates each constraint `c` in its group via hard constraint `s -> c`
-    # We use Gurobi directly here (as opposed to e.g. `s+=a>=1`) in order to gain access to the returned Gurobi constraints
-    # Gurobi returns its own `tupledict`, we just need the constraint (i.e. values)
+    # Add each assumption as a soft constraint `s>=1` using Gurobi directly (as opposed to e.g. `s+=assumptions`), in order to gain access to the returned Gurobi constraints so we can access their `IISConstr` later
+    # Gurobi returns its own `tupledict`, we just need the constraints (i.e. values)
     grb_assumptions = grb_model.addConstrs((s.solver_var(assumptions[i]) >= 1 for i in range(len(assumptions)))).values()
 
-    # Safe to import gurobipy since instantiating the Gurobi solver succeeded
-    import gurobipy
+    import gurobipy  # Safe to import gurobipy since instantiating the Gurobi solver succeeded
     if time_limit is not None:
         grb_model.Params.TimeLimit = time_limit
     try:
