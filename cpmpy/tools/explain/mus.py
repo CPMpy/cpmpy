@@ -341,9 +341,10 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
         :param soft: soft constraints, list of expressions
         :param hard: hard constraints, optional, list of expressions
         :param solver: which ILP solver to use (only 'gurobi' supported)
-        :param time_limit: maximum time in seconds for IIS computation (None = no limit)
+        :param time_limit: maximum, strictly positive, time limit in seconds for MUS computation (None = no limit). If the time limit is reached, `None` is returned
     """
     assert solver == "gurobi", f"Only Gurobi supported as IIS solver, but was given {solver}"
+    assert time_limit is None or time_limit > 0, f"`time_limit` should be strictly positive but was {time_limit} (note: a `time_limit=0` does not behave consistently with Gurobi)"
 
     # Create assumption variables and model with hard + (assumption -> soft)
     m, soft, assumptions = make_assump_model(soft, hard)
@@ -373,6 +374,11 @@ def mus_iis(soft, hard=[], solver="gurobi", time_limit=None):
         if e.errno == gurobipy.GRB.Error.IIS_NOT_INFEASIBLE:
             raise AssertionError("MUS: model must be UNSAT")
         raise
+
+    # Check if IIS is minimal (IISMinimal=1) or time limit was reached (IISMinimal=0)
+    if not grb_model.IISMinimal:
+        # TODO we could return a possibly non-minimal unsatisfiable subset (along with some indication) ; but this should be made consistent across MUS algorithms
+        return None  # return `None` (in line with CPMpy solving behaviour)
 
     # Find which assumption is in the IIS/MUS
     return [soft for soft, grb_assumption in zip(soft, grb_assumptions) if grb_assumption.IISConstr]
