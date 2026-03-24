@@ -149,7 +149,7 @@ class TestCSE:
         x = cp.intvar(0, 2, name="x")
         slv = cp.solvers.CPM_pindakaas()
         slv.encoding = "direct"
-        assert str(slv.transform((x == 0) | (x == 2))) == "[(BV[x == 0]) or (BV[x == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1]"
+        assert str(slv.transform((x == 0) | (x == 2))) == "[(BV[x == 0]) or (BV[x == 2]), sum(BV[x == 0], BV[x == 1], BV[x == 2]) == 1]"
 
     @pytest.mark.skip("aspirational")
     def test_int2bool_cse_one_var_order(self):

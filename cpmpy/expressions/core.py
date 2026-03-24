@@ -116,22 +116,9 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name, arg_list):
+    def __init__(self, name: str, arg_list: tuple[Any, ...]):  # goal: tuple[int|Expr|np.array|list[int|Expr], ...]
         self.name = name
-
-        if isinstance(arg_list, (tuple, GeneratorType)):
-            arg_list = list(arg_list)
-        elif isinstance(arg_list, np.ndarray):
-            # must flatten
-            arg_list = arg_list.reshape(-1)
-        for i in range(len(arg_list)):
-            if isinstance(arg_list[i], np.ndarray):
-                # must flatten
-                arg_list[i] = arg_list[i].reshape(-1)
-
-        assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
         self._args = arg_list
-
 
     @property
     def args(self):
@@ -427,8 +414,8 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg: bool|np.bool_) -> None:
-        assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
-        super(BoolVal, self).__init__("boolval", [bool(arg)])
+        arg = bool(arg)  # will raise ValueError if not a Boolean-able
+        super(BoolVal, self).__init__("boolval", (arg,))
 
     def value(self) -> bool:
         return self.args[0]
@@ -542,7 +529,7 @@ class Comparison(Expression):
         We expect at least one of the two to be an Expression.
         """
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
-        super().__init__(name, [left, right])
+        super().__init__(name, (left, right))
 
     def __repr__(self) -> str:
         if all(isinstance(x, Expression) for x in self.args):
@@ -654,7 +641,7 @@ class Operator(Expression):
                 i += 1
 
 
-        super().__init__(name, arg_list)
+        super().__init__(name, tuple(arg_list))
 
     def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
@@ -674,8 +661,9 @@ class Operator(Expression):
         if self.name == 'wsum':
             return f"sum({self.args[0]} * {self.args[1]})"
 
-        # infix printing of two arguments
-        if len(self.args) == 2:
+        if len(self.args) == 1:
+            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 ommited in print
+        elif len(self.args) == 2:  # infix printing of two arguments
             # bracketed printing of non-constants
             def wrap_bracket(arg):
                 if isinstance(arg, Expression):
@@ -684,8 +672,8 @@ class Operator(Expression):
             return "{} {} {}".format(wrap_bracket(self.args[0]),
                                      printname,
                                      wrap_bracket(self.args[1]))
-
-        return "{}({})".format(self.name, self.args)
+        else:  # n-ary
+            return "{}{}".format(self.name, self.args)  # args is a tuple, will be in ()
 
     def value(self) -> Optional[int]:
         """

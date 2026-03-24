@@ -82,7 +82,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                         break
                     elif is_false_cst(a):
                         if args is expr_args: # will remove this one, need to copy args...
-                            args = args.copy()
+                            args = list(args)  # takes copy
                         args.pop(i)
                     else:
                         i += 1
@@ -107,7 +107,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                         break
                     elif is_true_cst(a):
                         if args is expr_args:  # will remove this one, need to copy args...
-                            args = args.copy()
+                            args = list(args)  # takes copy
                         args.pop(i)
                     else:  # subexpression, should not happen here...
                         i += 1

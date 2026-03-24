@@ -162,7 +162,7 @@ class Minimum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
         """
-        super().__init__("min", flatlist(arg_list))
+        super().__init__("min", tuple(flatlist(arg_list)))
 
     def value(self) -> Optional[int]:
         """
@@ -210,7 +210,7 @@ class Maximum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
         """
-        super().__init__("max", flatlist(arg_list))
+        super().__init__("max", tuple(flatlist(arg_list)))
 
     def value(self) -> Optional[int]:
         """
@@ -258,7 +258,7 @@ class Abs(GlobalFunction):
         Arguments:
             expr (Expression): Expression of which to compute the absolute value
         """
-        super().__init__("abs", [expr])
+        super().__init__("abs", (expr,))
 
     def value(self) -> Optional[int]:
         """
@@ -450,7 +450,7 @@ class Division(GlobalFunction):
             x (ExprLike): Expression or constant to divide
             y (ExprLike): Expression or constant to divide by
         """
-        super().__init__("div", [x, y])
+        super().__init__("div", (x, y))
 
     def __repr__(self):
         """
@@ -545,7 +545,7 @@ class Modulo(GlobalFunction):
             x (ExprLike): Expression or constant for the dividend
             y (ExprLike): Expression or constant for the divisor
         """
-        super().__init__("mod", [x, y])
+        super().__init__("mod", (x, y))
 
     def __repr__(self):
         """
@@ -635,7 +635,7 @@ class Power(GlobalFunction):
             raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
         if exponent < 0:
             raise ValueError(f"Power constraint only supports non-negative integer exponents, not: {exponent}")
-        super().__init__("pow", [base, exponent])
+        super().__init__("pow", (base, exponent))
 
     def decompose(self):
         """
@@ -706,7 +706,7 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
-        super().__init__("element", [arr, idx])
+        super().__init__("element", (arr, idx))
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array, e.g. instead of Arr[Idx1][Idx2], do Arr[Idx1, Idx2].")
@@ -822,7 +822,7 @@ class Count(GlobalFunction):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
-        super().__init__("count", [arr, val])
+        super().__init__("count", (arr, val))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -883,7 +883,7 @@ class Among(GlobalFunction):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
-        super().__init__("among", [arr, vals])
+        super().__init__("among", (arr, vals))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -936,7 +936,7 @@ class NValue(GlobalFunction):
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
-        super().__init__("nvalue", arr)
+        super().__init__("nvalue", tuple(arr))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -1001,7 +1001,7 @@ class NValueExcept(GlobalFunction):
             raise ValueError("NValueExcept takes an array as input")
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
-        super().__init__("nvalue_except",[arr, n])
+        super().__init__("nvalue_except", (arr, n))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
