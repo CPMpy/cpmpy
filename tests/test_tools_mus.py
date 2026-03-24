@@ -94,6 +94,8 @@ class TestMus:
         mus_naive_cons = self.naive_func(soft=soft, hard=hard)
         assert len(set(mus_naive_cons)) == 1
 
+
+@pytest.mark.requires_solver("gurobi")
 class TestIIS(TestMus):
     def setup_method(self):
         self.mus_func = lambda soft, hard=[], solver="ortools": mus_iis(soft, hard=hard)
