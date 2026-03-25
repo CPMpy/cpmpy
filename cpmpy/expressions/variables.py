@@ -805,7 +805,8 @@ def _gen_var_names(name: Optional[str|ListLike[str]],
             raise ValueError(f"Duplicated names in {name_arr}.")
         if any(_is_invalid_name(n) for n in name_arr.flat):
             raise ValueError(_VAR_ERR)
-        return [name_arr[idx] for idx in np.ndindex(shape)]
+        # same order as np.ndindex(shape): C-order, last axis varies fastest
+        return list(name_arr.flat)
     else:
         raise TypeError(f"Unsupported type for name: {type(name)}")
 
