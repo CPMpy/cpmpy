@@ -9,9 +9,9 @@ jobs:
           - solver: ortools
           - solver: z3
           - solver: pysat
-          - solver: pysdd
             install_commands: |
               pip install pypblib
+          - solver: pysdd
           - solver: choco
           - solver: minizinc
             install_commands: |
