@@ -531,7 +531,7 @@ class HexSolutionPrinter:
         self._display = display
         self._solution_limit = solution_limit
         self._verbose = verbose
-        if isinstance(display, (list,Expression)):
+        if isinstance(display, Expression) or is_any_list(Expression):
             self._cpm_vars = get_variables(display)
         elif callable(display):
             # might use any, so populate all (user) variables with their values
@@ -566,12 +566,12 @@ class HexSolutionPrinter:
 
                 # display
                 if isinstance(self._display, Expression):
-                    print(argval(self._display))
-                elif isinstance(self._display, list):
-                    # explicit list of expressions to display
+                    print(self._display.value())
+                elif is_any_list(self._display):
                     print(argvals(self._display))
-                else: # callable
-                    self._display()
+                else:
+                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                    self._display()  # callback
                 
             # update data
             self.__solution_count += 1

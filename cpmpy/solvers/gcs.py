@@ -62,7 +62,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callbac
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, argval, argvals
+from ..expressions.utils import is_num, argval, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
@@ -314,15 +314,14 @@ class CPM_gcs(SolverInterface):
                     cpm_var._value = solution_map[sol_var]
 
             if isinstance(display, Expression):
-                print(argval(display))
-            elif isinstance(display, list):
-                # explicit list of expressions to display
+                print(display.value())
+            elif is_any_list(display):
                 print(argvals(display))
-            elif callable(display):
-                display()
             else:
-                raise NotImplementedError("Glasgow Constraint Solver: Unknown display type {}.".format(cpm_var))
-            return 
+                assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                display()  # callback
+            return
+
         sol_callback = None
         if display:
             sol_callback=display_callback

@@ -293,10 +293,11 @@ class CPM_cpo(SolverInterface):
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
+                    print(display.value())
+                elif is_any_list(display):
                     print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
 
             # count and stop
@@ -790,7 +791,7 @@ try:
                         sol_var = self._varmap[cpm_subvar]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
 
-                if isinstance(self._display, Expression):
+                if isinstance(self._display, (Expression, NDVarArray)):
                     print(argval(self._display))
                 elif isinstance(self._display, list):
                     # explicit list of expressions to display
