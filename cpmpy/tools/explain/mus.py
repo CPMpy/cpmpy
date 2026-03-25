@@ -1,9 +1,10 @@
 """
-    Re-impementation of MUS-computation techniques in CPMPy
+    Re-implementation of MUS-computation techniques in CPMPy
 
     - Deletion-based MUS
     - QuickXplain
     - Optimal MUS
+    - IIS-based MUS extraction
 """
 import warnings
 import numpy as np
