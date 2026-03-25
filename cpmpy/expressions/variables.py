@@ -65,8 +65,8 @@ from typing import Any, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
-from .core import Expression, ExprLike, ListLike, Operator
-from .utils import is_num, is_int, flatlist, is_boolexpr, is_true_cst, is_false_cst, get_bounds
+from .core import Expression, ExprLike, ListLike, BoolVal
+from .utils import is_num, is_int, is_boolexpr, get_bounds
 
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
