@@ -323,7 +323,7 @@ class CPM_gcs(SolverInterface):
             return
 
         sol_callback = None
-        if display:
+        if display is not None:
             sol_callback=display_callback
 
         self.gcs_result = self.gcs.solve(
