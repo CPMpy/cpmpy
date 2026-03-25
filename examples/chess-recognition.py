@@ -118,18 +118,12 @@ model = Model(
     (Count(board[0], P) == 0),
     (Count(board[7], p) == 0),
     (Count(board[7], P) == 0),
-    # The number of pieces of each piece type without promotion
-    ((Count(board, p) == 8) | (Count(board, P) == 8)).implies(
-        (Count(board, b) <= 2) &
-        (Count(board, r) <= 2) &
-        (Count(board, n) <= 2) &
-        (Count(board, q) <= 1)
+    # The number of pieces can't exceed the starting number plus the number of promotions possible
+    (
+        (Count(board, b) + Count(board, r) + Count(board, n) + Count(board, q) <= 2+2+1+1 + 8-Count(board, p))
     ),
-    ((Count(board, P) == 8) | (Count(board, p) == 8)).implies(
-        (Count(board, B) <= 2) &
-        (Count(board, R) <= 2) &
-        (Count(board, N) <= 2) &
-        (Count(board, Q) <= 1)
+    (
+        (Count(board, B) + Count(board, R) + Count(board, N) + Count(board, Q) <= 2+2+1+1 + 8-Count(board, P))
     ),
     # Bishops can't have moved if the pawns are still in starting position
     ((board[1, 1] == p) & (board[1, 3] == p) & (
