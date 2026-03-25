@@ -47,7 +47,7 @@ import argparse
 import warnings
 import traceback
 import multiprocessing
-from tqdm import tqdm
+from tqdm import tqdm  # type: ignore[import-untyped]
 from pathlib import Path
 from typing import Optional, Tuple
 from io import StringIO
