@@ -11,7 +11,6 @@ jobs:
           - solver: pysat
             install_commands: |
               pip install pypblib
-          - solver: pysdd
           - solver: choco
           - solver: minizinc
             install_commands: |
