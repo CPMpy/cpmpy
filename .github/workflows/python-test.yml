@@ -12,6 +12,8 @@ jobs:
             install_commands: |
               pip install pypblib
           - solver: choco
+	  - solver: exact
+	  - solver: gcs
           - solver: minizinc
             install_commands: |
               sudo snap install minizinc --classic
