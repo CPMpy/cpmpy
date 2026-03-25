@@ -357,7 +357,11 @@ def mus_iis(soft, hard=[], solver="gurobi"):
 
     # Add each assumption as a soft constraint `a>=1` using Gurobi directly (as opposed to e.g. `s+=assumptions`), in order to gain access to the returned Gurobi constraints so we can access their `IISConstr` later
     # Gurobi returns its own `tupledict`, we just need the constraints (i.e. values)
-    grb_assumptions = grb_model.addConstrs(a >= 1 for a in s.solver_vars(assumptions)).values()
+
+    # Get solver variables first and update model to register any newly created variables
+    solver_assumptions = s.solver_vars(assumptions)
+    grb_model.update()
+    grb_assumptions = grb_model.addConstrs(a >= 1 for a in solver_assumptions).values()
 
     import gurobipy  # Safe to import gurobipy since instantiating the Gurobi solver succeeded
     try:
