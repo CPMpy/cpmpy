@@ -1237,6 +1237,35 @@ class TestSupportedSolvers:
         assert model.solve(solver)
         assert model.solveAll(solver, **kwargs) == 2
 
+    def test_solveAll_display_expr(self, solver, capsys):
+        x = cp.boolvar(shape=3, name="x")
+        m = cp.Model(cp.sum(x) == 1)
+
+        n_sols = m.solveAll(solver=solver, display=x[0], solution_limit=3)  # should print 3 sols
+        assert n_sols == 3
+        out = capsys.readouterr().out
+        assert {"True", "False"} == set([s for s in out.split("\n") if len(s)])
+
+    def test_solveAll_display_ndvararray(self, solver, capsys):
+
+        x = cp.boolvar(shape=3,name="x")
+        m = cp.Model(cp.sum(x) == 1)
+
+        m.solveAll(solver=solver, display=x, solution_limit=3) # should print 3 sols
+        out = capsys.readouterr().out
+        assert {"[True, False, False]", "[False, True, False]", "[False, False, True]"} == set([s for s in out.split("\n") if len(s)])
+
+
+    def test_solveAll_display_list(self, solver, capsys):
+
+        x = cp.boolvar(shape=3, name="x")
+        m = cp.Model(cp.sum(x) == 1)
+
+        m.solveAll(solver=solver, display=list(x), solution_limit=3)  # should print 3 sols
+        out = capsys.readouterr().out
+        assert {"[True, False, False]", "[False, True, False]", "[False, False, True]"} ==  set([s for s in out.split("\n") if len(s)])
+
+
 
 @pytest.mark.generate_constraints.with_args(numexprs)
 def test_objective_numexprs(solver, constraint):
