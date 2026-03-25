@@ -539,7 +539,7 @@ class Comparison(Expression):
             left (ExprLike): Left-hand side (expression or constant)
             right (ExprLike): Right-hand side (expression or constant)
         
-        We expect at least one of the two to be an Expression.
+        We expect at least one of the two to be an :class:`Expression`.
         """
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, [left, right])
@@ -621,8 +621,8 @@ class Operator(Expression):
                 all(not is_num(a) for a in arg_list) and \
                 any(_wsum_should(a) for a in arg_list):
             we = [_wsum_make(a) for a in arg_list]
-            w: ListLike[ExprLike] = [wi for w, _ in we for wi in w]
-            e: ListLike[ExprLike] = [ei for _, e in we for ei in e]
+            w: list[ExprLike] = [wi for w, _ in we for wi in w]
+            e: list[ExprLike] = [ei for _, e in we for ei in e]
             name = 'wsum'
             arg_list = [w, e]
 
