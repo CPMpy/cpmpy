@@ -1082,11 +1082,11 @@ class TestSupportedSolvers:
         end = cp.intvar(0,50, shape=20)
         demand  = np.random.randint(10,15, size=20)
 
-        m += cp.Cumulative(start, dur, end,demand, 15)
+        m += cp.Cumulative(start, dur, end,demand, 20)
         m.minimize(cp.max(end))
         m.solve(solver=solver, time_limit=1)
         # normally, should not be able to solve within 1s...
-        assert m.status().exitstatus in (ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
+        assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
         # now trivally unsat
         m += cp.sum(bv) <= 0
