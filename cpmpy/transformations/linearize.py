@@ -50,7 +50,7 @@ General comparisons or expressions
 """
 import copy
 import warnings
-from typing import Set, Sequence, Optional
+from typing import Set, AbstractSet, Sequence, Optional
 
 import numpy as np
 import cpmpy as cp
@@ -560,9 +560,9 @@ def only_positive_coefficients(lst_of_expr):
 
 
 def decompose_linear(lst_of_expr: Sequence[Expression],
-                     supported: Set[str]=frozenset(),
-                     supported_reified:Set[str]=frozenset(),
-                     csemap:Optional[dict[Expression,Expression]]=None):
+                     supported: Optional[AbstractSet[str]] = None,
+                     supported_reified: Optional[AbstractSet[str]] = None,
+                     csemap: Optional[dict[Expression, Expression]] = None):
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
 
@@ -575,18 +575,28 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         returns:
             list of expressions
     """
+    if supported is None:
+        supported = frozenset[str]()
+    if supported_reified is None:
+        supported_reified = frozenset[str]()
+
     decompose_custom = get_linear_decompositions()
 
-    return decompose_in_tree(lst_of_expr, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_in_tree(lst_of_expr, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
 
-def decompose_linear_objective(obj: Sequence[Expression],
-                               supported: Set[str] = frozenset(),
-                               supported_reified: Set[str] = frozenset(),
+def decompose_linear_objective(obj: Expression,
+                               supported: Optional[AbstractSet[str]] = None,
+                               supported_reified: Optional[AbstractSet[str]] = None,
                                csemap: Optional[dict[Expression, Expression]] = None):
     """Decompose objective using linear-friendly (var == val) decompositions."""
+    if supported is None:
+        supported = frozenset[str]()
+    if supported_reified is None:
+        supported_reified = frozenset[str]()
+
     decompose_custom = get_linear_decompositions()
 
-    return decompose_objective(obj, supported, supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_objective(obj, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
 
 def get_linear_decompositions():
     """

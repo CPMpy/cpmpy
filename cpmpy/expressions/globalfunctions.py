@@ -73,12 +73,12 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Optional, Union
+from typing import Optional
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator
+from .core import Expression, Operator, ExprLike, ListLike
 from .variables import boolvar, intvar, cpm_array
 from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
@@ -157,10 +157,10 @@ class Minimum(GlobalFunction):
     Computes the minimum value of the arguments
     """
 
-    def __init__(self, arg_list: list[Expression]):
+    def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
-            arg_list (list[Expression]): List of expressions of which to compute the minimum
+            arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
         """
         super().__init__("min", flatlist(arg_list))
 
@@ -205,10 +205,10 @@ class Maximum(GlobalFunction):
     Computes the maximum value of the arguments
     """
 
-    def __init__(self, arg_list: list[Expression]):
+    def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
-            arg_list (list[Expression]): List of expressions of which to compute the maximum
+            arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
         """
         super().__init__("max", flatlist(arg_list))
 
@@ -315,11 +315,13 @@ class Multiplication(GlobalFunction):
     Supports decomposition into linear constraints for MIP solvers via :meth:`decompose`.
     """
 
-    def __init__(self, x: Expression, y: Expression):
+    def __init__(self, x: ExprLike, y: ExprLike):
         """
         Arguments:
-            x (Expression): First factor
-            y (Expression): Second factor
+            x (ExprLike): First factor (expression or constant)
+            y (ExprLike): Second factor (expression or constant)
+        
+        We expect at least one of the two is an Expression
 
         Normalizes so a constant is first when one factor is numeric (sets .is_lhs_num).
         """
@@ -442,11 +444,11 @@ class Division(GlobalFunction):
         * floor division (Python): `-7 // 3` = `math.floor(-7/3)` = -3
     """
 
-    def __init__(self, x: Expression, y: Expression):
+    def __init__(self, x: ExprLike, y: ExprLike):
         """
         Arguments:
-            x (Expression): Expression to divide
-            y (Expression): Expression to divide by
+            x (ExprLike): Expression or constant to divide
+            y (ExprLike): Expression or constant to divide by
         """
         super().__init__("div", [x, y])
 
@@ -537,11 +539,11 @@ class Modulo(GlobalFunction):
         * modulo (Python): `7 % -5` = -3 because `7 // -5` = -2 and `7 - (-5*-2)` = -3. Note how the sign of y is preserved.
     """
 
-    def __init__(self, x, y):
+    def __init__(self, x: ExprLike, y: ExprLike):
         """
         Arguments:
-            x (Expression): Expression to modulo
-            y (Expression): Expression to modulo by
+            x (ExprLike): Expression or constant for the dividend
+            y (ExprLike): Expression or constant for the divisor
         """
         super().__init__("mod", [x, y])
 
@@ -623,11 +625,11 @@ class Power(GlobalFunction):
     Only non-negative constant integer exponents are supported.
     """
 
-    def __init__(self, base:Expression, exponent:int):
+    def __init__(self, base: ExprLike, exponent: int|np.integer):
         """
         Arguments:
-            base (Expression): Expression to raise to the power
-            exponent (int): non-negative integer exponent (no variable allowed)
+            base (ExprLike): Expression or constant to raise to the power
+            exponent (int | np.integer): Non-negative integer exponent (constant only, no variable)
         """
         if not is_num(exponent):
             raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
@@ -694,11 +696,11 @@ class Element(GlobalFunction):
     is always numeric, even if `Arr` only contains Boolean variables.
     """
 
-    def __init__(self, arr: list[Union[int, Expression]], idx: Expression):
+    def __init__(self, arr: ListLike[ExprLike], idx: ExprLike):
         """
         Arguments:
-            arr (list[Union[int, Expression]]): list (including NDVarArray) of integers or expressions to index into
-            idx (Expression): Integer decision variable or expression, representing the index into the array
+            arr (ListLike[ExprLike]): List of expressions or constants to index into
+            idx (ExprLike): Integer expression or constant for the index (not a boolean expression)
         """
         if is_boolexpr(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
@@ -790,7 +792,7 @@ class Element(GlobalFunction):
         """
         return f"{self.args[0]}[{self.args[1]}]"
 
-def element(arg_list: list[Expression]) -> Element:
+def element(arg_list):
     """
     DEPRECATED: Use Element(arr,idx) instead of element([arr,idx]).
 
@@ -810,11 +812,11 @@ class Count(GlobalFunction):
     The Count global function represents the number of occurrences of a value in an array
     """
 
-    def __init__(self, arr: list[Expression], val: Union[int, Expression]):
+    def __init__(self, arr: ListLike[ExprLike], val: ExprLike):
         """
         Arguments:
-            arr (list[Expression]): Array of expressions to count in
-            val (Union[int, Expression]): 'Value' to count occurrences of (can also be an expression)
+            arr (ListLike[ExprLike]): List of expressions or constants to count in
+            val (ExprLike): 'Value' to count occurences of (can also be an expression)
         """
         if not is_any_list(arr):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
@@ -871,11 +873,11 @@ class Among(GlobalFunction):
     returns the number of variables among x1, x2, x3, x4 that take the value 1 or 2.
     """
 
-    def __init__(self, arr: list[Expression], vals: list[int]):
+    def __init__(self, arr: ListLike[ExprLike], vals: ListLike[int|np.integer]):
         """
         Arguments:
-            arr (list[Expression]): Array of expressions to count occurrences in
-            vals (list[int]): Array of integer values to count the total number of occurrences of
+            arr (ListLike[ExprLike]): List of expressions or constants to count occurrences in
+            vals (ListLike[int | np.integer]): List of integer constants whose occurrences are counted
         """
         if not is_any_list(arr) or not is_any_list(vals):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
@@ -927,10 +929,10 @@ class NValue(GlobalFunction):
     then `NValue([x1, x2, x3, x4])` returns 3 (the distinct values are 1, 2, and 3).
     """
 
-    def __init__(self, arr: list[Expression]):
+    def __init__(self, arr: ListLike[ExprLike]):
         """
         Arguments:
-            arr (list[Expression]): Array of expressions to count distinct values in
+            arr (ListLike[ExprLike]): List of expressions or constants to count distinct values in
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
@@ -989,11 +991,11 @@ class NValueExcept(GlobalFunction):
     excluding 0).
     """
 
-    def __init__(self, arr: list[Expression], n: int):
+    def __init__(self, arr: ListLike[ExprLike], n: int|np.integer):
         """
         Arguments:
-            arr (list[Expression]): Array of expressions to count distinct values in
-            n (int): Integer value to exclude from the count
+            arr (ListLike[ExprLike]): List of expressions or constants to count distinct values in
+            n (int | np.integer): Integer constant to exclude from the count
         """
         if not is_any_list(arr):
             raise ValueError("NValueExcept takes an array as input")
