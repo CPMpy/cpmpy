@@ -68,10 +68,12 @@ class CPM_scip(SolverInterface):
     def supported():
         # try to import the package
         try:
-            import pyscipopt as scip
+            import pyscipopt
             return True
-        except Exception:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     @classmethod
     def version(cls) -> Optional[str]:
