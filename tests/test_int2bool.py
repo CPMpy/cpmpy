@@ -145,6 +145,7 @@ class TestTransInt2Bool:
 
 class TestCSE:
 
+    @pytest.mark.requires_solver("pindakaas")
     def test_int2bool_cse_one_var(self):
         x = cp.intvar(0, 2, name="x")
         slv = cp.solvers.CPM_pindakaas()
@@ -152,6 +153,7 @@ class TestCSE:
         assert str(slv.transform((x == 0) | (x == 2))) == "[(BV[x == 0]) or (BV[x == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1]"
 
     @pytest.mark.skip("aspirational")
+    @pytest.mark.requires_solver("pindakaas")
     def test_int2bool_cse_one_var_order(self):
         x = cp.intvar(0, 2, name="x")
         slv = cp.solvers.CPM_pindakaas()
@@ -161,6 +163,7 @@ class TestCSE:
         # assert str(slv.transform((x >= 1) | (x < 2))) == "[(⟦x == 0⟧) or (⟦x == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1]"
 
     @pytest.mark.skip("aspirational")
+    @pytest.mark.requires_solver("pindakaas")
     def test_int2bool_cse_two_vars(self):
         slv = cp.solvers.CPM_pindakaas()
         x = cp.intvar(0, 2, name="x")
