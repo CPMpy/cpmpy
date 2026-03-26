@@ -701,9 +701,9 @@ class CPM_minizinc(SolverInterface):
             return f"{expr.name}({{}}, {{}})".format(X, Y)
 
         if expr.name in ["lex_chain_less", "lex_chain_lesseq"]:
-            X = cpm_array([[self._convert_expression(e) for e in row] for row in expr.args])
+            arr = np.array([[self._convert_expression(e) for e in row] for row in expr.args])  # use np.array because its plain strings
             str_X = "[|\n"  # opening
-            for row in X.T:  # Minizinc enforces lexicographic order on columns
+            for row in arr.T:  # Minizinc enforces lexicographic order on columns
                 str_X += ",".join(map(str, row)) + " |"  # rows
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)
@@ -823,7 +823,7 @@ class CPM_minizinc(SolverInterface):
                                                         self._convert_expression(fal))
 
         elif expr.name == "gcc":
-            assert isinstance(expr, GlobalCardinalityCount)  # typecheck that it has a .closed
+            assert isinstance(expr, GlobalCardinalityCount)  # typecheck that it has a .closed()
             vars, vals, occ = expr.args
             vars = self._convert_expression(vars)
             vals = self._convert_expression(vals)
