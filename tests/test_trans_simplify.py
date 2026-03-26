@@ -13,14 +13,14 @@ class TestTransSimplify:
 
     def test_bool_ops(self):
         expr = Operator("or", self.bvs.tolist() + [False])
-        assert str(self.transform(expr)) == "[or[bv[0], bv[1], bv[2]]]"
+        assert str(self.transform(expr)) == "[or(bv[0], bv[1], bv[2])]"
         expr = Operator("or", self.bvs.tolist() + [True])
         assert str(self.transform(expr)) == "[boolval(True)]"
 
         expr = Operator("and", self.bvs.tolist() + [False]) + self.ivs[0] >= 10
         assert str(self.transform(expr)) == "[0 + (iv[0]) >= 10]"
         expr = Operator("and", self.bvs.tolist() + [True]) + self.ivs[0] >= 10
-        assert str(self.transform(expr)) == "[(and[bv[0], bv[1], bv[2]]) + (iv[0]) >= 10]"
+        assert str(self.transform(expr)) == "[(and(bv[0], bv[1], bv[2])) + (iv[0]) >= 10]"
 
 
         expr = Operator("->", [self.bvs[0], True])
@@ -39,7 +39,7 @@ class TestTransSimplify:
         assert str(self.transform(expr)) == '[iv[0] >= 1]'
 
         expr = (cp.sum(self.ivs) + True) >= 10
-        assert str(self.transform(expr)) == '[sum[iv[0], iv[1], iv[2], 1] >= 10]'
+        assert str(self.transform(expr)) == '[sum(iv[0], iv[1], iv[2], 1) >= 10]'
 
         expr = True + self.ivs[0] >= False
         assert str(self.transform(expr)) == '[1 + (iv[0]) >= 0]'
@@ -96,7 +96,7 @@ class TestTransSimplify:
 
         # very nested one
         expr = Operator("and", self.bvs[:1].tolist() + [BoolVal(False)]) == Operator("or", self.bvs)
-        assert str(self.transform(expr)) == '[and[~bv[0], ~bv[1], ~bv[2]]]'
+        assert str(self.transform(expr)) == '[and(~bv[0], ~bv[1], ~bv[2])]'
 
     # issue #322
     def test_with_floats(self):

@@ -87,7 +87,7 @@
 import copy
 import warnings
 from types import GeneratorType
-from typing import Any, Optional, TypeAlias, TypeVar, Union, Sequence
+from typing import Any, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
 import numpy as np
 import cpmpy as cp
 
@@ -128,11 +128,11 @@ class Expression(object):
     def args(self, args):
         raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
 
-    def update_args(self, args):
+    def update_args(self, args: Iterable[Any]) -> None:
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
         """
-        self._args = args
+        self._args = tuple(args)
         # Reset cached "_has_subexpr"
         if hasattr(self, "_has_subexpr"):
             del self._has_subexpr
@@ -611,7 +611,7 @@ class Operator(Expression):
             w: ListLike[ExprLike] = [wi for w, _ in we for wi in w]
             e: ListLike[ExprLike] = [ei for _, e in we for ei in e]
             name = 'wsum'
-            arg_list = [w, e]
+            arg_list = (w, e)
 
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
@@ -640,8 +640,9 @@ class Operator(Expression):
                     i += l
                 i += 1
 
-
+        print("Arg list: ", arg_list, "tuple: ", tuple(arg_list))
         super().__init__(name, tuple(arg_list))
+        print("self args: ", self.args, self._args)
 
     def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
@@ -673,6 +674,7 @@ class Operator(Expression):
                                      printname,
                                      wrap_bracket(self.args[1]))
         else:  # n-ary
+            print("Nary: ", self.name, type(self.args), self.args)
             return "{}{}".format(self.name, self.args)  # args is a tuple, will be in ()
 
     def value(self) -> Optional[int]:
