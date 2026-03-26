@@ -211,6 +211,7 @@ def get_bounds(expr):
 def implies(expr, other):
     """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
     if isinstance(expr, (cp.expressions.core.Expression, cp.variables.NDVarArray)):
+        # both implement .implies()
         return expr.implies(other)
     elif is_true_cst(expr):
         return other
