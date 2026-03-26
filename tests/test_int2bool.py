@@ -142,6 +142,7 @@ class TestTransInt2Bool:
          SOL_IN: {cons_sols}
          SOL_OU: {flat_sols}
         """
+<<<<<<< gh_actions_seperate_runners
 
 class TestCSE:
 
@@ -174,3 +175,5 @@ class TestCSE:
             == "[(⟦x == 0⟧) or (⟦y == 2⟧), sum([⟦x == 0⟧, ⟦x == 1⟧, ⟦x == 2⟧]) == 1, sum([⟦y == 0⟧, ⟦y == 1⟧, ⟦y == 2⟧]) == 1]"
         )
         # currently: [(BV[x == 0]) or (BV[y == 2]), sum([BV[x == 0], BV[x == 1], BV[x == 2]]) == 1, (BV[x == 0]) -> (BV[x == 0]), (~BV[x == 0]) -> (sum([0, 1, 2, -3] * (BV[x == 0], BV[x == 1], BV[x == 2], BV8)) <= -1), (~BV[x == 0]) -> (sum([0, 1, 2, -1] * (BV[x == 0], BV[x == 1], BV[x == 2], BV8)) >= 0), sum([1, -1] * (BV[x == 0], ~BV 8)) <= 0, sum([BV[y == 0], BV[y == 1], BV[y == 2]]) == 1, (BV[y == 2]) -> (BV[y == 2]), (~BV[y == 2]) -> (sum([0, 1, 2, -1] * (BV[y == 0], BV[y == 1], BV[y == 2], BV9)) <= 1), (~BV[y == 2]) -> (sum([0, 1, 2, -3] * (BV[y == 0], BV[y == 1], BV[y == 2], BV9)) >= 0), sum([1, -1] * (BV[y == 2], ~BV9)) <= 0]
+=======
+>>>>>>> master
