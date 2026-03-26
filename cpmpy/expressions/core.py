@@ -604,7 +604,8 @@ class Operator(Expression):
         """
         Arguments:
             name (str): Operator name (one of :attr:`Operator.allowed`)
-            arg_list (Sequence[ExprLike | ListLike[ExprLike]]): List of expressions/constants or other lists of expressions/constants
+            arg_list (Sequence[ExprLike | ListLike[ExprLike]]): List of expressions/constants, 
+                        or list of size 2 with list of weights and list of expressions for wsum.
         """
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
