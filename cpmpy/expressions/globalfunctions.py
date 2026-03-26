@@ -704,6 +704,8 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
+        assert len(arr) > 0, "Element: array should not be empty"
+
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
