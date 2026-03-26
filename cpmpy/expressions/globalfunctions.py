@@ -412,7 +412,7 @@ class Multiplication(GlobalFunction):
             a, b = b, a
             lb_a, lb_b = lb_b, lb_a
             ub_a, ub_b = ub_b, ub_a
-        dom_a = list(range(lb_a, ub_a + 1))
+        dom_a = list[ExprLike](range(lb_a, ub_a + 1))
 
         # int*int linear decomposition:
         # a*b == sum_v(v * (a==v)) * b  with 'v' in dom(a)
@@ -706,6 +706,8 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
+        assert len(arr) > 0, "Element: array should not be empty"
+
         super().__init__("element", [arr, idx])
 
     def __getitem__(self, index):
