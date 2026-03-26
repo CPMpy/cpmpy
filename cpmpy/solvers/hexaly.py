@@ -531,7 +531,7 @@ class HexSolutionPrinter:
         self._display = display
         self._solution_limit = solution_limit
         self._verbose = verbose
-        if isinstance(display, Expression) or is_any_list(Expression):
+        if isinstance(display, Expression) or is_any_list(display):
             self._cpm_vars = get_variables(display)
         elif callable(display):
             # might use any, so populate all (user) variables with their values
