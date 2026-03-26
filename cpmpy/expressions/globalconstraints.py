@@ -444,13 +444,14 @@ class Circuit(GlobalConstraint):
 
         # element constraints can be partial
         from cpmpy.transformations.safening import _no_partial_functions
-        _, safe_order, toplevel, nbc = _no_partial_functions(order, is_toplevel=False) # will always safen elements, even if toplevel...
+        changed, safe_order, toplevel, nbc = _no_partial_functions(order, safen_toplevel=frozenset(), is_toplevel=False)
+        if changed:
+            order = safe_order # operate on the safened order expressions
 
-        value = [safe_order[-1] == 0, # return to start node
-                 cp.AllDifferent(safe_order),  # type: ignore # ensure no subcircuits
-                 cp.AllDifferent(succ) # redundant constraints, results in better decomposition
+        value = [order[-1] == 0, # return to start node
+                 AllDifferent(order),  # ensure no subcircuits
+                 AllDifferent(succ)    # redundant constraint, strengthens decomposition
                 ]
-
         return value + nbc, toplevel
 
     def value(self) -> Optional[bool]:
@@ -500,15 +501,15 @@ class Inverse(GlobalConstraint):
 
         # we try to avoid in-function imports (needed when cyclic dependency),
         # but decompose is typically only called once anyway, so here it is acceptable
-        from cpmpy.transformations import safening
+        from cpmpy.transformations.safening import _no_partial_functions
 
         fwd, rev = self.args
         rev = cpm_array(rev)
 
         constraining = [rev[x] == i for i,x in enumerate(fwd)]
         # Element constraints can be partial, so run safening transformation
-        _, constraining, defining, nbc = safening._no_partial_functions(constraining, is_toplevel=False, 
-                                                                        safen_toplevel=frozenset(("element",))) # TODO, how to know if element should be safened?
+        _, constraining, defining, nbc = _no_partial_functions(constraining, is_toplevel=False, 
+                                                              safen_toplevel=frozenset())
         
         return constraining + nbc, defining
 
@@ -964,8 +965,9 @@ class Xor(GlobalConstraint):
 
         if new_args is None:# did not find a Boolean variable to negate
             # pick first arg, and push down negation
+            from cpmpy.transformations.negation import recurse_negation
             new_args = list(self.args)
-            new_args[0] = cp.transformations.negation.recurse_negation(self.args[0])
+            new_args[0] = recurse_negation(self.args[0])
 
         return Xor(new_args)
 
