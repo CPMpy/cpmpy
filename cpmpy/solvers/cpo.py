@@ -764,7 +764,7 @@ try:
             # identify which variables to populate with their values
             self._cpm_vars = []
             self._display = display
-            if isinstance(display, (list,Expression)):
+            if isinstance(display, Expression) or is_any_list(display):
                 self._cpm_vars = get_variables(display)
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
@@ -779,21 +779,21 @@ try:
                     if hasattr(cpm_var, "flat"):
                         for cpm_subvar in cpm_var.flat:
                             sol_var = self._varmap[cpm_subvar]
-                            if isinstance(cpm_var,_BoolVarImpl):
+                            if isinstance(cpm_subvar, _BoolVarImpl):
                                 sol_var = sol_var.children[0]
-                                cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
+                                cpm_subvar._value = bool(sres.get_var_solution(sol_var).get_value())
                             else:
-                                cpm_var._value = sres.get_var_solution(sol_var).get_value()
+                                cpm_subvar._value = sres.get_var_solution(sol_var).get_value()
                     elif isinstance(cpm_var, _BoolVarImpl):
-                        sol_var = self._varmap[cpm_subvar].children[0]
+                        sol_var = self._varmap[cpm_var].children[0]
                         cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
                     else:
-                        sol_var = self._varmap[cpm_subvar]
+                        sol_var = self._varmap[cpm_var]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
 
-                if isinstance(self._display, (Expression, NDVarArray)):
+                if isinstance(self._display, Expression):
                     print(argval(self._display))
-                elif isinstance(self._display, list):
+                elif is_any_list(self._display):
                     # explicit list of expressions to display
                     print(argvals(self._display))
                 else: # callable
