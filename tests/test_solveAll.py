@@ -63,3 +63,24 @@ class TestSolveAll:
         m = cp.Model(a | b)
 
         assert 3 == m.solveAll('ortools', log_search_progress=True)
+
+    def test_solver_specific_display_ndvararray(self, capsys):
+        x = cp.boolvar(shape=3, name="x")
+        m = cp.Model(cp.sum(x) == 1)
+        expected = {"[True, False, False]", "[False, True, False]", "[False, False, True]"}
+
+        for name in ("cpo", "hexaly"):
+            if name not in cp.SolverLookup.solvernames():
+                continue
+
+            kwargs = {"display": x}
+            if name == "hexaly":
+                kwargs["time_limit"] = 5
+            else:
+                kwargs["solution_limit"] = 3
+
+            n_sols = m.solveAll(solver=name, **kwargs)
+            assert n_sols == 3
+
+            out = capsys.readouterr().out
+            assert expected == {s for s in out.split("\n") if s}
