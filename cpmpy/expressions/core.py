@@ -522,19 +522,18 @@ class BoolVal(Expression):
 
     def implies(self, other: ExprLike) -> Expression:
         my_val: bool = self.args[0]
-        if my_val:
-            # other must be True
-            if isinstance(other, Expression):
-                assert other.is_bool(), "implies: other must be a boolean expression"
+        if isinstance(other, Expression):
+            assert other.is_bool(), "implies: other must be a boolean expression"
+            if my_val:  # T -> other :: other
                 return other
-            else:
-                # should we check whether it actually is bool?
-                # note that this can return a BoolVal(True)
-                return BoolVal(bool(other))
+            return Operator("->", [self, other])  # do not simplify to True, would remove other from user view
         else:
-            # self=False already satisfies the implication
-            # note that if there are 'new' variables in `other`, the model will never see them
-            return BoolVal(True)
+            # should we check whether it actually is bool and not int?
+            if my_val:  # T -> other :: other
+                return BoolVal(bool(other))
+            else:  # F -> other :: True
+                return BoolVal(True)
+            # note that this can return a BoolVal(True)
 
 
 class Comparison(Expression):
