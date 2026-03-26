@@ -520,11 +520,21 @@ class BoolVal(Expression):
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other: Expression) -> Expression:
-        if self.args[0]:
-            return other
+    def implies(self, other: ExprLike) -> Expression:
+        my_val: bool = self.args[0]
+        if my_val:
+            # other must be True
+            if isinstance(other, Expression):
+                assert other.is_bool(), "implies: other must be a boolean expression"
+                return other
+            else:
+                # should we check whether it actually is bool?
+                # note that this can return a BoolVal(True)
+                return BoolVal(bool(other))
         else:
-            return other == other  # Always true, but keep variables in the model
+            # self=False already satisfies the implication
+            # note that if there are 'new' variables in `other`, the model will never see them
+            return BoolVal(True)
 
 
 class Comparison(Expression):
