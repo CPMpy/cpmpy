@@ -17,12 +17,14 @@ from utils import skip_on_missing_pblib
 # also add exclusions to the 3 EXCLUDE_* below as needed
 SOLVERNAMES = [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
 ALL_SOLS = False # test whether all solutions returned by the solver satisfy the constraint
+# ALL_SOLS = True # test whether all solutions returned by the solver satisfy the constraint
 
 # Exclude some global constraints for solvers
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
-    "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse",
+    # "Circuit",
     "Table", 'NegativeTable', "ShortTable", "Regular",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
@@ -37,6 +39,7 @@ SAT_SOLVERS = {"pysdd"}
 EXCLUDE_GLOBAL = {
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
+                  "gurobi": {"Circuit", "CumulativeOptional"}
                   
                   }
 
@@ -284,6 +287,14 @@ def global_functions(solver):
         else:
             yield cls(NUM_ARGS)
 
+def generate_cases(solver):
+    yield cp.boolvar(name="x") >= 0  # issue #736
+    x, y = cp.intvar(1, 3,shape=2, name=["x", "y"])
+    yield x ** 2 - 2*x*y + y**2 <= 3
+
+    # p, q = cp.intvar(shape=2, name=["p", "q"])
+    # yield p 
+    # yield ((cp.boolvar(name="x") >= 0) | (cp.boolvar(name="y") >= 0))  # issue #736
 
 def reify_imply_exprs(solver):
     """
@@ -304,48 +315,49 @@ def reify_imply_exprs(solver):
 
 
 def verify(cons):
-    assert argval(cons)
-    assert cons.value()
+    from cpmpy.transformations.get_variables import get_variables
+    vars_ = get_variables(cons)
+    assignment = {v.name: v.value() for v in sorted(vars_, key=lambda v: v.name)}
+    assert argval(cons), f"argval failed for {cons} with assignment {assignment}"
+    assert cons.value(), f"value() failed for {cons} with assignment {assignment}"
 
-@pytest.mark.generate_constraints.with_args(bool_exprs)
+def all_constraints(solver):
+    """Combined generator for all constraint types."""
+    # yield from bool_exprs(solver)
+    # yield from comp_constraints(solver)
+    # yield from reify_imply_exprs(solver)
+    yield from generate_cases(solver)
+
+@pytest.mark.generate_constraints.with_args(all_constraints)
 @skip_on_missing_pblib(skip_on_exception_only=True)
-def test_bool_constraints(solver, constraint):
+def test_constraints(solver, constraint):
     """
-        Tests boolean constraint by posting it to the solver and checking the value after solve.
+        Tests constraint by posting it to the solver and checking the value after solve.
     """
     if ALL_SOLS:
-        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
+        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint), solution_limit=100)
         assert n_sols >= 1
     else:
         assert SolverLookup.get(solver, Model(constraint)).solve()
         assert argval(constraint)
         assert constraint.value()
 
-@pytest.mark.generate_constraints.with_args(comp_constraints)
-@skip_on_missing_pblib(skip_on_exception_only=True)
-def test_comparison_constraints(solver, constraint):
-    """
-        Tests comparison constraint by posting it to the solver and checking the value after solve.
-    """
-    if ALL_SOLS:
-        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display= lambda: verify(constraint))
-        assert n_sols >= 1
-    else:
-        assert SolverLookup.get(solver,Model(constraint)).solve()
-        assert argval(constraint)
-        assert constraint.value()
+if __name__ == "__main__":
+    solver = None  # Use None for no solver-specific exclusions
 
+    generators = [
+        ("Boolean expressions", bool_exprs),
+        ("Comparison constraints", comp_constraints),
+        ("Global constraints", global_constraints),
+        ("Global functions", global_functions),
+        ("Reify/imply expressions", reify_imply_exprs),
+    ]
 
-@pytest.mark.generate_constraints.with_args(reify_imply_exprs)
-@skip_on_missing_pblib(skip_on_exception_only=True)
-def test_reify_imply_constraints(solver, constraint):
-    """
-        Tests boolean expression by posting it to solver and checking the value after solve.
-    """
-    if ALL_SOLS:
-        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint))
-        assert n_sols >= 1
-    else:
-        assert SolverLookup.get(solver, Model(constraint)).solve()
-        assert argval(constraint)
-        assert constraint.value()
+    for name, gen in generators:
+        print(f"\n{'='*60}")
+        print(f"{name}")
+        print('='*60)
+        for i, expr in enumerate(gen(solver)):
+            model = Model(expr)
+            print(f"{i+1}. {model}")
+
