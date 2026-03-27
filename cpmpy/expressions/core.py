@@ -181,14 +181,12 @@ class Expression(object):
 
         while stack:
             el = stack.pop()
-            if isinstance(el, Expression):
-                # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
-                if isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
-                    self._has_subexpr = True
-                    return True
-                elif not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
-                    self._has_subexpr = True
-                    return True
+            if isinstance(el, Expression) and not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
+                self._has_subexpr = True
+                return True
+            elif isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
+                self._has_subexpr = True
+                return True
             elif is_any_list(el):
                 # Add list elements to stack for processing
                 stack.extend(el)
@@ -507,11 +505,20 @@ class BoolVal(Expression):
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other: Expression) -> Expression:
-        if self.args[0]:
-            return other
+    def implies(self, other: ExprLike) -> Expression:
+        my_val: bool = self.args[0]
+        if isinstance(other, Expression):
+            assert other.is_bool(), "implies: other must be a boolean expression"
+            if my_val:  # T -> other :: other
+                return other
+            return Operator("->", [self, other])  # do not simplify to True, would remove other from user view
         else:
-            return other == other  # Always true, but keep variables in the model
+            # should we check whether it actually is bool and not int?
+            if my_val:  # T -> other :: other
+                return BoolVal(bool(other))
+            else:  # F -> other :: True
+                return BoolVal(True)
+            # note that this can return a BoolVal(True)
 
 
 class Comparison(Expression):
@@ -526,7 +533,7 @@ class Comparison(Expression):
             left (ExprLike): Left-hand side (expression or constant)
             right (ExprLike): Right-hand side (expression or constant)
         
-        We expect at least one of the two to be an Expression.
+        We expect at least one of the two to be an :class:`Expression`.
         """
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, (left, right))
@@ -582,7 +589,8 @@ class Operator(Expression):
         """
         Arguments:
             name (str): Operator name (one of :attr:`Operator.allowed`)
-            arg_list (Sequence[ExprLike | ListLike[ExprLike]]): List of expressions/constants or other lists of expressions/constants
+            arg_list (Sequence[ExprLike | ListLike[ExprLike]]): List of expressions/constants, 
+                        or list of size 2 with list of weights and list of expressions for wsum.
         """
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
@@ -608,8 +616,8 @@ class Operator(Expression):
                 all(not is_num(a) for a in arg_list) and \
                 any(_wsum_should(a) for a in arg_list):
             we = [_wsum_make(a) for a in arg_list]
-            w: ListLike[ExprLike] = [wi for w, _ in we for wi in w]
-            e: ListLike[ExprLike] = [ei for _, e in we for ei in e]
+            w: list[ExprLike] = [wi for w, _ in we for wi in w]
+            e: list[ExprLike] = [ei for _, e in we for ei in e]
             name = 'wsum'
             arg_list = (w, e)
 
@@ -640,9 +648,7 @@ class Operator(Expression):
                     i += l
                 i += 1
 
-        print("Arg list: ", arg_list, "tuple: ", tuple(arg_list))
-        super().__init__(name, tuple(arg_list))
-        print("self args: ", self.args, self._args)
+        super().__init__(name, arg_list)
 
     def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?

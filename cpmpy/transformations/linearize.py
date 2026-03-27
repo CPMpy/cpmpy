@@ -583,7 +583,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
 
     decompose_custom = get_linear_decompositions()
 
-    return decompose_in_tree(lst_of_expr, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
 
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,

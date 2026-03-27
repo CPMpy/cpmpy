@@ -51,7 +51,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args
+from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -73,7 +73,7 @@ class CPM_cpo(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",
-                                              'cumulative', 'no_overlap',
+                                              'cumulative', 'cumulative_optional', 'no_overlap', 'no_overlap_optional',
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element", "nvalue"})
     supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
 
@@ -293,10 +293,11 @@ class CPM_cpo(SolverInterface):
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
+                    print(display.value())
+                elif is_any_list(display):
                     print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
 
             # count and stop
@@ -545,39 +546,44 @@ class CPM_cpo(SolverInterface):
             elif cpm_con.name == "negative_table":
                 arr, table = self._cpo_expr(cpm_con.args)
                 return dom.forbidden_assignments(arr, table)
-            elif cpm_con.name == "cumulative":
-                start, dur, end, height, capacity = cpm_con.args
-                if end is None:
-                    end = [None for _ in range(len(start))] # easier to handle the task-making below
-                height, height_cons = get_nonneg_args(height)
-                cons = self._cpo_expr(height_cons)
-                docp = self.get_docp()
+            elif cpm_con.name == "cumulative" or cpm_con.name == "cumulative_optional":
+                if cpm_con.name == "cumulative_optional":
+                    start, dur, end, demand_lst, capacity, is_present = cpm_con.args
+                else:
+                    start, dur, end, demand_lst, capacity = cpm_con.args
+                    is_present = None
+
+                tasks, cons = self._make_tasks(start, dur, end, is_present)
+
+                # usage constraints
+                demand_lst, demand_cons = get_nonneg_args(demand_lst, is_present)
+                cons += self._cpo_expr(demand_cons)
+
                 total_usage = []
-                for s, d, e, h in zip(start, dur, end, height):
-                    task, task_cons = self._make_task(s, d, e)
-                    cons += task_cons
+                for i, (task, h) in enumerate(zip(tasks, demand_lst)):
                     if task is None: # can happen with 0 duration tasks
                         continue
                     else:
-                        task_height = dom.pulse(task, get_bounds(h))
-                        cons += [self._cpo_expr(h) == dom.height_at_start(task, task_height)]
-                        total_usage.append(task_height)
+                        task_demand = dom.pulse(task, get_bounds(h))
+                        if is_present is not None:
+                            cons += [dom.if_then(self.solver_var(is_present[i]),
+                                                 self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
+                        else:
+                            cons += [self._cpo_expr(h) == dom.height_at_start(task, task_demand)]
+                        total_usage.append(task_demand)
+               
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
-            elif cpm_con.name == "no_overlap":
-                start, dur, end  = cpm_con.args
-                if end is None:
-                    end = [None for _ in range(len(start))] # easier to handle the task-making below
-                cons = []
-                tasks = []
-                for s, d, e in zip(start, dur, end):
-                    task, task_cons = self._make_task(s, d, e)
-                    cons += task_cons
-                    if task is None: # can happen with 0 duration tasks
-                        continue
-                    else:
-                        tasks.append(task)
+            elif cpm_con.name == "no_overlap" or cpm_con.name == "no_overlap_optional":
+                if cpm_con.name == "no_overlap_optional":
+                    start, dur, end, is_present = cpm_con.args
+                else:
+                    start, dur, end = cpm_con.args
+                    is_present = None
+
+                tasks, cons = self._make_tasks(start, dur, end, is_present)
                 return cons + [dom.no_overlap(tasks)]
+            
             # a direct constraint, make with cpo (will be posted to it by calling function)
             elif isinstance(cpm_con, DirectConstraint):
                 return cpm_con.callSolver(self, self.cpo_model)
@@ -615,38 +621,61 @@ class CPM_cpo(SolverInterface):
 
         raise NotImplementedError("CP Optimizer: constraint not (yet) supported", cpm_con)
 
-    def _make_task(self, start, dur, end):
+    def _make_tasks(self, start, dur, end, is_present):
         """
-            Helper function to create task objects and additional constraints enforcing task-relation
+            Helper function to create list of task objects and additional constraints enforcing task-relation
         """
+        if end is None:
+            end = [None for _ in range(len(start))] # easier to handle the task-making below
+
+        # CPO crashes if size of interval is negative
+        dur, dur_cons = get_nonneg_args(dur, is_present)
+        extra_cons = self._cpo_expr(dur_cons)
+
+        if is_present is None:
+            is_present = [None] * len(start) # eases handling below
+
+        tasks = []
+        for s, d, e, p in zip(start, dur, end, is_present):
+            task, task_cons = self._make_task(s, d, e, p)
+            tasks.append(task)
+            extra_cons += task_cons
+        return tasks, extra_cons
+
+    def _make_task(self, start, dur, end, is_present):
+        """
+            Helper function to create a task object and additional constraints enforcing task-relation
+        """
+        assert get_bounds(dur)[0] >= 0, "cpo does not support intervals with negative duration, use `utils.get_nonneg_args` first"
         dom = self.get_docp().modeler
         docp = self.get_docp()
+        is_optional = is_present is not None
+        if not is_optional:
+            is_present = BoolVal(True) # eases handling below
 
         lb, ub = get_bounds(dur)
         extra_cons = []
-        if lb < 0 and ub < 0: # duration is always negative
-            return None, [False]
-        else:
-            new_dur = intvar(0, ub)
-            extra_cons += [self.solver_var(new_dur) == self._cpo_expr(dur)]
-            dur = new_dur
-            lb = 0 # update lb for next check below
-
         if lb == 0 == ub:
             if end is None: # nothing to enforce
                 return None, []
-            cpo_s, cpo_e = self._cpo_expr([start, end])
-            return None, extra_cons + [cpo_s == cpo_e] # no task, just enforce 0 duration
+            return None, extra_cons + self._cpo_expr([implies(is_present, start == end)]) # no task, just enforce 0 duration
 
         # Normal setting
         if end is None: # no end provided by user
-            cpo_s, cpo_d = self._cpo_expr([start, dur])
-            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur))
-            return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d]
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(start+dur), optional=is_optional)
+            extra_cons += [dom.if_then(dom.presence_of(task), dom.start_of(task) == self._cpo_expr(start)),
+                           dom.if_then(dom.presence_of(task), dom.size_of(task) == self._cpo_expr(dur))]
+            if is_optional: # enforce presence of task
+                extra_cons += [dom.presence_of(task) == self.solver_var(is_present)]
+            return task, extra_cons
         else:
-            cpo_s, cpo_d, cpo_e = self._cpo_expr([start, dur, end])
-            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end))
-            return task, extra_cons + [dom.start_of(task) == cpo_s, dom.size_of(task) == cpo_d, dom.end_of(task) == cpo_e]
+            task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end), optional=is_optional)
+            extra_cons += [dom.if_then(dom.presence_of(task), dom.start_of(task) == self._cpo_expr(start)),
+                           dom.if_then(dom.presence_of(task), dom.size_of(task) ==  self._cpo_expr(dur)),
+                           dom.if_then(dom.presence_of(task), dom.end_of(task) == self._cpo_expr(end))]
+            if is_optional: # enforce presence of task
+                extra_cons += [dom.presence_of(task) == self.solver_var(is_present)]
+            return task, extra_cons
 
 
 # solvers are optional, so this file should be interpretable
@@ -735,7 +764,7 @@ try:
             # identify which variables to populate with their values
             self._cpm_vars = []
             self._display = display
-            if isinstance(display, (list,Expression)):
+            if isinstance(display, Expression) or is_any_list(display):
                 self._cpm_vars = get_variables(display)
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
@@ -746,25 +775,18 @@ try:
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            sol_var = self._varmap[cpm_subvar]
-                            if isinstance(cpm_var,_BoolVarImpl):
-                                sol_var = sol_var.children[0]
-                                cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
-                            else:
-                                cpm_var._value = sres.get_var_solution(sol_var).get_value()
-                    elif isinstance(cpm_var, _BoolVarImpl):
-                        sol_var = self._varmap[cpm_subvar].children[0]
+                    if isinstance(cpm_var, _BoolVarImpl):
+                        sol_var = self._varmap[cpm_var].children[0]
                         cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
-                    else:
-                        sol_var = self._varmap[cpm_subvar]
+                    elif isinstance(cpm_var, _IntVarImpl):
+                        sol_var = self._varmap[cpm_var]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
+                    else:
+                        raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
                 if isinstance(self._display, Expression):
                     print(argval(self._display))
-                elif isinstance(self._display, list):
+                elif is_any_list(self._display):
                     # explicit list of expressions to display
                     print(argvals(self._display))
                 else: # callable

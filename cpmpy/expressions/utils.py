@@ -28,14 +28,20 @@ Internal utilities for expression handling.
         eval_comparison
         get_bounds     
 """
+from __future__ import annotations  # treat annotations lazy (as string)
 
 import cpmpy as cp
 import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TypeGuard, Union
+from typing import TYPE_CHECKING, TypeGuard, Union, Optional
 from cpmpy.exceptions import IncompleteFunctionError
+
+if TYPE_CHECKING:
+    # only import for type checking
+    from cpmpy.expressions.core import ListLike, ExprLike
+
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
@@ -129,7 +135,7 @@ def argval(a):
         try:
             val = a.value()
         except IncompleteFunctionError as e:
-            if a.is_bool():
+            if isinstance(a, cp.expressions.core.Expression) and a.is_bool():
                 return False
             else:
                 raise e
@@ -191,11 +197,11 @@ def get_bounds(expr):
     # from cpmpy.expressions.core import Expression
     # from cpmpy.expressions.variables import cpm_array
 
-    if isinstance(expr, cp.expressions.core.Expression):
+    if isinstance(expr, (cp.expressions.core.Expression, cp.variables.NDVarArray)):
         return expr.get_bounds()
     elif is_any_list(expr):
         lbs, ubs = zip(*[get_bounds(e) for e in expr])
-        return list(lbs), list(ubs) # return list as NDVarArray is covered above
+        return list(lbs), list(ubs)
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):
@@ -204,7 +210,8 @@ def get_bounds(expr):
 
 def implies(expr, other):
     """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
-    if isinstance(expr, cp.expressions.core.Expression):
+    if isinstance(expr, (cp.expressions.core.Expression, cp.variables.NDVarArray)):
+        # both implement .implies()
         return expr.implies(other)
     elif is_true_cst(expr):
         return other
@@ -215,20 +222,27 @@ def implies(expr, other):
 
 # Specific stuff for scheduling constraints
 
-def get_nonneg_args(args):
+def get_nonneg_args(args, condition=None):
     """
         Replace arguments with negative lowerbound with their nonnegative counterpart
+        arguments:
+            - args: list of expressions
+            - condition: list of boolean expressions, indicating whether the argument is present or not (e.g., optional tasks)
     """
+    if condition is None:
+        condition = [True] * len(args)
+    assert len(args) == len(condition), f"Args and is_present must have the same length but got {len(args)} and {len(condition)}"
+
     lbs, ubs = zip(*[get_bounds(arg) for arg in args])
     new_args = []
     cons = []
-    for lb, ub, arg in zip(lbs, ubs, args):
+    for lb, ub, arg, cond in zip(lbs, ubs, args, condition):
         if lb < 0:
             if ub >= 0:
                 iv = cp.intvar(0, ub)
             else: # ub < 0  
                 iv = cp.intvar(0,0)
-            cons.append(arg == iv) # will always be False if ub < 0
+            cons.append(implies(cond, arg == iv)) # will always be False if ub < 0
             new_args.append(iv)
         else:
             new_args.append(arg)
