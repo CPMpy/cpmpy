@@ -42,7 +42,7 @@ n = m.solveAll(display=x)
 
 `display` can also take lists of arbitrary CPMpy expressions:
 ```python
-n = m.solveAll(display=[x,sum(x)])
+    n = m.solveAll(display=[x,cp.sum(x)])
 ```
 
 Perhaps most powerful is the use of __callbacks__, which allows for rich printing, solution storing, dynamic stopping and more. You can use any variable name from the outer scope here (it is a closure). That does mean that you have to call `var.value()` each time to get the value(s) of this particular solution.
@@ -51,13 +51,13 @@ Rich printing with a callback function:
 ```python
 def myprint():
     xval = x.value()
-    print(f"x={xval}, sum(x)={sum(xval)}")
+    print(f"x={xval}, sum(x)={cp.sum(xval)}")
 n = m.solveAll(display=myprint) # callback function without brackets 
 ```
 
 Also callback with an anonymous lambda function possible:
 ```python
-n = m.solveAll(display=lambda: print(f"x={x.value()} sum(x)={sum(x.value())}") 
+n = m.solveAll(display=lambda: print(f"x={x.value()} sum(x)={cp.sum(x.value())}") 
 ```
 
 See the [set_game.ipynb](https://github.com/CPMpy/cpmpy/blob/master/examples/set_game.ipynb) for an example of how we use it as a callback to call a plotting function, to plot all the solutions as they are found.
