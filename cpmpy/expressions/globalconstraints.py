@@ -1247,8 +1247,8 @@ class CumulativeOptional(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super().__init__("cumulative_optional", [list(start), list(duration), list(end) if end is not None else None, 
-                                                 demand_list, capacity, list(is_present)])
+        super().__init__("cumulative_optional", (list(start), list(duration), list(end) if end is not None else None, 
+                                                 demand_list, capacity, list(is_present)))
 
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
         """
@@ -1490,7 +1490,7 @@ class NoOverlapOptional(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap_optional", [start, duration, end, is_present])
+        super().__init__("no_overlap_optional", (start, duration, end, is_present))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """

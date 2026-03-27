@@ -648,7 +648,7 @@ class Operator(Expression):
                     i += l
                 i += 1
 
-        super().__init__(name, arg_list)
+        super().__init__(name, tuple(arg_list))
 
     def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
