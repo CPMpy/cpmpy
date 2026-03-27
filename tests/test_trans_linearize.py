@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 import cpmpy as cp
@@ -138,6 +139,59 @@ class TestTransLinearize:
     
         n_sols = cp.Model(lincons).solveAll(display=cb)
         assert n_sols == 3 * 2 * 1# 1 and 3 not allowed
+
+    def test_table(self):
+        x = cp.intvar(shape=3, lb=1, ub=5)
+        cons = [
+            cp.Table(x, [[2, 1, 1], [3, 2, 2], [4, 3, 3], [1, 2, 3], [2, 1, 2]]),
+            x[0] != 2,
+            x[2] != 2
+        ]
+
+        lincons = linearize_constraint(decompose_linear(cons))
+
+
+        sols = []
+
+        def cb():
+            assert all(con.value() for con in cons)
+            sols.append(tuple(x.value()))
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+
+        assert n_sols == 2
+        assert set(sols) == {(1, 2, 3), (4, 3, 3)}
+
+        cons = [
+            cp.Table(x, [[2, 1, 1]])
+
+        ]
+
+        lincons = linearize_constraint(decompose_linear(cons))
+
+        sols = []
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+
+        assert n_sols == 1
+        assert set(sols) == {(2,1,1)}
+
+        cons = [
+            cp.Table(x, np.empty((0, len(x)), dtype=int))
+        ]
+
+        lincons = linearize_constraint(decompose_linear(cons))
+
+        sols = []
+
+        def cb():
+            assert all(con.value() for con in cons)
+            sols.append(tuple(x.value()))
+
+        n_sols = cp.Model(lincons).solveAll(display=cb)
+
+        assert n_sols == 0
+        assert set(sols) == set()
 
     # def test_issue_580(self): -> Modulo is now a global constraint
     #     x = cp.intvar(1, 5, name='x')
