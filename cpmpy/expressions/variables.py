@@ -471,7 +471,7 @@ class NDVarArray(np.ndarray):
     """
     _has_subexpr: Optional[bool] = None  # will be overwritten in instance, here for type hinting
 
-    def __init__(self, shape, **kwargs):
+    def __init__(self, shape: int|np.integer|tuple[int|np.integer, ...], **kwargs: Any) -> None:
         # bit ugly, but np.int and np.bool do not play well with > overloading
         if np.issubdtype(self.dtype, np.integer):
             self.astype(int)
@@ -483,7 +483,7 @@ class NDVarArray(np.ndarray):
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
 
-    def __array_finalize__(self, obj):
+    def __array_finalize__(self, obj: Any) -> None:
         # numpy view/slice creation hook: __init__ is not always called
         if obj is None:
             return
