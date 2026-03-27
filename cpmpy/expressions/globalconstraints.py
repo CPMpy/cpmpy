@@ -143,7 +143,7 @@ from .core import Expression, BoolVal, ExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 from .globalfunctions import * # XXX make this file backwards compatible
-
+from .mdd_encoding import filter_table, dom_size, construct_mdd, mdd_to_flow
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
 
@@ -597,6 +597,33 @@ class Table(GlobalConstraint):
         """
         arr, tab = self.args
         return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
+
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the Table global constraint. First, a table is converted to an MDD,
+        then this MDD is converted to flow constraints that ensure that exactly one row of the table is assigned to the array.
+        "
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, tab = self.args
+
+        if len(tab) == 0:
+            return [BoolVal(False)], []
+        elif len(tab) == 1:
+            cons = []
+            for i,x in enumerate(arr):
+                cons += [(x == tab[0][i])]
+            return cons, []
+
+        tab = filter_table(arr, np.array(tab))
+        ordering = np.argsort([dom_size(x) for x in arr])
+        reordered_tab = tab[:, ordering]
+        reordered_arr = [arr[i] for i in ordering]
+        mdd_cache = construct_mdd(reordered_tab)
+        flow_cons = mdd_to_flow(mdd_cache, reordered_arr)
+
+        return flow_cons, []
 
     def value(self) -> Optional[bool]:
         """

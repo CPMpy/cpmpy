@@ -581,8 +581,9 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         supported_reified = frozenset[str]()
 
     decompose_custom = get_linear_decompositions()
+    decompose_positive = get_positive_decompositions()
 
-    return decompose_in_tree(lst_of_expr, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_in_tree(lst_of_expr, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom, decompose_positive=decompose_positive)
 
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,
@@ -608,9 +609,20 @@ def get_linear_decompositions():
     """
     return dict(
         alldifferent=AllDifferent.decompose_linear,
-        element=Element.decompose_linear,
+        element=Element.decompose_linear
     )
-    # Should we add Gleb's table decomposition? or is it not non-reifiable?
+
+def get_positive_decompositions():
+    """
+        Implementation of custom linear decompositions for some global constraints that can only be positively reified.
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+
+    return dict(
+        table=Table.decompose_positive
+    )
 
 
 def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
