@@ -65,6 +65,11 @@ Supported solvers
      - SAT ISAT ALLSAT - OPT IOPT
      - pip + local + (aca.) licence
      -
+   * - :doc:`HiGHS <api/solvers/highs>`
+     - ILP
+     - SAT - OPT
+     - pip
+     - Open-source MIP solver (via `highspy`)
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
      - SAT ISAT - OPT IOPT - PAR

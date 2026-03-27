@@ -43,7 +43,7 @@ CPMpy supports a multitude of solvers of different technologies to be used as ba
 .. code-block:: bash
 
     # Choose any subset of solvers to install
-    $ pip install cpmpy[choco, cpo, exact, gcs, gurobi, minizinc, pysat, pysdd, z3] 
+    $ pip install cpmpy[choco, cpo, exact, gcs, gurobi, highs, minizinc, pysat, pysdd, z3]
 
 Some solvers require additional steps (like acquiring a (aca.) license). Have a look at :ref:`this <supported-solvers>` overview.
 

@@ -34,6 +34,7 @@
         minizinc
         cpo
         gurobi
+        highs
         exact
         z3
         pysat
@@ -76,6 +77,7 @@ from .choco import CPM_choco
 from .gcs import CPM_gcs
 from .cpo import CPM_cpo
 from .pindakaas import CPM_pindakaas
+from .highs import CPM_highs
 from .pumpkin import CPM_pumpkin
 from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
