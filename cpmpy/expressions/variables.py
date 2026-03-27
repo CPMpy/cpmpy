@@ -483,13 +483,6 @@ class NDVarArray(np.ndarray):
         # "No ``__init__`` method is needed because the array is fully initialized
         #         after the ``__new__`` method."
 
-    def __array_finalize__(self, obj: Any) -> None:
-        # numpy view/slice creation hook: __init__ is not always called
-        if obj is None:
-            return
-        # Views must recompute has_subexpr (content may differ from parent cache)
-        self._has_subexpr = None
-
     def has_subexpr(self) -> bool:
         """True if :meth:`flat` has an :class:`Expression` that is not a variable (:class:`_NumVarImpl`) or :class:`~cpmpy.expressions.core.BoolVal`."""
         if self._has_subexpr is not None:
@@ -658,12 +651,23 @@ class NDVarArray(np.ndarray):
 
         return cpm_array(np.apply_along_axis(cp.all, axis=axis, arr=self))
 
-    def get_bounds(self):  # TODO: can't type like other Expressions...? its an np.array, not just a value
+    def get_bounds(self) -> tuple[NDVarArray, NDVarArray]:
         lbs, ubs = zip(*[get_bounds(e) for e in self])
         return cpm_array(lbs), cpm_array(ubs)
 
     # VECTORIZED master function (delegate)
-    def _vectorized(self, other, attr):
+    def _vectorized(self, other: ExprLike|Iterable|Any, attr: str) -> NDVarArray:
+        """
+        Vectorized implementation of the given attribute (e.g. __eq__, __add__, etc.)
+
+        Args:
+            other (ExprLike|Iterable|Any): The other operand.
+                Typically an array/list of Expressions, or a single Expression, or a constant (or anything np compatible)
+            attr (str): The attribute to vectorize (e.g. __eq__, __add__, etc.)
+
+        Returns:
+            NDVarArray: The vectorized result.
+        """
         if not isinstance(other, Iterable):
             other = [other]*len(self)
         # this is a bit cryptic, but it calls 'attr' on s with o as arg
