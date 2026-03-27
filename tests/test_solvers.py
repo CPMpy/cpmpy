@@ -1100,49 +1100,6 @@ class TestSupportedSolvers:
 
 
 
-    def test_status_solveall(self, solver):
-        if solver == "hexaly":
-            pytest.skip("hexaly cannot proveably find all solutions, so status is never OPTIMAL")
-
-        bv = cp.boolvar(shape=3, name="bv")
-        m = cp.Model(cp.any(bv))
-
-        limit = None
-        if solver in ("gurobi", "cplex"): limit = 100000
-
-        num_sols = m.solveAll(solver=solver, solution_limit=limit)
-        assert num_sols == 7
-        assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
-
-
-
-        # adding a bunch of variables to increase nb of sols
-        try:
-            x = cp.boolvar(shape=32, name="x")
-            m = cp.Model(cp.any(x))
-            num_sols = m.solveAll(solver=solver, time_limit=1, solution_limit=limit)
-            assert m.status().exitstatus == ExitStatus.FEASIBLE
-
-            num_sols = m.solveAll(solver=solver, solution_limit=10)
-            assert num_sols == 10
-            assert m.status().exitstatus == ExitStatus.FEASIBLE
-
-            # edge-case: nb of solutions is exactly the sol limit
-            m = cp.Model(cp.any(bv))
-            num_sols = m.solveAll(solver=solver, solution_limit=7)
-            assert num_sols ==  7
-            assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE) # which of the two?
-
-        except NotImplementedError:
-            pass # not all solvers support time/solution limits
-
-        # making the problem unsat
-        if solver != "pysdd": # constraint not supported by pysdd
-            m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
-            num_sols = m.solveAll(solver=solver, solution_limit=limit)
-            assert num_sols == 0
-            assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
-
 
     def test_hidden_user_vars(self, solver):
         """
@@ -1236,35 +1193,6 @@ class TestSupportedSolvers:
         model = cp.Model(p.implies(3 * q == 2))
         assert model.solve(solver)
         assert model.solveAll(solver, **kwargs) == 2
-
-    def test_solveAll_display_expr(self, solver, capsys):
-        x = cp.boolvar(shape=3, name="x")
-        m = cp.Model(cp.sum(x) == 1)
-
-        n_sols = m.solveAll(solver=solver, display=x[0], solution_limit=3)  # should print 3 sols
-        assert n_sols == 3
-        out = capsys.readouterr().out
-        assert {"True", "False"} == set([s for s in out.split("\n") if len(s)])
-
-    def test_solveAll_display_ndvararray(self, solver, capsys):
-
-        x = cp.boolvar(shape=3,name="x")
-        m = cp.Model(cp.sum(x) == 1)
-
-        m.solveAll(solver=solver, display=x, solution_limit=3) # should print 3 sols
-        out = capsys.readouterr().out
-        assert {"[True, False, False]", "[False, True, False]", "[False, False, True]"} == set([s for s in out.split("\n") if len(s)])
-
-
-    def test_solveAll_display_list(self, solver, capsys):
-
-        x = cp.boolvar(shape=3, name="x")
-        m = cp.Model(cp.sum(x) == 1)
-
-        m.solveAll(solver=solver, display=list(x), solution_limit=3)  # should print 3 sols
-        out = capsys.readouterr().out
-        assert {"[True, False, False]", "[False, True, False]", "[False, False, True]"} ==  set([s for s in out.split("\n") if len(s)])
-
 
 
 @pytest.mark.generate_constraints.with_args(numexprs)

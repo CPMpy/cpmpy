@@ -651,9 +651,14 @@ class NDVarArray(np.ndarray):
 
         return cpm_array(np.apply_along_axis(cp.all, axis=axis, arr=self))
 
-    def get_bounds(self) -> tuple[NDVarArray, NDVarArray]:
-        lbs, ubs = zip(*[get_bounds(e) for e in self])
-        return cpm_array(lbs), cpm_array(ubs)
+    def get_bounds(self) -> tuple[np.ndarray, np.ndarray]:
+        if self.size == 0:  # believe it or not, this does happen... e.g. in test_int2bool and an exmaple
+            z = np.empty(self.shape, dtype=np.int64)
+            return z, z
+
+        lbs, ubs = zip(*[get_bounds(e) for e in self.flat])
+        return np.asarray(lbs).reshape(self.shape), \
+               np.asarray(ubs).reshape(self.shape)
 
     # VECTORIZED master function (delegate)
     def _vectorized(self, other: ExprLike|Iterable|Any, attr: str) -> NDVarArray:
