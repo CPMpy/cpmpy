@@ -48,12 +48,13 @@
 """
 import sys  # for stdout checking
 import time
+import warnings
 from typing import Optional, List
 
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
@@ -64,7 +65,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval
+from ..expressions.utils import flatlist, argvals, argval, is_num
 from ..exceptions import NotSupportedError
 
 import numpy as np

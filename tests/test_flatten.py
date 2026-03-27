@@ -1,6 +1,7 @@
 import cpmpy as cp
-from cpmpy.transformations.flatten_model import *
+from cpmpy.transformations.flatten_model import flatten_model, flatten_constraint, get_or_make_var, flatten_objective, normalized_boolexpr
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
+from cpmpy.expressions.core import Operator
 
 class TestFlattenModel:
     def setup_method(self):
