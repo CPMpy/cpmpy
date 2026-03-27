@@ -90,7 +90,7 @@ s = cp.SolverLookup.get("ortools", m) # faster on a solver interface directly
 while s.solve():
     print(x.value())
     # block this solution from being valid
-    s += ~all(x == x.value())
+    s.add(~cp.all(x == x.value()))
 ```
 
 In case of multiple variables you should put them in one long Python-native list, as such:
@@ -104,7 +104,7 @@ while s.solve():
     print(x.value(), b.value())
     allvars = list(x)+[b]
     # block this solution from being valid
-    s += ~all(v == v.value() for v in allvars)
+    s.add(~cp.all(v == v.value() for v in allvars))
 ```
 
 
@@ -116,9 +116,11 @@ The goal is to iteratively find solutions that are as diverse as possible with t
 Here is the example code for enumerating K diverse solutions with Hamming distance, which overwrites the objective function in each iteration:
 
 ```python
+import cpmpy as cp
+
 # Diverse solutions, Hamming distance (inequality)
-x = boolvar(shape=6)
-m = Model(sum(x) == 2)
+x = cp.boolvar(shape=6)
+m = cp.Model(cp.sum(x) == 2)
 s = cp.SolverLookup.get("ortools", m) # faster on a solver interface directly
 
 K = 3
@@ -127,7 +129,7 @@ while len(store) < 3 and s.solve():
     print(len(store), ":", x.value())
     store.append(x.value())
     # Hamming dist: nr of different elements
-    s.maximize(sum([sum(x != sol) for sol in store]))
+    s.maximize(cp.sum([cp.sum(x != sol) for sol in store]))
 ```
 
 As a fun fact, observe how `x != sol` works, even though one is a vector of Boolean variables and sol is a numpy array. However, both have the same length, so this is automatically translated into a pairwise comparison constraint by CPMpy. These numpy-style vectorized operations mean we have to write fewer loops while modeling.
@@ -136,7 +138,7 @@ To use the Euclidian distance, only the last line needs to be changed. We again 
 
 ```python
     # Euclidian distance: absolute difference in value
-    s.maximize(sum([sum( abs(np.add(x, -sol)) ) for sol in store]))
+    s.maximize(cp.sum([cp.sum( cp.abs(np.add(x, -sol)) ) for sol in store]))
 ```
 
 ## Mixing native callbacks with CPMpy

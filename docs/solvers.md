@@ -18,7 +18,7 @@ You can specify a solvername when calling `solve()` on a model:
 import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 m = cp.Model()
-m += cp.sum(x) <= 5
+m.add(cp.sum(x) <= 5)
 # use named solver
 m.solve(solver="ortools")
 ```
@@ -38,7 +38,7 @@ Importantly, the solver interface supports the same functions as the `Model()` o
 import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 s = cp.SolverLookup.get("ortools")
-s += cp.sum(x) <= 5
+s.add(cp.sum(x) <= 5)
 # we are operating on the ortools interface here
 s.solve()
 ```
@@ -79,7 +79,7 @@ We sometimes add solver-specific features to the CPMpy interface, for convenient
 import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 s = cp.SolverLookup.get("ortools")
-s += cp.sum(x) <= 5
+s.add(cp.sum(x) <= 5)
 # we are operating on a ortools' interface here
 s.solution_hint(x, [1,2,3])
 s.solve()
@@ -102,10 +102,10 @@ This has two potential benefits for incremental solving, whereby you add more co
 ```python
 gs = SolverLookup.get("gurobi")
 
-gs += sum(ivar) <= 5 
+gs.add(cp.sum(ivar) <= 5)
 gs.solve()
 
-gs += sum(ivar) == 3
+gs.add(cp.sum(ivar) == 3)
 # the underlying gurobi instance is reused, only the new constraint is added to it.
 # gurobi is an incremental solver and will look for solutions starting from the previous one.
 gs.solve()
@@ -127,8 +127,8 @@ iv = cp.intvar(1,9, shape=3)
 
 s = cp.SolverLookup.get("ortools")
 
-s += cp.AllDifferent(iv)
-s += cp.DirectConstraint("AddAllDifferent", iv)  # a DirectConstraint equivalent to the above for OrTools
+s.add(cp.AllDifferent(iv))
+s.add(cp.DirectConstraint("AddAllDifferent", iv))  # a DirectConstraint equivalent to the above for OrTools
 ```
 
 This requires knowledge of the API of the underlying solver, as any function name that you give to it will be called. The only special thing that the DirectConstraint does, is automatically translate any CPMpy variable in the argument to the native solver variable.
@@ -148,8 +148,8 @@ trans_tabl = [ # corresponds to regex 0* 1+ 0+
     (1, 0, 2),
     (2, 0, 2)
 ]
-s += cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
-                      novar=[1, 2, 3])  # optional, what not to scan for vars
+s.add(cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
+                          novar=[1, 2, 3])  # optional, what not to scan for vars
 ```
 
 A minimal example of the DirectConstraint for every supported solver is [in the test suite](https://github.com/CPMpy/cpmpy/tree/master/tests/test_direct.py).
@@ -166,7 +166,7 @@ iv = cp.intvar(1,9, shape=3)
 
 s = cp.SolverLookup.get("ortools")
 
-s += cp.AllDifferent(iv)  # the traditional way, equivalent to:
+s.add(cp.AllDifferent(iv))  # the traditional way, equivalent to:
 s.ort_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API, has to be with native variables
 ```
 
