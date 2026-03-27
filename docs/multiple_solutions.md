@@ -18,9 +18,9 @@ It returns the number of solutions found.
 In the following examples, we assume:
 
 ```python
-from cpmpy import *
-x = intvar(0, 3, shape=2)
-m = Model(x[0] > x[1])
+import cpmpy as cp
+x = cp.intvar(0, 3, shape=2)
+m = cp.Model(x[0] > x[1])
 ```
 
 Just return the number of solutions (here: 6)
@@ -42,7 +42,7 @@ n = m.solveAll(display=x)
 
 `display` can also take lists of arbitrary CPMpy expressions:
 ```python
-n = m.solveAll(display=[x,sum(x)])
+    n = m.solveAll(display=[x,cp.sum(x)])
 ```
 
 Perhaps most powerful is the use of __callbacks__, which allows for rich printing, solution storing, dynamic stopping and more. You can use any variable name from the outer scope here (it is a closure). That does mean that you have to call `var.value()` each time to get the value(s) of this particular solution.
@@ -51,13 +51,13 @@ Rich printing with a callback function:
 ```python
 def myprint():
     xval = x.value()
-    print(f"x={xval}, sum(x)={sum(xval)}")
+    print(f"x={xval}, sum(x)={cp.sum(xval)}")
 n = m.solveAll(display=myprint) # callback function without brackets 
 ```
 
 Also callback with an anonymous lambda function possible:
 ```python
-n = m.solveAll(display=lambda: print(f"x={x.value()} sum(x)={sum(x.value())}") 
+n = m.solveAll(display=lambda: print(f"x={x.value()} sum(x)={cp.sum(x.value())}") 
 ```
 
 See the [set_game.ipynb](https://github.com/CPMpy/cpmpy/blob/master/examples/set_game.ipynb) for an example of how we use it as a callback to call a plotting function, to plot all the solutions as they are found.
@@ -81,30 +81,30 @@ This approach makes use of the incremental nature of the solver interfaces. It i
 Here is an example of standard solution enumeration, note that this will be much slower than `solveAll()`.
 
 ```python
-from cpmpy import *
+import cpmpy as cp
 
-x = intvar(0,3, shape=2)
-m = Model(x[0] > x[1])
-s = SolverLookup.get("ortools", m) # faster on a solver interface directly
+x = cp.intvar(0,3, shape=2)
+m = cp.Model(x[0] > x[1])
+s = cp.SolverLookup.get("ortools", m) # faster on a solver interface directly
 
 while s.solve():
     print(x.value())
     # block this solution from being valid
-    s += ~all(x == x.value())
+    s.add(~cp.all(x == x.value()))
 ```
 
 In case of multiple variables you should put them in one long Python-native list, as such:
 ```python
-x = intvar(0,3, shape=2)
-b = boolvar()
-m = Model(b.implies(x[0] > x[1]))
-s = SolverLookup.get("ortools", m) # faster on a solver interface directly
+x = cp.intvar(0,3, shape=2)
+b = cp.boolvar()
+m = cp.Model(b.implies(x[0] > x[1]))
+s = cp.SolverLookup.get("ortools", m) # faster on a solver interface directly
 
 while s.solve():
     print(x.value(), b.value())
     allvars = list(x)+[b]
     # block this solution from being valid
-    s += ~all(v == v.value() for v in allvars)
+    s.add(~cp.all(v == v.value() for v in allvars))
 ```
 
 
@@ -116,10 +116,12 @@ The goal is to iteratively find solutions that are as diverse as possible with t
 Here is the example code for enumerating K diverse solutions with Hamming distance, which overwrites the objective function in each iteration:
 
 ```python
+import cpmpy as cp
+
 # Diverse solutions, Hamming distance (inequality)
-x = boolvar(shape=6)
-m = Model(sum(x) == 2)
-s = SolverLookup.get("ortools", m) # faster on a solver interface directly
+x = cp.boolvar(shape=6)
+m = cp.Model(cp.sum(x) == 2)
+s = cp.SolverLookup.get("ortools", m) # faster on a solver interface directly
 
 K = 3
 store = []
@@ -127,7 +129,7 @@ while len(store) < 3 and s.solve():
     print(len(store), ":", x.value())
     store.append(x.value())
     # Hamming dist: nr of different elements
-    s.maximize(sum([sum(x != sol) for sol in store]))
+    s.maximize(cp.sum([cp.sum(x != sol) for sol in store]))
 ```
 
 As a fun fact, observe how `x != sol` works, even though one is a vector of Boolean variables and sol is a numpy array. However, both have the same length, so this is automatically translated into a pairwise comparison constraint by CPMpy. These numpy-style vectorized operations mean we have to write fewer loops while modeling.
@@ -136,7 +138,7 @@ To use the Euclidian distance, only the last line needs to be changed. We again 
 
 ```python
     # Euclidian distance: absolute difference in value
-    s.maximize(sum([sum( abs(np.add(x, -sol)) ) for sol in store]))
+    s.maximize(cp.sum([cp.sum( cp.abs(np.add(x, -sol)) ) for sol in store]))
 ```
 
 ## Mixing native callbacks with CPMpy
@@ -145,12 +147,12 @@ CPMpy passes arguments to `solve()` directly to the underlying solver object, so
 
 The following is an example of that, which is actually how the native `solveAll()` for OR-Tools is implemented. You could give it your own custom implemented callback `cb` too.
 ```python
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.solvers import CPM_ortools
 from cpmpy.solvers.ortools import OrtSolutionPrinter
 
-x = intvar(0,3, shape=2)
-m = Model(x[0] > x[1])
+x = cp.intvar(0,3, shape=2)
+m = cp.Model(x[0] > x[1])
 
 s = SolverLookup.get('ortools', m)
 cb = OrtSolutionPrinter()

@@ -48,14 +48,15 @@
 """
 import sys  # for stdout checking
 import time
+import warnings
 from typing import Optional, List
 
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.variables import intvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -64,7 +65,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval
+from ..expressions.utils import flatlist, argvals, argval, is_num
 from ..exceptions import NotSupportedError
 
 import numpy as np
@@ -575,7 +576,7 @@ class CPM_exact(SolverInterface):
                     # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
                     if lhs.name == "mul":
                         if is_num(rhs): # make dummy var
-                            rhs = cp.intvar(rhs, rhs)
+                            rhs = intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
                                                                                   "rewritten by linearize"

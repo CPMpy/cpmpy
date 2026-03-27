@@ -139,10 +139,10 @@ import numpy as np
 
 import cpmpy as cp
 
+from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
-from .globalfunctions import * # XXX make this file backwards compatible
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
