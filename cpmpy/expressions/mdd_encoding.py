@@ -278,7 +278,7 @@ def mdd_to_flow(mdd_cache, X):
         elif column_counter[key] == 1:
             substitution[(key, 1)] = get_corresponding_bv(key, X)
         else:
-            bvs = cp.boolvar(shape=column_counter[key], name=f"e_{key}")
+            bvs = cp.boolvar(shape=column_counter[key])
 
             for n in range(1, column_counter[key] + 1):
                 substitution[(key, n)] = bvs[n - 1]
