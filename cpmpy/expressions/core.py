@@ -241,29 +241,63 @@ class Expression(object):
         return Operator('->', [self, other])
 
     # Comparisons
-    def __eq__(self, other):
-        # BoolExpr == 1|true|0|false, common case, simply BoolExpr
-        if self.is_bool() and is_num(other):
-            if other is True or other == 1:
-                return self
-            if other is False or other == 0:
-                return ~self
-        return Comparison("==", self, other)
+    def __eq__(self, other: object):
+        if isinstance(other, Expression):
+            return Comparison("==", self, other)
+        else:
+            other_int = int(other) # type: ignore  # raises ValueError if not convertible to int
+            # BoolExpr == 1|true|0|false, common case, simply BoolExpr
+            if self.is_bool():
+                if other_int == 1:
+                    return self
+                elif other_int == 0:
+                    return ~self
+                else:
+                    raise ValueError(f"Comparison {self} == {other_int} is not valid. Expected Boolean Expression or Boolean constant, but got {other_int}.")
+            return Comparison("==", self, other_int)
 
-    def __ne__(self, other):
-        return Comparison("!=", self, other)
+    def __ne__(self, other: object):
+        if isinstance(other, Expression):
+            return Comparison("!=", self, other)
+        else:
+            other_int = int(other) # type: ignore  # raises ValueError if not convertible to int
+            # BoolExpr != 1|true|0|false, common case, simply BoolExpr
+            if self.is_bool():
+                if other_int == 0:
+                    return self
+                elif other_int == 1:
+                    return ~self
+                else:
+                    raise ValueError(f"Comparison {self} == {other_int} is not valid. Expected Boolean Expression or Boolean constant, but got {other_int}.")
+            return Comparison("!=", self, other_int)
 
-    def __lt__(self, other):
-        return Comparison("<", self, other)
+    def __lt__(self, other: object):
+        if isinstance(other, Expression):
+            return Comparison("<", self, other)
+        else:
+            other_int = int(other) # type: ignore  # raises ValueError if not convertible to int
+            return Comparison("<", self, other_int)
 
-    def __le__(self, other):
-        return Comparison("<=", self, other)
+    def __le__(self, other: object):
+        if isinstance(other, Expression):
+            return Comparison("<=", self, other)
+        else:
+            other_int = int(other) # type: ignore  # raises ValueError if not convertible to int
+            return Comparison("<=", self, other_int)
 
-    def __gt__(self, other):
-        return Comparison(">", self, other)
+    def __gt__(self, other: object):
+        if isinstance(other, Expression):
+            return Comparison(">", self, other)
+        else:
+            other_int = int(other) # type: ignore  # raises ValueError if not convertible to int
+            return Comparison(">", self, other_int)
 
-    def __ge__(self, other):
-        return Comparison(">=", self, other)
+    def __ge__(self, other: object):
+        if isinstance(other, Expression):
+            return Comparison(">=", self, other)
+        else:
+            other_int = int(other) # type: ignore  # raises ValueError if not convertible to int
+            return Comparison(">=", self, other_int)
 
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
@@ -541,7 +575,7 @@ class Comparison(Expression):
     """
     allowed = {'==', '!=', '<=', '<', '>=', '>'}
 
-    def __init__(self, name: str, left: ExprLike, right: ExprLike) -> None:
+    def __init__(self, name: str, left: Expression, right: Expression|int) -> None:
         """
         Arguments:
             name (str): Comparison operator (one of :attr:`Comparison.allowed`)
@@ -551,13 +585,14 @@ class Comparison(Expression):
         We expect at least one of the two to be an :class:`Expression`.
         """
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
-        super().__init__(name, [left, right])
+        super().__init__(name, (left, right))
 
     def __repr__(self) -> str:
-        if all(isinstance(x, Expression) for x in self.args):
-            return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
-        # if not: prettier printing without braces
-        return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+        lhs, rhs = self.args
+        if isinstance(rhs, int):
+            # prettier printing without braces
+            return "{} {} {}".format(lhs, self.name, rhs) 
+        return "({}) {} ({})".format(lhs, self.name, rhs)
     
     def __bool__(self) -> bool:
         # will be called when comparing elements in a container, but always with `==`
@@ -568,16 +603,22 @@ class Comparison(Expression):
     # return the value of the expression
     # optional, default: None
     def value(self) -> Optional[bool]:
-        arg_vals = argvals(self.args)
+        lhs_val = self.args[0].value()
+        if lhs_val is None:
+            return None
 
-        if any(a is None for a in arg_vals): return None
-        if   self.name == "==": return arg_vals[0] == arg_vals[1]
-        elif self.name == "!=": return arg_vals[0] != arg_vals[1]
-        elif self.name == "<":  return arg_vals[0] < arg_vals[1]
-        elif self.name == "<=": return arg_vals[0] <= arg_vals[1]
-        elif self.name == ">":  return arg_vals[0] > arg_vals[1]
-        elif self.name == ">=": return arg_vals[0] >= arg_vals[1]
-        return None # default
+        rhs = self.args[1]
+        rhs_val = rhs if isinstance(rhs, int) else rhs.value()
+        if rhs_val is None:
+            return None
+
+        if   self.name == "==": return lhs_val == rhs_val
+        elif self.name == "!=": return lhs_val != rhs_val
+        elif self.name == "<":  return lhs_val < rhs_val
+        elif self.name == "<=": return lhs_val <= rhs_val
+        elif self.name == ">":  return lhs_val > rhs_val
+        elif self.name == ">=": return lhs_val >= rhs_val
+        return None  # default
 
 
 class Operator(Expression):
