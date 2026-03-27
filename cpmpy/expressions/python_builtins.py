@@ -118,12 +118,16 @@ def max(*iterable, **kwargs):
         arguments are supported in that case
     """
     if len(iterable) == 1:
-        iterable = tuple(iterable[0])
+        iterable = iterable[0]  # because of *iterable signature
 
-    if isinstance(iterable, np.ndarray) and iterable.dtype != object:
-        return np.asarray(iterable).max(**kwargs)  # makes sure its a plain np.array
-    if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
-        return builtins.max(iterable, **kwargs)  # shortcut to Python max
+    if isinstance(iterable, np.ndarray):
+        if iterable.dtype != object or \
+           not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat):
+            return builtins.max(iterable.flat, **kwargs)  # does not contain expressions
+    else:
+        iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
+        if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
+            return builtins.max(iterable, **kwargs)  # does not contain expressions
 
     assert len(kwargs)==0, "max over expressions does not support keyword arguments"
     return Maximum(iterable)
@@ -138,12 +142,16 @@ def min(*iterable, **kwargs):
         arguments are supported in that case
     """
     if len(iterable) == 1:
-        iterable = tuple(iterable[0])
+        iterable = iterable[0]  # because of *iterable signature
 
-    if isinstance(iterable, np.ndarray) and iterable.dtype != object:
-        return np.asarray(iterable).min(**kwargs)  # makes sure its a plain np.array
-    if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
-        return builtins.min(iterable, **kwargs)  # shortcut to Python min
+    if isinstance(iterable, np.ndarray):
+        if iterable.dtype != object or \
+           not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat):
+            return builtins.min(iterable.flat, **kwargs)  # does not contain expressions
+    else:
+        iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
+        if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
+            return builtins.min(iterable, **kwargs)  # does not contain expressions
 
     assert len(kwargs)==0, "min over expressions does not support keyword arguments"
     return Minimum(iterable)
@@ -157,12 +165,13 @@ def sum(iterable, **kwargs):
         checks if all constants and uses built-in sum() in that case
     """
     if isinstance(iterable, np.ndarray):
-        if iterable.dtype != object:
-            return np.asarray(iterable).sum(**kwargs)  # makes sure its a plain np.array
+        if iterable.dtype != object or \
+           not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat):
+            return builtins.sum(iterable.flat, **kwargs)  # does not contain expressions
     else:
         iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
         if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
-            return builtins.sum(iterable, **kwargs)
+            return builtins.sum(iterable, **kwargs)  # does not contain expressions
 
     assert len(kwargs)==0, "sum over expressions does not support keyword arguments"
     return Operator("sum", iterable)
