@@ -121,11 +121,11 @@ class Expression(object):
         self._args = arg_list
 
     @property
-    def args(self):
+    def args(self) -> tuple[Any, ...]:
         return self._args
 
     @args.setter
-    def args(self, args):
+    def args(self, args: Iterable[Any]) -> None:
         raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
 
     def update_args(self, args: Iterable[Any]) -> None:

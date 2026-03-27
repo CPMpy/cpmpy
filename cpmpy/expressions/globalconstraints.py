@@ -977,15 +977,16 @@ class Xor(GlobalConstraint):
 
     def negate(self) -> Expression:
         # negate one of the arguments, ideally a variable
-        new_args = None
+        new_args = list(self.args)  # takes shallow copy
+        changed = False
         for i, a in enumerate(self.args):
             if isinstance(a, _BoolVarImpl):
-                new_args = self.args[:i] + [~a] + self.args[i+1:]
+                new_args[i] = ~a
+                changed = True
                 break
 
-        if new_args is None:# did not find a Boolean variable to negate
+        if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            new_args = list(self.args)
             new_args[0] = cp.transformations.negation.recurse_negation(self.args[0])
 
         return Xor(new_args)
