@@ -1251,3 +1251,22 @@ def test_objective_numexprs(solver, constraint):
         assert constraint.value() > constraint.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
+
+@pytest.mark.requires_solver("gurobi")
+class TestGurobi:
+    def test_gurobi_read_integers_issue_858(self):
+        x = cp.intvar(1, 3, shape=2, name="x")
+        p = cp.intvar(0, 1, shape=3, name="p")
+        q = cp.intvar(0, 1, shape=3, name="q")
+        m = cp.Model()
+        m += x[0] == 1  # TODO without this, x[0] is assigned None because it does not occur in any constraint. This is a separate issue
+        m += cp.sum([p[0], p[1], p[2]]) == 1
+        m += cp.sum([3, 3, 1, -1] * cp.cpm_array([q[0], q[1], q[2], x[1]])) == 0
+        m += cp.sum([q[0], q[1], q[2]]) == 1
+
+        def check():
+            print(x, x.value())
+            assert (x[1].value() >= 1), f"{x[1]}={x.value()}"
+
+        m.solveAll(solver="gurobi", solution_limit=1000, display=check)
+
