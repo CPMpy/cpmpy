@@ -86,7 +86,6 @@
 """
 import copy
 import warnings
-from types import GeneratorType
 from typing import Any, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
 import numpy as np
 import cpmpy as cp
@@ -116,7 +115,7 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name: str, arg_list: tuple[Any, ...]):  # goal: tuple[int|Expr|np.array|list[int|Expr], ...]
+    def __init__(self, name: str, arg_list: tuple[Any, ...]):
         self.name = name
         self._args = arg_list
 
