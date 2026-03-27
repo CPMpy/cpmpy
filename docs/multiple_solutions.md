@@ -18,9 +18,9 @@ It returns the number of solutions found.
 In the following examples, we assume:
 
 ```python
-from cpmpy import *
-x = intvar(0, 3, shape=2)
-m = Model(x[0] > x[1])
+import cpmpy as cp
+x = cp.intvar(0, 3, shape=2)
+m = cp.Model(x[0] > x[1])
 ```
 
 Just return the number of solutions (here: 6)
@@ -81,11 +81,11 @@ This approach makes use of the incremental nature of the solver interfaces. It i
 Here is an example of standard solution enumeration, note that this will be much slower than `solveAll()`.
 
 ```python
-from cpmpy import *
+import cpmpy as cp
 
-x = intvar(0,3, shape=2)
-m = Model(x[0] > x[1])
-s = SolverLookup.get("ortools", m) # faster on a solver interface directly
+x = cp.intvar(0,3, shape=2)
+m = cp.Model(x[0] > x[1])
+s = cp.SolverLookup.get("ortools", m) # faster on a solver interface directly
 
 while s.solve():
     print(x.value())
@@ -95,10 +95,10 @@ while s.solve():
 
 In case of multiple variables you should put them in one long Python-native list, as such:
 ```python
-x = intvar(0,3, shape=2)
-b = boolvar()
-m = Model(b.implies(x[0] > x[1]))
-s = SolverLookup.get("ortools", m) # faster on a solver interface directly
+x = cp.intvar(0,3, shape=2)
+b = cp.boolvar()
+m = cp.Model(b.implies(x[0] > x[1]))
+s = cp.SolverLookup.get("ortools", m) # faster on a solver interface directly
 
 while s.solve():
     print(x.value(), b.value())
@@ -119,7 +119,7 @@ Here is the example code for enumerating K diverse solutions with Hamming distan
 # Diverse solutions, Hamming distance (inequality)
 x = boolvar(shape=6)
 m = Model(sum(x) == 2)
-s = SolverLookup.get("ortools", m) # faster on a solver interface directly
+s = cp.SolverLookup.get("ortools", m) # faster on a solver interface directly
 
 K = 3
 store = []
@@ -145,12 +145,12 @@ CPMpy passes arguments to `solve()` directly to the underlying solver object, so
 
 The following is an example of that, which is actually how the native `solveAll()` for OR-Tools is implemented. You could give it your own custom implemented callback `cb` too.
 ```python
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.solvers import CPM_ortools
 from cpmpy.solvers.ortools import OrtSolutionPrinter
 
-x = intvar(0,3, shape=2)
-m = Model(x[0] > x[1])
+x = cp.intvar(0,3, shape=2)
+m = cp.Model(x[0] > x[1])
 
 s = SolverLookup.get('ortools', m)
 cb = OrtSolutionPrinter()

@@ -5,9 +5,9 @@
 You can see the list of available solvers (and subsolvers) as follows:
 
 ```python
-from cpmpy import *
+import cpmpy as cp
 
-print(SolverLookup.solvernames())
+print(cp.SolverLookup.solvernames())
 ```
 
 On my system, with pysat and minizinc installed, this gives `['ortools', 'minizinc', 'minizinc:chuffed', 'minizinc:coin-bc', ..., 'pysat:minicard', 'pysat:minisat22', 'pysat:minisat-gh']
@@ -27,7 +27,7 @@ CPMpy's interface to ortools accepts keyword arguments to `solve()`, and will se
 For example, with `model` a CPMpy Model(), you can do the following to make or-tools use 8 parallel cores and print search progress:
 
 ```python
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.solvers import CPM_ortools
 
 s = CPM_ortools(model)
@@ -49,26 +49,26 @@ The parameter tuner is based on the following publication:
 
 In the following example, we tune the OR-tools solver.
 ```python
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.tools import ParameterTuner
 
-model = Model(...)
+model = cp.Model(...)
 
 tuner = ParameterTuner("ortools", model)
 best_params = tuner.tune(max_tries=100)
 print(f"Tuner reduced runtime from {tuner.base_runtime}s to {tuner.best_runtime}s")
 
 # now solve (a slightly different?) model using the best parameters
-solver = SolverLookup.get("ortools", model)
+solver = cp.SolverLookup.get("ortools", model)
 solver.solve(**best_params)
 ```
 
 However, solverinterfaces are not required to present a list of tunable parameters and the tool allows you to define the set of tunable parameters (and values) yourself.
 ```python
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.tools import ParameterTuner
 
-model = Model(...)
+model = cp.Model(...)
 
 tunables ={
    "MIPFocus": [0,1,2,3],
@@ -86,6 +86,6 @@ print(f"Tuner reduced runtime from {tuner.base_runtime}s to {tuner.best_runtime}
 
 best_params = tuner.tune(time_limit=10)
 
-solver = SolverLookup.get("gurobi", model)
+solver = cp.SolverLookup.get("gurobi", model)
 solver.solve(**best_params)
 ```
