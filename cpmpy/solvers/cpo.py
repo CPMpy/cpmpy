@@ -775,21 +775,14 @@ try:
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            sol_var = self._varmap[cpm_subvar]
-                            if isinstance(cpm_subvar, _BoolVarImpl):
-                                sol_var = sol_var.children[0]
-                                cpm_subvar._value = bool(sres.get_var_solution(sol_var).get_value())
-                            else:
-                                cpm_subvar._value = sres.get_var_solution(sol_var).get_value()
-                    elif isinstance(cpm_var, _BoolVarImpl):
+                    if isinstance(cpm_var, _BoolVarImpl):
                         sol_var = self._varmap[cpm_var].children[0]
                         cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
-                    else:
+                    elif isinstance(cpm_var, _IntVarImpl):
                         sol_var = self._varmap[cpm_var]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
+                    else:
+                        raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
                 if isinstance(self._display, Expression):
                     print(argval(self._display))

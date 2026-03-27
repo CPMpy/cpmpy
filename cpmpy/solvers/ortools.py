@@ -911,14 +911,12 @@ try:
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            cpm_subvar._value = self.Value(self._varmap[cpm_subvar])
-                    elif isinstance(cpm_var, _BoolVarImpl):
+                    if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(self.Value(self._varmap[cpm_var]))
+                    elif isinstance(cpm_var, _IntVarImpl):
+                        cpm_var._value = int(self.Value(self._varmap[cpm_var]))
                     else:
-                        cpm_var._value = self.Value(self._varmap[cpm_var])
+                        raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
                 # print the desired display
                 if isinstance(self._display, Expression):
