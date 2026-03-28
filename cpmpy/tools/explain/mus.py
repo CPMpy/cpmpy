@@ -1,9 +1,10 @@
 """
-    Re-impementation of MUS-computation techniques in CPMPy
+    Re-implementation of MUS-computation techniques in CPMPy
 
     - Deletion-based MUS
     - QuickXplain
     - Optimal MUS
+    - IIS-based MUS extraction
 """
 import warnings
 import numpy as np
@@ -330,6 +331,47 @@ def optimal_mus_naive(soft, hard=[], weights=None, solver="ortools", hs_solver="
     """
     return ocus_naive(soft, hard, weights, meta_constraint=True, solver=solver, hs_solver=hs_solver)
 
-   
 
+def mus_iis(soft, hard=[], solver="gurobi"):
+    """
+        Compute a MUS using a MIP solver's native Irreducible Inconsistent Subsystem (IIS) algorithm (MIP equivalent of MUS)
+
+        :param soft: soft constraints, list of expressions
+        :param hard: hard constraints, optional, list of expressions
+        :param solver: which ILP solver to use (only `gurobi` supported)
+    """
+    assert solver == "gurobi", f"Only Gurobi supported as IIS solver, but was given {solver}"
+
+    # Create assumption variables and model with hard + (assumption -> soft)
+    m, soft, assumptions = make_assump_model(soft, hard)
+
+    # Instantiate solver (will check if solver is installed and licensed)
+    s = cp.SolverLookup.get(solver, m)
+    grb_model = s.grb_model
+
+    # Force all hard constraints into the IIS (1 = force in, 0 = force out, -1 (default) = soft), as well as all `a -> c` for each assumption `a` and constraint `c` of each group/soft constraint in `soft`
+    grb_model.update()  # update required ; otherwise `getConstrs` can return empty
+    for hard_constraint in grb_model.getConstrs():
+        hard_constraint.IISConstrForce = 1
+    for hard_constraint in grb_model.getGenConstrs():  # CPMpy also posts general constraints
+        hard_constraint.IISGenConstrForce = 1
+
+    # Add each assumption as a soft constraint `a>=1` using Gurobi directly (as opposed to e.g. `s+=assumptions`), in order to gain access to the returned Gurobi constraints so we can access their `IISConstr` later
+    # Gurobi returns its own `tupledict`, we just need the constraints (i.e. values)
+
+    # Get solver variables first and update model to register any newly created variables
+    solver_assumptions = s.solver_vars(assumptions)
+    grb_model.update()
+    grb_assumptions = grb_model.addConstrs(a >= 1 for a in solver_assumptions).values()
+
+    import gurobipy  # Safe to import gurobipy since instantiating the Gurobi solver succeeded
+    try:
+        grb_model.computeIIS()
+    except gurobipy.GurobiError as e:
+        if e.errno == gurobipy.GRB.Error.IIS_NOT_INFEASIBLE:
+            raise AssertionError("MUS: model must be UNSAT")
+        raise
+
+    # Find which assumption is in the IIS/MUS
+    return [soft for soft, grb_assumption in zip(soft, grb_assumptions) if grb_assumption.IISConstr]
 

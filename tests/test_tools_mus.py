@@ -2,7 +2,7 @@ import pytest
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
-from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive
+from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_iis
 
 
 class TestMus:
@@ -84,6 +84,22 @@ class TestMus:
         assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
 
+    def test_decomposed_global(self):
+        x = cp.intvar(1, 5, shape=3, name="x")
+        soft = [x[0] == x[1], x[1] == x[2]]
+        hard = [cp.AllDifferent(x)]
+
+        mus_cons = self.mus_func(soft=soft, hard=hard)
+        assert len(set(mus_cons)) == 1
+        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
+        assert len(set(mus_naive_cons)) == 1
+
+
+@pytest.mark.requires_solver("gurobi")
+class TestIIS(TestMus):
+    def setup_method(self):
+        self.mus_func = lambda soft, hard=[], solver="ortools": mus_iis(soft, hard=hard)
+        self.naive_func = mus_naive
 
 class TestQuickXplain(TestMus):
 
