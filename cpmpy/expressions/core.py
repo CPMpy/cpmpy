@@ -679,7 +679,6 @@ class Operator(Expression):
                                      printname,
                                      wrap_bracket(self.args[1]))
         else:  # n-ary
-            print("Nary: ", self.name, type(self.args), self.args)
             return "{}{}".format(self.name, self.args)  # args is a tuple, will be in ()
 
     def value(self) -> Optional[int]:
