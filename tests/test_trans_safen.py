@@ -56,7 +56,7 @@ class TestTransLinearize:
         assert not cp.Model(safe_expr).solve()
 
         safened = no_partial_functions([~expr])
-        assert str(safened[0]) == "not((IV28 <= 3) and (boolval(False)))"
+        assert str(safened[0]) == "not(boolval(False))"
 
     def test_element_out_of_bounds(self):
         arr = cp.intvar(1,3, shape=3, name="x")
