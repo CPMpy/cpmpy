@@ -117,6 +117,9 @@ class Expression(object):
 
     def __init__(self, name: str, arg_list: tuple[Any, ...]):
         self.name = name
+        if not isinstance(arg_list, tuple):
+            warnings.warn(f"DEPRECATED: Argument list of {name} is not a tuple, updated the constructor!", UserWarning)
+            arg_list = tuple(arg_list)
         self._args = arg_list
 
     @property
