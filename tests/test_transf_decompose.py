@@ -19,37 +19,37 @@ class TestTransfDecomp:
         bv = cp.boolvar(name="bv")
 
         cons = [cp.AllDifferent(ivs)]
-        assert str(decompose_in_tree(cons)) == "[and([(x) != (y), (x) != (z), (y) != (z)])]"
+        assert str(decompose_in_tree(cons)) == "[and((x) != (y), (x) != (z), (y) != (z))]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == str(cons)
 
         # reified
         cons = [bv.implies(cp.AllDifferent(ivs))]
         assert str(decompose_in_tree(cons)) == \
-                         "[(bv) -> (and([(x) != (y), (x) != (z), (y) != (z)]))]"
+                         "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
-                         "[(bv) -> (and([(x) != (y), (x) != (z), (y) != (z)]))]"
+                         "[(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"}, supported_reified={"alldifferent"})) ==str(cons)
 
         cons = [cp.AllDifferent(ivs).implies(bv)]
         assert str(decompose_in_tree(cons)) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) -> (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) -> (bv)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) -> (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) -> (bv)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"}, supported_reified={"alldifferent"})) == \
                          str(cons)
 
         cons = [cp.AllDifferent(ivs) == (bv)]
         assert str(decompose_in_tree(cons)) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) == (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) == (bv)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) == (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) == (bv)]"
         assert str(decompose_in_tree(cons, supported_reified={"alldifferent"})) == \
                          str(cons)
 
         # tricky one
         cons = [cp.AllDifferent(ivs) < (bv)]
         assert str(decompose_in_tree(cons)) == \
-                         "[(and([(x) != (y), (x) != (z), (y) != (z)])) < (bv)]"
+                         "[(and((x) != (y), (x) != (z), (y) != (z))) < (bv)]"
 
     def test_decompose_num(self):
 
@@ -81,20 +81,20 @@ class TestTransfDecomp:
         ivs = [cp.intvar(1,9,name=n) for n in "xyz"]
 
         cons = [cp.AllDifferent(ivs) == 0]
-        assert set(map(str,decompose_in_tree(cons))) == {"not([and([(x) != (y), (x) != (z), (y) != (z)])])"}
+        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
 
         cons = [0 == cp.AllDifferent(ivs)]
-        assert set(map(str,decompose_in_tree(cons))) == {"not([and([(x) != (y), (x) != (z), (y) != (z)])])"}
+        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
 
         cons = [cp.AllDifferent(ivs) == cp.AllEqual(ivs[:-1])]
-        assert set(map(str,decompose_in_tree(cons))) == {"(and([(x) != (y), (x) != (z), (y) != (z)])) == ((x) == (y))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"(and((x) != (y), (x) != (z), (y) != (z))) == ((x) == (y))"}
 
         cons = [cp.min(ivs) == cp.max(ivs)]
         assert set(map(str,decompose_in_tree(cons, supported={"min"}))) == \
-                            {"(min(x,y,z)) == (IV0)", "or([(IV0) <= (x), (IV0) <= (y), (IV0) <= (z)])", "(IV0) >= (x)", "(IV0) >= (y)", "(IV0) >= (z)"}
+                         {"(min(x,y,z)) == (IV0)", "or((IV0) <= (x), (IV0) <= (y), (IV0) <= (z))", "(IV0) >= (x)", "(IV0) >= (y)", "(IV0) >= (z)"}
 
         assert set(map(str,decompose_in_tree(cons, supported={"max"}))) == \
-                         {"(IV1) == (max(x,y,z))", "or([(IV1) >= (x), (IV1) >= (y), (IV1) >= (z)])", "(IV1) <= (x)", "(IV1) <= (y)", "(IV1) <= (z)"}
+                         {"(IV1) == (max(x,y,z))", "or((IV1) >= (x), (IV1) >= (y), (IV1) >= (z))", "(IV1) <= (x)", "(IV1) <= (y)", "(IV1) <= (z)"}
 
         # numerical in non-comparison context
         cons = [cp.AllEqual([cp.min(ivs[:-1]),ivs[-1]])]
@@ -165,20 +165,20 @@ class TestTransfDecomp:
 
         cons = cp.AllDifferent(x)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1])"}
+                            {"and((a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1)"}
         # second call gives same result (no ivarmap state)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1])"}
+                            {"and((a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1)"}
 
         # nested
         cons = bv == cp.AllDifferent(x)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"(bv) == (and([(a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1]))"}
+                            {"(bv) == (and((a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1))"}
 
         # test nvalue
         cons = cp.NValue(x) == 8
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"sum([(a == 1) or (b == 1), (a == 2) or (b == 2), (a == 3) or (b == 3)]) == 8"}
+                            {"sum((a == 1) or (b == 1), (a == 2) or (b == 2), (a == 3) or (b == 3)) == 8"}
 
         # test element
         cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
@@ -202,9 +202,9 @@ class TestTransfDecomp:
 
         cons = cp.AllDifferent(arr)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {'and([sum([a == 1, b == 1, False]) <= 1, '
-                             'sum([a == 2, b == 2, True]) <= 1, '
-                             'sum([a == 3, b == 3, False]) <= 1])'}
+                            {'and(sum(a == 1, b == 1, False) <= 1, '
+                             'sum(a == 2, b == 2, True) <= 1, '
+                             'sum(a == 3, b == 3, False) <= 1)'}
 
         # also test full transformation stack
         if "gurobi" in cp.SolverLookup.solvernames():  # otherwise, not supported
