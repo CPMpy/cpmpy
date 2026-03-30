@@ -88,8 +88,8 @@ class TestTransfReif:
 
         # various reify_rewrite cases:
         assert f(rv == bvs[0]) == "[(rv) == (bvs[0])]"
-        assert f(rv == all(bvs)) == "[(and([bvs[0], bvs[1], bvs[2], bvs[3]])) == (rv)]"
-        assert f(rv.implies(any(bvs))) == "[(rv) -> (or([bvs[0], bvs[1], bvs[2], bvs[3]]))]"
+        assert f(rv == all(bvs)) == "[(and(bvs[0], bvs[1], bvs[2], bvs[3])) == (rv)]"
+        assert f(rv.implies(any(bvs))) == "[(rv) -> (or(bvs[0], bvs[1], bvs[2], bvs[3]))]"
         assert f((bvs[0].implies(bvs[1])).implies(rv)) == "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]"
         pytest.raises(ValueError, lambda : f(rv == AllDifferent(ivs)))
         assert fd([rv.implies(AllDifferent(ivs))]) == "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]"

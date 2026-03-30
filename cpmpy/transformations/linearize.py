@@ -135,26 +135,27 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                         else: # need to linearize the implication constraint itself
                             # either -> is not supported, or we are in a reified context (nested -> constraints are not linear)
                             assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
-                            if lin.args[0].name not in {"sum", "wsum"}:
-                                assert lin.args[0].name in supported, f"Unexpected rhs of implication: {lin}, it is not supported ({supported})"
+                            lin_lhs, lin_rhs = lin.args
+                            if lin_lhs.name not in {"sum", "wsum"}:
+                                assert lin_lhs.name in supported, f"Unexpected lhs of rhs of implication: {cpm_expr}, it is not supported ({supported})"
                                 indicator_constraints.append(cond.implies(lin))
                                 continue
 
                             # need to write as big-M
-                            assert lin.args[0].name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as rhs of implication constraint, but got {lin}"
-                            assert is_num(lin.args[1])
-                            lb, ub = get_bounds(lin.args[0])
+                            assert lin_lhs.name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as lhs of rhs of implication constraint, but got {lin_lhs}"
+                            assert is_num(lin_rhs)
+                            lb, ub = get_bounds(lin_lhs)
                             if lin.name == "<=":
-                                M = lin.args[1] - ub # subtracting M from lhs will always satisfy the implied constraint
-                                lin.args[0] += M * ~cond
-                                indicator_constraints.append(lin)
+                                M = lin_rhs - ub # subtracting M from lhs will always satisfy the implied constraint
+                                lin_lhs += M * ~cond
+                                indicator_constraints.append(Comparison(lin.name, lin_lhs, lin_rhs))
                             elif lin.name == ">=":
-                                M = lin.args[1] - lb # adding M to lhs will always satisfy the implied constraint
-                                lin.args[0] += M * ~cond
-                                indicator_constraints.append(lin)
+                                M = lin_rhs - lb # adding M to lhs will always satisfy the implied constraint
+                                lin_lhs += M * ~cond
+                                indicator_constraints.append(Comparison(lin.name, lin_lhs, lin_rhs))
                             elif lin.name == "==":
-                                indicator_constraints += linearize_constraint([cond.implies(lin.args[0] <= lin.args[1]),
-                                                                               cond.implies(lin.args[0] >= lin.args[1])],
+                                indicator_constraints += linearize_constraint([cond.implies(lin_lhs <= lin_rhs),
+                                                                               cond.implies(lin_lhs >= lin_rhs)],
                                                                               supported=supported, reified=reified, csemap=csemap)
                             else:
                                 raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")

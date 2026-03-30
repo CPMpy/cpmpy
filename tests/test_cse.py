@@ -48,7 +48,7 @@ class TestCSE:
         assert len(flat_cons) == 3
         
         assert str(flat_cons[0]) == "(BV0) or (BV1)"
-        assert str(flat_cons[1]) == "(sum([x, y, z]) <= 10) == (BV0)"
+        assert str(flat_cons[1]) == "(sum(x, y, z) <= 10) == (BV0)"
         assert str(flat_cons[2]) == "(alldifferent(x,y,z)) == (BV1)"
         
         # next time we use x + y + z <= 10, it should replace it with BV0
@@ -74,7 +74,7 @@ class TestCSE:
         assert str(decomp[1]) == "(IV0) >= (x)"
         assert str(decomp[2]) == "(IV0) >= (y)"
         assert str(decomp[3]) == "(IV0) >= (z)"
-        assert str(decomp[4]) == "or([(IV0) <= (x), (IV0) <= (y), (IV0) <= (z)])"
+        assert str(decomp[4]) == "or((IV0) <= (x), (IV0) <= (y), (IV0) <= (z))"
 
 
         # next time we use max([x,y,z]) it should replace the max-constraint with IV0
