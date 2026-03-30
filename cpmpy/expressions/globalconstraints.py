@@ -508,10 +508,12 @@ class Inverse(GlobalConstraint):
 
         constraining = [rev[x] == i for i,x in enumerate(fwd)]
         # Element constraints can be partial, so run safening transformation
-        _, constraining, defining, nbc = _no_partial_functions(constraining, is_toplevel=False, 
+        changed, safe_constraining, toplevel, nbc = _no_partial_functions(constraining, is_toplevel=False, 
                                                               safen_toplevel=frozenset())
+        if changed:
+            constraining = safe_constraining + nbc
         
-        return constraining + nbc, defining
+        return constraining, toplevel
 
     def value(self) -> Optional[bool]:
         """
