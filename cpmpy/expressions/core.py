@@ -679,9 +679,9 @@ class Operator(Expression):
         if self.name == 'wsum':
             return f"sum({self.args[0]} * {self.args[1]})"
 
-        printname = Operator.printmap.get(self.name, self.name) # default to self.name if not in printmap
         # infix printing of two arguments
         if len(self.args) == 2:
+            printname = Operator.printmap.get(self.name, self.name) # default to self.name if not in printmap
             arg0, arg1 = self.args
             str_arg0 = f"({arg0})" if isinstance(arg0, Expression) else str(arg0)
             str_arg1 = f"({arg1})" if isinstance(arg1, Expression) else str(arg1)
