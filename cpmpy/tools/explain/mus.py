@@ -334,7 +334,7 @@ def optimal_mus_naive(soft, hard=[], weights=None, solver="ortools", hs_solver="
 
 def mus_iis(soft, hard=[], solver="gurobi"):
     """
-        Compute a MUS using a MIP solver's native Irreducible Inconsistent Subsystem (IIS) algorithm (MIP equivalent of MUS)
+        Compute a MUS using a ILP solver's native Irreducible Inconsistent Subsystem (IIS) algorithm (ILP term equivalent to MUS)
 
         :param soft: soft constraints, list of expressions
         :param hard: hard constraints, optional, list of expressions
