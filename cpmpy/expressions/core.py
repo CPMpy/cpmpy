@@ -684,14 +684,10 @@ class Operator(Expression):
 
         # infix printing of two arguments
         if len(self.args) == 2:
-            # bracketed printing of non-constants
-            def wrap_bracket(arg):
-                if isinstance(arg, Expression):
-                    return f"({arg})"
-                return arg
-            return "{} {} {}".format(wrap_bracket(self.args[0]),
-                                     printname,
-                                     wrap_bracket(self.args[1]))
+            arg0, arg1 = self.args
+            str_arg0 = f"({arg0})" if isinstance(arg0, Expression) else str(arg0)
+            str_arg1 = f"({arg1})" if isinstance(arg1, Expression) else str(arg1)
+            return f"{str_arg0} {printname} {str_arg1}"
 
         return "{}({})".format(self.name, self.args)
 
