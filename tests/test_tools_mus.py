@@ -98,7 +98,7 @@ class TestMus:
 @pytest.mark.requires_solver("gurobi")
 class TestIIS(TestMus):
     def setup_method(self):
-        self.mus_func = lambda soft, hard=[], solver="ortools": mus_iis(soft, hard=hard)
+        self.mus_func = lambda soft, hard=[], solver="gurobi": mus_iis(soft, hard=hard, solver="gurobi")
         self.naive_func = mus_naive
 
 class TestQuickXplain(TestMus):
