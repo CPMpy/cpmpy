@@ -1769,9 +1769,9 @@ class TestTypeChecks:
     def test_table(self):
         iv = cp.intvar(-8,8,3)
 
-        constraints = [cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])] # not flatlist, should work
-        model = cp.Model(constraints)
-        assert model.solve()
+        #assert cp.Model(cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])).solve() # not flatlist, should work
+        # used to work, not allowed anymore
+        pytest.raises(TypeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
 
         pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
         pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])

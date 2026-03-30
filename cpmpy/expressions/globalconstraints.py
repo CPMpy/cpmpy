@@ -140,7 +140,7 @@ import numpy as np
 import cpmpy as cp
 
 from .core import Expression, BoolVal, ExprLike, ListLike
-from .variables import cpm_array, intvar, boolvar, _BoolVarImpl
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, _IntVarImpl, NDVarArray
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 from .globalfunctions import * # XXX make this file backwards compatible
 
@@ -568,25 +568,27 @@ class Table(GlobalConstraint):
     """
     Enforces that the values of the variables in 'array' correspond to a row in 'table'.
     """
+    _args: tuple[ListLike[Expression], np.ndarray]
+
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the array of variables
             table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
-        array = flatlist(array)
+        has_subexpr = None  # we don't know
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()
+            array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: {array}")
-        if isinstance(table, np.ndarray):  # Ensure it is a list
-            assert table.ndim == 2, "Table's table must be a 2D array"
-            assert table.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
-            table = table.tolist()
-        else:
-            tmp = np.array(table)
-            assert tmp.ndim == 2, "Table's table must be a 2D array"
-            assert tmp.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
+
+        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
+            table = np.array(table)
+        assert table.ndim == 2, "Table's table must be a 2D array"
+        assert table.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
             
-        super().__init__("table", (array, table))
+        super().__init__("table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -603,19 +605,24 @@ class Table(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = self.args
-        arrval = argvals(arr)
+        arr, tab = self._args
+        arrval = np.asarray(argvals(arr))
         if any(x is None for x in arrval):
             return None
-        return arrval in tab
+        return bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
         return NegativeTable(self.args[0], self.args[1])
 
     # specialisation to avoid recursing over big tables
     def has_subexpr(self) -> bool:
-        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args  # the table 'tab' is asserted to only hold constants
+        if self._has_subexpr is not None:
+            return self._has_subexpr
+        
+        arr = self.args[0]  # the args[1] table is asserted to only hold constants
+        if isinstance(arr, NDVarArray):
+            self._has_subexpr = arr.has_subexpr()
+        else:
             self._has_subexpr = any(a.has_subexpr() for a in arr)
         return self._has_subexpr
 
@@ -632,15 +639,21 @@ class ShortTable(GlobalConstraint):
             table (ListLike[ListLike[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
                 STAR represents a wildcard (corresponding variable can take any value).
         """
-        array = flatlist(array)
+        has_subexpr = None
+
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()
+            array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if isinstance(table, np.ndarray):
-            assert table.ndim == 2, "ShortTable's table must be a 2D array"
-            table = table.tolist()
+            raise TypeError("The first argument of a ShortTable constraint should only contain variables/expressions")
+
+        if not isinstance(table, np.ndarray):
+            table = np.asarray(table, dtype=object)
+        assert table.ndim == 2, "ShortTable's table must be a 2D array"
         if not all(is_int(x) or x == STAR for row in table for x in row):
             raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-        super().__init__("short_table", (array, table))
+
+        super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -671,8 +684,13 @@ class ShortTable(GlobalConstraint):
 
     # specialisation to avoid recursing over big tables
     def has_subexpr(self) -> bool:
-        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+        if self._has_subexpr is not None:
+            return self._has_subexpr
+        
+        arr = self.args[0]  # the args[1] table is asserted to only hold constants
+        if isinstance(arr, NDVarArray):
+            self._has_subexpr = arr.has_subexpr()
+        else:
             self._has_subexpr = any(a.has_subexpr() for a in arr)
         return self._has_subexpr
 
@@ -680,25 +698,28 @@ class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
     """
+    _args: tuple[ListLike[Expression], np.ndarray]
+
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the array of variables
             table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
-        array = flatlist(array)
+        has_subexpr = None
+
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()
+            array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"the first argument of a NegativeTable constraint should only contain variables/expressions: {array}")
-        if isinstance(table, np.ndarray):  # Ensure it is a list
-            assert table.ndim == 2, "NegativeTable's table must be a 2D array"
-            assert table.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
-            table = table.tolist()
-        else:
-            tmp = np.array(table)
-            assert tmp.ndim == 2, "NegativeTable's table must be a 2D array"
-            assert tmp.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
-            
-        super().__init__("negative_table", (array, table))
+
+        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
+            table = np.array(table)
+        assert table.ndim == 2, "NegativeTable's table must be a 2D array"
+        assert table.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
+
+        super().__init__("negative_table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -716,16 +737,21 @@ class NegativeTable(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = self.args
-        arrval = argvals(arr)
+        arr, tab = self._args
+        arrval = np.asarray(argvals(arr))
         if any(x is None for x in arrval):
             return None
-        return arrval not in tab
+        return not bool(np.any(np.all(tab == arrval, axis=1)))
 
     # specialisation to avoid recursing over big tables
     def has_subexpr(self) -> bool:
-        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
+        if self._has_subexpr is not None:
+            return self._has_subexpr
+        
+        arr = self.args[0]  # the args[1] table is asserted to only hold constants
+        if isinstance(arr, NDVarArray):
+            self._has_subexpr = arr.has_subexpr()
+        else:
             self._has_subexpr = any(a.has_subexpr() for a in arr)
         return self._has_subexpr
 
@@ -893,16 +919,22 @@ class InDomain(GlobalConstraint):
     """
     Enforces the expression is assigned to a value in the given domain.
     """
+    _args: tuple[Expression, np.ndarray]
 
-    def __init__(self, expr: ExprLike, arr: Iterable[int|np.integer]):
+    def __init__(self, expr: Expression, arr: Iterable[int|np.integer]):
         """
         Arguments:
             expr (ExprLike): Expression or constant to be assigned to a value in the given domain
             arr (Iterable[int | np.integer]): Iterable of integer constants representing the domain
         """
-        if not all(is_int(x) for x in arr):
-            raise TypeError("The second argument of an InDomain constraint should be a list of integer constants")
-        super().__init__("InDomain", (expr, arr))
+        has_subexpr = not isinstance(expr, _IntVarImpl)
+
+        if not isinstance(arr, np.ndarray):
+            arr = np.array(arr, dtype=int)
+        assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
+        assert arr.dtype == int, "The second argument of an InDomain constraint should be a 1D array of integer constants"
+
+        super().__init__("InDomain", (expr, arr), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -912,12 +944,12 @@ class InDomain(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        expr, arr = self.args
-        lb, ub = get_bounds(expr)
+        expr, arr = self._args
+        lb, ub = expr.get_bounds()
         
         defining = []
-        #if expr is not a var
-        if not isinstance(expr,Expression):
+        # if expr is not a var, checked in the constructor
+        if self._has_subexpr:
             aux = intvar(lb, ub)
             defining.append(aux == expr)
             expr = aux
@@ -929,11 +961,11 @@ class InDomain(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        expr, arr = self.args
-        exprval = argvals(expr)
+        expr, arr = self._args
+        exprval = expr.value()
         if exprval is None:
             return None
-        return exprval in arr
+        return bool(np.any(arr == exprval))
 
     def __repr__(self) -> str:
         return "{} in {}".format(self.args[0], self.args[1])
