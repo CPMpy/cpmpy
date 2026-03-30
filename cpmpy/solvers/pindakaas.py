@@ -271,10 +271,10 @@ class CPM_pindakaas(SolverInterface):
 
     def _add_clause(self, clause, conditions=[]):
         """Add a clause implied by conditions; both arguments are lists of CPMpy literals."""
-        if not isinstance(clause, list):
+        if not isinstance(clause, (tuple, list)):
             raise TypeError
 
-        self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + clause))
+        self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + list(clause)))
 
     def _post_constraint(self, cpm_expr, conditions=[]):
         if not isinstance(conditions, list):

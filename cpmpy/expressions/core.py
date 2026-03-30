@@ -86,8 +86,7 @@
 """
 import copy
 import warnings
-from types import GeneratorType
-from typing import Any, Optional, TypeAlias, TypeVar, Union, Sequence
+from typing import Any, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
 import numpy as np
 import cpmpy as cp
 
@@ -116,36 +115,37 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name, arg_list):
+    def __init__(self, name: str, arg_list: tuple[Any, ...]):
+        """
+        Constructor of the Expression class
+
+        Users should never call this constructor directly, but use the existing (global) constraints/functions.
+
+        - name (str): name of the Expression
+        - arg_list (tuple[Any,...]): arguments of the expression, stored as-is (do preprocessing in the subclass)
+                Requirement: Expressions should only be stored in arguments that are (nested) ListLike's, not inside other custom objects
+                Tip1: store lists of constants as np.ndarray, so we can see it is constant without recursing into it
+                Tip2: keep your NDVarArrays as is; if you require them to be 1D, do .reshape(-1) to flatten them
+        """
         self.name = name
-
-        if isinstance(arg_list, (tuple, GeneratorType)):
-            arg_list = list(arg_list)
-        elif isinstance(arg_list, np.ndarray):
-            # must flatten
-            arg_list = arg_list.reshape(-1)
-        for i in range(len(arg_list)):
-            if isinstance(arg_list[i], np.ndarray):
-                # must flatten
-                arg_list[i] = arg_list[i].reshape(-1)
-
-        assert (is_any_list(arg_list)), "_list_ of arguments required, even if of length one e.g. [arg]"
+        if not isinstance(arg_list, tuple):
+            warnings.warn(f"DEPRECATED: Argument list of {name} is not a tuple, updated the constructor!", UserWarning)
+            arg_list = tuple(arg_list)
         self._args = arg_list
 
-
     @property
-    def args(self):
+    def args(self) -> tuple[Any, ...]:
         return self._args
 
     @args.setter
-    def args(self, args):
+    def args(self, args: Iterable[Any]) -> None:
         raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
 
-    def update_args(self, args):
+    def update_args(self, args: Iterable[Any]) -> None:
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
         """
-        self._args = args
+        self._args = tuple(args)
         # Reset cached "_has_subexpr"
         if hasattr(self, "_has_subexpr"):
             del self._has_subexpr
@@ -188,21 +188,32 @@ class Expression(object):
         # return cached result
         if hasattr(self, '_has_subexpr'):
             return self._has_subexpr
+        
+        # micro-optimisations, cache the lookups
+        _NumVarImpl = cp.variables._NumVarImpl
+        _NDVarArray = cp.variables.NDVarArray
 
-        # Initialize stack with args
-        stack = list(self.args)
+        # Initialize stack with direct access to private _args
+        stack = list(self._args)
 
         while stack:
             el = stack.pop()
-            if isinstance(el, Expression) and not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
-                self._has_subexpr = True
-                return True
-            elif isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
-                self._has_subexpr = True
-                return True
-            elif is_any_list(el):
-                # Add list elements to stack for processing
-                stack.extend(el)
+            if isinstance(el, Expression):
+                if not isinstance(el, (_NumVarImpl, BoolVal)):
+                    self._has_subexpr = True
+                    return True
+                # else: its var/const, continue with the rest
+            elif isinstance(el, _NDVarArray):
+                if el.has_subexpr():
+                    self._has_subexpr = True
+                    return True
+                # else: all good, continue with the rest
+            elif isinstance(el, np.ndarray):
+                if el.dtype == object:
+                    stack.extend(el.flat)  # check its elements
+                # else: only constants, continue with the rest
+            elif isinstance(el, (list, tuple)):
+                stack.extend(el)  # check its elements
 
         # No subexpressions found
         self._has_subexpr = False
@@ -425,8 +436,8 @@ class BoolVal(Expression):
     """
 
     def __init__(self, arg: bool|np.bool_) -> None:
-        assert is_true_cst(arg) or is_false_cst(arg), f"BoolVal must be initialized with a boolean constant, got {arg} of type {type(arg)}"
-        super(BoolVal, self).__init__("boolval", [bool(arg)])
+        arg = bool(arg)  # will raise ValueError if not a Boolean-able
+        super(BoolVal, self).__init__("boolval", (arg,))
 
     def value(self) -> bool:
         return self.args[0]
@@ -549,7 +560,7 @@ class Comparison(Expression):
         We expect at least one of the two to be an :class:`Expression`.
         """
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
-        super().__init__(name, [left, right])
+        super().__init__(name, (left, right))
 
     def __repr__(self) -> str:
         if all(isinstance(x, Expression) for x in self.args):
@@ -632,7 +643,7 @@ class Operator(Expression):
             w: list[ExprLike] = [wi for w, _ in we for wi in w]
             e: list[ExprLike] = [ei for _, e in we for ei in e]
             name = 'wsum'
-            arg_list = [w, e]
+            arg_list = (w, e)
 
         # we have the requirement that weighted sums are [weights, expressions]
         if name == 'wsum':
@@ -661,8 +672,7 @@ class Operator(Expression):
                     i += l
                 i += 1
 
-
-        super().__init__(name, arg_list)
+        super().__init__(name, tuple(arg_list))
 
     def is_bool(self) -> bool:
         """ is it a Boolean (return type) Operator?
@@ -682,8 +692,9 @@ class Operator(Expression):
         if self.name == 'wsum':
             return f"sum({self.args[0]} * {self.args[1]})"
 
-        # infix printing of two arguments
-        if len(self.args) == 2:
+        if len(self.args) == 1:
+            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 ommited in print
+        elif len(self.args) == 2:  # infix printing of two arguments
             # bracketed printing of non-constants
             def wrap_bracket(arg):
                 if isinstance(arg, Expression):
@@ -692,8 +703,8 @@ class Operator(Expression):
             return "{} {} {}".format(wrap_bracket(self.args[0]),
                                      printname,
                                      wrap_bracket(self.args[1]))
-
-        return "{}({})".format(self.name, self.args)
+        else:  # n-ary
+            return "{}{}".format(self.name, self.args)  # args is a tuple, will be in ()
 
     def value(self) -> Optional[int]:
         """
