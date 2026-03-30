@@ -116,6 +116,17 @@ class Expression(object):
     """
 
     def __init__(self, name: str, arg_list: tuple[Any, ...]):
+        """
+        Constructor of the Expression class
+
+        Users should never call this constructor directly, but use the existing (global) constraints/functions.
+
+        - name (str): name of the Expression
+        - arg_list (tuple[Any,...]): arguments of the expression, stored as-is (do preprocessing in the subclass)
+                Requirement: Expressions should only be stored in arguments that are (nested) ListLike's, not inside other custom objects
+                Tip1: store lists of constants as np.ndarray, so we can see it is contant without recursing into it
+                Tip2: keep your NDVarArrays as is; if you require them to be 1D, do .reshape(-1) to flatten them
+        """
         self.name = name
         if not isinstance(arg_list, tuple):
             warnings.warn(f"DEPRECATED: Argument list of {name} is not a tuple, updated the constructor!", UserWarning)
@@ -183,15 +194,22 @@ class Expression(object):
 
         while stack:
             el = stack.pop()
-            if isinstance(el, Expression) and not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
-                self._has_subexpr = True
-                return True
-            elif isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
-                self._has_subexpr = True
-                return True
-            elif is_any_list(el):
-                # Add list elements to stack for processing
-                stack.extend(el)
+            if isinstance(el, Expression):
+                if not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
+                    self._has_subexpr = True
+                    return True
+                # else: its var/const, continue with the rest
+            elif isinstance(el, cp.variables.NDVarArray):
+                if el.has_subexpr():
+                    self._has_subexpr = True
+                    return True
+                # else: all good, continue with the rest
+            elif isinstance(el, np.ndarray):
+                if el.dtype == object:
+                    stack.extend(el.flat)  # check its elements
+                # else: only constants, continue with the rest
+            elif isinstance(el, (list, tuple)):
+                stack.extend(el)  # check its elements
 
         # No subexpressions found
         self._has_subexpr = False
