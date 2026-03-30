@@ -188,18 +188,22 @@ class Expression(object):
         # return cached result
         if hasattr(self, '_has_subexpr'):
             return self._has_subexpr
+        
+        # micro-optimisations, cache the lookups
+        _NumVarImpl = cp.variables._NumVarImpl
+        _NDVarArray = cp.variables.NDVarArray
 
-        # Initialize stack with args
-        stack = list(self.args)
+        # Initialize stack with direct access to private _args
+        stack = list(self._args)
 
         while stack:
             el = stack.pop()
             if isinstance(el, Expression):
-                if not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
+                if not isinstance(el, (_NumVarImpl, BoolVal)):
                     self._has_subexpr = True
                     return True
                 # else: its var/const, continue with the rest
-            elif isinstance(el, cp.variables.NDVarArray):
+            elif isinstance(el, _NDVarArray):
                 if el.has_subexpr():
                     self._has_subexpr = True
                     return True
