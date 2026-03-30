@@ -670,9 +670,6 @@ class Operator(Expression):
         return Operator.allowed[self.name][1]
 
     def __repr__(self) -> str:
-        printname = self.name
-        if printname in Operator.printmap:
-            printname = Operator.printmap[printname]
 
         # special cases
         if self.name == '-': # unary -
@@ -682,6 +679,7 @@ class Operator(Expression):
         if self.name == 'wsum':
             return f"sum({self.args[0]} * {self.args[1]})"
 
+        printname = Operator.printmap.get(self.name, self.name) # default to self.name if not in printmap
         # infix printing of two arguments
         if len(self.args) == 2:
             arg0, arg1 = self.args
