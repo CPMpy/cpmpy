@@ -194,14 +194,12 @@ class Expression(object):
 
         while stack:
             el = stack.pop()
-            if isinstance(el, Expression):
-                # only 3 types of expressions are leafs: _NumVarImpl, BoolVal or NDVarArray with no expressions inside.
-                if isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
-                    self._has_subexpr = True
-                    return True
-                elif not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
-                    self._has_subexpr = True
-                    return True
+            if isinstance(el, Expression) and not isinstance(el, (cp.variables._NumVarImpl, BoolVal)):
+                self._has_subexpr = True
+                return True
+            elif isinstance(el, cp.variables.NDVarArray) and el.has_subexpr():
+                self._has_subexpr = True
+                return True
             elif is_any_list(el):
                 # Add list elements to stack for processing
                 stack.extend(el)
