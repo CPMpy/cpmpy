@@ -124,7 +124,7 @@ class Expression(object):
         - name (str): name of the Expression
         - arg_list (tuple[Any,...]): arguments of the expression, stored as-is (do preprocessing in the subclass)
                 Requirement: Expressions should only be stored in arguments that are (nested) ListLike's, not inside other custom objects
-                Tip1: store lists of constants as np.ndarray, so we can see it is contant without recursing into it
+                Tip1: store lists of constants as np.ndarray, so we can see it is constant without recursing into it
                 Tip2: keep your NDVarArrays as is; if you require them to be 1D, do .reshape(-1) to flatten them
         """
         self.name = name
