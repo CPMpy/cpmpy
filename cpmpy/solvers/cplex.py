@@ -376,7 +376,7 @@ class CPM_cplex(SolverInterface):
         :return: list of Expression
         """
         # apply transformations, then post internally
-        # expressions have to be linearized to fit in MIP model. See /transformations/linearize
+        # expressions have to be linearized to fit in ILP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
         cpm_cons = decompose_linear(cpm_cons,
@@ -491,7 +491,7 @@ class CPM_cplex(SolverInterface):
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         CPLEX supports warmstarting the solver with a (in)feasible solution.
-        This is done using MIP starts which provide the solver with a starting point
+        This is done using ILP starts which provide the solver with a starting point
         for the branch-and-bound algorithm.
 
         The solution hint does NOT need to satisfy all constraints, it should just provide 
@@ -514,7 +514,7 @@ class CPM_cplex(SolverInterface):
         
         self.cplex_model.clear_mip_starts()
 
-        # Create a MIP start solution using the proper docplex API
+        # Create a ILP start solution using the proper docplex API
         if len(cpm_vars) > 0:
             warmstart = self.cplex_model.new_solution()
             for cpm_var, val in zip(cpm_vars, vals):

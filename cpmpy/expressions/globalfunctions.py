@@ -312,7 +312,7 @@ class Multiplication(GlobalFunction):
     Computes the product of two expressions: `x * y`.
 
     Created when the user writes ``*`` with at least one variable (e.g. ``x * y``, ``2 * x``).
-    Supports decomposition into linear constraints for MIP solvers via :meth:`decompose`.
+    Supports decomposition into linear constraints for ILP solvers via :meth:`decompose`.
     """
 
     def __init__(self, x: ExprLike, y: ExprLike):
@@ -379,7 +379,7 @@ class Multiplication(GlobalFunction):
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-        Decomposition of Multiplication into linear constraints (e.g. for MIP).
+        Decomposition of Multiplication into linear constraints (e.g. for ILP).
 
         - If is_lhs_num (const*expr): returns the wsum equivalent and no extra constraints.
         - If both args are Boolean (0/1): bv*bv equals bv&bv (logical AND), so returns that and no extra constraints.
