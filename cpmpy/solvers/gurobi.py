@@ -320,7 +320,6 @@ class CPM_gurobi(SolverInterface):
             Used especially to post an expression as objective function
         """
         import gurobipy as gp
-        print(cpm_expr, cpm_expr.name)
 
         if is_num(cpm_expr):
             return cpm_expr
