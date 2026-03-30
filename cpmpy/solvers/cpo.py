@@ -293,10 +293,11 @@ class CPM_cpo(SolverInterface):
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
+                    print(display.value())
+                elif is_any_list(display):
                     print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
 
             # count and stop
@@ -763,7 +764,7 @@ try:
             # identify which variables to populate with their values
             self._cpm_vars = []
             self._display = display
-            if isinstance(display, (list,Expression)):
+            if isinstance(display, Expression) or is_any_list(display):
                 self._cpm_vars = get_variables(display)
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
@@ -774,25 +775,18 @@ try:
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            sol_var = self._varmap[cpm_subvar]
-                            if isinstance(cpm_var,_BoolVarImpl):
-                                sol_var = sol_var.children[0]
-                                cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
-                            else:
-                                cpm_var._value = sres.get_var_solution(sol_var).get_value()
-                    elif isinstance(cpm_var, _BoolVarImpl):
-                        sol_var = self._varmap[cpm_subvar].children[0]
+                    if isinstance(cpm_var, _BoolVarImpl):
+                        sol_var = self._varmap[cpm_var].children[0]
                         cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
-                    else:
-                        sol_var = self._varmap[cpm_subvar]
+                    elif isinstance(cpm_var, _IntVarImpl):
+                        sol_var = self._varmap[cpm_var]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
+                    else:
+                        raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
                 if isinstance(self._display, Expression):
                     print(argval(self._display))
-                elif isinstance(self._display, list):
+                elif is_any_list(self._display):
                     # explicit list of expressions to display
                     print(argvals(self._display))
                 else: # callable
