@@ -1,24 +1,25 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 ##
 ## python_builtins.py
 ##
 """
-    Overwrites a number of python built-ins, so that they work over variables as expected.
+Overwrites a number of python built-ins, so that they work over variables as expected.
 
-    =================
-    List of functions
-    =================
-    .. autosummary::
-        :nosignatures:
+=================
+List of functions
+=================
+.. autosummary::
+:nosignatures:
 
-        all
-        any
-        max
-        min
-        sum
-        abs
+all
+any
+max
+min
+sum
+abs
 """
+
 import builtins  # to use the original Python-builtins
 import numpy as np
 
@@ -32,18 +33,19 @@ from .globalfunctions import Minimum, Maximum, Abs
 # all: listwise 'and'
 def all(iterable):
     """
-        all() overwrites python built-in,
-        if iterable contains any `Expression`, then returns an Operator("and", iterable)
-        otherwise returns whether all of the arguments are true
+    all() overwrites python built-in,
+    if iterable contains any `Expression`, then returns an Operator("and", iterable)
+    otherwise returns whether all of the arguments are true
     """
-    if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
-    collect = [] # logical expressions
+    if isinstance(iterable, NDVarArray):
+        iterable = iterable.flat  # 1D iterator
+    collect = []  # logical expressions
     is_expr, return_false = False, False
     for elem in iterable:
-        if isinstance(elem, Expression): # probably most likely case
+        if isinstance(elem, Expression):  # probably most likely case
             is_expr = True
             if isinstance(elem, BoolVal):
-                if not elem.args[0]: # False constant
+                if not elem.args[0]:  # False constant
                     return_false = True
             elif elem.is_bool():
                 collect.append(elem)
@@ -57,7 +59,7 @@ def all(iterable):
             raise Exception("Encountered list in 'all', only accept non-nested lists")
         else:
             raise Exception("Unexpected argument '{}' to 'all'".format(elem))
-    
+
     if return_false:
         return BoolVal(False) if is_expr else False
     if len(collect) == 0:
@@ -72,18 +74,19 @@ def all(iterable):
 # any: listwise 'or'
 def any(iterable):
     """
-        any() overwrites python built-in,
-        if iterable contains an `Expression`, then returns an Operator("or", iterable)
-        otherwise returns whether any of the arguments is true
+    any() overwrites python built-in,
+    if iterable contains an `Expression`, then returns an Operator("or", iterable)
+    otherwise returns whether any of the arguments is true
     """
-    if isinstance(iterable, NDVarArray): iterable=iterable.flat # 1D iterator
-    collect = [] # logical expressions
+    if isinstance(iterable, NDVarArray):
+        iterable = iterable.flat  # 1D iterator
+    collect = []  # logical expressions
     is_expr, return_true = False, False
     for elem in iterable:
-        if isinstance(elem, Expression): # probably most likely case
+        if isinstance(elem, Expression):  # probably most likely case
             is_expr = True
             if isinstance(elem, BoolVal):
-                if elem.args[0]: # True constant
+                if elem.args[0]:  # True constant
                     return_true = True
             elif elem.is_bool():
                 collect.append(elem)
@@ -97,7 +100,7 @@ def any(iterable):
             raise Exception("Encountered list in 'all', only accept non-nested lists")
         else:
             raise Exception("Unexpected argument '{}' to 'all'".format(elem))
-    
+
     if return_true:
         return BoolVal(True) if is_expr else True
     if len(collect) == 0:
@@ -111,84 +114,95 @@ def any(iterable):
 
 def max(*iterable, **kwargs):
     """
-        max() overwrites the python built-in to support decision variables.
+    max() overwrites the python built-in to support decision variables.
 
-        if iterable does not contain CPMpy expressions, the built-in is called
-        else a Maximum functional global constraint is constructed; no keyword
-        arguments are supported in that case
+    if iterable does not contain CPMpy expressions, the built-in is called
+    else a Maximum functional global constraint is constructed; no keyword
+    arguments are supported in that case
     """
     if len(iterable) == 1:
         iterable = iterable[0]  # because of *iterable signature
 
     if isinstance(iterable, np.ndarray):
-        if iterable.dtype != object or \
-           not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat):
+        if iterable.dtype != object or not builtins.any(
+            isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat
+        ):
             return builtins.max(iterable.flat, **kwargs)  # does not contain expressions
     else:
         iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
-        if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
+        if not builtins.any(
+            isinstance(elem, (Expression, NDVarArray)) for elem in iterable
+        ):
             return builtins.max(iterable, **kwargs)  # does not contain expressions
 
-    assert len(kwargs)==0, "max over expressions does not support keyword arguments"
+    assert len(kwargs) == 0, "max over expressions does not support keyword arguments"
     return Maximum(iterable)
 
 
 def min(*iterable, **kwargs):
     """
-        min() overwrites the python built-in to support decision variables.
+    min() overwrites the python built-in to support decision variables.
 
-        if iterable does not contain CPMpy expressions, the built-in is called
-        else a Minimum functional global constraint is constructed; no keyword
-        arguments are supported in that case
+    if iterable does not contain CPMpy expressions, the built-in is called
+    else a Minimum functional global constraint is constructed; no keyword
+    arguments are supported in that case
     """
     if len(iterable) == 1:
         iterable = iterable[0]  # because of *iterable signature
 
     if isinstance(iterable, np.ndarray):
-        if iterable.dtype != object or \
-           not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat):
+        if iterable.dtype != object or not builtins.any(
+            isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat
+        ):
             return builtins.min(iterable.flat, **kwargs)  # does not contain expressions
     else:
         iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
-        if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
+        if not builtins.any(
+            isinstance(elem, (Expression, NDVarArray)) for elem in iterable
+        ):
             return builtins.min(iterable, **kwargs)  # does not contain expressions
 
-    assert len(kwargs)==0, "min over expressions does not support keyword arguments"
+    assert len(kwargs) == 0, "min over expressions does not support keyword arguments"
     return Minimum(iterable)
 
 
 def sum(iterable, **kwargs):
     """
-        sum() overwrites the python built-in to support decision variables.
+    sum() overwrites the python built-in to support decision variables.
 
-        if iterable does not contain CPMpy expressions, the built-in is called
-        checks if all constants and uses built-in sum() in that case
+    if iterable does not contain CPMpy expressions, the built-in is called
+    checks if all constants and uses built-in sum() in that case
     """
     if isinstance(iterable, np.ndarray):
-        if iterable.dtype != object or \
-           not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat):
+        if iterable.dtype != object or not builtins.any(
+            isinstance(elem, (Expression, NDVarArray)) for elem in iterable.flat
+        ):
             return builtins.sum(iterable.flat, **kwargs)  # does not contain expressions
     else:
         iterable = tuple(iterable)  # convert iterable (possibly generator) to tuple
-        if not builtins.any(isinstance(elem, (Expression, NDVarArray)) for elem in iterable):
+        if not builtins.any(
+            isinstance(elem, (Expression, NDVarArray)) for elem in iterable
+        ):
             return builtins.sum(iterable, **kwargs)  # does not contain expressions
 
-    assert len(kwargs)==0, "sum over expressions does not support keyword arguments"
+    assert len(kwargs) == 0, "sum over expressions does not support keyword arguments"
     return Operator("sum", iterable)
 
 
 def abs(element):
     """
-        abs() overwrites the python built-in to support decision variables.
+    abs() overwrites the python built-in to support decision variables.
 
-        if the element given is not a CPMpy expression, the built-in is called
-        else an Absolute functional global constraint is constructed.
+    if the element given is not a CPMpy expression, the built-in is called
+    else an Absolute functional global constraint is constructed.
     """
-    if is_any_list(element):  # compat: not allowed by builtins.abs(), but allowed by numpy.abs()
+    if is_any_list(
+        element
+    ):  # compat: not allowed by builtins.abs(), but allowed by numpy.abs()
         return cpm_array([abs(elem) for elem in element])
 
     if isinstance(element, Expression):
         # create global
         return Abs(element)
-    
+
     return builtins.abs(element)

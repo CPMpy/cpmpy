@@ -1,77 +1,78 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 ##
 ## globalfunctions.py
 ##
 """
-    Global functions conveniently express numerical global constraints in function form.
+Global functions conveniently express numerical global constraints in function form.
 
-    For example `cp.Maximum(iv1, iv2, iv3) == iv4`, or `cp.Abs(iv1) > iv2` or `m.minimize(cp.Count(IVS, 0))`,
-    or other nested numeric expressions.
+For example `cp.Maximum(iv1, iv2, iv3) == iv4`, or `cp.Abs(iv1) > iv2` or `m.minimize(cp.Count(IVS, 0))`,
+or other nested numeric expressions.
 
-    Global functions are implemented as classes that inherit from :class:`GlobalFunction <cpmpy.expressions.globalfunctions.GlobalFunction>`.
-
-
-    Solver perspective
-    ------------------
-
-    * Native support: some solvers natively support the function form of global functions,
-    such as other CP languages, SMT solvers, Cplex, Hexaly etc.
-
-    * Predicate form: CP solvers and MINLP solvers only support the predicate form of global functions.
-    For example, `cp.Maximum(iv1, iv2, iv3) == iv4` has to be posted to the solver API
-    as `addMaximumEquals([iv1,iv2,iv3], iv4)`, and expressions like `cp.Abs(iv1) > iv2` have to be flattened
-    and posted as `addAbsEquals(iv1, aux)` and `aux > iv2`. This is automatically done by the flattening
-    transformation in the `flatten_model` transformation.
-
-    * Decomposition: if a solver does not support a global function, then it will be automatically
-    decomposed by the :func:`decompose_in_tree() <cpmpy.transformations.decompose_global.decompose_in_tree>` transformation, which will call its :meth:`decompose() <cpmpy.expressions.globalfunctions.GlobalFunction.decompose>` method.
-
-    The `.decompose()` function returns two arguments:
-        1. A single CPMpy expression representing the numerical value of the global function,
-            this is often an auxiliary variable, a sum of auxiliary variables or a sum over
-            nested expressions.
-        2. If the decomposition introduces new *auxiliary variables*, then the second argument
-            has to be a list of constraints that (totally) define those new variables.
-
-    To make maximum use of simplification and common subexpression elimination, we recommend that decompositions
-        use nested expression as much as possible and avoid creating auxiliary variables unless not expressible
-        in a more direct way.
+Global functions are implemented as classes that inherit from :class:`GlobalFunction <cpmpy.expressions.globalfunctions.GlobalFunction>`.
 
 
-    Example:
+Solver perspective
+------------------
 
-    .. code-block:: python
+* Native support: some solvers natively support the function form of global functions,
+such as other CP languages, SMT solvers, Cplex, Hexaly etc.
 
-        class MySum(GlobalFunction):
-            def __init__(self, args):
-                assert len(args) == 2, "MySum takes 2 arguments"
-                super().__init__("my_sum", args)
+* Predicate form: CP solvers and MINLP solvers only support the predicate form of global functions.
+For example, `cp.Maximum(iv1, iv2, iv3) == iv4` has to be posted to the solver API
+as `addMaximumEquals([iv1,iv2,iv3], iv4)`, and expressions like `cp.Abs(iv1) > iv2` have to be flattened
+and posted as `addAbsEquals(iv1, aux)` and `aux > iv2`. This is automatically done by the flattening
+transformation in the `flatten_model` transformation.
 
-            def decompose(self):
-                return (self.args[0] + self.args[1]), []  # the decomposition
+* Decomposition: if a solver does not support a global function, then it will be automatically
+decomposed by the :func:`decompose_in_tree() <cpmpy.transformations.decompose_global.decompose_in_tree>` transformation, which will call its :meth:`decompose() <cpmpy.expressions.globalfunctions.GlobalFunction.decompose>` method.
 
-    ===============
-    List of classes
-    ===============
+The `.decompose()` function returns two arguments:
+1. A single CPMpy expression representing the numerical value of the global function,
+this is often an auxiliary variable, a sum of auxiliary variables or a sum over
+nested expressions.
+2. If the decomposition introduces new *auxiliary variables*, then the second argument
+has to be a list of constraints that (totally) define those new variables.
 
-    .. autosummary::
-        :nosignatures:
+To make maximum use of simplification and common subexpression elimination, we recommend that decompositions
+use nested expression as much as possible and avoid creating auxiliary variables unless not expressible
+in a more direct way.
 
-        Minimum
-        Maximum
-        Abs
-        Multiplication
-        Division
-        Modulo
-        Power
-        Element
-        Count
-        Among
-        NValue
-        NValueExcept
+
+Example:
+
+.. code-block:: python
+
+class MySum(GlobalFunction):
+def __init__(self, args):
+assert len(args) == 2, "MySum takes 2 arguments"
+super().__init__("my_sum", args)
+
+def decompose(self):
+return (self.args[0] + self.args[1]), []  # the decomposition
+
+===============
+List of classes
+===============
+
+.. autosummary::
+:nosignatures:
+
+Minimum
+Maximum
+Abs
+Multiplication
+Division
+Modulo
+Power
+Element
+Count
+Among
+NValue
+NValueExcept
 
 """
+
 import warnings  # for deprecation warning
 from typing import Optional
 import numpy as np
@@ -79,8 +80,18 @@ import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
+from .variables import intvar
+from .utils import (
+    flatlist,
+    argval,
+    is_num,
+    eval_comparison,
+    is_any_list,
+    is_boolexpr,
+    get_bounds,
+    argvals,
+    implies,
+)
 
 
 class GlobalFunction(Expression):
@@ -94,13 +105,14 @@ class GlobalFunction(Expression):
     def is_bool(self) -> bool:
         """
         Returns:
-            bool: False, global functions are numeric
+        bool: False, global functions are numeric
+
         """
         return False
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-            Returns a decomposition into smaller constraints as a tuple of
+        Returns a decomposition into smaller constraints as a tuple of
             (numerical expression, list of constraints defining auxiliary variables)
 
             The first one will replace the GlobalFunction expression in-place,
@@ -112,12 +124,15 @@ class GlobalFunction(Expression):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the numerical expression and a list of constraints defining auxiliary variables
+
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
-    def decompose_comparison(self, cmp_op: str, cmp_rhs: Expression) -> tuple[list[Expression], list[Expression]]:
+    def decompose_comparison(
+        self, cmp_op: str, cmp_rhs: Expression
+    ) -> tuple[list[Expression], list[Expression]]:
         """
-            DEPRECATED: returns a list of constraints representing the decomposed
+        DEPRECATED: returns a list of constraints representing the decomposed
             comparison of the global function (and any auxiliary variables introduced).
 
         Arguments:
@@ -126,9 +141,13 @@ class GlobalFunction(Expression):
 
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing two lists: constraints representing the comparison, and constraints defining auxiliary variables
+
         """
-        warnings.warn(f"Deprecated, use {self}.decompose() instead, will be removed in "
-                      "stable version", DeprecationWarning)
+        warnings.warn(
+            f"Deprecated, use {self}.decompose() instead, will be removed in "
+            "stable version",
+            DeprecationWarning,
+        )
         valexpr, cons = self.decompose()
         return [eval_comparison(cmp_op, valexpr, cmp_rhs)], cons
 
@@ -138,36 +157,37 @@ class GlobalFunction(Expression):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound)
+
         """
         raise NotImplementedError("Bounds calculation for", self, "not available")
 
     def is_total(self) -> bool:
         """
-            Returns whether it is a total function.
-            If true, its value is defined for all arguments
+        Returns whether it is a total function.
+        If true, its value is defined for all arguments
 
-            TODO: I do not find anywhere where we set it dynamically to False?
-            TODO: REMOVE??
+        TODO: I do not find anywhere where we set it dynamically to False?
+        TODO: REMOVE??
         """
         return True
 
 
 class Minimum(GlobalFunction):
-    """
-    Computes the minimum value of the arguments
-    """
+    """Computes the minimum value of the arguments"""
 
     def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
-            arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
+        arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
+
         """
         super().__init__("min", tuple(flatlist(arg_list)))
 
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The minimum value of the arguments, or None if any argument is not assigned
+        Optional[int]: The minimum value of the arguments, or None if any argument is not assigned
+
         """
         vargs = [argval(a) for a in self.args]
         if any(val is None for val in vargs):
@@ -185,9 +205,12 @@ class Minimum(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the minimum value, and a list of constraints defining it
+
         """
         _min = intvar(*self.get_bounds())
-        return _min, [_min <= a for a in self.args] + [cp.any(_min >= a for a in self.args)]
+        return _min, [_min <= a for a in self.args] + [
+            cp.any(_min >= a for a in self.args)
+        ]
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -195,27 +218,28 @@ class Minimum(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the minimum value
+
         """
         bnds = [get_bounds(x) for x in self.args]
         return min(lb for lb, ub in bnds), min(ub for lb, ub in bnds)
 
 
 class Maximum(GlobalFunction):
-    """
-    Computes the maximum value of the arguments
-    """
+    """Computes the maximum value of the arguments"""
 
     def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
-            arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
+        arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
+
         """
         super().__init__("max", tuple(flatlist(arg_list)))
 
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The maximum value of the arguments, or None if any argument is not assigned
+        Optional[int]: The maximum value of the arguments, or None if any argument is not assigned
+
         """
         vargs = [argval(a) for a in self.args]
         if any(val is None for val in vargs):
@@ -233,9 +257,12 @@ class Maximum(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the maximum value, and a list of constraints defining it
+
         """
         _max = intvar(*self.get_bounds())
-        return _max, [_max >= a for a in self.args] + [cp.any(_max <= a for a in self.args)]
+        return _max, [_max >= a for a in self.args] + [
+            cp.any(_max <= a for a in self.args)
+        ]
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -243,27 +270,28 @@ class Maximum(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the maximum value
+
         """
         bnds = [get_bounds(x) for x in self.args]
         return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
 
 class Abs(GlobalFunction):
-    """
-    Computes the absolute value of the argument
-    """
+    """Computes the absolute value of the argument"""
 
     def __init__(self, expr: Expression):
         """
         Arguments:
-            expr (Expression): Expression of which to compute the absolute value
+        expr (Expression): Expression of which to compute the absolute value
+
         """
         super().__init__("abs", (expr,))
 
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The absolute value of the argument, or None if the argument is not assigned
+        Optional[int]: The absolute value of the argument, or None if the argument is not assigned
+
         """
         varg = argval(self.args[0])
         if varg is None:
@@ -281,12 +309,13 @@ class Abs(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the expression representing the absolute value (may be the argument itself, its negation, or an auxiliary variable), and a list of constraints defining it (empty if no auxiliary variable is needed)
+
         """
         arg = self.args[0]
         lb, ub = get_bounds(arg)
-        if lb >= 0: # always positive
+        if lb >= 0:  # always positive
             return arg, []
-        if ub <= 0: # always negative
+        if ub <= 0:  # always negative
             return -arg, []
 
         _abs = intvar(*self.get_bounds())
@@ -298,6 +327,7 @@ class Abs(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the absolute value
+
         """
         lb, ub = get_bounds(self.args[0])
         if lb >= 0:
@@ -320,10 +350,11 @@ class Multiplication(GlobalFunction):
         Arguments:
             x (ExprLike): First factor (expression or constant)
             y (ExprLike): Second factor (expression or constant)
-        
+
         We expect at least one of the two is an Expression
 
         Normalizes so a constant is first when one factor is numeric (sets .is_lhs_num).
+
         """
         is_lhs_num = False
         if is_num(x):
@@ -336,8 +367,9 @@ class Multiplication(GlobalFunction):
         self.is_lhs_num = is_lhs_num
 
     def update_args(self, args):
-        """ Allows in-place update of the expression's arguments.
-            Resets all cached computations which depend on the expression tree.
+        """
+        Allows in-place update of the expression's arguments.
+        Resets all cached computations which depend on the expression tree.
         """
         x, y = args
         is_lhs_num = False
@@ -421,8 +453,8 @@ class Multiplication(GlobalFunction):
 
         # encoding z_v == (a == v)*b via (a==v)->(z_v == b) & (a!=v)->(z_v == 0)
         encoding = []
-        z_lb = min(0, lb_b) # make sure it can take 0
-        z_ub = max(0, ub_b) # make sure it can take 0
+        z_lb = min(0, lb_b)  # make sure it can take 0
+        z_ub = max(0, ub_b)  # make sure it can take 0
         zs = cp.intvar(z_lb, z_ub, shape=(len(dom_a),))
         for v, z_v in zip(dom_a, zs):
             encoding.append((a == v).implies(z_v == b))
@@ -447,19 +479,23 @@ class Division(GlobalFunction):
     def __init__(self, x: ExprLike, y: ExprLike):
         """
         Arguments:
-            x (ExprLike): Expression or constant to divide
-            y (ExprLike): Expression or constant to divide by
+        x (ExprLike): Expression or constant to divide
+        y (ExprLike): Expression or constant to divide by
+
         """
         super().__init__("div", (x, y))
 
     def __repr__(self):
         """
         Returns:
-            str: String representation of integer division as 'x div y'
+        str: String representation of integer division as 'x div y'
+
         """
-        x,y = self.args
-        return "{} div {}".format(f"({x})" if isinstance(x, Expression) else x,
-                                  f"({y})" if isinstance(y, Expression) else y)
+        x, y = self.args
+        return "{} div {}".format(
+            f"({x})" if isinstance(x, Expression) else x,
+            f"({y})" if isinstance(y, Expression) else y,
+        )
 
     def decompose(self):
         """
@@ -470,34 +506,44 @@ class Division(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the integer division, and a list of constraints defining it
+
         """
-        x,y = self.args
+        x, y = self.args
         safen = []
 
         y_lb, y_ub = get_bounds(y)
         if y_lb <= 0 <= y_ub:
             safen = [y != 0]
-            warnings.warn(f"Division constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
+            warnings.warn(
+                f"Division constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions"
+            )
 
         r = intvar(*get_bounds(x % y))  # remainder
         _div = intvar(*self.get_bounds())
-        return _div, safen + [(x == (y * _div) + r), abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
+        return _div, safen + [
+            (x == (y * _div) + r),
+            abs(r) < abs(y),
+            abs(y) * abs(_div) <= abs(x),
+        ]
 
     def value(self):
         """
         Returns:
-            int: The integer division of the arguments, or None if the arguments are not assigned
+        int: The integer division of the arguments, or None if the arguments are not assigned
+
         """
-        x,y = argvals(self.args)
+        x, y = argvals(self.args)
         if x is None or y is None:
             return None
 
         try:
             return int(x / y)  # integer division, rounding towards zero
         except ZeroDivisionError:
-            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                          + "\n Use argval(expr) to get the value of expr with relational "
-                                            "semantics.")
+            raise IncompleteFunctionError(
+                f"Division by zero during value computation for expression {self}"
+                + "\n Use argval(expr) to get the value of expr with relational "
+                "semantics."
+            )
 
     def get_bounds(self):
         """
@@ -505,8 +551,9 @@ class Division(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the integer division
+
         """
-        x,y = self.args
+        x, y = self.args
         x_lb, x_ub = get_bounds(x)
         y_lb, y_ub = get_bounds(y)
 
@@ -518,11 +565,22 @@ class Division(GlobalFunction):
             if y_ub == 0:
                 y_ub = -1
             bounds = [
-                int(x_lb / y_lb), int(x_lb / -1), int(x_lb / 1), int(x_lb / y_ub),
-                int(x_ub / y_lb), int(x_ub / -1), int(x_ub / 1), int(x_ub / y_ub)
+                int(x_lb / y_lb),
+                int(x_lb / -1),
+                int(x_lb / 1),
+                int(x_lb / y_ub),
+                int(x_ub / y_lb),
+                int(x_ub / -1),
+                int(x_ub / 1),
+                int(x_ub / y_ub),
             ]
         else:
-            bounds = [int(x_lb / y_lb), int(x_lb / y_ub), int(x_ub / y_lb), int(x_ub / y_ub)]
+            bounds = [
+                int(x_lb / y_lb),
+                int(x_lb / y_ub),
+                int(x_ub / y_lb),
+                int(x_ub / y_ub),
+            ]
 
         return min(bounds), max(bounds)
 
@@ -530,7 +588,6 @@ class Division(GlobalFunction):
 class Modulo(GlobalFunction):
     """
     Computes the modulo of the arguments, the remainder with integer division (rounding towards zero): `x - (y * (x div y))`
-
 
     Warning: this is different from the Python's modulo operator `%`, which gives the remainder of the float division `x / y`
 
@@ -542,59 +599,68 @@ class Modulo(GlobalFunction):
     def __init__(self, x: ExprLike, y: ExprLike):
         """
         Arguments:
-            x (ExprLike): Expression or constant for the dividend
-            y (ExprLike): Expression or constant for the divisor
+        x (ExprLike): Expression or constant for the dividend
+        y (ExprLike): Expression or constant for the divisor
+
         """
         super().__init__("mod", (x, y))
 
     def __repr__(self):
         """
         Returns:
-            str: String representation with 'mod' as notation
+        str: String representation with 'mod' as notation
+
         """
-        x,y = self.args
-        return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
-                                  f"({y})" if isinstance(y, Expression) else y)
+        x, y = self.args
+        return "{} mod {}".format(
+            f"({x})" if isinstance(x, Expression) else x,
+            f"({y})" if isinstance(y, Expression) else y,
+        )
 
     def decompose(self):
         """
         Decomposition of Modulo global function, using integer division (rounding towards zero)
-        
+
         Decomposes `x mod y = z` as `x = k * y + z` with `|z| < |y|` and `sign(x) = sign(z)`
         https://en.wikipedia.org/wiki/Modulo
         https://marcelkliemannel.com/articles/2021/dont-confuse-integer-division-with-floor-division/
         """
-        x,y = self.args
+        x, y = self.args
         safen = []
 
         y_lb, y_ub = get_bounds(y)
         if y_lb <= 0 <= y_ub:
             safen = [y != 0]
-            warnings.warn(f"Modulo constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
+            warnings.warn(
+                f"Modulo constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions"
+            )
 
         _mod = intvar(*self.get_bounds())
         k = intvar(*get_bounds((x - _mod) // y))  # integer quotient (multiplier)
         return _mod, safen + [
-            k * y + _mod == x,   # module is remainder of integer division
+            k * y + _mod == x,  # module is remainder of integer division
             abs(_mod) < abs(y),  # remainder is smaller than divisor
-            x * _mod >= 0        # remainder is negative iff x is negative
+            x * _mod >= 0,  # remainder is negative iff x is negative
         ]
 
     def value(self):
         """
         Returns:
-            int: The modulo of the arguments, or None if the arguments are not assigned
+        int: The modulo of the arguments, or None if the arguments are not assigned
+
         """
-        x,y = argvals(self.args)
+        x, y = argvals(self.args)
         if x is None or y is None:
             return None
 
         try:  # modulo defined with integer division
             return x - (y * int(x / y))
         except ZeroDivisionError:
-            raise IncompleteFunctionError(f"Division by zero during value computation for expression {self}"
-                                          + "\n Use argval(expr) to get the value of expr with relational "
-                                            "semantics.")
+            raise IncompleteFunctionError(
+                f"Division by zero during value computation for expression {self}"
+                + "\n Use argval(expr) to get the value of expr with relational "
+                "semantics."
+            )
 
     def get_bounds(self):
         """
@@ -602,6 +668,7 @@ class Modulo(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the modulo
+
         """
         lb1, ub1 = get_bounds(self.args[0])
         lb2, ub2 = get_bounds(self.args[1])
@@ -625,16 +692,21 @@ class Power(GlobalFunction):
     Only non-negative constant integer exponents are supported.
     """
 
-    def __init__(self, base: ExprLike, exponent: int|np.integer):
+    def __init__(self, base: ExprLike, exponent: int | np.integer):
         """
         Arguments:
-            base (ExprLike): Expression or constant to raise to the power
-            exponent (int | np.integer): Non-negative integer exponent (constant only, no variable)
+        base (ExprLike): Expression or constant to raise to the power
+        exponent (int | np.integer): Non-negative integer exponent (constant only, no variable)
+
         """
         if not is_num(exponent):
-            raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
+            raise TypeError(
+                f"Power constraint takes an integer number as second argument, not: {exponent}"
+            )
         if exponent < 0:
-            raise ValueError(f"Power constraint only supports non-negative integer exponents, not: {exponent}")
+            raise ValueError(
+                f"Power constraint only supports non-negative integer exponents, not: {exponent}"
+            )
         super().__init__("pow", (base, exponent))
 
     def decompose(self):
@@ -645,20 +717,22 @@ class Power(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the power, and a list of constraints defining it
+
         """
         base, exp = self.args
         if exp == 0:
-            return 1,[]
+            return 1, []
 
         _pow = base
-        for _ in range(1,exp):
+        for _ in range(1, exp):
             _pow *= base
-        return _pow,[]
+        return _pow, []
 
     def value(self):
         """
         Returns:
-            int: The power of the arguments, or None if the arguments are not assigned
+        int: The power of the arguments, or None if the arguments are not assigned
+
         """
         base, exp = argvals(self.args)
         if base is None or exp is None:
@@ -672,11 +746,12 @@ class Power(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the power
+
         """
         base, exp = self.args
         lb_base, ub_base = get_bounds(base)
 
-        bounds = [lb_base ** exp, ub_base ** exp]
+        bounds = [lb_base**exp, ub_base**exp]
         return min(bounds), max(bounds)
 
 
@@ -699,24 +774,32 @@ class Element(GlobalFunction):
     def __init__(self, arr: ListLike[ExprLike], idx: ExprLike):
         """
         Arguments:
-            arr (ListLike[ExprLike]): List of expressions or constants to index into
-            idx (ExprLike): Integer expression or constant for the index (not a boolean expression)
+        arr (ListLike[ExprLike]): List of expressions or constants to index into
+        idx (ExprLike): Integer expression or constant for the index (not a boolean expression)
+
         """
         if is_boolexpr(idx):
-            raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
+            raise TypeError(
+                f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}"
+            )
         if is_any_list(idx):
-            raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
+            raise TypeError(
+                f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}"
+            )
         assert len(arr) > 0, "Element: array should not be empty"
 
         super().__init__("element", (arr, idx))
 
     def __getitem__(self, index):
-        raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array, e.g. instead of Arr[Idx1][Idx2], do Arr[Idx1, Idx2].")
+        raise CPMpyException(
+            "For using multi-dimensional Element, use comma-separated indices on the original array, e.g. instead of Arr[Idx1][Idx2], do Arr[Idx1, Idx2]."
+        )
 
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The value of the array element at the given index, or None if the index is not assigned or the array element is not assigned
+        Optional[int]: The value of the array element at the given index, or None if the index is not assigned or the array element is not assigned
+
         """
         arr, idx = self.args
         vidx = argval(idx)
@@ -724,8 +807,10 @@ class Element(GlobalFunction):
             return None
 
         if vidx < 0 or vidx >= len(arr):
-            raise IncompleteFunctionError(f"Index {vidx} out of range for array of length {len(arr)} while calculating value for expression {self}"
-                                            + "\n Use argval(expr) to get the value of expr with relational semantics.")
+            raise IncompleteFunctionError(
+                f"Index {vidx} out of range for array of length {len(arr)} while calculating value for expression {self}"
+                + "\n Use argval(expr) to get the value of expr with relational semantics."
+            )
         return argval(arr[vidx])  # can be None
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -738,6 +823,7 @@ class Element(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the element value, and a list of constraints defining it
+
         """
         arr, idx = self.args
 
@@ -745,12 +831,16 @@ class Element(GlobalFunction):
         defining = []
         if not (idx_lb >= 0 and idx_ub < len(arr)):
             defining += [idx >= 0, idx < len(arr)]
-            warnings.warn(f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
+            warnings.warn(
+                f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions"
+            )
 
         aux = intvar(*self.get_bounds())
 
-        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)
-        return aux, [implies(idx == i, aux == arr[i]) for i in range(lb, ub+1)] + defining
+        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr) - 1)
+        return aux, [
+            implies(idx == i, aux == arr[i]) for i in range(lb, ub + 1)
+        ] + defining
 
     def decompose_linear(self) -> tuple[Expression, list[Expression]]:
         """
@@ -762,6 +852,7 @@ class Element(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the expression representing the element value, and an empty list of constraints (no auxiliary variables needed)
+
         """
         arr, idx = self.args
 
@@ -769,10 +860,12 @@ class Element(GlobalFunction):
         defining = []
         if not (idx_lb >= 0 and idx_ub < len(arr)):
             defining += [idx >= 0, idx < len(arr)]
-            warnings.warn(f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
+            warnings.warn(
+                f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions"
+            )
 
-        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)
-        return cp.sum((idx == i)*arr[i] for i in range(lb, ub+1)), defining
+        lb, ub = max(idx_lb, 0), min(idx_ub, len(arr) - 1)
+        return cp.sum((idx == i) * arr[i] for i in range(lb, ub + 1)), defining
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -780,10 +873,11 @@ class Element(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the element value
+
         """
         arr, idx = self.args
         bnds = [get_bounds(x) for x in arr]
-        return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
+        return min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
     def __repr__(self) -> str:
         """
@@ -791,8 +885,10 @@ class Element(GlobalFunction):
 
         Returns:
             str: String representation of the Element global function.
+
         """
         return f"{self.args[0]}[{self.args[1]}]"
+
 
 def element(arg_list):
     """
@@ -803,27 +899,34 @@ def element(arg_list):
 
     Returns:
         Element: An Element global function instance
+
     """
-    warnings.warn("Deprecated, use Element(arr,idx) instead, will be removed in stable version", DeprecationWarning)
-    assert (len(arg_list) == 2), "Element expression takes 2 arguments: Arr, Idx"
+    warnings.warn(
+        "Deprecated, use Element(arr,idx) instead, will be removed in stable version",
+        DeprecationWarning,
+    )
+    assert len(arg_list) == 2, "Element expression takes 2 arguments: Arr, Idx"
     return Element(arg_list[0], arg_list[1])
 
 
 class Count(GlobalFunction):
-    """
-    The Count global function represents the number of occurrences of a value in an array
-    """
+    """The Count global function represents the number of occurrences of a value in an array"""
 
     def __init__(self, arr: ListLike[ExprLike], val: ExprLike):
         """
         Arguments:
-            arr (ListLike[ExprLike]): List of expressions or constants to count in
-            val (ExprLike): 'Value' to count occurences of (can also be an expression)
+        arr (ListLike[ExprLike]): List of expressions or constants to count in
+        val (ExprLike): 'Value' to count occurences of (can also be an expression)
+
         """
         if not is_any_list(arr):
-            raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
+            raise TypeError(
+                f"Count(arr, val) takes an array of expressions as first argument, not: {arr}"
+            )
         if is_any_list(val):
-            raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
+            raise TypeError(
+                f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}"
+            )
         super().__init__("count", (arr, val))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -834,6 +937,7 @@ class Count(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the count, and an empty list of constraints (no auxiliary variables needed)
+
         """
         arr, val = self.args
         return cp.sum((a == val) for a in arr), []
@@ -841,7 +945,8 @@ class Count(GlobalFunction):
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The number of occurrences of val in arr, or None if val or any element in arr is not assigned
+        Optional[int]: The number of occurrences of val in arr, or None if val or any element in arr is not assigned
+
         """
         arr, val = self.args
         vval = argval(val)
@@ -860,10 +965,10 @@ class Count(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the count value
+
         """
         arr, val = self.args
         return 0, len(arr)
-
 
 
 class Among(GlobalFunction):
@@ -875,11 +980,12 @@ class Among(GlobalFunction):
     returns the number of variables among x1, x2, x3, x4 that take the value 1 or 2.
     """
 
-    def __init__(self, arr: ListLike[ExprLike], vals: ListLike[int|np.integer]):
+    def __init__(self, arr: ListLike[ExprLike], vals: ListLike[int | np.integer]):
         """
         Arguments:
-            arr (ListLike[ExprLike]): List of expressions or constants to count occurrences in
-            vals (ListLike[int | np.integer]): List of integer constants whose occurrences are counted
+        arr (ListLike[ExprLike]): List of expressions or constants to count occurrences in
+        vals (ListLike[int | np.integer]): List of integer constants whose occurrences are counted
+
         """
         if not is_any_list(arr) or not is_any_list(vals):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
@@ -896,6 +1002,7 @@ class Among(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the total number of occurrences, and an empty list of constraints (no auxiliary variables needed)
+
         """
         arr, vals = self.args
         return cp.sum(Count(arr, val) for val in vals), []
@@ -903,7 +1010,8 @@ class Among(GlobalFunction):
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The number of variables in arr that take a value present in vals, or None if any element in arr is not assigned
+        Optional[int]: The number of variables in arr that take a value present in vals, or None if any element in arr is not assigned
+
         """
         arr, vals = self.args
         varr = argvals(arr)  # recursive handling of nested structures
@@ -918,6 +1026,7 @@ class Among(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the among count value
+
         """
         arr, vals = self.args
         return 0, len(arr)
@@ -934,7 +1043,8 @@ class NValue(GlobalFunction):
     def __init__(self, arr: ListLike[ExprLike]):
         """
         Arguments:
-            arr (ListLike[ExprLike]): List of expressions or constants to count distinct values in
+        arr (ListLike[ExprLike]): List of expressions or constants to count distinct values in
+
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
@@ -956,16 +1066,18 @@ class NValue(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the number of distinct values, and an empty list of constraints (no auxiliary variables needed)
+
         """
         lbs, ubs = get_bounds(self.args)
         lb, ub = min(lbs), max(ubs)
 
-        return cp.sum(cp.any(a == v for a in self.args) for v in range(lb, ub+1)), []
+        return cp.sum(cp.any(a == v for a in self.args) for v in range(lb, ub + 1)), []
 
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The number of distinct values in the array, or None if any element in arr is not assigned
+        Optional[int]: The number of distinct values in the array, or None if any element in arr is not assigned
+
         """
         vargs = [argval(a) for a in self.args]
         if any(v is None for v in vargs):
@@ -979,6 +1091,7 @@ class NValue(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the number of distinct values
+
         """
         return 1, len(self.args)
 
@@ -993,16 +1106,19 @@ class NValueExcept(GlobalFunction):
     excluding 0).
     """
 
-    def __init__(self, arr: ListLike[ExprLike], n: int|np.integer):
+    def __init__(self, arr: ListLike[ExprLike], n: int | np.integer):
         """
         Arguments:
-            arr (ListLike[ExprLike]): List of expressions or constants to count distinct values in
-            n (int | np.integer): Integer constant to exclude from the count
+        arr (ListLike[ExprLike]): List of expressions or constants to count distinct values in
+        n (int | np.integer): Integer constant to exclude from the count
+
         """
         if not is_any_list(arr):
             raise ValueError("NValueExcept takes an array as input")
         if not is_num(n):
-            raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
+            raise ValueError(
+                f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}"
+            )
         super().__init__("nvalue_except", (arr, n))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -1015,18 +1131,22 @@ class NValueExcept(GlobalFunction):
 
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the sum expression representing the number of distinct values (excluding n), and an empty list of constraints (no auxiliary variables needed)
+
         """
         arr, n = self.args
 
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
 
-        return cp.sum([cp.any(a == v for a in arr) for v in range(lb, ub+1) if v != n]), []
+        return cp.sum(
+            [cp.any(a == v for a in arr) for v in range(lb, ub + 1) if v != n]
+        ), []
 
     def value(self) -> Optional[int]:
         """
         Returns:
-            Optional[int]: The number of distinct values in the array, excluding value n, or None if any element in arr is not assigned
+        Optional[int]: The number of distinct values in the array, excluding value n, or None if any element in arr is not assigned
+
         """
         arr, n = self.args
         varr = [argval(a) for a in arr]
@@ -1044,6 +1164,7 @@ class NValueExcept(GlobalFunction):
 
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the number of distinct values (excluding n)
+
         """
         arr, n = self.args
         return 0, len(arr)
