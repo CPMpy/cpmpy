@@ -115,7 +115,7 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name: str, arg_list: tuple[Any, ...]):
+    def __init__(self, name: str, arg_list: tuple[Any, ...], has_subexpr: Optional[bool] = None):
         """
         Constructor of the Expression class
 

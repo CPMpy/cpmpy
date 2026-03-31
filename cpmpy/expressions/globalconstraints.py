@@ -132,7 +132,6 @@
         DirectConstraint
 
 """
-import copy
 import warnings
 from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
@@ -140,7 +139,7 @@ import numpy as np
 import cpmpy as cp
 
 from .core import Expression, BoolVal, ExprLike, ListLike
-from .variables import cpm_array, intvar, boolvar, _BoolVarImpl
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 from .globalfunctions import * # XXX make this file backwards compatible
 
@@ -216,13 +215,28 @@ class AllDifferent(GlobalConstraint):
     """
     Enforces that all arguments have a different (distinct) value
     """
+    _args: tuple[ExprLike, ...]
 
     def __init__(self, *args: ExprLike|ListLike[ExprLike]):
         """
         Arguments:
             args (ExprLike|ListLike[ExprLike]): List of expressions or constants to be different from each other
         """
-        super().__init__("alldifferent", tuple(flatlist(args)))
+        # shortcut
+        if len(args) == 1 and isinstance(args[0], NDVarArray):
+            arr = args[0]
+            super().__init__("alldifferent", tuple(arr.flat), has_subexpr=arr.has_subexpr())
+            return
+
+        flat: list[ExprLike] = []
+        for a in args:
+            if isinstance(a, np.ndarray):
+                flat.extend(a.flat)
+            elif isinstance(a, (list, tuple)):
+                flat.extend(a)
+            else:
+                flat.append(a)
+        super().__init__("alldifferent", tuple(flat))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -314,7 +328,20 @@ class AllDifferentExcept0(AllDifferentExceptN):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to 0
         """
-        super().__init__(flatlist(args), 0)
+        # shortcut
+        if len(args) == 1 and isinstance(args[0], NDVarArray):
+            super().__init__(args[0], 0)
+            return
+
+        flat: list[ExprLike] = []
+        for a in args:
+            if isinstance(a, np.ndarray):
+                flat.extend(a.flat)
+            elif isinstance(a, (list, tuple)):
+                flat.extend(a)
+            else:
+                flat.append(a)
+        super().__init__(flat, 0)
 
 
 def allequal(args):
@@ -336,7 +363,21 @@ class AllEqual(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to have the same value
         """
-        super().__init__("allequal", tuple(flatlist(args)))
+        # shortcut
+        if len(args) == 1 and isinstance(args[0], NDVarArray):
+            arr = args[0]
+            super().__init__("allequal", tuple(arr.flat), has_subexpr=arr.has_subexpr())
+            return
+
+        flat: list[ExprLike] = []
+        for a in args:
+            if isinstance(a, np.ndarray):
+                flat.extend(a.flat)
+            elif isinstance(a, (list, tuple)):
+                flat.extend(a)
+            else:
+                flat.append(a)
+        super().__init__("allequal", tuple(flat))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -422,10 +463,25 @@ class Circuit(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants representing the successors of the nodes to form the circuit
         """
-        flatargs = flatlist(args)
-        if len(flatargs) < 2:
+        has_subexpr = None
+        # shortcut
+        if len(args) == 1 and isinstance(args[0], NDVarArray):
+            arr = args[0]
+            newargs = tuple(arr.flat)
+            has_subexpr = arr.has_subexpr()
+        else:
+            flatargs: list[ExprLike] = []
+            for a in args:
+                if isinstance(a, np.ndarray):
+                    flatargs.extend(a.flat)
+                elif isinstance(a, (list, tuple)):
+                    flatargs.extend(a)
+                else:
+                    flatargs.append(a)
+            newargs = tuple(flatargs)
+        if len(newargs) < 2:
             raise ValueError('Circuit constraint must be given a minimum of 2 variables')
-        super().__init__("circuit", tuple(flatargs))
+        super().__init__("circuit", newargs, has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1664,7 +1720,21 @@ class Increasing(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to increasing values
         """
-        super().__init__("increasing", tuple(flatlist(args)))
+        # shortcut
+        if len(args) == 1 and isinstance(args[0], NDVarArray):
+            arr = args[0]
+            super().__init__("increasing", tuple(arr.flat), has_subexpr=arr.has_subexpr())
+            return
+
+        flat: list[ExprLike] = []
+        for a in args:
+            if isinstance(a, np.ndarray):
+                flat.extend(a.flat)
+            elif isinstance(a, (list, tuple)):
+                flat.extend(a)
+            else:
+                flat.append(a)
+        super().__init__("increasing", tuple(flat))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1697,7 +1767,21 @@ class Decreasing(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to decreasing values
         """
-        super().__init__("decreasing", tuple(flatlist(args)))
+        # shortcut
+        if len(args) == 1 and isinstance(args[0], NDVarArray):
+            arr = args[0]
+            super().__init__("decreasing", tuple(arr.flat), has_subexpr=arr.has_subexpr())
+            return
+
+        flat: list[ExprLike] = []
+        for a in args:
+            if isinstance(a, np.ndarray):
+                flat.extend(a.flat)
+            elif isinstance(a, (list, tuple)):
+                flat.extend(a)
+            else:
+                flat.append(a)
+        super().__init__("decreasing", tuple(flat))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1730,7 +1814,21 @@ class IncreasingStrict(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly increasing values
         """
-        super().__init__("strictly_increasing", tuple(flatlist(args)))
+        # shortcut
+        if len(args) == 1 and isinstance(args[0], NDVarArray):
+            arr = args[0]
+            super().__init__("strictly_increasing", tuple(arr.flat), has_subexpr=arr.has_subexpr())
+            return
+
+        flat: list[ExprLike] = []
+        for a in args:
+            if isinstance(a, np.ndarray):
+                flat.extend(a.flat)
+            elif isinstance(a, (list, tuple)):
+                flat.extend(a)
+            else:
+                flat.append(a)
+        super().__init__("strictly_increasing", tuple(flat))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1764,7 +1862,21 @@ class DecreasingStrict(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly decreasing values
         """
-        super().__init__("strictly_decreasing", tuple(flatlist(args)))
+        # shortcut
+        if len(args) == 1 and isinstance(args[0], NDVarArray):
+            arr = args[0]
+            super().__init__("strictly_decreasing", tuple(arr.flat), has_subexpr=arr.has_subexpr())
+            return
+
+        flat: list[ExprLike] = []
+        for a in args:
+            if isinstance(a, np.ndarray):
+                flat.extend(a.flat)
+            elif isinstance(a, (list, tuple)):
+                flat.extend(a)
+            else:
+                flat.append(a)
+        super().__init__("strictly_decreasing", tuple(flat))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
