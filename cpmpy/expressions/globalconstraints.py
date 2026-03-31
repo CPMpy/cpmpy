@@ -481,6 +481,25 @@ class Circuit(GlobalConstraint):
         
         return value, defining
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the Circuit global constraint, inspired by Miller-Tucker-Zemlin formulation for TSPs
+        """
+        succ = cpm_array(self.args)
+        n = len(succ)
+        
+        order = cp.intvar(0, n-1, shape=n)
+        
+        constraints = []
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    constraints += [succ[i] != j]
+                if j != 0:
+                    constraints += [succ[i] == j] == (order[i] + 1 == order[j])
+
+        return constraints, []
+
     def value(self) -> Optional[bool]:
         """
         Returns:
