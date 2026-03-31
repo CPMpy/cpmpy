@@ -531,7 +531,7 @@ class HexSolutionPrinter:
         self._display = display
         self._solution_limit = solution_limit
         self._verbose = verbose
-        if isinstance(display, (list,Expression)):
+        if isinstance(display, Expression) or is_any_list(display):
             self._cpm_vars = get_variables(display)
         elif callable(display):
             # might use any, so populate all (user) variables with their values
@@ -549,29 +549,26 @@ class HexSolutionPrinter:
                 hex_sol = optimizer.get_solution()
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            hex_var = self._solver.solver_var(cpm_subvar)
-                            cpm_subvar._value = int(hex_sol.get_value(hex_var))
-                    elif isinstance(cpm_var, _BoolVarImpl):
+                    if isinstance(cpm_var, _BoolVarImpl):
                         hex_var = self._solver.solver_var(cpm_var)
                         cpm_var._value = bool(hex_sol.get_value(hex_var))
-                    else:
+                    elif isinstance(cpm_var, _IntVarImpl):
                         hex_var = self._solver.solver_var(cpm_var)
                         cpm_var._value = int(hex_sol.get_value(hex_var))
+                    else:
+                        raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
                 # populate objective value
                 if self._solver.has_objective():
                     self._solver.objective_value_ = int(hex_sol.get_objective_bound(0))
 
                 # display
                 if isinstance(self._display, Expression):
-                    print(argval(self._display))
-                elif isinstance(self._display, list):
-                    # explicit list of expressions to display
+                    print(self._display.value())
+                elif is_any_list(self._display):
                     print(argvals(self._display))
-                else: # callable
-                    self._display()
+                else:
+                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {self._display} of type {type(self._display)}"
+                    self._display()  # callback
                 
             # update data
             self.__solution_count += 1
