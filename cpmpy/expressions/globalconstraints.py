@@ -487,7 +487,7 @@ class Circuit(GlobalConstraint):
         """
         succ = self.args
         n = len(succ)
-        order = cp.intvar(0, n-1, shape=n, name="order")
+        order = cp.intvar(0, n-1, shape=n)
         
         constraints = [x >= 0 for x in succ] + [x < n for x in succ]                    # bounds on successors
         constraints += [cp.sum(succ[i] == j for j in range(n)) == 1 for i in range(n)]  # each node has exactly one successor
