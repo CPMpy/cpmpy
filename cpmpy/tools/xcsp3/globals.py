@@ -420,7 +420,7 @@ class NonReifiedTable(GlobalConstraint):
         arr, tab = self.args
         row_selected = boolvar(shape=len(tab))
         if len(tab) == 1:
-            return [cpm_all(t == int(a) for (t, a) in zip(tab[0], arr))], []
+            return [cpm_all(t == a for (t, a) in zip(tab[0], arr))], []
         
         cons = []
         for i, row in enumerate(tab):

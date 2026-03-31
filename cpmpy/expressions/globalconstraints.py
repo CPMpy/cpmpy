@@ -631,7 +631,7 @@ class ShortTable(GlobalConstraint):
             table (ListLike[ListLike[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
                 STAR represents a wildcard (corresponding variable can take any value).
         """
-        has_subexpr = None
+        has_subexpr: Optional[bool] = None
 
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
