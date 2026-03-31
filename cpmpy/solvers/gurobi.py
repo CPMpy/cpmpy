@@ -45,6 +45,8 @@
 import cpmpy as cp
 from typing import Optional, List
 
+import math
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import *
@@ -52,9 +54,10 @@ from ..expressions.utils import argvals, argval
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var_or_list
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective
+from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -300,7 +303,7 @@ class CPM_gurobi(SolverInterface):
                                                       supported=self.supported_global_constraints,
                                                       supported_reified=self.supported_reified_global_constraints,
                                                       csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap, supported={"pow", "mul"})
         obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
         self.add(safe_cons + decomp_cons + flat_cons)
@@ -362,11 +365,15 @@ class CPM_gurobi(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                    supported=self.supported_global_constraints,
+                                    supported_reified=self.supported_reified_global_constraints,
+                                    csemap=self._csemap)
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
                                     csemap=self._csemap)
-        # cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap, supported={"mul", "pow"})  # flat normal form
         # cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         # cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
 
@@ -429,12 +436,10 @@ class CPM_gurobi(SolverInterface):
               # Base case: already a variable
               if isinstance(grb_expr, gp.Var):
                   return grb_expr
-
-
               r = self.solver_var(cp.boolvar())
 
+
               self.grb_model.update()
-              print(indent, "R", r, grb_expr)
 
               # Double-reification: r == TempConstr works for linear constraints
               self.grb_model.addConstr(r == grb_expr)
@@ -456,16 +461,44 @@ class CPM_gurobi(SolverInterface):
 
           def reify_cmp(sense, lhs_expr, rhs_const):
               """Reify a comparison using indicator constraints."""
+
+              # (2x _3y <= 5)
+              # (L == 2x + 3y, r == (L <= 5))
+
+              r_ = self.solver_var(cp.boolvar())
+
+              # r <-> (x = 3)
+              # L = x, r -> L = 3, ~r -> (L >= 4 \/ L <= 2)
+              # 
+
+              # TODO if not already LinExpr
+              L = self.grb_model.addVar(vtype=GRB.INTEGER, lb=-GRB.INFINITY,ub=GRB.INFINITY)
+              self.grb_model.addConstr(L == lhs_expr)
               r = self.solver_var(cp.boolvar())
-              self.grb_model.update()
-              self.grb_model.addGenConstrIndicator(r, True, lhs_expr, sense, rhs_const)
+
+              self.grb_model.addGenConstrIndicator(r, True, L, sense, rhs_const)
               # Add negation for double-reification
-              if sense == GRB.LESS_EQUAL:
-                  self.grb_model.addGenConstrIndicator(r, False, lhs_expr, GRB.GREATER_EQUAL, rhs_const + 1)
-              elif sense == GRB.GREATER_EQUAL:
-                  self.grb_model.addGenConstrIndicator(r, False, lhs_expr, GRB.LESS_EQUAL, rhs_const - 1)
-              elif sense == GRB.EQUAL:
-                  self.grb_model.addGenConstrIndicator(r, False, lhs_expr, GRB.LESS_EQUAL, rhs_const - 1)
+              match sense:
+                  case GRB.LESS_EQUAL:
+                      self.grb_model.addGenConstrIndicator(r, False, L, GRB.GREATER_EQUAL, rhs_const + 1)
+                  case GRB.GREATER_EQUAL:
+                      self.grb_model.addGenConstrIndicator(r, False, L, GRB.LESS_EQUAL, rhs_const - 1)
+                  case GRB.EQUAL:
+                      # self.grb_model.addGenConstrIndicator(r, False, L, GRB.LESS_EQUAL, rhs_const - 1)
+                      # D = self.grb_model.addVar(vtype=GRB.INTEGER, lb=-GRB.INFINITY,ub=GRB.INFINITY)
+                      # self.grb_model.addConstr(D == gp.abs_(L - lhs_expr))
+                      # self.grb_model.addConstr((r==0) >> (D >= 1))
+
+                      a = reify_cmp(GRB.GREATER_EQUAL, L, rhs_const + 1)
+                      b = reify_cmp(GRB.LESS_EQUAL, L, rhs_const - 1)
+                      print('neq', a,b)
+                      self.grb_model.addConstr((r==0) >> (a + b >= 1))
+
+                      # # self.grb_model.addGenConstrOr(r, [r_lt, r_gt])
+                      # r_ = self.solver_var(cp.boolvar())
+                      # self.grb_model.addConstr((r==0) >> r_)
+                      # self.grb_model.addConstr(r_ == )
+
               return r
 
 
@@ -480,20 +513,32 @@ class CPM_gurobi(SolverInterface):
 
           if isinstance(cpm_expr, Operator):
               match cpm_expr.name:
-                  case "-":
-                      return -add(cpm_expr.args[0])
                   case "or":
+                      # return reify(gp.or_(add(arg) for arg in cpm_expr.args))
+                      self.grb_model.update()
+
+                      # return sum(add(arg, depth=depth) for arg in cpm_expr.args)
+                      # def normalize(arg):
+                      #     if isinstance(arg, gp.QuadExpr):
+                      #         self.native_model
+
+                      # args = [normalize(arg) for arg in args]
                       return reify(gp.or_(add(arg) for arg in cpm_expr.args))
                   case "and":
+                      self.grb_model.update()
+                      return math.prod(add(arg, depth=depth) for arg in cpm_expr.args)
+
                       # return reify(gp.and_([0,1]))
-                      args = [add(arg) for arg in cpm_expr.args if not is_num(arg) or arg != 1]
+                      args = [add(arg, depth=depth) for arg in cpm_expr.args if not is_num(arg) or arg != 1]
                       assert len(args)
                       if not args:
                           return 1
                       elif any(a == 0 for a in args if is_num(a)):
                           return 0
                       else:
-                          return reify(gp.and_(args))
+                          # return gp.and_(args)
+                          # return sum(args) >= len(args)
+                          return math.prod(add(arg, depth=depth) for arg in cpm_expr.args)
                   case "->":
                       # TODO has to be wrong ; reify(...)
                       a, b = cpm_expr.args
@@ -507,11 +552,15 @@ class CPM_gurobi(SolverInterface):
                   case "not":
                       # Negation: not(a) is 1 - a
                       return 1 - add(cpm_expr.args[0], depth)
+                  case "-":
+                      return -add(cpm_expr.args[0], depth=depth)
                   case "sum":
+                      return sum(add(arg, depth) for arg in cpm_expr.args)
                       return gp.quicksum(add(arg, depth) for arg in cpm_expr.args)
                   case "wsum":
                       weights, args = cpm_expr.args
-                      return gp.quicksum(w * add(arg, depth) for w, arg in zip(weights, args))
+                      return sum(w * add(arg, depth) for w, arg in zip(weights, args))
+                      # return gp.quicksum(w * add(arg, depth) for w, arg in zip(weights, args))
                   case "sub":
                       a, b = cpm_expr.args
                       return add(a, depth) - add(b, depth)
@@ -526,24 +575,40 @@ class CPM_gurobi(SolverInterface):
                       # self.grb_model.addGenConstrNL(x, y, z)
                       # return reify(x**z)
                       return x**z
-                  case "abs":
-                      return reify(gp.abs_(add(cpm_expr.args[0], depth)))
-                  case "min":
-                      return reify(gp.min_(add(arg, depth) for arg in cpm_expr.args))
-                  case "max":
-                      return reify(gp.max_(add(arg, depth) for arg in cpm_expr.args))
                   case "mul":
                       a, b = cpm_expr.args
                       # return reify(add(a)*add(b))
                       return add(a) * add(b)
-          elif isinstance(cpm_expr, cp.expressions.globalconstraints.GlobalConstraint):
-              match cpm_expr.name:
-                  case "ite":
-                      i, t, e = add(cpm_expr.args[0], depth), add(cpm_expr.args[1], depth), add(cpm_expr.args[2], depth)
-                      print('ite', i,t,e)
-                      self.grb_model.addConstr((i==1) >> (t>=1))
-                      self.grb_model.addConstr((i==0) >> (e>=1))
-                      return i
+                  case _:
+                      # flatargs, flatcons = zip(*[get_or_make_var_or_list(arg, csemap=self._csemap) for arg in cpm_expr.args])
+                      flatargs = [add(arg, depth) for arg in cpm_expr.args]
+                      self.grb_model.update()
+                      # self.add(flatcons)
+                      match cpm_expr.name:
+                          case "abs":  # y = abs(x)
+                              x, = flatargs
+                              x_, = cpm_expr.args
+                              # y = add(cp.intvar(lb=max(0,cpm_expr.args[0].lb), ub=cpm_expr.args[0].ub), depth)
+                              y = add(cp.intvar(lb=x_.lb, ub=x_.ub), depth)
+                              self.grb_model.update()
+                              # self.native_model.addConstr(self.solver_var(y) == gp.abs_(add(x, depth)))
+                              self.native_model.addConstr(y == gp.abs_(x))
+                              return y
+
+                              # return gp.abs_(add(cpm_expr.args[0], depth))
+                              # return reify(abs(add(cpm_expr.args[0], depth)))
+                          case "min" | "max":
+                              y = add(cp.intvar(lb=min(x.lb for x in cpm_expr.args), ub=max(x.ub for x in cpm_expr.args)), depth)
+                              self.native_model.addConstr(y == (gp.min_(flatargs) if cpm_expr.name == "min" else gp.max_(flatargs)))
+                              return y
+          # elif isinstance(cpm_expr, cp.expressions.globalconstraints.GlobalConstraint):
+          #     match cpm_expr.name:
+          #         case "ite":
+          #             i, t, e = add(cpm_expr.args[0], depth), add(cpm_expr.args[1], depth), add(cpm_expr.args[2], depth)
+          #             print('ite', i,t,e)
+          #             self.grb_model.addConstr((i==1) >> (t>=1))
+          #             self.grb_model.addConstr((i==0) >> (e>=1))
+          #             return i
 
           if isinstance(cpm_expr, Comparison):
               lhs, rhs = cpm_expr.args
@@ -556,16 +621,14 @@ class CPM_gurobi(SolverInterface):
 
               match cpm_expr.name:
                   case "==":
-                      # lhs == rhs: r=1 -> lhs==rhs, r=0 -> lhs!=rhs
-                      r = self.solver_var(cp.boolvar())
-                      self.grb_model.update()
-                      # r=1 -> lhs == rhs
-                      # self.grb_model.addGenConstrIndicator(r, True, lhs_expr, GRB.EQUAL, 0)
+                      return reify_cmp(GRB.EQUAL, lhs_expr, 0)
+
                       self.grb_model.addConstr((r==1) >> (lhs_expr == 0))
                       # r=0 -> lhs != rhs (reuse the != case)
                       r_neq = add(lhs != rhs)
                       self.grb_model.addConstr((r==0) >> (r_neq >= 1))
                       # self.grb_model.addConstr(r + r_neq >= 1)
+                      # self.grb_model.addConstr(r == (grb_lhs == grb_rhs))
                       return r
                   case "!=":
                       # lhs != rhs  =>  (lhs < rhs) | (lhs > rhs)
@@ -577,9 +640,9 @@ class CPM_gurobi(SolverInterface):
                       return r
                   case "<=":
                       # lhs <= rhs  =>  (lhs - rhs) <= 0
-                      return lhs_expr <= 0
+                      # return reify_cmp(lhs_expr <= 0)
 
-                      # return reify_cmp(GRB.LESS_EQUAL, lhs_expr, 0)
+                      return reify_cmp(GRB.LESS_EQUAL, lhs_expr, 0)
                   case ">=":
                       # lhs >= rhs  =>  (lhs - rhs) >= 0
                       return reify_cmp(GRB.GREATER_EQUAL, lhs_expr, 0)
@@ -598,29 +661,32 @@ class CPM_gurobi(SolverInterface):
 
       # transform and post the constraints
       for cpm_expr in self.transform(cpm_expr_orig):
-        print("E", cpm_expr)
         grb_expr = add(cpm_expr)
         self.grb_model.update()
-        print("out", grb_expr, type(grb_expr))
         # If add() returned a Gurobi Var (not a constraint), wrap it as >= 1
         if isinstance(grb_expr, (gp.Var, gp.LinExpr)):
             self.grb_model.addConstr(grb_expr >= 1)
         elif isinstance(grb_expr, gp.TempConstr):
             self.grb_model.addConstr(grb_expr)
-        elif type(grb_expr).__name__ == 'GenExprAnd':
-            # GenExprAnd needs addGenConstrAnd: r = AND(args) then r >= 1
-            r = self.solver_var(cp.boolvar())
-            self.grb_model.addGenConstrAnd(r, list(grb_expr))
-            self.grb_model.addConstr(r >= 1)
-        elif type(grb_expr).__name__ == 'GenExprOr':
-            # GenExprOr needs addGenConstrOr: r = OR(args) then r >= 1
-            r = self.solver_var(cp.boolvar())
-            self.grb_model.addGenConstrOr(r, list(grb_expr))
-            self.grb_model.addConstr(r >= 1)
+        # elif type(grb_expr).__name__ == 'GenExprAnd':
+        #     # GenExprAnd needs addGenConstrAnd: r = AND(args) then r >= 1
+        #     r = self.solver_var(cp.boolvar())
+        #     self.grb_model.addGenConstrAnd(r, list(grb_expr))
+        #     self.grb_model.addConstr(r >= 1)
+        # elif type(grb_expr).__name__ == 'GenExprOr':
+        #     # GenExprOr needs addGenConstrOr: r = OR(args) then r >= 1
+        #     r = self.solver_var(cp.boolvar())
+        #     self.grb_model.addGenConstrOr(r, list(grb_expr))
+        #     self.grb_model.addConstr(r >= 1)
         else:
-            r = self.solver_var(cp.boolvar())
+            # r = self.solver_var(cp.boolvar())
+            # self.grb_model.addConstr(r == grb_expr)
+            # self.grb_model.addConstr(r >= 1)
+
+            r = self.grb_model.addVar(lb=1, ub=GRB.INFINITY)
             self.grb_model.addConstr(r == grb_expr)
-            self.grb_model.addConstr(r >= 1)
+            # self.grb_model.addGenConstrNL(r, grb_expr)
+            # self.grb_model.addConstr(1 == grb_expr)
         continue
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
