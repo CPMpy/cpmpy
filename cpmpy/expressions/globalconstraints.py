@@ -485,18 +485,22 @@ class Circuit(GlobalConstraint):
         """
         Linear decomposition of the Circuit global constraint, inspired by Miller-Tucker-Zemlin formulation for TSPs
         """
-        succ = cpm_array(self.args)
+        succ = self.args
         n = len(succ)
+        order = cp.intvar(0, n-1, shape=n, name="order")
         
-        order = cp.intvar(0, n-1, shape=n)
-        
-        constraints = []
+        constraints = [x >= 0 for x in succ] + [x < n for x in succ]                    # bounds on successors
+        constraints += [cp.sum(succ[i] == j for j in range(n)) == 1 for i in range(n)]  # each node has exactly one successor
+        constraints += [cp.sum(succ[i] == j for i in range(n)) == 1 for j in range(n)]  # each node has exactly one predecessor
+        constraints += [cp.AllDifferent(order)] # redundant constraint
+        constraints += [order[0] == 0]  # TODO: could replace order[0] with constant 0 instead?
+
         for i in range(n):
             for j in range(n):
                 if i == j:
                     constraints += [succ[i] != j]
                 if j != 0:
-                    constraints += [succ[i] == j] == (order[i] + 1 == order[j])
+                    constraints += [(succ[i] == j) == (order[i] + 1 == order[j])] # ensure no subtours
 
         return constraints, []
 
