@@ -10,6 +10,7 @@
         variables
         core
         globalconstraints
+        globalfunctions
         python_builtins
         utils
 
@@ -20,7 +21,11 @@
 # others need to be imported by the developer explicitely
 from .variables import boolvar, intvar, cpm_array
 from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
-from .globalconstraints import AllDifferent, AllDifferentExcept0, AllEqual, Circuit, Inverse, Table, Minimum, Maximum, Element, Xor, Cumulative, IfThenElse, Count, GlobalCardinalityCount, DirectConstraint
+from .globalconstraints import AllDifferent, AllDifferentExcept0, AllDifferentExceptN, AllEqual, AllEqualExceptN, Circuit, Inverse, Table, ShortTable, Xor, Cumulative, CumulativeOptional, \
+    IfThenElse, GlobalCardinalityCount, DirectConstraint, InDomain, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, \
+    LexLess, LexLessEq, LexChainLess, LexChainLessEq, Precedence, NoOverlap, NoOverlapOptional, \
+    NegativeTable, Regular
 from .globalconstraints import alldifferent, allequal, circuit # Old, to be deprecated
+from .globalfunctions import Minimum, Maximum, Abs, Multiplication, Division, Modulo, Power, Element, Count, Among, NValue, NValueExcept
 from .core import BoolVal
-from .python_builtins import all, any, max, min, sum
+from .python_builtins import all, any, max, min, sum, abs

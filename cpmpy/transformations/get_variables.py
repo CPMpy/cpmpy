@@ -1,14 +1,14 @@
 """
-Returns an list of all variables in the model or expressions
+Getting and printing variables in the model or expression.
 
-Variables are ordered by appearance, e.g. first encountered first
+Variables are ordered by appearance, e.g. first encountered first.
 """
 import warnings # for deprecation warning
 import numpy as np
+import cpmpy as cp
 
 from ..expressions.core import Expression
-from ..expressions.variables import _NumVarImpl, NegBoolView, NDVarArray
-from ..expressions.utils import is_any_list
+from ..expressions.variables import _NumVarImpl, NegBoolView
 
 def get_variables_model(model):
     """
@@ -32,8 +32,9 @@ def get_variables(expr, collect=None):
     """
         Get variables of an expression
 
-        - expr: Expression or list of expressions
-        - collect: optional set, variables will be added to this set of given
+        Arguments:
+            expr: Expression or list of expressions
+            collect: optional set, variables will be added to this set of given
    """
     def extract(lst, append):
         for e in lst:
@@ -43,17 +44,15 @@ def get_variables(expr, collect=None):
                         # this is just a view, return the actual variable
                         e = e._bv
                     append(e)
-                elif isinstance(e, NDVarArray):  # sometimes does not have a .name
-                    if e.dtype == object:
-                        extract(e.flat, append)
-                    # else: all const, skip
                 elif e.name == "wsum":
                     extract(e.args[1], append)  # skip data in arg0
                 elif e.name == "table":
                     extract(e.args[0], append)  # skip data in arg1
                 else:
                     extract(e.args, append)
-            elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            elif isinstance(e, np.ndarray) and e.dtype == object:
+                extract(e.flat, append)
+            elif isinstance(e, (list, tuple, np.flatiter)):
                 extract(e, append)
 
     if collect is not None:
@@ -77,12 +76,13 @@ def get_variables(expr, collect=None):
 
 def print_variables(expr_or_model):
     """
-        Print variables _and their domains_
+        Print variables **and their domains**
 
-        argument 'expr_or_model' can be an expression or a model
+        Arguments:
+            expr_or_model: can be an expression or a model
     """
-    from ..model import Model
-    if isinstance(expr_or_model, Model):
+
+    if isinstance(expr_or_model, cp.Model):
         vars_ = get_variables_model(expr_or_model)
     else:
         vars_ = get_variables(expr_or_model)

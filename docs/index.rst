@@ -1,98 +1,149 @@
 CPMpy: Constraint Programming and Modeling in Python
 ====================================================
 
-CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
+Source code and issue tracker: https://github.com/CPMpy/cpmpy
 
-Constraint Programming is a methodology for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
-
-CPMpy allows to model search problems in a high-level manner, by defining decision variables and constraints and an objective over them (similar to MiniZinc and Essence'). You can freely use numpy functions and indexing while doing so. This model is then automatically translated to state-of-the-art solver like or-tools, which then compute the optimal answer.
-   
-Source code and bug reports at https://github.com/CPMpy/cpmpy
-
-Getting started:
+CPMpy is ideal for solving combinatorial problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
 
 .. toctree::
    :maxdepth: 1
    :caption: Getting started:
 
-   Youtube tutorial video <https://www.youtube.com/watch?v=A4mmmDAdusQ>
-   beginner_tutorial
-   installation_instructions
-   Quickstart sudoku notebook <https://github.com/CPMpy/cpmpy/blob/master/examples/quickstart_sudoku.ipynb>
-   More examples <https://github.com/CPMpy/cpmpy/blob/master/examples/>
+   modeling
+   summary
+
+.. _supported-solvers:
+
+Supported solvers
+-----------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - **Solver**
+     - **Technology**
+     - **Capabilities**
+     - **Installation**
+     - **Notes**
+   * - :doc:`OR-Tools <api/solvers/ortools>`
+     - CP (LCG)
+     - SAT ASAT ALLSAT - OPT - PAR
+     - pip
+     - The default solver
+   * - :doc:`Pumpkin <api/solvers/pumpkin>`
+     - CP (LCG)
+     - SAT ASAT ALLSAT - OPT - PROOF
+     - local install (maturin)
+     - 
+   * - :doc:`GCS <api/solvers/gcs>`
+     - CP
+     - SAT ISAT ALLSAT - OPT - PROOF
+     - pip
+     -
+   * - :doc:`Choco <api/solvers/choco>`
+     - CP
+     - SAT ISAT ALLSAT - OPT
+     - pip
+     - 
+   * - :doc:`CP Optimizer <api/solvers/cpo>`
+     - CP
+     - SAT - OPT - PAR
+     - pip + local + (aca.) license
+     - 
+   * - :doc:`MiniZinc <api/solvers/minizinc>`
+     - CP
+     - SAT - OPT
+     - pip + local install
+     - Communicates through textfiles
+   * - :doc:`Z3 <api/solvers/z3>`
+     - SMT
+     - SAT ASAT ISAT - OPT
+     - pip
+     - 
+   * - :doc:`Hexaly <api/solvers/hexaly>`
+     - Global Opt.
+     - SAT ISAT ALLSAT - OPT IOPT
+     - pip + local + (aca.) licence
+     -
+   * - :doc:`Gurobi <api/solvers/gurobi>`
+     - ILP
+     - SAT ISAT - OPT IOPT - PAR
+     - pip + (aca.) license
+     - 
+   * - :doc:`CPLEX <api/solvers/cplex>`
+     - ILP
+     - SAT - OPT IOPT - PAR
+     - pip + local + (aca.) license
+     - No
+   * - :doc:`Exact <api/solvers/exact>`
+     - Pseudo-Boolean
+     - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
+     - pip >3.10 (Linux, Win)
+     - Manual installation on Mac possible
+   * - :doc:`RC2 <api/solvers/rc2>`
+     - MaxSAT
+     - OPT
+     - pip
+     - 
+   * - :doc:`Pindakaas <api/solvers/pindakaas>`
+     - SAT
+     - SAT ASAT ISAT
+     - pip
+     - Automatically encodes PB to SAT
+   * - :doc:`PySAT <api/solvers/pysat>`
+     - SAT
+     - SAT ASAT ISAT
+     - pip
+     - 
+   * - :doc:`PySDD <api/solvers/pysdd>`
+     - Decis. Diagram
+     - SAT ISAT ALLSAT - KC 
+     - pip
+     - only Boolean variables (CPMpy transformation incomplete)
+
+Native capability abbreviations:
+    * SAT: Satisfaction, ASAT: Satisfaction under Assumptions+core extraction, ISAT: Incremental Satisfaction, ALLSAT: All solution enumeration
+    * OPT: Optimisation, IOPT: Incremental optimisation
+    * PAR: Parallel solving, PROOF: Proof logging, KC: Knowledge Compilation
+
+Different solvers excel at different problems. `Try multiple! <modeling.html#selecting-a-solver>`_
+
+**CPMpy’s transformations** selectively rewrite only those constraint expressions that a solver does not support. While solvers can use any transformation they need, lower-level solvers largely reuse those of higher-level ones, creating a waterfall pattern:
+
+.. image:: waterfall.png
+  :width: 480
+  :alt: Waterfall from model to solvers
+
+
 
 .. toctree::
    :maxdepth: 1
-   :caption: User Documentation:
+   :caption: Advanced guides:
 
-   modeling
-   solvers
-   multiple_solutions
    how_to_debug
-   solver_parameters
+   multiple_solutions
    unsat_core_extraction
-   adding_solver
    developers
+   adding_solver
+   testing
+
+Open Source
+-----------
+
+CPMpy is open source (`Apache 2.0 license <https://github.com/cpmpy/cpmpy/blob/master/LICENSE>`_) and the development process is open too: all discussions happen on GitHub, even between direct colleagues, and all changes are reviewed through pull requests.
+
+**Join us!** We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the `examples folder <https://github.com/CPMpy/cpmpy/tree/master/examples>`_.
+
+
+Are you a solver developer? We are keen to `integrate solvers <adding_solver.html>`_ that have a python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
 
 
 .. toctree::
    :maxdepth: 1
    :caption: API documentation:
 
-   api/expressions
    api/model
-   api/solvers
+   api/expressions
    api/transformations
-
-Supported solvers
------------------
-
-CPMpy can translate to many different solvers, and even provides direct access to them.
-
-To make clear how well supported and tested these solvers are, we work with a tiered classification:
-
-* Tier 1 solvers: passes all internal tests, passes our bigtest suit, will be fuzztested in the near future
-    - "ortools" the OR-Tools CP-SAT solver
-    - "pysat" the PySAT library and its many SAT solvers ("pysat:glucose4", "pysat:lingeling", etc)
-
-* Tier 2 solvers: passes all internal tests, might fail on edge cases in bigtest
-    - "minizinc" the MiniZinc modeling system and its many solvers ("minizinc:gecode", "minizinc:chuffed", etc)
-    - "z3" the SMT solver and theorem prover
-    - "gurobi" the MIP solver
-    - "PySDD" a Boolean knowledge compiler
-
-* Tier 3 solvers: they are work in progress and live in a pull request
-    - "gcs" the Glasgow Constraint Solver
-    - "exact" the Exact pseudo-boolean solver
-
-We hope to upgrade many of these solvers to higher tiers, as well as adding new ones. Reach out on github if you want to help out.
-
-
-FAQ
----
-
-**Problem**: I get the following error:
-
-
-.. code-block:: python
-
-   "IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
-
-Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by cpmpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the `cpm_array()` wrapper:
-
-.. code-block:: python
-   :linenos:
-
-   # x is a variable 
-   X = intvar(0,3)
-
-   # Transforming a given numpy-array **m** into a CPMpy array
-   m = cpm_array(m)
-   
-   # apply constraint
-   m[X] == 8
-
-License
--------
-
-This library is delivered under the MIT License, (see [LICENSE](https://github.com/tias/cppy/blob/master/LICENSE)).
+   api/solvers
+   api/tools

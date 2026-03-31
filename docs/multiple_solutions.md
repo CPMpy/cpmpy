@@ -6,8 +6,8 @@ When using `solveAll()`, a solver will use an optimized native implementation be
 
 It has two special named optional arguments:
 
-  * `display=...`: accepts a CPMpy expression, a list of CPMpy expressions or a callback function that will be called on every solution found (default: None)
-  * `solution_limit=...`: stop after this many solutions (default: None)
+  - `display=...` : accepts a CPMpy expression, a list of CPMpy expressions or a callback function that will be called on every solution found (default: None)
+  - `solution_limit=...` : stop after this many solutions (default: None)
 
 It also accepts named argument `time_limit=...` and any other keyword argument is passed on to the solver just like `solve()` does.
 
@@ -40,7 +40,7 @@ Find all solutions, and print the value of `x` for each solution found.
 n = m.solveAll(display=x)
 ```
 
-`display` Can also take lists of arbitrary CPMpy expressions:
+`display` can also take lists of arbitrary CPMpy expressions:
 ```python
 n = m.solveAll(display=[x,sum(x)])
 ```
@@ -59,6 +59,8 @@ Also callback with an anonymous lambda function possible:
 ```python
 n = m.solveAll(display=lambda: print(f"x={x.value()} sum(x)={sum(x.value())}") 
 ```
+
+See the [set_game.ipynb](https://github.com/CPMpy/cpmpy/blob/master/examples/set_game.ipynb) for an example of how we use it as a callback to call a plotting function, to plot all the solutions as they are found.
 
 A callback is also the (only) way to go if you want to store information about all the found solutions (only recommended for small numbers of solutions).
 ```python
@@ -91,7 +93,7 @@ while s.solve():
     s += ~all(x == x.value())
 ```
 
-In case of multiple variables you should put them in one long python-native list, as such:
+In case of multiple variables you should put them in one long Python-native list, as such:
 ```python
 x = intvar(0,3, shape=2)
 b = boolvar()
@@ -109,7 +111,7 @@ while s.solve():
 ## Diverse solution search
 A better, more complex example of repeated solving is when searching for diverse solutions.
 
-The goal is to iteratively find solutions that are as diverse as possible with the previous solutions. Many definitions of diversity between solutions exist. We can for example measure the difference between two solutions with the Hamming distance (comparing the number of different values) or the Euclidian distance (compare the absolute difference in value for the variables).
+The goal is to iteratively find solutions that are as diverse as possible with the previous solutions. Many definitions of diversity between solutions exist. We can for example measure the difference between two solutions with the [Hamming distance](https://en.wikipedia.org/wiki/Hamming_distance#:~:text=In%20information%20theory%2C%20the%20Hamming,the%20corresponding%20symbols%20are%20different.) (comparing the number of different values) or the [Euclidian distance](https://en.wikipedia.org/wiki/Euclidean_distance) (compare the absolute difference in value for the variables).
 
 Here is the example code for enumerating K diverse solutions with Hamming distance, which overwrites the objective function in each iteration:
 
@@ -128,7 +130,7 @@ while len(store) < 3 and s.solve():
     s.maximize(sum([sum(x != sol) for sol in store]))
 ```
 
-As a fun fact, observe how `x != sol` works, even though one is a vector of Boolean variables and sol is Numpy array. However, both have the same length, so this is automatically translated into a pairwise comparison constraint by CPMpy. These numpy-style vectorized operations mean we have to write much less loops while modelling.
+As a fun fact, observe how `x != sol` works, even though one is a vector of Boolean variables and sol is a numpy array. However, both have the same length, so this is automatically translated into a pairwise comparison constraint by CPMpy. These numpy-style vectorized operations mean we have to write fewer loops while modeling.
 
 To use the Euclidian distance, only the last line needs to be changed. We again use vectorized operations and obtain succinct models. The creation of intermediate variables (with appropriate domains) is done by CPMpy behind the scenes.
 
@@ -141,7 +143,7 @@ To use the Euclidian distance, only the last line needs to be changed. We again 
 
 CPMpy passes arguments to `solve()` directly to the underlying solver object, so you can actually define your own native callbacks and pass them to the solve call.
 
-The following is an example of that, which is actually how the native `solveAll()` for ortools is implemented. You could give it your own custom implemented callback `cb` too.
+The following is an example of that, which is actually how the native `solveAll()` for OR-Tools is implemented. You could give it your own custom implemented callback `cb` too.
 ```python
 from cpmpy import *
 from cpmpy.solvers import CPM_ortools
@@ -155,3 +157,4 @@ cb = OrtSolutionPrinter()
 s.solve(enumerate_all_solutions=True, solution_callback=cb)
 print("Nr of solutions:",cb.solution_count())
 ```
+Have a look at `OrtSolutionPrinter`'s [implementation](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/solvers/ortools.py#L650).

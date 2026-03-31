@@ -1,101 +1,160 @@
+<div align="center">
+
 ![Github Version](https://img.shields.io/github/v/release/CPMpy/cpmpy?label=Github%20Release&logo=github)
 ![PyPI version](https://img.shields.io/pypi/v/cpmpy?color=blue&label=Pypi%20version&logo=pypi&logoColor=white)
 ![PyPI downloads](https://img.shields.io/pypi/dm/cpmpy?label=Pypi%20Downloads&logo=pypi&logoColor=white)
+![Tests](https://github.com/CPMpy/cpmpy/actions/workflows/python-test.yml/badge.svg)
 ![Licence](https://img.shields.io/github/license/CPMpy/cpmpy?label=Licence)
+</div>
 
-CPMpy is a Constraint Programming and Modeling library in Python, based on numpy, with direct solver access.
+---
 
-Constraint Programming is a methodology for solving combinatorial optimisation problems like assignment problems or covering, packing and scheduling problems. Problems that require searching over discrete decision variables.
-
-CPMpy allows to model search problems in a high-level manner, by defining decision variables and constraints and an objective over them (similar to MiniZinc and Essence'). You can freely use numpy functions and indexing while doing so. This model is then automatically translated to state-of-the-art solver like or-tools, which then compute the optimal answer. 
-
-Getting started:
-
-- Watch the [tutorial video](https://www.youtube.com/watch?v=A4mmmDAdusQ) on YouTube
-- Try it out [online without installation](https://mybinder.org/v2/gh/CPMpy/cpmpy/HEAD?labpath=examples%2Fquickstart_sudoku.ipynb) or browse the [examples/](examples/)
-- Install as easily as `pip3 install cpmpy`, or see the detailed [installation instructions](https://cpmpy.readthedocs.io/en/latest/installation_instructions.html)
-- Full documentation at [read the docs](https://cpmpy.readthedocs.io/) for more.
-
-Here is a quick highlight of some key features:
-
-- conveniently modeling and solving problems like [sudoku](examples/sudoku.py), [cryptarithmetic](examples/send_more_money.py), [jobshop scheduling](examples/jobshop.py), [traveling salesman problem](examples/tsp.py) and [more](examples/).
-- logging search progress and arbitrarily [modifying solver parameters](https://cpmpy.readthedocs.io/en/latest/solver_parameters.html)
-- intuitive [hyperparameter search](examples/advanced/hyperparameter_search.py) for a solver
-- easy UNSAT core extraction and computing [Minimal Unsatisfiable Subsets](https://cpmpy.readthedocs.io/en/latest/unsat_core_extraction.html) (MUS) of CP problems
+<p align="center">
+    <b>CPMpy</b>: a <b>C</b>onstraint <b>P</b>rogramming and <b>M</b>odeling library in <b>Py</b>thon, based on numpy, with direct solver access.
+</p>
 
 
-It is inspired by CVXpy, SciPy and Numberjack, and as most modern scientific Python tools, it uses numpy arrays as basic data structure. You can read about its origins and design decisions in [this short paper](https://github.com/tias/cppy/blob/master/docs/modref19_cppy.pdf).
+**Documentation: [https://cpmpy.readthedocs.io/](https://cpmpy.readthedocs.io/)**
 
-### An example
+---
+
+### Constraint solving at your finger tips
+
+For combinatorial problems with Boolean and integer variables. With many high-level constraints that are automatically decomposed when not natively supported by the solver.
+
+Lightweight, [well-documented](https://cpmpy.readthedocs.io/), used in research and industry. 
+
+Install simply with `pip install cpmpy`
+
+### 🔑 Key Features
+
+* **Solver-agnostic**: use and compare CP, ILP, SMT, PB and SAT solvers
+* **ML-friendly**: decision variables are numpy arrays, with vectorized operations and constraints
+* **Incremental solving**: assumption variables, adding constraints and updating objectives
+* **Extensively tested**: large test-suite and [actively fuzz-tested](https://github.com/CPMpy/fuzz-test)
+* **Tools**: for parameter-tuning, debugging, explanation generation and XCSP3 benchmarking
+* **Flexible**: easy to add constraints or solvers, also direct solver access
+
+### 🔩 Solvers
+
+CPMpy can translate to a wide variety of constraint solving paradigms, including both commercial and open-source solvers.
+
+* **CP Solvers**: OR-Tools (default), IBM CP Optimizer (license required), Choco, Glasgow GCS, Pumpkin, MiniZinc+solvers
+* **ILP Solvers**: Gurobi (license required), CPLEX (license required)
+* **GO Solvers**: Hexaly (license required)
+* **SMT Solvers**: Z3
+* **PB Solvers**: Exact
+* **SAT Encoders and Solvers**: PySAT+solvers, Pindakaas
+* **Decision Diagrams**: PySDD
+
+### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling
+
+An example that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
+
 ```python
-import numpy as np
-from cpmpy import *
+# Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
+# with different duration and energy consumption. Minimize makespan and total energy consumption
+import cpmpy as cp
+import pandas as pd
+import random; random.seed(1)
 
-e = 0 # value for empty cells
-given = np.array([
-    [e, e, e,  2, e, 5,  e, e, e],
-    [e, 9, e,  e, e, e,  7, 3, e],
-    [e, e, 2,  e, e, 9,  e, 6, e],
+# --- Data definition ---
+num_jobs = 15
+num_machines = 3
+# Generate some data: [job_id, machine_id, duration, energy]
+data = [[jobid, machid, random.randint(2, 8), random.randint(5, 15)]
+        for jobid in range(num_jobs) for machid in range(num_machines)]
+df_data = pd.DataFrame(data, columns=['job_id', 'machine_id', 'duration', 'energy'])
 
-    [2, e, e,  e, e, e,  4, e, 9],
-    [e, e, e,  e, 7, e,  e, e, e],
-    [6, e, 9,  e, e, e,  e, e, 1],
-
-    [e, 8, e,  4, e, e,  1, e, e],
-    [e, 6, 3,  e, e, e,  e, 8, e],
-    [e, e, e,  6, e, 8,  e, e, e]])
-
-
-# Variables
-puzzle = intvar(1,9, shape=given.shape, name="puzzle")
-
-model = Model(
-    # Constraints on rows and columns
-    [AllDifferent(row) for row in puzzle],
-    [AllDifferent(col) for col in puzzle.T], # numpy's Transpose
-)
-
-# Constraints on blocks
-for i in range(0,9, 3):
-    for j in range(0,9, 3):
-        model += AllDifferent(puzzle[i:i+3, j:j+3]) # python's indexing
-
-# Constraints on values (cells that are not empty)
-model += (puzzle[given!=e] == given[given!=e]) # numpy's indexing
+# Compute maximal horizon (crude upper bound) and number of alternatives
+horizon = df_data.groupby('job_id')['duration'].max().sum()
+num_alternatives = len(df_data.index)
+assert list(df_data.index) == list(range(num_alternatives)), "Index must be default integer (0,1,..)"
 
 
-# Solve and print
+# --- Decision variables ---
+start = cp.intvar(0, horizon, name="start", shape=num_alternatives)
+end   = cp.intvar(0, horizon, name="end", shape=num_alternatives)
+active = cp.boolvar(name="active", shape=num_alternatives)
+
+# --- Constraints ---
+model = cp.Model()
+
+# Each job must have one active alternative
+for job_id, group in df_data.groupby('job_id'):
+    model += (cp.sum(active[group.index]) == 1)
+
+# For all jobs ensure start + dur = end (also for inactives, thats OK)
+model += (start + df_data['duration'] == end)
+
+# No two active alternatives on the same machine may overlap; (ab)use cumulative with 'active' as demand.
+for mach_id, group in df_data.groupby('machine_id'):
+    sel = group.index
+    model += cp.Cumulative(start[sel], group['duration'].values, end[sel], active[sel], capacity=1)
+
+# --- Objectives ---
+# Makespan: max over all active alternatives
+makespan = cp.intvar(0, horizon, name="makespan")
+for i in range(num_alternatives):
+    model += active[i].implies(makespan >= end[i])  # end times of actives determines makespan
+
+# Total energy consumption
+total_energy = cp.sum(df_data['energy'] * active)
+
+# Minimize makespan first, then total energy
+model.minimize(100 * makespan + total_energy)
+
+
+# --- solving and graphical visualisation ---
 if model.solve():
-    print(puzzle.value())
+    print(model.status())
+    print("Total makespan:", makespan.value(), "energy:", total_energy.value())
+
+    # Visualize with Plotly's excellent Gantt chart support
+    import plotly.express as px
+    df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
+    df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
+    df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
+    px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
 else:
-    print("No solution found")
+    print("No solution found.")
 ```
 
-You can try it yourself in [this notebook](https://github.com/tias/cppy/blob/master/examples/quickstart_sudoku.ipynb).
-
-
-### Helping out
-We welcome any feedback, as well as hearing about how you are using it. You are also welcome to reuse any parts in your own project.
-
-A good starting point to help with the development, would be to write more CP problems in CPMpy, and add them to the examples folder.
-
-CPMpy is still in Beta stage, and bugs can still occur. If so, please report the issue on Github!
-
-Are you a solver developer? We are willing to integrate solvers that have a python API on pip. If this is the case for you, or if you want to discuss what it best looks like, do contact us!
-
-### FAQ
-Problem: I get the following error:
+You can then compare the runtime of all installed solvers, or [much more](https://cpmpy.readthedocs.io/)...
 ```python
-"IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices"
+for solvername in cp.SolverLookup.solvernames():
+    try:
+        model.solve(solver=solvername, time_limit=10)  # max 10 seconds
+        print(f"{solvername}: {model.status()}")
+    except Exception as e:
+        print(f"{solvername}: Not run -- {str(e)}")
 ```
 
-Solution: Indexing an array with a variable is not allowed by standard numpy arrays, but it is allowed by CPMpy-numpy arrays. First convert your numpy array to a cpmpy-numpy array with the 'cparray()' wrapper:
-```python
-m = cparray(m); m[X] == True
-```
+### 🌳 Ecosystem
 
-### Acknowledgments
-Part of the development received funding from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation programme (grant agreement No 101002802, [CHAT-Opt](https://people.cs.kuleuven.be/~tias.guns/chat-opt.html)).
+CPMpy is part of the scientific Python ecosystem, making it easy to use in Jupyter notebooks, to add visualisations, or to use it in machine learning pipelines.
+
+Other projects that build on CPMpy:
+* [XCP-explain](https://github.com/CPMpy/XCP-explain): a library for explainable constraint programming
+* [PyConA](https://github.com/CPMpy/pyconA): a library for constraint acquisition
+* [Fuzz-Test](https://github.com/CPMpy/fuzz-test): fuzz testing of constraint solvers
+* [Sudoku Assistant](https://sudoku-assistant.cs.kuleuven.be): an Android app for sudoku scanning, solving and intelligent hints
+* [CHAT-Opt demonstrator](https://chatopt.cs.kuleuven.be): translates natural language problem descriptions into CPMpy models
+
+Also, CPMpy participated in both the [2024 and 2025 XCSP3 competition](https://www.xcsp.org/competitions/), twice making its solvers win 3 gold and 1 silver medal.
+
+## 🔧 Library development
+
+CPMpy has the open-source [Apache 2.0 license]( https://github.com/cpmpy/cpmpy/blob/master/LICENSE) and is run as an open-source project. All discussions happen on Github, even between direct colleagues, and all changes are reviewed through pull requests. 
+
+Join us! We welcome any feedback and contributions. You are also free to reuse any parts in your own project. A good starting point to contribute is to add your models to the `examples/` folder.
+
+Are you a **solver developer**? We are keen to integrate solvers that have a Python API and are on pip. Check out our [adding solvers](https://cpmpy.readthedocs.io/en/latest/adding_solver.html) documentation and contact us!
+
+
+## 🙏 Acknowledgments
+
+Part of the development received funding through Prof. Tias Guns' European Research Council (ERC) Consolidator grant, under the European Union’s Horizon 2020 research and innovation programme (grant agreement No 101002802, [CHAT-Opt](https://people.cs.kuleuven.be/~tias.guns/chat-opt.html)).
 
 You can cite CPMpy as follows: "Guns, T. (2019). Increasing modeling language convenience with a universal n-dimensional array, CPpy as python-embedded example. The 18th workshop on Constraint Modelling and Reformulation at CP (ModRef 2019).
 
@@ -109,3 +168,4 @@ You can cite CPMpy as follows: "Guns, T. (2019). Increasing modeling language co
 }
 ```
 
+If you work in academia, please cite us. If you work in industry, we'd love to hear how you are using it. The lab of Prof. Guns is open to collaborations and contract research.

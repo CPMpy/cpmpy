@@ -38,7 +38,7 @@ def sport_scheduling(n_teams):
         # can be written cleaner, see issue #117
         # sum((home == t) | (away == t), axis=1) <= 2
         for p in range(n_periods):
-            model += sum((home[p] == t) | (away[p] == t)) <= 2
+            model += sum((home[:, p] == t) | (away[:, p] == t)) <= 2
 
     return model, (home, away)
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("-n_teams", type=int, default=8, help="Number of teams to schedule")
+    parser.add_argument("-n_teams", type=int, default=6, help="Number of teams to schedule")
 
     args = parser.parse_args()
 

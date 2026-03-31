@@ -47,25 +47,45 @@ The parameter tuner is based on the following publication:
 >Programming, Artificial Intelligence, and Operations Research. CPAIOR 2022. Lecture Notes in Computer Science,
 >vol 13292. Springer, Cham. https://doi.org/10.1007/978-3-031-08011-1_6
 
-Solver interfaces not providing the set of tunable parameters can still be tuned by using this utility and providing the parameter (values) yourself.
-
+In the following example, we tune the OR-tools solver.
 ```python
 from cpmpy import *
 from cpmpy.tools import ParameterTuner
 
 model = Model(...)
 
-tunables = {
-    "search_branching":[0,1,2],
-    "linearization_level":[0,1],
-    'symmetry_level': [0,1,2]}
+tuner = ParameterTuner("ortools", model)
+best_params = tuner.tune(max_tries=100)
+print(f"Tuner reduced runtime from {tuner.base_runtime}s to {tuner.best_runtime}s")
+
+# now solve (a slightly different?) model using the best parameters
+solver = SolverLookup.get("ortools", model)
+solver.solve(**best_params)
+```
+
+However, solverinterfaces are not required to present a list of tunable parameters and the tool allows you to define the set of tunable parameters (and values) yourself.
+```python
+from cpmpy import *
+from cpmpy.tools import ParameterTuner
+
+model = Model(...)
+
+tunables ={
+   "MIPFocus": [0,1,2,3],
+   "Method" : [-1, 0, 1,2,3,4,5],
+   "FlowCoverCuts" :[-1,0,1,2]
+}
 defaults = {
-    "search_branching": 0,
-    "linearization_level": 1,
-    'symmetry_level': 2
+    "MIPFocus": 0,
+    "Method": -1,
+    "FlowCoverCuts": -1
 }
 
-tuner = ParameterTuner("ortools", model, tunables, defaults)
-best_params = tuner.tune(max_tries=100)
-best_runtime = tuner.best_runtime
+tuner = ParameterTuner("gurobi", model, tunables, defaults)
+print(f"Tuner reduced runtime from {tuner.base_runtime}s to {tuner.best_runtime}s")
+
+best_params = tuner.tune(time_limit=10)
+
+solver = SolverLookup.get("gurobi", model)
+solver.solve(**best_params)
 ```
