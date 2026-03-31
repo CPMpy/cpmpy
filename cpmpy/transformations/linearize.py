@@ -1,53 +1,67 @@
 """
-Transforms flat constraints into linear constraints.
+Transform constraints to a linear form.
 
-Linearized constraints have one of the following forms:
+This transformation is necessary for Integer Linear Programming (ILP) solvers, and also
+for translating to Pseudo-Boolean or SAT solvers.
 
-Linear comparison:
-------------------
-- ``LinExpr == Constant``
-- ``LinExpr >= Constant``
-- ``LinExpr <= Constant``
+There are a number of components to getting a good linearisation:
+- **Decomposing global constraints/functions** in a 'linear friendly' way.
+  A common pattern is that constraints that enforce domain consistency on integer variables,
+  that these constraints should be decomposed over a Boolean representation of the domain. This is the
+  case for :class:`~cpmpy.expressions.globalconstraints.AllDifferent`, :class:`~cpmpy.expressions.globalfunctions.Element`
+  and other functions listed in :func:`get_linear_decompositions`.
+  Their default decomposition does not do it this way, hence we use a more linear-friendly decomposition.
+  This is done by :func:`decompose_linear`.
 
-LinExpr can be any of:
+- **Domain encodings** e.g. of `A=cp.intvar(0,4)` would create binary variables and constraints
+  like `B0 -> A=0`, `B1 -> A=1`, `B2 -> A=2`, etc and `sum(B0..B4) = 1`.
+  However each `B0 -> A=0` would require 2 Big-M constraints. Instead we can linearise the entire
+  domain encoding with two constraints: `sum(B0..4) = 1` and `A = sum(B0..4 * [0,1,2,3,4])`.
+  This is done by :func:`linearize_reified_variables` (as a pre-linearization optimization step).
 
-- `NumVar`
-- `sum`
-- `wsum`
+- **Disequalities and Inequalities** e.g. `sum(X) != 5` should be rewritten as `(sum(X) < 5) | (sum(X) > 5)`,
+  which is then further flattened into implications. Strict equalities like `sum(X) > 5` are in turn
+  rewritten to non-strict inequalities, e.g. `sum(X) >= 6`. This is done by :func:`linearize_constraint`.
 
-Indicator constraints:
-----------------------
+- **Implications and Big-M** e.g. `B -> sum(X) <= 4` should be linearised with the Big-M method,
+  if not natively supported. This is done by :func:`linearize_constraint`.
+  If it is natively supported, then the `supported` argument should contain '->'.
 
-+------------------------------------+
-| ``BoolVar -> LinExpr == Constant`` |
-+------------------------------------+
-| ``BoolVar -> LinExpr >= Constant`` |
-+------------------------------------+
-| ``BoolVar -> LinExpr <= Constant`` |
-+------------------------------------+
+To get a good linearisation, solver backends typically apply these transformations in roughly this order:
 
-========================================   ==============================================
-``BoolVar -> GenExpr``                     (GenExpr.name in supported, GenExpr.is_bool()) 
-``BoolVar -> GenExpr >= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-``BoolVar -> GenExpr <= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-``BoolVar -> GenExpr == Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-========================================   ==============================================
-
-Where ``BoolVar`` is a boolean variable or its negation.
-
-General comparisons or expressions
------------------------------------
-
-============================  ==============================================
-``GenExpr``                   (GenExpr.name in supported, GenExpr.is_bool())  
-``GenExpr == Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
-``GenExpr <= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
-``GenExpr >= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num()) 
-============================  ============================================== 
+- Call :func:`decompose_linear` / :func:`decompose_linear_objective` instead of the standard 'decompose_in_tree'.
+- Put constraints in flat normal form (:func:`~cpmpy.transformations.flatten_model.flatten_constraint`).
+- Apply :func:`linearize_reified_variables` to replace many reified equalities of the form
+  ``bv == (x == val)`` by a single direct encoding of ``x`` (must be done before implication-only normalisation).
+- Ensure implications are of the form ``bv -> <expr>`` (:func:`~cpmpy.transformations.reification.only_implies`).
+- Call :func:`linearize_constraint` to transform the inequalities, strict equalities and implications.
+- Optionally run post-passes such as :func:`only_positive_bv` and :func:`only_positive_coefficients`.
 
 
+Module functions
+----------------
 
+Main transformations:
+- :func:`linearize_constraint`: Transforms a list of constraints to a linear form.
+- :func:`decompose_linear`: Decompose unsupported global constraints in a linear-friendly way.
+- :func:`decompose_linear_objective`: Decompose objective using linear-friendly decompositions.
+- :func:`linearize_reified_variables`: Replace reifieds (BV <-> (x == val)) with entire direct encoding of 'x'.
+
+Helper functions:
+- :func:`canonical_comparison`: Canonicalize comparison expressions (variables on left, constants on right).
+- :func:`get_linear_decompositions`: Returns the custom linear decomposition map for global constraints.
+
+Optional post-linearisation transformations:
+- :func:`only_positive_bv`: Transforms constraints so only boolean variables appear positively
+  (no :class:`~cpmpy.expressions.variables.NegBoolView`).
+- :func:`only_positive_bv_wsum`: Helper function that replaces :class:`~cpmpy.expressions.variables.NegBoolView`
+  in var/sum/wsum expressions with equivalent expressions using only :class:`~cpmpy.expressions.variables._BoolVarImpl`.
+- :func:`only_positive_bv_wsum_const`: Same as :func:`only_positive_bv_wsum` but returns the constant
+  term separately.
+- :func:`only_positive_coefficients`: Transforms constraints so only positive coefficients appear
+  in linear constraints.
 """
+
 import copy
 import warnings
 from typing import Set, AbstractSet, Sequence, Optional
