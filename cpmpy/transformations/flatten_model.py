@@ -198,11 +198,11 @@ def flatten_constraint(expr, csemap=None, supported={}):
                 elif isinstance(expr.args[0], _BoolVarImpl):
                     # LHS is var, ensure RHS is normalized 'Boolexpr'
                     lhs,lcons = expr.args[0], ()
-                    rhs,rcons = normalized_boolexpr(expr.args[1], csemap=csemap)
+                    rhs,rcons = normalized_boolexpr(expr.args[1], csemap=csemap, supported=supported)
                 else:
                     # make LHS normalized 'Boolexpr', RHS must be a var
-                    lhs,lcons = normalized_boolexpr(expr.args[0], csemap=csemap)
-                    rhs,rcons = get_or_make_var(expr.args[1], csemap=csemap)
+                    lhs,lcons = normalized_boolexpr(expr.args[0], csemap=csemap, supported=supported)
+                    rhs,rcons = get_or_make_var(expr.args[1], csemap=csemap, supported=supported)
 
                 newlist.append(Operator(expr.name, (lhs,rhs)))
                 newlist.extend(lcons)
@@ -213,7 +213,7 @@ def flatten_constraint(expr, csemap=None, supported={}):
 
             # if none of the above cases + continue matched:
             # a normalizable boolexpr
-            (con, flatcons) = normalized_boolexpr(expr, csemap=csemap)
+            (con, flatcons) = normalized_boolexpr(expr, csemap=csemap, supported=supported)
             newlist.append(con)
             newlist.extend(flatcons)
 
@@ -373,7 +373,7 @@ def get_or_make_var(expr, csemap=None, supported={}):
             csemap[expr] = ivar
         return ivar, [flatexpr == ivar] + flatcons
 
-def get_or_make_var_or_list(expr, csemap=None):
+def get_or_make_var_or_list(expr, csemap=None, supported={}):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
         Used to convert arguments of globals
     """
@@ -381,13 +381,13 @@ def get_or_make_var_or_list(expr, csemap=None):
     if __is_flat_var_or_list(expr):
         return (expr,[])
     elif is_any_list(expr):
-        flatvars, flatcons = zip(*[get_or_make_var(arg, csemap=csemap) for arg in expr])
+        flatvars, flatcons = zip(*[get_or_make_var(arg, csemap=csemap, supported=supported) for arg in expr])
         return (flatvars, [c for con in flatcons for c in con])
     else:
-        return get_or_make_var(expr, csemap=csemap)
+        return get_or_make_var(expr, csemap=csemap, supported=supported)
 
 
-def normalized_boolexpr(expr, csemap=None):
+def normalized_boolexpr(expr, csemap=None, supported={}):
     """
         input is any Boolean (is_bool()) expression
         output are all 'flat normal form' Boolean expressions that can be 'reified', meaning that
@@ -503,6 +503,7 @@ def normalized_numexpr(expr, csemap=None, supported={}):
             - base_expr: same as 'expr', but all arguments are variables
             - base_cons: list of flat normal constraints
     """
+    print("normalized_numexpr", expr.name, expr)
     # XXX a boolexpr is also a valid numexpr... e.g. 30*(iv > 5) + ... see mario obj.
     if __is_flat_var(expr):
         return (expr, [])
@@ -559,23 +560,21 @@ def normalized_numexpr(expr, csemap=None, supported={}):
 
         else: # generic operator
             # recursively flatten all children
-            print("gen", expr.args, [a.name for a in expr.args])
-            flatvars, flatcons = zip(*[(arg, []) if arg.name in supported else get_or_make_var(arg, csemap=csemap) for arg in expr.args])
-            print("gen", flatvars)
+            flatvars, flatcons = zip(*(normalized_numexpr(arg, csemap=csemap, supported=supported) if arg.name in supported else get_or_make_var(arg, csemap=csemap) for arg in expr.args))
 
             newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
     else:
         # Globalfunction (examples: Max,Min,Element)
-        print("ge", expr)
 
         # just recursively flatten args, which can be lists
         if not expr.has_subexpr():
-            print("b")
             return (expr, [])
         else:
             # recursively flatten all children
-            flatvars, flatcons = zip(*[get_or_make_var_or_list(arg, csemap=csemap) for arg in expr.args])
+            flatvars, flatcons = zip(*[
+                normalized_numexpr(arg, supported=supported) if arg.name in supported else get_or_make_var_or_list(arg, csemap=csemap ,supported=supported)
+                for arg in expr.args])
 
             # take copy, replace args
             newexpr = copy.copy(expr) # shallow or deep? currently shallow
