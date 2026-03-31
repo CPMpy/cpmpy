@@ -4,3 +4,24 @@ requires = [
     "wheel"
 ]
 build-backend = "setuptools.build_meta"
+
+[tool.ruff.lint]
+select = [
+    "D", # pydocstyle
+    "F", # pyflakes
+]
+ignore = [
+    "E501", # Allow for lines beyond line-length
+    "D105", # Missing doc for magic methods
+    "D102", # Missing doc for public method
+    "D103", # Missing docstring in public function
+    "D107", # Missing docstring in __init_
+    "D400", # Allow missing punctuation
+    "D401", # Allow non-impereative mood of docstring
+    "D203", # Ignore
+    "D205", # 1 Blank line required between summary line and description
+    "D415", # Allow missing punctuation in doc
+    "D211", # Allow incorrect blank lines before class
+    "D212", # multi-line-summary-second-line
+    "TD003", # Allow missing issue links for TODO
+]
