@@ -210,30 +210,6 @@ def linearize_constraint(cpm_expr, supported={"sum","wsum"}, reified=False):
 
         return constraints
 
-    elif cpm_expr.name == "circuit" and cpm_expr.name not in supported:
-        """
-            Decomposition inspired by Miller-Tucker-Zemlin formulation for TSPs
-        """
-        succ = cpm_expr.args
-        n = len(succ)
-        order = intvar(0, n-1, shape=n, name="order") # indicates the order of the stops
-        x = boolvar(shape=(n, n), name="x")           # indicates if we go from stop i to j
-
-        constraints = []
-        constraints += [sum(row) == 1 for row in x]
-        constraints += [sum(col) == 1 for col in x.T]
-
-        for i in range(n):
-            for j in range(n):
-                if i == j:
-                    constraints += [x[i,j] <= 0] # cannot go from and to the same city
-                else:
-                    constraints += [x[i,j].implies(succ[i] == j)] # link to `succ` variables
-                if j != 0:
-                    constraints += [x[i,j].implies(-1*order[i] + 1*order[j] == 1)] # eliminate subcircuits from solution
-
-        return constraints
-
     elif isinstance(cpm_expr, GlobalConstraint) and cpm_expr.name not in supported:
         raise ValueError(f"Linearization of global constraint {cpm_expr} not supported, run `cpmpy.transformations.decompose_global.decompose_global() first")
 

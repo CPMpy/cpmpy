@@ -249,6 +249,25 @@ class Circuit(GlobalConstraint):
 
         return constraining, defining
 
+    def decompose_linear(self):
+        """
+        Linear decomposition of the circuit constraint, inspired by Miller-Tucker-Zemlin formulation for TSPs
+        """
+        succ = self.args
+        n = len(succ)
+
+        x = np.asarray([[succ[i] == j for j in range(n)] for i in range(n)])
+        order = intvar(0, n-1, shape=n)
+
+        constraints = [sum(row) == 1 for row in x]     # redundant constraint, not strictly needed
+        constraints += [sum(col) == 1 for col in x.T]  # redundant constraint, not strictly needed
+
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    constraints += [x[i,j] <= 0] # cannot go from and to the same city
+                if j != 0:
+                    constraints += [x[i,j].implies(order[i] + 1 == order[j])] # eliminate subcircuits from solution
 
     def value(self):
         pathlen = 0
