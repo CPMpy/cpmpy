@@ -398,7 +398,8 @@ class NonReifiedTable(GlobalConstraint):
 
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
-            array = array.reshape(-1)
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
         # skip check, we trust the parser
         #if not all(isinstance(x, Expression) for x in array):
         #    raise TypeError(f"The first argument of a NonReifiedTable constraint should only contain variables/expressions: {array}")
@@ -447,7 +448,8 @@ class RowSelectingShortTable(GlobalConstraint):
 
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
-            array = array.reshape(-1)
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
         # skip check, we trust the parser
         #if not all(isinstance(x, Expression) for x in array):
         #    raise TypeError(f"The first argument of a ShortTable constraint should only contain variables/expressions: {array}")
@@ -498,7 +500,8 @@ class NegativeShortTable(GlobalConstraint):
 
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
-            array = array.reshape(-1)
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
         # skip check, we trust the parser
         #if not all(isinstance(x, Expression) for x in array):
         #    raise TypeError(f"The first argument of a NegativeShortTable constraint should only contain variables/expressions: {array}")

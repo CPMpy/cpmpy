@@ -580,7 +580,8 @@ class Table(GlobalConstraint):
 
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
-            array = array.reshape(-1)
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"The first argument of a Table constraint should only contain variables/expressions: {array}")
 
@@ -634,7 +635,8 @@ class ShortTable(GlobalConstraint):
 
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
-            array = array.reshape(-1)
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"The first argument of a ShortTable constraint should only contain variables/expressions: {array}")
 
@@ -691,7 +693,8 @@ class NegativeTable(GlobalConstraint):
 
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
-            array = array.reshape(-1)
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"The first argument of a NegativeTable constraint should only contain variables/expressions: {array}")
 
