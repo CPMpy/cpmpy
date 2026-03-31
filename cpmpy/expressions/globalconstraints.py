@@ -576,18 +576,21 @@ class Table(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the array of variables
             table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
-        has_subexpr = None  # we don't know
+        has_subexpr = None
+
         if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()
+            has_subexpr = array.has_subexpr()  # fast shortcut
             array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: {array}")
+            raise TypeError(f"The first argument of a Table constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
             table = np.array(table)
         assert table.ndim == 2, "Table's table must be a 2D array"
-        assert table.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
+        assert table.dtype.kind in ('i', 'u', 'b'), "Table's table must contain integers"  # signed/unsigned/boolean
             
+        if has_subexpr is None:
+            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -614,18 +617,6 @@ class Table(GlobalConstraint):
     def negate(self) -> Expression:
         return NegativeTable(self.args[0], self.args[1])
 
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self) -> bool:
-        if self._has_subexpr is not None:
-            return self._has_subexpr
-        
-        arr = self.args[0]  # the args[1] table is asserted to only hold constants
-        if isinstance(arr, NDVarArray):
-            self._has_subexpr = arr.has_subexpr()
-        else:
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
-
 
 class ShortTable(GlobalConstraint):
     """
@@ -642,17 +633,19 @@ class ShortTable(GlobalConstraint):
         has_subexpr = None
 
         if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()
+            has_subexpr = array.has_subexpr()  # fast shortcut
             array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a ShortTable constraint should only contain variables/expressions")
+            raise TypeError(f"The first argument of a ShortTable constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):
-            table = np.asarray(table, dtype=object)
+            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
         assert table.ndim == 2, "ShortTable's table must be a 2D array"
-        if not all(is_int(x) or x == STAR for row in table for x in row):
+        if not all(x == STAR or isinstance(x, int) for x in table.flat):
             raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-
+            
+        if has_subexpr is None:
+            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -682,18 +675,6 @@ class ShortTable(GlobalConstraint):
                 return True
         return False
 
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self) -> bool:
-        if self._has_subexpr is not None:
-            return self._has_subexpr
-        
-        arr = self.args[0]  # the args[1] table is asserted to only hold constants
-        if isinstance(arr, NDVarArray):
-            self._has_subexpr = arr.has_subexpr()
-        else:
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
-
 class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
@@ -709,16 +690,18 @@ class NegativeTable(GlobalConstraint):
         has_subexpr = None
 
         if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()
+            has_subexpr = array.has_subexpr()  # fast shortcut
             array = array.reshape(-1)
         if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a NegativeTable constraint should only contain variables/expressions: {array}")
+            raise TypeError(f"The first argument of a NegativeTable constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
             table = np.array(table)
         assert table.ndim == 2, "NegativeTable's table must be a 2D array"
-        assert table.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
-
+        assert table.dtype.kind in ('i', 'u', 'b'), "NegativeTable's table must contain integers"  # signed/unsigned/boolean
+            
+        if has_subexpr is None:
+            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("negative_table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -742,18 +725,6 @@ class NegativeTable(GlobalConstraint):
         if any(x is None for x in arrval):
             return None
         return not bool(np.any(np.all(tab == arrval, axis=1)))
-
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self) -> bool:
-        if self._has_subexpr is not None:
-            return self._has_subexpr
-        
-        arr = self.args[0]  # the args[1] table is asserted to only hold constants
-        if isinstance(arr, NDVarArray):
-            self._has_subexpr = arr.has_subexpr()
-        else:
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
 
     def negate(self) -> Expression:
         return Table(self.args[0], self.args[1])
@@ -924,16 +895,16 @@ class InDomain(GlobalConstraint):
     def __init__(self, expr: Expression, arr: Iterable[int|np.integer]):
         """
         Arguments:
-            expr (ExprLike): Expression or constant to be assigned to a value in the given domain
+            expr (Expression): Expression to be assigned to a value in the given domain
             arr (Iterable[int | np.integer]): Iterable of integer constants representing the domain
         """
-        has_subexpr = not isinstance(expr, _IntVarImpl)
-
         if not isinstance(arr, np.ndarray):
-            arr = np.array(arr, dtype=int)
+            arr = np.array(arr)
         assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
-        assert arr.dtype == int, "The second argument of an InDomain constraint should be a 1D array of integer constants"
+        if len(arr) > 0:  # also allow the edge case of an empty (generated) list
+            assert arr.dtype.kind in ('i', 'u', 'b'), "The second argument of an InDomain constraint should be a 1D array of integer constants"
 
+        has_subexpr = expr.has_subexpr()
         super().__init__("InDomain", (expr, arr), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -947,14 +918,7 @@ class InDomain(GlobalConstraint):
         expr, arr = self._args
         lb, ub = expr.get_bounds()
         
-        defining = []
-        # if expr is not a var, checked in the constructor
-        if self._has_subexpr:
-            aux = intvar(lb, ub)
-            defining.append(aux == expr)
-            expr = aux
-
-        return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+        return [expr != val for val in range(lb, ub + 1) if val not in arr], []
 
     def value(self) -> Optional[bool]:
         """
@@ -971,9 +935,11 @@ class InDomain(GlobalConstraint):
         return "{} in {}".format(self.args[0], self.args[1])
 
     def negate(self) -> Expression:
-        lb, ub = get_bounds(self.args[0])
-        return InDomain(self.args[0],
-                        [v for v in range(lb,ub+1) if v not in set(self.args[1])])
+        expr, arr = self._args
+        lb, ub = expr.get_bounds()
+
+        # complement of arr
+        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr])
 
 
 class Xor(GlobalConstraint):

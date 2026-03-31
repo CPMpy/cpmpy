@@ -46,15 +46,16 @@ List of Solver-native classes
     MinizincSubcircuitWithStart
 """
 
+from typing import Literal
 import numpy as np
 import cpmpy as cp
-from cpmpy import cpm_array, intvar, boolvar
+
 from cpmpy.exceptions import CPMpyException
-from cpmpy.expressions.core import Expression, Operator
+from cpmpy.expressions.core import Expression, Operator, ListLike, ExprLike
 from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, DirectConstraint
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
     get_bounds, eval_comparison
-from cpmpy.expressions.variables import _IntVarImpl, NDVarArray
+from cpmpy.expressions.variables import cpm_array, intvar, boolvar, _IntVarImpl, NDVarArray
 from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any, min as cpm_min
 
 
@@ -392,31 +393,33 @@ class NonReifiedTable(GlobalConstraint):
     Look at :class:`globalconstraints.Table <cpmpy.expressions.globalconstraints.Table` for a formulation that does support reification.
     """
 
-    def __init__(self, array, table):
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         has_subexpr = None
 
         if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()
+            has_subexpr = array.has_subexpr()  # fast shortcut
             array = array.reshape(-1)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a NonReifiedTable constraint should only contain variables/expressions: {array}")
+        # skip check, we trust the parser
+        #if not all(isinstance(x, Expression) for x in array):
+        #    raise TypeError(f"The first argument of a NonReifiedTable constraint should only contain variables/expressions: {array}")
 
-        if not isinstance(table, np.ndarray):
+        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
             table = np.array(table)
         assert table.ndim == 2, "NonReifiedTable's table must be a 2D array"
-        assert table.dtype != object, "NonReifiedTable's table must have primitive type, not 'object'/expressions"
-
+        assert table.dtype.kind in ('i', 'u', 'b'), "NonReifiedTable's table must contain integers"  # signed/unsigned/boolean
+            
+        if has_subexpr is None:
+            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self):
         """
             This decomposition is only valid in a non-reified setting.
         """
-        from cpmpy.expressions.python_builtins import any, all
         arr, tab = self.args
         row_selected = boolvar(shape=len(tab))
         if len(tab) == 1:
-            return [all(t == a for (t, a) in zip(tab[0], arr))], []
+            return [cpm_all(t == int(a) for (t, a) in zip(tab[0], arr))], []
         
         cons = []
         for i, row in enumerate(tab):
@@ -432,22 +435,6 @@ class NonReifiedTable(GlobalConstraint):
             return None
         return bool(np.any(np.all(tab == arrval, axis=1)))
 
-    @property
-    def vars(self):
-        return self._args[0]
-
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self):
-        if self._has_subexpr is not None:
-            return self._has_subexpr
-        
-        arr = self.args[0]  # the args[1] table is asserted to only hold constants
-        if isinstance(arr, NDVarArray):
-            self._has_subexpr = arr.has_subexpr()
-        else:
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
-
 class RowSelectingShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
@@ -455,22 +442,25 @@ class RowSelectingShortTable(GlobalConstraint):
         Bit less validation then for :class:`globalconstraints.ShortTable <cpmpy.expressions.globalconstraints.ShortTable>`;
         decomposition differs (row-selecting formulation).
     """
-    def __init__(self, array, table):
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
         has_subexpr = None
 
         if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()
+            has_subexpr = array.has_subexpr()  # fast shortcut
             array = array.reshape(-1)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a RowSelectingShortTable constraint should only contain variables/expressions")
+        # skip check, we trust the parser
+        #if not all(isinstance(x, Expression) for x in array):
+        #    raise TypeError(f"The first argument of a ShortTable constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):
-            table = np.asarray(table, dtype=object)
-        assert table.ndim == 2, "RowSelectingShortTable's table must be a 2D array"
-        # skip iterated check for performance reasons
-        #if not all(is_int(x) or x == STAR for row in table for x in row):
+            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
+        assert table.ndim == 2, "ShortTable's table must be a 2D array"
+        # skip check, we trust the parser
+        #if not all(x == STAR or isinstance(x, int) for x in table.flat):
         #    raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-
+            
+        if has_subexpr is None:
+            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self):
@@ -480,7 +470,7 @@ class RowSelectingShortTable(GlobalConstraint):
         """
         from cpmpy.expressions.python_builtins import any, all
 
-        arr, tab = self._args
+        arr, tab = self.args
         row_selected = boolvar(shape=(len(tab),))
 
         cons = []
@@ -488,10 +478,10 @@ class RowSelectingShortTable(GlobalConstraint):
             subexpr = Operator("and", [ai == ri for ai, ri in zip(arr, row) if ri != STAR])
             cons.append(row_selected[i].implies(subexpr))
 
-        return [any(row_selected)]+cons,[]
+        return [cpm_any(row_selected)]+cons, []
 
     def value(self):
-        arr, tab = self._args
+        arr, tab = self.args
         arrval = np.array(argvals(arr))
         for row in tab:
             num_row = row[row != STAR].astype(int)
@@ -503,21 +493,25 @@ class RowSelectingShortTable(GlobalConstraint):
 class NegativeShortTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
-    def __init__(self, array, table):
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
         has_subexpr = None
 
         if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()
+            has_subexpr = array.has_subexpr()  # fast shortcut
             array = array.reshape(-1)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a NegativeShortTable constraint should only contain variables/expressions")
+        # skip check, we trust the parser
+        #if not all(isinstance(x, Expression) for x in array):
+        #    raise TypeError(f"The first argument of a NegativeShortTable constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):
-            table = np.asarray(table, dtype=object)
+            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
         assert table.ndim == 2, "NegativeShortTable's table must be a 2D array"
-        if not all(is_int(x) or x == STAR for row in table for x in row):
-            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-
+        # skip check, we trust the parser
+        #if not all(x == STAR or isinstance(x, int) for x in table.flat):
+        #    raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+            
+        if has_subexpr is None:
+            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("negative_shorttable", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self):
