@@ -379,10 +379,14 @@ class CPM_gurobi(SolverInterface):
 
         # cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
+        cpm_cons = only_implies(
+            cpm_cons,
+            csemap=self._csemap,
+            is_supported=lambda cpm_expr: cpm_expr.name == "==" and (isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name in {"or", "and"})
+        )  # anything that can create full reif should go above...
 
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"-","sum", "wsum","->","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"-","sum", "wsum","->","sub","min","max","mul","abs","pow", "or", "and"}), csemap=self._csemap)  # the core of the MIP-linearization
 
         # cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
@@ -442,11 +446,12 @@ class CPM_gurobi(SolverInterface):
           if isinstance(cpm_expr, Operator):
               match cpm_expr.name:
                   case "or": # TODO only usefull if we can represent an or as a sum of binary vars, which is not generally correct
-                      return reify(gp.or_(add(arg, depth) for arg in cpm_expr.args))
+                      return gp.or_(add(arg, depth) for arg in cpm_expr.args)
                   case "and":
                       # self.grb_model.update()
                       # return math.prod(add(arg, depth=depth) for arg in cpm_expr.args)
 
+                      return gp.and_(add(arg, depth) for arg in cpm_expr.args)
                       args = [add(arg, depth=depth) for arg in cpm_expr.args if not is_num(arg) or arg != 1]
                       assert len(args)
                       if not args:
@@ -454,7 +459,7 @@ class CPM_gurobi(SolverInterface):
                       elif any(a == 0 for a in args if is_num(a)):
                           return 0
                       else:
-                          return reify(gp.and_(add(arg) for arg in args))
+                          return gp.and_(add(arg) for arg in args)
                           # return math.prod(add(arg, depth=depth) for arg in cpm_expr.args)
                   case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
                       a, b = cpm_expr.args
@@ -475,19 +480,16 @@ class CPM_gurobi(SolverInterface):
                       a, b = cpm_expr.args
                       return add(a, depth) - add(b, depth)
           elif isinstance(cpm_expr, Comparison):
-              # cpm_expr = linearize_constraint([cpm_expr], supported=frozenset({"sum", "wsum","->","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
-              # print(cpm_expr)
-              lhs, rhs = cpm_expr.args
-              grb_lhs, grb_rhs = add(lhs, depth), add(rhs, depth)
+              a, b = add(cpm_expr.args[0], depth), add(cpm_expr.args[1], depth)
 
               match cpm_expr.name:
                   case "==":
-                      # Note: rhs/lhs are reversed since Gurobi functions are called by `y == f(x)`, but CPMpy normalizes to `f(x) == y` (e.g. `abs(x) == IV0`)
-                      return grb_rhs == grb_lhs
+                      # Note: Gurobi functions are called by `y == f(x)`, like CPMpy boolexprs, but numexprs are transformed to `f(x) == y` (e.g. `abs(x) == IV0`), so need to be flipped
+                      return a == b if cpm_expr.args[0].is_bool() else b == a
                   case "<=":
-                      return grb_lhs <= grb_rhs
+                      return a <= b
                   case ">=":
-                      return grb_lhs >= grb_rhs
+                      return a >= b
                   case _:
                       raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
           elif isinstance(cpm_expr, cp.expressions.globalfunctions.GlobalFunction):

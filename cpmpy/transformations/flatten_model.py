@@ -573,7 +573,7 @@ def normalized_numexpr(expr, csemap=None, supported={}):
         else:
             # recursively flatten all children
             flatvars, flatcons = zip(*[
-                normalized_numexpr(arg, supported=supported) if arg.name in supported else get_or_make_var_or_list(arg, csemap=csemap ,supported=supported)
+                normalized_numexpr(arg, supported=supported) if arg.name in supported else get_or_make_var_or_list(arg, csemap=csemap, supported=supported)
                 for arg in expr.args])
 
             # take copy, replace args

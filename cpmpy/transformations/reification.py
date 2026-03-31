@@ -30,6 +30,7 @@ from .flatten_model import flatten_constraint, get_or_make_var
 from .negation import recurse_negation
 
 def only_bv_reifies(constraints, csemap=None):
+    """Transforms all reifications to ``BV -> BE`` or ``BV == BE``"""
 
     newcons = []
     for cpm_expr in constraints:
@@ -52,7 +53,7 @@ def only_bv_reifies(constraints, csemap=None):
             newcons.append(cpm_expr)
     return newcons
 
-def only_implies(constraints, csemap=None):
+def only_implies(constraints, csemap=None, is_supported=None):
     """
         Transforms all reifications to ``BV -> BE`` form
 
@@ -73,7 +74,9 @@ def only_implies(constraints, csemap=None):
 
     for cpm_expr in constraints:
         # Operators: check BE -> BV
-        if cpm_expr.name == '->' and cpm_expr.args[1].name == '==':
+        if is_supported and is_supported(cpm_expr):
+            newcons.append(cpm_expr)
+        elif cpm_expr.name == '->' and cpm_expr.args[1].name == '==':
             a0,a1 = cpm_expr.args
             if a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)

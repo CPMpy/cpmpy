@@ -200,7 +200,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 assert len(new_expr) == 1
                 if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
                     continue # skip or([BoolVal(True)])
-                newlist.append(Operator("or", new_expr))
+                newlist.extend(new_expr)
                 continue
 
 
