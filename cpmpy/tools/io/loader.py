@@ -9,52 +9,41 @@ List of functions
     :nosignatures:
 
     load
-    read_formats
+    load_formats
 """
 
 from typing import Callable, List, Optional
 
 import cpmpy as cp
-from .dimacs import load_dimacs
-from cpmpy.tools.io.scip import load_scip
-from cpmpy.tools.io.wcnf import load_wcnf
-from cpmpy.tools.io.opb import load_opb
 from cpmpy.tools.io.utils import get_format
+from cpmpy.tools.io.xcsp3 import load_xcsp3
 
 # mapping format names to appropriate loader functions
-_reader_map = {
-    "mps": load_scip,
-    "lp": load_scip,
-    "cip": load_scip,
-    "fzn": load_scip,
-    "gms": load_scip,
-    "pip": load_scip,
-    "dimacs": load_dimacs,
-    "opb": load_opb,
-    "wcnf": load_wcnf,
+_loader_map = {
+    "xcsp3": load_xcsp3,
 }
 
 
-def _get_reader(format: str) -> Callable[[str], cp.Model]:
+def _get_loader(format: str) -> Callable[[str], cp.Model]:
     """
-    Get the reader function for a given format.
+    Get the loader function for a given format.
 
     Arguments:
-        format (str): The name of the format to get a reader for.
+        format (str): The name of the format to get a loader for.
 
     Raises:
         ValueError: If the format is not supported.
 
     Returns:
-        A callable that reads a model from a file.
+        A callable that loads a model from a file.
     """
 
-    if format not in _reader_map:
+    if format not in _loader_map:
         raise ValueError(f"Unsupported format: {format}")
 
-    return _reader_map[format]
+    return _loader_map[format]
 
-def read_formats() -> List[str]:
+def load_formats() -> List[str]:
     """
     List of supported load formats.
 
@@ -67,7 +56,7 @@ def read_formats() -> List[str]:
         model = load(file_path, format="mps")
         model = load(file_path, format="lp")
     """
-    return list(_reader_map.keys())
+    return list(_loader_map.keys())
 
 def _derive_format(file_path: str) -> str:
     """
@@ -116,8 +105,5 @@ def load(file_path: str, format: Optional[str] = None) -> cp.Model:
     if format is None:
         format = _derive_format(file_path)
 
-    reader = _get_reader(format)
+    reader = _get_loader(format)
     return reader(file_path)
-
-# Backward compatibility alias
-read = load

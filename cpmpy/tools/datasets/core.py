@@ -1,19 +1,19 @@
 """
 Dataset Base Classes
 
-This module defines multiple abstract datasets, a hierarchy of classes which together
-serve as the foundation for competition and application oriented benchmarking datasets.
+This module provides an abstract, PyTorch-style interface for datasets where
+instances are stored as files on disk. It standardizes:
 
-They enable the loading and managing of well-known benchmark instance collections 
-from the Constraint Optimisation (CO) community.
+- download and local storage of benchmark instances
+- instance access via ``__len__`` / ``__getitem__``
+- optional ``parse``/``transform``/``target_transform`` stages
+- sidecar metadata collection and reuse
 
-It standardizes how datasets are downloaded, stored, accessed, and optionally transformed.
+Main classes:
 
-It provides a Pytorch compatible interface (constructor arguments like "transform" and the
-methods __len__ and __getitem__ for iterating over the dataset).
-
-Additionaly, it provides a collection of methods and helper functions to adapt the dataset
-to the specific usecase requirements of constraint optimisation benchmarks.
+- :class:`Dataset`: minimal iterable dataset base
+- :class:`IndexedDataset`: indexable dataset base
+- :class:`FileDataset`: file-based dataset base with download + metadata support
 
 To implement a new dataset, one needs to subclass one of the abstract dataset classes,
 and provide implementation for the following methods:
@@ -29,29 +29,6 @@ Datasets must also implement the following dataset metadata attributes:
 - description: a short description of the dataset
 - homepage: a URL to the homepage of the dataset
 - citation: a list of citations for the dataset
-
-Optional dataset schema metadata:
-- features: a :class:`FeaturesInfo` schema describing domain-level instance fields
-  (for example ``jobs``, ``machines``, ``optimum``, ``horizon``).
-  This schema is exposed in dataset-level metadata and used by dataset cards and
-  export formats (e.g. Croissant) to document the meaning and types of fields in
-  instance metadata.
-
-``features`` is optional. Default behavior is ``features = None``:
-- dataset cards are still generated, but the "Instance Features (Domain Metadata)"
-  section is omitted.
-- Croissant export is still generated with core fields (``id``, ``name``, ``path``)
-  and standard CP model feature fields; only domain-specific schema fields from
-  ``features`` are omitted.
-- instance metadata collection and loading behavior are unchanged; ``features``
-  only documents schema and export metadata.
-
-Feature inheritance and extension:
-- child dataset classes may declare only new fields in ``features``; these are
-  merged with inherited fields from the nearest ancestor defining ``features``.
-- child fields override inherited fields with the same name.
-- to use a completely custom schema, define the full ``features`` object in the
-  child class.
 
 All parts for which an implementation must be provided are marked with an @abstractmethod decorator, 
 raising a NotImplementedError if not overwritten.
@@ -75,22 +52,11 @@ Example:
 The dataset also supports PyTorch-style transforms and target transforms.
 
 .. code-block:: python
-    from cpmpy.tools.io import load_wcnf
-    from cpmpy.tools.datasets.metadata import to_croissant
+    from cpmpy.tools.io import load_xcsp3
 
-    dataset = MyDataset(download=True, transform=load_wcnf, target_transform=to_croissant)
-    for model, croissant_record in dataset:
+    dataset = MyDataset(download=True, transform=load_xcsp3)
+    for model, info in dataset:
         ...
-
-For advanced operations on the datasets, like filtering, mapping, splitting, shuffling, sorting, etc., 
-make use of the PyTorch tooling ecosystem (thanks to our compatible interface).
-
-Example:
-.. code-block:: python
-    dataset = MyDataset(download=True, transform=load_wcnf, target_transform=to_croissant)
-    
-    from torch.utils.data import random_split
-    train_dataset, test_dataset = random_split(dataset, [0.8, 0.2])
 """
 from __future__ import annotations
 
@@ -108,9 +74,7 @@ from urllib.request import HTTPError, Request, urlopen
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import multiprocessing
 
-from .metadata import FeaturesInfo, DatasetInfo, InstanceInfo
 from .utils import extract_model_features, portable_instance_metadata
-from .transforms import _enrich_from_model
 
 # tqdm as an optional dependency, provides prettier progress bars
 try:
@@ -175,7 +139,7 @@ class Dataset(ABC):
         return []
 
     # OPTIONAL
-    features: Optional[FeaturesInfo] = None                # domain_metadata field schema
+    features = None                # domain_metadata field schema, for later
     
     # ---------------------------------------------------------------------------- #
 
@@ -188,57 +152,15 @@ class Dataset(ABC):
         self.transform = transform
         self.target_transform = target_transform
 
-    def __init_subclass__(cls, **kwargs):
-        """
-        Auto-merge ``features`` when a subclass declares only its *new* fields.
-
-        If a subclass explicitly defines ``features``, it is merged with the
-        nearest ancestor's ``features`` so the subclass only needs to list
-        what is new.  The subclass fields take precedence over inherited ones.
-
-        .. code-block:: python
-
-            class MyJSPDataset(JSPLibDataset):
-                # No need to repeat {jobs, machines, optimum, ...} — they are
-                # inherited and merged in automatically.
-                features = FeaturesInfo({"difficulty": ("float", "Computed difficulty score")})
-
-                def collect_instance_metadata(self, file):
-                    meta = super().collect_instance_metadata(file)
-                    meta["difficulty"] = ...
-                    return meta
-
-        To *replace* rather than extend the parent schema, explicitly set
-        ``features`` to the complete schema you want (the auto-merge still
-        runs, but if you start from scratch the parent's fields will be
-        absent from the parent's FeaturesInfo and won't be merged).
-        Alternatively, set ``features = None`` to clear the schema entirely.
-        """
-        super().__init_subclass__(**kwargs)
-        subclass_features = cls.__dict__.get("features")
-        if subclass_features is None:
-            return
-        # Walk the MRO to find the nearest ancestor that has features defined
-        for base in cls.__mro__[1:]:
-            parent_features = base.__dict__.get("features")
-            if parent_features is not None:
-                cls.features = parent_features | subclass_features
-                return
-
-
+   
     # ---------------------------------------------------------------------------- #
     #                     Methods to implement in subclasses:                      #
     # ---------------------------------------------------------------------------- #
 
     @abstractmethod
-    def instance_metadata(self, instance) -> InstanceInfo:
+    def instance_metadata(self, instance) -> dict:
         """
         Return the metadata for a given instance file.
-
-        Returns an :class:`~metadata.InstanceInfo`, which is a ``dict`` subclass
-        so all existing ``meta['year']``, ``meta.get('jobs')`` access is unchanged.
-        Structured access via ``info.domain_metadata``, ``info.model_features``,
-        ``info.id``, etc. is additive.
         """
         pass
 
@@ -248,49 +170,25 @@ class Dataset(ABC):
     # ---------------------------------------------------------------------------- #
 
     @classmethod
-    def dataset_metadata(cls) -> DatasetInfo:
+    def dataset_metadata(cls) -> dict:
         """
-        Return dataset-level metadata as a :class:`~metadata.DatasetInfo`.
-
-        :class:`~metadata.DatasetInfo` is the dataset metadata object.
-        It offers dict-compatible access for straightforward key-based usage
-        (for example ``dataset_metadata()['name']``), and also provides richer
-        helper methods such as ``dataset_metadata().card()`` and
-        ``dataset_metadata().to_croissant()``.
+        Return dataset-level metadata as a dictionary.
 
         Returns:
-            DatasetInfo: The dataset-level metadata.
+            dict: The dataset-level metadata.
         """
         if isinstance(cls.citation, str):
             citations = [cls.citation] if cls.citation else []
         else:
             citations = list(cls.citation)
 
-        return DatasetInfo({
+        return {
             "name": cls.name,
             "description": cls.description,
             "homepage": cls.homepage,
             "citation": citations,
             "features": cls.features,
-        })
-
-    @classmethod
-    def card(cls, format: str = "markdown") -> str:
-        """
-        Generate a dataset card for this dataset.
-
-        Shorthand for ``cls.dataset_metadata().card(format=format)``.
-
-        Follows HuggingFace Hub convention: YAML frontmatter (machine-readable)
-        followed by a markdown body (human-readable).
-
-        Arguments:
-            format (str): Only ``"markdown"`` is currently supported.
-
-        Returns:
-            str: The dataset card as a string.
-        """
-        return cls.dataset_metadata().card(format=format)
+        }
 
 
 class IndexedDataset(Dataset):
@@ -331,261 +229,6 @@ class IndexedDataset(Dataset):
             yield self[i]
 
 
-def expand_varying_kwargs(
-    vary: Union[str, List[str]],
-    gen_kwargs: dict,
-    mode: str = "zip",
-) -> Iterator[dict]:
-    """
-    Expand gen_kwargs into a sequence of kwargs dicts for varying parameters.
-
-    When ``vary`` is a single string, yields one kwargs dict per value in
-    ``gen_kwargs[vary]``.
-
-    When ``vary`` is a list of strings, each corresponding value in gen_kwargs
-    must be an iterable. Yields one kwargs dict per tuple:
-    - ``mode='zip'``: parallel iteration (zip), all iterables must have same length
-    - ``mode='product'``: Cartesian product over the varying dimensions
-
-    Arguments:
-        vary: Name(s) of keys in gen_kwargs whose values are iterables to vary over.
-        gen_kwargs: Base kwargs; keys in vary are replaced per iteration.
-        mode: ``'zip'`` (default) or ``'product'``.
-
-    Yields:
-        dict: Full kwargs for each generator call.
-    """
-    varying_keys = [vary] if isinstance(vary, str) else list(vary)
-    base_kwargs = {k: v for k, v in gen_kwargs.items() if k not in varying_keys}
-    varying_iters = [gen_kwargs[k] for k in varying_keys]
-
-    if mode == "zip":
-        for values in zip(*varying_iters):
-            yield {**base_kwargs, **dict(zip(varying_keys, values))}
-    elif mode == "product":
-        for values in product(*varying_iters):
-            yield {**base_kwargs, **dict(zip(varying_keys, values))}
-    else:
-        raise ValueError(f"mode must be 'zip' or 'product', got {mode!r}")
-
-
-class IterableDataset(Dataset):
-    """
-    Abstract base class for iterable datasets.
-
-    Iterable datasets are datasets where the instances are iterable and can be accessed by an iterator.
-    The dataset does not provide random access to the instances through an index or identifier.
-    An example is a generator function that yields the instances based on a random seed.
-
-    Implementing this class requires implementing the following method:
-    - __iter__: return an iterator over the dataset
-    """
-
-    @abstractmethod
-    def __iter__(self) -> Iterator[Tuple[Any, Any]]:
-        """
-        Return an iterator over the dataset.
-
-        Returns:
-            Iterator[Tuple[Any, Any]]: Iterator over the dataset, yielding (x, y) pairs of:
-                x: instance reference (e.g., file path, database key, generated seed, ...)
-                y: metadata (solution, features, origin, etc.)
-        """
-        pass
-
-    @staticmethod
-    def from_generator(
-        generator: Callable,
-        gen_kwargs: Optional[dict] = None,
-        vary: Optional[Union[str, List[str]]] = None,
-        vary_mode: str = "zip",
-    ) -> IterableDataset:
-        """
-        Create an IterableDataset from a generator.
-
-        Wraps a Python generator function into an ``IterableDataset``.
-        The method determines the number of ``generator(...)`` calls and their
-        keyword arguments from ``gen_kwargs`` and ``vary``.
-
-        ``gen_kwargs`` is the source of truth:
-        keys are parameter names of ``generator``, values are argument values.
-        ``vary`` selects which of these keys should be expanded.
-
-        Behavior summary:
-        - ``vary is None``:
-          one call -> ``generator(**gen_kwargs)``.
-        - ``vary`` is one key (e.g. ``"n"``):
-          one call per value in ``gen_kwargs["n"]``, while all other
-          keyword arguments from ``gen_kwargs`` are passed unchanged.
-        - ``vary`` is multiple keys (e.g. ``["n", "seed"]``):
-          one call per tuple of values for those keys, while all non-varied
-          keyword arguments from ``gen_kwargs`` are passed unchanged. 
-          Two options for the varying:
-            - ``vary_mode="zip"``: parallel iteration
-            - ``vary_mode="product"``: Cartesian product
-
-        Important:
-        - Every key mentioned in ``vary`` must already exist in ``gen_kwargs``.
-        - If a key is varied, its value in ``gen_kwargs`` must be iterable.
-        - Non-varied keys are reused unchanged for every generator call.
-
-        Arguments:
-            generator: Callable that returns an iterator yielding (x, y) pairs.
-                When ``vary`` is None, called as ``generator()`` or
-                ``generator(**gen_kwargs)``. When ``vary`` is set, called once
-                per value (or tuple of values) of the varying kwarg(s).
-            gen_kwargs: Optional dict of keyword arguments to pass to the generator.
-            vary: Optional name or list of names of keys in gen_kwargs whose values
-                are iterables. If a single string, the generator is called once per
-                value. If a list of strings, the generator is called once per tuple
-                from zip (default) or product of the iterables.
-            vary_mode: When ``vary`` is a list, ``'zip'`` (parallel iteration,
-                same-length iterables) or ``'product'`` (Cartesian product).
-
-        Examples:
-
-            .. code-block:: python
-
-                def gen_graph_coloring(num_instances, n_vertices, edge_prob, seed):
-                    import random
-                    rng = random.Random(seed)
-                    for i in range(num_instances):
-                        x = {
-                            "problem": "graph_coloring",
-                            "n_vertices": n_vertices,
-                            "edge_prob": edge_prob,
-                            "instance_seed": rng.randint(0, 10**9),
-                        }
-                        y = {"family": "gc", "name": f"gc_{n_vertices}_{i}"}
-                        yield x, y
-
-            Fixed kwargs (single call):
-
-                .. code-block:: python
-
-                    ds = IterableDataset.from_generator(
-                        gen_graph_coloring,
-                        gen_kwargs={
-                            "num_instances": 3,
-                            "n_vertices": 40,
-                            "edge_prob": 0.2,
-                            "seed": 7,
-                        },
-                    )
-                    # Calls gen_graph_coloring(...) once with fixed kwargs
-
-            Vary one kwarg:
-
-                .. code-block:: python
-
-                    ds = IterableDataset.from_generator(
-                        gen_graph_coloring,
-                        gen_kwargs={
-                            "num_instances": 3,
-                            "n_vertices": 40,
-                            "edge_prob": [0.1, 0.2, 0.3],
-                            "seed": 7,
-                        },
-                        vary="edge_prob",
-                    )
-                    # Calls:
-                    #   gen_graph_coloring(..., edge_prob=0.1, ...)
-                    #   gen_graph_coloring(..., edge_prob=0.2, ...)
-                    #   gen_graph_coloring(..., edge_prob=0.3, ...)
-                    # Other kwargs (num_instances, n_vertices, seed) stay fixed.
-
-            Vary multiple kwargs with zip (default):
-
-                .. code-block:: python
-
-                    def gen_rcpsp_like(num_instances, n_jobs, n_resources, tightness, seed):
-                        import random
-                        rng = random.Random(seed)
-                        for i in range(num_instances):
-                            x = {
-                                "problem": "rcpsp",
-                                "n_jobs": n_jobs,
-                                "n_resources": n_resources,
-                                "tightness": tightness,
-                                "instance_seed": rng.randint(0, 10**9),
-                            }
-                            y = {"family": "rcpsp", "name": f"j{n_jobs}_r{n_resources}_{i}"}
-                            yield x, y
-
-                    ds = IterableDataset.from_generator(
-                        gen_rcpsp_like,
-                        gen_kwargs={
-                            "num_instances": 2,
-                            "n_jobs": [30, 60],
-                            "n_resources": [4, 8],
-                            "tightness": [0.6, 0.8],
-                            "seed": 11,
-                        },
-                        vary=["n_jobs", "n_resources", "tightness"],
-                        vary_mode="zip",
-                    )
-                    # Calls:
-                    #   gen_rcpsp_like(..., n_jobs=30, n_resources=4, tightness=0.6, ...)
-                    #   gen_rcpsp_like(..., n_jobs=60, n_resources=8, tightness=0.8, ...)
-                    # Non-varied kwargs (num_instances, seed) are reused in both calls.
-
-            Vary multiple kwargs with Cartesian product::
-
-                .. code-block:: python
-
-                    ds = IterableDataset.from_generator(
-                        gen_rcpsp_like,
-                        gen_kwargs={
-                            "num_instances": 1,
-                            "n_jobs": [30, 60],
-                            "n_resources": [4, 8],
-                            "tightness": [0.6, 0.8],
-                            "seed": 11,
-                        },
-                        vary=["n_jobs", "n_resources", "tightness"],
-                        vary_mode="product",
-                    )
-                    # Calls all 2 x 2 x 2 = 8 combinations
-        """
-        gen_kwargs = gen_kwargs or {}
-
-        if vary is not None:
-            # Variant: call generator once per expanded kwargs
-            class FromGeneratorVariedDataset(IterableDataset):
-                def __init__(
-                    self,
-                    generator: Callable,
-                    gen_kwargs: dict,
-                    vary: Union[str, List[str]],
-                    vary_mode: str,
-                ):
-                    self.generator = generator
-                    self.gen_kwargs = gen_kwargs
-                    self.vary = vary
-                    self.vary_mode = vary_mode
-
-                def __iter__(self):
-                    for kwargs in expand_varying_kwargs(
-                        self.vary, self.gen_kwargs, mode=self.vary_mode
-                    ):
-                        for item in self.generator(**kwargs):
-                            yield item
-
-            return FromGeneratorVariedDataset(
-                generator, gen_kwargs, vary, vary_mode
-            )
-        else:
-            # Original: single call to generator
-            class FromGeneratorDataset(IterableDataset):
-                def __init__(self, generator: Callable, gen_kwargs: dict):
-                    self.generator = generator
-                    self.gen_kwargs = gen_kwargs
-
-                def __iter__(self):
-                    return self.generator(**self.gen_kwargs)
-
-            return FromGeneratorDataset(generator, gen_kwargs)
-
 class FileDataset(IndexedDataset):
     """
     Abstract base class for PyTorch-style datasets of file-based CO benchmarking sets.
@@ -605,10 +248,10 @@ class FileDataset(IndexedDataset):
       enable ``parse=True`` to obtain parsed intermediate data structures
       (for example table/dict structures for RCPSP-style scheduling data), then
       build a model separately or via a transform.
-
-    For a more detailed authoring guide (design patterns, metadata conventions,
-    and implementation checklist), see :ref:`datasets_advanced_authoring`.
-    """
+    """ 
+    # TODO documentation to add / improve
+    # For a more detailed authoring guide (design patterns, metadata conventions,
+    # and implementation checklist), see :ref:`datasets_advanced_authoring`.
 
     # Extension for metadata sidecar files
     METADATA_EXTENSION = ".meta.json"
@@ -635,8 +278,6 @@ class FileDataset(IndexedDataset):
                 not directly encode a CPMpy model in the source file.
             extension (str): Extension of the instance files. Used to filter instance files from the dataset directory.
             **kwargs: Advanced options. Currently supports:
-                - metadata_workers (int): Number of parallel workers for
-                  metadata collection during initial download (default: 1).
                 - ignore_sidecar (bool): If True, do not read/write metadata
                   sidecars and collect metadata on demand at iteration time
                   using ``collect_instance_metadata()`` (default: False).
@@ -652,7 +293,6 @@ class FileDataset(IndexedDataset):
         self._parse = parse
 
         # Advanced options
-        metadata_workers = kwargs.pop("metadata_workers", 1)
         self._ignore_sidecar = kwargs.pop("ignore_sidecar", False)
 
         if not self._check_exists():
@@ -661,7 +301,7 @@ class FileDataset(IndexedDataset):
             else:
                 self.download()
                 if not self._ignore_sidecar:
-                    self._collect_all_metadata(workers=metadata_workers)
+                    self._collect_all_metadata()
                 files = self._list_instances()
                 print(f"Finished downloading {len(files)} instances")
 
@@ -722,7 +362,7 @@ class FileDataset(IndexedDataset):
         """
         How an instance file from the dataset should be opened.
         Especially usefull when files come compressed and won't work with
-        python standard library's 'open', e.g. '.xz', '.lzma'.
+        Python standard library's 'open', e.g. '.xz', '.lzma'.
 
         Arguments:
             instance (os.PathLike): File path to the instance file.
@@ -770,25 +410,20 @@ class FileDataset(IndexedDataset):
     # ---------------------------------------------------------------------------- #
 
 
-    def instance_metadata(self, instance: os.PathLike) -> InstanceInfo:
+    def instance_metadata(self, instance: os.PathLike) -> dict:
         """
         Return the metadata for a given instance file.
-
-        Returns an :class:`~metadata.InstanceInfo`, which is a ``dict`` subclass
-        so all existing ``meta['year']``, ``meta.get('jobs')`` access is unchanged.
-        Structured access via ``info.domain_metadata``, ``info.model_features``,
-        ``info.id``, etc. is additive.
 
         Arguments:
             file (os.PathLike): Path to the instance file.
 
         Returns:
-            InstanceInfo: The metadata for the instance.
+            dict: The metadata for the instance.
         """
         metadata = {
             'id': str(instance),
             'dataset': self.name,
-            'category': self.category(),
+            'categories': self.categories(),
             'name': pathlib.Path(instance).name.replace(self.extension, ''),
             'path': instance,
         }
@@ -796,7 +431,7 @@ class FileDataset(IndexedDataset):
         # Advanced mode: bypass sidecars and collect metadata on demand.
         if self._ignore_sidecar:
             metadata.update(self.collect_instance_metadata(file=str(instance)))
-            return InstanceInfo(metadata)
+            return metadata
         else:
             # Load sidecar metadata if it exists
             meta_path = self._metadata_path(instance)
@@ -807,7 +442,7 @@ class FileDataset(IndexedDataset):
                 metadata.update(sidecar.get("instance_metadata", {}))
                 metadata.update(sidecar.get("format_metadata", {}))
                 metadata.update(sidecar.get("model_features", {}))
-            return InstanceInfo(metadata)
+            return metadata
 
 
     # ---------------------------------------------------------------------------- #
@@ -857,7 +492,7 @@ class FileDataset(IndexedDataset):
             data = self.parse(data)
 
         if self.transform:
-            # TODO revisit this flow of execution
+            # TODO maybe revisit this flow of execution
             if isinstance(data, (str, os.PathLike)):
                 # Convenience for io loaders: pass dataset.open when supported.
                 try:
@@ -879,9 +514,11 @@ class FileDataset(IndexedDataset):
                 metadata = self.transform.enrich_metadata(data, metadata)
             elif isinstance(data, cp.Model):
                 # Transform returned a CPMpy model; enrich metadata from model details.
-                metadata = _enrich_from_model(data, metadata)
+                # metadata = _enrich_from_model(data, metadata) TODO for future metadata PR
+                pass
         elif isinstance(data, cp.Model):
-            metadata = _enrich_from_model(data, metadata)
+            # metadata = _enrich_from_model(data, metadata) TODO for future metadata PR
+            pass
 
         return data, metadata
 
@@ -965,7 +602,12 @@ class FileDataset(IndexedDataset):
                         print(f"Error collecting metadata for {fp.name}: {e}")
 
     def _collect_one_metadata(self, file_path):
-        """Collect metadata for a single instance file."""
+        """
+        Collect metadata for a single instance file.
+
+        Arguments:
+            file_path (os.PathLike): Path to the instance file.
+        """
         meta_path = self._metadata_path(file_path)
         metadata_error = None
         try:
@@ -974,14 +616,14 @@ class FileDataset(IndexedDataset):
             instance_meta = {}
             metadata_error = str(e)
 
-        # Separate portable from format-specific fields
+        # Separate portable from format-specific fields TODO
         portable = portable_instance_metadata(instance_meta)
         format_specific = {
             k: v for k, v in instance_meta.items()
             if k not in portable and not k.startswith("_")
         }
 
-        # Derive instance name (strip format-specific extensions)
+        # Derive instance name (strip format-specific extensions) TODO
         stem = file_path.stem
         for ext in (".xml", ".wcnf", ".opb"):
             if stem.endswith(ext):
@@ -990,7 +632,7 @@ class FileDataset(IndexedDataset):
 
         # Build structured sidecar
         sidecar = {
-            "dataset": self.dataset_metadata().to_jsonable(),
+            "dataset": self.dataset_metadata(),
             "instance_name": stem,
             "source_file": str(file_path.relative_to(self.dataset_dir)),
             "categories": self.categories(),
@@ -998,6 +640,7 @@ class FileDataset(IndexedDataset):
             "format_metadata": format_specific,
         }
 
+        # Collect metadata collection error if any
         if metadata_error is not None:
             sidecar["_metadata_error"] = metadata_error
 
@@ -1013,7 +656,7 @@ class FileDataset(IndexedDataset):
             except (json.JSONDecodeError, IOError):
                 pass
 
-        if model_features is None:
+        if model_features is None: # TODO how does it handle non-models?
             if not callable(self.reader):
                 raise TypeError(
                     f"Cannot extract model features for {file_path}: "
@@ -1085,7 +728,9 @@ class FileDataset(IndexedDataset):
     @staticmethod
     def _download_sequential(url: str, filepath: os.PathLike, total_size: int, desc: str,
                              chunk_size: int = 1024 * 1024):
-        """Download file sequentially with progress bar."""
+        """
+        Download file sequentially with progress bar.
+        """
         import sys
         
         # Convert to Path if it's a string
@@ -1140,72 +785,18 @@ class FileDataset(IndexedDataset):
                 sys.stdout.write("\n")
                 sys.stdout.flush()
 
-    @staticmethod
-    def _download_parallel(urls_and_targets: List[Tuple[str, str]], base_url: str, 
-                           destination_dir: str, desc_prefix: str = "Downloading",
-                           chunk_size: int = 1024 * 1024,
-                           max_workers: Optional[int] = None) -> List[pathlib.Path]:
-        """
-        Download multiple files in parallel from a base URL.
-        
-        Arguments:
-            urls_and_targets (List[Tuple[str, str]]): List of (url_suffix, target_filename) tuples
-            base_url (str): Base URL for downloads (used as fallback)
-            destination_dir (str): Directory to save files
-            desc_prefix (str): Prefix for progress bar descriptions
-            chunk_size (int): Chunk size for downloads
-            max_workers (int, optional): Maximum number of parallel workers. Defaults to min(32, num_files)
-            
-        Returns:
-            List[pathlib.Path]: List of downloaded file paths
-        """
-        os.makedirs(destination_dir, exist_ok=True)
-        
-        if max_workers is None:
-            max_workers = min(32, len(urls_and_targets))
-        
-        downloaded_files = []
-        errors = []
-        
-        def download_one(url_suffix: str, target: str) -> Tuple[Optional[pathlib.Path], Optional[str]]:
-            dest_path = os.path.join(destination_dir, target)
-            desc = f"{desc_prefix} {target}"
-
-            try:
-                full_url = base_url.rstrip('/') + '/' + url_suffix.lstrip('/') + target
-                req = Request(full_url)
-                with urlopen(req) as response:
-                    total_size = int(response.headers.get('Content-Length', 0))
-                
-                FileDataset._download_sequential(full_url, dest_path, total_size, desc, chunk_size)
-                return pathlib.Path(dest_path), None
-            except Exception as e:
-                return None, str(e)
-        
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(download_one, url_suffix, target): (url_suffix, target)
-                for url_suffix, target in urls_and_targets
-            }
-            
-            for future in as_completed(futures):
-                url_suffix, target = futures[future]
-                result, error = future.result()
-                if result is not None:
-                    downloaded_files.append(result)
-                else:
-                    errors.append((target, error))
-        
-        if errors:
-            error_msg = f"Failed to download {len(errors)}/{len(urls_and_targets)} files. "
-            error_msg += f"First error: {errors[0][0]} - {errors[0][1]}"
-            warnings.warn(error_msg)
-        
-        return downloaded_files
 
 def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset:
     """
     Create a FileDataset from a list of files.
+
+    Example:
+
+    .. code-block:: python
+
+        dataset = from_files("path/to/dataset_files", extension=".txt")
+        for x, y in dataset:
+            print(x, y)
     """
     class FromFilesDataset(FileDataset):
         def __init__(self, dataset_dir: os.PathLike, extension: str = ".txt"):
@@ -1227,7 +818,7 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
         def citation(self) -> List[str]:
             raise NotImplementedError("Arbitrary file dataset does not support a citation. Please implement this method in a subclass, or use a more specific dataset class.")
 
-        def category(self) -> dict:
+        def categories(self) -> dict:
             raise NotImplementedError("Arbitrary file dataset does not support categories. Please implement this method in a subclass, or use a more specific dataset class.")
 
         def download(self) -> None:
@@ -1243,26 +834,3 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
             return metadata
 
     return FromFilesDataset(dataset_dir, extension)
-
-# Not implemented yet
-class URLDataset(IndexedDataset):
-    """
-    Abstract base class for URL-backed datasets.
-
-    Each instance reference is a URL.
-    """
-    pass
-
-# Not implemented yet
-class StreamingDataset(IterableDataset):
-    """
-    Abstract base class for streaming datasets.
-    """
-    pass
-
-# Not implemented yet
-class GeneratedDataset(IterableDataset):
-    """
-    Abstract base class for generated datasets.
-    """
-    pass

@@ -2,17 +2,7 @@ import warnings
 
 
 # mapping file extensions to appropriate format names
-_format_map = {
-    "mps"   : "mps",
-    "lp"    : "lp",
-    "cip"   : "cip",
-    "fzn"   : "fzn",
-    "gms"   : "gms",
-    "pip"   : "pip",
-    "wcnf"  : "wcnf",
-    "cnf"   : "dimacs",
-    "opb"   : "opb",
-}
+_format_map = {} # To be added to in the future, e.g. "cnf" -> "dimacs"
 
 _extension_map = {}
 for extension, format in _format_map.items():

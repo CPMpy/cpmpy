@@ -11,7 +11,6 @@ import pathlib
 import io
 
 from cpmpy.tools.datasets.core import FileDataset
-from cpmpy.tools.datasets.metadata import FeaturesInfo
 
 
 class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
@@ -34,11 +33,6 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
     citation = [
         "Audemard, G., Boussemart, F., Lecoutre, C., Piette, C., Tabary, S. XCSP3: An Integrated Format for Benchmarking Combinatorial Constrained Problems. arXiv:2009.00514, 2020.",
     ]
-
-    features = FeaturesInfo({
-        "instance_type": ("str", "Problem type declared in the XML root element (CSP, COP, WCSP, …)"),
-        "xcsp_format":   ("str", "XCSP format version string from the XML header"),
-    })
     
 
     def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False, **kwargs):
@@ -64,15 +58,11 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-
-    def category(self) -> dict:
+    def categories(self) -> dict:
         return {
             "year": self.year,
             "track": self.track
         }
-
-    def categories(self) -> dict:
-        return self.category()
 
     def collect_instance_metadata(self, file) -> dict:
         """Extract instance type (CSP/COP) from XCSP3 XML root element."""

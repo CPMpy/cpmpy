@@ -21,66 +21,10 @@ from typing import Callable, Optional, List
 from functools import partial
 
 import cpmpy as cp
-from .dimacs import write_dimacs
-from cpmpy.tools.io.scip import write_scip
-from cpmpy.tools.io.opb import write_opb
 from cpmpy.tools.io.utils import get_format
 
 # mapping format names to appropriate writer functions
-_writer_map = {
-    "mps": partial(write_scip, format="mps"),
-    "lp": partial(write_scip, format="lp"),
-    "cip": partial(write_scip, format="cip"),
-    # "cnf": partial(write_scip, format="cnf"),      # requires SIMPL, not included in pip package
-    # "diff": partial(write_scip, format="diff"),    # requires SIMPL, not included in pip package
-    "fzn": partial(write_scip, format="fzn"),
-    "gms": partial(write_scip, format="gms"),
-    # "opb": partial(write_scip, format="opb"),      # requires SIMPL, not included in pip package
-    # "osil": partial(write_scip, format="osil"),
-    "pip": partial(write_scip, format="pip"),
-    # "sol": partial(write_scip, format="sol"),      # requires SIMPL, not included in pip package
-    # "wbo": partial(write_scip, format="wbo"),      # requires SIMPL, not included in pip package   
-    # "zpl": partial(write_scip, format="zpl"),      # requires SIMPL, not included in pip package
-    "dimacs": write_dimacs,
-    "opb": write_opb,
-    "wcnf": write_dimacs,
-}
-
-# Maps each format to the external packages its writer depends on.
-# Used by writer_dependencies() to record provenance in sidecar metadata.
-_writer_deps = {
-    "mps": ["pyscipopt"],
-    "lp": ["pyscipopt"],
-    "cip": ["pyscipopt"],
-    "fzn": ["pyscipopt"],
-    "gms": ["pyscipopt"],
-    "pip": ["pyscipopt"],
-    "dimacs": ["pindakaas"],
-    "wcnf": ["pindakaas"],
-    "opb": [],
-}
-
-
-def writer_dependencies(format: str) -> dict:
-    """Return a dict of ``{package_name: version}`` for the writer's external deps.
-
-    Arguments:
-        format: target format name (e.g., ``"mps"``, ``"dimacs"``, ``"opb"``).
-
-    Returns:
-        dict mapping package names to installed version strings.
-        Packages that are not installed are omitted.
-    """
-    from importlib.metadata import version, PackageNotFoundError
-
-    deps = _writer_deps.get(format, [])
-    result = {}
-    for pkg in deps:
-        try:
-            result[pkg] = version(pkg)
-        except PackageNotFoundError:
-            pass
-    return result
+_writer_map = {} # To be added to in the future, e.g. "pb" -> write_pb
 
 
 def _get_writer(format: str) -> Callable:
