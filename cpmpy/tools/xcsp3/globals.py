@@ -512,7 +512,7 @@ class NegativeShortTable(GlobalConstraint):
 
     def decompose(self):
         arr, tab = self._args
-        return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row) if ri != "*") for row in tab)], []
+        return [cpm_all(cpm_any([ai != ri for ai, ri in zip(arr, row) if ri != "*"]) for row in tab)], []
 
     def value(self):
         arr, tab = self._args

@@ -288,7 +288,7 @@ class AllDifferentExceptN(GlobalConstraint):
             cond = (x == y)
             if is_bool(cond):
                 cond = cp.BoolVal(cond)
-            cons.append(cond.implies(cp.any(x == a for a in n))) # equivalent to (x in n) | (y in n) | (x != y)
+            cons.append(cond.implies(cp.any([x == a for a in n]))) # equivalent to (x in n) | (y in n) | (x != y)
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -570,7 +570,7 @@ class Table(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self._args
-        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
+        return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
         """
@@ -628,7 +628,7 @@ class ShortTable(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self._args
-        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
+        return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
         """
@@ -688,7 +688,7 @@ class NegativeTable(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self._args
-        return [cp.all(cp.any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
+        return [cp.all([cp.any([ai != ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
         """
@@ -1552,7 +1552,7 @@ class Precedence(GlobalConstraint):
                 lhs = args[j] == t
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
-                constraints += [lhs.implies(cp.any(args[:j] == s))]
+                constraints += [lhs.implies(cp.any([args[:j] == s]))]
         return constraints, []
 
     def value(self) -> Optional[bool]:
