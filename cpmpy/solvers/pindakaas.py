@@ -157,7 +157,11 @@ class CPM_pindakaas(SolverInterface):
         time_limit_delta: Optional[timedelta] = None
         if time_limit is not None:
             time_limit_delta = timedelta(seconds=time_limit)
-        solver_assumptions: Optional[List[Any]] = None if assumptions is None else self.solver_vars(list(assumptions))
+        if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
+            solver_assumptions = self.solver_vars(assumptions)
+        else:
+            solver_assumptions = None
 
         t = time.time()
         with self.pdk_solver.solve(time_limit=time_limit_delta, assumptions=solver_assumptions) as result:
