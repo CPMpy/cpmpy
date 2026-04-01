@@ -45,7 +45,7 @@
     Module details
     ==============
 """
-from typing import Optional, List, Iterable
+from typing import Optional, Iterable
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -148,7 +148,7 @@ class CPM_z3(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):       maximum solve time in seconds
-                assumptions:                        list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                assumptions:                        iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                                     For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                                     get_core() returns a small subset of assumption variables that are unsat together.
                 **kwargs:                           any keyword argument, sets parameters of solver object
