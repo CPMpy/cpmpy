@@ -65,7 +65,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval, is_num
+from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num
 from ..exceptions import NotSupportedError
 
 import numpy as np

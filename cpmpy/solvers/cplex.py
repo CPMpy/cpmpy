@@ -55,7 +55,7 @@ from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_bool, is_num
+from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
