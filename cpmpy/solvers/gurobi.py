@@ -364,31 +364,37 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
-        # cpm_cons = decompose_in_tree(cpm_cons,
-        #                             supported=self.supported_global_constraints,
-        #                             supported_reified=self.supported_reified_global_constraints,
-        #                             csemap=self._csemap)
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset(["mod", "div", "element"]))  # linearize and decompose expect safe exprs
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
                                     csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap, supported={"mul", "pow", "-", "sum"})  # flat normal form
-        # cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
-        # cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap, supported=frozenset(["mul", "pow", "-", "sum"]))  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
 
         # cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(
             cpm_cons,
             csemap=self._csemap,
-            is_supported=lambda cpm_expr: cpm_expr.name == "==" and (isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name in {"or", "and"})
+            is_supported=lambda cpm_expr:
+                (
+                    cpm_expr.name == "==" and
+                    (
+                        (isinstance(cpm_expr.args[1], Operator) and cpm_expr.args[1].name in {"or", "and"}) or
+                        isinstance(cpm_expr.args[1], _BoolVarImpl)
+                    )
+                ) or (
+                    cpm_expr.name == "->" and isinstance(cpm_expr.args[1], Comparison)
+                )
         )  # anything that can create full reif should go above...
 
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"-","sum", "wsum","->","sub","min","max","mul","abs","pow", "or", "and"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"-","sum", "wsum","->","sub","min","max","mul","abs","pow","and","or"}), csemap=self._csemap)  # the core of the MIP-linearization
 
-        # cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
+        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
+        # TODO don't rewrite ~p -> LinCons
         return cpm_cons
 
     def add(self, cpm_expr_orig):

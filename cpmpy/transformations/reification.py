@@ -175,10 +175,16 @@ def reify_rewrite(constraints, supported=frozenset(), csemap=None):
         else:  # reification, check for rewrite
             boolexpr = cpm_expr.args[boolexpr_index]
             if isinstance(boolexpr, Operator):
-                # Case 1, BE is Operator (and, or, ->)
-                #   assume supported, return as is
-                newcons.append(cpm_expr)
-                #   could actually rewrite into list of clauses like to_cnf() does... not for here
+                if boolexpr.name in supported or cpm_expr.name == "==":
+                    # Case 1, BE is Operator (and, or, ->)
+                    newcons.append(cpm_expr)
+                    #   could actually rewrite into list of clauses like to_cnf() does... not for here
+                elif cpm_expr.name == "->":
+                    (auxvar, cons) = get_or_make_var(boolexpr, csemap=csemap)
+                    newcons += cons
+                    reifexpr = copy.copy(cpm_expr)
+                    reifexpr.args[boolexpr_index] = auxvar
+                    newcons.append(reifexpr)
             elif isinstance(boolexpr, GlobalConstraint):
                 # Case 2, BE is a GlobalConstraint
                 # replace BE by its decomposition, then flatten

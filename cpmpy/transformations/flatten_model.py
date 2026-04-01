@@ -263,10 +263,12 @@ def flatten_constraint(expr, csemap=None, supported={}):
             if exprname == '==' and lexpr.is_bool():
                 if rvar.is_bool():
                     # this is a reification
-                    (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap)
+                    (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap, supported=supported)
                 else:
                     # integer comparison
-                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
+                    (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap, supported=supported)
+            elif expr.name == "!=":  # TODO ; this risks making a reified LinCons with a QuadExpr
+                (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap)
             else:
                 (lhs, lcons) = normalized_numexpr(lexpr, csemap=csemap, supported=supported)
 
@@ -503,7 +505,6 @@ def normalized_numexpr(expr, csemap=None, supported={}):
             - base_expr: same as 'expr', but all arguments are variables
             - base_cons: list of flat normal constraints
     """
-    print("normalized_numexpr", expr.name, expr)
     # XXX a boolexpr is also a valid numexpr... e.g. 30*(iv > 5) + ... see mario obj.
     if __is_flat_var(expr):
         return (expr, [])
@@ -560,7 +561,8 @@ def normalized_numexpr(expr, csemap=None, supported={}):
 
         else: # generic operator
             # recursively flatten all children
-            flatvars, flatcons = zip(*(normalized_numexpr(arg, csemap=csemap, supported=supported) if arg.name in supported else get_or_make_var(arg, csemap=csemap) for arg in expr.args))
+            # TODO should be some isinstance _IntVarImpl?
+            flatvars, flatcons = zip(*(normalized_numexpr(arg, csemap=csemap, supported=supported) if hasattr(arg, "name") and arg.name in supported else get_or_make_var(arg, csemap=csemap) for arg in expr.args))
 
             newexpr = Operator(expr.name, flatvars)
             return (newexpr, [c for con in flatcons for c in con])
@@ -573,7 +575,9 @@ def normalized_numexpr(expr, csemap=None, supported={}):
         else:
             # recursively flatten all children
             flatvars, flatcons = zip(*[
-                normalized_numexpr(arg, supported=supported) if arg.name in supported else get_or_make_var_or_list(arg, csemap=csemap, supported=supported)
+                normalized_numexpr(arg, supported=supported)
+                if arg.name in supported and expr.name
+                else get_or_make_var_or_list(arg, csemap=csemap, supported=supported)
                 for arg in expr.args])
 
             # take copy, replace args
