@@ -39,8 +39,6 @@ SAT_SOLVERS = {"pysdd"}
 EXCLUDE_GLOBAL = {
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
-                  "gurobi": {"Circuit", "CumulativeOptional"}
-                  
                   }
 
 # Exclude certain operators for solvers.

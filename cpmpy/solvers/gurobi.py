@@ -418,137 +418,93 @@ class CPM_gurobi(SolverInterface):
       from gurobipy import GRB, nlfunc
       import gurobipy as gp
 
-      def add(cpm_expr, depth):
-          """Recursively create a Gurobi expression tree from a CPMpy expression."""
-          indent = "  " * depth
-          depth+=1
-          self.grb_model.update()
-          print(f"{indent}Con:", cpm_expr, type(cpm_expr))
+      def add(cpm_expr):
+          """Recursively create a Gurobi constraint from a CPMpy expression."""
 
-          if is_num(cpm_expr):
-              return int(cpm_expr)
-
-          def reify(grb_expr):
-              """Create a binary variable representing the truth value of the gurobi logical constraint (OR/AND)"""
-
+          def add_(cpm_expr, depth):
+              indent = "  " * depth
+              depth+=1
               self.grb_model.update()
-              print(f"{indent}Reif", grb_expr)
+              print(f"{indent}Con:", cpm_expr, type(cpm_expr))
 
-              # Base case: already a variable
-              if isinstance(grb_expr, gp.Var):
-                  return grb_expr
+              if is_num(cpm_expr):
+                  return int(cpm_expr)
+              elif isinstance(cpm_expr, NegBoolView):
+                  return 1 - self.solver_var(cpm_expr._bv)
+              elif isinstance(cpm_expr, _NumVarImpl):
+                  return self.solver_var(cpm_expr)
+              elif isinstance(cpm_expr, Operator):
+                  match cpm_expr.name:
+                      case "or": # TODO only usefull if we can represent an or as a sum of binary vars, which is not generally correct
+                          return gp.or_(add_(arg, depth) for arg in cpm_expr.args)
+                      case "and":
+                          return gp.and_(add_(arg, depth) for arg in cpm_expr.args)
+                      case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
+                          a, b = cpm_expr.args
+                          assert isinstance(a, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs, but had {a}"
+                          assert isinstance(b, Comparison),  f"Implication constraint {cpm_expr} must have Comparison as rhs, but had {b}"
+                          is_pos = not isinstance(a, NegBoolView)
+                          return (add_(a if is_pos else a._bv, depth) == int(is_pos)) >> add_(b, depth)
+                      case "not":
+                          return 1 - add_(cpm_expr.args[0], depth)
+                      case "-":
+                          return -add_(cpm_expr.args[0], depth=depth)
+                      case "sum":
+                          return sum(add_(arg, depth) for arg in cpm_expr.args)
+                      case "wsum":
+                          return sum(weight * add_(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
+                      case "sub":
+                          return add_(cpm_expr.args[0], depth) - add_(cpm_expr.args[1], depth)
+              elif isinstance(cpm_expr, Comparison):
+                  a, b = add_(cpm_expr.args[0], depth), add_(cpm_expr.args[1], depth)
+                  match cpm_expr.name:
+                      case "==":
+                          # Note: Gurobi functions are called by `y == f(x)`, like normalized CPMpy boolexprs, but CPMpy numexprs are normalized to `f(x) == y` (e.g. `abs(x) == IV0`), so they need to be flipped
+                          return a == b if cpm_expr.args[0].is_bool() else b == a
+                      case "<=":
+                          return a <= b
+                      case ">=":
+                          return a >= b
+                      case _:
+                          raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
+              elif isinstance(cpm_expr, cp.expressions.globalfunctions.GlobalFunction):
+                  match cpm_expr.name:
+                      case "mul":
+                          return add_(cpm_expr.args[0], depth) * add_(cpm_expr.args[1], depth)
+                      case "pow":
+                          return add_(cpm_expr.args[0], depth) ** add_(cpm_expr.args[1], depth)
+                      case _:  # other global functions cannot be 
+                          match cpm_expr.name:
+                              case "abs":  # y = abs(x)
+                                  # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
+                                  return gp.abs_(add_(cpm_expr.args[0], depth))
+                              case "min" | "max":
+                                  y = add_(cp.intvar(lb=min(x.lb for x in cpm_expr.args), ub=max(x.ub for x in cpm_expr.args)), depth)
+                                  flatargs = [add_(arg, depth) for arg in cpm_expr.args]
+                                  self.native_model.addConstr(y == (gp.min_(flatargs) if cpm_expr.name == "min" else gp.max_(flatargs)))
+                                  return y
+              else:
+                  raise NotImplementedError(f"add_() not implemented for {cpm_expr}, {type(cpm_expr)}, {getattr(cpm_expr, 'name', None)}")
 
-              r = self.solver_var(cp.boolvar())
-              self.grb_model.addConstr(r == grb_expr)
-
-              return r
-
-          # Base case: variables
-          if isinstance(cpm_expr, NegBoolView):
-              return 1 - self.solver_var(cpm_expr._bv)
-          if isinstance(cpm_expr, _NumVarImpl):
-              return self.solver_var(cpm_expr)
-
-          if isinstance(cpm_expr, Operator):
-              match cpm_expr.name:
-                  case "or": # TODO only usefull if we can represent an or as a sum of binary vars, which is not generally correct
-                      return gp.or_(add(arg, depth) for arg in cpm_expr.args)
-                  case "and":
-                      # self.grb_model.update()
-                      # return math.prod(add(arg, depth=depth) for arg in cpm_expr.args)
-
-                      return gp.and_(add(arg, depth) for arg in cpm_expr.args)
-                      args = [add(arg, depth=depth) for arg in cpm_expr.args if not is_num(arg) or arg != 1]
-                      assert len(args)
-                      if not args:
-                          return 1
-                      elif any(a == 0 for a in args if is_num(a)):
-                          return 0
-                      else:
-                          return gp.and_(add(arg) for arg in args)
-                          # return math.prod(add(arg, depth=depth) for arg in cpm_expr.args)
-                  case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
-                      a, b = cpm_expr.args
-                      assert isinstance(a, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs, but had {a}"
-                      assert isinstance(b, Comparison),  f"Implication constraint {cpm_expr} must have Comparison as rhs, but had {b}"
-                      is_pos = not isinstance(a, NegBoolView)
-                      return (add(a if is_pos else a._bv, depth) == int(is_pos)) >> add(b, depth)
-                  case "not":
-                      # Negation: not(a) is 1 - a
-                      return 1 - add(cpm_expr.args[0], depth)
-                  case "-":
-                      return -add(cpm_expr.args[0], depth=depth)
-                  case "sum":
-                      return sum(add(arg, depth) for arg in cpm_expr.args)
-                  case "wsum":
-                      return sum(weight * add(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
-                  case "sub":
-                      a, b = cpm_expr.args
-                      return add(a, depth) - add(b, depth)
-          elif isinstance(cpm_expr, Comparison):
-              a, b = add(cpm_expr.args[0], depth), add(cpm_expr.args[1], depth)
-
-              match cpm_expr.name:
-                  case "==":
-                      # Note: Gurobi functions are called by `y == f(x)`, like CPMpy boolexprs, but numexprs are transformed to `f(x) == y` (e.g. `abs(x) == IV0`), so need to be flipped
-                      return a == b if cpm_expr.args[0].is_bool() else b == a
-                  case "<=":
-                      return a <= b
-                  case ">=":
-                      return a >= b
-                  case _:
-                      raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
-          elif isinstance(cpm_expr, cp.expressions.globalfunctions.GlobalFunction):
-              match cpm_expr.name:
-                  case "mul":
-                      return add(cpm_expr.args[0], depth) * add(cpm_expr.args[1], depth)
-                  case "pow":
-                      return add(cpm_expr.args[0], depth) ** add(cpm_expr.args[1], depth)
-                  case _:  # other global functions cannot be 
-                      # assert isinstance(cpm_expr, Comparison) and cpm_expr.name == "==", f"Expected global function to be transformed to f(x) == y, but was {cpm_expr}"
-                      flatargs = [add(arg, depth) for arg in cpm_expr.args]
-                      match cpm_expr.name:
-                          case "abs":  # y = abs(x)
-                              return gp.abs_(add(cpm_expr.args[0], depth))
-                          case "min" | "max":
-                              y = add(cp.intvar(lb=min(x.lb for x in cpm_expr.args), ub=max(x.ub for x in cpm_expr.args)), depth)
-                              self.native_model.addConstr(y == (gp.min_(flatargs) if cpm_expr.name == "min" else gp.max_(flatargs)))
-                              return y
+          grb_expr = add_(cpm_expr, 0)
+          if isinstance(grb_expr, (gp.Var, gp.LinExpr)):
+              # If add() returned a Gurobi Var (not a constraint), wrap it as >= 1
+              return grb_expr >= 1
+          elif isinstance(grb_expr, gp.TempConstr):
+              return grb_expr
           else:
-              raise NotImplementedError(f"add() not implemented for {cpm_expr}, {type(cpm_expr)}, {getattr(cpm_expr, 'name', None)}")
+              r = self.grb_model.addVar(lb=1, ub=GRB.INFINITY)
+              return r == grb_expr
 
       # add new user vars to the set
       get_variables(cpm_expr_orig, collect=self.user_vars)
 
       # transform and post the constraints
       for cpm_expr in self.transform(cpm_expr_orig):
-        grb_expr = add(cpm_expr, 0)
-        print("out", grb_expr)
+        con = add(cpm_expr)
         self.grb_model.update()
-        # If add() returned a Gurobi Var (not a constraint), wrap it as >= 1
-        if isinstance(grb_expr, (gp.Var, gp.LinExpr)):
-            self.grb_model.addConstr(grb_expr >= 1)
-        elif isinstance(grb_expr, gp.TempConstr):
-            self.grb_model.addConstr(grb_expr)
-        # elif type(grb_expr).__name__ == 'GenExprAnd':
-        #     # GenExprAnd needs addGenConstrAnd: r = AND(args) then r >= 1
-        #     r = self.solver_var(cp.boolvar())
-        #     self.grb_model.addGenConstrAnd(r, list(grb_expr))
-        #     self.grb_model.addConstr(r >= 1)
-        # elif type(grb_expr).__name__ == 'GenExprOr':
-        #     # GenExprOr needs addGenConstrOr: r = OR(args) then r >= 1
-        #     r = self.solver_var(cp.boolvar())
-        #     self.grb_model.addGenConstrOr(r, list(grb_expr))
-        #     self.grb_model.addConstr(r >= 1)
-        else:
-            # r = self.solver_var(cp.boolvar())
-            # self.grb_model.addConstr(r == grb_expr)
-            # self.grb_model.addConstr(r >= 1)
-
-            r = self.grb_model.addVar(lb=1, ub=GRB.INFINITY)
-            self.grb_model.addConstr(r == grb_expr)
-            # self.grb_model.addGenConstrNL(r, grb_expr)
-            # self.grb_model.addConstr(1 == grb_expr)
+        print("out", con)
+        self.grb_model.addConstr(con)
         continue
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
