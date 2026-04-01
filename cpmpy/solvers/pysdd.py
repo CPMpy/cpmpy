@@ -44,7 +44,7 @@
     ==============
 """
 from functools import reduce
-from typing import Optional, List
+from typing import Iterable, Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
@@ -135,7 +135,7 @@ class CPM_pysdd(SolverInterface):
         """
         return self.pysdd_root
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None):
         """
             See if an arbitrary model exists
 

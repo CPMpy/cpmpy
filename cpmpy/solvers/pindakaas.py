@@ -39,7 +39,7 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Optional, List, Any
+from typing import Iterable, Optional, List, Any
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
@@ -138,12 +138,12 @@ class CPM_pindakaas(SolverInterface):
                 user_vars.update(self.ivarmap[x.name].vars())
         return user_vars
 
-    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[List[_BoolVarImpl]] = None):
+    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[Iterable[_BoolVarImpl]] = None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
 
         :param time_limit: optional, time limit in seconds
-        :param assumptions: optional, a list of assumptions (Boolean variables which should hold for this solve call)
+        :param assumptions: optional, an iterable (e.g. list, set, tuple) of assumptions (Boolean variables which should hold for this solve call)
         """
         if self.unsatisfiable:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -157,7 +157,7 @@ class CPM_pindakaas(SolverInterface):
         time_limit_delta: Optional[timedelta] = None
         if time_limit is not None:
             time_limit_delta = timedelta(seconds=time_limit)
-        solver_assumptions: Optional[List[Any]] = None if assumptions is None else self.solver_vars(assumptions)
+        solver_assumptions: Optional[List[Any]] = None if assumptions is None else self.solver_vars(list(assumptions))
 
         t = time.time()
         with self.pdk_solver.solve(time_limit=time_limit_delta, assumptions=solver_assumptions) as result:
