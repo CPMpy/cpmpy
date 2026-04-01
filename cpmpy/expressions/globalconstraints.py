@@ -575,25 +575,30 @@ class Table(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the array of variables
             table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
-        has_subexpr = None
-
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
 
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array with integers
             table = np.array(table, dtype=int)
+        elif table.dtype.kind != 'i':  # dtype int
+            table = table.astype(int, copy=False)
         assert table.ndim == 2, "Table's table must be a 2D array"
-            
-        if has_subexpr is None:
-            has_subexpr = any(x.has_subexpr() for x in array)
+        assert table.shape[1] == len(array), f"Table width {table.shape[1]} != array length {len(array)}"
+
         super().__init__("table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Table global constraint. Enforces at least one row of the table is assigned to the array.
-        "
+
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
@@ -630,28 +635,28 @@ class ShortTable(GlobalConstraint):
             table (ListLike[ListLike[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
                 STAR represents a wildcard (corresponding variable can take any value).
         """
-        has_subexpr: Optional[bool] = None
-
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
 
         if not isinstance(table, np.ndarray):
             table = np.array(table, dtype=object)  # object, otherwise np makes it all string
         assert table.ndim == 2, "ShortTable's table must be a 2D array"
-        # strict check, induced by typing...
-        #if not all(x == STAR or isinstance(x, int) for x in table.flat):
-        #    raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        assert table.shape[1] == len(array), f"ShortTable width {table.shape[1]} != array length {len(array)}"
             
-        if has_subexpr is None:
-            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the ShortTable global constraint. Enforces at least one row of the table is assigned to the array.
-        "
+
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
@@ -669,9 +674,9 @@ class ShortTable(GlobalConstraint):
             return None
         arrval = arrval.astype(int, copy=False)
 
-        for row in tab:
-            mask = (row != STAR)
-            if (row[mask].astype(int) == arrval[mask]).all():
+        non_star = (tab != STAR)
+        for row, mask in zip(tab, non_star):
+            if (row[mask].astype(int, copy=False) == arrval[mask]).all():
                 return True
         return False
 
@@ -687,19 +692,24 @@ class NegativeTable(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the array of variables
             table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
-        has_subexpr = None
-
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
 
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
             table = np.array(table, dtype=int)
+        elif table.dtype.kind != 'i':  # dtype int
+            table = table.astype(int, copy=False)
         assert table.ndim == 2, "NegativeTable's table must be a 2D array"
-            
-        if has_subexpr is None:
-            has_subexpr = any(x.has_subexpr() for x in array)
+        assert table.shape[1] == len(array), f"NegativeTable width {table.shape[1]} != array length {len(array)}"
+
         super().__init__("negative_table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:

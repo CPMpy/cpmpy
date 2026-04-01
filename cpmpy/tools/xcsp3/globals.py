@@ -395,19 +395,21 @@ class NonReifiedTable(GlobalConstraint):
     _args: tuple[ListLike[Expression], np.ndarray]
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
-        has_subexpr = None
-
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
 
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
             table = np.array(table, dtype=int)
         assert table.ndim == 2, "NonReifiedTable's table must be a 2D array"
             
-        if has_subexpr is None:
-            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self):
@@ -442,19 +444,21 @@ class RowSelectingShortTable(GlobalConstraint):
     _args: tuple[ListLike[Expression], np.ndarray]
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
-        has_subexpr = None
-
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
 
         if not isinstance(table, np.ndarray):
             table = np.array(table, dtype=object)  # object, otherwise np makes it all string
         assert table.ndim == 2, "ShortTable's table must be a 2D array"
             
-        if has_subexpr is None:
-            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self):
@@ -489,19 +493,21 @@ class NegativeShortTable(GlobalConstraint):
     _args: tuple[ListLike[Expression], np.ndarray]
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
-        has_subexpr = None
-
         if isinstance(array, NDVarArray):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
 
         if not isinstance(table, np.ndarray):
             table = np.array(table, dtype=object)  # object, otherwise np makes it all string
         assert table.ndim == 2, "NegativeShortTable's table must be a 2D array"
             
-        if has_subexpr is None:
-            has_subexpr = any(x.has_subexpr() for x in array)
         super().__init__("negative_shorttable", (array, table), has_subexpr=has_subexpr)
 
     def decompose(self):
