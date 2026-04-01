@@ -585,10 +585,9 @@ class Table(GlobalConstraint):
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError(f"The first argument of a Table constraint should only contain variables/expressions: {array}")
 
-        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
-            table = np.array(table)
+        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array with integers
+            table = np.array(table, dtype=int)
         assert table.ndim == 2, "Table's table must be a 2D array"
-        assert table.dtype.kind in ('i', 'u', 'b'), "Table's table must contain integers"  # signed/unsigned/boolean
             
         if has_subexpr is None:
             has_subexpr = any(x.has_subexpr() for x in array)
@@ -699,9 +698,8 @@ class NegativeTable(GlobalConstraint):
             raise TypeError(f"The first argument of a NegativeTable constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
-            table = np.array(table)
+            table = np.array(table, dtype=int)
         assert table.ndim == 2, "NegativeTable's table must be a 2D array"
-        assert table.dtype.kind in ('i', 'u', 'b'), "NegativeTable's table must contain integers"  # signed/unsigned/boolean
             
         if has_subexpr is None:
             has_subexpr = any(x.has_subexpr() for x in array)
