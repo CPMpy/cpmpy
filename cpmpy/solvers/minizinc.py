@@ -480,10 +480,11 @@ class CPM_minizinc(SolverInterface):
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
+                    print(display.value())
+                elif is_any_list(display):
                     print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
 
             # count and stop

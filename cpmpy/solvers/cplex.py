@@ -619,10 +619,11 @@ class CPM_cplex(SolverInterface):
 
                 if display is not None:
                     if isinstance(display, Expression):
-                        print(argval(display))
-                    elif isinstance(display, list):
+                        print(display.value())
+                    elif is_any_list(display):
                         print(argvals(display))
                     else:
+                        assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                         display()  # callback
 
         # Reset pool search mode to default

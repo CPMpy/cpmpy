@@ -217,12 +217,12 @@ class AllDifferent(GlobalConstraint):
     Enforces that all arguments have a different (distinct) value
     """
 
-    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
+    def __init__(self, *args: ExprLike|ListLike[ExprLike]):
         """
         Arguments:
-            args (ListLike[ExprLike]): List of expressions or constants to be different from each other
+            args (ExprLike|ListLike[ExprLike]): List of expressions or constants to be different from each other
         """
-        super().__init__("alldifferent", flatlist(args))
+        super().__init__("alldifferent", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -274,7 +274,7 @@ class AllDifferentExceptN(GlobalConstraint):
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
-        super().__init__("alldifferent_except_n", [flatarr, n])
+        super().__init__("alldifferent_except_n", (flatarr, n))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -336,7 +336,7 @@ class AllEqual(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to have the same value
         """
-        super().__init__("allequal", flatlist(args))
+        super().__init__("allequal", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -374,7 +374,7 @@ class AllEqualExceptN(GlobalConstraint):
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
-        super().__init__("allequal_except_n", [flatarr, n])
+        super().__init__("allequal_except_n", (flatarr, n))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -425,7 +425,7 @@ class Circuit(GlobalConstraint):
         flatargs = flatlist(args)
         if len(flatargs) < 2:
             raise ValueError('Circuit constraint must be given a minimum of 2 variables')
-        super().__init__("circuit", flatargs)
+        super().__init__("circuit", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -516,7 +516,7 @@ class Inverse(GlobalConstraint):
         """
         if len(fwd) != len(rev):
             raise ValueError("Length of fwd and rev must be equal for Inverse constraint")
-        super().__init__("inverse", [fwd, rev])
+        super().__init__("inverse", (fwd, rev))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -586,7 +586,7 @@ class Table(GlobalConstraint):
             assert tmp.ndim == 2, "Table's table must be a 2D array"
             assert tmp.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
             
-        super().__init__("table", [array, table])
+        super().__init__("table", (array, table))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -640,7 +640,7 @@ class ShortTable(GlobalConstraint):
             table = table.tolist()
         if not all(is_int(x) or x == STAR for row in table for x in row):
             raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-        super().__init__("short_table", [array, table])
+        super().__init__("short_table", (array, table))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -698,7 +698,7 @@ class NegativeTable(GlobalConstraint):
             assert tmp.ndim == 2, "NegativeTable's table must be a 2D array"
             assert tmp.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
             
-        super().__init__("negative_table", [array, table])
+        super().__init__("negative_table", (array, table))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -773,7 +773,7 @@ class Regular(GlobalConstraint):
             raise TypeError("The third argument of a regular constraint should be a node id")
         if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
             raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
-        super().__init__("regular", [list(array), list(transitions), start, list(accepting)])
+        super().__init__("regular", (list(array), list(transitions), start, list(accepting)))
 
         node_set = set()
         self.trans_dict = {}
@@ -852,7 +852,7 @@ class IfThenElse(GlobalConstraint):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
                             f"{condition, if_true, if_false}")
-        super().__init__("ite", [condition, if_true, if_false])
+        super().__init__("ite", (condition, if_true, if_false))
 
     def value(self) -> Optional[bool]:
         """
@@ -902,7 +902,7 @@ class InDomain(GlobalConstraint):
         """
         if not all(is_int(x) for x in arr):
             raise TypeError("The second argument of an InDomain constraint should be a list of integer constants")
-        super().__init__("InDomain", [expr, arr])
+        super().__init__("InDomain", (expr, arr))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -963,7 +963,7 @@ class Xor(GlobalConstraint):
         arg_list = list(arg_list)
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        super().__init__("xor", list(arg_list))
+        super().__init__("xor", tuple(arg_list))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -976,7 +976,7 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
         decomp = [sum(self.args[:2]) == 1]
         if len(self.args) > 2:
-            decomp = Xor(decomp + self.args[2:]).decompose()[0]
+            decomp = Xor(decomp + list(self.args[2:])).decompose()[0]
         return decomp, []
 
     def value(self) -> Optional[bool]:
@@ -992,15 +992,16 @@ class Xor(GlobalConstraint):
 
     def negate(self) -> Expression:
         # negate one of the arguments, ideally a variable
-        new_args = None
+        new_args = list(self.args)  # takes shallow copy
+        changed = False
         for i, a in enumerate(self.args):
             if isinstance(a, _BoolVarImpl):
-                new_args = self.args[:i] + [~a] + self.args[i+1:]
+                new_args[i] = ~a
+                changed = True
                 break
 
-        if new_args is None:# did not find a Boolean variable to negate
+        if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            new_args = list(self.args)
             new_args[0] = cp.transformations.negation.recurse_negation(self.args[0])
 
         return Xor(new_args)
@@ -1052,7 +1053,7 @@ class Cumulative(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, demand_list, capacity])
+        super(Cumulative, self).__init__("cumulative", (list(start), list(duration), list(end) if end is not None else None, demand_list, capacity))
 
     
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
@@ -1246,8 +1247,8 @@ class CumulativeOptional(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super().__init__("cumulative_optional", [list(start), list(duration), list(end) if end is not None else None, 
-                                                 demand_list, capacity, list(is_present)])
+        super().__init__("cumulative_optional", (list(start), list(duration), list(end) if end is not None else None, 
+                                                 demand_list, capacity, list(is_present)))
 
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
         """
@@ -1407,7 +1408,7 @@ class NoOverlap(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap", [list(start), list(duration), list(end) if end is not None else None])
+        super().__init__("no_overlap", (list(start), list(duration), list(end) if end is not None else None))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1489,7 +1490,7 @@ class NoOverlapOptional(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap_optional", [start, duration, end, is_present])
+        super().__init__("no_overlap_optional", (start, duration, end, is_present))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1554,7 +1555,7 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of variables as first argument, but got", vars)
         if not is_any_list(precedence) or not all(is_num(p) for p in precedence):
             raise TypeError("Precedence expects a list of values as second argument, but got", precedence)
-        super().__init__("precedence", [list(vars), list(precedence)])
+        super().__init__("precedence", (list(vars), list(precedence)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1619,7 +1620,7 @@ class GlobalCardinalityCount(GlobalConstraint):
             raise TypeError("GlobalCardinalityCount expects a list of variables as occurrences, but got", occ)
         if len(vals) != len(occ):
             raise ValueError(f"Number of values and occurrences must be equal, but got {len(vals)} and {len(occ)}")
-        super().__init__("gcc", [list(vars), list(vals), list(occ)])
+        super().__init__("gcc", (list(vars), list(vals), list(occ)))
         self.closed = closed
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -1663,7 +1664,7 @@ class Increasing(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to increasing values
         """
-        super().__init__("increasing", flatlist(args))
+        super().__init__("increasing", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1696,7 +1697,7 @@ class Decreasing(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to decreasing values
         """
-        super().__init__("decreasing", flatlist(args))
+        super().__init__("decreasing", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1729,7 +1730,7 @@ class IncreasingStrict(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly increasing values
         """
-        super().__init__("strictly_increasing", flatlist(args))
+        super().__init__("strictly_increasing", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1763,7 +1764,7 @@ class DecreasingStrict(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly decreasing values
         """
-        super().__init__("strictly_decreasing", flatlist(args))
+        super().__init__("strictly_decreasing", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1799,7 +1800,7 @@ class LexLess(GlobalConstraint):
         """ 
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLess must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
-        super().__init__("lex_less", [list1, list2])
+        super().__init__("lex_less", (list1, list2))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1861,7 +1862,7 @@ class LexLessEq(GlobalConstraint):
         """
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLessEq must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
-        super().__init__("lex_lesseq", [list1, list2])
+        super().__init__("lex_lesseq", (list1, list2))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1919,7 +1920,7 @@ class LexChainLess(GlobalConstraint):
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
             raise ValueError(f"The matrix given in LexChainLess must be 2D, but got {Xarr.ndim} dimensions")
-        super().__init__("lex_chain_less", Xarr.tolist())
+        super().__init__("lex_chain_less", tuple(Xarr.tolist()))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1954,7 +1955,7 @@ class LexChainLessEq(GlobalConstraint):
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
             raise ValueError(f"The matrix given in LexChainLessEq must be 2D, but got {Xarr.ndim} dimensions")
-        super().__init__("lex_chain_lesseq", Xarr.tolist())
+        super().__init__("lex_chain_lesseq", tuple(Xarr.tolist()))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """ Decompose to a series of LexLessEq constraints between subsequent rows
@@ -2016,7 +2017,7 @@ class DirectConstraint(Expression):
         """
         # get the solver function, will raise an AttributeError if it does not exist
         solver_function = getattr(Native_solver, self.name)
-        solver_args = copy.copy(self.args)
+        solver_args = list(self.args)  # takes a copy
         for i in range(len(solver_args)):
             if self.novar is None or i not in self.novar:
                 # it may contain variables, replace

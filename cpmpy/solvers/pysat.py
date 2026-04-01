@@ -418,7 +418,7 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.add_clause(self.solver_vars(args))
             elif isinstance(a1, Operator) and a1.name == 'or':
                 # BoolVar() -> or(...)
-                args = [~a0]+a1.args
+                args = [~a0]+list(a1.args)
                 self.pysat_solver.add_clause(self.solver_vars(args))
             elif isinstance(a1, Comparison) and a1.args[0].name == "sum":  # implied sum comparison (a0->sum(bvs)<>val)
                 # implied sum comparison (a0->sum(bvs)<>val)

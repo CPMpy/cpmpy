@@ -240,7 +240,7 @@ class TestMul:
         prod = x * a
 
         assert isinstance(prod, NDVarArray)
-        for expr in prod.args:
+        for expr in prod:
             assert isinstance(expr, Expression) or expr == 0
 
 class TestArrayExpressions:

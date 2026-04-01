@@ -51,7 +51,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_bool, argval, argvals
+from ..expressions.utils import is_bool, argval, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -251,10 +251,11 @@ class CPM_pysdd(SolverInterface):
                     cpm_var._value = sol[i]
 
                 if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
+                    print(display.value())
+                elif is_any_list(display):
                     print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
         
         return len(projected_sols)

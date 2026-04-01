@@ -113,7 +113,7 @@ class TestFlattenExpr:
         assert  str(get_or_make_var( x.implies(y.implies(z)) )) == "(BV25, [((~BV0) or (BV24)) == (BV25), ((~BV1) or (BV2)) == (BV24)])"
 
         assert  str(get_or_make_var( (a > 10) )) == "(BV26, [(IV0 > 10) == (BV26)])"
-        assert  str(get_or_make_var( (a > 10)&x&y )) == "(BV28, [(and([BV27, BV0, BV1])) == (BV28), (IV0 > 10) == (BV27)])"
+        assert  str(get_or_make_var( (a > 10)&x&y )) == "(BV28, [(and(BV27, BV0, BV1)) == (BV28), (IV0 > 10) == (BV27)])"
 
         assert  str(get_or_make_var(Operator('not', [x]) == y)) == '(BV29, [((~BV0) == (BV1)) == (BV29)])'
 
@@ -121,7 +121,7 @@ class TestFlattenExpr:
         (a,b,c,d,e) = self.ivars[:5]
 
         assert  str(get_or_make_var( a+b )) == "(IV5, [((IV0) + (IV1)) == (IV5)])"
-        assert  str(get_or_make_var( a+b+c )) == "(IV6, [(sum([IV0, IV1, IV2])) == (IV6)])"
+        assert  str(get_or_make_var( a+b+c )) == "(IV6, [(sum(IV0, IV1, IV2)) == (IV6)])"
         assert  str(get_or_make_var( 2*a )) == "(IV7, [(sum([2] * [IV0])) == (IV7)])"
         assert  str(get_or_make_var( a*b )) == "(IV8, [((IV0) * (IV1)) == (IV8)])"
         assert  str(get_or_make_var( a//b )) == "(IV9, [((IV0) div (IV1)) == (IV9)])"
@@ -166,7 +166,7 @@ class TestFlattenExpr:
         assert  str(flatten_constraint( x&y )) == "[BV0, BV1]"
         assert  str(flatten_constraint( x&y&~z )) == "[BV0, BV1, ~BV2]"
         assert  str(flatten_constraint( x.implies(y) )) == "[(BV0) -> (BV1)]"
-        assert  str(flatten_constraint( x|(y.implies(z)) )) == "[or([BV0, ~BV1, BV2])]"
+        assert  str(flatten_constraint( x|(y.implies(z)) )) == "[or(BV0, ~BV1, BV2)]"
         assert  str(flatten_constraint( (a > 10)&x )) == "[IV0 > 10, BV0]"
         cp.boolvar() # increase counter
         assert  str(flatten_constraint( (a > 10).implies(x) )) == "[(IV0 > 10) -> (BV0)]"

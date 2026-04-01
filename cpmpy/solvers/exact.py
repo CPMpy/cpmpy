@@ -354,10 +354,11 @@ class CPM_exact(SolverInterface):
                 if display is not None:
                     self._fillVars()
                     if isinstance(display, Expression):
-                        print(argval(display))
-                    elif isinstance(display, list):
+                        print(display.value())
+                    elif is_any_list(display):
                         print(argvals(display))
                     else:
+                        assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                         display()  # callback
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
