@@ -1,6 +1,5 @@
 import pytest
 import cpmpy as cp 
-from cpmpy import *
 from cpmpy.solvers.pysat import CPM_pysat
 
 import importlib # can check for modules *without* importing them
@@ -19,7 +18,7 @@ def test_pypblib_error():
 @pytest.mark.skipif(not (pysat_available and pblib_available), reason="`pysat` is not installed" if not pysat_available else "`pypblib` not installed")
 class TestEncodePseudoBooleanConstraint:
     def setup_method(self):
-        self.bv = boolvar(shape=3)
+        self.bv = cp.boolvar(shape=3)
 
     def test_pysat_simple_atmost(self):
 
@@ -72,7 +71,7 @@ class TestEncodePseudoBooleanConstraint:
 
         ## check all types of linear constraints are handled
         for expression in expressions:
-            Model(expression).solve("pysat")
+            cp.Model(expression).solve("pysat")
 
     def test_encode_pb_oob(self):
         # test out of bounds (meaningless) thresholds
@@ -89,7 +88,7 @@ class TestEncodePseudoBooleanConstraint:
 
         ## check all types of linear constraints are handled
         for expression in expressions:
-            Model(expression).solve("pysat")
+            cp.Model(expression).solve("pysat")
             
     def test_encode_pb_reified(self):
         # Instantiate the solver with an empty model to get access to vpool and solver_var
