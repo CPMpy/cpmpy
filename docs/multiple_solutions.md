@@ -42,7 +42,7 @@ n = m.solveAll(display=x)
 
 `display` can also take lists of arbitrary CPMpy expressions:
 ```python
-    n = m.solveAll(display=[x,cp.sum(x)])
+n = m.solveAll(display=[x,cp.sum(x)])
 ```
 
 Perhaps most powerful is the use of __callbacks__, which allows for rich printing, solution storing, dynamic stopping and more. You can use any variable name from the outer scope here (it is a closure). That does mean that you have to call `var.value()` each time to get the value(s) of this particular solution.
