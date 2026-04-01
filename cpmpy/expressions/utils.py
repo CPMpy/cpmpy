@@ -135,7 +135,7 @@ def argval(a):
         try:
             val = a.value()
         except IncompleteFunctionError as e:
-            if a.is_bool():
+            if isinstance(a, cp.expressions.core.Expression) and a.is_bool():
                 return False
             else:
                 raise e
@@ -197,11 +197,11 @@ def get_bounds(expr):
     # from cpmpy.expressions.core import Expression
     # from cpmpy.expressions.variables import cpm_array
 
-    if isinstance(expr, cp.expressions.core.Expression):
+    if isinstance(expr, (cp.expressions.core.Expression, cp.variables.NDVarArray)):
         return expr.get_bounds()
     elif is_any_list(expr):
         lbs, ubs = zip(*[get_bounds(e) for e in expr])
-        return list(lbs), list(ubs) # return list as NDVarArray is covered above
+        return list(lbs), list(ubs)
     else:
         assert is_num(expr), f"All Expressions should have a get_bounds function, `{expr}`"
         if is_bool(expr):
@@ -210,7 +210,8 @@ def get_bounds(expr):
 
 def implies(expr, other):
     """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
-    if isinstance(expr, cp.expressions.core.Expression):
+    if isinstance(expr, (cp.expressions.core.Expression, cp.variables.NDVarArray)):
+        # both implement .implies()
         return expr.implies(other)
     elif is_true_cst(expr):
         return other
