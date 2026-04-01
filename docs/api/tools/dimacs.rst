@@ -1,7 +1,7 @@
-DIMACS (:mod:`cpmpy.tools.io.dimacs`)
+DIMACS (:mod:`cpmpy.tools.dimacs`)
 =====================================================
 
-.. automodule:: cpmpy.tools.io.dimacs
+.. automodule:: cpmpy.tools.dimacs
     :members:
     :undoc-members:
     :inherited-members:

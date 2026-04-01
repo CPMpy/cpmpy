@@ -122,12 +122,6 @@ Different solvers excel at different problems. `Try multiple! <modeling.html#sel
 
    how_to_debug
    multiple_solutions
-   reading_and_writing
-   instance_metadata
-   datasets
-   dataset_authoring
-   transforms_guide
-   benchmarking_workflows
    unsat_core_extraction
    developers
    adding_solver
