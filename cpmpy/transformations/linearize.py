@@ -332,14 +332,15 @@ def only_positive_bv(lst_of_expr, csemap=None):
                 new_cons += new_cons_
 
             if isinstance(rhs, _BoolVarImpl):
-                (new_rhs,), new_cons_ = only_positive_bv_args([rhs])
+                new_args, new_cons_ = only_positive_bv_args([rhs])
+                new_rhs = copy.copy(rhs)
+                new_rhs.update_args(new_args)
                 new_cons += new_cons_
             elif is_boolexpr(rhs):
                 new_args, new_cons_ = only_positive_bv_args(rhs.args)
                 new_rhs = copy.copy(rhs)
                 new_rhs.update_args(new_args)
                 new_cons += new_cons_
-                print("NEW", new_rhs)
             else:
                 new_rhs = rhs
 
