@@ -279,8 +279,6 @@ class CPM_pindakaas(SolverInterface):
             raise TypeError
 
         """Add a single, *transformed* constraint, implied by conditions."""
-        import pindakaas as pdk
-
         if isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
             if cpm_expr.args[0] is False:
