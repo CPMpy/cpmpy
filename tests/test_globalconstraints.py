@@ -1771,11 +1771,11 @@ class TestTypeChecks:
 
         #assert cp.Model(cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])).solve() # not flatlist, should work
         # used to work, not allowed anymore
-        pytest.raises(TypeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
 
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
 
     def test_issue627(self):
         for s, cls in cp.SolverLookup.base_solvers():

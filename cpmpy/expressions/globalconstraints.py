@@ -132,7 +132,6 @@
         DirectConstraint
 
 """
-import copy
 import warnings
 from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
@@ -582,8 +581,6 @@ class Table(GlobalConstraint):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"The first argument of a Table constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array with integers
             table = np.array(table, dtype=int)
@@ -600,7 +597,7 @@ class Table(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = self.args
+        arr, tab = self._args
         return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self) -> Optional[bool]:
@@ -610,12 +607,13 @@ class Table(GlobalConstraint):
         """
         arr, tab = self._args
         arrval = np.asarray(argvals(arr))
-        if any(x is None for x in arrval):
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
         return bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
-        return NegativeTable(self.args[0], self.args[1])
+        arr, tab = self._args
+        return NegativeTable(arr, tab)
 
 
 class ShortTable(GlobalConstraint):
@@ -623,6 +621,8 @@ class ShortTable(GlobalConstraint):
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
     """
+    _args: tuple[ListLike[Expression], np.ndarray]
+
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
         """
         Arguments:
@@ -636,14 +636,13 @@ class ShortTable(GlobalConstraint):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"The first argument of a ShortTable constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):
             table = np.array(table, dtype=object)  # object, otherwise np makes it all string
         assert table.ndim == 2, "ShortTable's table must be a 2D array"
-        if not all(x == STAR or isinstance(x, int) for x in table.flat):
-            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
+        # strict check, induced by typing...
+        #if not all(x == STAR or isinstance(x, int) for x in table.flat):
+        #    raise TypeError(f"elements in argument `table` should be integer or {STAR}")
             
         if has_subexpr is None:
             has_subexpr = any(x.has_subexpr() for x in array)
@@ -656,7 +655,7 @@ class ShortTable(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = self.args
+        arr, tab = self._args
         return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
 
     def value(self) -> Optional[bool]:
@@ -664,12 +663,12 @@ class ShortTable(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = self.args
-        arrval = argvals(arr)
-        if any(x is None for x in arrval):
+        arr, tab = self._args
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
-        arrval = np.asarray(arrval, dtype=int)
-        tab = np.asarray(tab)
+        arrval = arrval.astype(int, copy=False)
+
         for row in tab:
             mask = (row != STAR)
             if (row[mask].astype(int) == arrval[mask]).all():
@@ -694,8 +693,6 @@ class NegativeTable(GlobalConstraint):
             has_subexpr = array.has_subexpr()  # fast shortcut
             if array.ndim != 1:  # reshape to 1D
                 array = array.reshape(-1)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"The first argument of a NegativeTable constraint should only contain variables/expressions: {array}")
 
         if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
             table = np.array(table, dtype=int)
@@ -713,7 +710,7 @@ class NegativeTable(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = self.args
+        arr, tab = self._args
         return [cp.all(cp.any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
 
     def value(self) -> Optional[bool]:
@@ -723,12 +720,13 @@ class NegativeTable(GlobalConstraint):
         """
         arr, tab = self._args
         arrval = np.asarray(argvals(arr))
-        if any(x is None for x in arrval):
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
         return not bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
-        return Table(self.args[0], self.args[1])
+        arr, tab = self._args
+        return Table(arr, tab)
     
 
 class Regular(GlobalConstraint):
@@ -900,10 +898,8 @@ class InDomain(GlobalConstraint):
             arr (Iterable[int | np.integer]): Iterable of integer constants representing the domain
         """
         if not isinstance(arr, np.ndarray):
-            arr = np.array(arr)
+            arr = np.array(arr, dtype=int)
         assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
-        if len(arr) > 0:  # also allow the edge case of an empty (generated) list
-            assert arr.dtype.kind in ('i', 'u', 'b'), "The second argument of an InDomain constraint should be a 1D array of integer constants"
 
         has_subexpr = expr.has_subexpr()
         super().__init__("InDomain", (expr, arr), has_subexpr=has_subexpr)
@@ -933,7 +929,8 @@ class InDomain(GlobalConstraint):
         return bool(np.any(arr == exprval))
 
     def __repr__(self) -> str:
-        return "{} in {}".format(self.args[0], self.args[1])
+        expr, arr = self._args
+        return "{} in {}".format(expr, arr)
 
     def negate(self) -> Expression:
         expr, arr = self._args
