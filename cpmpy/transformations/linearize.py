@@ -88,7 +88,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
     for cpm_expr in lst_of_expr:
         # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
-            if "or" in supported:
+            # TODO gurobi specifically cannot do reified or's
+            if "or" in supported and not reified:
                 # post clause explicitly (don't use cp.any, which will just return the BoolVar)
                 newlist.append(cpm_expr)
             elif isinstance(cpm_expr, NegBoolView):
@@ -176,6 +177,11 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
 
+            # BV == and([a,b,c])
+            if cpm_expr.name == "==" and hasattr(rhs, "name") and rhs.name in supported:
+                newlist.append(cpm_expr)
+                continue
+
             if lhs.name == "sub":
                 # convert to wsum
                 lhs = Operator("wsum", [[1, -1], [lhs.args[0], lhs.args[1]]])
@@ -201,6 +207,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
             if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
                 # very special case, avoid writing as sum of 1 argument
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
+                new_expr = linearize_constraint(new_expr, supported=supported, reified=reified, csemap=csemap)
                 assert len(new_expr) == 1
                 if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
                     continue # skip or([BoolVal(True)])
