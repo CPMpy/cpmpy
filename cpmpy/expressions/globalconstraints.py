@@ -969,7 +969,8 @@ class Xor(GlobalConstraint):
 
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            new_args[0] = cp.transformations.negation.recurse_negation(self.args[0])
+            from cpmpy.transformations.negation import recurse_negation
+            new_args[0] = recurse_negation(self.args[0])
 
         return Xor(new_args)
 
