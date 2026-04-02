@@ -33,7 +33,8 @@ from .globalfunctions import Minimum, Maximum, Abs
 # all: listwise 'and'
 def all(iterable):
     """
-    all() overwrites python built-in,
+    Overwrites python built-in `all` function, to support decision variables.
+    
     if iterable contains any `Expression`, then returns an Operator("and", iterable)
     otherwise returns whether all of the arguments are true
     """
@@ -74,7 +75,8 @@ def all(iterable):
 # any: listwise 'or'
 def any(iterable):
     """
-    any() overwrites python built-in,
+    Overwrites python built-in `any` function, to support decision variables.
+
     if iterable contains an `Expression`, then returns an Operator("or", iterable)
     otherwise returns whether any of the arguments is true
     """
@@ -114,7 +116,7 @@ def any(iterable):
 
 def max(*iterable, **kwargs):
     """
-    max() overwrites the python built-in to support decision variables.
+    Overwrites the python built-in `max` function, to support decision variables.
 
     if iterable does not contain CPMpy expressions, the built-in is called
     else a Maximum functional global constraint is constructed; no keyword
@@ -141,7 +143,7 @@ def max(*iterable, **kwargs):
 
 def min(*iterable, **kwargs):
     """
-    min() overwrites the python built-in to support decision variables.
+    Overwrites the python built-in `min` function, to support decision variables.
 
     if iterable does not contain CPMpy expressions, the built-in is called
     else a Minimum functional global constraint is constructed; no keyword
@@ -168,7 +170,7 @@ def min(*iterable, **kwargs):
 
 def sum(iterable, **kwargs):
     """
-    sum() overwrites the python built-in to support decision variables.
+    Overwrites the python built-in `sum` function, to support decision variables.
 
     if iterable does not contain CPMpy expressions, the built-in is called
     checks if all constants and uses built-in sum() in that case
@@ -191,7 +193,7 @@ def sum(iterable, **kwargs):
 
 def abs(element):
     """
-    abs() overwrites the python built-in to support decision variables.
+    Overwrites the python built-in `abs` function, to support decision variables.
 
     if the element given is not a CPMpy expression, the built-in is called
     else an Absolute functional global constraint is constructed.

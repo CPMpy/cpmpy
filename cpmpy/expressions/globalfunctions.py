@@ -892,7 +892,7 @@ class Element(GlobalFunction):
 
 def element(arg_list):
     """
-    DEPRECATED: Use Element(arr,idx) instead of element([arr,idx]).
+    DEPRECATED: Use cpmpy.Element(arr,idx) instead
 
     Arguments:
         arg_list (list[Expression]): List containing array and index (2 elements)
