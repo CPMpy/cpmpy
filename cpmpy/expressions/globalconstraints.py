@@ -534,8 +534,6 @@ class Table(GlobalConstraint):
     """
     Enforces that the values of the variables in 'array' correspond to a row in 'table'.
     """
-    # args: tuple[ListLike[Expression], np.ndarray]
-
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
@@ -560,7 +558,15 @@ class Table(GlobalConstraint):
         assert table.ndim == 2, "Table's table must be a 2D array"
         assert table.shape[1] == len(array), f"Table width {table.shape[1]} != array length {len(array)}"
 
+        # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
+
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -569,7 +575,7 @@ class Table(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
+        arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
@@ -577,14 +583,14 @@ class Table(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
+        arr, tab = self.args
         arrval = np.asarray(argvals(arr))
         if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
         return bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
-        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
+        arr, tab = self.args
         return NegativeTable(arr, tab)
 
 
@@ -593,7 +599,6 @@ class ShortTable(GlobalConstraint):
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
     """
-    # args: tuple[ListLike[Expression], np.ndarray]
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
         """
@@ -617,8 +622,15 @@ class ShortTable(GlobalConstraint):
             table = np.array(table, dtype=object)  # object, otherwise np makes it all string
         assert table.ndim == 2, "ShortTable's table must be a 2D array"
         assert table.shape[1] == len(array), f"ShortTable width {table.shape[1]} != array length {len(array)}"
-            
+
+        # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -627,7 +639,7 @@ class ShortTable(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
+        arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
@@ -635,7 +647,7 @@ class ShortTable(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
+        arr, tab = self.args
         arrval = np.asarray(argvals(arr))
         if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
@@ -651,7 +663,6 @@ class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
     """
-    # args: tuple[ListLike[Expression], np.ndarray]
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
@@ -677,7 +688,14 @@ class NegativeTable(GlobalConstraint):
         assert table.ndim == 2, "NegativeTable's table must be a 2D array"
         assert table.shape[1] == len(array), f"NegativeTable width {table.shape[1]} != array length {len(array)}"
 
+        # args: tuple[ListLike[Expression], np.ndarray]
         super().__init__("negative_table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -687,7 +705,7 @@ class NegativeTable(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
+        arr, tab = self.args
         return [cp.all([cp.any([ai != ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
@@ -695,14 +713,14 @@ class NegativeTable(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
+        arr, tab = self.args
         arrval = np.asarray(argvals(arr))
         if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
         return not bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
-        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
+        arr, tab = self.args
         return Table(arr, tab)
     
 
@@ -866,7 +884,6 @@ class InDomain(GlobalConstraint):
     """
     Enforces the expression is assigned to a value in the given domain.
     """
-    # args: tuple[Expression, np.ndarray]
 
     def __init__(self, expr: Expression, arr: Iterable[int|np.integer]):
         """
@@ -879,7 +896,14 @@ class InDomain(GlobalConstraint):
         assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
 
         has_subexpr = expr.has_subexpr()
+        # args: tuple[Expression, np.ndarray]
         super().__init__("InDomain", (expr, arr), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[Expression, np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -889,7 +913,7 @@ class InDomain(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        expr, arr = cast(tuple[Expression, np.ndarray], self.args)
+        expr, arr = self.args
         lb, ub = expr.get_bounds()
         
         return [expr != val for val in range(lb, ub + 1) if val not in arr], []
@@ -899,18 +923,18 @@ class InDomain(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        expr, arr = cast(tuple[Expression, np.ndarray], self.args)
+        expr, arr = self.args
         exprval = expr.value()
         if exprval is None:
             return None
         return bool(np.any(arr == exprval))
 
     def __repr__(self) -> str:
-        expr, arr = cast(tuple[Expression, np.ndarray], self.args)
+        expr, arr = self.args
         return "{} in {}".format(expr, arr)
 
     def negate(self) -> Expression:
-        expr, arr = cast(tuple[Expression, np.ndarray], self.args)
+        expr, arr = self.args
         lb, ub = expr.get_bounds()
 
         # complement of arr
