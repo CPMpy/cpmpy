@@ -24,4 +24,5 @@ ignore = [
     "D211", # Allow incorrect blank lines before class
     "D212", # multi-line-summary-second-line
     "TD003", # Allow missing issue links for TODO
+    "F401", # allow to unused imports in `__init__.py` files -- not sure if we want to keep this
 ]
