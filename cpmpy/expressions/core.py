@@ -137,11 +137,12 @@ class Expression(object):
 
     @property
     def args(self) -> tuple[Any, ...]:
-        return self._args
+        """ READ-ONLY access to the expression's arguments.
+            Use :func:`~cpmpy.expressions.core.Expression.update_args` to update the arguments.
 
-    @args.setter
-    def args(self, args: Iterable[Any]) -> None:
-        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
+            Subclasses can override this property to return a more precisely typed tuple.
+        """
+        return self._args
 
     def update_args(self, args: Iterable[Any], has_subexpr: Optional[bool] = None) -> None:
         """ Allows in-place update of the expression's arguments.
