@@ -534,7 +534,7 @@ class Table(GlobalConstraint):
     """
     Enforces that the values of the variables in 'array' correspond to a row in 'table'.
     """
-    _args: tuple[ListLike[Expression], np.ndarray]
+    # args: tuple[ListLike[Expression], np.ndarray]
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
@@ -569,7 +569,7 @@ class Table(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = self._args
+        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
@@ -577,14 +577,14 @@ class Table(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = self._args
+        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
         arrval = np.asarray(argvals(arr))
         if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
         return bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
-        arr, tab = self._args
+        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
         return NegativeTable(arr, tab)
 
 
@@ -593,7 +593,7 @@ class ShortTable(GlobalConstraint):
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
     """
-    _args: tuple[ListLike[Expression], np.ndarray]
+    # args: tuple[ListLike[Expression], np.ndarray]
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
         """
@@ -627,7 +627,7 @@ class ShortTable(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = self._args
+        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
@@ -635,7 +635,7 @@ class ShortTable(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = self._args
+        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
         arrval = np.asarray(argvals(arr))
         if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
@@ -651,7 +651,7 @@ class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
     """
-    _args: tuple[ListLike[Expression], np.ndarray]
+    # args: tuple[ListLike[Expression], np.ndarray]
 
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
@@ -687,7 +687,7 @@ class NegativeTable(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        arr, tab = self._args
+        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
         return [cp.all([cp.any([ai != ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
@@ -695,14 +695,14 @@ class NegativeTable(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, tab = self._args
+        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
         arrval = np.asarray(argvals(arr))
         if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
         return not bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
-        arr, tab = self._args
+        arr, tab = cast(tuple[ListLike[Expression], np.ndarray], self.args)
         return Table(arr, tab)
     
 
@@ -866,7 +866,7 @@ class InDomain(GlobalConstraint):
     """
     Enforces the expression is assigned to a value in the given domain.
     """
-    _args: tuple[Expression, np.ndarray]
+    # args: tuple[Expression, np.ndarray]
 
     def __init__(self, expr: Expression, arr: Iterable[int|np.integer]):
         """
@@ -889,7 +889,7 @@ class InDomain(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        expr, arr = self._args
+        expr, arr = cast(tuple[Expression, np.ndarray], self.args)
         lb, ub = expr.get_bounds()
         
         return [expr != val for val in range(lb, ub + 1) if val not in arr], []
@@ -899,18 +899,18 @@ class InDomain(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        expr, arr = self._args
+        expr, arr = cast(tuple[Expression, np.ndarray], self.args)
         exprval = expr.value()
         if exprval is None:
             return None
         return bool(np.any(arr == exprval))
 
     def __repr__(self) -> str:
-        expr, arr = self._args
+        expr, arr = cast(tuple[Expression, np.ndarray], self.args)
         return "{} in {}".format(expr, arr)
 
     def negate(self) -> Expression:
-        expr, arr = self._args
+        expr, arr = cast(tuple[Expression, np.ndarray], self.args)
         lb, ub = expr.get_bounds()
 
         # complement of arr
