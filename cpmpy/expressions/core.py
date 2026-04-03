@@ -771,7 +771,7 @@ class Operator(Expression):
             lb1, ub1 = get_bounds(self.args[0])
             lowerbound, upperbound = -ub1, -lb1
 
-        if lowerbound == None:
+        if lowerbound is None:
             raise ValueError(f"Bound requested for unknown expression {self}, please report bug on github")
         if lowerbound > upperbound:
             #overflow happened

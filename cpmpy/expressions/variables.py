@@ -821,7 +821,7 @@ def _genname(basename: Optional[str], idxs: tuple[int|np.integer, ...]) -> Optio
 
     output: something like "basename[0,1]"
     """
-    if basename == None:
+    if basename is None:
         return None
     if _is_invalid_name(basename):
         raise ValueError(_VAR_ERR)
