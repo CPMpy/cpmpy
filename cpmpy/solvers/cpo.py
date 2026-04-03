@@ -46,9 +46,8 @@ from typing import Optional
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
