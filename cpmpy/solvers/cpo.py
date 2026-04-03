@@ -204,7 +204,7 @@ class CPM_cpo(SolverInterface):
         # allow manual solution callback for backwards compatibility
         if "solution_callback" in kwargs:
             callback = kwargs.pop('solution_callback')
-        elif display is not None:
+        if callback is None and display is not None:
             callback = CpoSolutionPrinter(self, display)
 
         # create solver object
