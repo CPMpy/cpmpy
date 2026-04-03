@@ -1032,22 +1032,26 @@ class TestSupportedSolvers:
         #test unique sols, should be same number
         assert len(sols) == 8
 
-    def test_solution_callback(self, solver):
+    def test_solution_callback(self, solver, capsys):
         import random
         random.seed(0)
 
+        solver_obj = cp.SolverLookup.get(solver)
+        if "display" not in inspect.signature(solver_obj.solve).parameters:
+            pytest.skip(f"{solver} does not support solution callbacking")
+
         n = 5
         vars = cp.intvar(0,n, shape=n)
-        obj = cp.sum([(1 if random.random() >= 0.5 else 2) * (a - b) for a in vars for b in vars])
+        obj = cp.sum([random.randint(1,n) * (a - b) for a in vars for b in vars])
         model = cp.Model(cp.AllDifferent(vars), maximize=obj)
 
-        if solver in  ("pysdd", "pysat", "minizinc", "choco"):
-            return # these solvers do not support callbacking/optimization
+        assert model.solve(solver=solver, display=vars, time_limit=3)
+        captured = capsys.readouterr().out
+        assert len(captured) > 0
 
-        assert model.solve(solver=solver, display=vars)
         # collect solutions using callback
         collector = list()
-        assert model.solve(solver=solver, display=lambda :  collector.append(argvals(vars)))
+        assert model.solve(solver=solver, display=lambda :  collector.append(argvals(vars)), time_limit=3)
         assert len(collector) >= 1
 
         # print some more information using callback
@@ -1057,12 +1061,16 @@ class TestSupportedSolvers:
 
         solver = cp.SolverLookup.get(solver, model)
         t0 = time()
-        assert solver.solve(display=display)
-        assert solver.objective_value() == 16
+        assert solver.solve(display=display, time_limit=3)
+        assert solver.objective_value() == 34
+        captured1 = capsys.readouterr().out
+        assert len(captured1) > 0
 
         solver.minimize(obj)
-        assert solver.solve(display=display)
-        assert solver.objective_value() == -16
+        assert solver.solve(display=display, time_limit=3)
+        assert solver.objective_value() == -34
+        captured2 = capsys.readouterr().out
+        assert len(captured2) > 0 # resets after previous capture
 
 
 
