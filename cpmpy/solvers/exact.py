@@ -22,7 +22,7 @@
     Requires that the 'exact' python package is installed:
 
     .. code-block:: console
-    
+
         $ pip install exact
 
     .. warning::
@@ -103,7 +103,7 @@ class CPM_exact(SolverInterface):
             return False
         except Exception as e:
             raise e
-        
+
     @staticmethod
     def version() -> Optional[str]:
         """
@@ -153,7 +153,7 @@ class CPM_exact(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
-        
+
     @property
     def native_model(self):
         """
@@ -193,7 +193,7 @@ class CPM_exact(SolverInterface):
                 - False     if no solution is found
         """
         from exact import Exact as xct
- 
+
         # set additional keyword arguments
         if(len(kwargs.items())>0):
             wrn_txt = f"Exact only supports options at initialization. Ignoring additional options {kwargs.items()}\n"
@@ -220,7 +220,7 @@ class CPM_exact(SolverInterface):
             timeout = time_limit
         else:
             timeout = 0
-            
+
         # call the solver, with parameters
         start = time.time()
         my_status, obj_val = self.xct_solver.toOptimum(timeout=timeout)

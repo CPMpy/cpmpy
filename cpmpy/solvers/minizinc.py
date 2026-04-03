@@ -106,7 +106,7 @@ class CPM_minizinc(SolverInterface):
     required_version = (2, 8, 2)
 
     @staticmethod
-    def supported(): 
+    def supported():
         return CPM_minizinc.installed() and CPM_minizinc.executable_installed() and not CPM_minizinc.outdated()
 
     @staticmethod
@@ -138,7 +138,7 @@ class CPM_minizinc(SolverInterface):
         else:
             # outdated
             return True
-                
+
 
     @staticmethod
     def solvernames(installed:bool=True, with_version:bool=False):
@@ -147,14 +147,14 @@ class CPM_minizinc(SolverInterface):
 
             Arguments:
                 installed (boolean): whether to filter the solvernames to those installed on your system (default True)
-                with_version (boolean): whether to additionally return the available version matching with each solvername 
+                with_version (boolean): whether to additionally return the available version matching with each solvername
                                         (if not available on the system, the entry defaults to None)
 
             Returns:
                 list of solver names if with_version==False, otherwise a tuple of two lists: the solver names and their versions
 
             .. warning::
-                WARNING, some of the returned solver names (when ``installed=False``) may not actually 
+                WARNING, some of the returned solver names (when ``installed=False``) may not actually
                 be installed on your system (namely cplex, gurobi, scip, xpress).
                 The following are bundled with minizinc: chuffed, coin-bc, gecode.
                 Use ``installed=True`` (the default) if you only want the names of the actually installed solvers.
@@ -164,11 +164,11 @@ class CPM_minizinc(SolverInterface):
         if CPM_minizinc.supported(): # check if minizinc is installed
             import minizinc
             driver = minizinc.default_driver
-            
+
             # Collect solver names
             all_solvers, all_versions = [], []
             output = driver._run(["--solvers-json"]) # get json-structured solver overview
-            solvers = json.loads(output.stdout)        
+            solvers = json.loads(output.stdout)
             for solver_dict in solvers:
                 # get subsolver metadata
                 tag = solver_dict["id"].split(".")[-1]
@@ -185,7 +185,7 @@ class CPM_minizinc(SolverInterface):
                 return ([], [])
             else:
                 return []
-            
+
 
         if not installed:
             """
@@ -207,8 +207,8 @@ class CPM_minizinc(SolverInterface):
             if with_version:
                 return (installed_solvers, installed_versions)
             else:
-                return installed_solvers       
-             
+                return installed_solvers
+
     @staticmethod
     def solverversion(subsolver:str) -> Optional[str]:
         """
@@ -218,7 +218,7 @@ class CPM_minizinc(SolverInterface):
             subsolver (str): name of the subsolver
 
         Returns:
-            Version number of the subsolver if installed, else None 
+            Version number of the subsolver if installed, else None
         """
         all_solvers, all_versions = CPM_minizinc.solvernames(installed=False, with_version=True)
         try:
@@ -325,10 +325,10 @@ class CPM_minizinc(SolverInterface):
             Creates and calls an Instance with the already created ``mzn_model`` and ``mzn_solver``
 
             Arguments:
-                time_limit (float, optional):       maximum solve time in seconds 
+                time_limit (float, optional):       maximum solve time in seconds
                 **kwargs (any keyword argument):    sets parameters of solver object
-                
-            
+
+
             Arguments that correspond to solver parameters:
 
             =======================  ===========
@@ -336,11 +336,11 @@ class CPM_minizinc(SolverInterface):
             =======================  ===========
             free_search=True              Allow the solver to ignore the search definition within the instance. (Only available when the -f flag is supported by the solver). (Default: 0)
             optimisation_level=0          Set the MiniZinc compiler optimisation level. (Default: 1; 0=none, 1=single pass, 2=double pass, 3=root node prop, 4,5=probing)
-            =======================  ===========             
-            
-            
+            =======================  ===========
+
+
             I am not sure where solver-specific arguments are documented, but the docs say that command line arguments can be passed by ommitting the '-' (e.g. 'f' instead of '-f')?
-            
+
             The minizinc solver parameters are partly defined in its API:
             https://minizinc-python.readthedocs.io/en/latest/api.html#minizinc.instance.Instance.solve
 
@@ -456,7 +456,7 @@ class CPM_minizinc(SolverInterface):
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
-        
+
         # make mzn_inst
         (kwargs, mzn_inst) = self._pre_solve(time_limit=time_limit, **kwargs)
         kwargs['all_solutions'] = True
@@ -923,7 +923,7 @@ class CPM_minizinc(SolverInterface):
                 call_from_model:    whether the method is called from a CPMpy Model instance or not
                 **kwargs:           any keyword argument, sets parameters of solver object, overwrites construction-time kwargs
 
-            Returns: 
+            Returns:
                 number of solutions found
         """
         # XXX: check that no objective function??

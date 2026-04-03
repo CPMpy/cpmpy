@@ -71,11 +71,11 @@ class CPM_gurobi(SolverInterface):
     Interface to Gurobi's Python API
 
     Creates the following attributes (see parent constructor for more):
-    
+
     - ``grb_model``: object, TEMPLATE's model object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
-    
+
     Documentation of the solver's own Python API:
     https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
@@ -113,7 +113,7 @@ class CPM_gurobi(SolverInterface):
         except Exception as e:
             warnings.warn(f"Problem encountered with Gurobi license: {e}")
             return False
-        
+
     @staticmethod
     def version() -> Optional[str]:
         """
@@ -134,7 +134,7 @@ class CPM_gurobi(SolverInterface):
             subsolver: None, not used
         """
         if not self.installed():
-            raise ModuleNotFoundError("CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.") 
+            raise ModuleNotFoundError("CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.")
         elif not self.license_ok():
             raise ModuleNotFoundError("CPM_gurobi: No license found or a problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
@@ -154,13 +154,16 @@ class CPM_gurobi(SolverInterface):
         return self.grb_model
 
 
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, display=Optional[Callback], **kwargs):
         """
             Call the gurobi solver
 
             Arguments:
                 time_limit (float, optional):  maximum solve time in seconds
-                solution_callback:             Gurobi callback function
+                display:     generic solution callback for use during optimization.
+                            either a list of CPMpy expressions, OR a callback function which
+                            gets called after the variable-value mapping of the intermediate solution.
+                            default/None: nothing is displayed
                 **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -181,21 +184,28 @@ class CPM_gurobi(SolverInterface):
         # edge case, empty model, ensure the solver has something to solve
         if not len(self.user_vars):
             self.add(intvar(1, 1) == 1)
-        
+
         # set time limit
         if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             self.grb_model.setParam("TimeLimit", time_limit)
 
+        # handle solution callbacks
+        callback = None
+        if "solution_callback" in kwargs:
+            callback = kwargs.pop("solution_callback")
+        if callback is None and display is not None:
+            callback = self._get_callback(display, events=[GRB.Callback.MIPSOL])
+
         # call the solver, with parameters
         for param, val in kwargs.items():
             self.grb_model.setParam(param, val)
 
-        _ = self.grb_model.optimize(callback=solution_callback)
-        grb_objective = self.grb_model.getObjective()
-
+        # call the gurobi solver with callback
+        self.grb_model.optimize(callback=callback)
         grb_status = self.grb_model.Status
+        grb_objective = self.grb_model.getObjective()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -502,7 +512,7 @@ class CPM_gurobi(SolverInterface):
         https://docs.gurobi.com/projects/optimizer/en/current/reference/attributes/variable.html#varhintval
 
         Optionally, you can also set the relative priority of the hint, using:
-        
+
         .. code-block:: python
 
             solver.solver_var(cpm_var).setAttr("VarHintPri", <priority>)
@@ -601,13 +611,45 @@ class CPM_gurobi(SolverInterface):
 
         if opt_sol_count:
             if opt_sol_count == solution_limit:
-                self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else:
                 grb_status = self.grb_model.Status
                 if grb_status == GRB.TIME_LIMIT: # reached time limit
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-                else: # found all solutions   
+                else: # found all solutions
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         # if unsat or timout with no solution, .solve() will have already set the state accordingly (so nothing to update)
 
         return opt_sol_count
+
+    def _get_callback(self, display, events):
+
+        self.events=  frozenset(events)
+        if isinstance(display, Expression) or is_any_list(display):
+            cpm_vars = get_variables(display)
+        else:
+            cpm_vars = list(self.user_vars)
+        grb_vars = self.solver_vars(cpm_vars)
+
+        def callback(model, state, **kwargs):
+            # fill in vars
+            if state not in self.events:
+                return # irrelevant event
+
+            grb_sol = model.cbGetSolution(grb_vars)
+            for cpm_var, solver_val in zip(cpm_vars, grb_sol):
+                if cpm_var.is_bool():
+                    cpm_var._value = solver_val >= 0.5
+                else:
+                    cpm_var._value = int(solver_val)
+
+            if isinstance(display, Expression):
+                print(display.value())
+            elif is_any_list(display):
+                print(argvals(display))
+            else:
+                assert callable(
+                    display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                display()  # callback
+
+        return callback

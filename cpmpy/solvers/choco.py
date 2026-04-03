@@ -22,7 +22,7 @@
         $ pip install pychoco
 
     Detailed installation instructions available at:
-    
+
     - https://pypi.org/project/pychoco/
     - https://pychoco.readthedocs.io/en/latest/
 
@@ -72,12 +72,12 @@ class CPM_choco(SolverInterface):
     Interface to the Choco solver python API
 
     Creates the following attributes (see parent constructor for more):
-    
+
     - ``chc_model`` : the pychoco.Model() created by _model()
     - ``chc_solver`` : the choco Model().get_solver() instance used in solve()
 
     Documentation of the solver's own Python API:
-    
+
     - https://pypi.org/project/pychoco/
     - https://pychoco.readthedocs.io/en/latest/
 
@@ -109,7 +109,7 @@ class CPM_choco(SolverInterface):
             return False
         except Exception as e:
             raise e
-        
+
     @staticmethod
     def version() -> Optional[str]:
         """
@@ -166,7 +166,7 @@ class CPM_choco(SolverInterface):
             Call the Choco solver
 
             Arguments:
-                time_limit (float, optional):   maximum solve time in seconds 
+                time_limit (float, optional):   maximum solve time in seconds
                 kwargs:                         any keyword argument, sets parameters of solver object
 
         """
@@ -177,7 +177,7 @@ class CPM_choco(SolverInterface):
         self.chc_solver = self.chc_model.get_solver()
 
         start = time.time()
-        
+
         # set time limit
         if time_limit is not None:
             if time_limit <= 0:
@@ -249,7 +249,7 @@ class CPM_choco(SolverInterface):
                 solution_limit: stop after this many solutions (default: None)
                 time_limit (float, optional):   maximum solve time in seconds
 
-            Returns: 
+            Returns:
                 number of solutions found
         """
 
@@ -646,7 +646,7 @@ class CPM_choco(SolverInterface):
                 automaton.set_initial_state(cpm_expr.node_map[start])
                 automaton.set_final(*[cpm_expr.node_map[a] for a in accepting])
                 return self.chc_model.regular(self._to_vars(array), automaton)
-            
+
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
@@ -685,7 +685,7 @@ class CPM_choco(SolverInterface):
                 raise NotImplementedError(f"Unknown global constraint {cpm_expr}, should be decomposed! If you reach this, please report on github.")
 
         # unlikely base case: Boolean variable
-        elif isinstance(cpm_expr, _BoolVarImpl):    
+        elif isinstance(cpm_expr, _BoolVarImpl):
             if isinstance(cpm_expr, NegBoolView):
                 return self.chc_model.arithm(self.solver_var(cpm_expr._bv), "=", 0)
 
