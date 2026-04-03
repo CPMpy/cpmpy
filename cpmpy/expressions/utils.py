@@ -35,12 +35,12 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, Union, Optional
+from typing import TYPE_CHECKING, TypeGuard, Optional, cast
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ListLike, ExprLike
+    from cpmpy.expressions.core import Expression, ListLike, ExprLike
 
 
 def is_bool(arg):
@@ -153,6 +153,23 @@ def argvals(arr):
     return argval(arr)
 
 
+def argvals_listlike(lst: ListLike[ExprLike]) -> Optional[list[int]]:
+    """ The well-typed way to get the values of a list of ExprLike's, or None if any expression is not assigned """
+    _Expr = cp.expressions.core.Expression
+
+    vals: list[int] = []
+    for e in lst:
+        if isinstance(e, _Expr):
+            v = e.value()
+            if v is None:
+                return None
+            vals.append(v)
+        elif isinstance(e, int):
+            vals.append(e)
+        else:  # only np.integer is still in ExprLike
+            vals.append(int(e))
+    return vals
+
 def eval_comparison(str_op, lhs, rhs):
     """
         Internal function: evaluates the textual `str_op` comparison operator
@@ -187,6 +204,46 @@ def eval_comparison(str_op, lhs, rhs):
         return lhs <= rhs
     else:
         raise Exception("Not a known comparison:", str_op)
+    
+def get_bounds_listlike(lst: ListLike[ExprLike]) -> tuple[list[int], list[int]]:
+    """ The well-typed way to get the bounds of a list of ExprLike's """
+    _Expr = cp.expressions.core.Expression
+
+    lbs: list[int] = []
+    ubs: list[int] = []
+    for e in lst:
+        if isinstance(e, _Expr):
+            (lb, ub) = e.get_bounds()
+            lbs.append(lb)
+            ubs.append(ub)
+        elif isinstance(e, int):
+            lbs.append(e)
+            ubs.append(e)
+        else:  # only np.integer is still in ExprLike
+            lbs.append(int(e))
+            ubs.append(int(e))
+    return lbs, ubs
+
+def get_minimax_bounds_listlike(lst: ListLike[ExprLike]) -> tuple[int, int]:
+    """ The well-typed way to get the minimax bounds of a list of ExprLike's """
+    _Expr = cp.expressions.core.Expression
+
+    glb: Optional[int] = None
+    gub: Optional[int] = None
+    for e in lst:
+        if isinstance(e, _Expr):
+            (lb, ub) = e.get_bounds()
+            glb = min(glb, lb) if glb is not None else lb
+            gub = max(gub, ub) if gub is not None else ub
+        elif isinstance(e, int):
+            glb = min(glb, e) if glb is not None else e
+            gub = max(gub, e) if gub is not None else e
+        else:  # only np.integer is still in ExprLike
+            glb = min(glb, int(e)) if glb is not None else int(e)
+            gub = max(gub, int(e)) if gub is not None else int(e)
+
+    assert glb is not None and gub is not None, f"No bounds found, empty list? `{lst}`"
+    return glb, gub
 
 def get_bounds(expr):
     """ return the bounds of the expression
@@ -255,3 +312,18 @@ def is_star(arg):
         Check if arg is star as used in the ShortTable global constraint
     """
     return isinstance(arg, type(STAR)) and arg == STAR
+
+def clean_bool(exprs: list[ExprLike]) -> list[Expression]:
+    """ Clean up a list of Boolean expressions representing a conjunction of Booleans
+
+    It only cleans up Python 'bool' instances
+    it returns [BoolVal(False)] if it contains a 'False'
+    """
+    new_exprs: list[Expression] = []
+    for e in exprs:
+        if isinstance(e, bool):
+            if e is False:
+                return [cp.BoolVal(False)]
+        else:
+            new_exprs.append(cast(Expression, e))  # we silently assume its Expression
+    return new_exprs

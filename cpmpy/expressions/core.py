@@ -116,7 +116,7 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name: str, arg_list: tuple[Any, ...]):
+    def __init__(self, name: str, arg_list: tuple[Any, ...], has_subexpr: Optional[bool] = None):
         """
         Constructor of the Expression class
 
@@ -137,10 +137,6 @@ class Expression(object):
     @property
     def args(self) -> tuple[Any, ...]:
         return self._args
-
-    @args.setter
-    def args(self, args: Iterable[Any]) -> None:
-        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
 
     def update_args(self, args: Iterable[Any]) -> None:
         """ Allows in-place update of the expression's arguments.
@@ -226,10 +222,10 @@ class Expression(object):
         """
         return True
 
-    def value(self):
-        return None # default
+    def value(self) -> Optional[int]:
+        return None  # default
 
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         if self.is_bool():
             return 0, 1 #default for boolean expressions
         raise NotImplementedError(f"`get_bounds` is not implemented for type {self}")
