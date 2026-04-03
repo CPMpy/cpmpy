@@ -37,7 +37,6 @@ __all__ = [
     "OPBDataset",
     "MaxSATEvalDataset",
     "SATDataset",
-    "DIMACSCliqueDataset",
     # Parse/model helpers for parse-first datasets
     "parse_jsp",
     "model_jobshop",
@@ -64,7 +63,6 @@ from .xcsp3 import XCSP3Dataset
 from .opb import OPBDataset
 from .mse import MaxSATEvalDataset
 from .sat import SATDataset
-from .dimacs_clique import DIMACSCliqueDataset
 from .transforms import Compose, Open, Load, Serialize, Translate, SaveToFile, Lambda, extract_format_metadata
 # Backward compatibility alias
 Parse = Load
