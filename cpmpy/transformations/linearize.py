@@ -13,10 +13,10 @@ There are a number of components to getting a good linearisation:
   Their default decomposition does not do it this way, hence we use a more linear-friendly decomposition.
   This is done by :func:`decompose_linear`.
 
-- **Domain encodings** e.g. of `A=cp.intvar(0,4)` would create binary variables and constraints
-  like `B0 -> A=0`, `B1 -> A=1`, `B2 -> A=2`, etc and `sum(B0..B4) = 1`.
-  However each `B0 -> A=0` would require 2 Big-M constraints. Instead we can linearise the entire
-  domain encoding with two constraints: `sum(B0..4) = 1` and `A = sum(B0..4 * [0,1,2,3,4])`.
+- **Domain encodings** constraint `(x == 3) + (x == 5) + (x == 7) >= 1` after flattening will introduce Boolean auxiliary
+  variables and constraints `Bx3 == (x == 3)`, `Bx5 == (x == 5)`, `Bx7 == (x == 7)` and `sum(Bx3, Bx5, Bx7) >= 1`.
+  However each `Bxi == (x == i)` would be linearized into 3 Big-M constraints. Instead we can linearise the entire
+  domain encoding of `x` for all `i` values in its domain with just two constraints: `sum_i(Bxi) = 1` and `x = sum_i(i*Bxi)`.
   This is done by :func:`linearize_reified_variables` (as a pre-linearization optimization step).
 
 - **Disequalities and Inequalities** e.g. `sum(X) != 5` should be rewritten as `(sum(X) < 5) | (sum(X) > 5)`,
@@ -31,11 +31,12 @@ To get a good linearisation, solver backends typically apply these transformatio
 
 - Call :func:`decompose_linear` / :func:`decompose_linear_objective` instead of the standard 'decompose_in_tree'.
 - Put constraints in flat normal form (:func:`~cpmpy.transformations.flatten_model.flatten_constraint`).
-- Apply :func:`linearize_reified_variables` to replace many reified equalities of the form
+- Apply :func:`linearize_reified_variables` to replace reified equalities of the form
   ``bv == (x == val)`` by a single direct encoding of ``x`` (must be done before implication-only normalisation).
 - Ensure implications are of the form ``bv -> <expr>`` (:func:`~cpmpy.transformations.reification.only_implies`).
 - Call :func:`linearize_constraint` to transform the inequalities, strict equalities and implications.
-- Optionally run post-passes such as :func:`only_positive_bv` and :func:`only_positive_coefficients`.
+- Optionally run post-passes such as :func:`only_positive_bv` (e.g. for ILP solvers that do not support NegBoolView)
+  and :func:`only_positive_coefficients` (e.g. for PB solvers that want it in this normal form)
 
 
 Module functions
@@ -45,14 +46,14 @@ Main transformations:
 - :func:`linearize_constraint`: Transforms a list of constraints to a linear form.
 - :func:`decompose_linear`: Decompose unsupported global constraints in a linear-friendly way.
 - :func:`decompose_linear_objective`: Decompose objective using linear-friendly decompositions.
-- :func:`linearize_reified_variables`: Replace reifieds (BV <-> (x == val)) with entire direct encoding of 'x'.
+- :func:`linearize_reified_variables`: For an integer x with (BV == (x == val)) constraints, replace them with the direct encoding of 'x'.
 
 Helper functions:
 - :func:`canonical_comparison`: Canonicalize comparison expressions (variables on left, constants on right).
 - :func:`get_linear_decompositions`: Returns the custom linear decomposition map for global constraints.
 
 Optional post-linearisation transformations:
-- :func:`only_positive_bv`: Transforms constraints so only boolean variables appear positively
+- :func:`only_positive_bv`: Transforms constraints so only :class:`~cpmpy.expressions.variables._BoolVarImpl` variables appear positively
   (no :class:`~cpmpy.expressions.variables.NegBoolView`).
 - :func:`only_positive_bv_wsum`: Helper function that replaces :class:`~cpmpy.expressions.variables.NegBoolView`
   in var/sum/wsum expressions with equivalent expressions using only :class:`~cpmpy.expressions.variables._BoolVarImpl`.
@@ -63,10 +64,8 @@ Optional post-linearisation transformations:
 """
 
 import copy
-import warnings
-from typing import Set, AbstractSet, Sequence, Optional
+from typing import AbstractSet, Sequence, Optional
 
-import numpy as np
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
@@ -76,8 +75,8 @@ from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, NegativeTable
-from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent
+from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 from .int2bool import _encode_int_var
