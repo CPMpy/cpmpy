@@ -51,7 +51,7 @@
         CPM_gcs
 """
 import warnings
-from typing import Optional
+from typing import Optional, Callable
 
 from packaging.version import Version
 
@@ -60,7 +60,7 @@ from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar, NDVarArray
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, argval, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -160,7 +160,7 @@ class CPM_gcs(SolverInterface):
     def has_objective(self):
         return self.objective_var is not None
     
-    def solve(self, time_limit:Optional[float]=None, display=Optional[Callback], prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
+    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
               verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
@@ -186,24 +186,9 @@ class CPM_gcs(SolverInterface):
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
 
+        callback = None
         if display is not None:
-            if isinstance(display, (Expression, list)):
-                cb_vars = get_variables(display)
-            else:
-                cb_vars = self.user_vars
-
-            def callback(sol):
-                # set values for variables
-                for cpm_var in cb_vars:
-                    cpm_var._value = sol[self.solver_var(cpm_var)]
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()
-        else:
-            callback = None
+            callback = self._get_callback(display)
 
         # If we're verifying we must be proving
         prove |= verify
@@ -286,6 +271,32 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
+    def _get_callback(self, display) -> Callable[[dict[str,int]], None]:
+        if isinstance(display, Expression) or is_any_list(Expression):
+            cpm_vars = get_variables(display)
+        else:
+            cpm_vars = list(self.user_vars)
+        gcs_vars = self.solver_vars(cpm_vars)
+
+        def callback(solution_map: dict[str, int]):
+            for cpm_var, gcs_var in zip(cpm_vars, gcs_vars):
+                if isinstance(cpm_var, _BoolVarImpl):
+                    # Convert back to bool
+                    cpm_var._value = bool(solution_map[gcs_var])
+                else:
+                    cpm_var._value = solution_map[gcs_var]
+
+            if isinstance(display, (Expression, NDVarArray)):
+                print(display.value())
+            elif is_any_list(display):
+                print(argvals(display))
+            else:
+                assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                display()  # callback
+            return
+
+        return callback
+
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False,
                  prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
                  verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
@@ -326,28 +337,9 @@ class CPM_gcs(SolverInterface):
                 self.proof_name = "gcs_proof"
         self.proof_location = proof_location
 
-        # Set display callback
-        def display_callback(solution_map):
-            for cpm_var in self.user_vars:
-                sol_var = self.solver_var(cpm_var)
-                if isinstance(cpm_var, _BoolVarImpl):
-                    # Convert back to bool
-                    cpm_var._value = bool(solution_map[sol_var])
-                else:
-                    cpm_var._value = solution_map[sol_var]
-
-            if isinstance(display, Expression):
-                print(display.value())
-            elif is_any_list(display):
-                print(argvals(display))
-            else:
-                assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                display()  # callback
-            return
-
         sol_callback = None
         if display is not None:
-            sol_callback=display_callback
+            sol_callback=self._get_callback(display)
 
         self.gcs_result = self.gcs.solve(
             all_solutions=True, 
