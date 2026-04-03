@@ -1013,16 +1013,16 @@ class FileDataset(IndexedDataset):
             except (json.JSONDecodeError, IOError):
                 pass
 
-        if model_features is None:
-            if not callable(self.reader):
-                raise TypeError(
-                    f"Cannot extract model features for {file_path}: "
-                    "no dataset reader configured. If unexpected, please open an issue on GitHub."
-                )
-            model = self.reader(str(file_path), open=self.open)
-            model_features = extract_model_features(model)
+        # if model_features is None:
+        #     if not callable(self.reader):
+        #         raise TypeError(
+        #             f"Cannot extract model features for {file_path}: "
+        #             "no dataset reader configured. If unexpected, please open an issue on GitHub."
+        #         )
+        #     model = self.reader(str(file_path), open=self.open)
+        #     model_features = extract_model_features(model)
     
-        sidecar["model_features"] = model_features
+        # sidecar["model_features"] = model_features
 
         with open(meta_path, "w") as f:
             json.dump(sidecar, f, indent=2)
