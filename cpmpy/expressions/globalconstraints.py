@@ -215,7 +215,6 @@ class AllDifferent(GlobalConstraint):
     """
     Enforces that all arguments have a different (distinct) value
     """
-    _args: tuple[ExprLike, ...]
 
     def __init__(self, *args: ExprLike|ListLike[ExprLike]):
         """
@@ -236,7 +235,13 @@ class AllDifferent(GlobalConstraint):
                 flat.extend(a)
             else:
                 flat.append(a)
+        # args: tuple[ExprLike, ...]
         super().__init__("alldifferent", tuple(flat))
+
+    @property
+    def args(self) -> tuple[ExprLike, ...]:
+        """ READ-ONLY, well-tuped arguments of this global constraint """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -377,7 +382,13 @@ class AllEqual(GlobalConstraint):
                 flat.extend(a)
             else:
                 flat.append(a)
+        # args: tuple[ExprLike, ...]
         super().__init__("allequal", tuple(flat))
+
+    @property
+    def args(self) -> tuple[ExprLike, ...]:
+        """ READ-ONLY, well-tuped arguments of this global constraint """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -481,7 +492,13 @@ class Circuit(GlobalConstraint):
             newargs = tuple(flatargs)
         if len(newargs) < 2:
             raise ValueError('Circuit constraint must be given a minimum of 2 variables')
+        # args: tuple[ExprLike, ...]
         super().__init__("circuit", newargs, has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ExprLike, ...]:
+        """ READ-ONLY, well-tuped arguments of this global constraint """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1734,7 +1751,13 @@ class Increasing(GlobalConstraint):
                 flat.extend(a)
             else:
                 flat.append(a)
+        # args: tuple[ExprLike, ...]
         super().__init__("increasing", tuple(flat))
+
+    @property
+    def args(self) -> tuple[ExprLike, ...]:
+        """ READ-ONLY, well-tuped arguments of this global constraint """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1781,7 +1804,13 @@ class Decreasing(GlobalConstraint):
                 flat.extend(a)
             else:
                 flat.append(a)
+        # args: tuple[ExprLike, ...]
         super().__init__("decreasing", tuple(flat))
+
+    @property
+    def args(self) -> tuple[ExprLike, ...]:
+        """ READ-ONLY, well-tuped arguments of this global constraint """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1828,7 +1857,13 @@ class IncreasingStrict(GlobalConstraint):
                 flat.extend(a)
             else:
                 flat.append(a)
+        # args: tuple[ExprLike, ...]
         super().__init__("strictly_increasing", tuple(flat))
+
+    @property
+    def args(self) -> tuple[ExprLike, ...]:
+        """ READ-ONLY, well-tuped arguments of this global constraint """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1876,7 +1911,13 @@ class DecreasingStrict(GlobalConstraint):
                 flat.extend(a)
             else:
                 flat.append(a)
+        # args: tuple[ExprLike, ...]
         super().__init__("strictly_decreasing", tuple(flat))
+
+    @property
+    def args(self) -> tuple[ExprLike, ...]:
+        """ READ-ONLY, well-tuped arguments of this global constraint """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """

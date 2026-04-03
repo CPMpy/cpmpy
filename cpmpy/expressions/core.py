@@ -137,10 +137,6 @@ class Expression(object):
     def args(self) -> tuple[Any, ...]:
         return self._args
 
-    @args.setter
-    def args(self, args: Iterable[Any]) -> None:
-        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
-
     def update_args(self, args: Iterable[Any]) -> None:
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
