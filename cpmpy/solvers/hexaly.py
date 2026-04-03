@@ -141,7 +141,7 @@ class CPM_hexaly(SolverInterface):
     def native_model(self):
         return self.hex_model
 
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the Hexaly solver
 
@@ -168,6 +168,16 @@ class CPM_hexaly(SolverInterface):
                 raise ValueError(f"Time limit must be positive but was {time_limit}")
             self.hex_solver.param.time_limit = int(time_limit)  # hexaly does not support float time limit
 
+        # register solution callback
+        callback = None
+        if "solution_callback" in kwargs:
+            callback = kwargs.pop("solution_callback")
+        if callback is None and display is not None:
+            callback = HexSolutionPrinter(self, display)
+        if callback is not None:
+            from hexaly.optimizer import HxCallbackType
+            self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, callback)
+
         # set solver parameters
         for arg, val in kwargs.items():
             setattr(self.hex_solver.param, arg, val)
@@ -175,11 +185,6 @@ class CPM_hexaly(SolverInterface):
         if self.is_satisfaction: # set dummy objective for satisfaction problems
             self.hex_model.add_objective(0, HxObjectiveDirection.MINIMIZE)
 
-        # register solution callback
-        if solution_callback is not None:
-            from hexaly.optimizer import HxCallbackType
-            self.hex_solver.add_callback(HxCallbackType.TIME_TICKED, solution_callback)
-        
         # new status, translate runtime
         self.hex_model.close() # model must be closed
         self.hex_solver.solve()
@@ -188,8 +193,8 @@ class CPM_hexaly(SolverInterface):
         self.cpm_status.runtime = self.hex_solver.statistics.running_time # wallclock time in (float) seconds
 
         # unregister solution callback
-        if solution_callback is not None:
-            self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, solution_callback)
+        if callback is not None:
+            self.hex_solver.remove_callback(HxCallbackType.TIME_TICKED, callback)
 
         # Translate solver exit status to CPMpy exit status
         # CSP:                         COP:
@@ -523,7 +528,7 @@ class HexSolutionPrinter:
                     default/None: nothing displayed
         solution_limit (default = None): stop after this many solutions 
     """
-    def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+    def __init__(self, solver:CPM_hexaly, display:Optional[Callback]=None, solution_limit:Optional[int]=None, verbose:bool=False):
         self.__last_best_value = None
         self.__solution_count = 0
 
