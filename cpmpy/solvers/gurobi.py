@@ -191,34 +191,19 @@ class CPM_gurobi(SolverInterface):
                 raise ValueError("Time limit must be positive")
             self.grb_model.setParam("TimeLimit", time_limit)
 
+        # handle solution callbacks
+        callback = None
+        if "solution_callback" in kwargs:
+            callback = kwargs.pop("solution_callback")
+        if callback is None and display is not None:
+            callback = self._get_callback(display, events=[GRB.Callback.MIPSOL])
+
         # call the solver, with parameters
         for param, val in kwargs.items():
             self.grb_model.setParam(param, val)
 
-        # handle callbacking
-        if display is not None:
-            assert "solution_callback" not in kwargs, "Cannot have both generic CPMpy callback and specialized gurobi solution callback"
-            if isinstance(display, Expression) or is_any_list(display):
-                _cpm_vars = get_variables(display)
-            else:
-                _cpm_vars = list(self.user_vars)
-            # avoid re-lookup
-            grb_vars = self.solver_vars(_cpm_vars)
-            def solution_callback(model, state, **kwargs):
-                if state == GRB.Callback.MIPSOL: # found new solution
-                    grb_sol = model.cbGetSolution(grb_vars)
-                    for cpm_var, val in zip(_cpm_vars, grb_sol):
-                        cpm_var._value = val
-
-                    if isinstance(display, Expression):
-                        print(argval(display))
-                    elif is_any_list(display):
-                        print(argvals(display))
-                    else:
-                        display()
-
         # call the gurobi solver with callback
-        self.grb_model.optimize(callback=solution_callback)
+        self.grb_model.optimize(callback=callback)
         grb_status = self.grb_model.Status
         grb_objective = self.grb_model.getObjective()
 
@@ -636,3 +621,35 @@ class CPM_gurobi(SolverInterface):
         # if unsat or timout with no solution, .solve() will have already set the state accordingly (so nothing to update)
 
         return opt_sol_count
+
+    def _get_callback(self, display, events):
+
+        self.events=  frozenset(events)
+        if isinstance(display, Expression) or is_any_list(display):
+            cpm_vars = get_variables(display)
+        else:
+            cpm_vars = list(self.user_vars)
+        grb_vars = self.solver_vars(cpm_vars)
+
+        def callback(model, state, **kwargs):
+            # fill in vars
+            if state not in self.events:
+                return # irrelevant event
+
+            grb_sol = model.cbGetSolution(grb_vars)
+            for cpm_var, solver_val in zip(cpm_vars, grb_sol):
+                if cpm_var.is_bool():
+                    cpm_var._value = solver_val >= 0.5
+                else:
+                    cpm_var._value = int(solver_val)
+
+            if isinstance(display, Expression):
+                print(display.value())
+            elif is_any_list(display):
+                print(argvals(display))
+            else:
+                assert callable(
+                    display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                display()  # callback
+
+        return callback
