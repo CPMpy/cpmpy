@@ -20,7 +20,6 @@ List of submodules
 # we only import methods/classes that are used for modelling
 # others need to be imported by the developer explicitely
 from .variables import boolvar, intvar, cpm_array
-from .variables import BoolVar, IntVar, cparray  # Old, to be deprecated
 from .globalconstraints import (
     AllDifferent,
     AllDifferentExcept0,
@@ -52,7 +51,6 @@ from .globalconstraints import (
     NegativeTable,
     Regular,
 )
-from .globalconstraints import alldifferent, allequal, circuit  # Old, to be deprecated
 from .globalfunctions import (
     Minimum,
     Maximum,

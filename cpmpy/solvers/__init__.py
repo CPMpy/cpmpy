@@ -62,7 +62,7 @@ List of functions
     param_combinations
 """
 
-from .utils import builtin_solvers, get_supported_solvers, param_combinations
+from .utils import param_combinations
 from .ortools import CPM_ortools
 from .pysat import CPM_pysat
 from .minizinc import CPM_minizinc
@@ -80,7 +80,6 @@ from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
 
 __all__ = [
-    "builtin_solvers",
     "CPM_choco",
     "CPM_cplex",
     "CPM_cpo",
@@ -96,6 +95,5 @@ __all__ = [
     "CPM_pysdd",
     "CPM_rc2",
     "CPM_z3",
-    "get_supported_solvers",
     "param_combinations",
 ]
