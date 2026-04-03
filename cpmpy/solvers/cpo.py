@@ -50,7 +50,7 @@ from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, NDVarArray
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -156,14 +156,14 @@ class CPM_cpo(SolverInterface):
         """
         return self.cpo_model
     
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the CP Optimizer solver
 
             Arguments:
-                time_limit (float, optional):   maximum solve time in seconds 
-                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `CpoSolutionCounter`. If you want to count all solutions, 
-                                                                                                        don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
+                time_limit (float, optional):   maximum solve time in seconds
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
+                        default/None: nothing displayed
                 kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -199,14 +199,22 @@ class CPM_cpo(SolverInterface):
         # set time limit
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
-        
+
+        callback = None
+        # allow manual solution callback for backwards compatibility
+        if "solution_callback" in kwargs:
+            callback = kwargs.pop('solution_callback')
+        elif display is not None:
+            callback = CpoSolutionPrinter(self, display)
+
         # create solver object
         self.cpo_solver = docp.solver.solver.CpoSolver(
             self.cpo_model,
-            TimeLimit=time_limit, 
-            **kwargs, 
-            listeners=[solution_callback] if solution_callback is not None else None
+            TimeLimit=time_limit,
+            **kwargs,
         )
+        if callback is not None:
+            self.cpo_solver.add_callback(callback)
 
         self.cpo_result = self.cpo_solver.solve()
 
@@ -681,10 +689,11 @@ class CPM_cpo(SolverInterface):
 # solvers are optional, so this file should be interpretable
 # even if cpo is not installed...
 try:
-    from docplex.cp.solver.solver_listener import CpoSolverListener
+    from docplex.cp.solver.cpo_callback import CpoCallback, EVENT_SOLUTION
+    from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
     import time
 
-    class CpoSolutionCounter(CpoSolverListener):
+    class CpoSolutionCounter(CpoCallback):
         """
         Native CP Optimizer callback for solution counting.
 
@@ -710,8 +719,10 @@ try:
             if self.__verbose:
                 self.__start_time = time.time()
 
-        def result_found(self, solver, sres):
-            """Called on each new solution."""
+        def invoke(self, solver: CpoSolver, event:str, sres:CpoSolveResult):
+            """Keep track of solution count"""
+            if event != EVENT_SOLUTION:
+                return# irrelevant event
             if self.__verbose:
                 current_time = time.time()
                 obj = sres.get_objective_value()
@@ -756,7 +767,7 @@ try:
                             default/None: nothing displayed
                 solution_limit (default = None): stop after this many solutions 
         """
-        def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+        def __init__(self, solver: CPM_cpo, display=None, solution_limit=None, verbose=False, events:set[str]={EVENT_SOLUTION}):
             super().__init__(verbose)
             self._solution_limit = solution_limit
             # we only need the cpmpy->solver varmap from the solver
@@ -769,9 +780,13 @@ try:
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
                 self._cpm_vars = solver.user_vars
+            self.events = frozenset(events)
 
-        def result_found(self, solver, sres):
-            """Called on each new solution."""
+        def invoke(self, solver:CpoSolver, event: str, sres:CpoSolveResult):
+            """Invoke for each relevant event"""
+            if event not in self.events:
+                return # irrelevant events
+
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
@@ -784,8 +799,8 @@ try:
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                if isinstance(self._display, Expression):
-                    print(argval(self._display))
+                if isinstance(self._display, (Expression, NDVarArray)):
+                    print(self._display.value())
                 elif is_any_list(self._display):
                     # explicit list of expressions to display
                     print(argvals(self._display))
