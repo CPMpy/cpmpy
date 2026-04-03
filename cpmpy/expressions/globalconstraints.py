@@ -141,7 +141,7 @@ import cpmpy as cp
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
+from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, get_minimax_bounds_listlike, argvals_listlike, clean_bool
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -216,7 +216,7 @@ class AllDifferent(GlobalConstraint):
     Enforces that all arguments have a different (distinct) value
     """
 
-    def __init__(self, *args: ExprLike|ListLike[ExprLike]):
+    def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ExprLike|ListLike[ExprLike]): List of expressions or constants to be different from each other
@@ -259,8 +259,7 @@ class AllDifferent(GlobalConstraint):
         
         For use with integer linear programming and pb/sat solvers.
         """
-        lbs, ubs = get_bounds(self.args)
-        lb, ub = min(lbs), max(ubs)
+        lb, ub = get_minimax_bounds_listlike(self.args)
         return [cp.sum((arg_i == val) for arg_i in self.args) <= 1 for val in range(lb, ub + 1)], []
 
     def value(self) -> Optional[bool]:
@@ -268,10 +267,10 @@ class AllDifferent(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        vals = argvals(self.args)
-        if any(v is None for v in vals):
+        vals = argvals_listlike(self.args)
+        if vals is None:
             return None
-        return len(set(vals)) == len(self.args)
+        return len(set(vals)) == len(vals)
 
 
 class AllDifferentExceptN(GlobalConstraint):
@@ -279,7 +278,7 @@ class AllDifferentExceptN(GlobalConstraint):
     Enforces that all arguments, except those equal to a value in n, have a different (distinct) value.
 
     Arguments:
-        arr (Sequence[Expression]): List of expressions to be different from each other, except those equal to a value in n
+        arr (ListLike[ExprLike]): List of expressions to be different from each other, except those equal to a value in n
         n (int or list[int]): Value or list of values that are excluded from satisfying the alldifferent condition
     """
 
@@ -398,15 +397,16 @@ class AllEqual(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         # arg0 == arg1, arg1 == arg2, arg2 == arg3... no need to post n^2 equalities
-        return [x == y for x, y in zip(self.args[:-1], self.args[1:])], []
+        decomp = clean_bool([x == y for x, y in zip(self.args[:-1], self.args[1:])]) 
+        return decomp, []
 
     def value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        vals = argvals(self.args)
-        if any(v is None for v in vals):
+        vals = argvals_listlike(self.args)
+        if vals is None:
             return None
         return len(set(vals)) == 1
 
@@ -511,7 +511,13 @@ class Circuit(GlobalConstraint):
 
         # construct the chain of neighbors
         succ = cp.cpm_array(self.args)
-        order = [succ[0]]
+        tmp: ExprLike = succ[0]
+        if isinstance(tmp, Expression):
+            succ_0: Expression = tmp
+        else:
+            # type incompatible side-case, succ[0] should not be a constant
+            succ_0 = intvar(int(tmp), int(tmp)) 
+        order: list[Expression] = [succ_0]
         for i in range(1, len(succ)):
             order.append(succ[order[i - 1]])
 
@@ -1538,7 +1544,7 @@ class NoOverlapOptional(GlobalConstraint):
         Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
         
         Returns:
-            tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         start, dur, end, is_present = self.args
         cons = [implies(p, d >= 0) for d, p in zip(dur, is_present)]
@@ -1735,15 +1741,15 @@ class Increasing(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
-        return [args[i] <= args[i+1] for i in range(len(args)-1)], []
+        return clean_bool([args[i] <= args[i+1] for i in range(len(args)-1)]), []
 
     def value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        args = argvals(self.args)
-        if any(x is None for x in args):
+        args = argvals_listlike(self.args)
+        if args is None:
             return None
         return all(args[i] <= args[i+1] for i in range(len(args)-1))
 
@@ -1788,15 +1794,15 @@ class Decreasing(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
-        return [args[i] >= args[i+1] for i in range(len(args)-1)], []
+        return clean_bool([args[i] >= args[i+1] for i in range(len(args)-1)]), []
 
     def value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        args = argvals(self.args)
-        if any(x is None for x in args):
+        args = argvals_listlike(self.args)
+        if args is None:
             return None
         return all(args[i] >= args[i+1] for i in range(len(args)-1))
 
@@ -1841,15 +1847,15 @@ class IncreasingStrict(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
-        return [args[i] < args[i+1] for i in range(len(args)-1)], []
+        return clean_bool([args[i] < args[i+1] for i in range(len(args)-1)]), []
 
     def value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        args = argvals(self.args)
-        if any(x is None for x in args):
+        args = argvals_listlike(self.args)
+        if args is None:
             return None
         args = argvals(self.args)
         return all(args[i] < args[i+1] for i in range(len(args)-1))
@@ -1895,17 +1901,16 @@ class DecreasingStrict(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         args = self.args
-        return [(args[i] > args[i+1]) for i in range(len(args)-1)], []
+        return clean_bool([args[i] > args[i+1] for i in range(len(args)-1)]), []
 
     def value(self) -> Optional[bool]:
         """
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        args = argvals(self.args)
-        if any(x is None for x in args):
+        args = argvals_listlike(self.args)
+        if args is None:
             return None
-        args = argvals(self.args)
         return all(args[i] > args[i+1] for i in range(len(args)-1))
 
 
