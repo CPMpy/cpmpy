@@ -130,3 +130,31 @@ class TestTransSimplify:
         cons = sum( weights * (bv != bool_as_ints) ) == 1
         assert str(self.transform(cons)) == "[sum([1, 2] * [bv[0], ~bv[1]]) == 1]"
         assert cp.Model(cons).solve()
+
+    def test_xor_simplify(self):
+        p, q = self.bvs[:2]
+        # The issue
+        expr = cp.Xor([cp.BoolVal(True), cp.BoolVal(True), p])
+        assert str(self.transform(expr)) == str([p])
+
+        # Other cases
+        expr = cp.Xor([cp.BoolVal(True), p])
+        assert str(self.transform(expr)) == str([~p])
+
+        expr = cp.Xor([cp.BoolVal(False), p])
+        assert str(self.transform(expr)) == str([p])
+
+        expr = cp.Xor([cp.BoolVal(True), cp.BoolVal(True), cp.BoolVal(True), p])
+        assert str(self.transform(expr)) == str([~p])
+
+        expr = cp.Xor([cp.BoolVal(True), cp.BoolVal(False), p])
+        assert str(self.transform(expr)) == str([~p])
+
+        expr = cp.Xor([])
+        assert str(self.transform(expr)) == str([BoolVal(False)])
+
+        expr = cp.Xor([p])
+        assert str(self.transform(expr)) == str([p])
+
+        expr = cp.Xor([p, q])
+        assert str(self.transform(expr)) == str([cp.Xor([p, q])])
