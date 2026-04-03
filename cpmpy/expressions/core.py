@@ -86,7 +86,8 @@
 """
 import copy
 import warnings
-from typing import Any, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
+from typing import Any, Final, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
+from frozendict import frozendict
 import numpy as np
 import cpmpy as cp
 
@@ -390,15 +391,17 @@ class Expression(object):
     def __rmod__(self, other):
         return cp.Modulo(other, self)
 
-    def __pow__(self, other, modulo=None):
-        assert (modulo is None), "Power operator: modulo not supported"
-        if is_num(other) and other == 1:
+    def __pow__(self, other: Any, modulo: Optional[int] = None):
+        if modulo is not None:
+            raise TypeError("Power operator: modulo not supported")
+        if not isinstance(other, (int, np.integer)):
+            raise TypeError(f"Power operator requires a constant integer exponent, not: {other}")
+        if other == 1:
             return self
         return cp.Power(self, other)
 
-    def __rpow__(self, other, modulo=None):
-        assert (modulo is None), "Power operator: modulo not supported"
-        return cp.Power(other, self)
+    def __rpow__(self, other: Any):
+        raise TypeError(f"Power operator requires a constant integer exponent, not a CPMpy expression: {self}")
 
     # Not implemented: (yet?)
     #object.__divmod__(self, other)
@@ -421,7 +424,7 @@ class Expression(object):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", [self])
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         raise ValueError(f"__bool__ should not be called on a CPMPy expression {self} as it will always return True\n"
                          "Do not use an expression as argument in an `if` statement and use cpmpy.any, cpmpy.max instead of python builtins\n"
                          "If you think this is an error, please report on github")
@@ -544,7 +547,7 @@ class BoolVal(Expression):
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
     """
-    allowed = {'==', '!=', '<=', '<', '>=', '>'}
+    allowed: Final = frozenset({'==', '!=', '<=', '<', '>=', '>'})
 
     def __init__(self, name: str, left: ExprLike, right: ExprLike) -> None:
         """
@@ -592,7 +595,7 @@ class Operator(Expression):
     Convention for 2-ary operators: if one of the two is a constant,
     it is stored first (as expr[0]), this eases weighted sum detection
     """
-    allowed = {
+    allowed: Final = frozendict({
         #name: (arity, is_bool)       arity 0 = n-ary, min 2
         'and': (0, True),
         'or':  (0, True),
@@ -602,8 +605,8 @@ class Operator(Expression):
         'wsum': (2, False),
         'sub': (2, False), # x - y
         '-':   (1, False), # -x
-    }
-    printmap = {'sum': '+', 'sub': '-'}
+    })
+    printmap: Final = frozendict({'sum': '+', 'sub': '-'})
 
     def __init__(self, name: str, arg_list: Sequence[ExprLike | ListLike[ExprLike]]) -> None:
         """
