@@ -90,8 +90,8 @@ from typing import Any, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
 import numpy as np
 import cpmpy as cp
 
-from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
-from ..exceptions import IncompleteFunctionError, TypeError
+from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
+from ..exceptions import TypeError
 
 # Common typing helpers
 T = TypeVar("T")
@@ -108,6 +108,7 @@ class Expression(object):
 
     Expressions may implement:
 
+    - :attr:`~cpmpy.expressions.core.Expression.args`:                  can override it with a narrower type for the arguments
     - :func:`~cpmpy.expressions.core.Expression.is_bool`:               whether its return type is Boolean
     - :func:`~cpmpy.expressions.core.Expression.value`:                 the value of the expression, default None
     - :func:`implies(x) <cpmpy.expressions.core.Expression.implies>`:   logical implication of this expression towards `x`
