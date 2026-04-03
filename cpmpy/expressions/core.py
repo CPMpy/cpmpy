@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #-*- coding:utf-8 -*-
+from __future__ import annotations
 ##
 ## expressions.py
 ##
@@ -73,7 +74,10 @@
         subexpressions and doing the appropriate computation
         this is used to conveniently print variable values, objective values
         and any other expression value (e.g. during debugging).
-    
+
+    :class:`~cpmpy.expressions.core.Description` bundles optional human-readable text and print flags for
+    :meth:`~cpmpy.expressions.core.Expression.set_description`, which can override :meth:`~cpmpy.expressions.core.Expression.__str__`.
+
     ===============
     List of classes
     ===============
@@ -81,11 +85,14 @@
         :nosignatures:
 
         Expression
+        BoolVal
         Comparison
         Operator
+        Description
 """
 import copy
 import warnings
+from dataclasses import dataclass
 from typing import Any, Final, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
 from frozendict import frozendict
 import numpy as np
@@ -113,8 +120,10 @@ class Expression(object):
     - :func:`~cpmpy.expressions.core.Expression.value`:                 the value of the expression, default None
     - :func:`implies(x) <cpmpy.expressions.core.Expression.implies>`:   logical implication of this expression towards `x`
     - :func:`~cpmpy.expressions.core.Expression.__repr__`:              for pretty printing the expression
+    - :meth:`~cpmpy.expressions.core.Expression.set_description`:      optional custom :meth:`__str__` text (class default ``_description`` is ``None``; set on the instance when used)
     - any ``__op__`` python operator overloading
     """
+    _description: Optional[Description] = None
 
     def __init__(self, name: str, arg_list: tuple[Any, ...]):
         """
@@ -151,21 +160,20 @@ class Expression(object):
         if hasattr(self, "_has_subexpr"):
             del self._has_subexpr
 
-    def set_description(self, txt, override_print=True, full_print=False):
-        self.desc = txt
-        self._override_print = override_print
-        self._full_print = full_print
+    def set_description(self, txt: str, override_print: bool = True, full_print: bool = False) -> None:
+        self._description = Description(txt, override_print, full_print)
 
-    def __str__(self):
-        if not hasattr(self, "desc") or self._override_print is False:
+    def __str__(self) -> str:
+        d = self._description
+        if d is None or not d.override_print:
             return self.__repr__()
-        out = self.desc
-        if self._full_print:
-            out += " -- "+self.__repr__()
+        out = d.text
+        if d.full_print:
+            out += " -- " + self.__repr__()
         return out
 
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         strargs = []
         for arg in self.args:
             if isinstance(arg, np.ndarray):
@@ -803,3 +811,11 @@ def _wsum_make(arg) -> tuple[list[int], list[ExprLike]]:
         return [-1], [arg.args[0]]
     # default
     return [1], [arg]
+
+
+@dataclass(slots=True)
+class Description:
+    """Human-readable print metadata for an :class:`~cpmpy.expressions.core.Expression`; set via :meth:`~cpmpy.expressions.core.Expression.set_description`."""
+    text: str
+    override_print: bool = True
+    full_print: bool = False
