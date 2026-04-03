@@ -91,8 +91,8 @@ from frozendict import frozendict
 import numpy as np
 import cpmpy as cp
 
-from .utils import is_int, is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
-from ..exceptions import IncompleteFunctionError, TypeError
+from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
+from ..exceptions import TypeError
 
 # Common typing helpers
 T = TypeVar("T")
@@ -109,6 +109,7 @@ class Expression(object):
 
     Expressions may implement:
 
+    - :attr:`~cpmpy.expressions.core.Expression.args`:                  can override it with a narrower type for the arguments
     - :func:`~cpmpy.expressions.core.Expression.is_bool`:               whether its return type is Boolean
     - :func:`~cpmpy.expressions.core.Expression.value`:                 the value of the expression, default None
     - :func:`implies(x) <cpmpy.expressions.core.Expression.implies>`:   logical implication of this expression towards `x`
@@ -116,7 +117,7 @@ class Expression(object):
     - any ``__op__`` python operator overloading
     """
 
-    def __init__(self, name: str, arg_list: tuple[Any, ...]):
+    def __init__(self, name: str, arg_list: tuple[Any, ...], has_subexpr: Optional[bool] = None):
         """
         Constructor of the Expression class
 
@@ -127,29 +128,33 @@ class Expression(object):
                 Requirement: Expressions should only be stored in arguments that are (nested) ListLike's, not inside other custom objects
                 Tip1: store lists of constants as np.ndarray, so we can see it is constant without recursing into it
                 Tip2: keep your NDVarArrays as is; if you require them to be 1D, do .reshape(-1) to flatten them
+        - has_subexpr (Optional[bool]): provide this if you know the answer already, to avoid computing it
         """
         self.name = name
         if not isinstance(arg_list, tuple):
             warnings.warn(f"DEPRECATED: Argument list of {name} is not a tuple, updated the constructor!", UserWarning)
             arg_list = tuple(arg_list)
         self._args = arg_list
+        self._has_subexpr = has_subexpr
 
     @property
     def args(self) -> tuple[Any, ...]:
+        """ READ-ONLY access to the expression's arguments.
+            Use :func:`~cpmpy.expressions.core.Expression.update_args` to update the arguments.
+
+            Subclasses can override this property to return a more precisely typed tuple.
+        """
         return self._args
 
-    @args.setter
-    def args(self, args: Iterable[Any]) -> None:
-        raise AttributeError("Cannot modify read-only attribute 'args', use 'update_args()'")
-
-    def update_args(self, args: Iterable[Any]) -> None:
+    def update_args(self, args: Iterable[Any], has_subexpr: Optional[bool] = None) -> None:
         """ Allows in-place update of the expression's arguments.
             Resets all cached computations which depend on the expression tree.
+
+            - args (Iterable[Any]): new arguments
+            - has_subexpr (Optional[bool]): provide this if you know the answer already, to avoid computing it
         """
         self._args = tuple(args)
-        # Reset cached "_has_subexpr"
-        if hasattr(self, "_has_subexpr"):
-            del self._has_subexpr
+        self._has_subexpr = has_subexpr
 
     def set_description(self, txt, override_print=True, full_print=False):
         self.desc = txt
@@ -186,8 +191,8 @@ class Expression(object):
             Results are cached for future calls and reset when the expression changes
             (in-place argument update).
         """
-        # return cached result
-        if hasattr(self, '_has_subexpr'):
+        # return previously computed result
+        if self._has_subexpr is not None:
             return self._has_subexpr
         
         # micro-optimisations, cache the lookups
