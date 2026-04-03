@@ -159,13 +159,8 @@ class CPM_ortools(SolverInterface):
                                 For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                 get_core() returns a small subset of assumption variables that are unsat together.
                                 Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
-                display:        generic solution callback for use during optimization.
-                                either a list of CPMpy expressions, OR a callback function which
-                                gets called after the variable-value mapping of the intermediate solution.
-                                default/None: nothing is displayed
-                solution_callback (an `ort.CpSolverSolutionCallback` object):   CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions,
-                                                                                don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
-
+                display:        Callback for each improving solution, either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
+                                    default/None: nothing displayed
 
             The ortools solver parameters are defined in its 'sat_parameters.proto' description:
             https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
@@ -216,6 +211,13 @@ class CPM_ortools(SolverInterface):
             # still present in v9.0
             self.ort_solver.parameters.keep_all_feasible_solutions_in_presolve = True
 
+        # setup solution callback, allow setting solution callback in kwargs for backwards compatibility
+        solution_callback = None
+        if "solution_callback" in kwargs:
+            solution_callback = kwargs.pop('solution_callback')
+        elif display is not None:
+            solution_callback = OrtSolutionPrinter(self, display)
+
         # set additional keyword arguments in sat_parameters.proto
         for (kw, val) in kwargs.items():
             # Convert integer values to enum values for parameters that require enums (OR-Tools >= 9.15)
@@ -229,12 +231,6 @@ class CPM_ortools(SolverInterface):
             # but only if a nonstandard stdout, otherwise duplicate output
             # see https://github.com/CPMpy/cpmpy/issues/84
             self.ort_solver.log_callback = print
-
-        if display is not None:
-            assert "solution_callback" not in kwargs, "Cannot have both generic CPMpy callback and specialized ortools solution callback"
-            solution_callback = OrtSolutionPrinter(self, display)
-        else:
-            solution_callback = kwargs.get("solution_callback")
 
         # call the solver, with parameters
         self.ort_status = self.ort_solver.solve(self.ort_model, solution_callback=solution_callback)
