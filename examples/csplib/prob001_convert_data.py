@@ -3,6 +3,8 @@ This file just reads a csp001 instance textfile and converts it into JSON format
 See `prob001_car_sequence.py` for the actual model that uses the JSON data file
 """
 import json
+import os
+
 import numpy as np
 import re
 import sys
@@ -139,11 +141,13 @@ if __name__ == "__main__":
   if len(sys.argv) > 2:
     out = sys.argv[2]
 
-  problems = list(parse_data(fname))
+  # if fname file does not exist, end with a warning
+  if not os.path.exists(fname):
+    print(f"File {fname} does not exist. No data to convert.")
+  else:
+    problems = list(parse_data(fname))
 
+    with open(out, "w") as outfile:
+      json.dump(problems, outfile, cls=CompactJSONEncoder, indent=4)
 
-  # outstring = pprint.pformat(problems, indent=4, sort_dicts=False)
-  # outstring = outstring.replace("'",'"')
-
-  with open(out, "w") as outfile:
-    json.dump(problems, outfile, cls=CompactJSONEncoder, indent=4)
+    print(f"Converted {len(problems)} problems to {out}")

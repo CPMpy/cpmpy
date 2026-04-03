@@ -17,6 +17,7 @@ Model was created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 
 import cpmpy
+from pathlib import Path
 from cpmpy import *
 
 def car_sequence(n_cars, n_options, n_classes, n_cars_p_class, options, capacity=None, blocks=None, **kwargs):
@@ -72,11 +73,9 @@ if __name__ == "__main__":
     import requests
 
     # argument parsing
-    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/master/examples/csplib/prob001_car_sequence.json"
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    #parser.add_argument('-instance', nargs='?', default="Problem 4/72  (Regin & Puget #1)", help="Name of the problem instance found in file 'filename'")
     parser.add_argument('-instance', nargs='?', default="Problem 60-04", help="Name of the problem instance found in file 'filename'")
-    parser.add_argument('-filename', nargs='?', default=url, help="File containing problem instances, can be local file or url")
+    parser.add_argument('-filename', nargs='?', default=str(Path(__file__).with_name("prob001_car_sequence.json")), help="File containing problem instances, can be local file or url")
     parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
     args = parser.parse_args()

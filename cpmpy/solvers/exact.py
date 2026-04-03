@@ -4,7 +4,7 @@
 ## exact.py
 ##
 """
-    Interface to Exact
+    Interface to Exact's Python API
 
     Exact solves decision and optimization problems formulated as integer linear programs. 
     Under the hood, it converts integer variables to binary (0-1) variables and applies highly efficient 
@@ -12,6 +12,26 @@
 
     The solver's git repository:
     https://gitlab.com/nonfiction-software/exact
+
+    Always use :func:`cp.SolverLookup.get("exact") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
+
+    ============
+    Installation
+    ============
+
+    Requires that the 'exact' python package is installed:
+
+    .. code-block:: console
+
+        $ pip install exact
+
+    .. warning::
+        Exact requires Python 3.10 or higher and the pip install only works on Linux and Windows.
+        On MacOS, you have to install the package from source.
+
+    See https://pypi.org/project/exact for more information.
+
+    The rest of this documentation is for advanced users.
 
     ===============
     List of classes
@@ -28,39 +48,44 @@
 """
 import sys  # for stdout checking
 import time
+import warnings
+from typing import Optional, List
 
-import pkg_resources
-from pkg_resources import VersionConflict
+from packaging.version import Version
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalfunctions import Multiplication
+from ..expressions.variables import intvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.decompose_global import decompose_in_tree
-from ..transformations.linearize import linearize_constraint, only_positive_bv
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals
+from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num
+from ..exceptions import NotSupportedError
 
 import numpy as np
 import numbers
 
 class CPM_exact(SolverInterface):
     """
-    Interface to the Python interface of Exact
-
-    Requires that the 'exact' python package is installed:
-    $ pip install exact
-    See https://pypi.org/project/exact for more information.
+    Interface to Exact's Python API
 
     Creates the following attributes (see parent constructor for more):
-        - xct_solver: the Exact instance used in solve() and solveAll()
-        - assumption_dict: maps Exact variables to (Exact value, CPM assumption expression)
+
+    - ``xct_solver`` : the Exact instance used in solve() and solveAll()
+    - ``assumption_dict`` : maps Exact variables to (Exact value, CPM assumption expression)
+
+    Documentation of the solver's own Python API is sparse, but example usage can be found at:
+    https://gitlab.com/nonfiction-software/exact/-/tree/main/python_examples
     """
+
+    supported_global_constraints = frozenset({"mul"})
+    supported_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
@@ -68,18 +93,27 @@ class CPM_exact(SolverInterface):
         try:
             # check if exact is installed
             import exact
-            # check installed version
-            pkg_resources.require("exact>=2.1.0")
+            xct_version = CPM_exact.version()
+            if Version(xct_version) < Version("2.1.0"):
+                warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version "
+                              f"{xct_version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
+                return False
             return True
         except ModuleNotFoundError: # exact is not installed
             return False
-        except VersionConflict: # unsupported version of exact
-            warnings.warn(f"CPMpy requires Exact version >=2.1.0 is required but you have version "
-                          f"{pkg_resources.get_distribution('exact').version}, beware exact>=2.1.0 requires "
-                          f"Python 3.10 or higher.")
-            return False
         except Exception as e:
             raise e
+
+    @staticmethod
+    def version() -> Optional[str]:
+        """
+        Returns the installed version of the solver's Python API.
+        """
+        from importlib.metadata import version, PackageNotFoundError
+        try:
+            return version('exact')
+        except PackageNotFoundError:
+            return None
 
 
     def __init__(self, cpm_model=None, subsolver=None, **kwargs):
@@ -90,8 +124,8 @@ class CPM_exact(SolverInterface):
         Exact solver object xct_solver.
 
         Arguments:
-        - cpm_model: Model(), a CPMpy Model() (optional)
-        - subsolver: None
+            cpm_model: Model(), a CPMpy Model() (optional)
+            subsolver: None
 
         Exact takes options at initialization instead of solving.
         The Exact solver parameters are defined by https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
@@ -99,12 +133,11 @@ class CPM_exact(SolverInterface):
         A workaround is to use dict-unpacking: `CPM_Exact(**{parameter-with-hyphen: 42})`
         """
         if not self.supported():
-            raise Exception("CPM_exact: Install the python package 'exact' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_exact: Install the python package 'cpmpy[exact]' to use this solver interface.")
         
         assert subsolver is None, "Exact does not allow subsolvers."
 
         from exact import Exact as xct
-
         # initialise the native solver object
         options = list(kwargs.items()) # options is a list of string-pairs, e.g. [("verbosity","1")]
         options = [(opt[0], str(opt[1])) for opt in options] # Ensure values are also strings
@@ -120,6 +153,7 @@ class CPM_exact(SolverInterface):
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="exact", cpm_model=cpm_model)
+
     @property
     def native_model(self):
         """
@@ -127,7 +161,7 @@ class CPM_exact(SolverInterface):
         """
         return self.xct_solver
 
-    def _fillVars(self, lst_vars=None):
+    def _fillVars(self):
         if not self.xct_solver.hasSolution():
             self.objective_value_ = None
             for cpm_var in self.user_vars:
@@ -135,24 +169,21 @@ class CPM_exact(SolverInterface):
             return
 
         # fill in variable values
-        if lst_vars is None:
-            lst_vars = list(self.user_vars)
+        lst_vars = list(self.user_vars)
         exact_vals = self.xct_solver.getLastSolutionFor(self.solver_vars(lst_vars))
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
-    def solve(self, time_limit=None, assumptions=None, display=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
         """
             Call Exact
 
-            Overwrites self.cpm_status
+            Overwrites ``self.cpm_status``
 
             :param assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
-                           For repeated solving, and/or for use with s.get_core(): if the model is UNSAT,
+                           For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
             :type assumptions: list of CPMpy Boolean variables
-            display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed. Only used when optimizing
 
             :param time_limit: optional, time limit in seconds
             :type time_limit: int or float
@@ -165,7 +196,9 @@ class CPM_exact(SolverInterface):
 
         # set additional keyword arguments
         if(len(kwargs.items())>0):
-            warnings.warn(f"Exact only supports options at initialization: {kwargs.items()}")
+            wrn_txt = f"Exact only supports options at initialization. Ignoring additional options {kwargs.items()}\n"
+            wrn_txt += "Use cp.SolverLookup.lookup('exact', **{parameter-with-hyphen: 42}) to set Exact parameters"
+            warnings.warn(wrn_txt)
 
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
@@ -180,51 +213,18 @@ class CPM_exact(SolverInterface):
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
             self.xct_solver.setAssumptions(list(zip(assump_vars,assump_vals)))
 
-        if display is not None and self.has_objective():
-            # this is a bit of a hack, but Exact does not support callbacks...
-            # have to manually interleave search instead, and make an assumption var to retract the objective after
-            #   see https://gitlab.com/nonfiction-software/exact/-/issues/23
-            lb, ub = get_bounds(self.objective_)
-            obj_assump = boolvar()
-            M = (ub - lb) + 1
-            self.objective(self.objective_ + M* obj_assump, self.objective_is_min_) # will post constraints obj + M * a < bound
-            self.xct_solver.setAssumptions([(self.solver_var(obj_assump), self.objective_is_min_)])
-
-            if isinstance(display, Expression) or is_any_list(display):
-                _cpm_vars = get_variables(display)
-            else:
-                _cpm_vars = None
-
-            start = time.time()
-            time_left = time_limit if time_limit is not None else 0
-            xct_status = self.xct_solver.runOnce(timeout=time_left)
-            while xct_status not in {"INCONSISTENT", "TIMEOUT"}:
-                self.xct_solver.boundObjByLastSol()  # ensure next one is improving
-                self._fillVars(_cpm_vars)
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:  # function
-                    display()
-                # next solve call
-                time_left = time_limit - (time.time() - start) if time_limit is not None else 0
-                xct_status = self.xct_solver.runOnce(timeout=time_left)
-            end = time.time()
-
-            # done, retract obj assumptions
-            if self.objective_is_min_:
-                obj_val = self.xct_solver.getBestSoFar() - M
-            else:
-                obj_val = -self.xct_solver.getBestSoFar()
-            self.xct_solver.setAssumptions([(self.solver_var(obj_assump), not self.objective_is_min_)])
-
-
+        # set time limit
+        if time_limit is not None:
+            if time_limit <= 0:
+                raise ValueError("Time limit must be positive")
+            timeout = time_limit
         else:
-            # call the solver, with parameters
-            start = time.time()
-            xct_status, obj_val = self.xct_solver.toOptimum(timeout=time_limit if time_limit is not None else 0)
-            end = time.time()
+            timeout = 0
+
+        # call the solver, with parameters
+        start = time.time()
+        my_status, obj_val = self.xct_solver.toOptimum(timeout=timeout)
+        end = time.time()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -232,18 +232,30 @@ class CPM_exact(SolverInterface):
 
         self.objective_value_ = None
         # translate exit status
-        if xct_status == "UNSAT" or xct_status == "INCONSISTENT": # found unsatisfiability (potentially over assumptions)
-            if self.has_objective() and self.xct_solver.hasSolution():
+        #   see 'toOptimum' documentation:
+        #   https://gitlab.com/nonfiction-software/exact/-/blob/main/src/interface/IntProg.cpp#L877
+        if my_status == "UNSAT": # found unsatisfiability
+            if self.has_objective() and self.xct_solver.hasSolution(): # optimisation problem -> unsat = no better solution found
                 self.cpm_status.exitstatus = ExitStatus.OPTIMAL
             else:
                 self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        elif xct_status == "SAT": # found solution, but not optimality proven
+        elif my_status == "SAT": # the optimal value has been found
             assert self.xct_solver.hasSolution()
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-        elif xct_status == "TIMEOUT": # found timeout
-            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            # COP
+            if self.has_objective():
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            # CSP
+            else:
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        elif my_status == "INCONSISTENT": # found inconsistency over assumptions
+            self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+        elif my_status == "TIMEOUT": # found timeout
+            if self.has_objective() and self.xct_solver.hasSolution(): # found a (sub-)optimal solution
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            else: # no solution found
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
         else:
-            raise NotImplementedError(xct_status)  # a new status type was introduced, please report on github
+            raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
         
         self._fillVars()
         if self.has_objective():
@@ -255,19 +267,26 @@ class CPM_exact(SolverInterface):
         # True/False depending on self.cpm_status
         return self._solve_return(self.cpm_status)
 
-    def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
+    def _update_time(self, timelim, start, end):
+        """
+            Internal helper function to keep track of remaining time.
+        """
+        if timelim != 0:
+            timelim -= (end - start)
+            if timelim == 0: timelim = -1
+        return timelim
+
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally, display the solutions.
 
             Arguments:
-                - display:  generic solution callback for use during optimization.
-                            either a list of CPMpy expressions, OR a callback function which
-                            gets called after the variable-value mapping of the intermediate solution.
-                            default/None: nothing is displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
+                        default/None: nothing displayed
+                time_limit: stop after this many seconds (default: None)
+                solution_limit: stop after this many solutions (default: None)
+                call_from_model: whether the method is called from a CPMpy Model instance or not
+                any other keyword argument
 
             Returns: number of solutions found
         """
@@ -282,30 +301,52 @@ class CPM_exact(SolverInterface):
 
         timelim = time_limit if time_limit is not None else 0
 
+        total_start = time.time()
+
         if self.has_objective():
+            start = time.time()
             if not call_from_model:
                 warnings.warn("Adding constraints to solver object to find all solutions, solver state will be invalid after this call!")
 
             (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
             if my_status == "UNSAT": # found unsatisfiability
+                total_end = time.time()
                 self._fillVars() # erases the solution
+                # update exit status
+                self.cpm_status = SolverStatus(self.name)
+                self.cpm_status.runtime = total_end - total_start
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+                # early exit
                 return 0
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout
+                total_end = time.time()
+                # update exit status
+                self.cpm_status = SolverStatus(self.name)
+                self.cpm_status.runtime = total_end - total_start
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+                # early exit
                 return 0
             else:
                 assert my_status == "SAT", "Unexpected status from Exact"
             self += self.objective_ == objval # fix obj val
+            end = time.time()
+            timelim = self._update_time(timelim, start, end) # update remaining time
+
 
         solsfound = 0
-        while solution_limit is None or solsfound < solution_limit:
+        while timelim >= 0 and (solution_limit is None or solsfound < solution_limit):
             # call the solver, with parameters
+            start = time.time()
             my_status = self.xct_solver.runFull(optimize=False, timeout=timelim)
+            end = time.time()
+            timelim = self._update_time(timelim, start, end) # update remaining time
+
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
-            if my_status == "UNSAT": # found unsatisfiability
+            if my_status == "UNSAT": # found unsatisfiability (no more solutions to be found)
                 self._fillVars() # erases the solution
-                return solsfound
+                break
             elif my_status == "SAT": # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
@@ -313,15 +354,36 @@ class CPM_exact(SolverInterface):
                 if display is not None:
                     self._fillVars()
                     if isinstance(display, Expression):
-                        print(argval(display))
-                    elif isinstance(display, list):
+                        print(display.value())
+                    elif is_any_list(display):
                         print(argvals(display))
                     else:
+                        assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                         display()  # callback
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout
-                return solsfound
+                break
+        total_end = time.time()
+
+        # new status, translate runtime
+        self.cpm_status = SolverStatus(self.name)
+        self.cpm_status.runtime = total_end - total_start
+
+        if solsfound: # found some solutions
+            if solsfound == solution_limit: # matched solution limit
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+            elif my_status == "UNSAT": # found all solutions (before limits were reached)
+                self.cpm_status.exitstatus = ExitStatus.OPTIMAL
+            else: # timeout
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else:
+            if my_status == "UNSAT": # unsat problem
+                self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
+            elif my_status == "TIMEOUT": # timeout
+                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
+            else:
+                raise NotImplementedError(my_status) # please report on GitHub
 
         return solsfound
 
@@ -340,8 +402,9 @@ class CPM_exact(SolverInterface):
         if is_num(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # variables to be translated should be positive
-        assert not isinstance(cpm_var, NegBoolView), "Internal error: found negative Boolean variables where only positive ones were expected, please report."
+        # special case, negative-bool-view. Should be eliminated in linearize
+        if isinstance(cpm_var, NegBoolView):
+            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
 
         # return it if it already exists
         if cpm_var in self._varmap:
@@ -366,22 +429,32 @@ class CPM_exact(SolverInterface):
 
     def objective(self, expr, minimize):
         """
-            Post the given expression to the solver as objective to minimize/maximize
+            Post the given expression to the solver as objective to minimize/maximize.
 
-            - expr: Expression, the CPMpy expression that represents the objective function
-            - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
+            Arguments:
+                expr: Expression, the CPMpy expression that represents the objective function
+                minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
         """
         self.objective_ = expr
         self.objective_is_min_ = minimize
 
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons  # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj))  # add objvars to vars
+        # save user variables
+        get_variables(expr, self.user_vars)
+
+        # transform objective
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_linear_objective(obj,
+                                                      supported=self.supported_global_constraints,
+                                                      supported_reified=self.supported_reified_global_constraints,
+                                                      csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+
+        self.add(safe_cons + decomp_cons + flat_cons)
 
         # make objective function or variable and post
-        xct_cfvars,xct_rhs = self._make_numexpr(flat_obj,0)
+        xct_cfvars,xct_rhs = self._make_numexpr(obj,0)
 
         # TODO: make this a custom transformation?
         newcfvrs = []
@@ -425,7 +498,6 @@ class CPM_exact(SolverInterface):
 
         return xcfvars, self.fix(xrhs)
 
-
     def transform(self, cpm_expr):
         """
         Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -433,7 +505,7 @@ class CPM_exact(SolverInterface):
         Implemented through chaining multiple solver-independent **transformation functions** from
         the `cpmpy/transformations/` directory.
 
-        See the 'Adding a new solver' docs on readthedocs for more information.
+        See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
         :param cpm_expr: CPMpy expression, or list thereof
         :type cpm_expr: Expression or list of Expression
@@ -442,15 +514,19 @@ class CPM_exact(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported=frozenset({'alldifferent'})) # Alldiff has a specialized MIP decomp
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]))  # supports >, <, !=
-        cpm_cons = only_bv_reifies(cpm_cons)
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","mul"}))  # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearisation, rewrite ~bv into 1-bv
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"}) # linearize and decompose expects safe exprs
+        cpm_cons = decompose_linear(cpm_cons,
+                                    supported=self.supported_global_constraints,
+                                    supported_reified = self.supported_reified_global_constraints,
+                                    csemap=self._csemap)
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","->","mul"}), csemap=self._csemap)  # the core of the MIP-linearization
+        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
 
         return cpm_cons
 
@@ -466,10 +542,10 @@ class CPM_exact(SolverInterface):
         self.xct_solver.addRightReification(head, sign, xct_cfvars, self.fix(xct_rhs))
 
     @staticmethod
-    def is_multiplication(cpm_expr): # helper function
-        return isinstance(cpm_expr, Operator) and cpm_expr.name == 'mul'
+    def is_multiplication(cpm_expr):  # helper function (Multiplication is GlobalFunction name 'mul')
+        return isinstance(cpm_expr, Multiplication)
 
-    def __add__(self, cpm_expr_orig):
+    def add(self, cpm_expr_orig):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -498,11 +574,8 @@ class CPM_exact(SolverInterface):
             if isinstance(cpm_expr, Comparison):
                 lhs, rhs = cpm_expr.args
                 if cpm_expr.name == "==":
-                    assert isinstance(lhs, Operator)
-                    # can be sum, wsum or mul
+                    # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
                     if lhs.name == "mul":
-                        assert pkg_resources.require("exact>=2.1.0"), f"Multiplication constraint {cpm_expr} " \
-                                                                      f"only supported by Exact version 2.1.0 and above"
                         if is_num(rhs): # make dummy var
                             rhs = intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
@@ -511,7 +584,7 @@ class CPM_exact(SolverInterface):
                         self.xct_solver.addMultiplication(self.solver_vars(lhs.args), True, xct_rhs, True, xct_rhs)
 
                     else:
-                        assert lhs.name == "sum" or lhs.name == "wsum"
+                        assert isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")
                         xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                         self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
 
@@ -564,6 +637,7 @@ class CPM_exact(SolverInterface):
                 raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
             
         return self
+    __add__ = add  # avoid redirect in superclass
 
     def get_core(self):
         from exact import Exact as xct
@@ -580,9 +654,10 @@ class CPM_exact(SolverInterface):
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
 
 
-    def solution_hint(self, cpm_vars, vals):
+    def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
         Exact supports warmstarting the solver with a partial feasible assignment.
+
         :param cpm_vars: list of CPMpy variables
         :param vals: list of (corresponding) values for the variables
         """

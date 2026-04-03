@@ -14,4 +14,5 @@ Expression transformations (:mod:`cpmpy.transformations`)
 .. .. include:: ./transformations/negation.rst
 .. .. include:: ./transformations/normalize.rst
 .. .. include:: ./transformations/reification.rst
+.. .. include:: ./transformations/safening.rst
 .. .. include:: ./transformations/to_cnf.rst

@@ -38,7 +38,7 @@ def PAF(arr, s):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("-length", nargs='?', type=int, default=16, help="Length of bitarray")
+    parser.add_argument("-length", nargs='?', type=int, default=12, help="Length of bitarray")
 
     length = parser.parse_args().length
 

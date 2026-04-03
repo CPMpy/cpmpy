@@ -29,7 +29,7 @@ def word_design(n=2):
 
     # 4 symbols from {C,G}
     for w in words:
-        model += sum((w == C) | (w == G)) >= 4
+        model += sum((w == C) | (w == G)) == 4
 
     # each pair of distinct words differ in at least 4 positions
     for x,y in all_pairs(words):
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("-n_words", type=int, default=24, help="Number of words to find")
+    parser.add_argument("-n_words", type=int, default=8, help="Number of words to find")
 
     n = parser.parse_args().n_words
 

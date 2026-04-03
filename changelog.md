@@ -1,5 +1,388 @@
 # Change log
 
+## 0.10.0
+
+### Added
+
+* **New solver**: Rc2 MaxSAT solver [#729](https://github.com/CPMpy/cpmpy/pull/729)
+* Expended `to_cnf` using `pumpkin` encoding backend [#782](https://github.com/CPMpy/cpmpy/pull/782)
+* Linearisation of multiplication between Boolean and Integer [#769](https://github.com/CPMpy/cpmpy/pull/769)
+* Solution callback for Hexaly [#787](https://github.com/CPMpy/cpmpy/pull/787), [#809](https://github.com/CPMpy/cpmpy/pull/809)
+* Start of solver parametrised testsuite [#817](https://github.com/CPMpy/cpmpy/pull/817)
+* Documentation overview of solver capabilities [#728](https://github.com/CPMpy/cpmpy/pull/728)
+* Typehints and documentation update for global constraints [#812](https://github.com/CPMpy/cpmpy/pull/812)
+* Typehints for Solve and SolveAll [#775](https://github.com/CPMpy/cpmpy/pull/775)
+* OCUS in tools, allowing meta-constraints on MUSes [#698](https://github.com/CPMpy/cpmpy/pull/698)
+* Fix supported solver version ranges [#816](https://github.com/CPMpy/cpmpy/pull/816)
+* Transversal / hitting set example (contributed by @nandorsieben) [#790](https://github.com/CPMpy/cpmpy/pull/790)
+* Nurserostering benchmark  [#789](https://github.com/CPMpy/cpmpy/pull/789)
+* Prediction+optimisation example of scheduling surgeries under uncertainty [5a87c5e](https://github.com/CPMpy/cpmpy/commit/5a87c5ec464394a952b166f93076788f70f4e2ce)
+* Decision-focused learning example [#621](https://github.com/CPMpy/cpmpy/pull/621)
+
+### Internal improvements
+
+* Globals define their own negation [#703](https://github.com/CPMpy/cpmpy/pull/703)
+* Change `cp.sum(*iterable, **kwargs)` to `cp.sum(iterable, **kwargs)` [#756](https://github.com/CPMpy/cpmpy/pull/756)
+* Division and Modulo as global functions [#807](https://github.com/CPMpy/cpmpy/pull/807)
+* Refactor decompose for global functions [#793](https://github.com/CPMpy/cpmpy/pull/793)
+* Refactor and update Cumulative and NoOverlap constraints [#694](https://github.com/CPMpy/cpmpy/pull/694)
+
+### Changed
+
+* Throw `ModuleNotFoundError` when module is not installed [#825](https://github.com/CPMpy/cpmpy/pull/825)
+
+### Fixed
+
+* Fix support for newest OR-Tools 9.15 release [#821](https://github.com/CPMpy/cpmpy/pull/821)
+* Check Hexaly license before using solver [#826](https://github.com/CPMpy/cpmpy/pull/826)
+* Fix `to_cnf` clause bypass issue [#824](https://github.com/CPMpy/cpmpy/pull/824)
+* Fix bug handle pdk unsat with conditions [#811](https://github.com/CPMpy/cpmpy/pull/811)
+* Missing packaging dependency in setup.py [#813](https://github.com/CPMpy/cpmpy/pull/813)
+* Abs constraint handle None  [#794](https://github.com/CPMpy/cpmpy/pull/794)
+* Timeout under assumptions for Exact [#805](https://github.com/CPMpy/cpmpy/pull/805)
+* Support for expressions in start, duration and end in CPO [#802](https://github.com/CPMpy/cpmpy/pull/802)
+* Consistent version checks [#792](https://github.com/CPMpy/cpmpy/pull/792)
+* Missing constraint tags for Pumpkin [#799](https://github.com/CPMpy/cpmpy/pull/799)
+* Z3 negate maximisation objective [#786](https://github.com/CPMpy/cpmpy/pull/786)
+* Scaled Booleans in Pumpkin interface [#776](https://github.com/CPMpy/cpmpy/pull/776)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.29...v0.10.0
+
+## 0.9.29
+
+### Fixed
+
+This is a hotfix release due to external breaking changes in the default solver backend.
+
+* Pin solver versions (not merged, cherry picked for this hotfix) [#816](https://github.com/CPMpy/cpmpy/pull/816)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.28...v0.9.29
+
+## 0.9.28
+
+This is a very small release with a hotfix for multi-dimensional indexing where the index is a decision variable.
+
+### Fixed
+
+* Hotfix for single expression in multi-dimensional indexing [#772](https://github.com/CPMpy/cpmpy/pull/772)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.27...v0.9.28
+
+## 0.9.27
+
+### Added
+
+* **New solver**: CPLEX ILP solver [#583](https://github.com/CPMpy/cpmpy/pull/583), [#762](https://github.com/CPMpy/cpmpy/pull/762), [#763](https://github.com/CPMpy/cpmpy/pull/763)
+* **New solver**: Hexaly local search solver [#718](https://github.com/CPMpy/cpmpy/pull/718)
+* **New tool**: CPMpy cli (get version information on all subsolvers) [#693](https://github.com/CPMpy/cpmpy/pull/693)
+* Use of CSE in `flatten_objective` [#730](https://github.com/CPMpy/cpmpy/pull/730)
+* Constraint tagging for `pumpkin` [#720](https://github.com/CPMpy/cpmpy/pull/720)
+* Solver capability overview in docs [d8d3a2d](https://github.com/CPMpy/cpmpy/commit/d8d3a2d0f78438aa0f0da6909d74b5a505b5f8a5)
+* PSP-lib dataset and loader [#701](https://github.com/CPMpy/cpmpy/pull/701)
+* Safen name collision between user and aux variables [#731](https://github.com/CPMpy/cpmpy/pull/731)
+
+### Changed
+
+* Update `pindakaas` to version 0.2.1 [#753](https://github.com/CPMpy/cpmpy/pull/753)
+* Exclude slow examples from testset [#746](https://github.com/CPMpy/cpmpy/pull/746)
+* Safe variable names [#731](https://github.com/CPMpy/cpmpy/pull/731)
+* SolverInterface consistency improvements and added tests [#726](https://github.com/CPMpy/cpmpy/pull/726)
+* Improve testing of examples [#651](https://github.com/CPMpy/cpmpy/pull/651)
+* Modernize shebangs of examples [#644](https://github.com/CPMpy/cpmpy/pull/644)
+* Linearize improvements [e721b0a](https://github.com/CPMpy/cpmpy/commit/e721b0ab960be632c525bfbbf493876031ca9d98)
+* Update waterfall (added automated int-to-bool) [710ec42](https://github.com/CPMpy/cpmpy/commit/710ec42fc34a014084e0f6bbe8d1e5eed72c3dcf)
+* Collection of improvements to GitHub README
+
+### Fixed
+
+* `Precedence` global decomposition [#742](https://github.com/CPMpy/cpmpy/pull/742)
+* Minor bugs in examples [#739](https://github.com/CPMpy/cpmpy/pull/739)
+* `gnureadline` typo in `setup.py` [#722](https://github.com/CPMpy/cpmpy/pull/722)
+* Non-contiguous array handling in `cpm_array` [#738](https://github.com/CPMpy/cpmpy/pull/738)
+* Remove simplification of nullifying arguments from constructors [#725](https://github.com/CPMpy/cpmpy/pull/725)
+* Skip psplib in testset due to random failure on GitHub actions [7a15d07](https://github.com/CPMpy/cpmpy/commit/7a15d07962610e3844d358a05c7c419e110f110c)
+* (Pin Pumpkin solver git commit [#719](https://github.com/CPMpy/cpmpy/pull/719)) outdated by [#720](https://github.com/CPMpy/cpmpy/pull/720)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.26...v0.9.27
+
+## 0.9.26
+
+### Added
+
+* **New solver**: Pumpkin LCG solver (by the ConSol Lab at TU Delft) [#669](https://github.com/CPMpy/cpmpy/pull/669)
+* **New solver**: Pindakaas library for transforming pseudo Boolean to CNF [#600](https://github.com/CPMpy/cpmpy/pull/600)
+* **New global**: `Regular` [#677](https://github.com/CPMpy/cpmpy/pull/677)
+* **New tool**: Tooling for the XCSP3 format: dataset, loader, CLI, benchmarking [#597](https://github.com/CPMpy/cpmpy/pull/597)
+* Common Subexpression Elimination (CSE) with normalized expressions [#679](https://github.com/CPMpy/cpmpy/pull/679)
+* Integer to boolean direct encoding [#653](https://github.com/CPMpy/cpmpy/pull/653)
+* Solution hinting for Gurobi [#691](https://github.com/CPMpy/cpmpy/pull/691)
+* Solution callback for CP Optimizer [#682](https://github.com/CPMpy/cpmpy/pull/682)
+* Acces to (installed) solver status/version: call `.version()` on a specific solver or on `SolverLookup` to get an overview. Or use `cp.SolverLookup.print_version()` for pretty printing. [#628](https://github.com/CPMpy/cpmpy/pull/628)
+* Support for canonicalisation of subtraction expressions [#686](https://github.com/CPMpy/cpmpy/pull/686) 
+* Allow use of boolean constants in weighted sum [#711](https://github.com/CPMpy/cpmpy/pull/711)
+* Added testset for incremental assumptions
+* Catch beginner mistakes linked to incorrect usage of boolean expression [#660](https://github.com/CPMpy/cpmpy/pull/660)
+
+### Changed
+
+* Refactoring of int2bool/pysat [#714](https://github.com/CPMpy/cpmpy/pull/714)
+* Updated instructions for adding a new solver with request to add solver to overview table
+* Improve efficiency `only_implies`: avoid retransform if no subexpression [#680](https://github.com/CPMpy/cpmpy/pull/680)
+* Consistent state reporting of `.solve()` across all solvers [#545](https://github.com/CPMpy/cpmpy/pull/545)
+* Improved docs and error messages for `canonical_comparison` [#678](https://github.com/CPMpy/cpmpy/pull/678)
+
+### Fixed
+
+* Support special cases for Xor global (boolean constants, single argument) [#717](https://github.com/CPMpy/cpmpy/pull/717)
+* Missing `optimal` exit status for GCS [#705](https://github.com/CPMpy/cpmpy/pull/705)
+* Missing solution for empty csp when enumerating [#674](https://github.com/CPMpy/cpmpy/pull/674)
+* Use of constants in globals [#700](https://github.com/CPMpy/cpmpy/pull/700)
+* CSE edge-case in `only_numexpr_equality` [#696](https://github.com/CPMpy/cpmpy/pull/696)
+* Choco `shorttable` star symbol data type [#697](https://github.com/CPMpy/cpmpy/pull/697)
+* Ensure python-native expression values to prevent unexpected behaviour with numpy constants [#695](https://github.com/CPMpy/cpmpy/pull/695)
+* Correctly handle numpy integers in `eval_comparison` [#683](https://github.com/CPMpy/cpmpy/pull/683)
+* CP Optimizer fix cumulative with zero-duration task [#681](https://github.com/CPMpy/cpmpy/pull/681)
+* Fix incorrect decomposition of `Inverse` global constraint [#673](https://github.com/CPMpy/cpmpy/pull/673)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.25...v0.9.26
+
+## 0.9.25
+
+### Added
+* **New solver**: IBM CP Optimizer [#576](https://github.com/CPMpy/cpmpy/pull/576)
+* **New global**: `ShortTable` [#469](https://github.com/CPMpy/cpmpy/pull/469)
+* `model.add()` as new default to add constraints to model (same behaviour as `+=`) [#640](https://github.com/CPMpy/cpmpy/pull/640)
+* Easy install of all solvers through the `"all"` optional dependency, i.e. `pip install cpmpy[all]` [#665](https://github.com/CPMpy/cpmpy/pull/665)
+* More complex variants of the Sudoku puzzle (in examples) [#577](https://github.com/CPMpy/cpmpy/pull/577)
+* API summery sheet [#629](https://github.com/CPMpy/cpmpy/pull/629)
+
+* Linearisation for `div`, `abs` and `mod` [#516](https://github.com/CPMpy/cpmpy/pull/516)
+* Linearisation for subtraction [#639](https://github.com/CPMpy/cpmpy/pull/639)
+* `div` linearisation for Gurobi [#593](https://github.com/CPMpy/cpmpy/pull/593)
+* Native cardinality constraints for PySAT [#588](https://github.com/CPMpy/cpmpy/pull/588)
+* `wsum` support for PySAT
+
+* Support for constants in `Element` global function [#630](https://github.com/CPMpy/cpmpy/pull/630)
+
+* `SolverLookup` now has `.supported()` and `.print_status()` to get information on the available solvers on the current system [#641](https://github.com/CPMpy/cpmpy/pull/641)
+* `solveAll()` now accepts solver-specific kwargs, just like `solve()` [#582](https://github.com/CPMpy/cpmpy/pull/582)
+
+* Optional dependencies for solvers and tools (setup.py) [#599](https://github.com/CPMpy/cpmpy/pull/599)
+* Documentation for all CPMpy exceptions [#622](https://github.com/CPMpy/cpmpy/pull/622)
+
+
+
+### Changed
+* Bumped minimal Python version from 3.7 to 3.8 [#575](https://github.com/CPMpy/cpmpy/pull/575)
+* `mod` and `div` now default to integer division
+* Improved reading of DIMACS formatted files [#587](https://github.com/CPMpy/cpmpy/pull/587)
+* Avoid max-based decomposition for `abs` if possible [#595](https://github.com/CPMpy/cpmpy/pull/595)
+* Cleanup semantics of Boolean Python builtins [#602](https://github.com/CPMpy/cpmpy/pull/602)
+* Performance optimisation of `simplify_bool` [#592](https://github.com/CPMpy/cpmpy/pull/592)
+* Ensure `AllDifferent` decomposition is linear [#614](https://github.com/CPMpy/cpmpy/pull/614)
+* Much improved README 
+* Improved docs formatting, especially for the Python API docstrings [#603](https://github.com/CPMpy/cpmpy/pull/603)
+* Improved API documentation of explanation tools [#512](https://github.com/CPMpy/cpmpy/pull/512)
+* Better exceptions for explanation tools [#512](https://github.com/CPMpy/cpmpy/pull/512)
+* Improve documentation of non-standard solver args passing for Exact [#616](https://github.com/CPMpy/cpmpy/pull/616)
+* General documentation improvements [#619](https://github.com/CPMpy/cpmpy/pull/619), [#633](https://github.com/CPMpy/cpmpy/pull/633), [#634](https://github.com/CPMpy/cpmpy/pull/634)
+* Skip subset of `PySAT` tests when optional dependency `pblib` is not available [#668](https://github.com/CPMpy/cpmpy/pull/668)
+
+### Fixed
+* Linearisation with boolean constants [#581](https://github.com/CPMpy/cpmpy/pull/581)
+* Linearisation of `AllDifferent` with integer constants [#547](https://github.com/CPMpy/cpmpy/pull/547)
+* Side conditions for `Precedence` global [#589](https://github.com/CPMpy/cpmpy/pull/589)
+* `simplify_bool` on non-CPMpy expressions [#626](https://github.com/CPMpy/cpmpy/pull/626)
+* Handling of negative variables in objective during linearisation [#495](https://github.com/CPMpy/cpmpy/pull/495)
+* Integers in `GCC` global for Choco-solver [#646](https://github.com/CPMpy/cpmpy/pull/646)
+* `NValueExceptN` for single value range [#645](https://github.com/CPMpy/cpmpy/pull/645)
+* Handling of empty clauses in GCS [#662](https://github.com/CPMpy/cpmpy/pull/662)
+* Missing user vars when calling `solveAll()`, resulting in incorrect number of solutions [#609](https://github.com/CPMpy/cpmpy/pull/609)
+* Consistent handling of non-positive `time_limit` [#642](https://github.com/CPMpy/cpmpy/pull/642)
+* Added `setuptools` to required dependencies (can be missing on some installs) [#664](https://github.com/CPMpy/cpmpy/pull/664)
+* DIMACS tempfiles on Windows [#601](https://github.com/CPMpy/cpmpy/pull/601)
+
+### Removed
+
+* Removed support for Python version 3.7 [#575](https://github.com/CPMpy/cpmpy/pull/575)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.24...v0.9.25
+
+<!-- ---------------------------------- - ---------------------------------- -->
+
+## 0.9.24
+
+### Release Notes
+
+#### Enhancements and Features
+- **Safening of partial functions**: New transformation to safen partial function. [#515](https://github.com/CPMpy/cpmpy/pull/515)
+- **Update Choco interface with native reification**: Improved the Choco solver interface with native reification support. [#526](https://github.com/CPMpy/cpmpy/pull/526)  
+- **Reals in objective function**: Added support for real numbers in the objective function. [#529](https://github.com/CPMpy/cpmpy/pull/529)  
+- **Better naive grow**: Enhanced the "naive grow" strategy for better performance. [#528](https://github.com/CPMpy/cpmpy/pull/528)  
+- **Blocks world**: Introduced a "blocks world" example for demonstration purposes. [#533](https://github.com/CPMpy/cpmpy/pull/533)  
+- **Examples Colab links**: Added direct Colab links to examples for easier experimentation. [#553](https://github.com/CPMpy/cpmpy/pull/553)  
+- **Circuit decomposition for all ranges**: Extended circuit decomposition to handle all ranges. [#424](https://github.com/CPMpy/cpmpy/pull/424)  
+- **Global function in Z3 objective**: Introduced global functions in Z3 solver objectives. [#560](https://github.com/CPMpy/cpmpy/pull/560)  
+- **Z3 auto subsolver**: Implemented automatic subsolver selection for Z3 when solving optimization problems. [#567](https://github.com/CPMpy/cpmpy/pull/567)  
+- **Parametrize solver tests**: Streamlined solver test cases using parameterization. [#572](https://github.com/CPMpy/cpmpy/pull/572)  
+- **Linearize power**: Added linearization for power operations. [#538](https://github.com/CPMpy/cpmpy/pull/538)  
+- **Improve Boolean normalization for PySAT**: Enhanced normalization of Boolean terms for PySAT. [#569](https://github.com/CPMpy/cpmpy/pull/569)  
+
+#### Performance Improvements
+- **Has subexpr optimization**: Skip transformations of leaf expressions for improved efficiency. [#532](https://github.com/CPMpy/cpmpy/pull/532)  
+- **Only implied speedup**: Optimized "only implied" handling for significant speedups. [#541](https://github.com/CPMpy/cpmpy/pull/541)  
+- **Distribute tests over CPUs**: Distributed tests over 4 CPUs, reducing runtime from `21m30s` to `8m45s`. [#571](https://github.com/CPMpy/cpmpy/pull/571)  
+- **ndvar_getitem optimization**: Improved `ndvar_getitem` by moving fetch casts to initialization. [#550](https://github.com/CPMpy/cpmpy/pull/550) 
+- **Remove inline imports**: Instead use `import as x` at top of file. [#542](https://github.com/CPMpy/cpmpy/pull/542)  
+
+#### Bug Fixes
+- **Remove broadcast in min/max**: Fixed issues when forwarding to built-in min/max functions. [#536](https://github.com/CPMpy/cpmpy/pull/536)  
+- **Convert numpy array in Table constraint**: Ensured proper conversion of NumPy arrays to lists in Table constraints. [#540](https://github.com/CPMpy/cpmpy/pull/540)  
+- **Clear values on UNSAT**: Added functionality to clear variable values when UNSAT is detected. [#523](https://github.com/CPMpy/cpmpy/pull/523)  
+- **Fix cpm_array with order='F'**: Resolved issues with `cpm_array()` when using column-major order. [#555](https://github.com/CPMpy/cpmpy/pull/555)  
+- **Car sequencing index fix**: Corrected indexing issues in the car sequencing problem. [#565](https://github.com/CPMpy/cpmpy/pull/565)  
+
+#### Code Quality and Maintenance
+- **Improve exception messages**: Enhanced clarity of exception messages and removed unused imports. [#539](https://github.com/CPMpy/cpmpy/pull/539)  
+- **Edits to the docs**: Updated documentation for clarity and completeness. [#530](https://github.com/CPMpy/cpmpy/pull/530)    
+- **Gurobi license check**: Separated Gurobi license checks into a distinct process. [#566](https://github.com/CPMpy/cpmpy/pull/566)  
+- **Standardize solver version checks**: Unified approach to checking solver version compatibility. [#568](https://github.com/CPMpy/cpmpy/pull/568)  
+- **Update requirements**: Upped our minimal python requirement from 3.6 to 3.7. [#573](https://github.com/CPMpy/cpmpy/pull/573)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.23...v0.9.24
+
+<!-- ---------------------------------- - ---------------------------------- -->
+
+## 0.9.23
+
+Quick release, because we want the updated tools to be available.
+
+### What's Changed
+* Extension to tools: MARCO and SMUS 
+* Added tests for incremental solving and fixed incemental solving with objective in Exact
+* Cumulative decomposition fix when capacity was numpy integer.
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.22...v0.9.23
+
+<!-- ---------------------------------- - ---------------------------------- -->
+
+## 0.9.22
+
+### What's New
+* New solver: GlasgowConstraintSolver (GCS)
+* Upgraded to Exact 2
+* Minizinc print: easily extract MiniZinc and FlatZinc text from CPMpy model.
+* Update TEMPLATE.py to make it clearer how to add new solvers.
+* SolverLookup gives clear error message in stead of returning None
+* allow kwargs in Model.solve()
+* call python builtins for sum, abs, min and max without expressions in the arguments.
+* All solvers now have a native_model() function, to allow native solver access.
+* It's now possible to name multiple new variables at once, by providing the names in a list.
+* Linearize transformation can now rewrite modulo (if multiplication is supported)
+* Fix behaviour of "all", "any", "max", "min", "sum", "prod" on higher dimensional NDVarArrays (maintain dimensionality)
+* Value function of expressions now always returns a python integer, where it could sometimes be a numpy integer.
+* Fixed performance issue where all solver vars where seen as user vars when solving with MiniZinc
+
+### Documentation
+* Overall improvement of documentation
+* update documentation of 'comparison' transformation
+
+### New Contributors
+Thanks to 2 new contributors!
+* [@ThomSerg](https://github.com/ThomSerg) and [@sin3000x](https://github.com/sin3000x)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.21...v0.9.22
+
+<!-- ---------------------------------- - ---------------------------------- -->
+
+## 0.9.21
+
+### New Global constraints:
+* Increasing, Decreasing, IncreasingStrict, DecreasingStrict
+* Lexicographical ordering constraints: LexLess, LexLessEq, LexChainLess, LexChainLessEq
+* Scheduling constraints Precedence and NoOverlap
+* Closed version of GCC
+* AllDiffExceptN, AllEqualExceptN 
+* Nvalues except n
+* Negative table
+* Among
+
+### Bug Fixes:
+* count nested in a wsum crashed MiniZinc [#461](https://github.com/CPMpy/cpmpy/issues/461)
+* AllDifferentExcept0 now correctly works with MiniZinc
+* User variables that get simplified away during transformation steps are now saved.
+* Add missing case in simplify bool transformation.
+
+### Quality of life
+* Removed type restriction for InDomain
+* Extending automatic testsuite
+* Check if minizinc executable is installed
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.20...v0.9.21
+
+<!-- ---------------------------------- - ---------------------------------- -->
+
+## 0.9.20
+
+### What's Changed
+* Choco is now a tier 2 solver, available to use after installing the pychoco package! 
+* new DIMACS parser and writer
+* SolverLookup is now a classmethod for easier use of custom solvers.
+* Fixed a bug where expression bounds didn't get rounded to integers when creating an intvar
+* Added a warning when expressions have non-integer bounds, as these will be rounded
+* Fixed a bug in our helper function is_bool, now also recognises our BoolVal objects
+* Updated our ortools and minizinc version requirements.
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.19..v0.9.20
+
+<!-- ---------------------------------- - ---------------------------------- -->
+
+## 0.9.19
+
+### What's Changed
+* Update on tools/subsets, add mcs and mss tools with grow-variants.
+* Full propagation with exact
+* Adding NValue global constraint
+* Minizinc result now saved in solver object, this allows to access the solver statistics.
+
+### Documentation
+* Update docs for tools.
+* Docs on solver statistics
+* Format solver api, and add missing links in docs
+* Update version and copyright date
+* Remove bug where python comment (#) got interpreted as a header.
+
+### Bug Fixes
+* Properly handle reified global constraints for Minizinc
+* Correctly handle global constraints with list-arguments of length 1
+* Add missing edge case in flatten
+* Type check table constraint first argument, cannot be a constant.
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.18...v0.9.19
+
+<!-- ---------------------------------- - ---------------------------------- -->
+
+## 0.9.18
+Minor release with some bugfixes, we are trying to do monthly releases now, so they will be more concise.
+
+### What's new?
+* get_bounds() helper function now works on arrays and lists, returning arrays (lists) of bounds
+* Pysdd added to our automated GitHub tests
+* Pysdd does not support Xor anymore.
+
+### Bugfixes
+* Fixed Cumulative bug when capacity was a numpy int.
+* Cumulative now works in Minizinc with only one task.
+* Docs look good again
+* Corrected default parameter value in docs
+* Fixed visualisations in Nonogram and Room assignment notebook examples
+* Adopted the new ORtools 9.8 names of tuneable parameters.
+
+## New Contributors
+* [@KennyVDV](https://github.com/KennyVDV) made their first contribution by adding a new example: chess_position
+
+<!-- ---------------------------------- - ---------------------------------- -->
+
 ## 0.9.17
 Some new solvers supported at tier 3, update to our transformations and bugfixes.
 
