@@ -970,11 +970,28 @@ class Xor(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
-        decomp = [sum(self.args[:2]) == 1]
-        if len(self.args) > 2:
-            decomp = Xor(decomp + list(self.args[2:])).decompose()[0]
-        return decomp, []
+        # lets first simplify the Xor by removing all constants:
+        # True Xor x :: ~x  and  False Xor x :: x
+        new_args: list[Expression] = []
+        parity = False  # base case
+        for a in self.args:
+            if isinstance(a, Expression) and not isinstance(a, BoolVal):
+                new_args.append(a)
+            else:  # a constant, don't store but update parity
+                if a:  # True Xor x :: ~x
+                    parity = not parity
+        if len(new_args) == 0:
+            return [BoolVal(parity)], []
+        if parity:  # negate last argument
+            new_args[-1] = ~new_args[-1]
+
+        # There are multiple decompositions possible,
+        # recursively using sum allows it to be efficient for all solvers.
+        prev: Expression = new_args[0]
+        for a in new_args[1:]:
+            prev = (prev + a == 1)  # recursive pairwise Xor decomposition
+
+        return [prev], []
 
     def value(self) -> Optional[bool]:
         arrvals = argvals(self.args)
