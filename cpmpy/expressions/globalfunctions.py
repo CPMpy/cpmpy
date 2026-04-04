@@ -79,8 +79,8 @@ import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
+from .variables import intvar, NDVarArray
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_listlike, get_bounds_listlike
 
 
 class GlobalFunction(Expression):
@@ -162,18 +162,27 @@ class Minimum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
         """
-        super().__init__("min", tuple(flatlist(arg_list)))
+        if isinstance(arg_list, NDVarArray):
+            has_subexpr = arg_list.has_subexpr()
+            return super().__init__("min", tuple(arg_list.flat), has_subexpr=has_subexpr)
+
+        # arg: tuple[ExprLike, ...]
+        super().__init__("min", tuple(arg_list))
+    
+    @property
+    def args(self) -> tuple[ExprLike, ...]:
+        """ READ-ONLY, well-typed argument of this global function """
+        return self._args
 
     def value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The minimum value of the arguments, or None if any argument is not assigned
         """
-        vargs = [argval(a) for a in self.args]
-        if any(val is None for val in vargs):
+        vals = argvals_listlike(self.args)
+        if vals is None:
             return None
-
-        return min(vargs)
+        return min(vals)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -196,8 +205,8 @@ class Minimum(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the minimum value
         """
-        bnds = [get_bounds(x) for x in self.args]
-        return min(lb for lb, ub in bnds), min(ub for lb, ub in bnds)
+        lbs, ubs = get_bounds_listlike(self.args)
+        return min(lbs), min(ubs)
 
 
 class Maximum(GlobalFunction):
