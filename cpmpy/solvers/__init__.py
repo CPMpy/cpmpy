@@ -62,7 +62,7 @@ List of functions
     param_combinations
 """
 
-from .utils import param_combinations
+from .utils import param_combinations, SolverLookup
 from .ortools import CPM_ortools
 from .pysat import CPM_pysat
 from .minizinc import CPM_minizinc
@@ -95,5 +95,6 @@ __all__ = [
     "CPM_pysdd",
     "CPM_rc2",
     "CPM_z3",
+    "SolverLookup",
     "param_combinations",
 ]
