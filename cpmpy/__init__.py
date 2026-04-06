@@ -6,7 +6,7 @@ as well as online at: https://cpmpy.readthedocs.io/
 
 Source code and bug reports at https://github.com/CPMpy/cpmpy
 
-The package constists of 4 modules:
+The package consists of 4 modules:
 - `model`: a generic container for expressions (constraints and an objective), it can also search for an available solver and call it
 - `expressions`: all forms of expression objects that allow you to specify constraints and objectives over variables
 - `solvers`: CPMpy classes that translate a model into approriate calls of a solver's API
@@ -20,6 +20,6 @@ __version__ = "0.10.0"
 from .expressions import __all__ as _expressions_all
 from .expressions import *  # noqa: F403
 from .model import Model
-from .solvers.utils import SolverLookup
+from .solvers import SolverLookup
 
 __all__ = ["__version__", "Model", "SolverLookup", *_expressions_all]
