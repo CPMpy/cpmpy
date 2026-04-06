@@ -51,6 +51,7 @@ def _push_down_negation(lst_of_expr):
                 expr = recurse_negation(expr.args[0])
         
             # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+            # TODO: check if one of them is a var
             elif expr.name == '!=':
                 lexpr, rexpr = expr.args
                 if is_boolexpr(lexpr) and is_boolexpr(rexpr):
