@@ -46,15 +46,18 @@ List of Solver-native classes
     MinizincSubcircuitWithStart
 """
 
+from typing import Literal
 import numpy as np
 import cpmpy as cp
-from cpmpy import cpm_array, intvar, boolvar
+
 from cpmpy.exceptions import CPMpyException
-from cpmpy.expressions.core import Expression, Operator
-from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, DirectConstraint
+from cpmpy.expressions.core import Expression, Operator, ListLike, ExprLike
+from cpmpy.expressions.globalconstraints import GlobalConstraint, AllDifferent, InDomain, DirectConstraint
+from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
     get_bounds, eval_comparison
-from cpmpy.expressions.variables import _IntVarImpl
+from cpmpy.expressions.variables import cpm_array, intvar, boolvar, _IntVarImpl, NDVarArray
+from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any, min as cpm_min
 
 
 # ---------------------------------------------------------------------------- #
@@ -76,7 +79,6 @@ class AllDifferentLists(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        from cpmpy.expressions.python_builtins import any as cpm_any
         constraints = []
         for lst1, lst2 in all_pairs(self.args):
             constraints += [cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2))]
@@ -108,7 +110,6 @@ class AllDifferentListsExceptN(GlobalConstraint):
     def decompose(self):
         """Returns the decomposition
         """
-        from cpmpy.expressions.python_builtins import all as cpm_all
         constraints = []
         for lst1, lst2 in all_pairs(self.args[0]):
             constraints += [cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(NonReifiedTable(lst1, self.args[1]))]
@@ -149,9 +150,6 @@ class SubCircuit(GlobalConstraint):
             A mix of the above Circuit decomposition, with elements from the Minizinc implementation for the support of optional visits:
             https://github.com/MiniZinc/minizinc-old/blob/master/lib/minizinc/std/subcircuit.mzn
         """
-        from cpmpy.expressions.python_builtins import min as cpm_min
-        from cpmpy.expressions.python_builtins import all as cpm_all
-
         # Input arguments
         succ = cpm_array(self.args) # Successor variables
         n = len(succ)
@@ -396,118 +394,156 @@ class NonReifiedTable(GlobalConstraint):
     Look at :class:`globalconstraints.Table <cpmpy.expressions.globalconstraints.Table` for a formulation that does support reification.
     """
 
-    def __init__(self, array, table):
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
-        super().__init__("table", (array, table))
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
+            table = np.array(table, dtype=int)
+        assert table.ndim == 2, "NonReifiedTable's table must be a 2D array"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self):
         """
-            This decomposition is only valid in a non-reified setting.
+            This explicit implication-only decomposition is only valid in a non-reified setting.
         """
-        from cpmpy.expressions.python_builtins import any, all
         arr, tab = self.args
-        row_selected = boolvar(shape=len(tab))
         if len(tab) == 1:
-            return [all(t == a for (t, a) in zip(tab[0], arr))], []
+            return [cpm_all(t == a for (t, a) in zip(tab[0], arr))], []
         
-        cons = []
+        row_selected = boolvar(shape=len(tab))
+        cons = [Operator("or", row_selected)]
         for i, row in enumerate(tab):
             subexpr = Operator("and", [x == v for x,v in zip(arr, row)])
-            cons.append(Operator("->", [row_selected[i], subexpr]))
-
-        return [Operator("or", row_selected)]+cons,[]
+            cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
+        return cons,[]
 
     def value(self):
         arr, tab = self.args
-        arrval = argvals(arr)
-        return arrval in tab
-
-    @property
-    def vars(self):
-        return self._args[0]
-
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self):
-        if not hasattr(self, '_has_subexpr'):  # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args  # the table 'tab' can only hold constants, never a nested expression
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
+            return None
+        return bool(np.any(np.all(tab == arrval, axis=1)))
 
 class RowSelectingShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
         no restrictions for the corresponding variable in that tuple.
-        This global skips typechecks on the table and has a different decomposition than the standard 
-        :class:`globalconstraints.ShortTable <cpmpy.expressions.globalconstraints.ShortTable>`.
+        Bit less validation then for :class:`globalconstraints.ShortTable <cpmpy.expressions.globalconstraints.ShortTable>`;
+        decomposition differs (row-selecting formulation).
     """
-    def __init__(self, array, table):
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if isinstance(table, np.ndarray): # Ensure it is a list
-            table = table.tolist()
-        super().__init__("short_table", (array, table))
+
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):
+            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
+        assert table.ndim == 2, "ShortTable's table must be a 2D array"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self):
         """
         Alternative decomposition, similar to `element` from Gleb's paper: "Improved Linearization of Constraint
         Programming Models"
         """
-        from cpmpy.expressions.python_builtins import any, all
-
         arr, tab = self.args
-        row_selected = boolvar(shape=(len(tab),))
 
-        cons = []
+        row_selected = boolvar(shape=(len(tab),))
+        cons = [Operator("or", row_selected)]
         for i, row in enumerate(tab):
             subexpr = Operator("and", [ai == ri for ai, ri in zip(arr, row) if ri != STAR])
-            cons.append(row_selected[i].implies(subexpr))
-
-        return [any(row_selected)]+cons,[]
+            cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
+        return cons,[]
 
     def value(self):
         arr, tab = self.args
-        tab = np.array(tab)
-        arrval = np.array(argvals(arr))
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
+            return None
+
         for row in tab:
-            num_row = row[row != STAR].astype(int)
-            num_vals = arrval[row != STAR].astype(int)
-            if (num_row == num_vals).all():
+            mask = (row != STAR)
+            if (row[mask].astype(int, copy=False) == arrval[mask]).all():
                 return True
         return False
 
 class NegativeShortTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
-    def __init__(self, array, table):
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
-        super().__init__("negative_shorttable", (array, table))
+
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):
+            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
+        assert table.ndim == 2, "NegativeShortTable's table must be a 2D array"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("negative_shorttable", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self):
-        from cpmpy.expressions.python_builtins import all as cpm_all
-        from cpmpy.expressions.python_builtins import any as cpm_any
         arr, tab = self.args
-        return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row) if ri != "*") for row in tab)], []
+        return [cpm_all(cpm_any([ai != ri for ai, ri in zip(arr, row) if ri != "*"]) for row in tab)], []
 
     def value(self):
         arr, tab = self.args
-        arrval = [argval(a) for a in arr]
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
+            return None
+
         for tup in tab:
-            thistup = True
-            for aval, tval in zip(arrval, tup):
-                if tval != '*':
-                    if aval != tval:
-                        thistup = False
-                        break
-            if thistup:
-                # found tuple that matches
-                return False
-        # didn't find tuple that matches
-        return True
+            mask = (tup != STAR)
+            if (tup[mask].astype(int, copy=False) != arrval[mask]).all():
+                return True
+        return False
 
 
 class MDD(GlobalConstraint):
@@ -789,8 +825,6 @@ class NoOverlap2d(GlobalConstraint):
         super().__init__("no_overlap2d", (start_x, dur_x, end_x, start_y, dur_y, end_y))
 
     def decompose(self):
-        from cpmpy.expressions.python_builtins import any as cpm_any
-
         start_x, dur_x, end_x,  start_y, dur_y, end_y = self.args
         n = len(start_x)
         cons =  [s + d == e for s,d,e in zip(start_x, dur_x, end_x)]
