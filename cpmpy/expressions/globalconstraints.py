@@ -982,8 +982,15 @@ class Xor(GlobalConstraint):
                     parity = not parity
         if len(new_args) == 0:
             return [BoolVal(parity)], []
-        if parity:  # negate last argument
-            new_args[-1] = ~new_args[-1]
+        if parity:  # negate first Boolean variable
+            changed = False
+            for i, a in enumerate(self.args):
+                if isinstance(a, _BoolVarImpl):
+                    new_args[i] = ~a
+                    changed = True
+                    break
+            if not changed:  # no variables, negate first argument
+                new_args[0] = ~new_args[0]  # Warning, creates a negated expression during decompose
 
         # There are multiple decompositions possible,
         # recursively using sum allows it to be efficient for all solvers.
@@ -1015,9 +1022,7 @@ class Xor(GlobalConstraint):
                 break
 
         if not changed:  # did not find a Boolean variable to negate
-            # pick first arg, and push down negation
-            from cpmpy.transformations.negation import recurse_negation
-            new_args[0] = recurse_negation(self.args[0])
+            new_args[0] = ~new_args[0]
 
         return Xor(new_args)
 
