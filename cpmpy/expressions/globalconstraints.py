@@ -1022,7 +1022,9 @@ class Xor(GlobalConstraint):
                 break
 
         if not changed:  # did not find a Boolean variable to negate
-            new_args[0] = ~new_args[0]
+            # pick first arg, and push down negation
+            from cpmpy.transformations.negation import recurse_negation
+            new_args[0] = recurse_negation(self.args[0])           
 
         return Xor(new_args)
 
