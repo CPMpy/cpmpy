@@ -20,6 +20,7 @@ List of submodules
 # we only import methods/classes that are used for modelling
 # others need to be imported by the developer explicitely
 from .variables import boolvar, intvar, cpm_array
+from .variables import BoolVar, IntVar, cparray # Old, to be deprecated
 from .globalconstraints import (
     AllDifferent,
     AllDifferentExcept0,
@@ -73,6 +74,10 @@ __all__ = [
     "boolvar",
     "intvar",
     "cpm_array",
+# Variables (old, to be deprecated)
+    "BoolVar",
+    "IntVar",
+    "cparray",
 # Global functions
     "Minimum",
     "Maximum",
