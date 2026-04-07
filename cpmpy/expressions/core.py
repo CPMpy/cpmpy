@@ -141,7 +141,7 @@ class Expression(object):
         """
         self.name = name
         if not isinstance(arg_list, tuple):
-            warnings.warn(f"DEPRECATED: Argument list of {name} is not a tuple, updated the constructor!", UserWarning)
+            warnings.warn(f"DEPRECATED: Argument list of {name} is not a tuple, update the constructor!", UserWarning)
             arg_list = tuple(arg_list)
         self._args = arg_list
         self._has_subexpr = has_subexpr
@@ -193,7 +193,7 @@ class Expression(object):
         return hash(self.__repr__())
 
     def has_subexpr(self) -> bool:
-        """ Does it contains nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
+        """ Does it contain nested :class:`Expressions <cpmpy.expressions.core.Expression>` (anything other than a :class:`~cpmpy.expressions.variables._NumVarImpl` or a constant)?
             Is of importance when deciding whether certain transformations are needed
             along particular paths of the expression tree.
             Results are cached for future calls and reset when the expression changes
@@ -382,7 +382,7 @@ class Expression(object):
             return self
         return Operator("sum", [other, self])
 
-    # substraction
+    # subtraction
     def __sub__(self, other):
         # if is_num(other) and other == 0:
         #     return self
@@ -406,16 +406,16 @@ class Expression(object):
             return self
         return cp.Multiplication(other, self)
 
-    # matrix multipliciation TODO?
+    # matrix multiplication TODO?
     #object.__matmul__(self, other)
 
     # other mathematical ones
     def __truediv__(self, other):
-        warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
+        warnings.warn("We only support floordivision, use // instead of /", SyntaxWarning)
         return self.__floordiv__(other)
 
     def __rtruediv__(self, other):
-        warnings.warn("We only support floordivision, use // in stead of /", SyntaxWarning)
+        warnings.warn("We only support floordivision, use // instead of /", SyntaxWarning)
         return self.__rfloordiv__(other)
 
     def __floordiv__(self, other):
@@ -563,7 +563,7 @@ class BoolVal(Expression):
     
 
     def has_subexpr(self) -> bool:
-        """ Does it contains nested Expressions (anything other than a _NumVarImpl or a constant)?
+        """ Does it contain nested Expressions (anything other than a _NumVarImpl or a constant)?
             Is of importance when deciding whether certain transformations are needed
             along particular paths of the expression tree.
         """
@@ -574,7 +574,7 @@ class BoolVal(Expression):
 
         Args:
             other (ExprLike): the right-hand-side of the implication
-            simplify (bool): if True, simplify True/False constants (might remove expressions & there variables from user-view)
+            simplify (bool): if True, simplify True/False constants (might remove expressions & their variables from user-view)
 
         Returns:
             Expression: the implication constraint or a BoolVal if simplified
@@ -739,7 +739,7 @@ class Operator(Expression):
             return f"sum({self.args[0]} * {self.args[1]})"
 
         if len(self.args) == 1:
-            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 ommited in print
+            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 omitted in print
         elif len(self.args) == 2:  # infix printing of two arguments
             printname = Operator.printmap.get(self.name, self.name) # default to self.name if not in printmap
             arg0, arg1 = self.args
@@ -826,7 +826,7 @@ def _wsum_should(arg) -> bool:
     True if the arg is already a wsum,
     or if it is a Multiplication with is_lhs_num
     (negation '-' does not mean it SHOULD be a wsum, because then
-     all substractions are transformed into less readable wsums)
+     all subtractions are transformed into less readable wsums)
     """
     name = getattr(arg, 'name', None)
     return name == 'wsum' or (name == 'mul' and arg.is_lhs_num)
