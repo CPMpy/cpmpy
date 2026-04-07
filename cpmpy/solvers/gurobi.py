@@ -459,8 +459,13 @@ class CPM_gurobi(SolverInterface):
                   a, b = add_(cpm_expr.args[0], depth), add_(cpm_expr.args[1], depth)
                   match cpm_expr.name:
                       case "==":
-                          # Note: Gurobi functions are called by `y == f(x)`, like normalized CPMpy boolexprs, but CPMpy numexprs are normalized to `f(x) == y` (e.g. `abs(x) == IV0`), so they need to be flipped
-                          return a == b if cpm_expr.args[0].is_bool() else b == a
+                          if isinstance(a, gp.NLExpr):
+                              # if flattening led to a non-linear expression, then it has to be constraint `y == f(x)` with `y` a `Var`
+                              return self.grb_model.addVar(lb=b, ub=b) == a
+                          else:
+                              # Else, this is a function constraint 
+                              # Note: Gurobi functions are called by `y == f(x)`, like normalized CPMpy boolexprs, but CPMpy numexprs are normalized to `f(x) == y` (e.g. `abs(x) == IV0`), so they need to be flipped
+                              return a == b if cpm_expr.args[0].is_bool() else b == a
                       case "<=":
                           return a <= b
                       case ">=":
@@ -479,6 +484,7 @@ class CPM_gurobi(SolverInterface):
                                   # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
                                   return gp.abs_(add_(cpm_expr.args[0], depth))
                               case "min" | "max":
+                                  # TODO outdated ; should be no need to make our own var
                                   y = add_(cp.intvar(lb=min(x.lb for x in cpm_expr.args), ub=max(x.ub for x in cpm_expr.args)), depth)
                                   flatargs = [add_(arg, depth) for arg in cpm_expr.args]
                                   self.native_model.addConstr(y == (gp.min_(flatargs) if cpm_expr.name == "min" else gp.max_(flatargs)))
@@ -493,8 +499,7 @@ class CPM_gurobi(SolverInterface):
           elif isinstance(grb_expr, gp.TempConstr):
               return grb_expr
           else:
-              r = self.grb_model.addVar(lb=1, ub=GRB.INFINITY)
-              return r == grb_expr
+              return self.grb_model.addVar(lb=1, ub=1) == grb_expr
 
       # add new user vars to the set
       get_variables(cpm_expr_orig, collect=self.user_vars)

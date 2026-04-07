@@ -103,13 +103,14 @@ def expression_tree_cases_():
 
     yield (
         "nested",
-        z + x * ((-y) ** 2) == 12,
-        ["(z) + ((x) * (pow(sum([-1] * [y]),2))) == 12"],
+        z + (x - 3) * ((-y) ** 2) - 3 == 12,
+        ["(z) + (((x) + -3) * (pow(sum([-1] * [y]),2))) == 15"],
         [
-            "\\ C3 = z + (sqr(y) * x)",
+            "\\ C3 = z + (sqr(y) * (-3 + x))",
             "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( VARIABLE , z , 0 )",
+            # TODO not totally clean MULTIPLY node?
             "( MULTIPLY , -1 , 0 ) ( SQUARE , -1 , 2 ) ( VARIABLE , y , 3 )",
-            "( VARIABLE , x , 2 )",
+            "( PLUS , -1 , 2 ) ( CONSTANT , -3 , 5 ) ( VARIABLE , x , 5 )",
         ],
     )
 
@@ -199,6 +200,7 @@ def expression_tree_cases_():
         ["(p) or (BV0)", "(BV0) == ((q) and (r))"],
         ["GC0: C2 = OR ( p , BV0 )", "GC1: BV0 = AND ( q , r )"],
     )
+
 
 @pytest.mark.requires_solver("gurobi")
 @pytest.mark.parametrize(

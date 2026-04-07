@@ -289,7 +289,7 @@ def flatten_constraint(expr, csemap=None, supported={}, reified=False):
     return newlist
 
 
-def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None):
+def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None, reified=False):
     """
     - Decision variable: Var
     - Linear: 
@@ -560,7 +560,7 @@ def normalized_numexpr(expr, csemap=None, supported={}, reified=False):
 
         else: # generic operator
             # recursively flatten all children
-            # TODO should be some isinstance _IntVarImpl?
+            # TODO make this some isinstance _IntVarImpl i/o hasattr?
             flatvars, flatcons = zip(*(
                 normalized_numexpr(arg, csemap=csemap, supported=supported, reified=reified)
                 if not reified and hasattr(arg, "name") and arg.name in supported else
