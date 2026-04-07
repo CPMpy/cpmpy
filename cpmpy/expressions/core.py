@@ -259,11 +259,11 @@ class Expression(object):
         """Implication constraint: ``self -> other``.
 
         Python does not offer relevant syntax for implication, call this method instead.
-        For double implication, use equivalence ``self == other``.
+        For double reification (<->), use equivalence ``self == other``.
 
         Args:
             other (ExprLike): the right-hand-side of the implication
-            simplify (bool): if True, simplify True/False constants (might remove expressions & there variables from user-view)
+            simplify (bool): if True, simplify True/False constants (might remove expressions & their variables from user-view)
 
         Returns:
             Expression: the implication constraint or a BoolVal if simplified
