@@ -155,14 +155,16 @@ class CPM_ortools(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):  maximum solve time in seconds
-                assumptions:    list of CPMpy Boolean variables (or their negation) that are assumed to be true.
-                                For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
-                                get_core() returns a small subset of assumption variables that are unsat together.
-                                Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+                assumptions:                   list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                                               For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
+                                               get_core() returns a small subset of assumption variables that are unsat together.
+                                               Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
                 solution_callback:             Optional CP-SAT ``CpSolverSolutionCallback`` object.
                                                Takes precedence over ``display`` when both are set.
-                display:                       Callback for each improving solution, either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
-                                               default/None: nothing displayed
+                display:                       generic solution callback for use during optimization.
+                                               either a list of CPMpy expressions, OR a callback function which
+                                               gets called after the variable-value mapping of the intermediate solution.
+                                               default/None: nothing is displayed
 
             The ortools solver parameters are defined in its 'sat_parameters.proto' description:
             https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto

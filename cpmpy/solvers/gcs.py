@@ -167,10 +167,10 @@ class CPM_gcs(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds.
-                display:           generic solution callback for use during optimization.
-                                    either a list of CPMpy expressions, OR a callback function which
-                                    gets called after the variable-value mapping of the intermediate solution.
-                                    default/None: nothing is displayed
+                display:                        generic solution callback for use during optimization.
+                                                either a list of CPMpy expressions, OR a callback function which
+                                                gets called after the variable-value mapping of the intermediate solution.
+                                                default/None: nothing is displayed
                 prove:                          whether to produce a VeriPB proof (.opb model file and .pbp proof file).
                 proof_name:                     name for the the proof files.
                 proof_location:                 location for the proof files (default to current working directory).

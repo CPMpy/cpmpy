@@ -202,10 +202,10 @@ class CPM_cpo(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        callback = solution_callback
-        if callback is None and "solution_callback" in kwargs:
-            callback = kwargs.pop('solution_callback')
-        if callback is None and display is not None:
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
+        elif display is not None:
             callback = CpoSolutionPrinter(self, display)
 
         # create solver object

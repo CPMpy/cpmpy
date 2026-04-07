@@ -151,8 +151,10 @@ class CPM_z3(SolverInterface):
                 assumptions:                        list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                                     For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                                     get_core() returns a small subset of assumption variables that are unsat together.
-                display:                            either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
-                                                        default/None: nothing displayed
+                display:                            generic solution callback for use during optimization.
+                                                    either a list of CPMpy expressions, OR a callback function which
+                                                    gets called after the variable-value mapping of the intermediate solution.
+                                                    default/None: nothing is displayed
                 **kwargs:                           any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
