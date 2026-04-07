@@ -413,6 +413,8 @@ class Expression(object):
             raise TypeError("Power operator: modulo not supported")
         if not isinstance(other, (int, np.integer)):
             raise TypeError(f"Power operator requires a constant integer exponent, not: {other}")
+        if other == 0:
+            return 1
         if other == 1:
             return self
         return cp.Power(self, other)
