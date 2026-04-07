@@ -60,6 +60,20 @@ def mus(soft, hard=[], solver="ortools"):
 
     return [dmap[avar] for avar in core]
 
+def mus_native(soft, hard=[], solver="exact"):
+    """
+    Compute a MUS using a solver's native MUS extractor.
+
+    :param soft: soft constraints, list of expressions
+    :param hard: hard constraints, optional, list of expressions
+    :param solver: which solver to use (only `gurobi` and `exact` supported)
+    """
+    
+    # Create assumption variables and model with hard + (assumption -> soft)
+    s = cp.SolverLookup.get(solver)
+    
+    return s._native_mus(soft, hard)
+
 
 def quickxplain(soft, hard=[], solver="ortools"):
     """

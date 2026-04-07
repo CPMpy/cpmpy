@@ -56,7 +56,7 @@ from packaging.version import Version
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.variables import intvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -652,6 +652,32 @@ class CPM_exact(SolverInterface):
 
         # return cpm_variables corresponding to Exact core
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
+    
+    def _native_mus(self, soft, hard=[]):
+        """
+            For using the solver's internal MUS extractor.
+
+            Returns a list of constraints that form a MUS.
+        """
+        
+        # Create assumption variables and model with hard + (assumption -> soft)
+        from cpmpy.tools.explain.utils import make_assump_model # avoid circular import
+        m, soft, assumptions = make_assump_model(soft, hard, name="mus_sel")
+        
+        self += m.constraints
+        
+        # set up assumptions for exact
+        assump_vals = [1 for v in assumptions]
+        assump_vars = [self.solver_var(v) for v in assumptions]
+        self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
+        self.xct_solver.setAssumptions(list(zip(assump_vars,assump_vals)))
+
+        # call native MUS extractor
+        _, res_xct = self.xct_solver.extractMUS()
+
+        # get the constraints back from the assumption variables
+        dmap = dict(zip(assumptions, soft))
+        return [dmap[boolvar(name=c)] for c in res_xct]
 
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
