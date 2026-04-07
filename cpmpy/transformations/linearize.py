@@ -1,58 +1,71 @@
 """
-Transforms flat constraints into linear constraints.
+Transform constraints to a linear form.
 
-Linearized constraints have one of the following forms:
+This transformation is necessary for Integer Linear Programming (ILP) solvers, and also
+for translating to Pseudo-Boolean or SAT solvers.
 
-Linear comparison:
-------------------
-- ``LinExpr == Constant``
-- ``LinExpr >= Constant``
-- ``LinExpr <= Constant``
+There are a number of components to getting a good linearisation:
+- **Decomposing global constraints/functions** in a 'linear friendly' way.
+  A common pattern is that constraints that enforce domain consistency on integer variables,
+  that these constraints should be decomposed over a Boolean representation of the domain. This is the
+  case for :class:`~cpmpy.expressions.globalconstraints.AllDifferent`, :class:`~cpmpy.expressions.globalfunctions.Element`
+  and other functions listed in :func:`get_linear_decompositions`.
+  Their default decomposition does not do it this way, hence we use a more linear-friendly decomposition.
+  This is done by :func:`decompose_linear`.
 
-LinExpr can be any of:
+- **Domain encodings** constraint `(x == 3) + (x == 5) + (x == 7) >= 1` after flattening will introduce Boolean auxiliary
+  variables and constraints `Bx3 == (x == 3)`, `Bx5 == (x == 5)`, `Bx7 == (x == 7)` and `sum(Bx3, Bx5, Bx7) >= 1`.
+  However each `Bxi == (x == i)` would be linearized into 3 Big-M constraints. Instead we can linearise the entire
+  domain encoding of `x` for all `i` values in its domain with just two constraints: `sum_i(Bxi) = 1` and `x = sum_i(i*Bxi)`.
+  This is done by :func:`linearize_reified_variables` (as a pre-linearization optimization step).
 
-- `NumVar`
-- `sum`
-- `wsum`
+- **Disequalities and Inequalities** e.g. `sum(X) != 5` should be rewritten as `(sum(X) < 5) | (sum(X) > 5)`,
+  which is then further flattened into implications. Strict equalities like `sum(X) > 5` are in turn
+  rewritten to non-strict inequalities, e.g. `sum(X) >= 6`. This is done by :func:`linearize_constraint`.
 
-Indicator constraints:
-----------------------
+- **Implications and Big-M** e.g. `B -> sum(X) <= 4` should be linearised with the Big-M method,
+  if not natively supported. This is done by :func:`linearize_constraint`.
+  If it is natively supported, then the `supported` argument should contain '->'.
 
-+------------------------------------+
-| ``BoolVar -> LinExpr == Constant`` |
-+------------------------------------+
-| ``BoolVar -> LinExpr >= Constant`` |
-+------------------------------------+
-| ``BoolVar -> LinExpr <= Constant`` |
-+------------------------------------+
+To get a good linearisation, solver backends typically apply these transformations in roughly this order:
 
-========================================   ==============================================
-``BoolVar -> GenExpr``                     (GenExpr.name in supported, GenExpr.is_bool()) 
-``BoolVar -> GenExpr >= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-``BoolVar -> GenExpr <= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-``BoolVar -> GenExpr == Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-========================================   ==============================================
-
-Where ``BoolVar`` is a boolean variable or its negation.
-
-General comparisons or expressions
------------------------------------
-
-============================  ==============================================
-``GenExpr``                   (GenExpr.name in supported, GenExpr.is_bool())  
-``GenExpr == Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
-``GenExpr <= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
-``GenExpr >= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num()) 
-============================  ============================================== 
+- Call :func:`decompose_linear` / :func:`decompose_linear_objective` instead of the standard 'decompose_in_tree'.
+- Put constraints in flat normal form (:func:`~cpmpy.transformations.flatten_model.flatten_constraint`).
+- Apply :func:`linearize_reified_variables` to replace reified equalities of the form
+  ``bv == (x == val)`` by a single direct encoding of ``x`` (must be done before implication-only normalisation).
+- Ensure implications are of the form ``bv -> <expr>`` (:func:`~cpmpy.transformations.reification.only_implies`).
+- Call :func:`linearize_constraint` to transform the inequalities, strict equalities and implications.
+- Optionally run post-passes such as :func:`only_positive_bv` (e.g. for ILP solvers that do not support NegBoolView)
+  and :func:`only_positive_coefficients` (e.g. for PB solvers that want it in this normal form)
 
 
+Module functions
+----------------
 
+Main transformations:
+- :func:`linearize_constraint`: Transforms a list of constraints to a linear form.
+- :func:`decompose_linear`: Decompose unsupported global constraints in a linear-friendly way.
+- :func:`decompose_linear_objective`: Decompose objective using linear-friendly decompositions.
+- :func:`linearize_reified_variables`: For an integer x with (BV == (x == val)) constraints, replace them with the direct encoding of 'x'.
+
+Helper functions:
+- :func:`canonical_comparison`: Canonicalize comparison expressions (variables on left, constants on right).
+- :func:`get_linear_decompositions`: Returns the custom linear decomposition map for global constraints.
+
+Optional post-linearisation transformations:
+- :func:`only_positive_bv`: Transforms constraints so only :class:`~cpmpy.expressions.variables._BoolVarImpl` variables appear positively
+  (no :class:`~cpmpy.expressions.variables.NegBoolView`).
+- :func:`only_positive_bv_wsum`: Helper function that replaces :class:`~cpmpy.expressions.variables.NegBoolView`
+  in var/sum/wsum expressions with equivalent expressions using only :class:`~cpmpy.expressions.variables._BoolVarImpl`.
+- :func:`only_positive_bv_wsum_const`: Same as :func:`only_positive_bv_wsum` but returns the constant
+  term separately.
+- :func:`only_positive_coefficients`: Transforms constraints so only positive coefficients appear
+  in linear constraints.
 """
-import copy
-import warnings
-from typing import Set, AbstractSet, Sequence, Optional
 
-import numpy as np
+import copy
+from typing import AbstractSet, Sequence, Optional
+
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
@@ -62,8 +75,8 @@ from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, NegativeTable
-from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent
+from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 from .int2bool import _encode_int_var
