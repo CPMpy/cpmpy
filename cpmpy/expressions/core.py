@@ -204,8 +204,8 @@ class Expression(object):
             return self._has_subexpr
         
         # micro-optimisations, cache the lookups
-        _NumVarImpl = cp.variables._NumVarImpl
-        _NDVarArray = cp.variables.NDVarArray
+        _NumVarImpl = cp.expressions.variables._NumVarImpl
+        _NDVarArray = cp.expressions.variables.NDVarArray
 
         # Initialize stack with direct access to private _args
         stack = list(self._args)
