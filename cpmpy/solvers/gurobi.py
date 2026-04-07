@@ -154,16 +154,18 @@ class CPM_gurobi(SolverInterface):
         return self.grb_model
 
 
-    def solve(self, time_limit:Optional[float]=None, display=Optional[Callback], **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the gurobi solver
 
             Arguments:
                 time_limit (float, optional):  maximum solve time in seconds
-                display:     generic solution callback for use during optimization.
-                            either a list of CPMpy expressions, OR a callback function which
-                            gets called after the variable-value mapping of the intermediate solution.
-                            default/None: nothing is displayed
+                solution_callback:             Gurobi callback function.
+                                               Takes precedence over ``display`` when both are set.
+                display:                       generic solution callback for use during optimization.
+                                               either a list of CPMpy expressions, OR a callback function which
+                                               gets called after the variable-value mapping of the intermediate solution.
+                                               default/None: nothing is displayed
                 **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -193,9 +195,9 @@ class CPM_gurobi(SolverInterface):
 
         # handle solution callbacks
         callback = None
-        if "solution_callback" in kwargs:
-            callback = kwargs.pop("solution_callback")
-        if callback is None and display is not None:
+        if solution_callback is not None:
+            callback = solution_callback
+        elif display is not None:
             callback = self._get_callback(display, events=[GRB.Callback.MIPSOL])
 
         # call the solver, with parameters

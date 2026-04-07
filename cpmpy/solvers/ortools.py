@@ -149,7 +149,7 @@ class CPM_ortools(SolverInterface):
         return self.ort_model
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, display:Optional[Callback] = None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the CP-SAT solver
 
@@ -159,8 +159,10 @@ class CPM_ortools(SolverInterface):
                                 For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                 get_core() returns a small subset of assumption variables that are unsat together.
                                 Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
-                display:        Callback for each improving solution, either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
-                                    default/None: nothing displayed
+                solution_callback:             Optional CP-SAT ``CpSolverSolutionCallback`` object.
+                                               Takes precedence over ``display`` when both are set.
+                display:                       Callback for each improving solution, either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
+                                               default/None: nothing displayed
 
             The ortools solver parameters are defined in its 'sat_parameters.proto' description:
             https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
@@ -211,12 +213,12 @@ class CPM_ortools(SolverInterface):
             # still present in v9.0
             self.ort_solver.parameters.keep_all_feasible_solutions_in_presolve = True
 
-        # setup solution callback, allow setting solution callback in kwargs for backwards compatibility
-        solution_callback = None
-        if "solution_callback" in kwargs:
-            solution_callback = kwargs.pop('solution_callback')
+        # setup solution callback
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
         elif display is not None:
-            solution_callback = OrtSolutionPrinter(self, display)
+            callback = OrtSolutionPrinter(self, display)
 
         # set additional keyword arguments in sat_parameters.proto
         for (kw, val) in kwargs.items():
@@ -233,7 +235,7 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.log_callback = print
 
         # call the solver, with parameters
-        self.ort_status = self.ort_solver.solve(self.ort_model, solution_callback=solution_callback)
+        self.ort_status = self.ort_solver.solve(self.ort_model, solution_callback=callback)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -930,7 +932,7 @@ try:
                 elif is_any_list(self._display):
                     print(argvals(self._display))
                 else:
-                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {self._display} of type {type(self._display)}"
                     self._display()  # callback
 
             # check for count limit

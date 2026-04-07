@@ -156,14 +156,16 @@ class CPM_cpo(SolverInterface):
         """
         return self.cpo_model
     
-    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the CP Optimizer solver
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds
-                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
-                        default/None: nothing displayed
+                solution_callback:              a ``docplex.cp.solver.solver_listener.CpoSolverListener`` object)
+                                                Takes precedence over ``display`` when both are set.
+                display:                        either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
+                                                default/None: nothing displayed
                 kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -200,9 +202,8 @@ class CPM_cpo(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        callback = None
-        # allow manual solution callback for backwards compatibility
-        if "solution_callback" in kwargs:
+        callback = solution_callback
+        if callback is None and "solution_callback" in kwargs:
             callback = kwargs.pop('solution_callback')
         if callback is None and display is not None:
             callback = CpoSolutionPrinter(self, display)

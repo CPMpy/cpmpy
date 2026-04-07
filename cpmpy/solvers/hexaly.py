@@ -141,13 +141,16 @@ class CPM_hexaly(SolverInterface):
     def native_model(self):
         return self.hex_model
 
-    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the Hexaly solver
 
             Arguments:
                 time_limit:  maximum solve time in seconds (float, optional)
-                kwargs:      any keyword argument, sets parameters of solver object
+                solution_callback:             Hexaly callback registered on ``TIME_TICKED``.
+                                               Takes precedence over ``display`` when both are set.
+                display:                       generic solution callback; either expressions, a list thereof, or a callable (see ``HexSolutionPrinter``).
+                kwargs:                        any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
 
@@ -170,9 +173,9 @@ class CPM_hexaly(SolverInterface):
 
         # register solution callback
         callback = None
-        if "solution_callback" in kwargs:
-            callback = kwargs.pop("solution_callback")
-        if callback is None and display is not None:
+        if solution_callback is not None:
+            callback = solution_callback
+        elif display is not None:
             callback = HexSolutionPrinter(self, display)
         if callback is not None:
             from hexaly.optimizer import HxCallbackType
