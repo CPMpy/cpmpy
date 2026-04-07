@@ -7,7 +7,7 @@ import numpy as np
 
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, ListLike
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.utils import is_any_list, is_bool, is_boolexpr
 
@@ -51,12 +51,18 @@ def _push_down_negation(lst_of_expr: ListLike[Expression]) -> tuple[bool, ListLi
                 expr = recurse_negation(expr.args[0])
         
             # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
-            # TODO: check if one of them is a var
             elif expr.name == '!=':
                 lexpr, rexpr = expr.args
-                if is_boolexpr(lexpr) and is_boolexpr(rexpr):
+                if isinstance(lexpr, (_BoolVarImpl, BoolVal)):
+                    newlist.append((~lexpr) == rexpr)
+                    changed = True
+                elif isinstance(rexpr, (_BoolVarImpl, BoolVal)):
+                    newlist.append((lexpr == (~rexpr)))
+                    changed = True
+                elif is_boolexpr(lexpr) and is_boolexpr(rexpr):
                     newexpr = (lexpr == recurse_negation(rexpr))
                     newlist.append(newexpr)
+                    changed = True
                 else:
                     newlist.append(expr)
             
