@@ -416,7 +416,6 @@ class CPM_gurobi(SolverInterface):
 
         :return: self
       """
-      from gurobipy import GRB, nlfunc
       import gurobipy as gp
 
       def add(cpm_expr):
@@ -456,6 +455,11 @@ class CPM_gurobi(SolverInterface):
                           return sum(weight * add_(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
                       case "sub":
                           return add_(cpm_expr.args[0], depth) - add_(cpm_expr.args[1], depth)
+                      case "div":
+                          assert False, "TODO"
+                          # TODO
+                        # if not is_num(lhs.args[1]):
+                        #     raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
               elif isinstance(cpm_expr, Comparison):
                   a, b = add_(cpm_expr.args[0], depth), add_(cpm_expr.args[1], depth)
                   match cpm_expr.name:
@@ -484,12 +488,13 @@ class CPM_gurobi(SolverInterface):
                               case "abs":  # y = abs(x)
                                   # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
                                   return gp.abs_(add_(cpm_expr.args[0], depth))
-                              case "min" | "max":
-                                  # TODO outdated ; should be no need to make our own var
-                                  y = add_(cp.intvar(lb=min(x.lb for x in cpm_expr.args), ub=max(x.ub for x in cpm_expr.args)), depth)
-                                  flatargs = [add_(arg, depth) for arg in cpm_expr.args]
-                                  self.native_model.addConstr(y == (gp.min_(flatargs) if cpm_expr.name == "min" else gp.max_(flatargs)))
-                                  return y
+                              case _:
+                                  args = (add_(arg, depth) for arg in cpm_expr.args)
+                                  match cpm_expr.name:
+                                      case "min":
+                                          return gp.min_(args)
+                                      case "max":
+                                          return gp.max_(args)
               else:
                   raise NotImplementedError(f"add_() not implemented for {cpm_expr}, {type(cpm_expr)}, {getattr(cpm_expr, 'name', None)}")
 

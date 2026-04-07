@@ -102,6 +102,13 @@ def expression_tree_cases_():
     )
 
     yield (
+        "maximum",
+        z + cp.Maximum([x, y]) == 12,
+        ["(z) + (IV0) == 12", "(max(x,y)) == (IV0)"],
+        ["R0: z + IV0 = 12", "GC0: IV0 = MAX ( x , y )"],
+    )
+
+    yield (
         "nested",
         z + (x - 3) * ((-y) ** 2) - 3 == 12,
         ["(z) + (((x) + -3) * (pow(sum([-1] * [y]),2))) == 15"],
