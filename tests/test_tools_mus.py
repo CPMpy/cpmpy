@@ -2,7 +2,7 @@ import pytest
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
-from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive
+from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
 
 class TestMus:
@@ -83,6 +83,11 @@ class TestMus:
         assert len(ms) < len(cons)
         assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
+        
+class TestNativeMusExact(TestMus):
+    def setup_method(self):
+        self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver="exact")
+        self.naive_func = mus_naive
 
 
 class TestQuickXplain(TestMus):
