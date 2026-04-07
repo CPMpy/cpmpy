@@ -49,22 +49,33 @@ def _push_down_negation(lst_of_expr: ListLike[Expression]) -> tuple[bool, ListLi
             if expr.name == "not":
                 # the negative case, negate
                 expr = recurse_negation(expr.args[0])
-        
+
             # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
-            elif expr.name == '!=':
+            elif expr.name == '!=' and is_boolexpr(expr.args[0]) and is_boolexpr(expr.args[1]):
+
                 lexpr, rexpr = expr.args
+
                 if isinstance(lexpr, (_BoolVarImpl, BoolVal)):
-                    newlist.append((~lexpr) == rexpr)
+                    rhs_changed, rhs_newlist = _push_down_negation(lexpr.args[1])
+                    if rhs_changed:
+                        rexpr = rhs_newlist[0]
+                    expr = (~lexpr) == rexpr
                     changed = True
+
                 elif isinstance(rexpr, (_BoolVarImpl, BoolVal)):
-                    newlist.append((lexpr == (~rexpr)))
+                    lhs_changed, lhs_newlist = _push_down_negation(rexpr.args[0])
+                    if lhs_changed:
+                        lexpr = lhs_newlist[0]
+                    expr = lexpr == (~rexpr)
                     changed = True
+
                 elif is_boolexpr(lexpr) and is_boolexpr(rexpr):
-                    newexpr = (lexpr == recurse_negation(rexpr))
-                    newlist.append(newexpr)
+                    lhs_changed, lhs_newlist = _push_down_negation(lexpr.args[1])
+                    if lhs_changed:
+                        rexpr = lhs_newlist[0]
+                    # recurse_negation will handle rexpr
+                    expr = lexpr == recurse_negation(rexpr)
                     changed = True
-                else:
-                    newlist.append(expr)
             
             elif expr.has_subexpr():
                 rec_changed, rec_newlist = _push_down_negation(expr.args)
