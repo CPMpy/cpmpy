@@ -773,8 +773,10 @@ class NDVarArray(np.ndarray):
     def __rxor__(self, other):
         return self._vectorized(other, '__rxor__')
 
-    def implies(self, other):
-        return self._vectorized(other, 'implies')
+    def implies(self, other, simplify=False):
+        if not isinstance(other, Iterable):
+            other = [other] * len(self)
+        return cpm_array([s.implies(o, simplify=simplify) for s, o in zip(self, other)])
 
     #in	  __contains__(self, value) 	Check membership
     # CANNOT meaningfully overwrite, python always returns True/False

@@ -35,12 +35,13 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, Union, Optional
+from typing import TYPE_CHECKING, TypeGuard, overload
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ListLike, ExprLike
+    from cpmpy.expressions.core import ExprLike, Expression
+    from cpmpy.expressions.variables import NDVarArray
 
 
 def is_bool(arg):
@@ -208,17 +209,23 @@ def get_bounds(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
 
-def implies(expr, other):
+# first to are declarations for typing purposes only
+@overload
+def implies(expr: NDVarArray, other: ExprLike, simplify: bool = False) -> NDVarArray: ...
+@overload
+def implies(expr: Expression|bool|np.bool_, other: ExprLike, simplify: bool = False) -> Expression: ...
+
+def implies(expr: NDVarArray|Expression|bool|np.bool_, other: ExprLike, simplify: bool = False) -> NDVarArray|ExprLike:
     """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
     if isinstance(expr, (cp.expressions.core.Expression, cp.expressions.variables.NDVarArray)):
         # both implement .implies()
-        return expr.implies(other)
+        return expr.implies(other, simplify=simplify)
     elif is_true_cst(expr):
         return other
     elif is_false_cst(expr):
         return cp.BoolVal(True)
     else:
-        return expr.implies(other)
+        raise ValueError(f"implies: expr must be an Expression or a boolean, got {type(expr)}")
 
 # Specific stuff for scheduling constraints
 
