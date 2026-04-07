@@ -11,20 +11,23 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal, ListLi
 from ..expressions.variables import _BoolVarImpl, _NumVarImpl
 from ..expressions.utils import is_any_list, is_bool, is_boolexpr
 
-def push_down_negation(lst_of_expr, toplevel=True):
+def push_down_negation(lst_of_expr: ListLike[Expression], toplevel=True):
     """
-        Transformation that checks all elements from the list,
-        and pushes down any negation it finds with the :func:`recurse_negation()` function.
+        Recursively simplifies expressions by pushing down negation into the arguments.
+        E.g., not(x >= 3 | y == 2) is simplified to (x < 3) & (y != 2).
 
-        Assumes the input is a list (typically from :func:`~cpmpy.transformations.normalize.toplevel_list()`) and ensures the output is
-        a `toplevel_list` if the input was.
+        Input is expected to be a flat list of Expressions.
+        Argument `toplevel` is deprecated and will be removed in a future version.
+
+        Return:
+            list of Expressions
     """
-    changed, newlist = _push_down_negation(lst_of_expr)
+    changed, newlist = _push_down_negation(lst_of_expr, toplevel=True)
     if not changed:
         return lst_of_expr
     return newlist
 
-def _push_down_negation(lst_of_expr: ListLike[Expression]) -> tuple[bool, ListLike]:
+def _push_down_negation(lst_of_expr: ListLike[Expression], toplevel=False) -> tuple[bool, ListLike]:
     
     newlist: list = []
     changed = False
@@ -48,7 +51,11 @@ def _push_down_negation(lst_of_expr: ListLike[Expression]) -> tuple[bool, ListLi
             # special cases, _recurse_negation() will handle recursive calls into the args
             if expr.name == "not":
                 # the negative case, negate
+                changed = True
                 expr = recurse_negation(expr.args[0])
+                if toplevel and expr.name == "and":
+                    newlist.extend(expr.args)
+                    continue
 
             # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
             elif expr.name == '!=' and is_boolexpr(expr.args[0]) and is_boolexpr(expr.args[1]):
@@ -56,21 +63,21 @@ def _push_down_negation(lst_of_expr: ListLike[Expression]) -> tuple[bool, ListLi
                 lexpr, rexpr = expr.args
 
                 if isinstance(lexpr, (_BoolVarImpl, BoolVal)):
-                    rhs_changed, rhs_newlist = _push_down_negation(lexpr.args[1])
+                    rhs_changed, rhs_newlist = _push_down_negation((rexpr,))
                     if rhs_changed:
                         rexpr = rhs_newlist[0]
                     expr = (~lexpr) == rexpr
                     changed = True
 
                 elif isinstance(rexpr, (_BoolVarImpl, BoolVal)):
-                    lhs_changed, lhs_newlist = _push_down_negation(rexpr.args[0])
+                    lhs_changed, lhs_newlist = _push_down_negation((lexpr,))
                     if lhs_changed:
                         lexpr = lhs_newlist[0]
                     expr = lexpr == (~rexpr)
                     changed = True
 
                 elif is_boolexpr(lexpr) and is_boolexpr(rexpr):
-                    lhs_changed, lhs_newlist = _push_down_negation(lexpr.args[1])
+                    lhs_changed, lhs_newlist = _push_down_negation((lexpr,))
                     if lhs_changed:
                         rexpr = lhs_newlist[0]
                     # recurse_negation will handle rexpr
