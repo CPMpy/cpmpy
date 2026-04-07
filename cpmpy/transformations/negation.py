@@ -24,14 +24,14 @@ def push_down_negation(lst_of_expr, toplevel=True):
         return lst_of_expr
     return newlist
 
-def _push_down_negation(lst_of_expr):
+def _push_down_negation(lst_of_expr: ListLike[Expression]) -> tuple[bool, ListLike]:
     
-    newlist = []
+    newlist: list = []
     changed = False
     
     if isinstance(lst_of_expr, np.ndarray) and not (lst_of_expr.dtype == object):
         # shortcut for data array, return as is
-        return lst_of_expr
+        return changed, lst_of_expr
     
     for expr in lst_of_expr:
         if is_any_list(expr):
@@ -70,7 +70,7 @@ def _push_down_negation(lst_of_expr):
         # default case: vars, constants, direct constraints
         newlist.append(expr)        
 
-    return newlist, changed
+    return changed, newlist
 
 def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
     """
