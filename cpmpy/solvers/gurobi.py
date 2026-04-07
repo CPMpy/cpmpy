@@ -44,13 +44,14 @@
 
 import cpmpy as cp
 from typing import Optional, List
+import warnings
 
 import math
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import *
-from ..expressions.utils import argvals, argval
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.utils import argvals, argval, is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -704,10 +705,11 @@ class CPM_gurobi(SolverInterface):
 
             if display is not None:
                 if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
+                    print(display.value())
+                elif is_any_list(display):
                     print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
 
         # Reset pool search mode to default

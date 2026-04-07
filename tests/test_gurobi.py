@@ -83,7 +83,7 @@ def expression_tree_cases_():
     yield (
         "imp_quad",
         p.implies(x * y == 3),
-        ["((x) * (y)) == (IV0)", "(p) -> (sum([IV0]) == 3)"],
+        ["((x) * (y)) == (IV0)", "(p) -> (sum(IV0) == 3)"],
         ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 = 3"],
     )
 
@@ -166,7 +166,7 @@ def expression_tree_cases_():
         z * (x == 2) == 1,
         [
             "(z) * (BV0) == 1",
-            "(BV0) -> (sum([x]) == 2)",
+            "(BV0) -> (sum(x) == 2)",
             "(~BV0) -> (sum([1, -1] * [x, BV1]) <= 1)",
             "(~BV0) -> (sum([1, -5] * [x, BV1]) >= -2)",
             "(BV0) -> (sum([-1] * [BV1]) >= 0)",  # TODO ?

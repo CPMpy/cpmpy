@@ -10,7 +10,7 @@ import cpmpy as cp
 from ..expressions.core import BoolVal, Expression, Comparison, Operator
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
-from ..expressions.variables import NDVarArray, _BoolVarImpl
+from ..expressions.variables import _BoolVarImpl
 from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
 
@@ -28,14 +28,14 @@ def toplevel_list(cpm_expr, merge_and=True):
     def unravel(lst, append):
         for e in lst:
             if isinstance(e, Expression):
-                if isinstance(e, NDVarArray):  # sometimes does not have .name
-                    unravel(e.flat, append)
-                elif merge_and and e.name == "and":
+                if merge_and and e.name == "and":
                     unravel(e.args, append)
                 else:
                     assert (e.is_bool()), f"Only boolean expressions allowed at toplevel, got {e}"
                     append(e) # presumably the most frequent case
-            elif isinstance(e, (list, tuple, np.flatiter, np.ndarray)):
+            elif isinstance(e, np.ndarray):
+                unravel(e.flat, append)  # return iterator over flat elements
+            elif isinstance(e, (list, tuple, np.flatiter)):
                 unravel(e, append)
             elif e is False or e is np.False_:
                 append(BoolVal(e))
@@ -82,7 +82,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                         break
                     elif is_false_cst(a):
                         if args is expr_args: # will remove this one, need to copy args...
-                            args = args.copy()
+                            args = list(args)  # takes copy
                         args.pop(i)
                     else:
                         i += 1
@@ -107,7 +107,7 @@ def simplify_boolean(lst_of_expr, num_context=False):
                         break
                     elif is_true_cst(a):
                         if args is expr_args:  # will remove this one, need to copy args...
-                            args = args.copy()
+                            args = list(args)  # takes copy
                         args.pop(i)
                     else:  # subexpression, should not happen here...
                         i += 1

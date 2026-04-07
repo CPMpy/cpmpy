@@ -88,12 +88,13 @@ commutative expressions (``and``, ``or``, ``sum``, ``wsum``, ...) but such optim
     TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
     TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
+import copy
 import math
 import builtins
 import cpmpy as cp
 
 from .normalize import toplevel_list, simplify_boolean
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
 from ..expressions.utils import is_num, is_any_list, is_int, is_star

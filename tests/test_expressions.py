@@ -3,7 +3,8 @@ import pytest
 import cpmpy as cp
 import numpy as np
 
-from cpmpy.expressions import *
+from cpmpy.expressions.variables import boolvar, intvar, cpm_array
+from cpmpy.expressions.globalfunctions import Maximum, Abs
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
@@ -239,7 +240,7 @@ class TestMul:
         prod = x * a
 
         assert isinstance(prod, NDVarArray)
-        for expr in prod.args:
+        for expr in prod:
             assert isinstance(expr, Expression) or expr == 0
 
 class TestArrayExpressions:
