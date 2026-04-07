@@ -46,7 +46,7 @@ from typing import Optional
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from .. import DirectConstraint
+from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
