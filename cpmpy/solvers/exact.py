@@ -67,6 +67,7 @@ from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num
 from ..exceptions import NotSupportedError
+from .utils import SolverLookup
 
 import numpy as np
 import numbers
@@ -653,20 +654,21 @@ class CPM_exact(SolverInterface):
         # return cpm_variables corresponding to Exact core
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
     
-    def _native_mus(self, soft, hard=[]):        
+    @staticmethod
+    def _native_mus(soft, hard=[]):        
         # Create assumption variables and model with hard + (assumption -> soft)
         from cpmpy.tools.explain.utils import make_assump_model # avoid circular import
         m, soft, assumptions = make_assump_model(soft, hard)
         
-        self += m.constraints
+        s = SolverLookup.get("exact", m)
         
-        assert not self.solve(assumptions=assumptions), "MUS: model must be UNSAT"
+        assert not s.solve(assumptions=assumptions), "MUS: model must be UNSAT"
         
         # set up assumptions for exact
-        self.xct_solver.setAssumptions([(self.solver_var(v), 1) for v in assumptions])
+        s.xct_solver.setAssumptions([(s.solver_var(v), 1) for v in assumptions])
 
         # call native MUS extractor
-        _, res_xct = self.xct_solver.extractMUS()
+        _, res_xct = s.xct_solver.extractMUS()
 
         # get the constraints back from the assumption variables
         dmap = dict(zip(assumptions, soft))

@@ -5,6 +5,7 @@
     - QuickXplain
     - Optimal MUS
 """
+import sys
 import warnings
 import numpy as np
 import cpmpy as cp
@@ -69,10 +70,11 @@ def mus_native(soft, hard=[], solver="exact"):
     :param solver: which solver to use (only `gurobi` and `exact` supported)
     """
     
-    # Create assumption variables and model with hard + (assumption -> soft)
-    s = cp.SolverLookup.get(solver)
+    # get solver class
+    class_name = f"CPM_{solver}"
+    solver_class = getattr(sys.modules[__name__], class_name)
     
-    return s._native_mus(soft, hard)
+    return solver_class._native_mus(soft, hard)
 
 
 def quickxplain(soft, hard=[], solver="ortools"):
