@@ -286,7 +286,7 @@ class CPM_gcs(SolverInterface):
                 else:
                     cpm_var._value = solution_map[gcs_var]
 
-            if isinstance(display, (Expression, NDVarArray)):
+            if isinstance(display, Expression):
                 print(display.value())
             elif is_any_list(display):
                 print(argvals(display))
