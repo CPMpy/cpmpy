@@ -14,7 +14,8 @@ E.g., bv <-> max(a,b,c) >= 4 can be rewritten as [bv <-> IV0 >= 4, IV0 == max(a,
 
 Unsupported global constraints and global functions are decomposed in-place and the resulting set of constraints
 is wrapped in a conjunction.
-E.g., x + ~AllDifferent(a,b,c) >= 2 is decomposed into x + ~((a) != (b) & (a) != (c) & (b) != (c)) >= 2
+Negation is pushed down into the decomposition when the global constraint is decomposed
+E.g., x + ~AllDifferent(a,b,c) >= 2 is decomposed into x + ~((a) != (b) & (a) != (c) & (b) != (c)) >= 2 and in turn written to x + (a == b) | (a == c) | (b == c)
 This allows to post the decomposed expression tree to the solver if it supports it (e.g., SMT-solvers, MiniZinc, CPO)
 """
 
@@ -167,13 +168,13 @@ def _decompose_in_tree(lst_of_expr: ListLike[Any],
                 rec_changed, newargs, rec_toplevel = _decompose_in_tree(expr.args, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap, decompose_custom=decompose_custom)
                 if rec_changed:
                     changed = True
+                    toplevel.extend(rec_toplevel)
                     if expr.name == "not": # cannot leave negation here, push down in the arguments of the decomposition
                         assert len(newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {newargs}"
                         expr = recurse_negation(newargs[0])
                     else:
                         expr = copy.copy(expr)
                         expr.update_args(newargs)
-                        toplevel.extend(rec_toplevel)
 
             if hasattr(expr, "decompose"):  # it is a global function or global constraint
                 is_supported = expr.name in supported
