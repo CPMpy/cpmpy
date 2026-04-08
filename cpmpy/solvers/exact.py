@@ -663,6 +663,7 @@ class CPM_exact(SolverInterface):
         
         # set up assumptions for exact
         s.xct_solver.setAssumptions([(s.solver_var(v), 1) for v in assumptions])
+        s.assumption_dict = {s.solver_var(v): (1, v) for v in assumptions}
 
         # call native MUS extractor
         res_xct, mus_xct = s.xct_solver.extractMUS()
@@ -671,7 +672,7 @@ class CPM_exact(SolverInterface):
 
         # get the constraints back from the assumption variables
         dmap = dict(zip(assumptions, soft))
-        return [dmap[boolvar(name=c)] for c in mus_xct]
+        return [dmap[s.assumption_dict[c][1]] for c in mus_xct]
 
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
