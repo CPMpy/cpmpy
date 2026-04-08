@@ -42,7 +42,7 @@
     ==============
 """
 
-from typing import Optional, List
+from typing import Optional, List, Callable
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -154,7 +154,7 @@ class CPM_gurobi(SolverInterface):
         return self.grb_model
 
 
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback:Optional[Callable]=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the gurobi solver
 
@@ -560,10 +560,10 @@ class CPM_gurobi(SolverInterface):
                 "try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
-        sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
+        kwargs.update({"PoolSearchMode":2, "PoolSolutions":solution_limit})
 
         # solve the model
-        self.solve(time_limit=time_limit, **sa_kwargs, **kwargs)
+        self.solve(time_limit=time_limit, **kwargs)
 
         optimal_val = None
         solution_count = self.grb_model.SolCount
