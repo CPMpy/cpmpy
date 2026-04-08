@@ -663,7 +663,7 @@ class CPM_exact(SolverInterface):
         
         # set up assumptions for exact
         xct_assumptions = [s.solver_var(x) for x in assumptions]
-        s.xct_solver.setAssumptions([(x, 1) for v in xct_assumptions])
+        s.xct_solver.setAssumptions([(x, 1) for x in xct_assumptions])
 
         # call native MUS extractor
         res_xct, mus_xct = s.xct_solver.extractMUS()
