@@ -481,23 +481,20 @@ class CPM_gurobi(SolverInterface):
                       case _:
                           raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
               elif isinstance(cpm_expr, cp.expressions.globalfunctions.GlobalFunction):
+                  args = [add_(a, depht) for a in cpm_expr.args]
                   match cpm_expr.name:
                       case "mul":
-                          return add_(cpm_expr.args[0], depth) * add_(cpm_expr.args[1], depth)
+                          return args[0] * args[1]
                       case "pow":
-                          return add_(cpm_expr.args[0], depth) ** add_(cpm_expr.args[1], depth)
-                      case _:  # other global functions cannot be 
-                          match cpm_expr.name:
-                              case "abs":  # y = abs(x)
-                                  # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
-                                  return gp.abs_(add_(cpm_expr.args[0], depth))
-                              case _:
-                                  args = (add_(arg, depth) for arg in cpm_expr.args)
-                                  match cpm_expr.name:
-                                      case "min":
-                                          return gp.min_(args)
-                                      case "max":
-                                          return gp.max_(args)
+                          return args[0] ** args[1]
+                      # remaining global function cannot be part of the expression tree
+                      case "abs":  # y = abs(x)
+                          # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
+                          return gp.abs_(args[0])
+                      case "min":
+                          return gp.min_(args)
+                      case "max":
+                          return gp.max_(args)
 
               elif isinstance(cpm_expr, DirectConstraint):
                   cpm_expr.callSolver(self, self.grb_model)
