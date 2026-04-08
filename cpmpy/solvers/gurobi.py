@@ -481,7 +481,7 @@ class CPM_gurobi(SolverInterface):
                       case _:
                           raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
               elif isinstance(cpm_expr, cp.expressions.globalfunctions.GlobalFunction):
-                  args = [add_(a, depht) for a in cpm_expr.args]
+                  args = [add_(a, depth) for a in cpm_expr.args]
                   match cpm_expr.name:
                       case "mul":
                           return args[0] * args[1]
