@@ -176,14 +176,18 @@ def reify_rewrite(constraints, supported=frozenset(), csemap=None):
             boolexpr = cpm_expr.args[boolexpr_index]
             if isinstance(boolexpr, Operator):
                 if boolexpr.name in supported or cpm_expr.name == "==":
-                    # Case 1, BE is Operator (and, or, ->)
+                    # Case 1a, BE is Operator (and, or, ->)
                     newcons.append(cpm_expr)
                     #   could actually rewrite into list of clauses like to_cnf() does... not for here
                 elif cpm_expr.name == "->":
+                    # Case 1b, BE is an unflattened expression (TODO duplicated from below)
+                    # We have BV -> BE, create BV -> auxvar, auxvar == BE
                     (auxvar, cons) = get_or_make_var(boolexpr, csemap=csemap)
                     newcons += cons
                     reifexpr = copy.copy(cpm_expr)
-                    reifexpr.args[boolexpr_index] = auxvar
+                    args = list(reifexpr.args)
+                    args[boolexpr_index] = auxvar
+                    reifexpr.update_args(tuple(args))
                     newcons.append(reifexpr)
             elif isinstance(boolexpr, GlobalConstraint):
                 # Case 2, BE is a GlobalConstraint
