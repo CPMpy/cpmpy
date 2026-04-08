@@ -23,8 +23,7 @@ ALL_SOLS = False # test whether all solutions returned by the solver satisfy the
 NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
-    "GlobalCardinalityCount", "InDomain", "Inverse",
-    # "Circuit",
+    "GlobalCardinalityCount", "InDomain", "Inverse", "Circuit",
     "Table", 'NegativeTable', "ShortTable", "Regular",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",

@@ -467,7 +467,9 @@ class CPM_gurobi(SolverInterface):
                       case "==":
                           if isinstance(a, gp.NLExpr):
                               # if flattening led to a non-linear expression, then it has to be constraint `y == f(x)` with `y` a `Var`
-                              return self.grb_model.addVar(lb=b, ub=b) == a
+                              y = b if isinstance(b, gp.Var) else self.grb_model.addVar(lb=b, ub=b)
+                              # TODO unclear why this is no longer normalized to be a constant `b`
+                              return y == a
                           else:
                               # Else, this is a function constraint 
                               # Note: Gurobi functions are called by `y == f(x)`, like normalized CPMpy boolexprs, but CPMpy numexprs are normalized to `f(x) == y` (e.g. `abs(x) == IV0`), so they need to be flipped
