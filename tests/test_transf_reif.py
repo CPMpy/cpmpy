@@ -82,7 +82,7 @@ class TestTransfReif:
         rv = cp.boolvar(name="rv")
         arr = cp.cpm_array([0,1,2])
 
-        f = lambda expr : str(reify_rewrite(flatten_constraint(expr)))
+        f = lambda expr : str(reify_rewrite(flatten_constraint(expr), supported={"or"}))
         fd = lambda expr : str(reify_rewrite(flatten_constraint(decompose_in_tree(expr))))
 
 
