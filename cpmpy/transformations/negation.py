@@ -98,11 +98,17 @@ def _push_down_negation(lst_of_expr: ListLike[Expression], toplevel=False) -> tu
 
 def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
     """
-        Negate `expr` by pushing the negation down into it and its args.
+        Negate `expr` by pushing the negation down into it and its arguments.
 
-        - :class:`~cpmpy.expressions.core.Comparison`: swap comparison sign
-        - :func:`Operator.is_bool() <cpmpy.expressions.core.Operator.is_bool()>`: apply DeMorgan
-        - :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`: leave "NOT" operator before global constraint. Use :func:`~cpmpy.transformations.decompose_global.decompose_in_tree()` for this
+        The following cases are handled:
+        - Boolean variables and constants: negate the variable or constant
+        - Comparisons: swap comparison sign
+        - Boolean operators (and/or/implies): apply DeMorgan
+        - Global constraints: calls :func:`~cpmpy.expressions.globalconstraints.GlobalConstraint.negate()` to negate the global constraint.
+          Depending on the implementation, this may leave a "NOT" operator before the global constraint. 
+          Use :func:`~cpmpy.transformations.decompose_global.decompose_in_tree()` to decompose the negated global constraint into simpler constraints if needed.
+
+        Ensures no "NOT" operator is left in the expression tree of `expr`, apart from negated global constraints.
 
         Returns the negated expression.
     """
