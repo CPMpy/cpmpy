@@ -57,6 +57,27 @@ def expression_tree_cases_():
     p, q, r = [cp.boolvar(name=name) for name in "pqr"]
 
     yield (
+        "BV",
+        p,
+        ["p"],
+        ["R0: p >= 1"],
+    )
+
+    yield (
+        "True",
+        cp.BoolVal(True),
+        ["boolval(True)"],
+        ["R0: C0 = 1"],
+    )
+
+    yield (
+        "False",
+        cp.BoolVal(False),
+        ["boolval(False)"],
+        ["R0: C0 = 0"],
+    )
+
+    yield (
         "pow",
         x**2 + y == 9,
         ["(pow(x,2)) + (y) == 9"],
