@@ -442,9 +442,10 @@ class CPM_gurobi(SolverInterface):
                       case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
                           a, b = cpm_expr.args
                           assert isinstance(a, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs, but had {a}"
-                          assert isinstance(b, Comparison),  f"Implication constraint {cpm_expr} must have Comparison as rhs, but had {b}"
+                          # To not complicate linearize, we could see a _BoolVarImpl as consequent, which we rewrite here to a unary LinExpr
                           is_pos = not isinstance(a, NegBoolView)
-                          return (add_(a if is_pos else a._bv, depth) == int(is_pos)) >> add_(b, depth)
+                          consequent = add_(b, depth) >= 1 if isinstance(b, _BoolVarImpl) else add_(b, depth)
+                          return (add_(a if is_pos else a._bv, depth) == int(is_pos)) >> consequent
                       case "not":
                           return 1 - add_(cpm_expr.args[0], depth)
                       case "-":

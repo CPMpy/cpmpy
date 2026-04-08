@@ -101,7 +101,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
             # TODO gurobi specifically cannot do reified or's
-            if "or" in supported and not reified:
+            if "or" in supported:
                 # post clause explicitly (don't use cp.any, which will just return the BoolVar)
                 newlist.append(cpm_expr)
             elif isinstance(cpm_expr, NegBoolView):
@@ -131,7 +131,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
                     # shortcut for BV -> BV, convert to disjunction and linearize it (if unsupported)
                     if "->" in supported:
-                        newlist.append(cond.implies(sub_expr >= 1))
+                        newlist.append(cond.implies(cp.all(linearize_constraint([sub_expr], supported=supported, reified=True, csemap=csemap))))
                     else:
                         newlist.append(1 * cond + -1 * sub_expr <= 0)
 
