@@ -654,25 +654,25 @@ class CPM_exact(SolverInterface):
         # return cpm_variables corresponding to Exact core
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
     
-    @staticmethod
-    def _native_mus(soft, hard=[]):        
+    @classmethod
+    def _native_mus(cls, soft, hard=[]):        
         # Create assumption variables and model with hard + (assumption -> soft)
         from cpmpy.tools.explain.utils import make_assump_model # avoid circular import
         m, soft, assumptions = make_assump_model(soft, hard)
         
-        s = SolverLookup.get("exact", m)
-        
-        assert not s.solve(assumptions=assumptions), "MUS: model must be UNSAT"
+        s = cls(m)
         
         # set up assumptions for exact
         s.xct_solver.setAssumptions([(s.solver_var(v), 1) for v in assumptions])
 
         # call native MUS extractor
-        _, res_xct = s.xct_solver.extractMUS()
+        res_xct, mus_xct = s.xct_solver.extractMUS()
+        
+        assert res_xct != "SAT", "MUS: model must be UNSAT"
 
         # get the constraints back from the assumption variables
         dmap = dict(zip(assumptions, soft))
-        return [dmap[boolvar(name=c)] for c in res_xct]
+        return [dmap[boolvar(name=c)] for c in mus_xct]
 
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):

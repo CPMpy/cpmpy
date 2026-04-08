@@ -4,8 +4,8 @@
     - Deletion-based MUS
     - QuickXplain
     - Optimal MUS
+    - Native MUS for given solvers
 """
-import sys
 import warnings
 import numpy as np
 import cpmpy as cp
@@ -72,7 +72,7 @@ def mus_native(soft, hard=[], solver="exact"):
     
     # get solver class
     class_name = f"CPM_{solver}"
-    solver_class = getattr(sys.modules[__name__], class_name)
+    solver_class = cp.SolverLookup.lookup(class_name)
     
     return solver_class._native_mus(soft, hard)
 
