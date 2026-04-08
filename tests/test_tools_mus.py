@@ -83,7 +83,7 @@ class TestMus:
         assert len(ms) < len(cons)
         assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
-        
+@pytest.mark.requires_solver("exact")       
 class TestNativeMusExact(TestMus):
     def setup_method(self):
         self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver="exact")
