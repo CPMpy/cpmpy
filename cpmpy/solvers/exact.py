@@ -662,8 +662,8 @@ class CPM_exact(SolverInterface):
         s = cls(m)
         
         # set up assumptions for exact
-        s.xct_solver.setAssumptions([(s.solver_var(v), 1) for v in assumptions])
-        s.assumption_dict = {s.solver_var(v): (1, v) for v in assumptions}
+        xct_assumptions = [s.solver_var(x) for x in assumptions]
+        s.xct_solver.setAssumptions([(x, 1) for v in xct_assumptions])
 
         # call native MUS extractor
         res_xct, mus_xct = s.xct_solver.extractMUS()
@@ -671,8 +671,8 @@ class CPM_exact(SolverInterface):
         assert res_xct != "SAT", "MUS: model must be UNSAT"
 
         # get the constraints back from the assumption variables
-        dmap = dict(zip(assumptions, soft))
-        return [dmap[s.assumption_dict[c][1]] for c in mus_xct]
+        dmap = dict(zip(xct_assumptions, soft))
+        return [dmap[c] for c in mus_xct]
 
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):

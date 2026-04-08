@@ -71,8 +71,7 @@ def mus_native(soft, hard=[], solver="exact"):
     """
     
     # get solver class
-    class_name = f"CPM_{solver}"
-    solver_class = cp.SolverLookup.lookup(class_name)
+    solver_class = cp.SolverLookup.lookup(solver)
     
     return solver_class._native_mus(soft, hard)
 
