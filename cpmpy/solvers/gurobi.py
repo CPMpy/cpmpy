@@ -498,6 +498,10 @@ class CPM_gurobi(SolverInterface):
                                           return gp.min_(args)
                                       case "max":
                                           return gp.max_(args)
+
+              elif isinstance(cpm_expr, DirectConstraint):
+                  cpm_expr.callSolver(self, self.grb_model)
+                  return True
               else:
                   raise NotImplementedError(f"add_() not implemented for {cpm_expr}, {type(cpm_expr)}, {getattr(cpm_expr, 'name', None)}")
 
