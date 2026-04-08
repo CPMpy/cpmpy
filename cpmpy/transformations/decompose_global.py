@@ -26,7 +26,7 @@ from ..expressions.core import Expression, ListLike
 from ..expressions.variables import NDVarArray
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import all as cpm_all
-
+from ..transformations.negation import recurse_negation
 
 def decompose_in_tree(lst_of_expr: list[Expression],
                       supported: Optional[AbstractSet[str]] = None,
@@ -166,10 +166,14 @@ def _decompose_in_tree(lst_of_expr: ListLike[Any],
             if expr.has_subexpr():
                 rec_changed, newargs, rec_toplevel = _decompose_in_tree(expr.args, supported=supported, supported_reified=supported_reified, is_toplevel=False, csemap=csemap, decompose_custom=decompose_custom)
                 if rec_changed:
-                    expr = copy.copy(expr)
-                    expr.update_args(newargs)
-                    toplevel.extend(rec_toplevel)
                     changed = True
+                    if expr.name == "not": # cannot leave negation here, push down in the arguments of the decomposition
+                        assert len(newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {newargs}"
+                        expr = recurse_negation(newargs[0])
+                    else:
+                        expr = copy.copy(expr)
+                        expr.update_args(newargs)
+                        toplevel.extend(rec_toplevel)
 
             if hasattr(expr, "decompose"):  # it is a global function or global constraint
                 is_supported = expr.name in supported
