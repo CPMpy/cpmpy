@@ -67,7 +67,6 @@ from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num
 from ..exceptions import NotSupportedError
-from .utils import SolverLookup
 
 import numpy as np
 import numbers
