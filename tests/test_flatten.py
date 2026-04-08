@@ -60,9 +60,9 @@ class TestFlattenConstraint:
         (x,y,z) = self.bvars[:3]
 
         e = (x != y) 
-        assert "[(~BV1) == (BV0)]" == str(flatten_constraint(e))
+        # assert "[(~BV1) == (BV0)]" == str(flatten_constraint(e)) -> part of push_down_negation now
         e = (x != ~y) 
-        assert "[(~BV1) == (~BV0)]" == str(flatten_constraint(e))
+        # assert "[(~BV1) == (~BV0)]" == str(flatten_constraint(e)) -> part of push_down_negation now
         e = (a != b) 
         assert "[(IV0) != (IV1)]" == str(flatten_constraint(e))
 
@@ -173,7 +173,7 @@ class TestFlattenExpr:
         cp.boolvar() # increase counter
         assert  str(flatten_constraint( (a > 10) )) == "[IV0 > 10]"
         assert  str(flatten_constraint( (a > 10) == 1 )) == "[IV0 > 10]"
-        assert  str(flatten_constraint( (a > 10) == 0 )) == "[IV0 <= 10]"
+        # assert  str(flatten_constraint( (a > 10) == 0 )) == "[IV0 <= 10]" -> part of push_down_negation now
         assert  str(flatten_constraint( (a > 10) == x )) == "[(IV0 > 10) == (BV0)]"
         #self.assertEqual( str(flatten_constraint( x == (a > 10) )), "[(IV0 > 10) == (BV0)]" ) # TODO, make it do the swap (again)
         assert  str(flatten_constraint( (a > 10) | (b + c > 2) )) == "[(BV5) or (BV6), (IV0 > 10) == (BV5), ((IV1) + (IV2) > 2) == (BV6)]"
@@ -201,15 +201,15 @@ class TestFlattenExpr:
         assert  str(flatten_constraint( c == a // b )) == "[((IV0) div (IV1)) == (IV2)]"
 
         # double negation #146
-        assert  str(flatten_constraint( ~(~(a == 7)) )) == "[IV0 == 7]"
+        # assert  str(flatten_constraint( ~(~(a == 7)) )) == "[IV0 == 7]" -> part of push_down_negation now
 
-        # negated normal form tests
-        assert  str(flatten_constraint( ~(x|y) )) == "[~BV0, ~BV1]"
-        assert  str(flatten_constraint( z.implies(~(x|y)) )) == "[(BV2) -> (~BV0), (BV2) -> (~BV1)]"
-        assert  str(flatten_constraint( ~(z.implies(~(x|y))) )) == "[BV2, (BV0) or (BV1)]"
-        assert  str(flatten_constraint(~(z.implies(~(x&y))))) == "[BV2, BV0, BV1]"
-        assert  str(flatten_constraint((~z).implies(~(x|y)))) == "[(~BV2) -> (~BV0), (~BV2) -> (~BV1)]"
-        assert  str(flatten_constraint((~z|y).implies(~(x|y)))) == "[(BV0) -> (BV2), (BV0) -> (~BV1), (BV1) -> (BV2), (BV1) -> (~BV1)]"
+        # negated normal form tests -> disabled, part of push_down_negation now
+        # assert  str(flatten_constraint( ~(x|y) )) == "[~BV0, ~BV1]"
+        # assert  str(flatten_constraint( z.implies(~(x|y)) )) == "[(BV2) -> (~BV0), (BV2) -> (~BV1)]"
+        # assert  str(flatten_constraint( ~(z.implies(~(x|y))) )) == "[BV2, (BV0) or (BV1)]"
+        # assert  str(flatten_constraint(~(z.implies(~(x&y))))) == "[BV2, BV0, BV1]"
+        # assert  str(flatten_constraint((~z).implies(~(x|y)))) == "[(~BV2) -> (~BV0), (~BV2) -> (~BV1)]"
+        # assert  str(flatten_constraint((~z|y).implies(~(x|y)))) == "[(BV0) -> (BV2), (BV0) -> (~BV1), (BV1) -> (BV2), (BV1) -> (~BV1)]"
         assert  str(a % 1 == 0) == "(IV0) mod 1 == 0"
 
         # boolexpr as numexpr
