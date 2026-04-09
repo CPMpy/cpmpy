@@ -110,7 +110,7 @@ class TestTransfDecomp:
         class MyGlobal1(GlobalConstraint):
 
             def __init__(self, arr):
-                super().__init__("myglobal1", flatlist(arr))
+                super().__init__("myglobal1", tuple(arr))
 
             def decompose(self):
                 return ([MyGlobalFunc(self.args)+5 <= 0, cp.max(self.args) == 1],
@@ -119,7 +119,7 @@ class TestTransfDecomp:
         class MyGlobalFunc(GlobalFunction):
 
             def __init__(self, arr):
-                super().__init__("myglobalfunc", flatlist(arr))
+                super().__init__("myglobalfunc", tuple(arr))
 
             def decompose(self):
                 return cp.sum(self.args), [self.args[0] != 0]
@@ -127,7 +127,7 @@ class TestTransfDecomp:
         class MyGlobal2(GlobalConstraint):
 
             def __init__(self, arr):
-                super().__init__("myglobal2", flatlist(arr))
+                super().__init__("myglobal2", tuple(arr))
             def decompose(self):
                 return [cp.sum(self.args) >= 3], []
 
@@ -135,7 +135,7 @@ class TestTransfDecomp:
         # non-nested case
         x = cp.intvar(0,10,shape=2, name="x")
 
-        cons = MyGlobal1([x])
+        cons = MyGlobal1(x)
         assert set(map(str,decompose_in_tree([cons], supported={"myglobalfunc","max"}))) == \
                             {'((myglobalfunc(x[0],x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
                              '(x[0]) + (x[1]) >= 3'}
@@ -148,7 +148,7 @@ class TestTransfDecomp:
         # nested case
         bv = cp.boolvar(name="bv")
 
-        cons = bv == MyGlobal1([x])
+        cons = bv == MyGlobal1(x)
         assert set(map(str, decompose_in_tree([cons], supported={"myglobalfunc", "max"}))) == \
                             {'(bv) == (((myglobalfunc(x[0],x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1))',
                              '(x[0]) + (x[1]) >= 3'}
