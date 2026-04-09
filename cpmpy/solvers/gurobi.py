@@ -63,7 +63,7 @@ from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..transformations.negation import recurse_negation
+from ..transformations.negation import recurse_negation, push_down_negation
 
 try:
     import gurobipy as gp
@@ -465,6 +465,7 @@ class CPM_gurobi(SolverInterface):
                           assert False
 
                   if depth == 1:
+                      # TODO make nicer
                       # r = cp.intvar(lb=1,ub=1)
                       # r = 1
                       self.native_model.addConstr(self.grb_model.addVar(lb=1, ub=1) == rhs)
@@ -474,21 +475,16 @@ class CPM_gurobi(SolverInterface):
                   else:
                       r = cp.intvar(*cpm_expr.get_bounds())
 
-                  print("R", r, cpm_expr)
                   self.native_model.addConstr(add_(r, depth) == rhs)
               elif is_boolexpr(cpm_expr):
                   r = cp.boolvar()
-                  print("n", r)
                   add(r.implies(cpm_expr))
-                  # TODO 
+                  # TODO recurse_negation
                   add((~r).implies(recurse_negation(cpm_expr)))
                   return r
               else:
-                  print("asdf")
                   r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
                   add(r == cpm_expr)
-                  # self.native_model.addConstr(add_(r == cpm_expr, depth))
-                  # return add_(r, depth)
               return r
 
           def linearize(cpm_expr, depth):
@@ -496,31 +492,15 @@ class CPM_gurobi(SolverInterface):
               if is_num(cpm_expr) or isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
                   return cpm_expr
                   return add_(cpm_expr, depth)
-              # elif cpm_expr.is_bool() and isinstance(cpm_expr, Comparison):
               elif isinstance(cpm_expr, Comparison):
                   a, b = cpm_expr.args
                   if isinstance(a, Operator) and a.name == "sum":
-
-                      # return add_(cpm_expr, depth)
                       return cpm_expr
                   else:
                       lhs = linearize(a, depth)
-
-                      # args = [linearize(a_, depth) for a_ in a.args]
-                      print('lhs', lhs)
                       cpm_expr_ = copy.copy(cpm_expr)
                       cpm_expr_.update_args([lhs, b])
-                      # lhs.update_args(args)
-                      # cpm_expr.update_args()
-                      print('q', cpm_expr_)
                       return cpm_expr_
-                      # return cp.sum(a for a in args)
-
-                  # # TODO what about TempConstr
-                  # if isinstance(con, gp.Q):
-                  #     return con
-                  # else:
-                  #     return linearize(con, depth+1)
               else:
                   return reify(cpm_expr, depth)
 
@@ -608,10 +588,15 @@ class CPM_gurobi(SolverInterface):
                           return add_(a, depth) >= add_(b, depth)
                       case "!=":
                           # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
-                          d, e = cp.boolvar(), cp.boolvar()
-                          add(d.implies(a > b))
-                          add(e.implies(a < b))
-                          return add_(d | e, depth)
+                          cpm_expr, = push_down_negation([cpm_expr])
+                          print("push", cpm_expr)
+                          if cpm_expr.name != "!=":
+                              return add_(cpm_expr, depth)
+
+                          imp_gt, imp_lt = cp.boolvar(), cp.boolvar()
+                          add(imp_gt.implies(a > b))
+                          add(imp_lt.implies(a < b))
+                          return add_(imp_gt | imp_lt, depth)
                       case ">":
                           return add_((a >= b + 1), depth)
                       case "<":
