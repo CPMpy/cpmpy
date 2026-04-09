@@ -3,6 +3,7 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.transformations.decompose_global import decompose_in_tree
@@ -596,7 +597,7 @@ class TestLinearizeReifiedVariablesThreshold:
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
-        self.csemap = {}
+        self.csemap = CSEMap()
         self.ivarmap = {}
         a = cp.intvar(1, 3, name="a")
         self.a = a
