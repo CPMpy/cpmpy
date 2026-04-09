@@ -438,11 +438,15 @@ class CPM_gurobi(SolverInterface):
               print("reify", cpm_expr)
               # TODO get_or_make_var_or_list
 
-              if isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
+              if isinstance(cpm_expr, NegBoolView):
+                  r = cp.boolvar()
+                  add(r == cpm_expr)
+                  return r
+              elif isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
                   return cpm_expr
               elif cpm_expr.name in {"max", "min", "abs", "or", "and"}:
                   # The arguments to general functions have to be integer variables
-                  args = [a if isinstance(a, _IntVarImpl) else reify(a, depth + 1) for a in cpm_expr.args]
+                  args = [a if isinstance(a, _IntVarImpl) and not isinstance(a, NegBoolView) else reify(a, depth + 1) for a in cpm_expr.args]
                   args = [add_(a, depth) for a in args]
                   match cpm_expr.name:
                       case "abs":  # y = abs(x)
@@ -554,10 +558,7 @@ class CPM_gurobi(SolverInterface):
                           return (add_(a if is_pos else a._bv, depth) == int(is_pos)) >> rhs
                       case "not":
                           a, = cpm_expr.args
-                          print("A", a)
-                          assert not isinstance(a, _BoolVarImpl)
                           return add_(recurse_negation(a), depth)
-                          # return 1 - add_(a, depth)
                       case "-":
                           return -add_(cpm_expr.args[0], depth=depth)
                       case "sum":
@@ -566,7 +567,6 @@ class CPM_gurobi(SolverInterface):
                           # cpm_expr_.update_args(args)
                           return sum(add_(arg, depth) for arg in cpm_expr.args)
                       case "wsum":
-                          assert False
                           return sum(weight * add_(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
                       case "sub":
                           return add_(cpm_expr.args[0], depth) - add_(cpm_expr.args[1], depth)
