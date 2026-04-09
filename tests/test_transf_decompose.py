@@ -81,10 +81,10 @@ class TestTransfDecomp:
         ivs = [cp.intvar(1,9,name=n) for n in "xyz"]
 
         cons = [cp.AllDifferent(ivs) == 0]
-        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [0 == cp.AllDifferent(ivs)]
-        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [cp.AllDifferent(ivs) == cp.AllEqual(ivs[:-1])]
         assert set(map(str,decompose_in_tree(cons))) == {"(and((x) != (y), (x) != (z), (y) != (z))) == ((x) == (y))"}
