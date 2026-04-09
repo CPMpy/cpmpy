@@ -52,7 +52,7 @@ import math
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, is_boolexpr
-from ..expressions.utils import argvals, argval, is_any_list, is_num
+from ..expressions.utils import argvals, argval, is_any_list, is_num, is_bool
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -435,47 +435,55 @@ class CPM_gurobi(SolverInterface):
 
 
           def reify(cpm_expr, depth):
-              print("reify", cpm_expr)
+              print("reify", cpm_expr, getattr(cpm_expr, 'name', None))
               # TODO get_or_make_var_or_list
 
-              if isinstance(cpm_expr, NegBoolView):
+              if is_num(cpm_expr):
+                  return cpm_expr
+              elif isinstance(cpm_expr, NegBoolView):
                   r = cp.boolvar()
-                  add(r == cpm_expr)
+                  # add(r == cpm_expr)
+                  # avoid inf. recursion
+                  c = add_(r, depth) == add_(cpm_expr, depth)
+                  print("add", c)
+                  self.native_model.addConstr(c)
                   return r
               elif isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
                   return cpm_expr
-              elif cpm_expr.name in {"max", "min", "abs", "or", "and"}:
+              elif cpm_expr.name in {"sum", "wsum", "sub", "-"}:
+                  return cpm_expr
+              elif cpm_expr.name in {"max", "min", "abs", "or", "and", "->"}:
                   # The arguments to general functions have to be integer variables
-                  args = [a if isinstance(a, _IntVarImpl) and not isinstance(a, NegBoolView) else reify(a, depth + 1) for a in cpm_expr.args]
-                  args = [add_(a, depth) for a in args]
+                  def flatten_args(args):
+                      args = [a if isinstance(a, _IntVarImpl) and not isinstance(a, NegBoolView) else reify(a, depth + 1) for a in args]
+                      args = [add_(a, depth) for a in args]
+                      return args
                   match cpm_expr.name:
                       case "abs":  # y = abs(x)
                           # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
-                          rhs = gp.abs_(args[0])
+                          rhs = gp.abs_(flatten_args(cpm_expr.args)[0])
                       case "min":
-                          rhs = gp.min_(args)
+                          rhs = gp.min_(flatten_args(cpm_expr.args))
                       case "max":
-                          print("C", cpm_expr)
-                          rhs = gp.max_(args)
+                          rhs = gp.max_(flatten_args(cpm_expr.args))
                       case "or":
-                          rhs = gp.or_(a for a in args)
+                          rhs = gp.or_(flatten_args(cpm_expr.args))
                       case "and":
-                          rhs = gp.and_(a for a in args)
+                          rhs = gp.and_(flatten_args(cpm_expr.args))
+                      case "->":
+                          a, b = cpm_expr.args
+                          rhs = gp.or_(flatten_args([~a, b]))
                       case _:
                           assert False
 
-                  if depth == 1:
-                      # TODO make nicer
-                      # r = cp.intvar(lb=1,ub=1)
-                      # r = 1
-                      self.native_model.addConstr(self.grb_model.addVar(lb=1, ub=1) == rhs)
-                      return None
-                  elif is_boolexpr(cpm_expr):
+                  if is_boolexpr(cpm_expr):
                       r = cp.boolvar()
                   else:
                       r = cp.intvar(*cpm_expr.get_bounds())
 
-                  self.native_model.addConstr(add_(r, depth) == rhs)
+                  c = add_(r, depth) == rhs
+                  print("add", c)
+                  self.native_model.addConstr(c)
               elif is_boolexpr(cpm_expr):
                   r = cp.boolvar()
                   add(r.implies(cpm_expr))
@@ -563,17 +571,20 @@ class CPM_gurobi(SolverInterface):
                   a, b = cpm_expr.args
                   match cpm_expr.name:
                       case "==":
+                          a, b = reify(a, depth), reify(b, depth)
                           a, b = add_(a, depth), add_(b, depth)
                           if isinstance(a, gp.NLExpr):
+                              assert False
                               print("NL")
                               # if flattening led to a non-linear expression, then it has to be constraint `y == f(x)` with `y` a `Var`
                               y = b if isinstance(b, gp.Var) else self.grb_model.addVar(lb=b, ub=b)
                               # TODO unclear why this is no longer normalized to be a constant `b` (same below)
                               return y == a
-                          elif isinstance(a, (gp.LinExpr, gp.QuadExpr, gp.Var)):
+                          elif isinstance(a, (int, gp.LinExpr, gp.QuadExpr, gp.Var)):
                               print("Lin")
                               return a == b
                           elif isinstance(a, gp.GenExpr) or isinstance(b, gp.GenExpr):
+                              assert False
                               print("G", a, b)
                               # Else, this is a function constraint
                               # Note: Gurobi functions are called by `y == f(x)`, like normalized CPMpy boolexprs, but CPMpy numexprs are normalized to `f(x) == y` (e.g. `abs(x) == IV0`), so they need to be flipped
@@ -592,11 +603,11 @@ class CPM_gurobi(SolverInterface):
                           print("push", cpm_expr)
                           if cpm_expr.name != "!=":
                               return add_(cpm_expr, depth)
-
-                          imp_gt, imp_lt = cp.boolvar(), cp.boolvar()
-                          add(imp_gt.implies(a > b))
-                          add(imp_lt.implies(a < b))
-                          return add_(imp_gt | imp_lt, depth)
+                          else:
+                              imp_gt, imp_lt = cp.boolvar(), cp.boolvar()
+                              add(imp_gt.implies(a > b))
+                              add(imp_lt.implies(a < b))
+                              return add_(imp_gt | imp_lt, depth)
                       case ">":
                           return add_((a >= b + 1), depth)
                       case "<":
@@ -632,7 +643,7 @@ class CPM_gurobi(SolverInterface):
                   cpm_expr.callSolver(self, self.grb_model)
                   return True
               else:
-                  raise NotImplementedError(f"add_() not implemented for {cpm_expr}, {type(cpm_expr)}, {getattr(cpm_expr, 'name', None)}")
+                  raise NotImplementedError(f"add_() not implemented for {cpm_expr} of type {type(cpm_expr)} w/ name {getattr(cpm_expr, 'name', None)}")
 
           grb_expr = add_(cpm_expr, 0)
           if grb_expr is None:
