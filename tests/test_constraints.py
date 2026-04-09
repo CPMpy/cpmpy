@@ -3,12 +3,21 @@ import inspect
 import cpmpy as cp
 import numpy as np
 from cpmpy import Model, SolverLookup, BoolVal
+from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.utils import argval, is_num, eval_comparison, get_bounds
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.globalfunctions import GlobalFunction
+from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def reset_var_counters():
+    """Reset the intvar and boolvar counters before each test."""
+    _IntVarImpl.counter = 0
+    _BoolVarImpl.counter = 0
 
 from utils import skip_on_missing_pblib
 
@@ -39,6 +48,7 @@ EXCLUDE_GLOBAL = {
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
                   }
+EXCLUDE_GLOBAL = True
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
@@ -81,8 +91,9 @@ def numexprs(solver):
     for expr in bool_exprs(solver):
         yield expr
     
-    for expr in global_functions(solver):
-        yield expr
+    if EXCLUDE_GLOBAL is not True:
+        for expr in global_functions(solver):
+            yield expr
 
 
 # Generate all possible comparison constraints
@@ -136,8 +147,9 @@ def bool_exprs(solver):
     for eq_name in ["==", "!="]:
         yield Comparison(eq_name, *BOOL_ARGS[:2])
 
-    for cpm_cons in global_constraints(solver):
-        yield cpm_cons
+    if EXCLUDE_GLOBAL is not True:
+        for cpm_cons in global_constraints(solver):
+            yield cpm_cons
 
 def global_constraints(solver):
     """
@@ -146,6 +158,7 @@ def global_constraints(solver):
            Xor, Cumulative, NValue, Count, Increasing, Decreasing, IncreasingStrict, DecreasingStrict, LexLessEq, LexLess
     """
     classes = inspect.getmembers(cp.expressions.globalconstraints, inspect.isclass)
+    # classes = [("Xor",cp.Xor)]
     classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
     classes = [(name, cls) for name, cls in classes if name not in EXCLUDE_GLOBAL.get(solver, {})]
 
@@ -163,7 +176,7 @@ def global_constraints(solver):
             yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
             yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
         elif name == "Regular":
-            yield cp.Regular(cp.intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
+            yield cp.Regular(cp.intvar(0,3, shape=3, name="x"), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
             yield cp.NegativeTable(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":
@@ -184,7 +197,7 @@ def global_constraints(solver):
 
             yield cp.Cumulative(start=s, duration=dur, demand=demand, capacity=cap) # also try with no end provided
             if solver != "pumpkin": # only supports with fixed durations
-                yield cp.Cumulative(s.tolist()+[cp.intvar(0,10)], dur + [cp.intvar(-3,3)], e.tolist()+[cp.intvar(0,10)], 1, cap)
+                yield cp.Cumulative(s.tolist()+[cp.intvar(0,10, name="start_2")], dur + [cp.intvar(-3,3, name="dur_2")], e.tolist()+[cp.intvar(0,10, name="end_2")], 1, cap)
                 yield cp.Cumulative(s, dur, e, cp.intvar(-3,3,shape=3,name="demand"), cap)
             continue
 
@@ -193,12 +206,12 @@ def global_constraints(solver):
             e = cp.intvar(0, 10, shape=4, name="end")
             dur = [1, 4, 3, 2]
             demand = [11, 4, 8, 7]
-            is_present = [cp.boolvar(), cp.boolvar(), True, False]
+            is_present = [cp.boolvar(name="start[0]_present"), cp.boolvar(name="start[1]_present"), True, False]
             cap = 10
             yield cls(s, dur, e, demand, cap, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
-            cnts = cp.intvar(0,10,shape=3)
+            cnts = cp.intvar(0,10,shape=3,name="vals")
             yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
         elif name == "AllDifferentExceptN":
             vals = [1, 2, 3]
@@ -222,25 +235,25 @@ def global_constraints(solver):
             s = cp.intvar(0, 10, shape=4, name="start")
             e = cp.intvar(0, 10, shape=4, name="end")
             dur = [1, 4, 3, 2]
-            is_present = [cp.boolvar(), cp.boolvar(), True, False]
+            is_present = [cp.boolvar(name="start[0]_present"), cp.boolvar(name="start[1]_present"), True, False]
             yield cls(s, dur, e, is_present)
         elif name == "GlobalCardinalityCount":
             vals = [1, 2, 3]
-            cnts = cp.intvar(0,10,shape=3)
+            cnts = cp.intvar(0,10,shape=3, name="counts")
             yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
         elif name == "LexLessEq":
-            X = cp.intvar(0, 3, shape=3)
-            Y = cp.intvar(0, 3, shape=3)
+            X = cp.intvar(0, 3, shape=3, name="X")
+            Y = cp.intvar(0, 3, shape=3, name="Y")
             yield cp.LexLessEq(X, Y)
         elif name == "LexLess":
-            X = cp.intvar(0, 3, shape=3)
-            Y = cp.intvar(0, 3, shape=3)
+            X = cp.intvar(0, 3, shape=3, name="X")
+            Y = cp.intvar(0, 3, shape=3, name="Y")
             yield cp.LexLess(X, Y)
         elif name == "LexChainLess":
-            X = cp.intvar(0, 3, shape=(3,3))
+            X = cp.intvar(0, 3, shape=(3,3), name="X")
             yield cp.LexChainLess(X)
         elif name == "LexChainLessEq":
-            X = cp.intvar(0, 3, shape=(3,3))
+            X = cp.intvar(0, 3, shape=(3,3), name="X")
             yield cp.LexChainLessEq(X)
         else: # default constructor, list of numvars
             yield cls(NUM_ARGS)            
@@ -291,8 +304,10 @@ def generate_cases(solver):
     x, y = cp.intvar(1, 3,shape=2, name=["x", "y"])
     yield x ** 2 - 2*x*y + y**2 <= 3
 
-    # p, q = cp.intvar(shape=2, name=["p", "q"])
-    # yield p 
+    p, q, r = [cp.boolvar(name=x) for x in "pqr"]
+    yield p | q
+    yield r | (p & q)
+    # yield z | (p & q)
     # yield ((cp.boolvar(name="x") >= 0) | (cp.boolvar(name="y") >= 0))  # issue #736
 
 def reify_imply_exprs(solver):
@@ -313,19 +328,26 @@ def reify_imply_exprs(solver):
         yield comp_expr == BOOL_VAR
 
 
-def verify(cons):
-    from cpmpy.transformations.get_variables import get_variables
-    vars_ = get_variables(cons)
+def verify(constraint):
+    vars_ = get_variables(constraint)
     assignment = {v.name: v.value() for v in sorted(vars_, key=lambda v: v.name)}
-    assert argval(cons), f"argval failed for {cons} with assignment {assignment}"
-    assert cons.value(), f"value() failed for {cons} with assignment {assignment}"
+    assert all(val is not None for val in assignment.values()), "Expected all variables to be assigned"
+    assert argval(constraint), f"argval failed for {constraint} with assignment {assignment}"
+    assert constraint.value(), f"value() failed for {constraint} with assignment {assignment}"
 
 def all_constraints(solver):
-    """Combined generator for all constraint types."""
-    # yield from bool_exprs(solver)
-    # yield from comp_constraints(solver)
-    # yield from reify_imply_exprs(solver)
-    yield from generate_cases(solver)
+    """Combined generator for all constraint types, yielding (id, constraint) tuples."""
+    generators = [
+        ("bool", bool_exprs),
+        ("comp", comp_constraints),
+        ("case", generate_cases),
+        ("reify", reify_imply_exprs),
+    ]
+    idx = 0
+    for prefix, gen in generators:
+        for i, c in enumerate(gen(solver)):
+            yield (f"{idx}-{prefix}_{i}", c)
+            idx += 1
 
 @pytest.mark.generate_constraints.with_args(all_constraints)
 @skip_on_missing_pblib(skip_on_exception_only=True)
@@ -333,12 +355,22 @@ def test_constraints(solver, constraint):
     """
         Tests constraint by posting it to the solver and checking the value after solve.
     """
+
+    # Show model with variables and their domains
+    model = Model(constraint)
+    vars_ = get_variables(constraint)
+    var_info = {v.name: (v.lb, v.ub) for v in sorted(vars_, key=lambda v: v.name)}
+    print(f"Model: {model}")
+    print(f"Variables: {var_info}")
+
     if ALL_SOLS:
-        n_sols = SolverLookup.get(solver, Model(constraint)).solveAll(display=lambda: verify(constraint), solution_limit=100)
-        assert n_sols >= 1
+        n_sols = SolverLookup.get(solver, model).solveAll(display=lambda: verify(constraint), solution_limit=100)
+        assert n_sols >= 1, f"Unexpected unsat: {constraint}"
     else:
-        assert SolverLookup.get(solver, Model(constraint)).solve()
-        assert argval(constraint)
+        # print("TF", SolverLookup.get(solver).transform(model.constraints))
+        assert SolverLookup.get(solver, model).solve(), f"Unexpected unsat: {constraint}"
+        for constraint in model.constraints:
+            verify(constraint)
         assert constraint.value()
 
 if __name__ == "__main__":

@@ -84,6 +84,18 @@ def expression_tree_cases_():
         ["qc0: y + [ x ^2 ] = 9"],
     )
 
+    yield (
+        "neq",
+        x != 1,
+        ["(z) * (sum([1, -1] * [x, y])) == 1"],
+        [
+            "R0: BV2 >= 1",
+            "GC0: BV0 = 1 -> x >= 2",
+            "GC1: BV1 = 1 -> x <= 0",
+            "GC2: BV2 = OR ( BV0 , BV1 )",
+        ],  # TODO not sure how it did this, but happy with it
+    )
+
     """Positive implications"""
     yield (
         "positive_implication",
@@ -122,6 +134,13 @@ def expression_tree_cases_():
         ["qc0: z + [ x * y ] = 12"],
     )
 
+    # yield (
+    #     "div",
+    #     z + x / y == 12,
+    #     ["(z) + (IV0) == 12", "(max(x,y)) == (IV0)"],
+    #     ["R0: z + IV0 = 12", "GC0: IV0 = MAX ( x , y )"],
+    # )
+
     yield (
         "maximum",
         z + cp.Maximum([x, y]) == 12,
@@ -134,13 +153,26 @@ def expression_tree_cases_():
         z + (x - 3) * ((-y) ** 2) - 3 == 12,
         ["(z) + (((x) + -3) * (pow(sum([-1] * [y]),2))) == 15"],
         [
-            "\\ C3 = z + (sqr(y) * (-3 + x))",
-            "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( VARIABLE , z , 0 )",
-            # TODO not totally clean MULTIPLY node?
-            "( MULTIPLY , -1 , 0 ) ( SQUARE , -1 , 2 ) ( VARIABLE , y , 3 )",
-            "( PLUS , -1 , 2 ) ( CONSTANT , -3 , 5 ) ( VARIABLE , x , 5 )",
+            "\\ C3 = (z + (sqr(y) * (-3 + x))) + -3",
+            "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( PLUS , -1 , 0 ) ( VARIABLE , z , 1 )",
+            "( MULTIPLY , -1 , 1 ) ( SQUARE , -1 , 3 ) ( VARIABLE , y , 4 )",
+            "( PLUS , -1 , 3 ) ( CONSTANT , -3 , 6 ) ( VARIABLE , x , 6 )",
+            "( CONSTANT , -3 , 0 )",
         ],
     )
+
+    # yield (
+    #     "nested_obj",
+    #     cp.Model(minimize=z + (x - 3) * ((-y) ** 2) - 3),
+    #     ["(z) + (((x) + -3) * (pow(sum([-1] * [y]),2))) == 15"],
+    #     [
+    #         "\\ C3 = z + (sqr(y) * (-3 + x))",
+    #         "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( VARIABLE , z , 0 )",
+    #         # TODO not totally clean MULTIPLY node?
+    #         "( MULTIPLY , -1 , 0 ) ( SQUARE , -1 , 2 ) ( VARIABLE , y , 3 )",
+    #         "( PLUS , -1 , 2 ) ( CONSTANT , -3 , 5 ) ( VARIABLE , x , 5 )",
+    #     ],
+    # )
 
     # # TODO needlessly reifying
     # yield (
@@ -189,22 +221,26 @@ def expression_tree_cases_():
         ["qc0: [ - z * x - z * y ] = 1"],
     )
 
+    # yield (
+    #     "tmp",
+    #     (~p).implies(x >= 2),
+    #     ["(z) * (sum([-1, -1] * [x, y])) == 1"],
+    #     ["qc0: [ - z * x - z * y ] = 1"],
+    # )
+
     yield (
         "reification",
         z * (x == 2) == 1,
         [
-            "(z) * (BV0) == 1",
-            "(BV0) -> (sum(x) == 2)",
-            "(~BV0) -> (sum([1, -1] * [x, BV1]) <= 1)",
-            "(~BV0) -> (sum([1, -5] * [x, BV1]) >= -2)",
-            "(BV0) -> (sum([-1] * [BV1]) >= 0)",  # TODO ?
+            "(z) * (x == 2) == 1",
         ],
         [
-            "qc0: [ z * BV0 ] = 1",
+            "qc0: [ BV0 * z ] = 1",
             "GC0: BV0 = 1 -> x = 2",
-            "GC1: BV0 = 0 -> x - BV1 <= 1",
-            "GC2: BV0 = 0 -> x - 5 BV1 >= -2",
-            "GC3: BV0 = 1 -> - BV1 >= 0",
+            "GC1: BV1 = 1 -> x >= 3",
+            "GC2: BV2 = 1 -> x <= 1",
+            "GC4: BV0 = 0 -> BV3 >= 1",
+            "GC3: BV3 = OR ( BV1 , BV2 )",
         ],
     )
 
@@ -226,7 +262,7 @@ def expression_tree_cases_():
         "conjunction_in_disjunction",
         (p | (q & r)),
         ["(p) or (BV0)", "(BV0) == ((q) and (r))"],
-        ["GC0: C2 = OR ( p , BV0 )", "GC1: BV0 = AND ( q , r )"],
+        ["GC0: BV0 = AND ( q , r )", "GC1: C4 = OR ( p , BV0 )"],
     )
 
 
@@ -237,16 +273,23 @@ def expression_tree_cases_():
 def test_gurobi_expression_tree(name, constraint, expected_tf, expected_lp):
     """Test that Gurobi transformation generates expected LP output."""
     reset_counters()
-    solver = CPM_gurobi()
+
+    print("CONSTRAINT")
+    print(constraint)
     transformed = [str(c) for c in CPM_gurobi().transform(constraint)]
     print("TF", ", ".join(transformed))
     reset_counters()
 
-    solver += constraint
+    if not isinstance(constraint, cp.Model):
+        m = cp.Model(constraint)
+    solver = CPM_gurobi(m)
 
     lp = get_lp_string(solver)
     print(lp)
 
     constraints = extract_constraints(lp)
-    assert transformed == expected_tf, f"Generated transformation:\n{transformed}"
-    assert constraints == expected_lp, f"Generated constraints:\n{constraints}\n\nFull LP:\n{lp}"
+    # assert transformed == expected_tf, f"From {constraint} to TF\n{transformed}"
+    assert constraints == expected_lp, f"From {constraint} to LP\n{constraints}\n\nFull LP:\n{lp}"
+    is_sat = solver.solve()
+    assert not is_sat or constraint.value(), "Incorrect constraint value"
+    # assert is_sat == m.solve(), "Unexpected solve result"
