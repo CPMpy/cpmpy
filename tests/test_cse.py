@@ -31,7 +31,7 @@ class TestCSE:
         assert str(fc) == "alldifferent(x,IV0,z)"
         assert len(csemap) == 1
 
-        assert str(next(iter(csemap.keys()))) == "(y) + (y)"
+        assert str(next(iter(csemap.csemap.keys()))) == "(y) + (y)"
         assert str(csemap[y + y]) == "IV0"
 
         # next time we use y + y, it should replace it IV0
