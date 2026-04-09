@@ -23,6 +23,8 @@ from typing import List, AbstractSet, Optional, Dict, Tuple, Any, Callable, cast
 import numpy as np
 
 from ..expressions.core import Expression, ListLike
+from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import NDVarArray
 from ..expressions.utils import is_any_list
 from ..expressions.python_builtins import all as cpm_all
@@ -32,7 +34,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                       supported: Optional[AbstractSet[str]] = None,
                       supported_reified: Optional[AbstractSet[str]] = None,
                       _toplevel=None, nested=False,
-                      csemap: Optional[Dict[Expression, Expression]] = None,
+                      csemap = None,
                       decompose_custom: Optional[Dict[str, Callable]] = None) -> List[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
@@ -171,40 +173,48 @@ def _decompose_in_tree(lst_of_expr: ListLike[Any],
                     toplevel.extend(rec_toplevel)
                     changed = True
 
-            if hasattr(expr, "decompose"):  # it is a global function or global constraint
+            if isinstance(expr, (GlobalConstraint, GlobalFunction)):  # it is a global function or global constraint
                 is_supported = expr.name in supported
                 if not is_toplevel and expr.is_bool():
                     # argument to another expression, only possible if supported reified
                     is_supported = expr.name in supported_reified
 
                 if is_supported is False:
-                    if (csemap is not None) and expr in csemap:
-                        # we might have already decomposed it previously
-                        newexpr = csemap[expr]
-                    else:
+
+                    decomp: Optional[Expression | list[Expression]] = None # global constraints return list, global functions return expr
+
+                    if (csemap is not None):
+                        decomp = csemap.get_decomposition(expr)
+                    if decomp is None:
                         if decompose_custom is not None and expr.name in decompose_custom:
-                            newexpr, define = decompose_custom[expr.name](expr)
+                            decomp, define = decompose_custom[expr.name](expr)
                         else:
-                            newexpr, define = expr.decompose()
+                            decomp, define = expr.decompose()
                         toplevel.extend(define)
 
                         # decomposed constraints may introduce new globals
-                        if isinstance(newexpr, list):  # globals return a list instead of a single expression (TODO: change?)
-                            rec_changed, rec_newexpr, rec_toplevel = _decompose_in_tree(newexpr, supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap, decompose_custom=decompose_custom)
+                        if isinstance(decomp, list):  # globals return a list instead of a single expression (TODO: change?)
+                            rec_changed, rec_newexpr, rec_toplevel = _decompose_in_tree(decomp, supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap, decompose_custom=decompose_custom)
                             if rec_changed:
                                 newexpr_lst = rec_newexpr
                                 toplevel.extend(rec_toplevel)
                             else:
-                                newexpr_lst = newexpr  # for mypy
+                                newexpr_lst = decomp  # for mypy
                             newexpr = cpm_all(newexpr_lst)  # make the list a single expression
                         else:
-                            rec_changed, rec_lst_newexpr, rec_toplevel = _decompose_in_tree((newexpr,), supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap, decompose_custom=decompose_custom)
+                            rec_changed, rec_lst_newexpr, rec_toplevel = _decompose_in_tree((decomp,), supported=supported, supported_reified=supported_reified, is_toplevel=is_toplevel, csemap=csemap, decompose_custom=decompose_custom)
                             if rec_changed:
                                 newexpr = rec_lst_newexpr[0]
                                 toplevel.extend(rec_toplevel)
+                            else:
+                                newexpr = decomp
 
                         if (csemap is not None):
-                            csemap[expr] = newexpr
+                            csemap.save_decomposition(expr, newexpr)
+                    elif isinstance(decomp, list): # retrieved list of expr from cache above
+                            newexpr = cpm_all(decomp)
+                    else: # retrieved expr from cache above
+                        newexpr = decomp
 
                     newlist.append(newexpr)
                     changed = True
