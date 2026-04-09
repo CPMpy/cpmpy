@@ -510,8 +510,10 @@ class NDVarArray(np.ndarray):
     def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing
 
-        # index is single expression: direct element
+        # index is single expression: direct element (1D only)
         if isinstance(index, Expression):
+            if self.ndim != 1:
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
             return cp.Element(self, index)
 
         # multi-dimensional index
@@ -534,12 +536,7 @@ class NDVarArray(np.ndarray):
             arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
             index = index[expr_dim[0]:]
 
-            # calculate index for flat array
-            flat_index = index[-1]
-            for dim, idx in enumerate(index[:-1]):
-                flat_index += idx * math.prod(arr.shape[dim+1:])
-            # using index expression as single var for flat array
-            return cp.Element(arr.flatten(), flat_index)
+            return cp.MultiDimElement(arr, index)
 
         return super().__getitem__(index)
 
