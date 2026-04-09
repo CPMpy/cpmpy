@@ -27,6 +27,7 @@ from enum import Enum
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, ListLike
 from ..expressions.variables import _NumVarImpl
+from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_any_list, argvals
 from ..expressions.python_builtins import any
@@ -87,7 +88,7 @@ class SolverInterface(object):
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
         self._varmap = dict()  # maps cpmpy variables to native solver variables
-        self._csemap = dict()  # maps cpmpy expressions to solver expressions
+        self._csemap = CSEMap()  # maps cpmpy expressions to solver expressions
 
         # rest uses own API
         if cpm_model is not None:
