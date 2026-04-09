@@ -66,6 +66,7 @@
         Modulo
         Power
         Element
+        MultiDimElement
         Count
         Among
         NValue
@@ -73,13 +74,14 @@
 
 """
 import warnings  # for deprecation warning
+import math
 from typing import Optional
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import boolvar, intvar, cpm_array
+from .variables import boolvar, intvar, cpm_array, NDVarArray
 from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
 
@@ -694,6 +696,7 @@ class Element(GlobalFunction):
 
     Note: because Element is a numeric global function, the return type of the `Element` function
     is always numeric, even if `Arr` only contains Boolean variables.
+    Element only supports 1D arrays; use MultiDimElement for multi-dimensional indexing.
     """
 
     def __init__(self, arr: ListLike[ExprLike], idx: ExprLike):
@@ -706,6 +709,14 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
+        if isinstance(arr, NDVarArray):
+            if arr.ndim != 1:
+                raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
+        elif isinstance(arr, np.ndarray):
+            if arr.ndim != 1:
+                raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
+        elif is_any_list(arr) and any(is_any_list(el) for el in arr):
+            raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
         assert len(arr) > 0, "Element: array should not be empty"
 
         super().__init__("element", (arr, idx))
@@ -793,6 +804,77 @@ class Element(GlobalFunction):
             str: String representation of the Element global function.
         """
         return f"{self.args[0]}[{self.args[1]}]"
+
+
+class MultiDimElement(GlobalFunction):
+    """
+    The `MultiDimElement(Arr, Indices)` global function allows indexing into a multi-dimensional array
+    with multiple decision variables.
+    """
+
+    def __init__(self, arr: ListLike[ExprLike], indices: ListLike[ExprLike]):
+        """
+        Arguments:
+            arr (ListLike[ExprLike]): Multi-dimensional array of expressions or constants to index into
+            indices (ListLike[ExprLike]): Integer expressions or constants for each dimension index
+        """
+        if not is_any_list(indices):
+            raise TypeError(f"MultiDimElement(arr, indices) takes a list of index expressions, not: {indices}")
+        if any(is_boolexpr(idx) for idx in indices):
+            raise TypeError("MultiDimElement(arr, indices) takes integer expressions as indices, not boolean expressions")
+
+        if isinstance(arr, NDVarArray):
+            arr = arr
+        else:
+            arr = cpm_array(arr)
+
+        if arr.ndim <= 1:
+            raise TypeError("MultiDimElement only supports multi-dimensional arrays. Use Element for 1D arrays.")
+        if len(indices) != arr.ndim:
+            raise ValueError(f"MultiDimElement expects {arr.ndim} indices, got {len(indices)}")
+
+        super().__init__("multidim_element", (arr, *tuple(indices)))
+
+    def __getitem__(self, index):
+        raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
+
+    def _arr_and_indices(self):
+        return self.args[0], self.args[1:]
+
+    def value(self) -> Optional[int]:
+        arr, indices = self._arr_and_indices()
+        vidxs = [argval(idx) for idx in indices]
+        if any(v is None for v in vidxs):
+            return None
+        for v, dim in zip(vidxs, arr.shape):
+            if v < 0 or v >= dim:
+                raise IncompleteFunctionError(
+                    f"Index {v} out of range for dimension size {dim} while calculating value for expression {self}"
+                    + "\n Use argval(expr) to get the value of expr with relational semantics."
+                )
+        return argval(arr[tuple(vidxs)])
+
+    def _flat_index(self, shape, indices):
+        # calculate index for flat array
+        flat_index = indices[-1]
+        for dim, idx in enumerate(indices[:-1]):
+            flat_index += idx * math.prod(shape[dim+1:])
+        return flat_index
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
+        arr, indices = self._arr_and_indices()
+        flat_index = self._flat_index(arr.shape, indices)
+        return Element(arr.reshape(-1), flat_index), []
+
+    def get_bounds(self) -> tuple[int, int]:
+        arr, _ = self._arr_and_indices()
+        bnds = [get_bounds(x) for x in arr]
+        return min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
+
+    def __repr__(self) -> str:
+        arr, indices = self._arr_and_indices()
+        idx_repr = ", ".join(str(i) for i in indices)
+        return f"{arr}[{idx_repr}]"
 
 def element(arg_list):
     """
