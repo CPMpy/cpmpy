@@ -179,6 +179,23 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
                     cpm_expr = output_expr  # replace partial function by this (total) new output expression
                     changed = True
 
+            elif cpm_expr.name == "multidim_element":
+
+                if is_toplevel and cpm_expr.name not in safen_toplevel: # no need to safen
+                    new_lst.append(cpm_expr)
+                    continue
+
+                arr = cpm_expr.args[0]
+                for dim_idx, (idx, dim) in enumerate(zip(cpm_expr.args[1:], arr.shape)):
+                    lb, ub = get_bounds(idx)
+                    if lb < 0 or ub >= dim: # index can be out of bounds
+                        guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(0, dim-1), idx_to_safen=1+dim_idx)
+
+                        nbc_for_each_expr[i].append(guard)  # guard must be added to nearest Boolean context
+                        toplevel += extra_cons  # any additional constraint that must be true
+                        cpm_expr = output_expr  # replace partial function by this (total) new output expression
+                        changed = True
+
             elif cpm_expr.name == "div" or cpm_expr.name == "mod":
                 if is_toplevel and cpm_expr.name not in safen_toplevel: # no need to safen
                     new_lst.append(cpm_expr)
