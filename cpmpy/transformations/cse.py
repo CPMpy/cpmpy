@@ -5,8 +5,10 @@ from ..expressions.variables import boolvar, intvar, _IntVarImpl
 
 
 class CSEMap:
-    csemap = dict[Expression, _IntVarImpl]()
-    decomp_map = dict[Expression, Expression]()
+
+    def __init__(self):
+        self.csemap = dict[Expression, _IntVarImpl]()
+        self.decomp_map = dict[Expression, Expression]()
 
     # pass special methods to internal csemap
     def __len__(self):
