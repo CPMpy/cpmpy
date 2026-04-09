@@ -97,7 +97,7 @@ class TestCSE:
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
 
         cons = cp.max([x,y,z]) <= 42
-        csemap = dict()
+        csemap = CSEMap()
         eq_cons = only_numexpr_equality([cons], csemap=csemap)
         
         assert set([str(c) for c in eq_cons]) == {"(max(x,y,z)) == (IV0)", "IV0 <= 42"}
@@ -114,7 +114,7 @@ class TestCSE:
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
         
         cons = cp.max(x,y) < z
-        csemap = dict()
+        csemap = CSEMap()
         lin_cons = linearize_constraint([cons], supported={"max"}, csemap=csemap)
         
         assert len(lin_cons) == 2
@@ -130,19 +130,20 @@ class TestCSE:
 
         obj = cp.max(x+y,z) - cp.min(x+y,z)
 
-        csemap = dict()
+        csemap = CSEMap()
         flat_obj, cons = flatten_objective(obj, csemap=csemap)
         assert len(cons) == 3
         assert len(csemap) == 3
-        assert set(csemap.keys()) == \
+        assert set(csemap.csemap.keys()) == \
                             {cp.max(x+y,z), cp.min(x+y,z), x+y}
 
         # assume we did some transformations before
-        csemap = {cp.max(x+y,z) : cp.intvar(0,20, name="aux")}
+        csemap = CSEMap()
+        csemap.csemap = {cp.max(x+y,z) : cp.intvar(0,20, name="aux")}
         flat_obj, cons = flatten_objective(obj, csemap=csemap)
         assert len(cons) == 2# just replaced max with aux var
         assert len(csemap) == 3
-        assert set(csemap.keys()) == \
+        assert set(csemap.csemap.keys()) == \
                             {cp.max(x + y, z), cp.min(x + y, z), x + y}
 
 
