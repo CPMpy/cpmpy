@@ -200,16 +200,6 @@ class TestFlattenExpr:
         assert  str(flatten_constraint( a // b == c )) == "[((IV0) div (IV1)) == (IV2)]"
         assert  str(flatten_constraint( c == a // b )) == "[((IV0) div (IV1)) == (IV2)]"
 
-        # double negation #146
-        # assert  str(flatten_constraint( ~(~(a == 7)) )) == "[IV0 == 7]" -> part of push_down_negation now
-
-        # negated normal form tests -> disabled, part of push_down_negation now
-        # assert  str(flatten_constraint( ~(x|y) )) == "[~BV0, ~BV1]"
-        # assert  str(flatten_constraint( z.implies(~(x|y)) )) == "[(BV2) -> (~BV0), (BV2) -> (~BV1)]"
-        # assert  str(flatten_constraint( ~(z.implies(~(x|y))) )) == "[BV2, (BV0) or (BV1)]"
-        # assert  str(flatten_constraint(~(z.implies(~(x&y))))) == "[BV2, BV0, BV1]"
-        # assert  str(flatten_constraint((~z).implies(~(x|y)))) == "[(~BV2) -> (~BV0), (~BV2) -> (~BV1)]"
-        # assert  str(flatten_constraint((~z|y).implies(~(x|y)))) == "[(BV0) -> (BV2), (BV0) -> (~BV1), (BV1) -> (BV2), (BV1) -> (~BV1)]"
         assert  str(a % 1 == 0) == "(IV0) mod 1 == 0"
 
         # boolexpr as numexpr
