@@ -1,6 +1,7 @@
 import cpmpy as cp
 
 from cpmpy.transformations.comparison import only_numexpr_equality
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
@@ -21,7 +22,7 @@ class TestCSE:
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
        
         nested_alldiff = cp.AllDifferent(x,y+y,z)      
-        csemap = dict()
+        csemap = CSEMap()
 
         flat_cons = flatten_constraint(nested_alldiff, csemap=csemap)
 
@@ -66,7 +67,7 @@ class TestCSE:
 
         b = cp.boolvar(name="b")
         nested_cons = b == ((cp.max([x,y,z]) + q) <= 10)
-        csemap = dict()
+        csemap = CSEMap()
         decomp = decompose_in_tree([nested_cons], csemap=csemap)
     
         assert len(decomp) == 5
