@@ -452,7 +452,7 @@ class CPM_gurobi(SolverInterface):
                   return cpm_expr
               elif cpm_expr.name in {"sum", "wsum", "sub", "-"}:
                   return cpm_expr
-              elif cpm_expr.name in {"max", "min", "abs", "or", "and", "->"}:
+              elif cpm_expr.name in {"max", "min", "abs", "or", "and", "->", "not"}:
                   # The arguments to general functions have to be integer variables
                   def flatten_args(args):
                       args = [a if isinstance(a, _IntVarImpl) and not isinstance(a, NegBoolView) else reify(a, depth + 1) for a in args]
@@ -473,6 +473,10 @@ class CPM_gurobi(SolverInterface):
                       case "->":
                           a, b = cpm_expr.args
                           rhs = gp.or_(flatten_args([~a, b]))
+                      case "not":
+                          # TODO shakey
+                          a, = cpm_expr.args
+                          return reify(~a, depth)
                       case _:
                           assert False
 
@@ -522,6 +526,8 @@ class CPM_gurobi(SolverInterface):
 
               if cpm_expr is None:
                   return None
+              # elif is_bool(cpm_expr): # TODO merg in next
+              #     return cpm_expr
               elif is_num(cpm_expr):
                   return int(cpm_expr)
               elif isinstance(cpm_expr, NegBoolView):
@@ -594,8 +600,10 @@ class CPM_gurobi(SolverInterface):
                           else:
                               raise Exception(f"Unexpected expression in {cpm_expr}, {type(a)}")
                       case "<=":
+                          a, b = reify(a, depth), reify(b, depth)
                           return add_(a, depth) <= add_(b, depth)
                       case ">=":
+                          a, b = reify(a, depth), reify(b, depth)
                           return add_(a, depth) >= add_(b, depth)
                       case "!=":
                           # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
@@ -604,6 +612,7 @@ class CPM_gurobi(SolverInterface):
                           if cpm_expr.name != "!=":
                               return add_(cpm_expr, depth)
                           else:
+                              a, b = cpm_expr.args
                               imp_gt, imp_lt = cp.boolvar(), cp.boolvar()
                               add(imp_gt.implies(a > b))
                               add(imp_lt.implies(a < b))
