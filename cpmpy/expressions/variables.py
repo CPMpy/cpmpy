@@ -524,19 +524,23 @@ class NDVarArray(np.ndarray):
 
             # find dimension of expression in index
             expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
-            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
-                # TODO can we do the same for more than one Expression? Not sure...
-                index  = list(index)
-                index += [index.pop(expr_dim[0])]
-
-                arr = np.moveaxis(self, expr_dim[0], -1)
-                return cp.Element(arr[(*index[:-1],)], index[-1])
-
-
             arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
-            index = index[expr_dim[0]:]
+            index = list(index[expr_dim[0]:])
 
-            return cp.MultiDimElement(arr, index)
+            # eliminate constant indices to reduce dimensionality
+            selector = []
+            new_indices = []
+            for idx in index:
+                if isinstance(idx, Expression):
+                    selector.append(slice(None))
+                    new_indices.append(idx)
+                else:
+                    selector.append(idx)
+            arr = arr[tuple(selector)]
+
+            if len(new_indices) == 1:
+                return cp.Element(arr, new_indices[0])
+            return cp.MultiDimElement(arr, new_indices)
 
         return super().__getitem__(index)
 
