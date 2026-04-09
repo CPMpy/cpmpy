@@ -92,6 +92,7 @@ import copy
 import math
 import builtins
 import cpmpy as cp
+from .cse import CSEMap
 
 from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import Expression, Comparison, Operator
