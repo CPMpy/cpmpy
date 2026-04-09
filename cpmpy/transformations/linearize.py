@@ -68,6 +68,7 @@ from typing import AbstractSet, Sequence, Optional
 
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
+from .cse import CSEMap
 
 from .flatten_model import flatten_constraint, get_or_make_var
 from .decompose_global import decompose_in_tree, decompose_objective
@@ -576,7 +577,7 @@ def only_positive_coefficients(lst_of_expr):
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Optional[AbstractSet[str]] = None,
                      supported_reified: Optional[AbstractSet[str]] = None,
-                     csemap: Optional[dict[Expression, Expression]] = None):
+                     csemap: Optional[CSEMap] = None):
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
 
@@ -601,7 +602,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,
                                supported_reified: Optional[AbstractSet[str]] = None,
-                               csemap: Optional[dict[Expression, Expression]] = None):
+                               csemap: Optional[CSEMap] = None):
     """Decompose objective using linear-friendly (var == val) decompositions."""
     if supported is None:
         supported = frozenset[str]()

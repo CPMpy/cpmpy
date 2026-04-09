@@ -22,6 +22,7 @@ import copy
 from typing import List, AbstractSet, Optional, Dict, Tuple, Any, Callable, cast
 import numpy as np
 
+from .cse import CSEMap
 from ..expressions.core import Expression, ListLike
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
@@ -34,7 +35,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                       supported: Optional[AbstractSet[str]] = None,
                       supported_reified: Optional[AbstractSet[str]] = None,
                       _toplevel=None, nested=False,
-                      csemap = None,
+                      csemap: Optional[CSEMap] = None,
                       decompose_custom: Optional[Dict[str, Callable]] = None) -> List[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
@@ -81,7 +82,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 def decompose_objective(expr: Expression,
                         supported: Optional[AbstractSet[str]] = None,
                         supported_reified: Optional[AbstractSet[str]] = None,
-                        csemap: Optional[Dict[Expression, Expression]] = None,
+                        csemap: Optional[CSEMap] = None,
                         decompose_custom: Optional[Dict[str, Callable]]=None) -> Tuple[Expression, List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver
@@ -121,7 +122,7 @@ def _decompose_in_tree(lst_of_expr: ListLike[Any],
                        supported: AbstractSet[str],
                        supported_reified: AbstractSet[str],
                        is_toplevel: bool,
-                       csemap: Optional[Dict[Expression, Expression]]=None,
+                       csemap: Optional[CSEMap]=None,
                        decompose_custom:Optional[Dict[str, Callable]]=None) -> Tuple[bool, List[Expression], List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver, recursive internal version.
