@@ -45,7 +45,8 @@
     Module details
     ==============
 """
-from typing import Optional, List
+import typing
+from typing import Optional, List, Callable
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -578,7 +579,7 @@ class CPM_z3(SolverInterface):
         return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
 
 
-    def _get_callback(self, display):
+    def _get_callback(self, display:Callback) -> Callable:
 
         if isinstance(display, Expression) or is_any_list(display):
             cpm_vars = get_variables(display) # only fill in relevant vars for callback
@@ -586,7 +587,10 @@ class CPM_z3(SolverInterface):
             cpm_vars = list(self.user_vars) # function can use any variables
         z3_vars = self.solver_vars(cpm_vars)
 
-        def callback(sol):
+        if typing.TYPE_CHECKING:
+            from z3.z3 import ModelRef
+
+        def callback(sol: ModelRef) -> None:
             # fill in values of current solution
             for cpm_var, sol_var in zip(cpm_vars, z3_vars):
                 if isinstance(cpm_var, _BoolVarImpl):

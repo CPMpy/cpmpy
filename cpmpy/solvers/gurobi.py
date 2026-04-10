@@ -42,7 +42,7 @@
     ==============
 """
 
-from typing import Optional, List, Callable
+from typing import Optional, List, Callable, Iterable, TYPE_CHECKING
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -624,7 +624,13 @@ class CPM_gurobi(SolverInterface):
 
         return opt_sol_count
 
-    def _get_callback(self, display, events):
+    def _get_callback(self, display:Callback, events:Iterable) -> Callable:
+        """
+        Get the callback function to use for Gurobi.
+        Arguments:
+            display: either an expression, a list of expressions, or a callback function
+            events: iterable of gurobipy.GRB.Callback event codes
+        """
 
         self.events=  frozenset(events)
         if isinstance(display, Expression) or is_any_list(display):
@@ -633,7 +639,9 @@ class CPM_gurobi(SolverInterface):
             cpm_vars = list(self.user_vars)
         grb_vars = self.solver_vars(cpm_vars)
 
-        def callback(model, state, **kwargs):
+        import gurobipy as gp
+
+        def callback(model:gp.Model, state:gp.CallbackClass, **kwargs) -> None:
             # fill in vars
             if state not in self.events:
                 return # irrelevant event

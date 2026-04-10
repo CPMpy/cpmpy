@@ -271,14 +271,14 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def _get_callback(self, display) -> Callable[[dict[str,int]], None]:
+    def _get_callback(self, display:Callback) -> Callable[[dict[str,int]], None]:
         if isinstance(display, Expression) or is_any_list(Expression):
             cpm_vars = get_variables(display)
         else:
             cpm_vars = list(self.user_vars)
         gcs_vars = self.solver_vars(cpm_vars)
 
-        def callback(solution_map: dict[str, int]):
+        def callback(solution_map: dict[str, int]) -> None:
             for cpm_var, gcs_var in zip(cpm_vars, gcs_vars):
                 if isinstance(cpm_var, _BoolVarImpl):
                     # Convert back to bool
