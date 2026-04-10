@@ -368,7 +368,6 @@ class CPM_gurobi(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset(["mod", "div", "element"]))  # linearize and decompose expect safe exprs
-        print("decompose_linear", cpm_cons)
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
@@ -430,12 +429,14 @@ class CPM_gurobi(SolverInterface):
       """
       import gurobipy as gp
 
+      verbose = False
+
       def add(cpm_expr):
           """Recursively create a Gurobi constraint from a CPMpy expression."""
 
 
           def reify(cpm_expr, depth):
-              print("reify", cpm_expr, getattr(cpm_expr, 'name', None))
+              if verbose: print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, 'name', None))
               # TODO get_or_make_var_or_list
 
               if is_num(cpm_expr):
@@ -445,7 +446,7 @@ class CPM_gurobi(SolverInterface):
                   # add(r == cpm_expr)
                   # avoid inf. recursion
                   c = add_(r, depth) == add_(cpm_expr, depth)
-                  print("add", c)
+                  if verbose: print("add", c)
                   self.native_model.addConstr(c)
                   return r
               elif isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
@@ -472,7 +473,7 @@ class CPM_gurobi(SolverInterface):
                           # gp.or_/gp.and_ need Gurobi Vars, not ints or LinExprs
                           if isinstance(g, int):
                               g = self.grb_model.addVar(lb=g, ub=g, vtype=gp.GRB.BINARY if g in (0,1) else gp.GRB.INTEGER)
-                              self.grb_model.update()
+                              if verbose: self.grb_model.update()
                           grb_args.append(g)
                       return grb_args
                   match cpm_expr.name:
@@ -502,7 +503,7 @@ class CPM_gurobi(SolverInterface):
                       r = cp.intvar(*cpm_expr.get_bounds())
 
                   c = add_(r, depth) == rhs
-                  print("add", c)
+                  if verbose: print("add", c)
                   self.native_model.addConstr(c)
               elif is_boolexpr(cpm_expr):
                   r = cp.boolvar()
@@ -517,7 +518,7 @@ class CPM_gurobi(SolverInterface):
               return r
 
           def linearize(cpm_expr, depth):
-              print("lin", cpm_expr)
+              if verbose: print(f"{'  ' * depth}lin", cpm_expr)
               if is_num(cpm_expr) or isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
                   return cpm_expr
                   return add_(cpm_expr, depth)
@@ -538,8 +539,7 @@ class CPM_gurobi(SolverInterface):
           def add_(cpm_expr, depth):
               indent = "  " * depth
               depth+=1
-              self.grb_model.update()
-              print(f"{indent}Con:", cpm_expr, type(cpm_expr))
+              if verbose: print(f"{indent}Con:", cpm_expr, type(cpm_expr))
 
               if cpm_expr is None:
                   return None
@@ -559,7 +559,6 @@ class CPM_gurobi(SolverInterface):
                       #     return gp.and_(a for a in flatten_args(cpm_expr, depth))
                       case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
                           a, b = cpm_expr.args
-                          print("a, ", a,b)
                           # Reify antecedent if not a BoolVar
                           if not isinstance(a, _BoolVarImpl):
                               a = reify(a, depth)
@@ -600,17 +599,14 @@ class CPM_gurobi(SolverInterface):
                           a, b = add_(a, depth), add_(b, depth)
                           if isinstance(a, gp.NLExpr):
                               assert False
-                              print("NL")
                               # if flattening led to a non-linear expression, then it has to be constraint `y == f(x)` with `y` a `Var`
                               y = b if isinstance(b, gp.Var) else self.grb_model.addVar(lb=b, ub=b)
                               # TODO unclear why this is no longer normalized to be a constant `b` (same below)
                               return y == a
                           elif isinstance(a, (int, gp.LinExpr, gp.QuadExpr, gp.Var)):
-                              print("Lin")
                               return a == b
                           elif isinstance(a, gp.GenExpr) or isinstance(b, gp.GenExpr):
                               assert False
-                              print("G", a, b)
                               # Else, this is a function constraint
                               # Note: Gurobi functions are called by `y == f(x)`, like normalized CPMpy boolexprs, but CPMpy numexprs are normalized to `f(x) == y` (e.g. `abs(x) == IV0`), so they need to be flipped
                               y, fx = (a, b) if cpm_expr.args[0].is_bool() else (b, a)
@@ -627,7 +623,6 @@ class CPM_gurobi(SolverInterface):
                       case "!=":
                           # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
                           cpm_expr, = push_down_negation([cpm_expr])
-                          print("push", cpm_expr)
                           if cpm_expr.name != "!=":
                               return add_(cpm_expr, depth)
                           else:
@@ -684,8 +679,8 @@ class CPM_gurobi(SolverInterface):
           else:
               grb_con = self.grb_model.addVar(lb=1, ub=1) == grb_expr
 
-          self.grb_model.update()
-          print("OUT", grb_con)
+          if verbose: self.grb_model.update()
+          if verbose: print("OUT", grb_con)
           self.native_model.addConstr(grb_con)
 
       # add new user vars to the set
