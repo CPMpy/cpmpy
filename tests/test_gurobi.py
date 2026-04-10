@@ -112,12 +112,25 @@ def expression_tree_cases_():
         ["GC0: p = 0 -> x + y <= 3"],
     )
 
-    """While NL constraint pow can be a expression tree node, it cannot be reified"""
+    """While NL constraint pow can be a expression tree node, it cannot be reified as indicator constraint require linears"""
     yield (
-        "imp_quad",
-        p.implies(x * y == 3),
+        "implies_quad",
+        p.implies(x * y >= 4),
         ["((x) * (y)) == (IV0)", "(p) -> (sum(IV0) == 3)"],
+        ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 >= 4"],
+    )
+
+    """An indicator LHS has to be a BV"""
+    yield (
+        "quad_implies",
+        (x * y >= 2).implies(z <= 3),
         ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 = 3"],
+        [
+            "qc0: IV0 + [ - x * y ] = 0",
+            "GC0: BV0 = 1 -> IV0 >= 2",
+            "GC1: BV0 = 0 -> IV0 <= 1",
+            "GC2: BV0 = 1 -> z <= 3",
+        ],
     )
 
     yield (
@@ -249,7 +262,7 @@ def expression_tree_cases_():
         p | q,
         ["(p) or (q)"],
         ["R0: BV0 >= 1", "GC0: BV0 = OR ( p , q )"],
-# TODO perhaps ["GC0: C2 = OR ( p , q )"],
+        # TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
 
     # yield (
