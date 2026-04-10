@@ -584,6 +584,10 @@ class CPM_gurobi(SolverInterface):
                           return add_(cpm_expr.args[0], depth) - add_(cpm_expr.args[1], depth)
                       case "div":
                           assert False, "TODO"
+                      case "and" if depth == 1:  # top-level: post args directly
+                          for arg in cpm_expr.args:
+                              add(arg)
+                          return True
                       case "or" | "and":
                           return add_(reify(cpm_expr, depth), depth)
                       case _:
