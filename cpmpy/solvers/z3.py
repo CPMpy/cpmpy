@@ -45,7 +45,6 @@
     Module details
     ==============
 """
-import typing
 from typing import Optional, List, Callable
 
 from cpmpy.transformations.get_variables import get_variables
@@ -587,8 +586,7 @@ class CPM_z3(SolverInterface):
             cpm_vars = list(self.user_vars) # function can use any variables
         z3_vars = self.solver_vars(cpm_vars)
 
-        if typing.TYPE_CHECKING:
-            from z3.z3 import ModelRef
+        from z3.z3 import ModelRef
 
         def callback(sol: ModelRef) -> None:
             # fill in values of current solution
