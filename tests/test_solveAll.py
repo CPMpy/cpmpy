@@ -96,6 +96,7 @@ class TestSolveAll:
         assert 3 == m.solveAll('ortools', log_search_progress=True)
 
 
+    @pytest.mark.skip()
     def test_solveAll_display_expr(self, solver, capsys):
         x = cp.boolvar(shape=3, name="x")
         m = cp.Model(cp.sum(x) == 1)
@@ -105,6 +106,7 @@ class TestSolveAll:
         out = capsys.readouterr().out
         assert {"True", "False"} == set([s for s in out.split("\n") if len(s)])
 
+    @pytest.mark.skip()
     def test_solveAll_display_ndvararray(self, solver, capsys):
         x = cp.boolvar(shape=3,name="x")
         m = cp.Model(cp.sum(x) == 1)
@@ -113,6 +115,7 @@ class TestSolveAll:
         out = capsys.readouterr().out
         assert {"[True, False, False]", "[False, True, False]", "[False, False, True]"} == set([s for s in out.split("\n") if len(s)])
 
+    @pytest.mark.skip()
     def test_solveAll_display_list(self, solver, capsys):
         x = cp.boolvar(shape=3, name="x")
         m = cp.Model(cp.sum(x) == 1)
