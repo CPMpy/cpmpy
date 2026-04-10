@@ -527,19 +527,31 @@ class CPM_gurobi(SolverInterface):
               return r
 
           def make_linear(expr, depth):
-              """Force an expression into a variable by creating an aux var if needed."""
+              """Force an expression into a linear form by reifying non-linear parts into aux vars."""
               if is_num(expr) or isinstance(expr, _NumVarImpl):
                   return expr
-              if isinstance(expr, Operator) and expr.name in {"sum", "wsum", "sub", "-"}:
+              if isinstance(expr, Operator) and expr.name in {"sum", "sub", "-"}:
+                  args = [make_linear(a, depth) for a in expr.args]
+                  expr = copy.copy(expr)
+                  expr.update_args(args)
                   return expr
-              # Non-linear expression (mul, pow, etc.) — must become an aux var
-              if expr in self._csemap:
-                  return self._csemap[expr]
-              r = cp.intvar(*expr.get_bounds())
-              c = add_(r, depth) == add_(expr, depth)
-              self.native_model.addConstr(c)
-              self._csemap[expr] = r
-              return r
+              if isinstance(expr, Operator) and expr.name == "wsum":
+                  weights, vars_ = expr.args
+                  vars_ = [make_linear(a, depth) for a in vars_]
+                  expr = copy.copy(expr)
+                  expr.update_args([weights, vars_])
+                  return expr
+              # mul/pow — must become an aux var for linearity
+              if hasattr(expr, 'name') and expr.name in {"mul", "pow"}:
+                  if expr in self._csemap:
+                      return self._csemap[expr]
+                  r = cp.intvar(*expr.get_bounds())
+                  c = add_(r, depth) == add_(expr, depth)
+                  self.native_model.addConstr(c)
+                  self._csemap[expr] = r
+                  return r
+              # Other expressions (bool expr, etc.) — reify into aux var
+              return reify(expr, depth)
 
           def linearize(cpm_expr, depth):
               """Ensure expression is linear (no mul/pow) by reifying non-linear parts into aux vars."""
@@ -644,10 +656,10 @@ class CPM_gurobi(SolverInterface):
                           else:
                               raise Exception(f"Unexpected expression in {cpm_expr}, {type(a)}")
                       case "<=":
-                          a, b = reify(a, depth), reify(b, depth)
+                          a, b = make_linear(a, depth), make_linear(b, depth)
                           return add_(a, depth) <= add_(b, depth)
                       case ">=":
-                          a, b = reify(a, depth), reify(b, depth)
+                          a, b = make_linear(a, depth), make_linear(b, depth)
                           return add_(a, depth) >= add_(b, depth)
                       case "!=":
                           # One-directional indicator split: d=1 -> a>b, e=1 -> a<b

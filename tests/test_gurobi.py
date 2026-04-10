@@ -203,7 +203,7 @@ def expression_tree_cases_():
         "mul_in_abs",
         cp.Abs(x * y) + z == 3,
         ["(IV1) + (z) == 3", "(abs(IV0)) == (IV1)", "((x) * (y)) == (IV0)"],
-        ["R0: IV1 + z = 3", "qc0: IV0 + [ - x * y ] = 0", "GC0: IV1 = ABS ( IV0 )"],
+        ["R0: IV0 + z = 3", "qc0: C2 + [ - x * y ] = 0", "GC0: IV0 = ABS ( C2 )"],
     )
 
     # TODO keep as operator?
@@ -248,7 +248,8 @@ def expression_tree_cases_():
         "disjunction",
         p | q,
         ["(p) or (q)"],
-        ["GC0: C2 = OR ( p , q )"],
+        ["R0: BV0 >= 1", "GC0: BV0 = OR ( p , q )"],
+# TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
 
     # yield (
@@ -262,7 +263,7 @@ def expression_tree_cases_():
         "conjunction_in_disjunction",
         (p | (q & r)),
         ["(p) or (BV0)", "(BV0) == ((q) and (r))"],
-        ["GC0: BV0 = AND ( q , r )", "GC1: C4 = OR ( p , BV0 )"],
+        ["R0: BV1 >= 1", "GC0: BV0 = AND ( q , r )", "GC1: BV1 = OR ( p , BV0 )"],
     )
 
 
