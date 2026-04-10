@@ -41,13 +41,13 @@ def push_down_negation(lst_of_expr, toplevel=True):
             else:
                 newlist.append(arg_neg)
 
-        # rewrite 'BoolExpr != Expr' to normalized 'Expr == ~BoolExpr'
+        # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
         elif expr.name == '!=':
             lexpr, rexpr = expr.args
-            try:
-                i = next(i for i, e in enumerate(expr.args) if is_boolexpr(e))
-                newlist.append(expr.args[1-i] == recurse_negation(expr.args[i]))
-            except StopIteration:
+            if is_boolexpr(lexpr) and is_boolexpr(rexpr):
+                newexpr = (lexpr == recurse_negation(rexpr))
+                newlist.append(newexpr)
+            else:
                 newlist.append(expr)
 
         else:
