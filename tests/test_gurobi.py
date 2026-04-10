@@ -145,7 +145,7 @@ def expression_tree_cases_():
         "maximum",
         z + cp.Maximum([x, y]) == 12,
         ["(z) + (IV0) == 12", "(max(x,y)) == (IV0)"],
-        ["R0: z + IV0 = 12", "GC0: IV0 = MAX ( x , y )"],
+        ["R0: IV0 + z = 12", "GC0: IV0 = MAX ( x , y )"],
     )
 
     yield (
