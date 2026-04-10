@@ -450,14 +450,31 @@ class CPM_gurobi(SolverInterface):
                   return r
               elif isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
                   return cpm_expr
-              elif cpm_expr.name in {"sum", "wsum", "sub", "-"}:
+              elif cpm_expr.name in {"sum", "sub", "-"}:
+                  args = [reify(a, depth) for a in cpm_expr.args]
+                  cpm_expr = copy.copy(cpm_expr)
+                  cpm_expr.update_args(args)
+                  return cpm_expr
+              elif cpm_expr.name == "wsum":
+                  weights, vars_ = cpm_expr.args
+                  vars_ = [reify(a, depth) for a in vars_]
+                  cpm_expr = copy.copy(cpm_expr)
+                  cpm_expr.update_args([weights, vars_])
                   return cpm_expr
               elif cpm_expr.name in {"max", "min", "abs", "or", "and", "->", "not"}:
                   # The arguments to general functions have to be integer variables
                   def flatten_args(args):
                       args = [a if isinstance(a, _IntVarImpl) and not isinstance(a, NegBoolView) else reify(a, depth + 1) for a in args]
-                      args = [add_(a, depth) for a in args]
-                      return args
+                      grb_args = []
+                      # TODO only added for and/or -> prop constants instead
+                      for a in args:
+                          g = add_(a, depth)
+                          # gp.or_/gp.and_ need Gurobi Vars, not ints or LinExprs
+                          if isinstance(g, int):
+                              g = self.grb_model.addVar(lb=g, ub=g, vtype=gp.GRB.BINARY if g in (0,1) else gp.GRB.INTEGER)
+                              self.grb_model.update()
+                          grb_args.append(g)
+                      return grb_args
                   match cpm_expr.name:
                       case "abs":  # y = abs(x)
                           # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
@@ -474,9 +491,8 @@ class CPM_gurobi(SolverInterface):
                           a, b = cpm_expr.args
                           rhs = gp.or_(flatten_args([~a, b]))
                       case "not":
-                          # TODO shakey
                           a, = cpm_expr.args
-                          return reify(~a, depth)
+                          return reify(recurse_negation(a), depth)
                       case _:
                           assert False
 
@@ -496,7 +512,8 @@ class CPM_gurobi(SolverInterface):
                   return r
               else:
                   r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
-                  add(r == cpm_expr)
+                  c = add_(r, depth) == add_(cpm_expr, depth)
+                  self.native_model.addConstr(c)
               return r
 
           def linearize(cpm_expr, depth):
@@ -543,9 +560,11 @@ class CPM_gurobi(SolverInterface):
                       case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
                           a, b = cpm_expr.args
                           print("a, ", a,b)
+                          # Reify antecedent if not a BoolVar
+                          if not isinstance(a, _BoolVarImpl):
+                              a = reify(a, depth)
                           q = linearize(b, depth)
                           is_pos = not isinstance(a, NegBoolView)
-                          assert isinstance(a, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs, but had {a}"
                           rhs = add_(q, depth)
                           if isinstance(rhs, (gp.Var, gp.LinExpr)):
                               rhs = rhs >= 1
