@@ -176,7 +176,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
         # args are positive now, still check if no 'not' in its arguments
         rec_changed, rec_newargs = _push_down_negation_args(expr.args)
         if rec_changed:
-            new_comp.update_args(rec_newargs, has_subexpr=expr.has_subexpr())
+            new_comp.update_args(rec_newargs)
         return new_comp
         
     elif isinstance(expr, Operator):
