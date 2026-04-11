@@ -4,14 +4,14 @@
 import copy
 import warnings  # for deprecation warning
 import numpy as np
-
+from typing import Any
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, ListLike
-from ..expressions.variables import _BoolVarImpl, _NumVarImpl
-from ..expressions.utils import is_any_list, is_bool, is_boolexpr
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.variables import _BoolVarImpl, NDVarArray, cpm_array
+from ..expressions.utils import is_boolexpr
 
-def push_down_negation(lst_of_expr: ListLike[Expression], toplevel=True):
+def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Expression]:
     """
         Recursively simplifies expressions by pushing down negation into the arguments.
         E.g., not(x >= 3 | y == 2) is simplified to (x < 3) & (y != 2).
@@ -22,79 +22,115 @@ def push_down_negation(lst_of_expr: ListLike[Expression], toplevel=True):
         Return:
             list of Expressions
     """
-    changed, newlist = _push_down_negation(lst_of_expr, toplevel=True)
-    if not changed:
-        return lst_of_expr
+    newlist: list[Expression] = []
+    for expr in lst_of_expr:
+        changed, newexpr = _push_down_negation_expr(expr)
+        if changed:
+            # TODO: newexpr.args are ExprLike, not Expression, so this may be wrong.
+            if toplevel and newexpr.name == "and":
+                newlist.extend(newexpr.args)
+            else:
+                newlist.append(newexpr)
+        else:
+            newlist.append(expr)
     return newlist
 
-def _push_down_negation(lst_of_expr: ListLike[Expression], toplevel=False) -> tuple[bool, ListLike]:
+
+def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
+    # special cases, _recurse_negation() will handle recursive calls into the args
+    if expr.name == "not":
+        # the negative case, negate
+        return True, recurse_negation(expr.args[0])
+
+    # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+    elif expr.name == '!=':
+        lexpr, rexpr = expr.args
+        lhs_bool = is_boolexpr(lexpr)
+        rhs_bool = is_boolexpr(rexpr)
+        if lhs_bool and rhs_bool:
+            if isinstance(lexpr, (_BoolVarImpl, BoolVal)):
+                rhs_changed, rhs_newexpr = _push_down_negation_expr(rexpr)
+                if rhs_changed:
+                    rexpr = rhs_newexpr
+                return True, (~lexpr) == rexpr
+
+            elif isinstance(rexpr, (_BoolVarImpl, BoolVal)):
+                lhs_changed, lhs_newexpr = _push_down_negation_expr(lexpr)
+                if lhs_changed:
+                    lexpr = lhs_newexpr
+                return True, lexpr == (~rexpr)
+
+            else:
+                # change lhs, keep/recurse rhs
+                lexpr = recurse_negation(lexpr)
+                rhs_changed, rhs_newexpr = _push_down_negation_expr(rexpr)
+                if rhs_changed:
+                    rexpr = rhs_newexpr
+                return True, lexpr == rexpr
     
-    newlist: list = []
+    if expr.has_subexpr():
+        rec_changed, rec_newargs = _push_down_negation_args(expr.args)
+        if rec_changed:
+            newexpr = copy.copy(expr)
+            newexpr.update_args(rec_newargs)
+            return True, newexpr
+    
+    return False, expr
+
+
+def _push_down_negation_args(args: tuple[Any, ...]) -> tuple[bool, tuple[Any, ...]]:
     changed = False
-    
-    if isinstance(lst_of_expr, np.ndarray) and not (lst_of_expr.dtype == object):
-        # shortcut for data array, return as is
-        return changed, lst_of_expr
-    
-    for expr in lst_of_expr:
-        if is_any_list(expr):
-            # can be a nested list with expressions?
-            rec_changed, rec_newlist = _push_down_negation(expr)
+    newargs: list[Any] = []
+    for arg in args:
+        if isinstance(arg, Expression):
+            rec_changed, rec_newexpr = _push_down_negation_expr(arg)
             if rec_changed:
                 changed = True
-                newlist.extend(rec_newlist)
-            else:
-                newlist.append(expr)
-        
-        if isinstance(expr, Expression):
+                newargs.append(rec_newexpr)
+                continue
 
-            # special cases, _recurse_negation() will handle recursive calls into the args
-            if expr.name == "not":
-                # the negative case, negate
-                changed = True
-                expr = recurse_negation(expr.args[0])
-                if toplevel and expr.name == "and":
-                    newlist.extend(expr.args)
-                    continue
-
-            # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
-            elif expr.name == '!=' and is_boolexpr(expr.args[0]) and is_boolexpr(expr.args[1]):
-
-                lexpr, rexpr = expr.args
-
-                if isinstance(lexpr, (_BoolVarImpl, BoolVal)):
-                    rhs_changed, rhs_newlist = _push_down_negation((rexpr,))
-                    if rhs_changed:
-                        rexpr = rhs_newlist[0]
-                    expr = (~lexpr) == rexpr
-                    changed = True
-
-                elif isinstance(rexpr, (_BoolVarImpl, BoolVal)):
-                    lhs_changed, lhs_newlist = _push_down_negation((lexpr,))
-                    if lhs_changed:
-                        lexpr = lhs_newlist[0]
-                    expr = lexpr == (~rexpr)
-                    changed = True
-
-                elif is_boolexpr(lexpr) and is_boolexpr(rexpr):
-                    lhs_changed, lhs_newlist = _push_down_negation((lexpr,))
-                    if lhs_changed:
-                        rexpr = lhs_newlist[0]
-                    # recurse_negation will handle rexpr
-                    expr = lexpr == recurse_negation(rexpr)
-                    changed = True
-            
-            elif expr.has_subexpr():
-                rec_changed, rec_newlist = _push_down_negation(expr.args)
+        elif isinstance(arg, np.ndarray):
+            if isinstance(arg, NDVarArray):
+                # NDVarArray: only if it contains subexpressions
+                if arg.has_subexpr():
+                    rec_changed, rec_newargs = _push_down_negation_args(tuple(arg.flat))
+                    if rec_changed:
+                        changed = True
+                        newargs.append(cpm_array(rec_newargs).reshape(arg.shape))
+                        continue
+            elif arg.dtype == object:
+                # not sure we need this... an np.array that might contain expressions (or we only allow NDVarArray in that case?)
+                rec_changed, rec_newargs = _push_down_negation_args(tuple(arg.flat))
                 if rec_changed:
                     changed = True
-                    copy.copy(expr)
-                    expr.update_args(rec_newlist)
+                    newargs.append(np.array(rec_newargs).reshape(arg.shape))
+                    continue
 
-        # default case: vars, constants, direct constraints
-        newlist.append(expr)        
+            # if still here, only data
+            newargs.append(arg)
+            continue
 
-    return changed, newlist
+        elif isinstance(arg, list):
+            rec_changed, rec_newarg = _push_down_negation_args(tuple(arg))
+            if rec_changed:
+                changed = True
+                newargs.append(list(rec_newarg))
+                continue
+        
+        elif isinstance(arg, tuple):  # unlikely but allowed
+            rec_changed, rec_newarg = _push_down_negation_args(arg)
+            if rec_changed:
+                changed = True
+                newargs.append(rec_newarg)
+                continue
+        
+        # all the rest: not allowed to contain expressions
+        newargs.append(arg)
+
+    if changed:
+        return True, tuple(newargs)
+    else:
+        return False, args
 
 def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
     """
@@ -138,9 +174,9 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
             raise ValueError(f"Unknown comparison to negate {expr}")
 
         # args are positive now, still check if no 'not' in its arguments
-        rec_changed, rec_newargs = _push_down_negation(expr.args)
+        rec_changed, rec_newargs = _push_down_negation_args(expr.args)
         if rec_changed:
-            new_comp.update_args(rec_newargs)
+            new_comp.update_args(rec_newargs, has_subexpr=expr.has_subexpr())
         return new_comp
         
     elif isinstance(expr, Operator):
@@ -148,7 +184,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
 
         if expr.name == "not":
             # negation while in negative context = switch back to positive case
-            rec_changed, rec_args = _push_down_negation(expr.args)
+            _, rec_args = _push_down_negation_args(expr.args)
             assert len(rec_args) == 1, f"not has only 1 argument but got {rec_args}"
             return rec_args[0]
 
@@ -156,12 +192,11 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
             # ~(x -> y) :: x & ~y
             # arg0 remains positive, but check its arguments
             # (must wrap awkwardly in a list, but can make no assumption about expr.args[0] has .args)
-            x_changed, x_arg_lst = _push_down_negation([expr.args[0]])
-            if x_changed:
-                new_x = x_arg_lst[0]
-            else:
-                new_x = expr.args[0]
-            return new_x & recurse_negation(expr.args[1])
+            lhs = expr.args[0]
+            lhs_changed, lhs_new = _push_down_negation_expr(lhs)
+            if lhs_changed:
+                lhs = lhs_new
+            return lhs & recurse_negation(expr.args[1])
 
         elif expr.name == "and":
             # ~(x & y) :: ~x | ~y -- negate all arguments
@@ -169,7 +204,6 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
             new_op = copy.copy(expr)
             new_op.name = "or"
             new_op.update_args([recurse_negation(a) for a in expr.args])
-            new_op._has_subexpr = expr._has_subexpr
             return new_op
         
         elif expr.name == "or":
@@ -178,7 +212,6 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
             new_op = copy.copy(expr)
             new_op.name = "and"
             new_op.update_args([recurse_negation(a) for a in expr.args])
-            new_op._has_subexpr = expr._has_subexpr
             return new_op
 
         else:
@@ -187,7 +220,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
     # global constraints
     elif isinstance(expr, GlobalConstraint):
         new_glob = copy.copy(expr)
-        rec_changed, rec_args = _push_down_negation(expr.args)
+        rec_changed, rec_args = _push_down_negation_args(expr.args)
         if rec_changed:
             new_glob.update_args(rec_args)
         return new_glob.negate()
