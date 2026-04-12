@@ -685,7 +685,7 @@ class Power(GlobalFunction):
         if not isinstance(exponent, int):
             exponent = int(exponent)
             #raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
-        if exponent <= 0:
+        if exponent < 0:
             raise ValueError(f"Power constraint only supports positive integer exponents, not: {exponent}")
 
         # args: tuple[Expression, int]
@@ -706,6 +706,9 @@ class Power(GlobalFunction):
             tuple[Expression, list[Expression]]: A tuple containing the auxiliary variable representing the power, and a list of constraints defining it
         """
         base, exp = self.args
+
+        if exp == 0:
+            return 0*base + 1, []  # must be an Expression...
 
         _pow = base
         for _ in range(1,exp):
