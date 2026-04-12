@@ -26,9 +26,14 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
     for expr in lst_of_expr:
         changed, newexpr = _push_down_negation_expr(expr)
         if changed:
-            # TODO: newexpr.args are ExprLike, not Expression, so this may be wrong.
             if toplevel and newexpr.name == "and":
-                newlist.extend(newexpr.args)
+                # TODO: newexpr.args are ExprLike, check for constants
+                for b in newexpr.args:
+                    if isinstance(b, Expression):
+                        newlist.append(b)
+                    elif not b:
+                        newlist.append(BoolVal(b))
+                        break  # stop early if a False
             else:
                 newlist.append(newexpr)
         else:
