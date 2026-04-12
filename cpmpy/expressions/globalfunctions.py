@@ -314,7 +314,7 @@ class Abs(GlobalFunction):
         if ub <= 0: # always negative
             return -arg, []
 
-        _abs = intvar(*self.get_bounds())  # not just lb,ub, see implementation
+        _abs = intvar(*self.get_bounds())  # not just lb,ub; see get_bounds
         return _abs, [(arg >= 0).implies(_abs == arg), (arg < 0).implies(_abs == -arg)]
 
     def get_bounds(self) -> tuple[int, int]:
@@ -513,7 +513,7 @@ class Division(GlobalFunction):
 
         r = intvar(*get_bounds(x % y))  # remainder
         _div = intvar(*self.get_bounds())
-        defining.append(Comparison("==", x, (y * _div) + r))
+        defining.append(Comparison("==", x, (y * _div) + r))  # explicit expression for type checking (x can be const)
         defining.extend([abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)])
         return _div, defining
 

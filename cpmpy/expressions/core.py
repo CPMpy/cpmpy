@@ -204,8 +204,8 @@ class Expression(object):
             return self._has_subexpr
         
         # micro-optimisations, cache the lookups
-        _NumVarImpl = cp.variables._NumVarImpl
-        _NDVarArray = cp.variables.NDVarArray
+        _NumVarImpl = cp.expressions.variables._NumVarImpl
+        _NDVarArray = cp.expressions.variables.NDVarArray
 
         # Initialize stack with direct access to private _args
         stack = list(self._args)
@@ -413,8 +413,7 @@ class Expression(object):
             raise TypeError("Power operator: modulo not supported")
         if not isinstance(other, (int, np.integer)):
             raise TypeError(f"Power operator requires a constant integer exponent, not: {other}")
-        if other == 0:
-            return 1
+        #if other == 0:  # do not simlify to 1, it might remove user variables from view
         if other == 1:
             return self
         return cp.Power(self, other)
