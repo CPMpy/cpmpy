@@ -352,7 +352,7 @@ class CPM_gurobi(SolverInterface):
         raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
     verbose = True
-    general_constraints = {"max", "min", "abs", "and", "or", "->"}
+    general_constraints = {"max", "min", "abs", "and", "or"}
 
     def transform(self, cpm_expr):
         """
@@ -438,9 +438,11 @@ class CPM_gurobi(SolverInterface):
                     
                     match cpm_expr.name:
                         case "->":
+                            assert False
                             a, b = cpm_expr.args
                             rhs = update_args(cpm_expr, flatten_args([~a, b]))
                         case "not":
+                            assert False
                             a, = cpm_expr.args
                             return reify(recurse_negation(a), depth)
                         # TODO we could support abs inside the expression tree with sqrt(pow(x,2))?
@@ -494,29 +496,32 @@ class CPM_gurobi(SolverInterface):
             def linearize(cpm_expr, depth):
                 """Ensure expression is linear (no mul/pow) by reifying non-linear parts into aux vars."""
                 if self.verbose: print(f"{'  ' * depth}lin", cpm_expr)
-                if is_num(cpm_expr) or isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
+                if is_num(cpm_expr):
                     return cpm_expr
+                elif isinstance(cpm_expr, _BoolVarImpl):
+                    return cpm_expr >= 1
                 elif isinstance(cpm_expr, Comparison):
                     cpm_expr = add_(cpm_expr, depth)
 
                     if isinstance(cpm_expr, _BoolVarImpl):
                         return cpm_expr >= 1
-                    elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name in {"sum", "wsum"}:
+                    elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
                         a, b = cpm_expr.args
                         terms = update_args(a, [reify(a_i, depth) for a_i in a.args])
-                        assert a.name != "wsum"
-                        # a = Operator("sum", [a])
+                    elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "wsum":
+                        a, b = cpm_expr.args
+                        w, x = a.args
+                        terms = update_args(a, [w, [reify(x_i, depth) for x_i in x]])
                     else:
                         a, b = cpm_expr.args
                         terms = reify(a, depth)
 
-                    # terms = a if isinstance(a, _NumVarImpl) else update_args(a, [reify(a_i, depth) for a_i in a.args])
-                    # terms = update_args(a, [reify(a_i, depth) for a_i in a.args])
                     return update_args(cpm_expr, [terms, b])
-                    return update_args(cpm_expr, [make_linear(a, depth) for a in cpm_expr.args])
-                    # return add_(update_args(cpm_expr, [make_linear(a, depth) for a in cpm_expr.args]), depth)
                 else:
-                    return reify(cpm_expr, depth)
+                    result = reify(cpm_expr, depth)
+                    if isinstance(result, _BoolVarImpl):
+                        return result >= 1
+                    return result
               
             def add_(cpm_expr, depth):
 
@@ -525,7 +530,7 @@ class CPM_gurobi(SolverInterface):
                 if self.verbose: print(f"{indent}Con:", cpm_expr, type(cpm_expr))
 
                 if cpm_expr is None:
-                    return None
+                    return cp.BoolVal(True)
                 elif is_num(cpm_expr):
                     return cpm_expr
                 elif isinstance(cpm_expr, NegBoolView):
@@ -534,38 +539,33 @@ class CPM_gurobi(SolverInterface):
                     return cpm_expr
                 elif isinstance(cpm_expr, (Operator, GlobalFunction)):
                     match cpm_expr.name:
-                        # case "or": # TODO only usefull if we can represent an or as a sum of binary vars, which is not generally correct
-                        #     return gp.or_(a for a in flatten_args(cpm_expr, depth))
-                        # case "and":
-                        #     return gp.and_(a for a in flatten_args(cpm_expr, depth))
                         case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
                             a, b = cpm_expr.args
-                            # Reify antecedent if not a BoolVar
-                            # if not isinstance(a, _BoolVarImpl):
-                            #     a = reify(a, depth)
-                            # q = linearize(b, depth)
-                            # is_pos = not isinstance(a, NegBoolView)
-                            # rhs = add_(q, depth)
-                            # if isinstance(rhs, (gp.Var, gp.LinExpr)):
-                            #     rhs = rhs >= 1
-                            # NegBoolView can be kept as-is; Gurobi handles p=0 -> ... natively
-                            p = a if isinstance(a, (_BoolVarImpl, NegBoolView)) else reify(a, depth)
-                            q = linearize(b, depth)
-                            return update_args(cpm_expr, [p, q])
-                            # return (add_(a if is_pos else a._bv, depth) == int(is_pos)) >> rhs
+                            if isinstance(cpm_expr.args[1], Comparison):
+                                print('indic', cpm_expr, type(cpm_expr.args[1]))
+                                p = a if isinstance(a, _BoolVarImpl) else reify(a, depth)
+                                if is_bool(p):
+                                    return add_(b, depth) if a else True
+                                assert isinstance(p, _BoolVarImpl)
+                                q = linearize(b, depth)
+                                assert isinstance(q, Comparison), q  # not required to be a canonical comparison
+                                # and (isinstance(q.args[0], _NumVarImpl) or (isinstance(q.args[0], Operator) and q.args[0].name in {"sum", "wsum"})), q
+                                return update_args(cpm_expr, [p, q])
+                            else:
+                                print("smp")
+                                return add_((~a) | b, depth)
+                        # case "->":
                         case "not":
                             a, = cpm_expr.args
                             return add_(recurse_negation(a), depth)
                         case "-" | "sub" | "sum" | "mul" | "pow":  # Expression tree nodes (w/ args)
                             args = [add_(a, depth) for a in cpm_expr.args]
-                            args = [reify(a, depth) if isinstance(a, Comparison) else a for a in args]
+                            # Boolean expressions (Comparisons, implications, etc.) should be reified when inside arithmetic
+                            args = [reify(a, depth) if is_boolexpr(a) else a for a in args]
                             return update_args(cpm_expr, args)
                         case "-":
                             return -add_(cpm_expr.args[0], depth=depth)
                         case "sum":
-                            # args = [reify(a, depth) if a.name in {"max"} else a for a in cpm_expr.args]
-                            # cpm_expr_ = copy.copy(cpm_expr)
-                            # cpm_expr_.update_args(args)
                             args = [reify(add_(arg, depth), depth) for arg in cpm_expr.args]
                             # args = update_args(cpm_expr, [add_(arg, depth) for arg in cpm_expr.args])
                             return update_args(cpm_expr, args)
@@ -596,11 +596,22 @@ class CPM_gurobi(SolverInterface):
                     a, b = cpm_expr.args
                     match cpm_expr.name:
                         case "==":
+                            # if isinstance(a, _BoolVarImpl) and is_boolexpr(b):
+                            #     add(a.implies(b))
+                            #     add((~a).implies(recurse_negation(b)))
+                            #     return True
+                            #     # return add_(a.implies(b) & (~a).implies(recurse_negation(b)), depth)
                             if isinstance(a, _NumVarImpl):
                                 if isinstance(b, (Operator, GlobalFunction)) and b.name in self.general_constraints:
-                                    return update_args(cpm_expr, [a, b])
+                                    args = [add_(b_i, depth) for b_i in b.args]
+                                    args = [reify(b_i, depth) if isinstance(b_i, NegBoolView) else b_i for b_i in b.args]
+                                    return update_args(cpm_expr, [a, update_args(b, args)])
                                 else:
-                                    return update_args(cpm_expr, [a, add_(b, depth)])
+                                    b = add_(b, depth)
+                                    # TODO check
+                                    if is_boolexpr(b) and not isinstance(b, _BoolVarImpl):
+                                        b = reify(b, depth)
+                                    return update_args(cpm_expr, [a, b])
 
                             # a = reify(a, depth)
                             # if isinstance(b, (int, _NumVarImpl)):
@@ -608,8 +619,15 @@ class CPM_gurobi(SolverInterface):
                             # elif isinstance(b, (Operator, GlobalFunction)) and b.name in self.general_constraints:
                             #     return update_args(cpm_expr, [a, update_args(b, [reify(b_i, depth) for b_i in b.args])])
 
+
                             # b = reify(b, depth)
                             a, b = add_(a, depth), add_(b, depth)
+                            # Bool expressions in numeric == context must be reified to integer vars
+                            # TODO check
+                            if is_boolexpr(a) and not isinstance(a, _BoolVarImpl):
+                                a = reify(a, depth)
+                            if is_boolexpr(b) and not isinstance(b, _BoolVarImpl):
+                                b = reify(b, depth)
                             return update_args(cpm_expr, [a, b])
                         case "<=":
                             # a, b = make_linear(a, depth), make_linear(b, depth)
@@ -620,14 +638,15 @@ class CPM_gurobi(SolverInterface):
                         case "!=":
                             # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
                             cpm_expr, = push_down_negation([cpm_expr])
-                            if cpm_expr.name != "!=":
-                                return add_(cpm_expr, depth)
-                            else:
+                            print("PD", cpm_expr)
+                            if cpm_expr.name == "!=":
                                 a, b = cpm_expr.args
                                 imp_gt, imp_lt = cp.boolvar(), cp.boolvar()
                                 add(imp_gt.implies(a > b))
                                 add(imp_lt.implies(a < b))
                                 return add_(imp_gt | imp_lt, depth)
+                            else:  # push_down_negation may have changed != into ==
+                                return add_(cpm_expr, depth)
                         case ">":
                             return add_(a >= b + 1, depth)
                         case "<":
@@ -650,6 +669,14 @@ class CPM_gurobi(SolverInterface):
         for c in cpm_cons:
             add(c)
         cpm_cons = all_cons
+
+        with open("/tmp/model.txt", "w") as f:
+            f.write("# Original constraints:\n")
+            for c in toplevel_list(cpm_expr):
+                f.write(str(c) + "\n")
+            f.write("\n# Transformed constraints:\n")
+            for c in cpm_cons:
+                f.write(str(c) + "\n")
 
         # print("flatten_constraint", cpm_cons)
         # cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap, supported=frozenset(["mul", "pow", "-", "sum", "wsum"]))  # flat normal form
@@ -724,7 +751,7 @@ class CPM_gurobi(SolverInterface):
               elif is_num(cpm_expr):
                   return int(cpm_expr)
               elif isinstance(cpm_expr, NegBoolView):
-                  return add(1 - cpm_expr._bv)
+                  return add_(1 - cpm_expr._bv, depth)
                   # return 1 - self.solver_var(cpm_expr._bv)
               elif isinstance(cpm_expr, _NumVarImpl):
                   return self.solver_var(cpm_expr)
