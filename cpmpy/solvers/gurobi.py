@@ -522,15 +522,16 @@ class CPM_gurobi(SolverInterface):
                     cpm_expr = update_args(cpm_expr, [a, b])
                     a, b = cpm_expr.args
 
-                    if isinstance(a, Operator) and a.name == "sum":
-                        terms = update_args(a, [reify(a_i, depth) for a_i in a.args])
-                    elif isinstance(a, Operator) and a.name == "wsum":
-                        w, x = a.args
-                        terms = update_args(a, [w, [reify(x_i, depth) for x_i in x]])
-                    else:
-                        terms = reify(a, depth)
+                    def _linearize_expr(expr):
+                        if isinstance(expr, Operator) and expr.name == "sum":
+                            return update_args(expr, [reify(a_i, depth) for a_i in expr.args])
+                        elif isinstance(expr, Operator) and expr.name == "wsum":
+                            w, x = expr.args
+                            return update_args(expr, [w, [reify(x_i, depth) for x_i in x]])
+                        else:
+                            return reify(expr, depth)
 
-                    return update_args(cpm_expr, [terms, b])
+                    return update_args(cpm_expr, [_linearize_expr(a), _linearize_expr(b)])
                 else:
                     result = reify(cpm_expr, depth)
                     if isinstance(result, _NumVarImpl):
@@ -590,7 +591,7 @@ class CPM_gurobi(SolverInterface):
                             return update_args(cpm_expr, args)
                             return sum(add_(arg, depth) for arg in cpm_expr.args)
                         case "wsum":
-                            return sum(weight * add_(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
+                            return sum(weight * add_num(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
                         case "sub":
                             return add_(cpm_expr.args[0], depth) - add_(cpm_expr.args[1], depth)
                         case "div":
@@ -600,10 +601,23 @@ class CPM_gurobi(SolverInterface):
                                 add(arg)
                             return True
                         case "pow" | "mul":
-                            return update_args(cpm_expr, [add_(a, depth) for a in cpm_expr.args])
+                            return update_args(cpm_expr, [add_num(a, depth) for a in cpm_expr.args])
                         # case "or" | "and":
                         case name if name in self.general_constraints:  # general constraints have to be posted as y = f(x), and `x` has to be flat as well
-                            return reify(update_args(cpm_expr, [reify(add_(arg, depth), depth) for arg in cpm_expr.args]), depth)
+
+                            args = [reify(add_(arg, depth), depth) for arg in cpm_expr.args]
+                            # Short-circuit: and(False, ...) = False, or(True, ...) = True
+                            if name == "and" and any(is_num(a) and a == 0 for a in args):
+                                return 0
+                            if name == "or" and any(is_num(a) and a == 1 for a in args):
+                                return 1
+                            # Filter out trivially true/false constants
+                            if name == "and":
+                                args = [a for a in args if not (is_num(a) and a == 1)]
+                            if name == "or":
+                                args = [a for a in args if not (is_num(a) and a == 0)]
+                            return reify(update_args(cpm_expr, args), depth)
+
                             return reify(cpm_expr, depth)
                             return add_(reify(cpm_expr, depth), depth)  # TODO ?
                         case _:
@@ -623,7 +637,16 @@ class CPM_gurobi(SolverInterface):
                             if isinstance(a, _NumVarImpl):
                                 if isinstance(b, (Operator, GlobalFunction)) and b.name in self.general_constraints:
                                     args = [add_(b_i, depth) for b_i in b.args]
-                                    args = [reify(b_i, depth) if isinstance(b_i, NegBoolView) else b_i for b_i in b.args]
+                                    args = [b_i if isinstance(b_i, _IntVarImpl) and not isinstance(b_i, NegBoolView) else reify(b_i, depth) for b_i in args]
+                                    # Short-circuit and filter constants for and/or
+                                    if b.name == "and" and any(is_num(x) and x == 0 for x in args):
+                                        return update_args(cpm_expr, [a, 0])
+                                    if b.name == "or" and any(is_num(x) and x == 1 for x in args):
+                                        return update_args(cpm_expr, [a, 1])
+                                    if b.name == "and":
+                                        args = [x for x in args if not (is_num(x) and x == 1)]
+                                    if b.name == "or":
+                                        args = [x for x in args if not (is_num(x) and x == 0)]
                                     return update_args(cpm_expr, [a, update_args(b, args)])
                                 else:
                                     return update_args(cpm_expr, [a, add_num(b, depth)])
