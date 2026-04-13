@@ -422,16 +422,18 @@ class CPM_gurobi(SolverInterface):
                 # elif cpm_expr.name in {"sum", "sub", "-", "mul", "pow"}:
                 #     return update_args(cpm_expr, [add_(a, depth) for a in cpm_expr.args])
                     # return update_args(cpm_expr, [reify(a, depth) for a in cpm_expr.args])
-                elif cpm_expr.name == "wsum":
-                    assert False
-                    weights, vars_ = cpm_expr.args
-                    vars_ = [reify(a, depth) for a in vars_]
-                    cpm_expr = copy.copy(cpm_expr)
-                    cpm_expr.update_args([weights, vars_])
-                    return cpm_expr
+                # elif cpm_expr.name == "wsum":
+                #     weights, vars_ = cpm_expr.args
+                #     vars_ = [reify(a, depth) for a in vars_]
+                #     cpm_expr = copy.copy(cpm_expr)
+                #     cpm_expr.update_args([weights, vars_])
+                #     return cpm_expr
                 # elif cpm_expr.name in {"max", "min", "abs", "or", "and", "->", "not"}:
                 # elif cpm_expr.name in self.general_constraints | {"not"}:
+                # elif cpm_expr.name == "->":
+                #     assert False
                 elif cpm_expr.name in self.general_constraints:
+                    print("general")
                     # The arguments to general functions have to be binary/integer variables
                     def flatten_args(args):
                         return [a if isinstance(a, _IntVarImpl) and not isinstance(a, NegBoolView) else reify(a, depth + 1) for a in args]
@@ -499,27 +501,39 @@ class CPM_gurobi(SolverInterface):
                 if is_num(cpm_expr):
                     return cpm_expr
                 elif isinstance(cpm_expr, _BoolVarImpl):
+                    assert False
                     return cpm_expr >= 1
                 elif isinstance(cpm_expr, Comparison):
                     cpm_expr = add_(cpm_expr, depth)
 
                     if isinstance(cpm_expr, _BoolVarImpl):
                         return cpm_expr >= 1
-                    elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "sum":
-                        a, b = cpm_expr.args
+                    elif not isinstance(cpm_expr, Comparison):
+                        # add_ reduced it (e.g. != became ~bv -> 1-bv), recurse
+                        return linearize(cpm_expr, depth)
+
+                    a, b = cpm_expr.args
+                    # TODO check..
+                    # Reify general constraint args to variables so the comparison becomes linear
+                    if isinstance(a, (Operator, GlobalFunction)) and a.name in self.general_constraints:
+                        a = reify(a, depth)
+                    if isinstance(b, (Operator, GlobalFunction)) and b.name in self.general_constraints:
+                        b = reify(b, depth)
+                    cpm_expr = update_args(cpm_expr, [a, b])
+                    a, b = cpm_expr.args
+
+                    if isinstance(a, Operator) and a.name == "sum":
                         terms = update_args(a, [reify(a_i, depth) for a_i in a.args])
-                    elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name == "wsum":
-                        a, b = cpm_expr.args
+                    elif isinstance(a, Operator) and a.name == "wsum":
                         w, x = a.args
                         terms = update_args(a, [w, [reify(x_i, depth) for x_i in x]])
                     else:
-                        a, b = cpm_expr.args
                         terms = reify(a, depth)
 
                     return update_args(cpm_expr, [terms, b])
                 else:
                     result = reify(cpm_expr, depth)
-                    if isinstance(result, _BoolVarImpl):
+                    if isinstance(result, _NumVarImpl):
                         return result >= 1
                     return result
               
