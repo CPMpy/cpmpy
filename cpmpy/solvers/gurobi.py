@@ -523,6 +523,13 @@ class CPM_gurobi(SolverInterface):
                         return result >= 1
                     return result
               
+            def add_num(cpm_expr, depth):
+                """Like add_, but reifies bool expressions to integer vars for use in numeric context."""
+                result = add_(cpm_expr, depth)
+                if is_boolexpr(result) and not isinstance(result, _BoolVarImpl):
+                    result = reify(result, depth)
+                return result
+
             def add_(cpm_expr, depth):
 
                 indent = "  " * depth
@@ -559,9 +566,7 @@ class CPM_gurobi(SolverInterface):
                             a, = cpm_expr.args
                             return add_(recurse_negation(a), depth)
                         case "-" | "sub" | "sum" | "mul" | "pow":  # Expression tree nodes (w/ args)
-                            args = [add_(a, depth) for a in cpm_expr.args]
-                            # Boolean expressions (Comparisons, implications, etc.) should be reified when inside arithmetic
-                            args = [reify(a, depth) if is_boolexpr(a) else a for a in args]
+                            args = [add_num(a, depth) for a in cpm_expr.args]
                             return update_args(cpm_expr, args)
                         case "-":
                             return -add_(cpm_expr.args[0], depth=depth)
@@ -607,43 +612,28 @@ class CPM_gurobi(SolverInterface):
                                     args = [reify(b_i, depth) if isinstance(b_i, NegBoolView) else b_i for b_i in b.args]
                                     return update_args(cpm_expr, [a, update_args(b, args)])
                                 else:
-                                    b = add_(b, depth)
-                                    # TODO check
-                                    if is_boolexpr(b) and not isinstance(b, _BoolVarImpl):
-                                        b = reify(b, depth)
-                                    return update_args(cpm_expr, [a, b])
-
-                            # a = reify(a, depth)
-                            # if isinstance(b, (int, _NumVarImpl)):
-                            #     return update_args(cpm_expr, [a, b])
-                            # elif isinstance(b, (Operator, GlobalFunction)) and b.name in self.general_constraints:
-                            #     return update_args(cpm_expr, [a, update_args(b, [reify(b_i, depth) for b_i in b.args])])
-
-
-                            # b = reify(b, depth)
-                            a, b = add_(a, depth), add_(b, depth)
-                            # Bool expressions in numeric == context must be reified to integer vars
-                            # TODO check
-                            if is_boolexpr(a) and not isinstance(a, _BoolVarImpl):
-                                a = reify(a, depth)
-                            if is_boolexpr(b) and not isinstance(b, _BoolVarImpl):
-                                b = reify(b, depth)
-                            return update_args(cpm_expr, [a, b])
+                                    return update_args(cpm_expr, [a, add_num(b, depth)])
+                            else:
+                                a, b = add_num(a, depth), add_num(b, depth)
+                                return update_args(cpm_expr, [a, b])
                         case "<=":
-                            # a, b = make_linear(a, depth), make_linear(b, depth)
-                            return add_(a, depth) <= add_(b, depth)
+                            return add_num(a, depth) <= add_num(b, depth)
                         case ">=":
-                            # a, b = make_linear(a, depth), make_linear(b, depth)
-                            return add_(a, depth) >= add_(b, depth)
+                            return add_num(a, depth) >= add_num(b, depth)
                         case "!=":
                             # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
                             cpm_expr, = push_down_negation([cpm_expr])
                             print("PD", cpm_expr)
                             if cpm_expr.name == "!=":
+                                # TODO cse
                                 a, b = cpm_expr.args
                                 imp_gt, imp_lt = cp.boolvar(), cp.boolvar()
                                 add(imp_gt.implies(a > b))
                                 add(imp_lt.implies(a < b))
+                                # TODO compare to big-M approach? Probably analogous.. 
+                                # TODO only if reified
+                                add((~imp_gt).implies(a <= b))
+                                add((~imp_lt).implies(a >= b))
                                 return add_(imp_gt | imp_lt, depth)
                             else:  # push_down_negation may have changed != into ==
                                 return add_(cpm_expr, depth)
