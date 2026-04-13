@@ -404,6 +404,7 @@ class CPM_gurobi(SolverInterface):
                 return cpm_expr
 
             def reify(cpm_expr, depth):
+                """Return something which can be an argument for a general constraint"""
                 if self.verbose: print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, 'name', None))
                 # TODO get_or_make_var_or_list
 
@@ -415,52 +416,8 @@ class CPM_gurobi(SolverInterface):
                     return get_or_make_var(cpm_expr)
                 elif isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
                     return cpm_expr
-                # check cache for non-trivial expressions
-                # elif cpm_expr in self._csemap:
-                #     return self._csemap[cpm_expr]
-                  
-                # elif cpm_expr.name in {"sum", "sub", "-", "mul", "pow"}:
-                #     return update_args(cpm_expr, [add_(a, depth) for a in cpm_expr.args])
-                    # return update_args(cpm_expr, [reify(a, depth) for a in cpm_expr.args])
-                # elif cpm_expr.name == "wsum":
-                #     weights, vars_ = cpm_expr.args
-                #     vars_ = [reify(a, depth) for a in vars_]
-                #     cpm_expr = copy.copy(cpm_expr)
-                #     cpm_expr.update_args([weights, vars_])
-                #     return cpm_expr
-                # elif cpm_expr.name in {"max", "min", "abs", "or", "and", "->", "not"}:
-                # elif cpm_expr.name in self.general_constraints | {"not"}:
-                # elif cpm_expr.name == "->":
-                #     assert False
-                elif cpm_expr.name in self.general_constraints:
-                    print("general")
-                    # The arguments to general functions have to be binary/integer variables
-                    def flatten_args(args):
-                        return [a if isinstance(a, _IntVarImpl) and not isinstance(a, NegBoolView) else reify(a, depth + 1) for a in args]
-                    
-                    match cpm_expr.name:
-                        case "->":
-                            assert False
-                            a, b = cpm_expr.args
-                            rhs = update_args(cpm_expr, flatten_args([~a, b]))
-                        case "not":
-                            assert False
-                            a, = cpm_expr.args
-                            return reify(recurse_negation(a), depth)
-                        # TODO we could support abs inside the expression tree with sqrt(pow(x,2))?
-                        case _:  # y = abs(x)
-                            rhs = update_args(cpm_expr, flatten_args(cpm_expr.args))
-
-                    # Create reification var (int for e.g. max, bool for e.g. or)
-                    if is_boolexpr(cpm_expr):
-                        r = cp.boolvar()
-                    else:
-                        r = cp.intvar(*cpm_expr.get_bounds())
-
-                    add(r == rhs)
-                    # if self.verbose: print("add", c)
-                    # self.native_model.addConstr(c)
-                elif is_boolexpr(cpm_expr):
+                elif is_boolexpr(cpm_expr) and cpm_expr.name not in self.general_constraints:
+                    # TODO reuse get_or_make_var?
                     r = cp.boolvar()
                     self._csemap[cpm_expr] = r
                     add(r.implies(cpm_expr))
@@ -468,14 +425,12 @@ class CPM_gurobi(SolverInterface):
                     return r
                 else:
                     return get_or_make_var(cpm_expr)
-                    # r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
-                    # add(r == cpm_expr)
-                    # self.native_model.addConstr(c)
 
                 return r
 
             def make_linear(expr, depth):
                 """Force an expression into a linear form by reifying non-linear parts into aux vars."""
+                print("LIN", expr)
                 if is_num(expr) or isinstance(expr, _NumVarImpl):
                     return expr
                 elif isinstance(expr, Operator):
@@ -580,46 +535,19 @@ class CPM_gurobi(SolverInterface):
                         case "not":
                             a, = cpm_expr.args
                             return add_(recurse_negation(a), depth)
-                        case "-" | "sub" | "sum" | "mul" | "pow":  # Expression tree nodes (w/ args)
+                        case "-" | "sub" | "sum" | "mul" | "pow" | "div":  # Expression tree nodes (w/ args)
+                            assert cpm_expr.name != "div", "TODO"
                             args = [add_num(a, depth) for a in cpm_expr.args]
                             return update_args(cpm_expr, args)
-                        case "-":
-                            return -add_(cpm_expr.args[0], depth=depth)
-                        case "sum":
-                            args = [reify(add_(arg, depth), depth) for arg in cpm_expr.args]
-                            # args = update_args(cpm_expr, [add_(arg, depth) for arg in cpm_expr.args])
-                            return update_args(cpm_expr, args)
-                            return sum(add_(arg, depth) for arg in cpm_expr.args)
                         case "wsum":
                             return sum(weight * add_num(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
-                        case "sub":
-                            return add_(cpm_expr.args[0], depth) - add_(cpm_expr.args[1], depth)
-                        case "div":
-                            assert False, "TODO"
                         case "and" if depth == 1:  # top-level: post args directly
                             for arg in cpm_expr.args:
                                 add(arg)
                             return True
-                        case "pow" | "mul":
-                            return update_args(cpm_expr, [add_num(a, depth) for a in cpm_expr.args])
-                        # case "or" | "and":
                         case name if name in self.general_constraints:  # general constraints have to be posted as y = f(x), and `x` has to be flat as well
-
-                            args = [reify(add_(arg, depth), depth) for arg in cpm_expr.args]
-                            # Short-circuit: and(False, ...) = False, or(True, ...) = True
-                            if name == "and" and any(is_num(a) and a == 0 for a in args):
-                                return 0
-                            if name == "or" and any(is_num(a) and a == 1 for a in args):
-                                return 1
-                            # Filter out trivially true/false constants
-                            if name == "and":
-                                args = [a for a in args if not (is_num(a) and a == 1)]
-                            if name == "or":
-                                args = [a for a in args if not (is_num(a) and a == 0)]
-                            return reify(update_args(cpm_expr, args), depth)
-
-                            return reify(cpm_expr, depth)
-                            return add_(reify(cpm_expr, depth), depth)  # TODO ?
+                            # f(x1, x2, ...) === y = f(y1, y2, ..), y1=x1, y2=x2, ..
+                            return reify(update_args(cpm_expr, [reify(add_(arg, depth), depth) for arg in cpm_expr.args]), depth)
                         case _:
                             assert False
                             # TODO
@@ -636,17 +564,8 @@ class CPM_gurobi(SolverInterface):
                             #     # return add_(a.implies(b) & (~a).implies(recurse_negation(b)), depth)
                             if isinstance(a, _NumVarImpl):
                                 if isinstance(b, (Operator, GlobalFunction)) and b.name in self.general_constraints:
-                                    args = [add_(b_i, depth) for b_i in b.args]
-                                    args = [b_i if isinstance(b_i, _IntVarImpl) and not isinstance(b_i, NegBoolView) else reify(b_i, depth) for b_i in args]
-                                    # Short-circuit and filter constants for and/or
-                                    if b.name == "and" and any(is_num(x) and x == 0 for x in args):
-                                        return update_args(cpm_expr, [a, 0])
-                                    if b.name == "or" and any(is_num(x) and x == 1 for x in args):
-                                        return update_args(cpm_expr, [a, 1])
-                                    if b.name == "and":
-                                        args = [x for x in args if not (is_num(x) and x == 1)]
-                                    if b.name == "or":
-                                        args = [x for x in args if not (is_num(x) and x == 0)]
+                                    args = [add_num(b_i, depth) for b_i in b.args]
+                                    args = [reify(b_i, depth) if isinstance(b_i, NegBoolView) else b_i for b_i in b.args]
                                     return update_args(cpm_expr, [a, update_args(b, args)])
                                 else:
                                     return update_args(cpm_expr, [a, add_num(b, depth)])
