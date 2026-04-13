@@ -290,11 +290,15 @@ def expression_tree_cases_():
         "reification",
         z * (x == 2) == 1,
         [
-            "(x == 2)"
-            "(z) * BV0 == 1",
+            "(BV0) -> (x == 2)",
+            "(BV1) -> (x >= 3)",  # TODO REUSE BV0?
+            "(BV2) -> (x <= 1)",
+            "(BV3) == ((BV1) or (BV2))",
+            "(~BV0) -> (BV3 >= 1)",
+            "(z) * (BV0) == 1",
         ],
         [
-            "qc0: [ z * BV0 ] = 1",
+            "qc0: [ BV0 * z ] = 1",
             "GC0: BV0 = 1 -> x = 2",
             "GC1: BV1 = 1 -> x >= 3",
             "GC2: BV2 = 1 -> x <= 1",
@@ -306,7 +310,7 @@ def expression_tree_cases_():
     yield (
         "disjunction",
         p | q,
-        ["(p) or (q)"],
+        ["(BV0) == ((p) or (q))", "BV0"],  # TODO avoid BV0
         ["R0: BV0 >= 1", "GC0: BV0 = OR ( p , q )"],
         # TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
@@ -321,7 +325,7 @@ def expression_tree_cases_():
     yield (
         "conjunction_in_disjunction",
         (p | (q & r)),
-        ["(p) or (BV0)", "(BV0) == ((q) and (r))"],
+        ["(BV0) == ((q) and (r))", "(BV1) == ((p) or (BV0))", "BV1"],
         ["R0: BV1 >= 1", "GC0: BV0 = AND ( q , r )", "GC1: BV1 = OR ( p , BV0 )"],
     )
 

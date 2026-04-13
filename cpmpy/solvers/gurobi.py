@@ -458,6 +458,7 @@ class CPM_gurobi(SolverInterface):
                     # self.native_model.addConstr(c)
                 elif is_boolexpr(cpm_expr):
                     r = cp.boolvar()
+                    self._csemap[cpm_expr] = r
                     add(r.implies(cpm_expr))
                     add((~r).implies(recurse_negation(cpm_expr)))
                     return r
@@ -497,13 +498,16 @@ class CPM_gurobi(SolverInterface):
                     return cpm_expr
                 elif isinstance(cpm_expr, Comparison):
                     cpm_expr = add_(cpm_expr, depth)
-                    a, b = cpm_expr.args
 
-                    if isinstance(a, Operator) and a.name in {"sum", "wsum"}:
+                    if isinstance(cpm_expr, _BoolVarImpl):
+                        return cpm_expr >= 1
+                    elif isinstance(cpm_expr.args[0], Operator) and cpm_expr.args[0].name in {"sum", "wsum"}:
+                        a, b = cpm_expr.args
                         terms = update_args(a, [reify(a_i, depth) for a_i in a.args])
                         assert a.name != "wsum"
                         # a = Operator("sum", [a])
                     else:
+                        a, b = cpm_expr.args
                         terms = reify(a, depth)
 
                     # terms = a if isinstance(a, _NumVarImpl) else update_args(a, [reify(a_i, depth) for a_i in a.args])
@@ -552,6 +556,10 @@ class CPM_gurobi(SolverInterface):
                         case "not":
                             a, = cpm_expr.args
                             return add_(recurse_negation(a), depth)
+                        case "-" | "sub" | "sum" | "mul" | "pow":  # Expression tree nodes (w/ args)
+                            args = [add_(a, depth) for a in cpm_expr.args]
+                            args = [reify(a, depth) if isinstance(a, Comparison) else a for a in args]
+                            return update_args(cpm_expr, args)
                         case "-":
                             return -add_(cpm_expr.args[0], depth=depth)
                         case "sum":
@@ -575,7 +583,8 @@ class CPM_gurobi(SolverInterface):
                         case "pow" | "mul":
                             return update_args(cpm_expr, [add_(a, depth) for a in cpm_expr.args])
                         # case "or" | "and":
-                        case name if name in self.general_constraints:
+                        case name if name in self.general_constraints:  # general constraints have to be posted as y = f(x), and `x` has to be flat as well
+                            return reify(update_args(cpm_expr, [reify(add_(arg, depth), depth) for arg in cpm_expr.args]), depth)
                             return reify(cpm_expr, depth)
                             return add_(reify(cpm_expr, depth), depth)  # TODO ?
                         case _:
