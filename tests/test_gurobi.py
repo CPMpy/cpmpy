@@ -85,15 +85,29 @@ def expression_tree_cases_():
     )
 
     yield (
+        "tmp_implies_non_linear",
+        p.implies(x >= 1),
+        # ["(p) -> (x >= 1)"],
+        ["(p) -> (x >= 1)"],
+        ["GC0: p = 1 -> x >= 1"],
+    )
+
+    yield (
         "neq",
         x != 1,
-        ["(z) * (sum([1, -1] * [x, y])) == 1"],
+        # z * (x - y) == 1
+        [
+            "(BV0) -> (x >= 2)",
+            "(BV1) -> (x <= 0)",
+            "(BV2) == ((BV0) or (BV1))",
+            "BV2",  # TODO removable
+        ],
         [
             "R0: BV2 >= 1",
             "GC0: BV0 = 1 -> x >= 2",
             "GC1: BV1 = 1 -> x <= 0",
             "GC2: BV2 = OR ( BV0 , BV1 )",
-        ],  # TODO not sure how it did this, but happy with it
+        ],
     )
 
     """Positive implications"""
@@ -116,7 +130,7 @@ def expression_tree_cases_():
     yield (
         "implies_quad",
         p.implies(x * y >= 4),
-        ["((x) * (y)) == (IV0)", "(p) -> (sum(IV0) == 3)"],
+        ["(IV0) == ((x) * (y))", "(p) -> (IV0 >= 4)"],
         ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 >= 4"],
     )
 
@@ -124,14 +138,41 @@ def expression_tree_cases_():
     yield (
         "quad_implies",
         (x * y >= 2).implies(z <= 3),
-        ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 = 3"],
         [
+            "(IV0) == ((x) * (y))",
+            "(BV0) -> (IV0 >= 2)",
+            "(~BV0) -> (IV0 <= 1)",
+            "(BV0) -> (z <= 3)",
+        ],
+        [
+            # TODO duplicated
             "qc0: IV0 + [ - x * y ] = 0",
             "GC0: BV0 = 1 -> IV0 >= 2",
             "GC1: BV0 = 0 -> IV0 <= 1",
             "GC2: BV0 = 1 -> z <= 3",
         ],
     )
+
+    nl_con = z + (x - 3) * ((-y) ** 2) - 3 == 12
+
+    # """An indicator LHS has to be a BV"""
+    # yield (
+    #     "nl_implies",
+    #     (x + (y>=3) <= 2).implies(z <= 3),
+    #     ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 = 3"],
+    #     [
+    #         "GC1: BV0 = 1 -> IV0 + z = 15",
+    #         "GC2: BV1 = 1 -> IV0 + z >= 16",
+    #         "GC3: BV2 = 1 -> IV0 + z <= 14",
+    #         "GC5: BV0 = 0 -> BV3 >= 1",
+    #         "GC6: BV0 = 1 -> z <= 3",
+    #         "\\ IV0 = sqr(y) * (-3 + x)",
+    #         "GC0: IV0 = NL : ( MULTIPLY , -1 , -1 ) ( SQUARE , -1 , 0 )",
+    #         "( VARIABLE , y , 1 ) ( PLUS , -1 , 0 ) ( CONSTANT , -3 , 3 )",
+    #         "( VARIABLE , x , 3 )",
+    #         "GC4: BV3 = OR ( BV1 , BV2 )",
+    #     ],
+    # )
 
     yield (
         "pow_bool",
@@ -157,14 +198,15 @@ def expression_tree_cases_():
     yield (
         "maximum",
         z + cp.Maximum([x, y]) == 12,
-        ["(z) + (IV0) == 12", "(max(x,y)) == (IV0)"],
+        ["(IV0) == (max(x,y))", "(z) + (IV0) == 12"],
         ["R0: IV0 + z = 12", "GC0: IV0 = MAX ( x , y )"],
     )
 
     yield (
         "nested",
-        z + (x - 3) * ((-y) ** 2) - 3 == 12,
-        ["(z) + (((x) + -3) * (pow(sum([-1] * [y]),2))) == 15"],
+        nl_con,
+        # ["(z) + (((x) + -3) * (pow(sum([-1] * [y]),2))) == 15"],
+        None,
         [
             "\\ C3 = (z + (sqr(y) * (-3 + x))) + -3",
             "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( PLUS , -1 , 0 ) ( VARIABLE , z , 1 )",
@@ -200,7 +242,10 @@ def expression_tree_cases_():
     yield (
         "abs",
         cp.Abs(x) + y == 3,
-        ["(IV0) + (y) == 3", "(abs(x)) == (IV0)"],
+        [
+            "(IV0) == (abs(x))",
+            "(IV0) + (y) == 3",
+        ],
         ["R0: IV0 + y = 3", "GC0: IV0 = ABS ( x )"],
     )
 
@@ -208,29 +253,29 @@ def expression_tree_cases_():
     yield (
         "abs_in_mul",
         cp.Abs(x) * y + z == 3,
-        ["((IV0) * (y)) + (z) == 3", "(abs(x)) == (IV0)"],
+        ["(IV0) == (abs(x))", "((IV0) * (y)) + (z) == 3"],
         ["qc0: z + [ IV0 * y ] = 3", "GC0: IV0 = ABS ( x )"],
     )
 
     yield (
         "mul_in_abs",
         cp.Abs(x * y) + z == 3,
-        ["(IV1) + (z) == 3", "(abs(IV0)) == (IV1)", "((x) * (y)) == (IV0)"],
-        ["R0: IV0 + z = 3", "qc0: C2 + [ - x * y ] = 0", "GC0: IV0 = ABS ( C2 )"],
+        ["(IV0) == ((x) * (y))", "(IV1) == (abs(IV0))", "(IV1) + (z) == 3"],
+        ["R0: IV1 + z = 3", "qc0: IV0 + [ - x * y ] = 0", "GC0: IV1 = ABS ( IV0 )"],
     )
 
     # TODO keep as operator?
     yield (
         "minus_in",
         z * (x - y) == 1,
-        ["(z) * (sum([1, -1] * [x, y])) == 1"],
+        ["(z) * ((x) + (-(y))) == 1"],
         ["qc0: [ z * x - z * y ] = 1"],  # TODO not sure how it did this, but happy with it
     )
 
     yield (
         "minus_out",
         z * -(x + y) == 1,
-        ["(z) * (sum([-1, -1] * [x, y])) == 1"],
+        ["(z) * (-((x) + (y))) == 1"],
         ["qc0: [ - z * x - z * y ] = 1"],
     )
 
@@ -245,10 +290,11 @@ def expression_tree_cases_():
         "reification",
         z * (x == 2) == 1,
         [
-            "(z) * (x == 2) == 1",
+            "(x == 2)"
+            "(z) * BV0 == 1",
         ],
         [
-            "qc0: [ BV0 * z ] = 1",
+            "qc0: [ z * BV0 ] = 1",
             "GC0: BV0 = 1 -> x = 2",
             "GC1: BV1 = 1 -> x >= 3",
             "GC2: BV2 = 1 -> x <= 1",
@@ -296,14 +342,18 @@ def test_gurobi_expression_tree(name, constraint, expected_tf, expected_lp):
 
     if not isinstance(constraint, cp.Model):
         m = cp.Model(constraint)
+
+    if expected_tf is not None:
+        assert transformed == expected_tf, f"From {constraint} to TF\n{transformed}"
+
     solver = CPM_gurobi(m)
 
     lp = get_lp_string(solver)
+    constraints = extract_constraints(lp)
     print(lp)
 
-    constraints = extract_constraints(lp)
-    # assert transformed == expected_tf, f"From {constraint} to TF\n{transformed}"
-    assert constraints == expected_lp, f"From {constraint} to LP\n{constraints}\n\nFull LP:\n{lp}"
+    if expected_lp is not None:
+        assert constraints == expected_lp, f"From {constraint} to LP\n{constraints}\n\nFull LP:\n{lp}"
     is_sat = solver.solve()
     assert not is_sat or constraint.value(), "Incorrect constraint value"
     # assert is_sat == m.solve(), "Unexpected solve result"
