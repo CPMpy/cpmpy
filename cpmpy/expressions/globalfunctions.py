@@ -868,7 +868,7 @@ class MultiDimElement(GlobalFunction):
 
     def get_bounds(self) -> tuple[int, int]:
         arr, _ = self._arr_and_indices()
-        bnds = [get_bounds(x) for x in arr]
+        bnds = [get_bounds(x) for x in arr.flat]
         return min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
     def __repr__(self) -> str:
