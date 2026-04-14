@@ -27,10 +27,11 @@ from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
+from ..expressions.core import BoolVal, Comparison, Operator
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, boolvar
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
-from ..expressions.globalfunctions import GlobalFunction, Multiplication, Division
+from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.utils import is_num, is_true_cst, is_false_cst
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -38,7 +39,6 @@ from ..transformations.linearize import decompose_linear, decompose_linear_objec
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..expressions.utils import is_true_cst, is_false_cst
 
 
 class CPM_scip(SolverInterface):
