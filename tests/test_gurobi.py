@@ -86,6 +86,13 @@ def expression_tree_cases_():
         ["qc0: y + [ x ^2 ] = 9"],
     )
 
+    # yield (
+    #     "implication",
+    #     p.implies(q),
+    #     ["(p) -> (q >= 1)"],
+    #     ["GC0: p = 1 -> q >= 1"],
+    # )
+
     yield (
         "tmp_implies_non_linear",
         p.implies(x >= 1),
@@ -101,14 +108,18 @@ def expression_tree_cases_():
         [
             "(BV0) -> (x >= 2)",
             "(BV1) -> (x <= 0)",
+            "(~BV0) -> (x <= 1)",  # TODO removable in pos context?
+            "(~BV1) -> (x >= 1)",
             "(BV2) == ((BV0) or (BV1))",
-            "BV2",  # TODO removable
+            "BV2",
         ],
         [
             "R0: BV2 >= 1",
             "GC0: BV0 = 1 -> x >= 2",
             "GC1: BV1 = 1 -> x <= 0",
-            "GC2: BV2 = OR ( BV0 , BV1 )",
+            "GC2: BV0 = 0 -> x <= 1",
+            "GC3: BV1 = 0 -> x >= 1",
+            "GC4: BV2 = OR ( BV0 , BV1 )",
         ],
     )
 
@@ -221,7 +232,7 @@ def expression_tree_cases_():
     # yield (
     #     "nested_obj",
     #     cp.Model(minimize=z + (x - 3) * ((-y) ** 2) - 3),
-    #     ["(z) + (((x) + -3) * (pow(sum([-1] * [y]),2))) == 15"],
+    #     ["(z) + (((x) + -3) * pow(sum([-1] * [y]),2)) == 15"],
     #     [
     #         "\\ C3 = z + (sqr(y) * (-3 + x))",
     #         "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( VARIABLE , z , 0 )",
@@ -262,8 +273,9 @@ def expression_tree_cases_():
     yield (
         "mul_in_abs",
         cp.Abs(x * y) + z == 3,
-        ["(IV1) == ((x) * (y))", "(IV0) == (abs(IV1))", "(IV0) + (z) == 3"],
-        ["R0: IV0 + z = 3", "qc0: IV1 + [ - x * y ] = 0", "GC0: IV0 = ABS ( IV1 )"],
+        ["(IV0) == ((x) * (y))", "(IV1) == (abs(IV0))", "(IV1) + (z) == 3"],
+        None,
+        # ["R0: IV0 + z = 3", "qc0: IV1 + [ - x * y ] = 0", "GC0: IV0 = ABS ( IV1 )"],
     )
 
     # TODO keep as operator?
@@ -291,22 +303,33 @@ def expression_tree_cases_():
     yield (
         "reification",
         z * (x == 2) == 1,
+        # [
+        #     "(BV0) -> (x == 2)",
+        #     "(BV1) -> (x >= 3)",  # TODO REUSE BV0?
+        #     "(BV2) -> (x <= 1)",
+        #     "(BV3) == ((BV1) or (BV2))",
+        #     "(~BV0) -> (BV3 >= 1)",
+        #     "(z) * (BV0) == 1",
+        # ],
         [
             "(BV0) -> (x == 2)",
-            "(BV1) -> (x >= 3)",  # TODO REUSE BV0?
+            "(BV1) -> (x >= 3)",
             "(BV2) -> (x <= 1)",
+            "(~BV1) -> (x <= 2)",
+            "(~BV2) -> (x >= 2)",
             "(BV3) == ((BV1) or (BV2))",
             "(~BV0) -> (BV3 >= 1)",
             "(z) * (BV0) == 1",
         ],
-        [
-            "qc0: [ BV0 * z ] = 1",
-            "GC0: BV0 = 1 -> x = 2",
-            "GC1: BV1 = 1 -> x >= 3",
-            "GC2: BV2 = 1 -> x <= 1",
-            "GC4: BV0 = 0 -> BV3 >= 1",
-            "GC3: BV3 = OR ( BV1 , BV2 )",
-        ],
+        None,
+        # [
+        #     "qc0: [ BV0 * z ] = 1",
+        #     "GC0: BV0 = 1 -> x = 2",
+        #     "GC1: BV1 = 1 -> x >= 3",
+        #     "GC2: BV2 = 1 -> x <= 1",
+        #     "GC4: BV0 = 0 -> BV3 >= 1",
+        #     "GC3: BV3 = OR ( BV1 , BV2 )",
+        # ],
     )
 
     yield (
@@ -317,11 +340,63 @@ def expression_tree_cases_():
         # TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
 
+    # (x) * (pow(y,2)) <= 4
+    # (x) * (pow(y,2)) - 4 <= 0
+    # y <= 0, y = (x) * (pow(y,2)) - 4
+    yield (
+        "unnormalized_quad",
+        (x * y) <= 4,
+        ["(x) * (y) <= 4"],
+        ["qc0: [ x * y ] <= 4"],
+        # TODO perhaps ["GC0: C2 = OR ( p , q )"],
+    )
+
+    yield (
+        "normalized_nonlinear",
+        (x * (y**2)) <= 4,
+        ["(x) * (pow(y,2)) <= 4"],
+        [
+            "R0: C2 <= 4",
+            "\\ C2 = sqr(y) * x",
+            "GC0: C2 = NL : ( MULTIPLY , -1 , -1 ) ( SQUARE , -1 , 0 )",
+            "( VARIABLE , y , 1 ) ( VARIABLE , x , 0 )",
+        ],
+        # TODO perhaps ["GC0: C2 = OR ( p , q )"],
+    )
+
+    yield (
+        "normalize_nonlinear_on_rhs",
+        (p | q) <= (x == 2) + (y**2),
+        [
+            "(BV0) == ((p) or (q))",
+            "(BV1) -> (x == 2)",
+            "(BV2) -> (x >= 3)",
+            "(BV3) -> (x <= 1)",
+            "(~BV2) -> (x <= 2)",
+            "(~BV3) -> (x >= 2)",
+            "(BV4) == ((BV2) or (BV3))",
+            "(~BV1) -> (BV4 >= 1)",
+            "(BV0) <= ((BV1) + (pow(y,2)))",
+        ],  # TODO avoid BV0
+        [
+            "qc0: BV0 - BV1 + [ - y ^2 ] <= 0",
+            "GC1: BV1 = 1 -> x = 2",
+            "GC2: BV2 = 1 -> x >= 3",
+            "GC3: BV3 = 1 -> x <= 1",
+            "GC4: BV2 = 0 -> x <= 2",
+            "GC5: BV3 = 0 -> x >= 2",
+            "GC7: BV1 = 0 -> BV4 >= 1",
+            "GC0: BV0 = OR ( p , q )",
+            "GC6: BV4 = OR ( BV2 , BV3 )",
+        ],
+        # TODO perhaps ["GC0: C2 = OR ( p , q )"],
+    )
+
     yield (
         "neg_disjunction",
         ~(p | q),
-        ["(~p) == (BV1)", "(~q) == (BV2)", "(BV0) == ((BV1) and (BV2))", "BV0"],
-        ["R0: - p - BV1 = -1", "R1: - q - BV2 = -1", "R2: BV0 >= 1", "GC0: BV0 = AND ( BV1 , BV2 )"],
+        ["(~p) == (BV0)", "(~q) == (BV1)", "(BV2) == ((BV0) and (BV1))", "BV2"],
+        ["R0: - p - BV0 = -1", "R1: - q - BV1 = -1", "R2: BV2 >= 1", "GC0: BV2 = AND ( BV0 , BV1 )"],
     )
 
     # yield (

@@ -414,9 +414,7 @@ class CPM_gurobi(SolverInterface):
             def add_general_constraint(f, depth, reified=False, y=None):
                 # require non-variable
                 # f(x1, x2, ...) === f(y1, y2, ..), y1=x1, y2=x2, ... 
-                print("GEN y == f", y, f)
                 args = [reify(add_(arg, depth, reified=True), depth) for arg in f.args]
-                print("ARGS", args)
                 # require non-constants
                 args = propagate_boolconst(f.name, args)
                 if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
@@ -463,7 +461,6 @@ class CPM_gurobi(SolverInterface):
 
             def make_linear(expr, depth):
                 """Force an expression into a linear form by reifying non-linear parts into aux vars."""
-                print("LIN", expr)
                 if is_num(expr) or isinstance(expr, _NumVarImpl):
                     return expr
                 elif isinstance(expr, Operator):
@@ -486,28 +483,19 @@ class CPM_gurobi(SolverInterface):
             def add_comparison(cpm_expr, depth, reified=False):
                 a, b = cpm_expr.args
 
-                # # Normalize <=/>= : move all non-constant terms to LHS, then reify non-linear LHS
-                # a, b = cpm_expr.args
-                # if not is_num(a):
-                #     a = 0
-                #     b = b - a
+                if cpm_expr.name == "==" and not reified and isinstance(a, _NumVarImpl) and isinstance(b, Operator) and b.name in self.general_constraints:
+                    # already of the form: y = f(x)
+                    add_general_constraint(b, depth, reified=reified, y=a)
+                    con = True  # constraint posted as side effect
+                    return reify(con, depth) if reified else con
 
                 match cpm_expr.name:
-                    case "==":
-                        if not reified and isinstance(a, _NumVarImpl) and isinstance(b, Operator) and b.name in self.general_constraints:
-                            # already of the form: y = f(x)
-                            add_general_constraint(b, depth, reified=reified, y=a)
-                            con = True  # constraint posted as side effect
-                        else:
-                            con = update_args(cpm_expr, [add_(a, depth, reified=True), add_(b, depth, reified=True)])
-                    case "<=":
-                        con = add_(a, depth, reified=True) <= add_(b, depth, reified=True)
-                    case ">=":
-                        con = add_(a, depth, reified=True) >= add_(b, depth, reified=True)
+                    case "==" | "<=" | ">=":
+                        a, b = add_(a, depth, reified=True), add_(b, depth, reified=True)
+                        con = update_args(cpm_expr, [a, b])
                     case "!=":
                         # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
                         cpm_expr, = push_down_negation([cpm_expr])
-                        print("PD", cpm_expr)
                         if cpm_expr.name == "!=":
                             # TODO cse
                             a, b = cpm_expr.args
@@ -774,24 +762,21 @@ class CPM_gurobi(SolverInterface):
                               else:
                                   y = b if isinstance(b, gp.Var) else self.grb_model.addVar(lb=b, ub=b)
                                   return y == a
-                          elif isinstance(a, gp.GenExpr) or isinstance(b, gp.GenExpr):
-                              # GenExpr (general constraint) must be on RHS: y == f(x)
-                              if isinstance(b, gp.GenExpr):
-                                  y = a if isinstance(a, gp.Var) else self.grb_model.addVar(lb=a, ub=a)
-                                  return y == b
-                              else:
-                                  y = b if isinstance(b, gp.Var) else self.grb_model.addVar(lb=b, ub=b)
-                                  return y == a
-                          elif isinstance(a, (int, gp.LinExpr, gp.QuadExpr, gp.Var)):
+                          elif isinstance(a, (int, gp.LinExpr, gp.QuadExpr, gp.Var, gp.GenExpr)):
                               return a == b
                           else:
                               raise Exception(f"Unexpected expression in {cpm_expr}, {type(a)}")
-                      case "<=":
-                          # a, b = make_linear(a, depth), make_linear(b, depth)
-                          return add_(a, depth) <= add_(b, depth)
-                      case ">=":
-                          # a, b = make_linear(a, depth), make_linear(b, depth)
-                          return add_(a, depth) >= add_(b, depth)
+                      case "<=" | ">=":
+                          a, b = add_(a, depth), add_(b, depth)
+                          # Gurobi requires NLExpr in y=f(x) form; reify to aux var
+                          def _reify_nl(expr):
+                              if isinstance(expr, gp.NLExpr):
+                                  y = self.grb_model.addVar(lb=-gp.GRB.INFINITY)
+                                  self.grb_model.addConstr(y == expr)
+                                  return y
+                              return expr
+                          a, b = _reify_nl(a), _reify_nl(b)
+                          return (a <= b) if cpm_expr.name == "<=" else (a >= b)
                       case _:
                           raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
               elif isinstance(cpm_expr, cp.expressions.globalfunctions.GlobalFunction):
