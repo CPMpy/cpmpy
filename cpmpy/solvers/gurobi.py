@@ -393,12 +393,6 @@ class CPM_gurobi(SolverInterface):
                     add(r == cpm_expr)
                 return r
 
-            def get_args(cpm_expr):
-                if isinstance(cpm_expr, (int, _NumVarImpl)):
-                    return [cpm_expr]
-                else:
-                    return cpm_expr.args
-
             def update_args(cpm_expr, args):
                 cpm_expr = copy.copy(cpm_expr)
                 cpm_expr.update_args(args)
@@ -417,6 +411,26 @@ class CPM_gurobi(SolverInterface):
                     case _:
                         return args
 
+            def add_general_constraint(f, depth, reified=False, y=None):
+                # require non-variable
+                # f(x1, x2, ...) === f(y1, y2, ..), y1=x1, y2=x2, ... 
+                print("GEN y == f", y, f)
+                args = [reify(add_(arg, depth, reified=True), depth) for arg in f.args]
+                print("ARGS", args)
+                # require non-constants
+                args = propagate_boolconst(f.name, args)
+                if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
+                    return args
+                else:
+                    # TODO intro constant if non-reified
+                    # require the form: y = f(x)
+                    y = get_or_make_var(f, define=False) if y is None else y
+
+                    # y, y = f(x)
+                    f = update_args(f, args)
+                    all_cons.append(y == f)  # side-step Comparison handling
+                    return y
+
             def reify(cpm_expr, depth):
                 """Return something which can be an argument for a general constraint"""
                 if self.verbose: print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, 'name', None))
@@ -430,22 +444,6 @@ class CPM_gurobi(SolverInterface):
                     return get_or_make_var(cpm_expr)
                 elif isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
                     return cpm_expr
-                elif cpm_expr.name in self.general_constraints:  # f(x1, x2, ...)
-                    # require non-variable
-                    # f(x1, x2, ...) === f(y1, y2, ..), y1=x1, y2=x2, ... 
-                    args = [reify(add_(arg, depth, reified=True), depth) for arg in cpm_expr.args]
-                    # require non-constants
-                    args = propagate_boolconst(cpm_expr.name, args)
-                    if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
-                        return args
-                    else:
-                        # TODO intro constant if non-reified
-                        # require the form: y = f(x)
-                        y = get_or_make_var(cpm_expr, define=False)
-
-                        # y, y = f(x)
-                        all_cons.append(y == update_args(cpm_expr, args))  # side-step Comparison handling
-                        return y
                 elif is_boolexpr(cpm_expr):
                     if cpm_expr.name == "->":
                         # Convert p -> q to or(~p, q) to avoid circular reification
@@ -487,11 +485,21 @@ class CPM_gurobi(SolverInterface):
 
             def add_comparison(cpm_expr, depth, reified=False):
                 a, b = cpm_expr.args
+
+                # # Normalize <=/>= : move all non-constant terms to LHS, then reify non-linear LHS
+                # a, b = cpm_expr.args
+                # if not is_num(a):
+                #     a = 0
+                #     b = b - a
+
                 match cpm_expr.name:
                     case "==":
-                        # TODO elif isinstance(b, _NumVarImpl) then swap args
-                        a, b = add_(a, depth, reified=True), add_(b, depth, reified=True)
-                        con = update_args(cpm_expr, [a, b])
+                        if not reified and isinstance(a, _NumVarImpl) and isinstance(b, Operator) and b.name in self.general_constraints:
+                            # already of the form: y = f(x)
+                            add_general_constraint(b, depth, reified=reified, y=a)
+                            con = True  # constraint posted as side effect
+                        else:
+                            con = update_args(cpm_expr, [add_(a, depth, reified=True), add_(b, depth, reified=True)])
                     case "<=":
                         con = add_(a, depth, reified=True) <= add_(b, depth, reified=True)
                     case ">=":
@@ -527,7 +535,6 @@ class CPM_gurobi(SolverInterface):
                 if is_num(cpm_expr):
                     return cpm_expr
                 elif isinstance(cpm_expr, _BoolVarImpl):
-                    assert False
                     return cpm_expr >= 1
                 elif isinstance(cpm_expr, Comparison):
                     cpm_expr = add_(cpm_expr, depth)
@@ -580,8 +587,8 @@ class CPM_gurobi(SolverInterface):
                     match cpm_expr.name:
                         case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
                             a, b = cpm_expr.args
-                            if isinstance(cpm_expr.args[1], Comparison):
-                                print('indic', cpm_expr, type(cpm_expr.args[1]))
+                            # if isinstance(b, (_NumVarImpl, Comparison)):  # TODO
+                            if isinstance(b, Comparison):
                                 p = a if isinstance(a, NegBoolView) else reify(a, depth)
                                 if is_num(p):  # propagate fixed antecedent
                                     return add_(b, depth, reified=reified) if a else True
@@ -605,10 +612,8 @@ class CPM_gurobi(SolverInterface):
                             for arg in cpm_expr.args:
                                 add(arg)
                             return True
-                        case name if name in self.general_constraints:  # general constraints have to be posted as y = f(x), and `x` has to be flat as well
-                            # f(x) === (y == f(x))
-                            return reify(cpm_expr, depth)
-                            return reify(update_args(cpm_expr, [reify(add_(arg, depth, reified=True), depth) for arg in cpm_expr.args]), depth)
+                        case name if name in self.general_constraints:
+                            return add_general_constraint(cpm_expr, depth, reified=reified)
                         case _:
                             assert False
                             # TODO
