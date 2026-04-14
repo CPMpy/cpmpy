@@ -329,7 +329,7 @@ class SolverInterface(object):
         raise NotSupportedError("Solver does not support unsat core extraction")
     
     @classmethod
-    def _native_mus(cls, soft, hard=[]):
+    def mus_native(cls, soft, hard=[]):
         """
         For using the solver's internal MUS extractor 
 

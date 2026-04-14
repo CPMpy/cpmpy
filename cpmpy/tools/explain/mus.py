@@ -73,7 +73,7 @@ def mus_native(soft, hard=[], solver="exact"):
     # get solver class
     solver_class = cp.SolverLookup.lookup(solver)
     
-    return solver_class._native_mus(soft, hard)
+    return solver_class.mus_native(soft, hard)
 
 
 def quickxplain(soft, hard=[], solver="ortools"):

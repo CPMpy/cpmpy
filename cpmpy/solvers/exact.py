@@ -654,11 +654,12 @@ class CPM_exact(SolverInterface):
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
     
     @classmethod
-    def _native_mus(cls, soft, hard=[]):        
+    def mus_native(cls, soft, hard=[]):        
         # Create assumption variables and model with hard + (assumption -> soft)
         from cpmpy.tools.explain.utils import make_assump_model # avoid circular import
         m, soft, assumptions = make_assump_model(soft, hard)
         
+        # initialize solver object with model
         s = cls(m)
         
         # set up assumptions for exact
