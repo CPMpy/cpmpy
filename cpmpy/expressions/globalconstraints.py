@@ -441,7 +441,7 @@ class Circuit(GlobalConstraint):
         for i in range(1, len(succ)):
             order.append(succ[order[i - 1]])
 
-        # element constraints can be partial
+        # element constraints of 'succ' with 'order[i-1]' as index can be partial (outside of succ bounds)
         from cpmpy.transformations.safening import _no_partial_functions
         changed, safe_order, toplevel, nbc = _no_partial_functions(order, safen_toplevel=frozenset(), is_toplevel=False)
         if changed:
@@ -470,7 +470,7 @@ class Circuit(GlobalConstraint):
         for i in range(n):
             for j in range(n):
                 if i == j:
-                    constraints += [succ[i] != j]
+                    constraints += [succ[i] != j]  # no self-loops
                 if j != 0:
                     constraints += [(succ[i] == j) == (order[i] + 1 == order[j])] # ensure no subtours
 
