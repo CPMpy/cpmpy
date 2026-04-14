@@ -78,12 +78,10 @@ import os
 import pathlib
 import io
 import tempfile
-import warnings
-from itertools import product
-from typing import Any, Iterator, Optional, Tuple, List, Union, Callable
+from typing import Any, Optional, Tuple, List, Callable
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
 
 from .utils import extract_model_features, portable_instance_metadata
