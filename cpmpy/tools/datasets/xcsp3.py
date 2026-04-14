@@ -1,7 +1,8 @@
 """
 XCS3 Dataset
 
-https://xcsp.org/instances/
+    XCSP3 is an XML-based format designed to represent instances of combinatorial constrained problems from the angle of Constraint Programming (CP). 
+    Origin: https://xcsp.org/instances/
 """
 
 import os
@@ -65,7 +66,9 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
         }
 
     def collect_instance_metadata(self, file) -> dict:
-        """Extract instance type (CSP/COP) from XCSP3 XML root element."""
+        """
+        Extract instance type (CSP/COP) from XCSP3 XML root element.
+        """
         import re
         result = {}
         try:
