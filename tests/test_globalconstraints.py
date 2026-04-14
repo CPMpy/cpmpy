@@ -217,11 +217,6 @@ class TestGlobal:
         if solver == "choco":
             pytest.skip(reason="Negated circuit with out-of-bound idx crashes Choco")
 
-        if solver in ("gurobi", "hexaly"):
-            solveall_kwargs = dict(time_limit=5) # should be enough time to enumerate all
-        else:
-            solveall_kwargs = {}
-
         x = cp.intvar(lb=-1, ub=4, shape=3)
         circuit = cp.Circuit(x)
         model = cp.Model([~circuit, x == [1,2,0]])
@@ -236,6 +231,12 @@ class TestGlobal:
         for var in x:
             total *= (1 + var.ub - var.lb)
 
+        solveall_kwargs = dict()
+        if solver in ("gurobi", "cplex"):
+            solveall_kwargs['solution_limit']= total+1
+        if solver in ("gurobi", "cplex", "hexaly"):
+            solveall_kwargs['time_limit']= 5  # should be enough time to enumerate all
+        
         all_sols = set()
         not_all_sols = set()
 
