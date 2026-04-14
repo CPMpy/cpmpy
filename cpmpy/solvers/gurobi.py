@@ -414,18 +414,18 @@ class CPM_gurobi(SolverInterface):
                         return args
 
             def add_general_constraint(f, depth, reified=False, y=None):
-                # require non-variable
-                # f(x1, x2, ...) === f(y1, y2, ..), y1=x1, y2=x2, ... 
+                """Add the general constraint `f(x)` in gurobi's required form, `y=f(x)` with `x` a list of variables (Boolean/integer, depending on the general constraint type)"""
+                # require only variables
+                # f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
                 args = [reify(add_(arg, depth, reified=True), depth) for arg in f.args]
                 # require non-constants
                 args = propagate_boolconst(f.name, args)
                 if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
                     return args
                 else:
-                    # TODO intro constant if non-reified
                     # require the form: y = f(x)
                     if y is None:
-                        y = get_or_make_var(f, define=False)
+                        y = get_or_make_var(f, define=False) if reified else 1
 
                     # y, y = f(x)
                     f = with_args(f, args)
@@ -435,7 +435,6 @@ class CPM_gurobi(SolverInterface):
             def reify(cpm_expr, depth):
                 """Return something which can be an argument for a general constraint or linear (indicator) constraint"""
                 if self.verbose: print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, 'name', None))
-                # TODO get_or_make_var_or_list
 
                 if is_num(cpm_expr):
                     return cpm_expr
@@ -465,13 +464,11 @@ class CPM_gurobi(SolverInterface):
             def add_comparison(cpm_expr, depth, reified=False):
                 a, b = cpm_expr.args
 
-                if cpm_expr.name == "==" and not reified and isinstance(a, (int, _NumVarImpl)) and isinstance(b, Operator) and b.name in self.general_constraints:
-                    # already of the form: y = f(x)
-                    add_general_constraint(b, depth, reified=reified, y=a)
-                    con = True  # constraint posted as side effect
-                    return reify(con, depth) if reified else con
-
                 match cpm_expr.name:
+                    case "==" if not reified and isinstance(a, (int, _NumVarImpl)) and isinstance(b, Operator) and b.name in self.general_constraints:
+                        # already of the form: y = f(x)
+                        add_general_constraint(b, depth, reified=reified, y=a)
+                        con = True  # constraint posted as side effect
                     case "==" if isinstance(a, _BoolVarImpl) and is_boolexpr(b) and not isinstance(b, _NumVarImpl):
                         # BV == boolexpr: post as indicator constraints
                         add(a.implies(b))
@@ -485,9 +482,7 @@ class CPM_gurobi(SolverInterface):
                         cpm_expr, = push_down_negation([cpm_expr], toplevel=not reified)
                         if cpm_expr.name == "!=":
                             a, b = cpm_expr.args
-                            imp_gt = get_or_make_var(a > b)
-                            imp_lt = get_or_make_var(a < b)
-                            return add_(imp_gt | imp_lt, depth, reified=reified)
+                            return add_((a > b) | (a < b), depth, reified=reified)
                         else: # push_down_negation may have changed e.g. != into ==
                             return add_(cpm_expr, depth, reified=reified)
                     case ">":
@@ -503,13 +498,17 @@ class CPM_gurobi(SolverInterface):
                 """Ensure expression is linear (no mul/pow) by reifying non-linear parts into aux vars."""
                 if self.verbose: print(f"{'  ' * depth}lin", cpm_expr)
 
-                cpm_expr = add_(cpm_expr, depth)
+                # Only comparisons (except !=) can be indicator bodies directly;
+                # everything else (!=, BoolVars, and/or/etc.) needs reification into a BV
+                can_be_linear = isinstance(cpm_expr, Comparison) and cpm_expr.name != "!="
+                cpm_expr = add_(cpm_expr, depth, reified=not can_be_linear)
                 if isinstance(cpm_expr, _NumVarImpl):
                     return cpm_expr >= 1
                 elif isinstance(cpm_expr, Comparison):
-
                     def linearize_expr(expr):
-                        if isinstance(expr, Operator) and expr.name == "sum":
+                        if is_num(expr) or isinstance(expr, _NumVarImpl):
+                            return expr
+                        elif isinstance(expr, Operator) and expr.name == "sum":
                             match expr.name:
                                 case "sum":
                                     return with_args(expr, [reify(a_i, depth) for a_i in expr.args])
@@ -518,13 +517,13 @@ class CPM_gurobi(SolverInterface):
                                     return with_args(expr, [w, [reify(x_i, depth) for x_i in x]])
                                 case _:
                                     return reify(expr, depth)
-
                         else:
                             return reify(expr, depth)
 
                     a, b = cpm_expr.args
                     return with_args(cpm_expr, [linearize_expr(a), linearize_expr(b)])
                 else:
+                    cpm_expr = add_(cpm_expr, depth, reified=False)
                     result = reify(cpm_expr, depth)
                     if isinstance(result, _NumVarImpl):
                         return result >= 1
@@ -557,7 +556,7 @@ class CPM_gurobi(SolverInterface):
                                 q = linearize(b, depth)
                                 if is_num(q):
                                     return True if q else add_(p, depth, reified=reified)
-                                assert isinstance(q, Comparison), q  # not required to be a canonical comparison
+                                assert isinstance(q, Comparison), f"Expected linear constraint, but got {q}"  # not required to be a canonical comparison
                                 return with_args(cpm_expr, [p, q])
                             else:
                                 return add_((~a) | b, depth, reified=reified)

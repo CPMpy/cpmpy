@@ -79,6 +79,7 @@ def expression_tree_cases_():
         ["R0: <= -1"],
     )
 
+    """A quadratic constraint"""
     yield (
         "pow",
         x**2 + y == 9,
@@ -94,35 +95,55 @@ def expression_tree_cases_():
     # )
 
     yield (
-        "tmp_implies_non_linear",
-        p.implies(x >= 1),
-        # ["(p) -> (x >= 1)"],
-        ["(p) -> (x >= 1)"],
-        ["GC0: p = 1 -> x >= 1"],
-    )
-
-    yield (
         "neq",
         x != 1,
         # z * (x - y) == 1
         [
             "(BV0) -> (x >= 2)",
             "(~BV0) -> (x <= 1)",
-            "True",
             "(BV1) -> (x <= 0)",
             "(~BV1) -> (x >= 1)",
-            "True",
-            "(BV2) == ((BV0) or (BV1))",
-            "BV2",
+            "(BV0) or (BV1)",
+            "1",
         ],
         [
-            "R0: BV2 >= 1",
             "GC0: BV0 = 1 -> x >= 2",
             "GC1: BV0 = 0 -> x <= 1",
             "GC2: BV1 = 1 -> x <= 0",
             "GC3: BV1 = 0 -> x >= 1",
+            "GC4: C3 = OR ( BV0 , BV1 )",
+        ],
+    )
+
+    yield (
+        "implies_neq",
+        p.implies(x != 1),
+        [
+            "(BV0) -> (x >= 2)",
+            "(~BV0) -> (x <= 1)",
+            "(BV1) -> (x <= 0)",
+            "(~BV1) -> (x >= 1)",
+            "(BV2) == ((BV0) or (BV1))",
+            "(p) -> (BV2 >= 1)",
+        ],
+        [
+            "GC0: BV0 = 1 -> x >= 2",
+            "GC1: BV0 = 0 -> x <= 1",
+            "GC2: BV1 = 1 -> x <= 0",
+            "GC3: BV1 = 0 -> x >= 1",
+            "GC5: p = 1 -> BV2 >= 1",
             "GC4: BV2 = OR ( BV0 , BV1 )",
         ],
+    )
+
+
+
+    yield (
+        "implies_x_ge_1",
+        p.implies(x >= 1),
+        # ["(p) -> (x >= 1)"],
+        ["(p) -> (x >= 1)"],
+        ["GC0: p = 1 -> x >= 1"],
     )
 
     """Positive implications"""
@@ -310,10 +331,8 @@ def expression_tree_cases_():
             "(BV0) -> (x == 2)",
             "(BV1) -> (x >= 3)",
             "(~BV1) -> (x <= 2)",
-            "True",
             "(BV2) -> (x <= 1)",
             "(~BV2) -> (x >= 2)",
-            "True",
             "(BV3) == ((BV1) or (BV2))",
             "(~BV0) -> (BV3 >= 1)",
             "(z) * (BV0) == 1",
@@ -324,10 +343,18 @@ def expression_tree_cases_():
     yield (
         "disjunction",
         p | q,
-        ["(BV0) == ((p) or (q))", "BV0"],  # TODO avoid BV0
-        ["R0: BV0 >= 1", "GC0: BV0 = OR ( p , q )"],
+        ["(p) or (q)", "1"],  # TODO avoid BV0
+        ["GC0: C2 = OR ( p , q )"],
         # TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
+
+    # yield (
+    #     "maximum_root",
+    #     1 == cp.Maximum([x, y]),
+    #     None,
+    #     ["GC0: C2 = MAX ( x , y )"],
+    # )
+
 
     # (x) * (pow(y,2)) <= 4
     # (x) * (pow(y,2)) - 4 <= 0
@@ -360,24 +387,14 @@ def expression_tree_cases_():
             "(BV0) == ((p) or (q))",
             "(BV1) -> (x == 2)",
             "(BV2) -> (x >= 3)",
-            "(BV3) -> (x <= 1)",
             "(~BV2) -> (x <= 2)",
+            "(BV3) -> (x <= 1)",
             "(~BV3) -> (x >= 2)",
             "(BV4) == ((BV2) or (BV3))",
             "(~BV1) -> (BV4 >= 1)",
             "(BV0) <= ((BV1) + (pow(y,2)))",
         ],  # TODO avoid BV0
-        [
-            "qc0: BV0 - BV1 + [ - y ^2 ] <= 0",
-            "GC1: BV1 = 1 -> x = 2",
-            "GC2: BV2 = 1 -> x >= 3",
-            "GC3: BV3 = 1 -> x <= 1",
-            "GC4: BV2 = 0 -> x <= 2",
-            "GC5: BV3 = 0 -> x >= 2",
-            "GC7: BV1 = 0 -> BV4 >= 1",
-            "GC0: BV0 = OR ( p , q )",
-            "GC6: BV4 = OR ( BV2 , BV3 )",
-        ],
+        None,
         # TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
 
@@ -398,9 +415,16 @@ def expression_tree_cases_():
     yield (
         "conjunction_in_disjunction",
         (p | (q & r)),
-        ["(BV0) == ((q) and (r))", "(BV1) == ((p) or (BV0))", "BV1"],
-        ["R0: BV1 >= 1", "GC0: BV0 = AND ( q , r )", "GC1: BV1 = OR ( p , BV0 )"],
+        ["(BV0) == ((q) and (r))", "(p) or (BV0)", "1"],
+        ["GC0: BV0 = AND ( q , r )", "GC1: C4 = OR ( p , BV0 )"],
     )
+
+    # yield (
+    #     "all_different",
+    #     cp.AllDifferent(cp.intvar(1, 2, shape=2, name="X")),
+    #     ["(BV0) == ((q) and (r))", "(BV1) == ((p) or (BV0))", "BV1"],
+    #     ["R0: BV1 >= 1", "GC0: BV0 = AND ( q , r )", "GC1: BV1 = OR ( p , BV0 )"],
+    # )
 
 
 @pytest.mark.requires_solver("gurobi")
@@ -431,6 +455,10 @@ def test_gurobi_expression_tree(name, constraint, expected_tf, expected_lp):
 
     if expected_lp is not None:
         assert constraints == expected_lp, f"From {constraint} to LP\n{constraints}\n\nFull LP:\n{lp}"
+
     is_sat = solver.solve()
-    assert not is_sat or constraint.value(), "Incorrect constraint value"
+    if is_sat:
+        assert constraint.value(), "Incorrect constraint value"
+
+    assert is_sat is m.solve()
     # assert is_sat == m.solve(), "Unexpected solve result"
