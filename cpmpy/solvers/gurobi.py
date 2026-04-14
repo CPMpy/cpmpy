@@ -383,13 +383,14 @@ class CPM_gurobi(SolverInterface):
         def add(cpm_expr):
             """Recursively create a Gurobi constraint from a CPMpy expression."""
 
-            def get_or_make_var(cpm_expr):
+            def get_or_make_var(cpm_expr, define=True):
                 if cpm_expr in self._csemap:
                     return self._csemap[cpm_expr]
 
                 r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
                 self._csemap[cpm_expr] = r
-                add(r == cpm_expr)
+                if define:
+                    add(r == cpm_expr)
                 return r
 
             def get_args(cpm_expr):
@@ -405,12 +406,16 @@ class CPM_gurobi(SolverInterface):
 
             def propagate_boolconst(name, args):
                 """Propagate boolean constants in and/or: and(0,...)=0, or(1,...)=1, filter neutral elements."""
-                # TODO single loop should be possible
-                absorb = 0 if name == "and" else 1  # absorbing element
-                args = [a for a in args if not (is_num(a) and a == 1 - absorb)]
-                if any(is_num(a) and a == absorb for a in args):
-                    return absorb
-                return args
+                match name:
+                    case "and" | "or":
+                        # TODO single loop should be possible
+                        absorb = 0 if name == "and" else 1  # absorbing element
+                        args = [a for a in args if not (is_num(a) and a == 1 - absorb)]
+                        if any(is_num(a) and a == absorb for a in args):
+                            return absorb
+                        return args
+                    case _:
+                        return args
 
             def reify(cpm_expr, depth):
                 """Return something which can be an argument for a general constraint"""
@@ -425,7 +430,28 @@ class CPM_gurobi(SolverInterface):
                     return get_or_make_var(cpm_expr)
                 elif isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
                     return cpm_expr
-                elif is_boolexpr(cpm_expr) and cpm_expr.name not in self.general_constraints:
+                elif cpm_expr.name in self.general_constraints:  # f(x1, x2, ...)
+                    # require non-variable
+                    # f(x1, x2, ...) === f(y1, y2, ..), y1=x1, y2=x2, ... 
+                    args = [reify(add_(arg, depth, reified=True), depth) for arg in cpm_expr.args]
+                    # require non-constants
+                    args = propagate_boolconst(cpm_expr.name, args)
+                    if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
+                        return args
+                    else:
+                        # TODO intro constant if non-reified
+                        # require the form: y = f(x)
+                        y = get_or_make_var(cpm_expr, define=False)
+
+                        # y, y = f(x)
+                        all_cons.append(y == update_args(cpm_expr, args))  # side-step Comparison handling
+                        return y
+                elif is_boolexpr(cpm_expr):
+                    if cpm_expr.name == "->":
+                        # Convert p -> q to or(~p, q) to avoid circular reification
+                        # (reifying via manual implies would cause CSE to create tautologies)
+                        a, b = cpm_expr.args
+                        return reify(Operator("or", [recurse_negation(a), b]), depth)
                     # TODO reuse get_or_make_var?
                     r = cp.boolvar()
                     self._csemap[cpm_expr] = r
@@ -463,24 +489,9 @@ class CPM_gurobi(SolverInterface):
                 a, b = cpm_expr.args
                 match cpm_expr.name:
                     case "==":
-                        if isinstance(a, _NumVarImpl):
-                            if isinstance(b, (Operator, GlobalFunction)) and b.name in self.general_constraints:
-                                # y = f(x1, x2, ...) === y = f(y1, y2, ..), y1=x1, y2=x2, ...
-                                args = [reify(add_(arg, depth, reified=True), depth) for arg in b.args]
-                                if b.name in ("and", "or"):
-                                    args = propagate_boolconst(b.name, args)
-                                    if is_num(args):
-                                        con = update_args(cpm_expr, [a, args])
-                                    else:
-                                        con = update_args(cpm_expr, [a, update_args(b, args)])
-                                else:
-                                    con = update_args(cpm_expr, [a, update_args(b, args)])
-                            else:
-                                con = update_args(cpm_expr, [a, add_(b, depth, reified=True)])
                         # TODO elif isinstance(b, _NumVarImpl) then swap args
-                        else:
-                            a, b = add_(a, depth, reified=True), add_(b, depth, reified=True)
-                            con = update_args(cpm_expr, [a, b])
+                        a, b = add_(a, depth, reified=True), add_(b, depth, reified=True)
+                        con = update_args(cpm_expr, [a, b])
                     case "<=":
                         con = add_(a, depth, reified=True) <= add_(b, depth, reified=True)
                     case ">=":
