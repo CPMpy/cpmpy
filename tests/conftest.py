@@ -206,7 +206,6 @@ def pytest_addoption(parser):
         help=(
             "Enable tests marked with 'dataset_download'. "
             "By default these tests are skipped because they download dataset files from the network. "
-            "Equivalent to setting CPMPY_RUN_DOWNLOAD_TESTS=1."
         ),
     )
 
@@ -369,7 +368,7 @@ def pytest_collection_modifyitems(config, items):
     
     cmd_solver_option = config.getoption("--solver") # get cli `--solver`` arg
     cmd_solvers = _parse_solver_option(cmd_solver_option)  # parse into list
-    run_download_tests = config.getoption("--include-datasets") or os.environ.get("CPMPY_RUN_DOWNLOAD_TESTS") == "1"
+    run_download_tests = config.getoption("--include-datasets")
     
     # Uncomment for debugging
     # if cmd_solver_option:
@@ -401,7 +400,7 @@ def pytest_collection_modifyitems(config, items):
                 pytest.mark.skip(
                     reason=(
                         "Test requires downloading dataset files. "
-                        "Use --include-datasets or set CPMPY_RUN_DOWNLOAD_TESTS=1 to enable."
+                        "Use --include-datasets to enable."
                     )
                 )
             )
