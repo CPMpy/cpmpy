@@ -85,8 +85,6 @@ from urllib.request import HTTPError, Request, urlopen
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
 
-from .utils import extract_model_features, portable_instance_metadata
-
 # tqdm as an optional dependency, provides prettier progress bars
 try:
     from tqdm import tqdm
@@ -624,13 +622,6 @@ class FileDataset(IndexedDataset):
             instance_meta = {}
             metadata_error = str(e)
 
-        # Separate portable from format-specific fields TODO
-        portable = portable_instance_metadata(instance_meta)
-        format_specific = {
-            k: v for k, v in instance_meta.items()
-            if k not in portable and not k.startswith("_")
-        }
-
         # Derive instance name (strip format-specific extensions) TODO
         stem = file_path.stem
         for ext in (".xml", ".wcnf", ".opb"):
@@ -644,8 +635,7 @@ class FileDataset(IndexedDataset):
             "instance_name": stem,
             "source_file": str(file_path.relative_to(self.dataset_dir)),
             "categories": self.categories(),
-            "instance_metadata": portable,
-            "format_metadata": format_specific,
+            "instance_metadata": instance_meta,
         }
 
         # Collect metadata collection error if any
