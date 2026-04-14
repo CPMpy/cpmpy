@@ -351,7 +351,7 @@ class CPM_gurobi(SolverInterface):
 
         raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
-    verbose = True
+    verbose = False
     general_constraints = {"max", "min", "abs", "and", "or"}
 
     def transform(self, cpm_expr):
