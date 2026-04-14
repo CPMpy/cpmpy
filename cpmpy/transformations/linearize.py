@@ -77,7 +77,7 @@ from ..exceptions import TransformationNotImplementedError
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent
 from ..expressions.globalfunctions import GlobalFunction, Element
-from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst, is_boolexpr
+from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 from .int2bool import _encode_int_var
 
@@ -100,10 +100,9 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
     for cpm_expr in lst_of_expr:
         # Boolean literals are handled as trivial linears or unit clauses depending on `supported`
         if isinstance(cpm_expr, _BoolVarImpl):
-            # TODO gurobi specifically cannot do reified or's
             if "or" in supported:
                 # post clause explicitly (don't use cp.any, which will just return the BoolVar)
-                newlist.append(cpm_expr)
+                newlist.append(Operator("or", [cpm_expr]))
             elif isinstance(cpm_expr, NegBoolView):
                 # might as well remove the negation
                 newlist.append(sum([~cpm_expr]) <= 0)
@@ -129,11 +128,8 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                                                        f"calling `linearize_constraint`"
 
                 if isinstance(cond, _BoolVarImpl) and isinstance(sub_expr, _BoolVarImpl):
-                    # shortcut for BV -> BV, convert to disjunction and linearize it (if unsupported)
-                    if "->" in supported:
-                        newlist.append(cond.implies(cp.all(linearize_constraint([sub_expr], supported=supported, reified=True, csemap=csemap))))
-                    else:
-                        newlist.append(1 * cond + -1 * sub_expr <= 0)
+                    # shortcut for BV -> BV, convert to disjunction and apply linearize on it
+                    newlist.append(1 * cond + -1 * sub_expr <= 0)
 
                 # BV -> LinExpr
                 elif isinstance(cond, _BoolVarImpl):
@@ -190,11 +186,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
 
-            # BV == and([a,b,c])
-            if cpm_expr.name == "==" and hasattr(rhs, "name") and rhs.name in supported:
-                newlist.append(cpm_expr)
-                continue
-
             if lhs.name == "sub":
                 # convert to wsum
                 lhs = Operator("wsum", [[1, -1], [lhs.args[0], lhs.args[1]]])
@@ -220,11 +211,10 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
             if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
                 # very special case, avoid writing as sum of 1 argument
                 new_expr = simplify_boolean([eval_comparison(cpm_expr.name,lhs.args[0], rhs)])
-                new_expr = linearize_constraint(new_expr, supported=supported, reified=reified, csemap=csemap)
                 assert len(new_expr) == 1
                 if isinstance(new_expr[0], BoolVal) and  new_expr[0].value() is True:
                     continue # skip or([BoolVal(True)])
-                newlist.extend(new_expr)
+                newlist.append(Operator("or", new_expr))
                 continue
 
 
@@ -294,24 +284,6 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
 
     return newlist
 
-def only_positive_bv_args(args, csemap=None):
-    # other operators in comparison such as "min", "max"
-    nbv_sel = [isinstance(a, NegBoolView) for a in args]
-    new_cons = []
-    if any(nbv_sel):
-        new_args = []
-        for i, nbv in enumerate(nbv_sel):
-            if nbv:
-                aux = cp.boolvar() # TODO not added to CSE??
-                new_args.append(aux)
-                new_cons += [aux + args[i]._bv == 1]  # aux == 1 - arg._bv
-            else:
-                new_args.append(args[i])
-
-        return new_args, new_cons
-    else:
-        return args, []
-
 def only_positive_bv(lst_of_expr, csemap=None):
     """
         Replaces :class:`~cpmpy.expressions.comparison.Comparison` containing :class:`~cpmpy.expressions.variables.NegBoolView` with equivalent expression using only :class:`~cpmpy.expressions.variables.BoolVar`.
@@ -322,43 +294,32 @@ def only_positive_bv(lst_of_expr, csemap=None):
     newlist = []
     for cpm_expr in lst_of_expr:
 
-        if isinstance(cpm_expr, Operator) and cpm_expr.name in {"or", "and"}:
-            new_args, new_cons = only_positive_bv_args(cpm_expr.args)
-            cpm_expr_ = copy.copy(cpm_expr)
-            cpm_expr_.update_args(new_args)
-            newlist.extend([cpm_expr_] + new_cons)
-        elif isinstance(cpm_expr, Comparison):
+        if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             new_lhs = lhs
-
             new_cons = []
-            if (isinstance(lhs, _NumVarImpl) or lhs.name in {"sum","wsum"}) and not is_boolexpr(rhs):
+
+            if isinstance(lhs, _NumVarImpl) or lhs.name in {"sum","wsum"}:
                 new_lhs, const = only_positive_bv_wsum_const(lhs)
                 rhs -= const
-            elif isinstance(lhs, _BoolVarImpl):
-                (new_lhs,), new_cons_ = only_positive_bv_args([lhs])
-                new_cons += new_cons_
             else:
-                new_args, new_cons_ = only_positive_bv_args(lhs.args)
-                new_lhs = copy.copy(lhs)
-                new_lhs.update_args(new_args)
-                new_cons += new_cons_
+                # other operators in comparison such as "min", "max"
+                nbv_sel = [isinstance(a, NegBoolView) for a in lhs.args]
+                if any(nbv_sel):
+                    new_args = []
+                    for i, nbv in enumerate(nbv_sel):
+                        if nbv:
+                            aux = cp.boolvar()
+                            new_args.append(aux)
+                            new_cons += [aux + lhs.args[i]._bv == 1]  # aux == 1 - arg._bv
+                        else:
+                            new_args.append(lhs.args[i])
 
-            if isinstance(rhs, _BoolVarImpl):
-                new_args, new_cons_ = only_positive_bv_args([rhs])
-                new_rhs = copy.copy(rhs)
-                new_rhs.update_args(new_args)
-                new_cons += new_cons_
-            elif is_boolexpr(rhs):
-                new_args, new_cons_ = only_positive_bv_args(rhs.args)
-                new_rhs = copy.copy(rhs)
-                new_rhs.update_args(new_args)
-                new_cons += new_cons_
-            else:
-                new_rhs = rhs
+                    new_lhs = copy.copy(lhs)
+                    new_lhs.update_args(new_args)
 
-            if new_lhs is not lhs or new_rhs is not rhs:
-                newlist.append(eval_comparison(cpm_expr.name, new_lhs, new_rhs))
+            if new_lhs is not lhs:
+                newlist.append(eval_comparison(cpm_expr.name, new_lhs, rhs))
                 newlist += new_cons  # already linear
             else:
                 newlist.append(cpm_expr)
@@ -372,7 +333,9 @@ def only_positive_bv(lst_of_expr, csemap=None):
             subexpr = only_positive_bv([subexpr], csemap=csemap)
             newlist += [cond.implies(expr) for expr in subexpr]
 
-        elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint, _BoolVarImpl)):
+        elif isinstance(cpm_expr, _BoolVarImpl):
+            raise ValueError(f"Unreachable: unexpected Boolean literal (`_BoolVarImpl`) in expression {cpm_expr}, perhaps `linearize_constraint` was not called before this `only_positive_bv `call")
+        elif isinstance(cpm_expr, (GlobalConstraint, BoolVal, DirectConstraint)):
             newlist.append(cpm_expr)
         else:
             raise Exception(f"{cpm_expr} is not linear or is not supported. Please report on github")

@@ -30,7 +30,6 @@ from .flatten_model import flatten_constraint, get_or_make_var
 from .negation import recurse_negation
 
 def only_bv_reifies(constraints, csemap=None):
-    """Transforms all reifications to ``BV -> BE`` or ``BV == BE``"""
 
     newcons = []
     for cpm_expr in constraints:
@@ -53,7 +52,7 @@ def only_bv_reifies(constraints, csemap=None):
             newcons.append(cpm_expr)
     return newcons
 
-def only_implies(constraints, csemap=None, is_supported=None):
+def only_implies(constraints, csemap=None):
     """
         Transforms all reifications to ``BV -> BE`` form
 
@@ -74,9 +73,7 @@ def only_implies(constraints, csemap=None, is_supported=None):
 
     for cpm_expr in constraints:
         # Operators: check BE -> BV
-        if is_supported and is_supported(cpm_expr):
-            newcons.append(cpm_expr)
-        elif cpm_expr.name == '->' and cpm_expr.args[1].name == '==':
+        if cpm_expr.name == '->' and cpm_expr.args[1].name == '==':
             a0,a1 = cpm_expr.args
             if a1.args[0].is_bool() and a1.args[1].is_bool():
                 # BV0 -> BV2 == BV3 :: BV0 -> (BV2->BV3 & BV3->BV2)
@@ -175,20 +172,10 @@ def reify_rewrite(constraints, supported=frozenset(), csemap=None):
         else:  # reification, check for rewrite
             boolexpr = cpm_expr.args[boolexpr_index]
             if isinstance(boolexpr, Operator):
-                if boolexpr.name in supported or cpm_expr.name == "==":
-                    # Case 1a, BE is Operator (and, or, ->)
-                    newcons.append(cpm_expr)
-                    #   could actually rewrite into list of clauses like to_cnf() does... not for here
-                elif cpm_expr.name == "->":
-                    # Case 1b, BE is an unflattened expression (TODO duplicated from below)
-                    # We have BV -> BE, create BV -> auxvar, auxvar == BE
-                    (auxvar, cons) = get_or_make_var(boolexpr, csemap=csemap)
-                    newcons += cons
-                    reifexpr = copy.copy(cpm_expr)
-                    args = list(reifexpr.args)
-                    args[boolexpr_index] = auxvar
-                    reifexpr.update_args(tuple(args))
-                    newcons.append(reifexpr)
+                # Case 1, BE is Operator (and, or, ->)
+                #   assume supported, return as is
+                newcons.append(cpm_expr)
+                #   could actually rewrite into list of clauses like to_cnf() does... not for here
             elif isinstance(boolexpr, GlobalConstraint):
                 # Case 2, BE is a GlobalConstraint
                 # replace BE by its decomposition, then flatten

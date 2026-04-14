@@ -197,7 +197,7 @@ def get_bounds(expr):
     # from cpmpy.expressions.core import Expression
     # from cpmpy.expressions.variables import cpm_array
 
-    if isinstance(expr, (cp.expressions.core.Expression, cp.variables.NDVarArray)):
+    if isinstance(expr, (cp.expressions.core.Expression, cp.expressions.variables.NDVarArray)):
         return expr.get_bounds()
     elif is_any_list(expr):
         lbs, ubs = zip(*[get_bounds(e) for e in expr])
@@ -210,7 +210,7 @@ def get_bounds(expr):
 
 def implies(expr, other):
     """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
-    if isinstance(expr, (cp.expressions.core.Expression, cp.variables.NDVarArray)):
+    if isinstance(expr, (cp.expressions.core.Expression, cp.expressions.variables.NDVarArray)):
         # both implement .implies()
         return expr.implies(other)
     elif is_true_cst(expr):
