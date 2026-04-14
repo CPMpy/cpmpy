@@ -34,7 +34,7 @@ class TestTransLinearize:
 
         # implies
         cons = linearize_constraint([a.implies(b)])[0]
-        assert "(a) -> (b >= 1)" == str(cons)
+        assert "sum([1, -1] * [a, b]) <= 0" == str(cons)
     
     def test_bug_168(self):
         from cpmpy.solvers import CPM_gurobi
@@ -69,8 +69,8 @@ class TestTransLinearize:
         assert str(linearize_constraint([a | b | c])) == "[sum(a, b, c) >= 1]"
         assert str(linearize_constraint([a | b | (~c)])) == "[sum(a, b, ~c) >= 1]"
         # test implies
-        assert str(linearize_constraint([a.implies(b)])) == "[(a) -> (b >= 1)]"
-        assert str(linearize_constraint([a.implies(~b)])) == "[(a) -> (b <= 0)]"
+        assert str(linearize_constraint([a.implies(b)])) == "[sum([1, -1] * [a, b]) <= 0]"
+        assert str(linearize_constraint([a.implies(~b)])) == "[sum([1, -1] * [a, ~b]) <= 0]"
         assert str(linearize_constraint([a.implies(x+y+z >= 0)])) == str([])
         assert str(linearize_constraint([a.implies(x+y+z >= 2)])) == "[(a) -> (sum(x, y, z) >= 2)]"
         assert str(linearize_constraint([a.implies(x+y+z > 0)])) == "[(a) -> (sum(x, y, z) >= 1)]"
@@ -87,7 +87,7 @@ class TestTransLinearize:
         c1, c2, c3 = linearize_constraint([a.implies(x != y)])
         assert str(c1) == "(a) -> (sum([1, -1, -6] * [x, y, BV4]) <= -1)"
         assert str(c2) == "(a) -> (sum([1, -1, -6] * [x, y, BV4]) >= -5)"
-        assert str(c3) == "(~a) -> (BV4 <= 0)"
+        assert str(c3) == "sum([1, -1] * [~a, ~BV4]) <= 0"
 
 
     def test_single_boolvar(self):
@@ -95,8 +95,8 @@ class TestTransLinearize:
         p = cp.boolvar(name="p")
         assert str([p >= 1]) == str(linearize_constraint([p]))
         assert str([p <= 0]) == str(linearize_constraint([~p]))
-        assert str([p]) == str(linearize_constraint([p], supported={"or"}))
-        assert str([~p]) == str(linearize_constraint([~p], supported={"or"}))
+        assert str([Operator("or", [p])]) == str(linearize_constraint([p], supported={"or"}))
+        assert str([Operator("or", [~p])]) == str(linearize_constraint([~p], supported={"or"}))
 
     def test_neq(self):
         # not equals is a tricky constraint to linearize, do some extra tests on it here
