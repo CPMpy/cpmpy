@@ -565,9 +565,7 @@ class CPM_gurobi(SolverInterface):
                 depth += 1
                 if self.verbose: print(f"{indent}Con:", cpm_expr, type(cpm_expr), "reif" if reified else "root")
 
-                if cpm_expr is None:
-                    return 1
-                elif is_num(cpm_expr):
+                if is_num(cpm_expr):
                     return int(cpm_expr)
                 elif isinstance(cpm_expr, _NumVarImpl):
                     return cpm_expr
