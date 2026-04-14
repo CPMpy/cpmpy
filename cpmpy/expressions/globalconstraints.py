@@ -466,14 +466,16 @@ class Circuit(GlobalConstraint):
         constraints += [cp.AllDifferent(order)] # redundant constraint
         constraints += [order[0] == 0]  # TODO: could replace order[0] with constant 0 instead?
 
+        defining = []
         for i in range(n):
             for j in range(n):
                 if i == j:
                     constraints += [succ[i] != j]  # no self-loops
                 if j != 0:
-                    constraints += [(succ[i] == j) == (order[i] + 1 == order[j])] # ensure no subtours
+                    # link order variables to successor-relation, defined toplevel
+                    defining += [(succ[i] == j) == (order[i] + 1 == order[j])] # ensure no subtours
 
-        return constraints, []
+        return constraints, defining
 
     def value(self) -> Optional[bool]:
         """
