@@ -52,8 +52,8 @@ instance-level metadata gets auto collected and stored in a JSON sidecar file. A
 will use the sidecar file to avoid re-collecting the metadata.
 
 Iterating over the dataset is done in the same way as a PyTorch dataset. It returns 2-tuples (x,y) of:
-- x: instance reference / identifier (a file path is the only supported instance identifier type at the moment)
-- y: instance metadata (solution, features, origin, etc.)
+- x: instance reference (a file path is the only supported instance reference type at the moment)
+- y: instance metadata  (solution, features, origin, etc.)
 
 Example:
 
@@ -77,6 +77,7 @@ import json
 import os
 import pathlib
 import io
+import sys
 import tempfile
 from typing import Any, Optional, Tuple, List, Callable
 from urllib.error import URLError
@@ -126,7 +127,7 @@ class Dataset(ABC):
 
     Each instance in a dataset is characterised by a (x, y) pair of:
         x: instance reference (e.g., file path, database key, generated seed, ...)
-        y: metadata (solution, features, origin, etc.)
+        y: instance metadata  (solution, features, origin, etc.)
     """
     
 
@@ -149,15 +150,15 @@ class Dataset(ABC):
         return []
 
     # OPTIONAL
-    features = None                # domain_metadata field schema, for later
+    features = None                # domain_metadata field schema, for later (TODO)
     
     # ---------------------------------------------------------------------------- #
 
     def __init__(self, transform: Optional[Callable] = None, target_transform: Optional[Callable] = None):
         """
         Arguments:
-            transform (callable, optional): Optional transform applied to the instance reference.
-            target_transform (callable, optional): Optional transform applied to the metadata.
+            transform (callable, optional):            Optional transform applied to the instance reference.
+            target_transform (callable, optional):     Optional transform applied to the instance metadata.
         """
         self.transform = transform
         self.target_transform = target_transform
@@ -170,7 +171,7 @@ class Dataset(ABC):
     @abstractmethod
     def instance_metadata(self, instance) -> dict:
         """
-        Return the metadata for a given instance file.
+        Return the metadata for a given instance.
         """
         pass
 
@@ -187,6 +188,7 @@ class Dataset(ABC):
         Returns:
             dict: The dataset-level metadata.
         """
+        # Handle both single string and list of strings for citations
         if isinstance(cls.citation, str):
             citations = [cls.citation] if cls.citation else []
         else:
@@ -209,8 +211,8 @@ class IndexedDataset(Dataset):
     can be accessed by that identifier. For example its positional index within the dataset.
 
     Implementing this class requires implementing the following methods:
-    - __len__: return the total number of instances
-    - __getitem__: return the instance and metadata at the given index / identifier
+    - ``__len__``: return the total number of instances
+    - ``__getitem__``: return the instance and metadata at the given index / identifier
     """
 
     @abstractmethod
@@ -227,7 +229,7 @@ class IndexedDataset(Dataset):
 
         Returns:
             x: instance reference (e.g., file path, database key, generated seed, ...)
-            y: metadata (solution, features, origin, etc.)
+            y: instance metadata  (solution, features, origin, etc.)
         """
         pass
 
@@ -285,8 +287,8 @@ class FileDataset(IndexedDataset):
             download (bool): If True, downloads the dataset if it does not exist locally (default=False).
             parse (bool): If True, run ``self.parse(instance_path)`` before
                 applying ``transform``. Intended for data-only datasets that do
-                not directly encode a CPMpy model in the source file.
-            extension (str): Extension of the instance files. Used to filter instance files from the dataset directory.
+                not directly encode a model in the source file.
+            extension (str): Extension of the instance files. Used to filter instance files within the dataset directory.
             **kwargs: Advanced options. Currently supports:
                 - ignore_sidecar (bool): If True, do not read/write metadata
                   sidecars and collect metadata on demand at iteration time
@@ -502,23 +504,16 @@ class FileDataset(IndexedDataset):
             data = self.parse(data)
 
         if self.transform:
-            # TODO maybe revisit this flow of execution
+            # TODO maybe revisit this flow of execution once CPMpy model feature extraction has been added
             if isinstance(data, (str, os.PathLike)):
-                # Convenience for io loaders: pass dataset.open when supported.
-                try:
-                    data = self.transform(data, open=self.open)
-                except TypeError:
-                    data = self.transform(data)
+                data = self.transform(data, open=self.open)
             else:
-                try:
+                # Convenience for parse-first datasets where parse() returns
+                # tuples and model builders take positional args.
+                if isinstance(data, tuple):
+                    data = self.transform(*data)
+                else:
                     data = self.transform(data)
-                except TypeError as exc:
-                    # Convenience for parse-first datasets where parse() returns
-                    # tuples and model builders take positional args.
-                    if isinstance(data, tuple):
-                        data = self.transform(*data)
-                    else:
-                        raise exc
             # Let transforms contribute to metadata (e.g. model verification info)
             if hasattr(self.transform, 'enrich_metadata'):
                 metadata = self.transform.enrich_metadata(data, metadata)
@@ -570,10 +565,13 @@ class FileDataset(IndexedDataset):
 
         # Filter files that need processing
         files_to_process = []
-        for file_path in files:
-            meta_path = self._metadata_path(file_path)
-            if force or not meta_path.exists():
-                files_to_process.append(file_path)
+        if force:
+            files_to_process = files
+        else:
+            for file_path in files:
+                meta_path = self._metadata_path(file_path)
+                if not meta_path.exists():
+                    files_to_process.append(file_path)
 
         if not files_to_process:
             return
@@ -593,9 +591,9 @@ class FileDataset(IndexedDataset):
             # Parallel processing with ProcessPoolExecutor for CPU-bound work
             print(f"Collecting metadata for {len(files_to_process)} instances using {workers} workers...")
             
-            # Use ProcessPoolExecutor with fork start method (Linux) to allow bound methods
-            # On Linux, fork allows sharing the dataset instance, so bound methods work
-            ctx = multiprocessing.get_context('fork')
+            # 'fork' is Linux-only; 'spawn' is the safe cross-platform default
+            start_method = 'fork' if sys.platform == 'linux' else 'spawn'
+            ctx = multiprocessing.get_context(start_method)
             with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as executor:
                 futures = {executor.submit(self._collect_one_metadata, fp): fp for fp in files_to_process}
                 
@@ -653,29 +651,6 @@ class FileDataset(IndexedDataset):
         # Collect metadata collection error if any
         if metadata_error is not None:
             sidecar["_metadata_error"] = metadata_error
-
-        # Preserve previously extracted model features if present.
-        # Otherwise, compute them from the parsed model when possible.
-        model_features = None
-        if meta_path.exists():
-            try:
-                with open(meta_path, "r") as f:
-                    existing = json.load(f)
-                if "model_features" in existing:
-                    model_features = existing["model_features"]
-            except (json.JSONDecodeError, IOError):
-                pass
-
-        if model_features is None: # TODO how does it handle non-models?
-            if not callable(self.reader):
-                raise TypeError(
-                    f"Cannot extract model features for {file_path}: "
-                    "no dataset reader configured. If unexpected, please open an issue on GitHub."
-                )
-            model = self.reader(str(file_path), open=self.open)
-            model_features = extract_model_features(model)
-    
-        sidecar["model_features"] = model_features
 
         with open(meta_path, "w") as f:
             json.dump(sidecar, f, indent=2)
@@ -741,8 +716,6 @@ class FileDataset(IndexedDataset):
         """
         Download file sequentially with progress bar.
         """
-        import sys
-        
         # Convert to Path if it's a string
         if isinstance(filepath, str):
             filepath = pathlib.Path(filepath)
