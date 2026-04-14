@@ -782,38 +782,22 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
             print(x, y)
     """
     class FromFilesDataset(FileDataset):
+        # Plain class attributes so that dataset_metadata() (a classmethod
+        # that reads cls.name / cls.description / ...) works correctly.
+        name = ""
+        description = ""
+        homepage = ""
+        citation: List[str] = []
+
         def __init__(self, dataset_dir: os.PathLike, extension: str = ".txt"):
+            # Set name from the directory so metadata contains something useful.
+            self.name = pathlib.Path(dataset_dir).name
             super().__init__(dataset_dir=dataset_dir, extension=extension)
 
-        @property
-        def name(self) -> str:
-            raise NotImplementedError("Arbitrary file dataset does not support a name. Please implement this method in a subclass, or use a more specific dataset class.")
-
-        @property
-        def description(self) -> str:
-            raise NotImplementedError("Arbitrary file dataset does not support a description. Please implement this method in a subclass, or use a more specific dataset class.")
-
-        @property
-        def url(self) -> str:
-            raise NotImplementedError("Arbitrary file dataset does not support a URL. Please implement this method in a subclass, or use a more specific dataset class.")
-
-        @property
-        def citation(self) -> List[str]:
-            raise NotImplementedError("Arbitrary file dataset does not support a citation. Please implement this method in a subclass, or use a more specific dataset class.")
-
         def categories(self) -> dict:
-            raise NotImplementedError("Arbitrary file dataset does not support categories. Please implement this method in a subclass, or use a more specific dataset class.")
+            return {}
 
         def download(self) -> None:
-            raise NotImplementedError("Arbitrary file dataset does not support downloading. Please implement this method in a subclass, or use a more specific dataset class.")
-
-        def instance_metadata(self, file: os.PathLike) -> dict:
-            metadata = {
-                'id': str(file),
-                'dataset_dir': str(self.dataset_dir),
-                'name': pathlib.Path(file).name.replace(self.extension, ''),
-                'path': file,
-            }
-            return metadata
+            raise NotImplementedError("from_files() datasets are already local; downloading is not supported.")
 
     return FromFilesDataset(dataset_dir, extension)
