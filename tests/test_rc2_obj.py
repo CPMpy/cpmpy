@@ -7,7 +7,6 @@ from cpmpy.solvers.rc2 import CPM_rc2
 rc2_available = CPM_rc2.supported()
 
 @pytest.mark.skipif(not rc2_available, reason="RC2 solver not available")
-@pytest.mark.requires_solver("rc2")
 class TestRC2Transform(unittest.TestCase):
     """
     Test cases for RC2 solver objective transformation functionality
