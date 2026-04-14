@@ -459,27 +459,6 @@ class CPM_gurobi(SolverInterface):
 
                 return r
 
-            def make_linear(expr, depth):
-                """Force an expression into a linear form by reifying non-linear parts into aux vars."""
-                if is_num(expr) or isinstance(expr, _NumVarImpl):
-                    return expr
-                elif isinstance(expr, Operator):
-                    match expr.name:
-                        case "sum" | "sub" | "-":
-                            return update_args(cpm_expr, [make_linear(a, depth) for a in cpm_expr.args])
-                        case "wsum":
-                            w, x = cpm_expr.args
-                            # TODO has to be reify ,.
-                            x = update_args(x, [make_linear(a, depth) for a in x.args])
-                            return update_args(cpm_expr, [w, x])
-                        case "mul" | "pow":
-                            return get_or_make_var(expr)
-                        case _:
-                            assert False
-                else:
-                    # Other expressions (bool expr, etc.) — reify into aux var
-                    return reify(expr, depth)
-
             def add_comparison(cpm_expr, depth, reified=False):
                 a, b = cpm_expr.args
 
@@ -517,42 +496,32 @@ class CPM_gurobi(SolverInterface):
                         raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
 
                 return reify(con, depth) if reified else con
+
             def linearize(cpm_expr, depth):
                 """Ensure expression is linear (no mul/pow) by reifying non-linear parts into aux vars."""
                 if self.verbose: print(f"{'  ' * depth}lin", cpm_expr)
-                if is_num(cpm_expr):
-                    return cpm_expr
-                elif isinstance(cpm_expr, _BoolVarImpl):
+
+                cpm_expr = add_(cpm_expr, depth)
+                if isinstance(cpm_expr, _NumVarImpl):
                     return cpm_expr >= 1
                 elif isinstance(cpm_expr, Comparison):
-                    cpm_expr = add_(cpm_expr, depth)
 
-                    if isinstance(cpm_expr, _BoolVarImpl):
-                        return cpm_expr >= 1
-                    elif not isinstance(cpm_expr, Comparison):
-                        # add_ reduced it (e.g. != became ~bv -> 1-bv), recurse
-                        return linearize(cpm_expr, depth)
-
-                    a, b = cpm_expr.args
-                    # TODO check..
-                    # Reify general constraint args to variables so the comparison becomes linear
-                    if isinstance(a, (Operator, GlobalFunction)) and a.name in self.general_constraints:
-                        a = reify(a, depth)
-                    if isinstance(b, (Operator, GlobalFunction)) and b.name in self.general_constraints:
-                        b = reify(b, depth)
-                    cpm_expr = update_args(cpm_expr, [a, b])
-                    a, b = cpm_expr.args
-
-                    def _linearize_expr(expr):
+                    def linearize_expr(expr):
                         if isinstance(expr, Operator) and expr.name == "sum":
-                            return update_args(expr, [reify(a_i, depth) for a_i in expr.args])
-                        elif isinstance(expr, Operator) and expr.name == "wsum":
-                            w, x = expr.args
-                            return update_args(expr, [w, [reify(x_i, depth) for x_i in x]])
+                            match expr.name:
+                                case "sum":
+                                    return update_args(expr, [reify(a_i, depth) for a_i in expr.args])
+                                case "wsum":
+                                    w, x = expr.args
+                                    return update_args(expr, [w, [reify(x_i, depth) for x_i in x]])
+                                case _:
+                                    return reify(expr, depth)
+
                         else:
                             return reify(expr, depth)
 
-                    return update_args(cpm_expr, [_linearize_expr(a), _linearize_expr(b)])
+                    a, b = cpm_expr.args
+                    return update_args(cpm_expr, [linearize_expr(a), linearize_expr(b)])
                 else:
                     result = reify(cpm_expr, depth)
                     if isinstance(result, _NumVarImpl):
