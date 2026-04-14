@@ -467,6 +467,7 @@ class Circuit(GlobalConstraint):
         constraints += [cp.AllDifferent(order)] # redundant constraint
         constraints += [order[0] == 0]  # TODO: could replace order[0] with constant 0 instead?
 
+        defining: list[Expression] = []
         for i in range(n):
             for j in range(n):
                 if i == j:
