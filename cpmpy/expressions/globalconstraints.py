@@ -470,9 +470,11 @@ class Circuit(GlobalConstraint):
         for i in range(n):
             for j in range(n):
                 if i == j:
-                    constraints += [succ[i] != j]  # no self-loops
+                    # forbid self-loops
+                    constraints += [succ[i] != j]
                 if j != 0:
-                    constraints += [(succ[i] == j) == (order[i] + 1 == order[j])] # ensure no subtours
+                    # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
+                    constraints += [(succ[i] == j) == (order[i] + 1 == order[j])]
 
         return constraints, []
 
