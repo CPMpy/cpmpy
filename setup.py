@@ -55,6 +55,7 @@ setup(
         'numpy>=1.5',
         'setuptools',
         'packaging', # to check solver versions
+        'frozendict', # standard in newer Python versions
     ],
     extras_require={
         # Solvers

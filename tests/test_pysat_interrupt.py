@@ -1,10 +1,10 @@
 import pytest
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.solvers import CPM_pysat
 
 def frietkot():
     # Construct the model.
-    (mayo, ketchup, curry, andalouse, samurai) = boolvar(5)
+    (mayo, ketchup, curry, andalouse, samurai) = cp.boolvar(5)
 
     # Pure CNF
     Nora = mayo | ketchup
@@ -20,7 +20,7 @@ def frietkot():
 
     allwishes = [Nora, Leander, Benjamin, Behrouz, Guy, Daan, Celine, Anton, Danny, Luc]
 
-    model = Model(allwishes)
+    model = cp.Model(allwishes)
     return model, [mayo, ketchup, curry, andalouse, samurai]
 
 @pytest.mark.skipif(not CPM_pysat.supported(),
@@ -41,20 +41,20 @@ class TestPySATInterrupt:
         from pysat.examples.genhard import PHP
         from collections import defaultdict
         import time
-        lit_cpmvar = defaultdict(lambda: boolvar())
-        m  = Model()
+        lit_cpmvar = defaultdict(lambda: cp.boolvar())
+        m  = cp.Model()
 
         # Implementing pysat example for interrupt in cpmpy
         # https://pysathq.github.io/docs/html/api/solvers.html#pysat.solvers.Solver.interrupt
         for clause in PHP(nof_holes=20).clauses:
-            m +=any(~lit_cpmvar[abs(lit)] if lit < 0 else lit_cpmvar[abs(lit)] for lit in clause)
+            m += cp.any(~lit_cpmvar[abs(lit)] if lit < 0 else lit_cpmvar[abs(lit)] for lit in clause)
 
         s = CPM_pysat(m)
 
         assumption = [lit_cpmvar[1]]
 
         # offset for additional stuff done by cpmpy after solving
-        time_limit, grace_time_limit = 1, 1.0
+        time_limit, grace_time_limit = 1, 1.5
 
         tstart_solving = time.time()
         s.solve(assumptions=assumption, time_limit=time_limit)

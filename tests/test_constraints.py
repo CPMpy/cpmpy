@@ -201,9 +201,11 @@ def global_constraints(solver):
             cnts = cp.intvar(0,10,shape=3)
             yield cp.GlobalCardinalityCount(NUM_ARGS, vals, cnts)
         elif name == "AllDifferentExceptN":
-            yield cp.AllDifferentExceptN(NUM_ARGS, NUM_VAR)
+            vals = [1, 2, 3]
+            yield cp.AllDifferentExceptN(NUM_ARGS, vals)
         elif name == "AllEqualExceptN":
-            yield cp.AllEqualExceptN(NUM_ARGS, NUM_VAR)
+            vals = [1, 2, 3]
+            yield cp.AllEqualExceptN(NUM_ARGS, vals)
         elif name == "Precedence":
             x = cp.intvar(0,5, shape=3, name="x")
             yield cp.Precedence(x, [3,1,0])

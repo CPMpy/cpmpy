@@ -480,10 +480,11 @@ class CPM_minizinc(SolverInterface):
             # display if needed
             if display is not None:
                 if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
+                    print(display.value())
+                elif is_any_list(display):
                     print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
 
             # count and stop
@@ -701,9 +702,9 @@ class CPM_minizinc(SolverInterface):
             return f"{expr.name}({{}}, {{}})".format(X, Y)
 
         if expr.name in ["lex_chain_less", "lex_chain_lesseq"]:
-            X = cpm_array([[self._convert_expression(e) for e in row] for row in expr.args])
+            arr = np.array([[self._convert_expression(e) for e in row] for row in expr.args])  # use np.array because its plain strings
             str_X = "[|\n"  # opening
-            for row in X.T:  # Minizinc enforces lexicographic order on columns
+            for row in arr.T:  # Minizinc enforces lexicographic order on columns
                 str_X += ",".join(map(str, row)) + " |"  # rows
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)
