@@ -101,8 +101,10 @@ def expression_tree_cases_():
         [
             "(BV0) -> (x >= 2)",
             "(~BV0) -> (x <= 1)",
+            "True",
             "(BV1) -> (x <= 0)",
             "(~BV1) -> (x >= 1)",
+            "True",
             "(BV0) or (BV1)",
             "1",
         ],
@@ -121,8 +123,10 @@ def expression_tree_cases_():
         [
             "(BV0) -> (x >= 2)",
             "(~BV0) -> (x <= 1)",
+            "True",
             "(BV1) -> (x <= 0)",
             "(~BV1) -> (x >= 1)",
+            "True",
             "(BV2) == ((BV0) or (BV1))",
             "(p) -> (BV2 >= 1)",
         ],
@@ -135,8 +139,6 @@ def expression_tree_cases_():
             "GC4: BV2 = OR ( BV0 , BV1 )",
         ],
     )
-
-
 
     yield (
         "implies_x_ge_1",
@@ -178,6 +180,7 @@ def expression_tree_cases_():
             "(IV0) == ((x) * (y))",
             "(BV0) -> (IV0 >= 2)",
             "(~BV0) -> (IV0 <= 1)",
+            "True",
             "(BV0) -> (z <= 3)",
         ],
         [
@@ -331,10 +334,13 @@ def expression_tree_cases_():
             "(BV0) -> (x == 2)",
             "(BV1) -> (x >= 3)",
             "(~BV1) -> (x <= 2)",
+            "True",
             "(BV2) -> (x <= 1)",
             "(~BV2) -> (x >= 2)",
+            "True",
             "(BV3) == ((BV1) or (BV2))",
             "(~BV0) -> (BV3 >= 1)",
+            "True",
             "(z) * (BV0) == 1",
         ],
         None,
@@ -355,6 +361,12 @@ def expression_tree_cases_():
     #     ["GC0: C2 = MAX ( x , y )"],
     # )
 
+    yield (
+        "maximum_bv_root",
+        1 == cp.Maximum([p, q]),
+        ["(IV0) == (max(p,q))", "IV0 == 1"],
+        ["R0: IV0 = 1", "GC0: IV0 = MAX ( p , q )"],
+    )
 
     # (x) * (pow(y,2)) <= 4
     # (x) * (pow(y,2)) - 4 <= 0
@@ -388,10 +400,13 @@ def expression_tree_cases_():
             "(BV1) -> (x == 2)",
             "(BV2) -> (x >= 3)",
             "(~BV2) -> (x <= 2)",
+            "True",
             "(BV3) -> (x <= 1)",
             "(~BV3) -> (x >= 2)",
+            "True",
             "(BV4) == ((BV2) or (BV3))",
             "(~BV1) -> (BV4 >= 1)",
+            "True",
             "(BV0) <= ((BV1) + (pow(y,2)))",
         ],  # TODO avoid BV0
         None,

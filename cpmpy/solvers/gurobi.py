@@ -47,8 +47,6 @@ from typing import Optional, List
 import copy
 import warnings
 
-import math
-
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, is_boolexpr
@@ -425,6 +423,7 @@ class CPM_gurobi(SolverInterface):
                 else:
                     # require the form: y = f(x)
                     if y is None:
+                        assert reified or f.name in {"and", "or"}, f"Unexpected numexpr {f} encountered at root level"
                         y = get_or_make_var(f, define=False) if reified else 1
 
                     # y, y = f(x)
@@ -438,7 +437,7 @@ class CPM_gurobi(SolverInterface):
 
                 if is_num(cpm_expr):
                     return cpm_expr
-                elif cpm_expr in self._csemap:  # TODO efficient to add this early check?
+                elif cpm_expr in self._csemap:  # required to prevent infinite recursion
                     return self._csemap[cpm_expr]
                 elif isinstance(cpm_expr, NegBoolView):
                     return get_or_make_var(cpm_expr)
@@ -446,20 +445,15 @@ class CPM_gurobi(SolverInterface):
                     return cpm_expr
                 elif is_boolexpr(cpm_expr):
                     if cpm_expr.name == "->":
+                        # TODO check
                         # Convert p -> q to or(~p, q) to avoid circular reification
                         # (reifying via manual implies would cause CSE to create tautologies)
                         a, b = cpm_expr.args
                         return reify(Operator("or", [recurse_negation(a), b]), depth)
-                    # TODO reuse get_or_make_var?
-                    r = cp.boolvar()
-                    self._csemap[cpm_expr] = r
-                    add(r.implies(cpm_expr))
-                    add((~r).implies(recurse_negation(cpm_expr)))
-                    return r
+                    else:
+                        return get_or_make_var(cpm_expr)
                 else:
                     return get_or_make_var(cpm_expr)
-
-                return r
 
             def add_comparison(cpm_expr, depth, reified=False):
                 a, b = cpm_expr.args
@@ -468,9 +462,9 @@ class CPM_gurobi(SolverInterface):
                     case "==" if not reified and isinstance(a, (int, _NumVarImpl)) and isinstance(b, Operator) and b.name in self.general_constraints:
                         # already of the form: y = f(x)
                         add_general_constraint(b, depth, reified=reified, y=a)
-                        con = True  # constraint posted as side effect
+                        return True
                     case "==" if isinstance(a, _BoolVarImpl) and is_boolexpr(b) and not isinstance(b, _NumVarImpl):
-                        # BV == boolexpr: post as indicator constraints
+                        # BV == boolexpr === BV <-> boolexpr: post as bi-implications
                         add(a.implies(b))
                         add((~a).implies(recurse_negation(b)))
                         con = True
@@ -483,7 +477,7 @@ class CPM_gurobi(SolverInterface):
                         if cpm_expr.name == "!=":
                             a, b = cpm_expr.args
                             return add_((a > b) | (a < b), depth, reified=reified)
-                        else: # push_down_negation may have changed e.g. != into ==
+                        else:  # push_down_negation may have changed e.g. != into ==
                             return add_(cpm_expr, depth, reified=reified)
                     case ">":
                         return add_(a >= b + 1, depth, reified=reified)
@@ -508,7 +502,7 @@ class CPM_gurobi(SolverInterface):
                     def linearize_expr(expr):
                         if is_num(expr) or isinstance(expr, _NumVarImpl):
                             return expr
-                        elif isinstance(expr, Operator) and expr.name == "sum":
+                        elif isinstance(expr, Operator):
                             match expr.name:
                                 case "sum":
                                     return with_args(expr, [reify(a_i, depth) for a_i in expr.args])
@@ -523,11 +517,7 @@ class CPM_gurobi(SolverInterface):
                     a, b = cpm_expr.args
                     return with_args(cpm_expr, [linearize_expr(a), linearize_expr(b)])
                 else:
-                    cpm_expr = add_(cpm_expr, depth, reified=False)
-                    result = reify(cpm_expr, depth)
-                    if isinstance(result, _NumVarImpl):
-                        return result >= 1
-                    return result
+                    return reify(cpm_expr, depth) >= 1
 
             def raise_unsupported(cpm_expr):
                 raise NotSupportedError("CPM_gurobi: Unsupported constraint", cpm_expr)
@@ -547,7 +537,7 @@ class CPM_gurobi(SolverInterface):
                     match cpm_expr.name:
                         case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
                             a, b = cpm_expr.args
-                            # if isinstance(b, (_NumVarImpl, Comparison)):  # TODO
+                            # if isinstance(b, (_NumVarImpl, Comparison)):  # TODO requires reification?
                             if isinstance(b, Comparison):
                                 p = a if isinstance(a, NegBoolView) else reify(a, depth)
                                 if is_num(p):  # propagate fixed antecedent
