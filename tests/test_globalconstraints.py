@@ -159,7 +159,7 @@ class TestGlobal:
                 except (NotImplementedError, NotSupportedError):
                     pass
 
-    def test_circuit(self):
+    def test_circuit(self, solver):
         """
         Circuit constraint unit tests the hamiltonian circuit on a
         successor array. For example, if
@@ -176,67 +176,65 @@ class TestGlobal:
         x = cp.intvar(0, 5, 6)
         constraints = [cp.Circuit(x)]
         model = cp.Model(constraints)
-        assert model.solve()
+        assert model.solve(solver=solver)
         assert cp.Circuit(x).value()
 
         constraints = [cp.Circuit(x).decompose()]
         model = cp.Model(constraints)
-        assert model.solve()
+        assert model.solve(solver=solver)
         assert cp.Circuit(x).value()
 
         # Test with domain (-2,7)
         x = cp.intvar(-2, 7, 6)
         circuit = cp.Circuit(x)
         model = cp.Model([circuit])
-        assert model.solve()
+        assert model.solve(solver=solver)
         assert circuit.value()
 
         model = cp.Model([~circuit])
-        assert model.solve()
+        assert model.solve(solver=solver)
         assert not circuit.value()
 
         # Test decomposition with domain (-2,7)
         constraints = [cp.Circuit(x).decompose()]
         model = cp.Model(constraints)
-        assert model.solve()
+        assert model.solve(solver=solver)
         assert cp.Circuit(x).value()
 
         # Test with smaller domain (1,5)
         x = cp.intvar(1, 5, 5)
         circuit = cp.Circuit(x)
         model = cp.Model([circuit])
-        assert not model.solve()
+        assert not model.solve(solver=solver)
         assert not circuit.value()
 
         model = cp.Model([~circuit])
-        assert model.solve()
+        assert model.solve(solver=solver)
         assert not circuit.value()
 
         # Test decomposition with domain (1,5)
         constraints = [cp.Circuit(x).decompose()]
         model = cp.Model(constraints)
-        assert not model.solve()
+        assert not model.solve(solver=solver)
         assert not cp.Circuit(x).value()
 
 
-    def test_not_circuit(self):
+    def test_not_circuit(self, solver):
         x = cp.intvar(lb=-1, ub=5, shape=4)
         circuit = cp.Circuit(x)
         model = cp.Model([~circuit, x == [1,2,3,0]])
-        assert not model.solve()
+        assert not model.solve(solver=solver)
 
         model = cp.Model([~circuit])
-        assert model.solve()
+        assert model.solve(solver=solver)
         assert not circuit.value()
         assert not cp.Model([circuit, ~circuit]).solve()
 
         all_sols = set()
         not_all_sols = set()
 
-        circuit_models = cp.Model(circuit).solveAll(display=lambda : all_sols.add(tuple(x.value())))
-        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_all_sols.add(tuple(x.value())))
-
-        total = cp.Model(x == x).solveAll()
+        circuit_models = cp.Model(circuit).solveAll(display=lambda : all_sols.add(tuple(x.value())), solver=solver)
+        not_circuit_models = cp.Model(~circuit).solveAll(display=lambda : not_all_sols.add(tuple(x.value())), solver=solver)
 
         for sol in all_sols:
             for var,val in zip(x, sol):
@@ -248,6 +246,9 @@ class TestGlobal:
                 var._value = val
             assert not circuit.value()
 
+        total = 1
+        for var in x:
+            total *= (1 + var.ub - var.lb)
         assert total == len(all_sols) + len(not_all_sols)
 
 
