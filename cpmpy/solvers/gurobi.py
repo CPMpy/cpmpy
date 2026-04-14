@@ -424,11 +424,12 @@ class CPM_gurobi(SolverInterface):
                 else:
                     # TODO intro constant if non-reified
                     # require the form: y = f(x)
-                    y = get_or_make_var(f, define=False) if y is None else y
+                    if y is None:
+                        y = get_or_make_var(f, define=False)
 
                     # y, y = f(x)
                     f = with_args(f, args)
-                    all_cons.append(y == f)  # side-step Comparison handling
+                    all_cons.append(y == f)  # add directly so that Comparison does not have to deal with it
                     return y
 
             def reify(cpm_expr, depth):
@@ -464,13 +465,18 @@ class CPM_gurobi(SolverInterface):
             def add_comparison(cpm_expr, depth, reified=False):
                 a, b = cpm_expr.args
 
-                if cpm_expr.name == "==" and not reified and isinstance(a, _NumVarImpl) and isinstance(b, Operator) and b.name in self.general_constraints:
+                if cpm_expr.name == "==" and not reified and isinstance(a, (int, _NumVarImpl)) and isinstance(b, Operator) and b.name in self.general_constraints:
                     # already of the form: y = f(x)
                     add_general_constraint(b, depth, reified=reified, y=a)
                     con = True  # constraint posted as side effect
                     return reify(con, depth) if reified else con
 
                 match cpm_expr.name:
+                    case "==" if isinstance(a, _BoolVarImpl) and is_boolexpr(b) and not isinstance(b, _NumVarImpl):
+                        # BV == boolexpr: post as indicator constraints
+                        add(a.implies(b))
+                        add((~a).implies(recurse_negation(b)))
+                        con = True
                     case "==" | "<=" | ">=":
                         a, b = add_(a, depth, reified=True), add_(b, depth, reified=True)
                         con = with_args(cpm_expr, [a, b])
@@ -478,17 +484,11 @@ class CPM_gurobi(SolverInterface):
                         # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
                         cpm_expr, = push_down_negation([cpm_expr], toplevel=not reified)
                         if cpm_expr.name == "!=":
-                            # TODO cse
                             a, b = cpm_expr.args
-                            imp_gt, imp_lt = cp.boolvar(), cp.boolvar()
-                            add(imp_gt.implies(a > b))
-                            add(imp_lt.implies(a < b))
-                            # Full reification needed: ensure imp_gt/imp_lt are true when conditions hold
-                            add((~imp_gt).implies(a <= b))
-                            add((~imp_lt).implies(a >= b))
-
+                            imp_gt = get_or_make_var(a > b)
+                            imp_lt = get_or_make_var(a < b)
                             return add_(imp_gt | imp_lt, depth, reified=reified)
-                        else:  # push_down_negation may have changed != into ==
+                        else: # push_down_negation may have changed e.g. != into ==
                             return add_(cpm_expr, depth, reified=reified)
                     case ">":
                         return add_(a >= b + 1, depth, reified=reified)

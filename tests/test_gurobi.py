@@ -107,17 +107,19 @@ def expression_tree_cases_():
         # z * (x - y) == 1
         [
             "(BV0) -> (x >= 2)",
+            "(~BV0) -> (x <= 1)",
+            "True",
             "(BV1) -> (x <= 0)",
-            "(~BV0) -> (x <= 1)",  # TODO removable in pos context?
             "(~BV1) -> (x >= 1)",
+            "True",
             "(BV2) == ((BV0) or (BV1))",
             "BV2",
         ],
         [
             "R0: BV2 >= 1",
             "GC0: BV0 = 1 -> x >= 2",
-            "GC1: BV1 = 1 -> x <= 0",
-            "GC2: BV0 = 0 -> x <= 1",
+            "GC1: BV0 = 0 -> x <= 1",
+            "GC2: BV1 = 1 -> x <= 0",
             "GC3: BV1 = 0 -> x >= 1",
             "GC4: BV2 = OR ( BV0 , BV1 )",
         ],
@@ -303,33 +305,20 @@ def expression_tree_cases_():
     yield (
         "reification",
         z * (x == 2) == 1,
-        # [
-        #     "(BV0) -> (x == 2)",
-        #     "(BV1) -> (x >= 3)",  # TODO REUSE BV0?
-        #     "(BV2) -> (x <= 1)",
-        #     "(BV3) == ((BV1) or (BV2))",
-        #     "(~BV0) -> (BV3 >= 1)",
-        #     "(z) * (BV0) == 1",
-        # ],
+        # TODO apply direct encoding Should help a lot here
         [
             "(BV0) -> (x == 2)",
             "(BV1) -> (x >= 3)",
-            "(BV2) -> (x <= 1)",
             "(~BV1) -> (x <= 2)",
+            "True",
+            "(BV2) -> (x <= 1)",
             "(~BV2) -> (x >= 2)",
+            "True",
             "(BV3) == ((BV1) or (BV2))",
             "(~BV0) -> (BV3 >= 1)",
             "(z) * (BV0) == 1",
         ],
         None,
-        # [
-        #     "qc0: [ BV0 * z ] = 1",
-        #     "GC0: BV0 = 1 -> x = 2",
-        #     "GC1: BV1 = 1 -> x >= 3",
-        #     "GC2: BV2 = 1 -> x <= 1",
-        #     "GC4: BV0 = 0 -> BV3 >= 1",
-        #     "GC3: BV3 = OR ( BV1 , BV2 )",
-        # ],
     )
 
     yield (
