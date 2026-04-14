@@ -229,4 +229,3 @@ def test_sidecar_dataset_and_categories(sidecar_payload):
 def test_sidecar_source_file_and_model_features(sidecar_payload):
     _spec, _dataset, instance_path, _meta_path, sidecar = sidecar_payload
     assert sidecar["source_file"].endswith(instance_path.name)
-    assert "model_features" in sidecar

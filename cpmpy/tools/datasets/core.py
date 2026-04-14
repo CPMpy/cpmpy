@@ -146,9 +146,6 @@ class Dataset(ABC):
     @classproperty
     def citation(self) -> List[str]:
         return []
-
-    # OPTIONAL
-    features = None                # domain_metadata field schema, for later (TODO)
     
     # ---------------------------------------------------------------------------- #
 
@@ -197,7 +194,6 @@ class Dataset(ABC):
             "description": cls.description,
             "homepage": cls.homepage,
             "citation": citations,
-            "features": cls.features,
         }
 
 
@@ -448,10 +444,8 @@ class FileDataset(IndexedDataset):
             if meta_path.exists():
                 with open(meta_path, "r") as f:
                     sidecar = json.load(f)
-                # Structured: flatten instance_metadata, format_metadata, and model_features
+                # Structured: flatten instance_metadata
                 metadata.update(sidecar.get("instance_metadata", {}))
-                metadata.update(sidecar.get("format_metadata", {}))
-                metadata.update(sidecar.get("model_features", {}))
             return metadata
 
 
