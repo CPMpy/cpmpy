@@ -474,9 +474,9 @@ class Circuit(GlobalConstraint):
                     constraints += [succ[i] != j]
                 if j != 0:
                     # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
-                    constraints += [(succ[i] == j) == (order[i] + 1 == order[j])]
+                    defining += [(succ[i] == j) == (order[i] + 1 == order[j])]
 
-        return constraints, []
+        return constraints, defining
 
     def value(self) -> Optional[bool]:
         """
