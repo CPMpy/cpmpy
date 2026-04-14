@@ -66,14 +66,16 @@ def expression_tree_cases_():
     yield (
         "True",
         cp.BoolVal(True),
-        ["boolval(True)"],
+        ["1"],
+        # ["boolval(True)"],
         ["R0: C0 = 1"],
     )
 
     yield (
         "False",
         cp.BoolVal(False),
-        ["boolval(False)"],
+        ["0"],
+        # ["boolval(False)"],
         ["R0: C0 = 0"],
     )
 
@@ -260,8 +262,8 @@ def expression_tree_cases_():
     yield (
         "mul_in_abs",
         cp.Abs(x * y) + z == 3,
-        ["(IV0) == ((x) * (y))", "(IV1) == (abs(IV0))", "(IV1) + (z) == 3"],
-        ["R0: IV1 + z = 3", "qc0: IV0 + [ - x * y ] = 0", "GC0: IV1 = ABS ( IV0 )"],
+        ["(IV1) == ((x) * (y))", "(IV0) == (abs(IV1))", "(IV0) + (z) == 3"],
+        ["R0: IV0 + z = 3", "qc0: IV1 + [ - x * y ] = 0", "GC0: IV0 = ABS ( IV1 )"],
     )
 
     # TODO keep as operator?
@@ -313,6 +315,13 @@ def expression_tree_cases_():
         ["(BV0) == ((p) or (q))", "BV0"],  # TODO avoid BV0
         ["R0: BV0 >= 1", "GC0: BV0 = OR ( p , q )"],
         # TODO perhaps ["GC0: C2 = OR ( p , q )"],
+    )
+
+    yield (
+        "neg_disjunction",
+        ~(p | q),
+        ["(~p) == (BV1)", "(~q) == (BV2)", "(BV0) == ((BV1) and (BV2))", "BV0"],
+        ["R0: - p - BV1 = -1", "R1: - q - BV2 = -1", "R2: BV0 >= 1", "GC0: BV0 = AND ( BV1 , BV2 )"],
     )
 
     # yield (
