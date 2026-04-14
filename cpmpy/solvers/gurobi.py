@@ -474,7 +474,7 @@ class CPM_gurobi(SolverInterface):
                         con = update_args(cpm_expr, [a, b])
                     case "!=":
                         # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
-                        cpm_expr, = push_down_negation([cpm_expr])
+                        cpm_expr, = push_down_negation([cpm_expr], toplevel=not reified)
                         if cpm_expr.name == "!=":
                             # TODO cse
                             a, b = cpm_expr.args
@@ -527,6 +527,9 @@ class CPM_gurobi(SolverInterface):
                     if isinstance(result, _NumVarImpl):
                         return result >= 1
                     return result
+
+            def raise_unsupported(cpm_expr):
+                raise NotSupportedError("CPM_gurobi: Unsupported constraint", cpm_expr)
               
             def add_(cpm_expr, depth, reified=False):
 
@@ -555,30 +558,26 @@ class CPM_gurobi(SolverInterface):
                                 return update_args(cpm_expr, [p, q])
                             else:
                                 return add_((~a) | b, depth, reified=reified)
-                        case "not":
+                        case "not":  # not is not handled
                             a, = cpm_expr.args
                             return add_(recurse_negation(a), depth, reified=True)
                         case "-" | "sub" | "sum" | "mul" | "pow" | "div":  # Expression tree nodes (w/ args)
                             assert cpm_expr.name != "div", "TODO"
                             return update_args(cpm_expr, [add_(a, depth, reified=True) for a in cpm_expr.args])
-                        case "wsum":
-                            return sum(weight * add_(arg, depth, reified=True) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
-                        case "and" if not reified:  # top-level: post args directly # TODO CHECK??
-                            for arg in cpm_expr.args:
-                                add(arg)
-                            return True
+                        case "wsum":  # Just for efficiency, don't call add on the weights
+                            ws, xs = cpm_expr.args
+                            return update_args(cpm_expr, [ws, [add_(x, depth, reified=True) for x in xs]])
                         case name if name in self.general_constraints:
                             return add_general_constraint(cpm_expr, depth, reified=reified)
                         case _:
-                            assert False
-                            # TODO
+                            raise_unsupported(cpm_expr)
                 elif isinstance(cpm_expr, Comparison):
                     return add_comparison(cpm_expr, depth, reified=reified)
                 elif isinstance(cpm_expr, DirectConstraint):
                     cpm_expr.callSolver(self, self.grb_model)
                     return True
                 else:
-                    raise NotImplementedError(f"add_() not implemented for {cpm_expr} of type {type(cpm_expr)} w/ name {getattr(cpm_expr, 'name', None)}")
+                    raise_unsupported(cpm_expr)
 
             result = add_(cpm_expr, 0)
             all_cons.append(result)
@@ -662,60 +661,43 @@ class CPM_gurobi(SolverInterface):
 
               depth+=1
 
-              if cpm_expr is None:
-                  return None
-              # elif is_bool(cpm_expr): # TODO merg in next
-              #     return cpm_expr
-              elif is_num(cpm_expr):
-                  return int(cpm_expr)
-              elif isinstance(cpm_expr, NegBoolView):
-                  return add_(1 - cpm_expr._bv, depth)
-                  # return 1 - self.solver_var(cpm_expr._bv)
+              if isinstance(cpm_expr, int):
+                  return cpm_expr
               elif isinstance(cpm_expr, _NumVarImpl):
                   return self.solver_var(cpm_expr)
-              elif isinstance(cpm_expr, Operator):
+              elif isinstance(cpm_expr, (Operator, GlobalFunction)):
                   match cpm_expr.name:
-                      # case "or": # TODO only usefull if we can represent an or as a sum of binary vars, which is not generally correct
-                      #     return gp.or_(a for a in flatten_args(cpm_expr, depth))
-                      # case "and":
-                      #     return gp.and_(a for a in flatten_args(cpm_expr, depth))
                       case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
                           a, b = cpm_expr.args
                           is_pos = not isinstance(a, NegBoolView)
                           p = add_(a if is_pos else a._bv, depth)
-                          # if isinstance(rhs, (gp.Var, gp.LinExpr)):
-                          #     rhs = rhs >= 1
                           return (p == int(is_pos)) >> add_(b, depth)
-                      case "not":
-                          assert False
-                          a, = cpm_expr.args
-                          return add_(recurse_negation(a), depth)
                       case "-":
                           return -add_(cpm_expr.args[0], depth=depth)
                       case "sum":
-                          # args = [reify(a, depth) if a.name in {"max"} else a for a in cpm_expr.args]
-                          # cpm_expr_ = copy.copy(cpm_expr)
-                          # cpm_expr_.update_args(args)
                           return sum(add_(arg, depth) for arg in cpm_expr.args)
                       case "wsum":
                           return sum(weight * add_(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
                       case "sub":
                           return add_(cpm_expr.args[0], depth) - add_(cpm_expr.args[1], depth)
-                      case "div":
-                          assert False, "TODO"
-                      case "and" if depth == 1:  # top-level: post args directly
-                          for arg in cpm_expr.args:
-                              add(arg)
-                          return True
-                      case "or":
-                          return gp.or_(add_(a, depth) for a in cpm_expr.args)
-                      case "and":
-                          return gp.and_(add_(a, depth) for a in cpm_expr.args)
-                      case _:
-                          assert False
-                          # TODO
-                        # if not is_num(lhs.args[1]):
-                        #     raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
+                      case "mul":
+                          return add_(cpm_expr.args[0], depth) * add_(cpm_expr.args[1], depth)
+                      case "pow":
+                          return add_(cpm_expr.args[0], depth) ** add_(cpm_expr.args[1], depth)
+                      case general_constraint_name:
+                          assert general_constraint_name in self.general_constraints
+                          args = [add_(a, depth) for a in cpm_expr.args]
+                          match general_constraint_name:
+                              case "or":
+                                  return gp.or_(*args)
+                              case "and":
+                                  return gp.and_(*args)
+                              case "abs":  # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
+                                  return gp.abs_(*args)
+                              case "min":
+                                  return gp.min_(*args)
+                              case "max":
+                                  return gp.max_(*args)
               elif isinstance(cpm_expr, Comparison):
                   a, b = cpm_expr.args
                   match cpm_expr.name:
@@ -746,38 +728,6 @@ class CPM_gurobi(SolverInterface):
                           return (a <= b) if cpm_expr.name == "<=" else (a >= b)
                       case _:
                           raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
-              elif isinstance(cpm_expr, cp.expressions.globalfunctions.GlobalFunction):
-                  # def flatten_args(cpm_expr, depth):
-                  #     args = [reify(a, depth) if isinstance(a, Comparison) else a for a in cpm_expr.args]
-                  #     args = [add_(a, depth) for a in args]
-                  #     return args
-
-                  args = [(add_(a, depth)) for a in cpm_expr.args]
-                  match cpm_expr.name:
-                      case "mul":
-                          return args[0] * args[1]
-                      case "pow":
-                          return args[0] ** args[1]
-                      case "abs":
-                          # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
-                          return gp.abs_(*args)
-                      case "min":
-                          return gp.min_(*args)
-                      case "max":
-                          return gp.max_(*args)
-                      # remaining global function cannot be part of the expression tree
-                      case _:
-                          assert False
-                          return add_(reify(cpm_expr, depth), depth)
-                          # match cpm_expr:
-                          #     case "abs":  # y = abs(x)
-                          #         # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
-                          #         return gp.abs_(args[0])
-                          #     case "min":
-                          #         return gp.min_(args)
-                          #     case "max":
-                          #         return gp.max_(args)
-                          #
               elif isinstance(cpm_expr, DirectConstraint):
                   cpm_expr.callSolver(self, self.grb_model)
                   return True
@@ -785,7 +735,9 @@ class CPM_gurobi(SolverInterface):
                   raise NotImplementedError(f"add_() not implemented for {cpm_expr} of type {type(cpm_expr)} w/ name {getattr(cpm_expr, 'name', None)}")
 
           grb_expr = add_(cpm_expr, 0)
-          if grb_expr is None:
+          if isinstance(grb_expr, (bool, int)):
+              if not grb_expr:
+                  self.grb_model.addConstr(0 >= 1)  # infeasible
               return
           elif isinstance(grb_expr, (gp.Var, gp.LinExpr)):
               # If add() returned a Gurobi Var (not a constraint), wrap it as >= 1

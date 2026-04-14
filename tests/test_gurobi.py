@@ -68,7 +68,7 @@ def expression_tree_cases_():
         cp.BoolVal(True),
         ["1"],
         # ["boolval(True)"],
-        ["R0: C0 = 1"],
+        [],
     )
 
     yield (
@@ -76,7 +76,7 @@ def expression_tree_cases_():
         cp.BoolVal(False),
         ["0"],
         # ["boolval(False)"],
-        ["R0: C0 = 0"],
+        ["R0: <= -1"],
     )
 
     yield (
