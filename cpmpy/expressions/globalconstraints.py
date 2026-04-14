@@ -462,8 +462,8 @@ class Circuit(GlobalConstraint):
         order = cp.intvar(0, n-1, shape=n)
         
         constraints = [x >= 0 for x in succ] + [x < n for x in succ]                    # bounds on successors
-        constraints += [cp.sum(succ[i] == j for j in range(n)) == 1 for i in range(n)]  # each node has exactly one successor
-        constraints += [cp.sum(succ[i] == j for i in range(n)) == 1 for j in range(n)]  # each node has exactly one predecessor
+        constraints += [cp.sum(succ[i] == j for j in range(n)) == 1 for i in range(n)]  # each node i has exactly one successor
+        constraints += [cp.sum(succ[j] == i for j in range(n)) == 1 for i in range(n)]  # each node i has exactly one predecessor
         constraints += [cp.AllDifferent(order)] # redundant constraint
         constraints += [order[0] == 0]  # TODO: could replace order[0] with constant 0 instead?
 
