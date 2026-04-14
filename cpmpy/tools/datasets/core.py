@@ -1,45 +1,59 @@
 """
 Dataset Base Classes
 
-This module provides an abstract, PyTorch-style interface for datasets where
-instances are stored as files on disk. It standardizes:
+This module provides an abstract, PyTorch-style dataset interface for Constraint Optimisation (CO) benchmarks.
+With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, etc. can be downloaded and iterated over.
 
-- download and local storage of benchmark instances
-- instance access via ``__len__`` / ``__getitem__``
-- optional ``parse``/``transform``/``target_transform`` stages
-- sidecar metadata collection and reuse
+Whilst the class hierarchy put in place will support more exotic dataset types in the future, with a structure 
+put in place that takes inspiration from conventions within the ML community, currently only file-based datasets 
+are supported, i.e. datasets where the instances are stored as files on disk. 
+
+The base classes standardize:
+
+- download and local storage of benchmark instances (file-based datasets)
+- instance access via ``__len__`` / ``__getitem__`` (PyTorch compatibility)
+- optional ``parse``/``transform``/``target_transform`` arguments
+- dataset metadata (with sidecar collection)
 
 Main classes:
 
-- :class:`Dataset`: minimal iterable dataset base
-- :class:`IndexedDataset`: indexable dataset base
+- :class:`Dataset`: minimal dataset base
+- :class:`IndexedDataset`: indexable dataset base, instances are accessible by index
 - :class:`FileDataset`: file-based dataset base with download + metadata support
+
+Class hierarchy::
+
+    Dataset (ABC)
+    └── IndexedDataset (ABC)
+        └── FileDataset (ABC)
+            └── XCSP3Dataset
+            └── (your dataset here)
 
 To implement a new dataset, one needs to subclass one of the abstract dataset classes,
 and provide implementation for the following methods:
-- category: return a dictionary of category labels, describing to which subset the dataset has been restricted (year, track, ...)
-- download: download the dataset (helper function :func:`_download_file` is provided)
+- ``category``: return a dictionary of category labels, describing to which subset the dataset has been restricted (year, track, ...)
+- ``download``: download the dataset (helper function :func:`_download_file` is provided)
 
 Some optional methods to overwrite are:
-- collect_instance_metadata: collect metadata about individual instances (e.g. number of variables, constraints, ...), potentially domain specific 
-- open: how to open the instance file (e.g. for compressed files, use .xz, .lzma, .gz, ...)
+- ``collect_instance_metadata``: collect metadata about individual instances (e.g. number of variables, constraints, ...), potentially domain specific 
+- ``open``: how to open the instance file (e.g. for compressed files using .xz, .lzma, .gz, ...)
 
 Datasets must also implement the following dataset metadata attributes:
-- name: the name of the dataset
-- description: a short description of the dataset
-- homepage: a URL to the homepage of the dataset
-- citation: a list of citations for the dataset
+- ``name``: the name of the dataset
+- ``description``: a short description of the dataset
+- ``homepage``: a URL to the homepage of the dataset
+- ``citation``: a list of citations for the dataset
 
 All parts for which an implementation must be provided are marked with an @abstractmethod decorator, 
 raising a NotImplementedError if not overwritten.
 
-Datasets files should be downloaded as-is, without any preprocessing or decompression. Upon initial download,
+Dataset files should be downloaded as-is, without any preprocessing or decompression. Upon initial download,
 instance-level metadata gets auto collected and stored in a JSON sidecar file. All subsequent accesses to the dataset
 will use the sidecar file to avoid re-collecting the metadata.
 
 Iterating over the dataset is done in the same way as a PyTorch dataset. It returns 2-tuples (x,y) of:
-- x: instance reference (a file path is the only supported type at the moment)
-- y: metadata (solution, features, origin, etc.)
+- x: instance reference / identifier (a file path is the only supported instance identifier type at the moment)
+- y: instance metadata (solution, features, origin, etc.)
 
 Example:
 
