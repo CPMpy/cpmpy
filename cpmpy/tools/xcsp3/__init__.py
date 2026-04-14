@@ -6,9 +6,6 @@
 """
 Set of utilities for working with XCSP3-formatted CP models.
 
-==================
-List of submodules
-==================
 
 =================
 List of functions
@@ -49,6 +46,8 @@ import lzma
 import os
 import cpmpy as cp
 
+# Special case for optional cpmpy dependencies
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pycsp3.parser.xparser import ParserXCSP3

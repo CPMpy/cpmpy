@@ -52,9 +52,7 @@ Example:
 The dataset also supports PyTorch-style transforms and target transforms.
 
 .. code-block:: python
-    from cpmpy.tools.io import load_xcsp3
-
-    dataset = MyDataset(download=True, transform=load_xcsp3)
+    dataset = MyDataset(download=True, transform=my_model_loader)
     for model, info in dataset:
         ...
 """
@@ -242,7 +240,7 @@ class FileDataset(IndexedDataset):
 
     - Model-defined instances: files directly encode variables/constraints/objective
       (for example XCSP3, OPB, DIMACS, FlatZinc). In this case, users typically
-      pass a loader from ``cpmpy.tools.io`` as ``transform``.
+      pass a loader as ``transform``, converting the raw file instance into a model.
     - Data-only instances: files encode problem data for a fixed family, but no
       model. In this case, subclasses should override ``parse()`` and users can
       enable ``parse=True`` to obtain parsed intermediate data structures
