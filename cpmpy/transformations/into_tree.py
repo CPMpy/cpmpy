@@ -1,17 +1,18 @@
 """
-    Transform CPMpy expressions into expression trees suitable for solvers that support non-linear expression trees. This transformation is currently quite specific towards Gurobi's new non-linear expression tree support.
+Transform CPMpy expressions into expression trees suitable for solvers that support non-linear expression trees. This transformation is currently quite specific towards Gurobi's new non-linear expression tree support.
 
-    Unlike the flatten/linearize pipeline, this transformation preserves
-    non-linear structure (e.g. mul, pow) as expression tree nodes, only flattening
-    what the solver cannot handle natively:
-    - Unsupported constraints (e.g. and, or, min, max, abs) are reified into y=f(x) form
+Unlike the flatten/linearize pipeline, this transformation preserves
+non-linear structure (e.g. mul, pow) as expression tree nodes, only flattening
+what the solver cannot handle natively:
+- Unsupported constraints (e.g. and, or, min, max, abs) are reified into y=f(x) form
 
-    currently, there are gurobi specific transformations:
+currently, there are gurobi specific transformations:
 
-    - Indicator constraints require linear bodies, so non-linear parts are reified
-    - Reification of boolean expressions uses bi-implication with indicator constraints
-    - != is decomposed into a disjunction of strict inequalities
+- Indicator constraints require linear bodies, so non-linear parts are reified
+- Reification of boolean expressions uses bi-implication with indicator constraints
+- != is decomposed into a disjunction of strict inequalities
 """
+
 import copy
 
 # TODO mainly, unduplicate the added ad-hoc transformations done by the other transformation
@@ -110,7 +111,8 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
 
         def reify(cpm_expr, depth):
             """Return a variable representing the expression, for use as argument in general/indicator constraints."""
-            if verbose: print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, 'name', None))
+            if verbose:
+                print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, "name", None))
 
             if is_num(cpm_expr):
                 return cpm_expr
@@ -129,7 +131,12 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
             a, b = cpm_expr.args
 
             match cpm_expr.name:
-                case "==" if not reified and isinstance(a, (int, _NumVarImpl)) and isinstance(b, Operator) and b.name in GENERAL_CONSTRAINTS:
+                case "==" if (
+                    not reified
+                    and isinstance(a, (int, _NumVarImpl))
+                    and isinstance(b, Operator)
+                    and b.name in GENERAL_CONSTRAINTS
+                ):
                     # already of the form: y = f(x)
                     add_general_constraint(b, depth, reified=reified, y=a)
                     return True
@@ -143,7 +150,7 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                     con = with_args(cpm_expr, [a, b])
                 case "!=":
                     # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
-                    cpm_expr, = push_down_negation([cpm_expr], toplevel=not reified)
+                    (cpm_expr,) = push_down_negation([cpm_expr], toplevel=not reified)
                     if cpm_expr.name == "!=":
                         a, b = cpm_expr.args
                         if reified:
@@ -161,13 +168,16 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                 case "<":
                     return to_expr(a <= b - 1, depth, reified=reified)
                 case _:
-                    raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
+                    raise Exception(
+                        f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}"
+                    )
 
             return reify(con, depth) if reified else con
 
         def linearize(cpm_expr, depth):
             """Ensure expression is linear (no mul/pow) by reifying non-linear parts into aux vars."""
-            if verbose: print(f"{'  ' * depth}lin", cpm_expr)
+            if verbose:
+                print(f"{'  ' * depth}lin", cpm_expr)
 
             # Only comparisons (except !=) can be indicator bodies directly;
             # everything else (!=, BoolVars, and/or/etc.) needs reification into a BV
@@ -176,6 +186,7 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
             if isinstance(cpm_expr, _NumVarImpl):
                 return cpm_expr >= 1
             elif isinstance(cpm_expr, Comparison):
+
                 def linearize_expr(expr):
                     if is_num(expr) or isinstance(expr, _NumVarImpl):
                         return expr
@@ -198,13 +209,14 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
 
         def raise_unexpected_expr(cpm_expr):
             raise NotSupportedError("CPM_gurobi: Unsupported constraint", cpm_expr)
-          
+
         def to_expr(cpm_expr, depth, reified=False):
             """Create an supported expression tree node."""
 
             indent = "  " * depth
             depth += 1
-            if verbose: print(f"{indent}Con:", cpm_expr, type(cpm_expr), "reif" if reified else "root")
+            if verbose:
+                print(f"{indent}Con:", cpm_expr, type(cpm_expr), "reif" if reified else "root")
 
             if is_num(cpm_expr):
                 return int(cpm_expr)
@@ -212,10 +224,11 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                 return cpm_expr
             elif isinstance(cpm_expr, (Operator, GlobalFunction)):
                 match cpm_expr.name:
-                    case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
+                    case "->":
                         a, b = cpm_expr.args
                         # if isinstance(b, (_NumVarImpl, Comparison)):  # TODO requires reification?
                         if isinstance(b, Comparison):
+                            # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr) (note: not required to be a canonical comparison)
                             p = a if isinstance(a, NegBoolView) else reify(a, depth)
                             if is_num(p):  # propagate fixed antecedent
                                 return to_expr(b, depth, reified=reified) if a else True
@@ -223,12 +236,13 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                             q = linearize(b, depth)
                             if is_num(q):
                                 return True if q else to_expr(p, depth, reified=reified)
-                            assert isinstance(q, Comparison), f"Expected linear constraint, but got {q}"  # not required to be a canonical comparison
+                            assert isinstance(q, Comparison), f"Expected linear constraint, but got {q}"
                             return with_args(cpm_expr, [p, q])
                         else:
+                            # Other constraint will have to be handled as logical constraints
                             return to_expr((~a) | b, depth, reified=reified)
                     case "not":  # not is not handled by gurobi
-                        a, = cpm_expr.args
+                        (a,) = cpm_expr.args
                         return to_expr(recurse_negation(a), depth, reified=True)
                     case "-" | "sub" | "sum" | "mul" | "pow" | "div":  # Expression tree nodes (w/ args)
                         assert cpm_expr.name != "div", "TODO"

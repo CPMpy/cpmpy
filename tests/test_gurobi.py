@@ -193,6 +193,15 @@ def expression_tree_cases_():
         ],
     )
 
+    # TODO improve?
+    # yield (
+    #     "quad_implies",
+    #     p.implies(q.implies(x >= 2)),
+    #     None,
+    #     []
+    # )
+
+
     # """An indicator LHS has to be a BV"""
     # yield (
     #     "nl_implies",
