@@ -645,7 +645,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     if csemap is None:
         return constraints
 
-    var_vals = csemap.get_reified_equalities()
+    var_vals = csemap.get_reified_predicates()
     
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
