@@ -433,26 +433,17 @@ class CPM_gurobi(SolverInterface):
                     return y
 
             def reify(cpm_expr, depth):
-                """Return something which can be an argument for a general constraint or linear (indicator) constraint"""
+                """Return a variable representing the expression, for use as argument in general/indicator constraints."""
                 if self.verbose: print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, 'name', None))
 
                 if is_num(cpm_expr):
                     return cpm_expr
-                elif cpm_expr in self._csemap:  # required to prevent infinite recursion
-                    return self._csemap[cpm_expr]
-                elif isinstance(cpm_expr, NegBoolView):
-                    return get_or_make_var(cpm_expr)
-                elif isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):
+                elif isinstance(cpm_expr, _NumVarImpl) and not isinstance(cpm_expr, NegBoolView):
                     return cpm_expr
-                elif is_boolexpr(cpm_expr):
-                    if cpm_expr.name == "->":
-                        # TODO check
-                        # Convert p -> q to or(~p, q) to avoid circular reification
-                        # (reifying via manual implies would cause CSE to create tautologies)
-                        a, b = cpm_expr.args
-                        return reify(Operator("or", [recurse_negation(a), b]), depth)
-                    else:
-                        return get_or_make_var(cpm_expr)
+                elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+                    # Convert p -> q to or(~p, q) to avoid circular reification
+                    a, b = cpm_expr.args
+                    return reify(Operator("or", [recurse_negation(a), b]), depth)
                 else:
                     return get_or_make_var(cpm_expr)
 
