@@ -2,7 +2,7 @@
 
 CPMpy can be used as a declarative modeling language: you create a `Model()`, add constraints and call `solve()` on it.
 
-The default solver is OR-Tools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, a conflict-driven cutting-planes solver (Exact), even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
+The default solver is OR-Tools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: more CP solvers (IBM-CPO, choco, gcs, pumpkin), ILP solvers (scip, gurobi, cplex), SAT solvers (those in PySAT and pindakaas), the Z3 SMT solver, a conflict-driven cutting-planes solver (Exact), even a knowledge compiler (PySDD), a global optimisation solver (Hexaly) and any CP solver supported by the text-based MiniZinc language.
 
 See the list of solvers known by CPMpy with:
 
