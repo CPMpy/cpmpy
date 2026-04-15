@@ -555,10 +555,15 @@ class CPM_gurobi(SolverInterface):
         s.native_model.update()
 
         # force all hard constraints (including reified soft constraints) into the IIS
-        for constr in s.native_model.getConstrs():
-            constr.IISConstrForce = 1
-        for constr in s.native_model.getGenConstrs():
-            constr.IISGenConstrForce = 1
+        for cons, attr in [
+            (s.native_model.getConstrs(), "IISConstrForce"),
+            (s.native_model.getGenConstrs(), "IISGenConstrForce"),
+            # we don't use these latter two at the time of writing, but future-proof anyway
+            (s.native_model.getQConstrs(), "IISQConstrForce"),
+            (s.native_model.getSOSs(), "IISSOSForce"),
+        ]:
+            for con in cons:
+                con.setAttr(attr, 1)
 
         # now add each soft constraint or the assumption representing it
         grb_soft = [s._add_transformed(c) for c in grb_soft]  # note: now grb_soft contains gurobi constraint objects
@@ -579,10 +584,11 @@ class CPM_gurobi(SolverInterface):
             for constr in s.native_model.getGenConstrs():
                 print(f"  {constr.GenConstrName}: IISGenConstr={constr.IISGenConstr}, IISGenConstrForce={constr.IISGenConstrForce}")
 
-        # return a MUS consisting of each soft constraint of which its representing Gurobi soft constraint is in the IIS
         return [
+            # return a MUS consisting of each soft constraint..
             soft_i for soft_i, grb_soft_i in zip(soft, grb_soft)
-            if (grb_soft_i.IISConstr if isinstance(grb_soft_i, gp.Constr) else grb_soft_i.IISGenConstr)
+            # ..if its representing Gurobi soft constraint is in the IIS
+            if any(getattr(grb_soft_i, attr, False) for attr in ("IISConstr", "IISGenConstr", "IISQConstr", "IISSOS"))
         ]
 
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
