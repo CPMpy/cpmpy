@@ -83,7 +83,7 @@ def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
     return False, expr
 
 
-def _push_down_negation_args(args: tuple[Any, ...]) -> tuple[bool, tuple[Any, ...]]:
+def _push_down_negation_args(args: list[Any] | tuple[Any, ...]) -> tuple[bool, list[Any] | tuple[Any, ...]]:
     changed = False
     newargs: list[Any] = []
     for arg in args:
@@ -115,14 +115,7 @@ def _push_down_negation_args(args: tuple[Any, ...]) -> tuple[bool, tuple[Any, ..
             newargs.append(arg)
             continue
 
-        elif isinstance(arg, list):
-            rec_changed, rec_newarg = _push_down_negation_args(tuple(arg))
-            if rec_changed:
-                changed = True
-                newargs.append(list(rec_newarg))
-                continue
-        
-        elif isinstance(arg, tuple):  # unlikely but allowed
+        elif isinstance(arg, (list, tuple)):
             rec_changed, rec_newarg = _push_down_negation_args(arg)
             if rec_changed:
                 changed = True
@@ -133,7 +126,7 @@ def _push_down_negation_args(args: tuple[Any, ...]) -> tuple[bool, tuple[Any, ..
         newargs.append(arg)
 
     if changed:
-        return True, tuple(newargs)
+        return True, newargs
     else:
         return False, args
 
