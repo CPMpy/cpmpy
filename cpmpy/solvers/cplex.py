@@ -104,6 +104,8 @@ class CPM_cplex(SolverInterface):
     @staticmethod
     def license_ok():
         if not CPM_cplex.installed():
+            warnings.warn(
+                f"License check failed, python package 'docplex' or 'cplex' is not installed! Please check 'CPM_cplex.installed()' before attempting to check license.")
             return False
         else:
             try:
