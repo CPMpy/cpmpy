@@ -429,6 +429,7 @@ class CPM_gurobi(SolverInterface):
                     # y, y = f(x)
                     f = with_args(f, args)
                     all_cons.append(y == f)  # add directly so that Comparison does not have to deal with it
+                    # TODO could be done by add(y == f)?
                     return y
 
             def reify(cpm_expr, depth):
@@ -476,7 +477,14 @@ class CPM_gurobi(SolverInterface):
                         cpm_expr, = push_down_negation([cpm_expr], toplevel=not reified)
                         if cpm_expr.name == "!=":
                             a, b = cpm_expr.args
-                            return add_((a > b) | (a < b), depth, reified=reified)
+                            if reified:
+                                return add_((a > b) | (a < b), depth, reified=reified)
+                            else:
+                                z = cp.boolvar()
+                                # return add_(z.implies(a > b) & (~z).implies(a < b), depth, reified=reified)
+                                add(z.implies(a > b))
+                                add((~z).implies(a < b))
+                                return True
                         else:  # push_down_negation may have changed e.g. != into ==
                             return add_(cpm_expr, depth, reified=reified)
                     case ">":

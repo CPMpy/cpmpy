@@ -97,7 +97,13 @@ def expression_tree_cases_():
     yield (
         "neq",
         x != 1,
-        # z * (x - y) == 1
+        ["(BV0) -> (x >= 2)", "(~BV0) -> (x <= 0)", "True"],
+        ["GC0: BV0 = 1 -> x >= 2", "GC1: BV0 = 0 -> x <= 0"],
+    )
+
+    yield (
+        "reified_neq",
+        (x != 1) | p,
         [
             "(BV0) -> (x >= 2)",
             "(~BV0) -> (x <= 1)",
@@ -105,16 +111,11 @@ def expression_tree_cases_():
             "(BV1) -> (x <= 0)",
             "(~BV1) -> (x >= 1)",
             "True",
-            "(BV0) or (BV1)",
+            "(BV2) == ((BV0) or (BV1))",
+            "(BV2) or (p)",
             "1",
         ],
-        [
-            "GC0: BV0 = 1 -> x >= 2",
-            "GC1: BV0 = 0 -> x <= 1",
-            "GC2: BV1 = 1 -> x <= 0",
-            "GC3: BV1 = 0 -> x >= 1",
-            "GC4: C3 = OR ( BV0 , BV1 )",
-        ],
+        None,
     )
 
     yield (
