@@ -655,7 +655,7 @@ class CPM_gurobi(SolverInterface):
                                     return gp.or_(*args)
                                 case "and":
                                     return gp.and_(*args)
-                                case "abs":  # TODO we could support this inside the expression tree with sqrt(pow(x,2))?
+                                case "abs":
                                     return gp.abs_(*args)
                                 case "min":
                                     return gp.min_(*args)
@@ -681,6 +681,8 @@ class CPM_gurobi(SolverInterface):
                         case "<=" | ">=":
                             a, b = add_(a, depth), add_(b, depth)
                             # Gurobi requires NLExpr in y=f(x) form; reify to aux var
+                            # TODO check if can be re-used in ==
+                            # TODO use reify
                             def _reify_nl(expr):
                                 if isinstance(expr, gp.NLExpr):
                                     y = self.grb_model.addVar(lb=-gp.GRB.INFINITY)
