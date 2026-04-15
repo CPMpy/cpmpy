@@ -14,6 +14,7 @@ currently, there are gurobi specific transformations:
 """
 
 import copy
+import numpy as np
 
 # TODO mainly, unduplicate the added ad-hoc transformations done by the other transformation
 # TODO specific to gurobi: handling neq, linearize for indicator
@@ -28,21 +29,17 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from .negation import recurse_negation, push_down_negation
 
-# TODO change to supported constraints
-GENERAL_CONSTRAINTS = {"max", "min", "abs", "and", "or"}
 
+def into_tree(cpm_expr, csemap=None, verbose=False, supported={}, general_constraints={}):
+    """Transform CPMpy expressions into an expression tree, flattening unsupported expressions but keeping supported ones as tree nodes.
 
-def into_tree(cpm_expr, csemap=None, verbose=False):
-    """Transform CPMpy expressions into an expression tree with non-linear nodes preserved.
-
-    Recursively processes expressions, keeping mul/pow/sum as tree nodes and
-    reifying only what the solver cannot handle natively (general constraints,
-    non-linear indicator bodies, !=). Side-effect constraints (from reification
-    and decomposition) are collected and returned alongside the main constraints.
+    Recursively processes expressions, keeping mul/pow/sum as tree nodes and reifying only what the solver cannot handle natively (general constraints, non-linear indicator bodies, !=). Side-effect constraints (from reification and decomposition) are collected and returned alongside the main constraints.
 
     Args:
         cpm_expr: CPMpy expression or list of expressions to transform
         csemap: dict for common subexpression elimination (shared across calls)
+        supported: set of supported constraints (will not be flattened)
+        general_constraints: set of Gurobi general constraints (will be left as y = f(x1, x2, ...) with xi being integer/Boolean variables).
         verbose: if True, print debug trace of the transformation
 
     Returns:
@@ -134,8 +131,8 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                 case "==" if (
                     not reified
                     and isinstance(a, (int, _NumVarImpl))
-                    and isinstance(b, Operator)
-                    and b.name in GENERAL_CONSTRAINTS
+                    and isinstance(b, (GlobalFunction, Operator))
+                    and b.name in general_constraints
                 ):
                     # already of the form: y = f(x)
                     add_general_constraint(b, depth, reified=reified, y=a)
@@ -208,7 +205,7 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                 return reify(cpm_expr, depth) >= 1
 
         def raise_unexpected_expr(cpm_expr):
-            raise NotSupportedError("CPM_gurobi: Unsupported constraint", cpm_expr)
+            raise NotSupportedError(f"CPM_gurobi: Unsupported constraint {cpm_expr}")
 
         def to_expr(cpm_expr, depth, reified=False):
             """Create an supported expression tree node."""
@@ -219,7 +216,12 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                 print(f"{indent}Con:", cpm_expr, type(cpm_expr), "reif" if reified else "root")
 
             if is_num(cpm_expr):
-                return int(cpm_expr)
+                # TODO clean this up ; currently overly complicated due to float expressions
+                return (
+                    int(cpm_expr)
+                    if isinstance(cpm_expr, (bool, np.bool_)) or not isinstance(cpm_expr, (int, float))
+                    else cpm_expr
+                )
             elif isinstance(cpm_expr, _NumVarImpl):
                 return cpm_expr
             elif isinstance(cpm_expr, (Operator, GlobalFunction)):
@@ -244,18 +246,17 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                     case "not":  # not is not handled by gurobi
                         (a,) = cpm_expr.args
                         return to_expr(recurse_negation(a), depth, reified=True)
-                    case "-" | "sub" | "sum" | "mul" | "pow" | "div":  # Expression tree nodes (w/ args)
+                    case name if name in supported:  # Expression tree nodes (w/ args)
                         assert cpm_expr.name != "div", "TODO"
-                        return with_args(cpm_expr, [to_expr(a, depth, reified=True) for a in cpm_expr.args])
-                    case "wsum":  # Just for efficiency, don't call add on the weights
-                        ws, xs = cpm_expr.args
-                        return with_args(cpm_expr, [ws, [to_expr(x, depth, reified=True) for x in xs]])
-                    case _:
+                        if name == "wsum":  # Just for efficiency, don't call add on the weights
+                            ws, xs = cpm_expr.args
+                            return with_args(cpm_expr, [ws, [to_expr(x, depth, reified=True) for x in xs]])
+                        else:
+                            return with_args(cpm_expr, [to_expr(a, depth, reified=True) for a in cpm_expr.args])
+                    case name if name in general_constraints:
                         return add_general_constraint(cpm_expr, depth, reified=reified)
-                    # case name if name in self.general_constraints:  # general constraints are not handled by the expression tree, so they will be reified
-                    #     return add_general_constraint(cpm_expr, depth, reified=reified)
-                    # case _:
-                    #     raise_unexpected_expr(cpm_expr)
+                    case _:
+                        raise_unexpected_expr(cpm_expr)
             elif isinstance(cpm_expr, Comparison):
                 return add_comparison(cpm_expr, depth, reified=reified)
             elif isinstance(cpm_expr, DirectConstraint):
@@ -263,12 +264,13 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
             else:
                 raise_unexpected_expr(cpm_expr)
 
-        cpm_cons.append(to_expr(cpm_expr, 0))
+        root = to_expr(cpm_expr, 0)
+        cpm_cons.append(root)
+        return root
 
     if is_any_list(cpm_expr):
-        for c in cpm_expr:
-            add(c)
+        roots = [add(c) for c in cpm_expr]
     else:
-        add(cpm_expr)
+        roots = [add(cpm_expr)]
 
-    return cpm_cons
+    return roots, cpm_cons

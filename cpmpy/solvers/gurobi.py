@@ -81,6 +81,8 @@ class CPM_gurobi(SolverInterface):
 
     supported_global_constraints = frozenset({"min", "max", "abs", "mul", "pow"})
     supported_reified_global_constraints = frozenset()
+    supported_tree_exprs = frozenset({"sum", "wsum", "-", "sub", "mul", "pow", "div"})
+    general_constraints = frozenset({"max", "min", "abs", "and", "or"})
 
     @staticmethod
     def supported():
@@ -293,19 +295,20 @@ class CPM_gurobi(SolverInterface):
         # save user variables
         get_variables(expr, self.user_vars)
 
-        # transform objective
+        # transform objective into expression tree
         obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(obj,
-                                                      supported=self.supported_global_constraints,
-                                                      supported_reified=self.supported_reified_global_constraints,
-                                                      csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap, supported={"pow", "mul"})
-        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+        self.add(safe_cons)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
-
-        # make objective function or variable and post
-        grb_obj = self._make_numexpr(obj)
+        [obj_root], obj_cons = into_tree(
+                obj,
+                csemap=self._csemap,
+                supported=self.supported_tree_exprs,
+                general_constraints=self.general_constraints,
+                verbose=self.verbose
+        )
+        # obj_cons includes the root; only post side-effect constraints
+        self.add([c for c in obj_cons if c is not obj_root])
+        grb_obj = self._make_numexpr(obj_root)
         if minimize:
             self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
         else:
@@ -367,7 +370,13 @@ class CPM_gurobi(SolverInterface):
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
                                     csemap=self._csemap)
-        cpm_cons = into_tree(cpm_cons, csemap=self._csemap, verbose=self.verbose)
+        _roots, cpm_cons = into_tree(
+                cpm_cons,
+                csemap=self._csemap,
+                supported=self.supported_tree_exprs,
+                general_constraints=self.general_constraints,
+                verbose=self.verbose
+        )
 
         if self.verbose:
             with open("/tmp/model.txt", "w") as f:
@@ -409,7 +418,7 @@ class CPM_gurobi(SolverInterface):
 
                 depth += 1
 
-                if isinstance(cpm_expr, int):
+                if isinstance(cpm_expr, (int, float)):
                     return cpm_expr
                 elif isinstance(cpm_expr, _NumVarImpl):
                     return self.solver_var(cpm_expr)
@@ -481,7 +490,7 @@ class CPM_gurobi(SolverInterface):
                     raise NotImplementedError(f"add_() not implemented for {cpm_expr} of type {type(cpm_expr)} w/ name {getattr(cpm_expr, 'name', None)}")
 
             grb_expr = add_(cpm_expr, 0)
-            if isinstance(grb_expr, (bool, int)):
+            if isinstance(grb_expr, (bool, int, float)):
                 if not grb_expr:
                     self.grb_model.addConstr(0 >= 1)  # infeasible
                 return
