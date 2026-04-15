@@ -654,32 +654,28 @@ class CPM_gurobi(SolverInterface):
                                     return gp.max_(*args)
                 elif isinstance(cpm_expr, Comparison):
                     a, b = cpm_expr.args
+                    a, b = add_(a, depth), add_(b, depth)
+
+                    def _reify_nl(expr):
+                        """Gurobi requires NLExpr in y=f(x) form; reify to aux var."""
+                        if isinstance(expr, gp.NLExpr):
+                            y = self.grb_model.addVar(lb=-gp.GRB.INFINITY)
+                            self.grb_model.addConstr(y == expr)
+                            return y
+                        return expr
+
                     match cpm_expr.name:
                         case "==":
-                            a, b = add_(a, depth), add_(b, depth)
                             if isinstance(a, gp.NLExpr) or isinstance(b, gp.NLExpr):
-                                # NLExpr must be on RHS: y == f(x)
+                                # NLExpr can stay in ==, just ensure other side is a Var
                                 if isinstance(b, gp.NLExpr):
                                     y = a if isinstance(a, gp.Var) else self.grb_model.addVar(lb=a, ub=a)
                                     return y == b
                                 else:
                                     y = b if isinstance(b, gp.Var) else self.grb_model.addVar(lb=b, ub=b)
                                     return y == a
-                            elif isinstance(a, (int, gp.LinExpr, gp.QuadExpr, gp.Var, gp.GenExpr)):
-                                return a == b
-                            else:
-                                raise Exception(f"Unexpected expression in {cpm_expr}, {type(a)}")
+                            return a == b
                         case "<=" | ">=":
-                            a, b = add_(a, depth), add_(b, depth)
-                            # Gurobi requires NLExpr in y=f(x) form; reify to aux var
-                            # TODO check if can be re-used in ==
-                            # TODO use reify
-                            def _reify_nl(expr):
-                                if isinstance(expr, gp.NLExpr):
-                                    y = self.grb_model.addVar(lb=-gp.GRB.INFINITY)
-                                    self.grb_model.addConstr(y == expr)
-                                    return y
-                                return expr
                             a, b = _reify_nl(a), _reify_nl(b)
                             return (a <= b) if cpm_expr.name == "<=" else (a >= b)
                         case _:
