@@ -86,10 +86,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing
 
 # tqdm as an optional dependency, provides prettier progress bars
+tqdm: Any = None
 try:
-    from tqdm import tqdm
+    from tqdm import tqdm as _tqdm
+    tqdm = _tqdm
 except ImportError:
-    tqdm = None
+    pass
 
 import cpmpy as cp
 
@@ -264,7 +266,7 @@ class FileDataset(IndexedDataset):
 
     def __init__(
             self,
-            dataset_dir: str = ".",
+            dataset_dir: str | os.PathLike[str] = ".",
             transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
             download: bool = False,
             parse: bool = False,
@@ -436,7 +438,7 @@ class FileDataset(IndexedDataset):
 
         # Advanced mode: bypass sidecars and collect metadata on demand.
         if self._ignore_sidecar:
-            metadata.update(self.collect_instance_metadata(file=str(instance)))
+            metadata.update(self.collect_instance_metadata(file=pathlib.Path(instance)))
             return metadata
         else:
             # Load sidecar metadata if it exists
@@ -482,18 +484,18 @@ class FileDataset(IndexedDataset):
 
         files = self._list_instances()
         file_path = files[index]
-        filename = str(file_path)
 
-        metadata = self.instance_metadata(filename)
+        metadata = self.instance_metadata(file_path)
         if self.target_transform:
             metadata = self.target_transform(metadata)
 
-        data = filename
+        # Instance reference is a string path (PyTorch-style); parse/transform may replace it.
+        data: Any = str(file_path)
 
         # Built-in parse stage: parse the instance file into intermediate data structures.
         # Mostly meant for datasets where files represent data and modeling is separate.
         if self._parse:
-            data = self.parse(data)
+            data = self.parse(file_path)
 
         if self.transform:
             # TODO maybe revisit this flow of execution once CPMpy model feature extraction has been added
@@ -644,7 +646,7 @@ class FileDataset(IndexedDataset):
 
     @staticmethod
     def _download_file(url: str, target: str, destination: Optional[str] = None,
-                        desc: str = None,
+                        desc: Optional[str] = None,
                         chunk_size: int = 1024 * 1024) -> os.PathLike:
         """
         Download a file from a URL with progress bar and speed information.
@@ -700,10 +702,8 @@ class FileDataset(IndexedDataset):
         """
         Download file sequentially with progress bar.
         """
-        # Convert to Path if it's a string
-        if isinstance(filepath, str):
-            filepath = pathlib.Path(filepath)
-        
+        filepath = pathlib.Path(filepath)
+
         # Ensure parent directory exists
         filepath.parent.mkdir(parents=True, exist_ok=True)
         
