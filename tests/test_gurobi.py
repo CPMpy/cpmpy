@@ -193,8 +193,6 @@ def expression_tree_cases_():
         ],
     )
 
-    nl_con = z + (x - 3) * ((-y) ** 2) - 3 == 12
-
     # """An indicator LHS has to be a BV"""
     # yield (
     #     "nl_implies",
@@ -244,14 +242,14 @@ def expression_tree_cases_():
 
     yield (
         "nested",
-        nl_con,
-        # ["(z) + (((x) + -3) * (pow(sum([-1] * [y]),2))) == 15"],
-        None,
+        z + (cp.max([x, y]) - 3) * ((-y) ** 2) - 3 == 12,
+        ["(IV0) == (max(x,y))", "sum(z, ((IV0) + -3) * (pow(-(y),2)), -3) == 12"],
         [
-            "\\ C3 = (z + (sqr(y) * (-3 + x))) + -3",
-            "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( PLUS , -1 , 0 ) ( VARIABLE , z , 1 )",
+            "GC0: IV0 = MAX ( x , y )",
+            "\\ C4 = (z + (sqr(y) * (-3 + IV0))) + -3",
+            "GC1: C4 = NL : ( PLUS , -1 , -1 ) ( PLUS , -1 , 0 ) ( VARIABLE , z , 1 )",
             "( MULTIPLY , -1 , 1 ) ( SQUARE , -1 , 3 ) ( VARIABLE , y , 4 )",
-            "( PLUS , -1 , 3 ) ( CONSTANT , -3 , 6 ) ( VARIABLE , x , 6 )",
+            "( PLUS , -1 , 3 ) ( CONSTANT , -3 , 6 ) ( VARIABLE , IV0 , 6 )",
             "( CONSTANT , -3 , 0 )",
         ],
     )
