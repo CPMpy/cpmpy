@@ -132,17 +132,16 @@
         DirectConstraint
 
 """
-import copy
 import warnings
 from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
 
 import cpmpy as cp
 
+from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, ListLike
-from .variables import cpm_array, intvar, boolvar, _BoolVarImpl
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, _IntVarImpl, NDVarArray
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
-from .globalfunctions import * # XXX make this file backwards compatible
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -222,7 +221,7 @@ class AllDifferent(GlobalConstraint):
         Arguments:
             args (ExprLike|ListLike[ExprLike]): List of expressions or constants to be different from each other
         """
-        super().__init__("alldifferent", flatlist(args))
+        super().__init__("alldifferent", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -274,7 +273,7 @@ class AllDifferentExceptN(GlobalConstraint):
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
-        super().__init__("alldifferent_except_n", [flatarr, n])
+        super().__init__("alldifferent_except_n", (flatarr, n))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -289,7 +288,7 @@ class AllDifferentExceptN(GlobalConstraint):
             cond = (x == y)
             if is_bool(cond):
                 cond = cp.BoolVal(cond)
-            cons.append(cond.implies(cp.any(x == a for a in n))) # equivalent to (x in n) | (y in n) | (x != y)
+            cons.append(cond.implies(cp.any([x == a for a in n]))) # equivalent to (x in n) | (y in n) | (x != y)
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -336,7 +335,7 @@ class AllEqual(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to have the same value
         """
-        super().__init__("allequal", flatlist(args))
+        super().__init__("allequal", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -374,7 +373,7 @@ class AllEqualExceptN(GlobalConstraint):
         if not is_any_list(n):
             n = cast(int, n)
             n = [n] # ensure n is a list of ints
-        super().__init__("allequal_except_n", [flatarr, n])
+        super().__init__("allequal_except_n", (flatarr, n))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -425,7 +424,7 @@ class Circuit(GlobalConstraint):
         flatargs = flatlist(args)
         if len(flatargs) < 2:
             raise ValueError('Circuit constraint must be given a minimum of 2 variables')
-        super().__init__("circuit", flatargs)
+        super().__init__("circuit", tuple(flatargs))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -435,51 +434,24 @@ class Circuit(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        succ = cpm_array(self.args)
-        n = len(succ)
-        order = intvar(0,n-1, shape=n)
-        defining: list[Expression] = []
-        value: list[Expression] = []
 
-        # We define the auxiliary order variables to represent the order we visit all the nodes.
-        # `order[i] == succ[order[i - 1]]`
-        # These constraints need to be in the defining part, since they define our auxiliary vars
-        # However, this would make it impossible for ~circuit to be satisfied in some cases,
-        # because there does not always exist a valid ordering
-        # This happens when the variables in succ don't take values in the domain of 'order',
-        # i.e. for succ = [9,-1,0], there is no valid ordering, but we satisfy ~circuit(succ)
-        # We explicitly deal with these cases by defining the variable 'a' that indicates if we can define an ordering.
-        # TODO at some point: do not introduce these auxiliary variables ourselves, rely on cse instead. 
-        # Blocking factor: need safening and decomposing of global constraints to be integrated.
-        # accumulator = 0
-        # for i = 0..n-1:
-        #    accumulator = succ[accumulator]  # creates an element global function
-        # return [0 == accumulator, cp.AllDiff(succ), cp.all(succ >= 0), cp.all(succ <= n)], []
+        # construct the chain of neighbors
+        succ = cp.cpm_array(self.args)
+        order = [succ[0]]
+        for i in range(1, len(succ)):
+            order.append(succ[order[i - 1]])
 
+        # element constraints can be partial
+        from cpmpy.transformations.safening import _no_partial_functions
+        changed, safe_order, toplevel, nbc = _no_partial_functions(order, safen_toplevel=frozenset(), is_toplevel=False)
+        if changed:
+            order = safe_order # operate on the safened order expressions
 
-        lbs, ubs = get_bounds(succ)
-        if min(lbs) > 0 or max(ubs) < n - 1:
-            # no way this can be a circuit
-            return [BoolVal(False)], []
-        elif min(lbs) >= 0 and max(ubs) < n:
-            # there always exists a valid ordering, since our bounds are tight
-            a: Expression = BoolVal(True)
-        else:
-            # we may get values in succ that are outside the bounds of it's array length (making the ordering undefined)
-            a = boolvar()
-            defining += [a == ((cp.Minimum(succ) >= 0) & (cp.Maximum(succ) < n))]
-            for i in range(n):
-                defining += [(~a).implies(order[i] == 0)]  # assign arbitrary value, so a is totally defined.
-
-        value += [AllDifferent(succ)]  # different successors
-        value += [AllDifferent(order)]  # different orders
-        value += [order[n - 1] == 0]  # symmetry breaking, last one is '0'
-        defining += [a.implies(order[0] == succ[0])]
-        for i in range(1, n):
-            defining += [a.implies(
-                order[i] == succ[order[i - 1]])]  # first one is successor of '0', ith one is successor of i-1
-        
-        return value, defining
+        value = [order[-1] == 0, # return to start node
+                 AllDifferent(order),  # ensure no subcircuits
+                 AllDifferent(succ)    # redundant constraint, strengthens decomposition
+                ]
+        return value + nbc, toplevel
 
     def value(self) -> Optional[bool]:
         """
@@ -516,7 +488,7 @@ class Inverse(GlobalConstraint):
         """
         if len(fwd) != len(rev):
             raise ValueError("Length of fwd and rev must be equal for Inverse constraint")
-        super().__init__("inverse", [fwd, rev])
+        super().__init__("inverse", (fwd, rev))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -528,25 +500,19 @@ class Inverse(GlobalConstraint):
 
         # we try to avoid in-function imports (needed when cyclic dependency),
         # but decompose is typically only called once anyway, so here it is acceptable
-        from cpmpy.transformations import safening
+        from cpmpy.transformations.safening import _no_partial_functions
 
         fwd, rev = self.args
         rev = cpm_array(rev)
 
-        constraining, defining = [], []
-        for i,x in enumerate(fwd):
-            if is_num(x) and not 0 <= x < len(rev): 
-                return [cp.BoolVal(False)], [] # can never satisfy the Inverse constraint
-           
-            lb, ub = get_bounds(x)
-            if lb >= 0 and ub < len(rev): # safe, index is within bounds
-                constraining.append(rev[x] == i)
-            else: # partial! need safening here
-                is_defined, total_expr, toplevel = safening._safen_range(rev[x], (0, len(rev)-1), 1)
-                constraining += [is_defined, total_expr == i]
-                defining += toplevel
+        constraining = [rev[x] == i for i,x in enumerate(fwd)]
+        # Element constraints can be partial, so run safening transformation
+        changed, safe_constraining, toplevel, nbc = _no_partial_functions(constraining, is_toplevel=False,
+                                                              safen_toplevel=frozenset())
+        if changed:
+            constraining = safe_constraining + nbc
         
-        return constraining, defining
+        return constraining, toplevel
 
     def value(self) -> Optional[bool]:
         """
@@ -574,29 +540,43 @@ class Table(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the array of variables
             table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a Table constraint should only contain variables/expressions: {array}")
-        if isinstance(table, np.ndarray):  # Ensure it is a list
-            assert table.ndim == 2, "Table's table must be a 2D array"
-            assert table.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
-            table = table.tolist()
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
         else:
-            tmp = np.array(table)
-            assert tmp.ndim == 2, "Table's table must be a 2D array"
-            assert tmp.dtype != object, "Table's table must have primitive type, not 'object'/expressions"
-            
-        super().__init__("table", [array, table])
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array with integers
+            table = np.array(table, dtype=int)
+        elif table.dtype.kind != 'i':  # dtype int
+            table = table.astype(int, copy=False)
+        assert table.ndim == 2, "Table's table must be a 2D array"
+        assert table.shape[1] == len(array), f"Table width {table.shape[1]} != array length {len(array)}"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
+
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Table global constraint. Enforces at least one row of the table is assigned to the array.
-        "
+
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self.args
-        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row)) for row in tab)], []
+        return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
         """
@@ -604,20 +584,14 @@ class Table(GlobalConstraint):
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
         arr, tab = self.args
-        arrval = argvals(arr)
-        if any(x is None for x in arrval):
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
-        return arrval in tab
+        return bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
-        return NegativeTable(self.args[0], self.args[1])
-
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self) -> bool:
-        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args  # the table 'tab' is asserted to only hold constants
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
+        arr, tab = self.args
+        return NegativeTable(arr, tab)
 
 
 class ShortTable(GlobalConstraint):
@@ -625,6 +599,7 @@ class ShortTable(GlobalConstraint):
     Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
     no restrictions for the corresponding variable in that tuple.
     """
+
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
         """
         Arguments:
@@ -632,25 +607,40 @@ class ShortTable(GlobalConstraint):
             table (ListLike[ListLike[int | '*']] | np.ndarray): List of lists or 2D ndarray; entries are integers or STAR ('*')
                 STAR represents a wildcard (corresponding variable can take any value).
         """
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if isinstance(table, np.ndarray):
-            assert table.ndim == 2, "ShortTable's table must be a 2D array"
-            table = table.tolist()
-        if not all(is_int(x) or x == STAR for row in table for x in row):
-            raise TypeError(f"elements in argument `table` should be integer or {STAR}")
-        super().__init__("short_table", [array, table])
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):
+            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
+        assert table.ndim == 2, "ShortTable's table must be a 2D array"
+        assert table.shape[1] == len(array), f"ShortTable width {table.shape[1]} != array length {len(array)}"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the ShortTable global constraint. Enforces at least one row of the table is assigned to the array.
-        "
+
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self.args
-        return [cp.any(cp.all(ai == ri for ai, ri in zip(arr, row) if ri != STAR) for row in tab)], []
+        return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
         """
@@ -658,47 +648,54 @@ class ShortTable(GlobalConstraint):
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
         arr, tab = self.args
-        arrval = argvals(arr)
-        if any(x is None for x in arrval):
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
-        arrval = np.asarray(arrval, dtype=int)
-        tab = np.asarray(tab)
-        for row in tab:
-            mask = (row != STAR)
-            if (row[mask].astype(int) == arrval[mask]).all():
+        arrval = arrval.astype(int, copy=False)
+
+        non_star = (tab != STAR)
+        for row, mask in zip(tab, non_star):
+            if (row[mask].astype(int, copy=False) == arrval[mask]).all():
                 return True
         return False
-
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self) -> bool:
-        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
 
 class NegativeTable(GlobalConstraint):
     """
     The values of the variables in 'array' do not correspond to any row in 'table'.
     """
+
     def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the array of variables
             table (ListLike[ListLike[int]] | np.ndarray): List of lists of integers or 2D ndarray of ints representing the table.
         """
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError(f"the first argument of a NegativeTable constraint should only contain variables/expressions: {array}")
-        if isinstance(table, np.ndarray):  # Ensure it is a list
-            assert table.ndim == 2, "NegativeTable's table must be a 2D array"
-            assert table.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
-            table = table.tolist()
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
         else:
-            tmp = np.array(table)
-            assert tmp.ndim == 2, "NegativeTable's table must be a 2D array"
-            assert tmp.dtype != object, "NegativeTable's table must have primitive type, not 'object'/expressions"
-            
-        super().__init__("negative_table", [array, table])
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
+            table = np.array(table, dtype=int)
+        elif table.dtype.kind != 'i':  # dtype int
+            table = table.astype(int, copy=False)
+        assert table.ndim == 2, "NegativeTable's table must be a 2D array"
+        assert table.shape[1] == len(array), f"NegativeTable width {table.shape[1]} != array length {len(array)}"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("negative_table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -709,7 +706,7 @@ class NegativeTable(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self.args
-        return [cp.all(cp.any(ai != ri for ai, ri in zip(arr, row)) for row in tab)], []
+        return [cp.all([cp.any([ai != ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
     def value(self) -> Optional[bool]:
         """
@@ -717,20 +714,14 @@ class NegativeTable(GlobalConstraint):
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
         arr, tab = self.args
-        arrval = argvals(arr)
-        if any(x is None for x in arrval):
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
             return None
-        return arrval not in tab
-
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self) -> bool:
-        if not hasattr(self, '_has_subexpr'): # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args # the table 'tab' can only hold constants, never a nested expression
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
+        return not bool(np.any(np.all(tab == arrval, axis=1)))
 
     def negate(self) -> Expression:
-        return Table(self.args[0], self.args[1])
+        arr, tab = self.args
+        return Table(arr, tab)
     
 
 class Regular(GlobalConstraint):
@@ -773,7 +764,7 @@ class Regular(GlobalConstraint):
             raise TypeError("The third argument of a regular constraint should be a node id")
         if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
             raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
-        super().__init__("regular", [list(array), list(transitions), start, list(accepting)])
+        super().__init__("regular", (list(array), list(transitions), start, list(accepting)))
 
         node_set = set()
         self.trans_dict = {}
@@ -852,7 +843,7 @@ class IfThenElse(GlobalConstraint):
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
                             f"{condition, if_true, if_false}")
-        super().__init__("ite", [condition, if_true, if_false])
+        super().__init__("ite", (condition, if_true, if_false))
 
     def value(self) -> Optional[bool]:
         """
@@ -894,15 +885,25 @@ class InDomain(GlobalConstraint):
     Enforces the expression is assigned to a value in the given domain.
     """
 
-    def __init__(self, expr: ExprLike, arr: Iterable[int|np.integer]):
+    def __init__(self, expr: Expression, arr: Iterable[int|np.integer]):
         """
         Arguments:
-            expr (ExprLike): Expression or constant to be assigned to a value in the given domain
+            expr (Expression): Expression to be assigned to a value in the given domain
             arr (Iterable[int | np.integer]): Iterable of integer constants representing the domain
         """
-        if not all(is_int(x) for x in arr):
-            raise TypeError("The second argument of an InDomain constraint should be a list of integer constants")
-        super().__init__("InDomain", [expr, arr])
+        if not isinstance(arr, np.ndarray):
+            arr = np.array(arr, dtype=int)
+        assert arr.ndim == 1, "The second argument of an InDomain constraint should be a 1D array of integer constants"
+
+        has_subexpr = expr.has_subexpr()
+        # args: tuple[Expression, np.ndarray]
+        super().__init__("InDomain", (expr, arr), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[Expression, np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -913,16 +914,9 @@ class InDomain(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         expr, arr = self.args
-        lb, ub = get_bounds(expr)
+        lb, ub = expr.get_bounds()
         
-        defining = []
-        #if expr is not a var
-        if not isinstance(expr,Expression):
-            aux = intvar(lb, ub)
-            defining.append(aux == expr)
-            expr = aux
-
-        return [expr != val for val in range(lb, ub + 1) if val not in arr], defining
+        return [expr != val for val in range(lb, ub + 1) if val not in arr], []
 
     def value(self) -> Optional[bool]:
         """
@@ -930,18 +924,21 @@ class InDomain(GlobalConstraint):
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
         expr, arr = self.args
-        exprval = argvals(expr)
+        exprval = expr.value()
         if exprval is None:
             return None
-        return exprval in arr
+        return bool(np.any(arr == exprval))
 
     def __repr__(self) -> str:
-        return "{} in {}".format(self.args[0], self.args[1])
+        expr, arr = self.args
+        return "{} in {}".format(expr, arr)
 
     def negate(self) -> Expression:
-        lb, ub = get_bounds(self.args[0])
-        return InDomain(self.args[0],
-                        [v for v in range(lb,ub+1) if v not in set(self.args[1])])
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+
+        # complement of arr
+        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr])
 
 
 class Xor(GlobalConstraint):
@@ -963,7 +960,7 @@ class Xor(GlobalConstraint):
         arg_list = list(arg_list)
         if len(arg_list) == 2 and is_num(arg_list[1]):
             arg_list[0], arg_list[1] = arg_list[1], arg_list[0]
-        super().__init__("xor", list(arg_list))
+        super().__init__("xor", tuple(arg_list))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -976,7 +973,7 @@ class Xor(GlobalConstraint):
         # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
         decomp = [sum(self.args[:2]) == 1]
         if len(self.args) > 2:
-            decomp = Xor(decomp + self.args[2:]).decompose()[0]
+            decomp = Xor(decomp + list(self.args[2:])).decompose()[0]
         return decomp, []
 
     def value(self) -> Optional[bool]:
@@ -992,16 +989,18 @@ class Xor(GlobalConstraint):
 
     def negate(self) -> Expression:
         # negate one of the arguments, ideally a variable
-        new_args = None
+        new_args = list(self.args)  # takes shallow copy
+        changed = False
         for i, a in enumerate(self.args):
             if isinstance(a, _BoolVarImpl):
-                new_args = self.args[:i] + [~a] + self.args[i+1:]
+                new_args[i] = ~a
+                changed = True
                 break
 
-        if new_args is None:# did not find a Boolean variable to negate
+        if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            new_args = list(self.args)
-            new_args[0] = cp.transformations.negation.recurse_negation(self.args[0])
+            from cpmpy.transformations.negation import recurse_negation
+            new_args[0] = recurse_negation(self.args[0])
 
         return Xor(new_args)
 
@@ -1052,7 +1051,7 @@ class Cumulative(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super(Cumulative, self).__init__("cumulative", [list(start), list(duration), list(end) if end is not None else None, demand_list, capacity])
+        super(Cumulative, self).__init__("cumulative", (list(start), list(duration), list(end) if end is not None else None, demand_list, capacity))
 
     
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
@@ -1246,8 +1245,8 @@ class CumulativeOptional(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super().__init__("cumulative_optional", [list(start), list(duration), list(end) if end is not None else None, 
-                                                 demand_list, capacity, list(is_present)])
+        super().__init__("cumulative_optional", (list(start), list(duration), list(end) if end is not None else None,
+                                                 demand_list, capacity, list(is_present)))
 
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
         """
@@ -1407,7 +1406,7 @@ class NoOverlap(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap", [list(start), list(duration), list(end) if end is not None else None])
+        super().__init__("no_overlap", (list(start), list(duration), list(end) if end is not None else None))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1489,7 +1488,7 @@ class NoOverlapOptional(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap_optional", [start, duration, end, is_present])
+        super().__init__("no_overlap_optional", (start, duration, end, is_present))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1554,7 +1553,7 @@ class Precedence(GlobalConstraint):
             raise TypeError("Precedence expects a list of variables as first argument, but got", vars)
         if not is_any_list(precedence) or not all(is_num(p) for p in precedence):
             raise TypeError("Precedence expects a list of values as second argument, but got", precedence)
-        super().__init__("precedence", [list(vars), list(precedence)])
+        super().__init__("precedence", (list(vars), list(precedence)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1619,7 +1618,7 @@ class GlobalCardinalityCount(GlobalConstraint):
             raise TypeError("GlobalCardinalityCount expects a list of variables as occurrences, but got", occ)
         if len(vals) != len(occ):
             raise ValueError(f"Number of values and occurrences must be equal, but got {len(vals)} and {len(occ)}")
-        super().__init__("gcc", [list(vars), list(vals), list(occ)])
+        super().__init__("gcc", (list(vars), list(vals), list(occ)))
         self.closed = closed
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -1663,7 +1662,7 @@ class Increasing(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to increasing values
         """
-        super().__init__("increasing", flatlist(args))
+        super().__init__("increasing", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1696,7 +1695,7 @@ class Decreasing(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to decreasing values
         """
-        super().__init__("decreasing", flatlist(args))
+        super().__init__("decreasing", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1729,7 +1728,7 @@ class IncreasingStrict(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly increasing values
         """
-        super().__init__("strictly_increasing", flatlist(args))
+        super().__init__("strictly_increasing", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1763,7 +1762,7 @@ class DecreasingStrict(GlobalConstraint):
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be assigned to strictly decreasing values
         """
-        super().__init__("strictly_decreasing", flatlist(args))
+        super().__init__("strictly_decreasing", tuple(flatlist(args)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1799,7 +1798,7 @@ class LexLess(GlobalConstraint):
         """ 
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLess must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
-        super().__init__("lex_less", [list1, list2])
+        super().__init__("lex_less", (list1, list2))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1861,7 +1860,7 @@ class LexLessEq(GlobalConstraint):
         """
         if len(list1) != len(list2):
             raise ValueError(f"The 2 lists given in LexLessEq must have the same size: list1 length is {len(list1)} and list2 length is {len(list2)}")
-        super().__init__("lex_lesseq", [list1, list2])
+        super().__init__("lex_lesseq", (list1, list2))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1919,7 +1918,7 @@ class LexChainLess(GlobalConstraint):
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
             raise ValueError(f"The matrix given in LexChainLess must be 2D, but got {Xarr.ndim} dimensions")
-        super().__init__("lex_chain_less", Xarr.tolist())
+        super().__init__("lex_chain_less", tuple(Xarr.tolist()))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1954,7 +1953,7 @@ class LexChainLessEq(GlobalConstraint):
         Xarr = np.array(X) # also checks length of each row is equal
         if Xarr.ndim != 2:
             raise ValueError(f"The matrix given in LexChainLessEq must be 2D, but got {Xarr.ndim} dimensions")
-        super().__init__("lex_chain_lesseq", Xarr.tolist())
+        super().__init__("lex_chain_lesseq", tuple(Xarr.tolist()))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """ Decompose to a series of LexLessEq constraints between subsequent rows
@@ -2016,7 +2015,7 @@ class DirectConstraint(Expression):
         """
         # get the solver function, will raise an AttributeError if it does not exist
         solver_function = getattr(Native_solver, self.name)
-        solver_args = copy.copy(self.args)
+        solver_args = list(self.args)  # takes a copy
         for i in range(len(solver_args)):
             if self.novar is None or i not in self.novar:
                 # it may contain variables, replace
