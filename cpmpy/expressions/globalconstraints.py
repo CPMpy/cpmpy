@@ -466,14 +466,15 @@ class Circuit(GlobalConstraint):
         constraints += [cp.AllDifferent(order)] # redundant constraint
         constraints += [order[0] == 0]  # TODO: could replace order[0] with constant 0 instead?
 
-        defining = []
+        defining: list[Expression] = []
         for i in range(n):
             for j in range(n):
                 if i == j:
-                    constraints += [succ[i] != j]  # no self-loops
+                    # forbid self-loops
+                    constraints += [succ[i] != j]
                 if j != 0:
-                    # link order variables to successor-relation, defined toplevel
-                    defining += [(succ[i] == j) == (order[i] + 1 == order[j])] # ensure no subtours
+                    # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
+                    defining += [(succ[i] == j) == (order[i] + 1 == order[j])]
 
         return constraints, defining
 
