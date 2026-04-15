@@ -77,7 +77,7 @@ def omus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', 
     for con in soft_constraints:
         # see if solver supports reification of 'con'
         try:
-            m = Model([BoolVar().implies(con)])
+            m = Model([boolvar().implies(con)])
             SolverLookup.lookup(solver)(m).solve()
         except:
             # it did not
@@ -140,7 +140,7 @@ def omus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='orto
     assum_model = Model(hard_constraints)
 
     # make assumption indicators, add reified constraints
-    ind = BoolVar(shape=len(soft_constraints), name="ind")
+    ind = boolvar(shape=len(soft_constraints), name="ind")
     for i,bv in enumerate(ind):
         assum_model += [bv.implies(soft_constraints[i])]
     # to map indicator variable back to soft_constraints
