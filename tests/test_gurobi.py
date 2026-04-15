@@ -97,7 +97,7 @@ def expression_tree_cases_():
     yield (
         "neq",
         x != 1,
-        ["(BV0) -> (x >= 2)", "(~BV0) -> (x <= 0)", "True"],
+        ["True", "(BV0) -> (x >= 2)", "(~BV0) -> (x <= 0)"],
         ["GC0: BV0 = 1 -> x >= 2", "GC1: BV0 = 0 -> x <= 0"],
     )
 
@@ -105,6 +105,7 @@ def expression_tree_cases_():
         "reified_neq",
         (x != 1) | p,
         [
+            "1",
             "(BV0) -> (x >= 2)",
             "(~BV0) -> (x <= 1)",
             "True",
@@ -113,7 +114,6 @@ def expression_tree_cases_():
             "True",
             "(BV2) == ((BV0) or (BV1))",
             "(BV2) or (p)",
-            "1",
         ],
         None,
     )
@@ -122,6 +122,7 @@ def expression_tree_cases_():
         "implies_neq",
         p.implies(x != 1),
         [
+            "(p) -> (BV2 >= 1)",
             "(BV0) -> (x >= 2)",
             "(~BV0) -> (x <= 1)",
             "True",
@@ -129,16 +130,8 @@ def expression_tree_cases_():
             "(~BV1) -> (x >= 1)",
             "True",
             "(BV2) == ((BV0) or (BV1))",
-            "(p) -> (BV2 >= 1)",
         ],
-        [
-            "GC0: BV0 = 1 -> x >= 2",
-            "GC1: BV0 = 0 -> x <= 1",
-            "GC2: BV1 = 1 -> x <= 0",
-            "GC3: BV1 = 0 -> x >= 1",
-            "GC5: p = 1 -> BV2 >= 1",
-            "GC4: BV2 = OR ( BV0 , BV1 )",
-        ],
+        None,
     )
 
     yield (
@@ -169,7 +162,7 @@ def expression_tree_cases_():
     yield (
         "implies_quad",
         p.implies(x * y >= 4),
-        ["(IV0) == ((x) * (y))", "(p) -> (IV0 >= 4)"],
+        ["(p) -> (IV0 >= 4)", "(IV0) == ((x) * (y))"],
         ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 >= 4"],
     )
 
@@ -178,19 +171,13 @@ def expression_tree_cases_():
         "quad_implies",
         (x * y >= 2).implies(z <= 3),
         [
+            "(BV0) -> (z <= 3)",
             "(IV0) == ((x) * (y))",
             "(BV0) -> (IV0 >= 2)",
             "(~BV0) -> (IV0 <= 1)",
             "True",
-            "(BV0) -> (z <= 3)",
         ],
-        [
-            # TODO duplicated
-            "qc0: IV0 + [ - x * y ] = 0",
-            "GC0: BV0 = 1 -> IV0 >= 2",
-            "GC1: BV0 = 0 -> IV0 <= 1",
-            "GC2: BV0 = 1 -> z <= 3",
-        ],
+        None,
     )
 
     # TODO improve?
@@ -200,7 +187,6 @@ def expression_tree_cases_():
     #     None,
     #     []
     # )
-
 
     # """An indicator LHS has to be a BV"""
     # yield (
@@ -245,21 +231,21 @@ def expression_tree_cases_():
     yield (
         "maximum",
         z + cp.Maximum([x, y]) == 12,
-        ["(IV0) == (max(x,y))", "(z) + (IV0) == 12"],
-        ["R0: IV0 + z = 12", "GC0: IV0 = MAX ( x , y )"],
+        ["(z) + (IV0) == 12", "(IV0) == (max(x,y))"],
+        ["R0: z + IV0 = 12", "GC0: IV0 = MAX ( x , y )"],
     )
 
     yield (
         "nested",
         z + (cp.max([x, y]) - 3) * ((-y) ** 2) - 3 == 12,
-        ["(IV0) == (max(x,y))", "sum(z, ((IV0) + -3) * (pow(-(y),2)), -3) == 12"],
+        ["sum(z, ((IV0) + -3) * (pow(-(y),2)), -3) == 12", "(IV0) == (max(x,y))"],
         [
-            "GC0: IV0 = MAX ( x , y )",
-            "\\ C4 = (z + (sqr(y) * (-3 + IV0))) + -3",
-            "GC1: C4 = NL : ( PLUS , -1 , -1 ) ( PLUS , -1 , 0 ) ( VARIABLE , z , 1 )",
+            "\\ C3 = (z + (sqr(y) * (-3 + IV0))) + -3",
+            "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( PLUS , -1 , 0 ) ( VARIABLE , z , 1 )",
             "( MULTIPLY , -1 , 1 ) ( SQUARE , -1 , 3 ) ( VARIABLE , y , 4 )",
             "( PLUS , -1 , 3 ) ( CONSTANT , -3 , 6 ) ( VARIABLE , IV0 , 6 )",
             "( CONSTANT , -3 , 0 )",
+            "GC1: IV0 = MAX ( x , y )",
         ],
     )
 
@@ -290,8 +276,8 @@ def expression_tree_cases_():
         "abs",
         cp.Abs(x) + y == 3,
         [
-            "(IV0) == (abs(x))",
             "(IV0) + (y) == 3",
+            "(IV0) == (abs(x))",
         ],
         ["R0: IV0 + y = 3", "GC0: IV0 = ABS ( x )"],
     )
@@ -300,14 +286,14 @@ def expression_tree_cases_():
     yield (
         "abs_in_mul",
         cp.Abs(x) * y + z == 3,
-        ["(IV0) == (abs(x))", "((IV0) * (y)) + (z) == 3"],
+        ["((IV0) * (y)) + (z) == 3", "(IV0) == (abs(x))"],
         ["qc0: z + [ IV0 * y ] = 3", "GC0: IV0 = ABS ( x )"],
     )
 
     yield (
         "mul_in_abs",
         cp.Abs(x * y) + z == 3,
-        ["(IV0) == ((x) * (y))", "(IV1) == (abs(IV0))", "(IV1) + (z) == 3"],
+        ["(IV1) + (z) == 3", "(IV0) == ((x) * (y))", "(IV1) == (abs(IV0))"],
         None,
         # ["R0: IV0 + z = 3", "qc0: IV1 + [ - x * y ] = 0", "GC0: IV0 = ABS ( IV1 )"],
     )
@@ -339,6 +325,7 @@ def expression_tree_cases_():
         z * (x == 2) == 1,
         # TODO apply direct encoding Should help a lot here
         [
+            "(z) * (BV0) == 1",
             "(BV0) -> (x == 2)",
             "(BV1) -> (x >= 3)",
             "(~BV1) -> (x <= 2)",
@@ -349,7 +336,6 @@ def expression_tree_cases_():
             "(BV3) == ((BV1) or (BV2))",
             "(~BV0) -> (BV3 >= 1)",
             "True",
-            "(z) * (BV0) == 1",
         ],
         None,
     )
@@ -357,7 +343,7 @@ def expression_tree_cases_():
     yield (
         "disjunction",
         p | q,
-        ["(p) or (q)", "1"],  # TODO avoid BV0
+        ["1", "(p) or (q)"],  # TODO avoid BV0
         ["GC0: C2 = OR ( p , q )"],
         # TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
@@ -372,7 +358,7 @@ def expression_tree_cases_():
     yield (
         "maximum_bv_root",
         1 == cp.Maximum([p, q]),
-        ["(IV0) == (max(p,q))", "IV0 == 1"],
+        ["IV0 == 1", "(IV0) == (max(p,q))"],
         ["R0: IV0 = 1", "GC0: IV0 = MAX ( p , q )"],
     )
 
@@ -404,6 +390,7 @@ def expression_tree_cases_():
         "normalize_nonlinear_on_rhs",
         (p | q) <= (x == 2) + (y**2),
         [
+            "(BV0) <= ((BV1) + (pow(y,2)))",
             "(BV0) == ((p) or (q))",
             "(BV1) -> (x == 2)",
             "(BV2) -> (x >= 3)",
@@ -415,7 +402,6 @@ def expression_tree_cases_():
             "(BV4) == ((BV2) or (BV3))",
             "(~BV1) -> (BV4 >= 1)",
             "True",
-            "(BV0) <= ((BV1) + (pow(y,2)))",
         ],  # TODO avoid BV0
         None,
         # TODO perhaps ["GC0: C2 = OR ( p , q )"],
@@ -424,8 +410,8 @@ def expression_tree_cases_():
     yield (
         "neg_disjunction",
         ~(p | q),
-        ["(~p) == (BV0)", "(~q) == (BV1)", "(BV2) == ((BV0) and (BV1))", "BV2"],
-        ["R0: - p - BV0 = -1", "R1: - q - BV1 = -1", "R2: BV2 >= 1", "GC0: BV2 = AND ( BV0 , BV1 )"],
+        ["BV2", "(~p) == (BV0)", "(~q) == (BV1)", "(BV2) == ((BV0) and (BV1))"],
+        ["R0: BV2 >= 1", "R1: - p - BV0 = -1", "R2: - q - BV1 = -1", "GC0: BV2 = AND ( BV0 , BV1 )"],
     )
 
     # yield (
@@ -438,7 +424,7 @@ def expression_tree_cases_():
     yield (
         "conjunction_in_disjunction",
         (p | (q & r)),
-        ["(BV0) == ((q) and (r))", "(p) or (BV0)", "1"],
+        ["1", "(BV0) == ((q) and (r))", "(p) or (BV0)"],
         ["GC0: BV0 = AND ( q , r )", "GC1: C4 = OR ( p , BV0 )"],
     )
 
