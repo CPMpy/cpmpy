@@ -1,4 +1,21 @@
+"""
+    Transform CPMpy expressions into expression trees suitable for solvers that support non-linear expression trees. This transformation is currently quite specific towards Gurobi's new non-linear expression tree support.
+
+    Unlike the flatten/linearize pipeline, this transformation preserves
+    non-linear structure (e.g. mul, pow) as expression tree nodes, only flattening
+    what the solver cannot handle natively:
+    - Unsupported constraints (e.g. and, or, min, max, abs) are reified into y=f(x) form
+
+    currently, there are gurobi specific transformations:
+
+    - Indicator constraints require linear bodies, so non-linear parts are reified
+    - Reification of boolean expressions uses bi-implication with indicator constraints
+    - != is decomposed into a disjunction of strict inequalities
+"""
 import copy
+
+# TODO mainly, unduplicate the added ad-hoc transformations done by the other transformation
+# TODO specific to gurobi: handling neq, linearize for indicator
 
 import cpmpy as cp
 from ..expressions.core import Comparison, Operator, is_boolexpr
@@ -10,18 +27,35 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from .negation import recurse_negation, push_down_negation
 
-# TODO 
+# TODO change to supported constraints
 GENERAL_CONSTRAINTS = {"max", "min", "abs", "and", "or"}
 
 
 def into_tree(cpm_expr, csemap=None, verbose=False):
-    """Recursively create a CPMpy expression tree supported by the solver. This will partially flatten the expression which are not supported, while leaving in the expressions which are."""
+    """Transform CPMpy expressions into an expression tree with non-linear nodes preserved.
+
+    Recursively processes expressions, keeping mul/pow/sum as tree nodes and
+    reifying only what the solver cannot handle natively (general constraints,
+    non-linear indicator bodies, !=). Side-effect constraints (from reification
+    and decomposition) are collected and returned alongside the main constraints.
+
+    Args:
+        cpm_expr: CPMpy expression or list of expressions to transform
+        csemap: dict for common subexpression elimination (shared across calls)
+        verbose: if True, print debug trace of the transformation
+
+    Returns:
+        list of transformed CPMpy constraints ready for solver-specific posting
+    """
+
+    # constraints will be added to this list
     cpm_cons = []
 
     if csemap is None:
         csemap = {}
 
-    def into_tree_(cpm_expr):
+    def add(cpm_expr):
+        """Add this expression to the tree, flattening if unsupported."""
 
         def get_or_make_var(cpm_expr, define=True):
             """Get or make (Boolean/integer) var `b` which represent the expression. Add defining constraints b == cpm_expr if `define=True`."""
@@ -31,7 +65,7 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
             r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
             csemap[cpm_expr] = r
             if define:
-                into_tree_(r == cpm_expr)
+                add(r == cpm_expr)
             return r
 
         def with_args(cpm_expr, args):
@@ -101,8 +135,8 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                     return True
                 case "==" if isinstance(a, _BoolVarImpl) and is_boolexpr(b) and not isinstance(b, _NumVarImpl):
                     # BV == boolexpr === BV <-> boolexpr: post as bi-implications
-                    into_tree_(a.implies(b))
-                    into_tree_((~a).implies(recurse_negation(b)))
+                    add(a.implies(b))
+                    add((~a).implies(recurse_negation(b)))
                     con = True
                 case "==" | "<=" | ">=":
                     a, b = to_expr(a, depth, reified=True), to_expr(b, depth, reified=True)
@@ -117,8 +151,8 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
                         else:
                             z = cp.boolvar()
                             # return add_(z.implies(a > b) & (~z).implies(a < b), depth, reified=reified)
-                            into_tree_(z.implies(a > b))
-                            into_tree_((~z).implies(a < b))
+                            add(z.implies(a > b))
+                            add((~z).implies(a < b))
                             return True
                     else:  # push_down_negation may have changed e.g. != into ==
                         return to_expr(cpm_expr, depth, reified=reified)
@@ -215,14 +249,12 @@ def into_tree(cpm_expr, csemap=None, verbose=False):
             else:
                 raise_unexpected_expr(cpm_expr)
 
-        if verbose: print("c", cpm_expr)
-        result = to_expr(cpm_expr, 0)
-        cpm_cons.append(result)
+        cpm_cons.append(to_expr(cpm_expr, 0))
 
     if is_any_list(cpm_expr):
         for c in cpm_expr:
-            into_tree_(c)
+            add(c)
     else:
-        into_tree_(cpm_expr)
+        add(cpm_expr)
 
     return cpm_cons
