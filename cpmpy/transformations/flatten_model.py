@@ -336,14 +336,16 @@ def get_or_make_var(expr, csemap=None):
 
     if is_any_list(expr):
         raise Exception(f"Expected single variable, not a list for: {expr}")
-
+    
+    # check if the expression is already in the csemap
     new_var = None
     if (csemap is not None):
         new_var = csemap.get(expr)
     if new_var is not None:
         return (new_var, [])
 
-    # need to recursively flatten new_cons
+    # expression is not in the csemap
+    # need to recursively flatten
     if expr.is_bool():
         flatexpr, flatcons = normalized_boolexpr(expr, csemap=csemap)
         if isinstance(flatexpr, _BoolVarImpl):
@@ -352,15 +354,21 @@ def get_or_make_var(expr, csemap=None):
     else:
         flatexpr, flatcons = normalized_numexpr(expr, csemap=csemap)
 
-    if csemap is None:
-        # this will have some overhead, but it nicely stores all logic in the csemap object
-        new_var, _new_cons = CSEMap().get_or_make_var(expr)
-    else:
-        new_var, _new_cons = csemap.get_or_make_var(expr)
+    if csemap is not None:
+        # save both original expression and flattened expression to the csemap
+        # maybe the flattened expression is already in the map?
+        new_var = csemap.get(flatexpr)
+        expr_eq_var = []
+        if new_var is None: # it's not in the map
+            new_var, expr_eq_var = csemap.get_or_make_var(flatexpr)
+        if flatexpr is not expr: # avoid additional hash call if expr was flat already
+            csemap.flat_map[expr] = new_var
 
-    # TODO: this seems weird, we are dismissing the `new_var == expr` made by the csemap
-    #   can be fixed by doing the normalization in the main flatten loop instead of here
-    return new_var, [flatexpr == new_var] + flatcons
+    else:
+        # this will have some overhead, but it nicely stores all logic in the csemap object
+        new_var, expr_eq_var = CSEMap().get_or_make_var(flatexpr) # some ove
+
+    return new_var, expr_eq_var + flatcons
 
 def get_or_make_var_or_list(expr, csemap = None):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
