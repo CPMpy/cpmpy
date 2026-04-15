@@ -42,27 +42,21 @@
     ==============
 """
 
-import cpmpy as cp
 from typing import Optional, List
-import copy
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal, is_boolexpr
-from ..expressions.utils import argvals, argval, is_any_list, is_num, is_bool, get_bounds
+from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.utils import argvals, is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var_or_list
+from ..transformations.into_tree import into_tree
+from ..transformations.flatten_model import flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective
-from ..transformations.decompose_global import decompose_in_tree
+from ..transformations.linearize import only_positive_bv_wsum, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
-from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..transformations.negation import recurse_negation, push_down_negation
 
 try:
     import gurobipy as gp
@@ -350,7 +344,6 @@ class CPM_gurobi(SolverInterface):
         raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
     verbose = False
-    general_constraints = {"max", "min", "abs", "and", "or"}
 
     def transform(self, cpm_expr):
         """
@@ -374,219 +367,16 @@ class CPM_gurobi(SolverInterface):
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
                                     csemap=self._csemap)
+        cpm_cons = into_tree(cpm_cons, csemap=self._csemap, verbose=self.verbose)
 
-        all_cons = []  # accumulate all constraints (including side-effect ones from != and reify)
-
-
-        def to_expression_tree(cpm_expr):
-            """Recursively create a CPMpy expression tree supported by the solver. This will partially flatten the expression which are not supported, while leaving in the expressions which are."""
-
-            def get_or_make_var(cpm_expr, define=True):
-                """Get or make (Boolean/integer) var `b` which represent the expression. Add defining constraints b == cpm_expr if `define=True`."""
-                if cpm_expr in self._csemap:
-                    return self._csemap[cpm_expr]
-
-                r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
-                self._csemap[cpm_expr] = r
-                if define:
-                    to_expression_tree(r == cpm_expr)
-                return r
-
-            def with_args(cpm_expr, args):
-                """Copy expression and replace args"""
-                cpm_expr = copy.copy(cpm_expr)
-                cpm_expr.update_args(args)
-                return cpm_expr
-
-            def propagate_boolconst(name, args):
-                """Propagate boolean constants in and/or: and(0,...)=0, or(1,...)=1, filter neutral elements."""
-                match name:
-                    case "and" | "or":
-                        # TODO single loop should be possible
-                        absorb = 0 if name == "and" else 1  # absorbing element
-                        args = [a for a in args if not (is_num(a) and a == 1 - absorb)]
-                        if any(is_num(a) and a == absorb for a in args):
-                            return absorb
-                        return args
-                    case _:
-                        return args
-
-            def add_general_constraint(f, depth, reified=False, y=None):
-                """Add the general constraint `f(x)` in gurobi's required form, `y=f(x)` with `x` a list of variables (Boolean/integer, depending on the general constraint type)"""
-                # require only variables
-                # f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
-                args = [reify(to_expr(arg, depth, reified=True), depth) for arg in f.args]
-                # require non-constants
-                args = propagate_boolconst(f.name, args)
-                if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
-                    return args
-                else:
-                    # require the form: y = f(x)
-                    if y is None:
-                        assert reified or f.name in {"and", "or"}, f"Unexpected numexpr {f} encountered at root level"
-                        y = get_or_make_var(f, define=False) if reified else 1
-
-                    # y, y = f(x)
-                    f = with_args(f, args)
-                    all_cons.append(y == f)  # add directly so that Comparison does not have to deal with it
-                    # TODO could be done by add(y == f)?
-                    return y
-
-            def reify(cpm_expr, depth):
-                """Return a variable representing the expression, for use as argument in general/indicator constraints."""
-                if self.verbose: print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, 'name', None))
-
-                if is_num(cpm_expr):
-                    return cpm_expr
-                elif isinstance(cpm_expr, _NumVarImpl) and not isinstance(cpm_expr, NegBoolView):
-                    return cpm_expr
-                elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-                    # Convert p -> q to or(~p, q) to avoid circular reification
-                    a, b = cpm_expr.args
-                    return reify((~a) | b, depth)
-                else:
-                    return get_or_make_var(cpm_expr)
-
-            def add_comparison(cpm_expr, depth, reified=False):
-                """Process a Comparison expression. Returns a Comparison or True (posted as side effect).
-                If reified=True, returns a BoolVar representing the truth value of the comparison."""
-                a, b = cpm_expr.args
-
-                match cpm_expr.name:
-                    case "==" if not reified and isinstance(a, (int, _NumVarImpl)) and isinstance(b, Operator) and b.name in self.general_constraints:
-                        # already of the form: y = f(x)
-                        add_general_constraint(b, depth, reified=reified, y=a)
-                        return True
-                    case "==" if isinstance(a, _BoolVarImpl) and is_boolexpr(b) and not isinstance(b, _NumVarImpl):
-                        # BV == boolexpr === BV <-> boolexpr: post as bi-implications
-                        to_expression_tree(a.implies(b))
-                        to_expression_tree((~a).implies(recurse_negation(b)))
-                        con = True
-                    case "==" | "<=" | ">=":
-                        a, b = to_expr(a, depth, reified=True), to_expr(b, depth, reified=True)
-                        con = with_args(cpm_expr, [a, b])
-                    case "!=":
-                        # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
-                        cpm_expr, = push_down_negation([cpm_expr], toplevel=not reified)
-                        if cpm_expr.name == "!=":
-                            a, b = cpm_expr.args
-                            if reified:
-                                return to_expr((a > b) | (a < b), depth, reified=reified)
-                            else:
-                                z = cp.boolvar()
-                                # return add_(z.implies(a > b) & (~z).implies(a < b), depth, reified=reified)
-                                to_expression_tree(z.implies(a > b))
-                                to_expression_tree((~z).implies(a < b))
-                                return True
-                        else:  # push_down_negation may have changed e.g. != into ==
-                            return to_expr(cpm_expr, depth, reified=reified)
-                    case ">":
-                        return to_expr(a >= b + 1, depth, reified=reified)
-                    case "<":
-                        return to_expr(a <= b - 1, depth, reified=reified)
-                    case _:
-                        raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
-
-                return reify(con, depth) if reified else con
-
-            def linearize(cpm_expr, depth):
-                """Ensure expression is linear (no mul/pow) by reifying non-linear parts into aux vars."""
-                if self.verbose: print(f"{'  ' * depth}lin", cpm_expr)
-
-                # Only comparisons (except !=) can be indicator bodies directly;
-                # everything else (!=, BoolVars, and/or/etc.) needs reification into a BV
-                can_be_linear = isinstance(cpm_expr, Comparison) and cpm_expr.name != "!="
-                cpm_expr = to_expr(cpm_expr, depth, reified=not can_be_linear)
-                if isinstance(cpm_expr, _NumVarImpl):
-                    return cpm_expr >= 1
-                elif isinstance(cpm_expr, Comparison):
-                    def linearize_expr(expr):
-                        if is_num(expr) or isinstance(expr, _NumVarImpl):
-                            return expr
-                        elif isinstance(expr, Operator):
-                            match expr.name:
-                                case "sum":
-                                    return with_args(expr, [reify(a_i, depth) for a_i in expr.args])
-                                case "wsum":
-                                    w, x = expr.args
-                                    return with_args(expr, [w, [reify(x_i, depth) for x_i in x]])
-                                case _:
-                                    return reify(expr, depth)
-                        else:
-                            return reify(expr, depth)
-
-                    a, b = cpm_expr.args
-                    return with_args(cpm_expr, [linearize_expr(a), linearize_expr(b)])
-                else:
-                    return reify(cpm_expr, depth) >= 1
-
-            def raise_unsupported(cpm_expr):
-                raise NotSupportedError("CPM_gurobi: Unsupported constraint", cpm_expr)
-              
-            def to_expr(cpm_expr, depth, reified=False):
-                """Create an supported expression tree node."""
-
-                indent = "  " * depth
-                depth += 1
-                if self.verbose: print(f"{indent}Con:", cpm_expr, type(cpm_expr), "reif" if reified else "root")
-
-                if is_num(cpm_expr):
-                    return int(cpm_expr)
-                elif isinstance(cpm_expr, _NumVarImpl):
-                    return cpm_expr
-                elif isinstance(cpm_expr, (Operator, GlobalFunction)):
-                    match cpm_expr.name:
-                        case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
-                            a, b = cpm_expr.args
-                            # if isinstance(b, (_NumVarImpl, Comparison)):  # TODO requires reification?
-                            if isinstance(b, Comparison):
-                                p = a if isinstance(a, NegBoolView) else reify(a, depth)
-                                if is_num(p):  # propagate fixed antecedent
-                                    return to_expr(b, depth, reified=reified) if a else True
-                                assert isinstance(p, _BoolVarImpl)
-                                q = linearize(b, depth)
-                                if is_num(q):
-                                    return True if q else to_expr(p, depth, reified=reified)
-                                assert isinstance(q, Comparison), f"Expected linear constraint, but got {q}"  # not required to be a canonical comparison
-                                return with_args(cpm_expr, [p, q])
-                            else:
-                                return to_expr((~a) | b, depth, reified=reified)
-                        case "not":  # not is not handled by gurobi
-                            a, = cpm_expr.args
-                            return to_expr(recurse_negation(a), depth, reified=True)
-                        case "-" | "sub" | "sum" | "mul" | "pow" | "div":  # Expression tree nodes (w/ args)
-                            assert cpm_expr.name != "div", "TODO"
-                            return with_args(cpm_expr, [to_expr(a, depth, reified=True) for a in cpm_expr.args])
-                        case "wsum":  # Just for efficiency, don't call add on the weights
-                            ws, xs = cpm_expr.args
-                            return with_args(cpm_expr, [ws, [to_expr(x, depth, reified=True) for x in xs]])
-                        case name if name in self.general_constraints:  # general constraints are not handled by the expression tree, so they will be reified
-                            return add_general_constraint(cpm_expr, depth, reified=reified)
-                        case _:
-                            raise_unsupported(cpm_expr)
-                elif isinstance(cpm_expr, Comparison):
-                    return add_comparison(cpm_expr, depth, reified=reified)
-                elif isinstance(cpm_expr, DirectConstraint):
-                    cpm_expr.callSolver(self, self.grb_model)
-                    return True
-                else:
-                    raise_unsupported(cpm_expr)
-
-            result = to_expr(cpm_expr, 0)
-            all_cons.append(result)
-            return result
-
-        for c in cpm_cons:
-            to_expression_tree(c)
-        cpm_cons = all_cons
-
-        with open("/tmp/model.txt", "w") as f:
-            f.write("# Original constraints:\n")
-            for c in toplevel_list(cpm_expr):
-                f.write(str(c) + "\n")
-            f.write("\n# Transformed constraints:\n")
-            for c in cpm_cons:
-                f.write(str(c) + "\n")
+        if self.verbose:
+            with open("/tmp/model.txt", "w") as f:
+                f.write("# Original constraints:\n")
+                for c in toplevel_list(cpm_expr):
+                    f.write(str(c) + "\n")
+                f.write("\n# Transformed constraints:\n")
+                for c in cpm_cons:
+                    f.write(str(c) + "\n")
 
         return cpm_cons
 
@@ -643,7 +433,7 @@ class CPM_gurobi(SolverInterface):
                         case "pow":
                             return add_(cpm_expr.args[0], depth) ** add_(cpm_expr.args[1], depth)
                         case general_constraint_name:
-                            assert general_constraint_name in self.general_constraints
+                            assert general_constraint_name in {"max", "min", "abs", "and", "or"}
                             args = [add_(a, depth) for a in cpm_expr.args]
                             match general_constraint_name:
                                 case "or":
