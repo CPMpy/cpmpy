@@ -44,6 +44,7 @@ List of solver submodules
     hexaly
     rc2
     scip
+    highs
 
 =========================
 List of helper submodules
@@ -80,6 +81,7 @@ from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
 from .scip import CPM_scip
+from .highs import CPM_highs
 
 __all__ = [
     "CPM_choco",
@@ -96,8 +98,9 @@ __all__ = [
     "CPM_pysat",
     "CPM_pysdd",
     "CPM_rc2",
-    "CPM_scip",
     "CPM_z3",
+    "CPM_scip",
+    "CPM_highs",
     "SolverLookup",
     "param_combinations",
 ]
