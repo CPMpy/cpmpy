@@ -59,9 +59,11 @@ class CPM_scip(SolverInterface):
 
     # Globals we keep and how they are translated in add():
     # - "xor": addConsXor();
-    # - "abs": addCons(abs(x) <= k); 
-    # - "mul", "div": addCons(mul,div == rhs).
-    supported_global_constraints = frozenset({"xor", "abs", "mul", "div"})
+    # - "abs": addCons(abs(x) <= k);
+    # - "mul": addCons(mul == rhs).
+    # No native "div": PySCIPOpt uses real division, which does not match CPMpy integer division
+    # (round toward zero); same rationale as Gurobi — decompose via Division.decompose().
+    supported_global_constraints = frozenset({"xor", "abs", "mul"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -301,16 +303,13 @@ class CPM_scip(SolverInterface):
         if cpm_expr.name == "wsum":
             return scip.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
-        # GlobalFunction: abs, mul, div (PySCIPOpt supports these in constraints/objective)
+        # GlobalFunction: abs, mul (PySCIPOpt supports these in constraints/objective)
         if isinstance(cpm_expr, GlobalFunction):
             if cpm_expr.name == "abs":
                 return abs(self._make_numexpr(cpm_expr.args[0]))
             if cpm_expr.name == "mul":
                 a, b = self._make_numexpr(cpm_expr.args[0]), self._make_numexpr(cpm_expr.args[1])
                 return a * b
-            if cpm_expr.name == "div":
-                a, b = self._make_numexpr(cpm_expr.args[0]), self._make_numexpr(cpm_expr.args[1])
-                return a / b
 
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
 
