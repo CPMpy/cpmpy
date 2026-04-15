@@ -31,7 +31,7 @@ class TestCSE:
         assert str(fc) == "alldifferent(x,IV0,z)"
         assert len(csemap) == 1
 
-        assert str(next(iter(csemap.csemap.keys()))) == "(y) + (y)"
+        assert str(next(iter(csemap.flat_map.keys()))) == "(y) + (y)"
         assert str(csemap[y + y]) == "IV0"
 
         # next time we use y + y, it should replace it IV0
@@ -133,18 +133,24 @@ class TestCSE:
         csemap = CSEMap()
         flat_obj, cons = flatten_objective(obj, csemap=csemap)
         assert len(cons) == 3
-        assert len(csemap) == 3
-        assert set(csemap.csemap.keys()) == \
-                            {cp.max(x+y,z), cp.min(x+y,z), x+y}
+        assert len(csemap) == 5 # also stored flat constraints
+        csemap_should = {'(x) + (y)': 'IV0', # flat expr
+                         'max((x) + (y),z)': 'IV1', # orig expr
+                         'max(IV0,z)': 'IV1', # flat expr
+                         'min((x) + (y),z)': 'IV2', # orig expr
+                         'min(IV0,z)': 'IV2'} # flat expr
+        assert {str(key) : str(val) for key, val in csemap.flat_map.items()} == csemap_should
 
         # assume we did some transformations before
         csemap = CSEMap()
-        csemap.csemap = {cp.max(x+y,z) : cp.intvar(0,20, name="aux")}
+        csemap.flat_map = {cp.max(x+y,z) : cp.intvar(0,20, name="aux")}
         flat_obj, cons = flatten_objective(obj, csemap=csemap)
         assert len(cons) == 2# just replaced max with aux var
-        assert len(csemap) == 3
-        assert set(csemap.csemap.keys()) == \
-                            {cp.max(x + y, z), cp.min(x + y, z), x + y}
-
+        assert len(csemap) == 4 # also store flat constraints
+        csemap_should = {'max((x) + (y),z)': 'aux', # the one we put in
+                         'min((x) + (y),z)': 'IV4', # orig expr
+                         'min(IV3,z)': 'IV4', # flat expr
+                         '(x) + (y)': 'IV3'} # flat expr
+        assert {str(key): str(val) for key, val in csemap.flat_map.items()} == csemap_should
 
     ### other transformations only use csemap as argument to flatten_constraint internally, not sure how to easily test them
