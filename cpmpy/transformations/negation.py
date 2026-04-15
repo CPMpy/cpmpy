@@ -50,28 +50,29 @@ def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
     # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
     elif expr.name == '!=':
         lexpr, rexpr = expr.args
-        lhs_bool = is_boolexpr(lexpr)
-        rhs_bool = is_boolexpr(rexpr)
-        if lhs_bool and rhs_bool:
-            if isinstance(lexpr, (_BoolVarImpl, BoolVal)):
-                rhs_changed, rhs_newexpr = _push_down_negation_expr(rexpr)
-                if rhs_changed:
-                    rexpr = rhs_newexpr
-                return True, (~lexpr) == rexpr
 
-            elif isinstance(rexpr, (_BoolVarImpl, BoolVal)):
-                lhs_changed, lhs_newexpr = _push_down_negation_expr(lexpr)
-                if lhs_changed:
-                    lexpr = lhs_newexpr
-                return True, lexpr == (~rexpr)
+        if is_boolexpr(lexpr):
+            if isinstance(rexpr, (bool, BoolVal)):
+                if rexpr:  # lexpr != True :: ~lexpr, simplify by pushing down the negation on lhs
+                    return True, recurse_negation(lexpr)
+                else:  # lexpr != False :: lexpr, simplify and recurse
+                    _, newlexpr = _push_down_negation_expr(lexpr)
+                    return True, newlexpr
+                    
+            elif isinstance(rexpr, Expression) and rexpr.is_bool():
+                if isinstance(rexpr, _BoolVarImpl):  # if rhs is a var, just negate that
+                    lhs_changed, lhs_newexpr = _push_down_negation_expr(lexpr)
+                    if lhs_changed:
+                        lexpr = lhs_newexpr
+                    return True, lexpr == (~rexpr)
 
-            else:
-                # change lhs, keep/recurse rhs
-                lexpr = recurse_negation(lexpr)
-                rhs_changed, rhs_newexpr = _push_down_negation_expr(rexpr)
-                if rhs_changed:
-                    rexpr = rhs_newexpr
-                return True, lexpr == rexpr
+                else:
+                    # change lhs, keep/recurse rhs
+                    lexpr = recurse_negation(lexpr)
+                    rhs_changed, rhs_newexpr = _push_down_negation_expr(rexpr)
+                    if rhs_changed:
+                        rexpr = rhs_newexpr
+                    return True, lexpr == rexpr
     
     if expr.has_subexpr():
         rec_changed, rec_newargs = _push_down_negation_args(expr.args)

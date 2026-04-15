@@ -60,11 +60,11 @@ class TestFlattenConstraint:
         (x,y,z) = self.bvars[:3]
 
         e = (x != y) 
-        assert "[(~BV0) == (BV1)]" == str(flatten_constraint(e))
+        assert "[(~BV1) == (BV0)]" == str(flatten_constraint(e))
         e = (x != ~y) 
-        assert "[(BV1) == (BV0)]" == str(flatten_constraint(e))
+        assert "[(~BV1) == (~BV0)]" == str(flatten_constraint(e))
         e = ((~x) != y)
-        assert "[(BV0) == (BV1)]" == str(flatten_constraint(e))
+        assert "[(~BV0) == (~BV1)]" == str(flatten_constraint(e))
         e = (a != b) 
         assert "[(IV0) != (IV1)]" == str(flatten_constraint(e))
 
