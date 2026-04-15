@@ -532,8 +532,6 @@ class CPM_gurobi(SolverInterface):
         Returns a MUS (list of constraints from soft).
         """
 
-        DEBUG = False
-
         soft = toplevel_list(soft, merge_and=False)
         hard = toplevel_list(hard)
 
@@ -568,21 +566,12 @@ class CPM_gurobi(SolverInterface):
         # now add each soft constraint or the assumption representing it
         grb_soft = [s._add_transformed(c) for c in grb_soft]  # note: now grb_soft contains gurobi constraint objects
 
-        if DEBUG:
-            s.native_model.write("/tmp/model.lp")
-
         try:  # compute IIS (conveniently fails if original model was SAT)
             s.native_model.computeIIS()
         except gp.GurobiError as e:
             if e.errno == gp.GRB.Error.IIS_NOT_INFEASIBLE:
                 raise AssertionError("MUS: model must be UNSAT")
             raise
-
-        if DEBUG:
-            for constr in s.native_model.getConstrs():
-                print(f"  {constr.ConstrName}: IISConstr={constr.IISConstr}, IISConstrForce={constr.IISConstrForce}")
-            for constr in s.native_model.getGenConstrs():
-                print(f"  {constr.GenConstrName}: IISGenConstr={constr.IISGenConstr}, IISGenConstrForce={constr.IISGenConstrForce}")
 
         return [
             # return a MUS consisting of each soft constraint..
