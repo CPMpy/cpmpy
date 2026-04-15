@@ -2,7 +2,7 @@ import pytest
 
 import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
-from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native, mus_iis
+from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
 
 class TestMus:
@@ -101,10 +101,11 @@ class TestNativeMusExact(TestMus):
 
 
 @pytest.mark.requires_solver("gurobi")
-class TestIIS(TestMus):
+class TestNativeMusGurobi(TestMus):
     def setup_method(self):
-        self.mus_func = lambda soft, hard=[], solver="gurobi": mus_iis(soft, hard=hard, solver="gurobi")
+        self.mus_func = lambda soft, hard=[], solver="gurobi": mus_native(soft, hard=hard, solver="gurobi")
         self.naive_func = mus_naive
+
 
 class TestQuickXplain(TestMus):
 

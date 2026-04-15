@@ -513,6 +513,49 @@ class CPM_gurobi(SolverInterface):
         for cpm_var, val in zip(cpm_vars, vals):
             self.solver_var(cpm_var).setAttr("VarHintVal", val)
 
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using Gurobi's native IIS (Irreducible Inconsistent Subsystem) algorithm.
+
+        Args:
+            soft: List of soft constraints over which a MUS needs to be found
+            hard: List of hard constraints that always need to be satisfied
+
+        Returns a MUS (list of constraints from soft).
+        """
+        from ..tools.explain.utils import make_assump_model
+
+        # Create assumption variables and model with hard + (assumption -> soft)
+        m, soft, assumptions = make_assump_model(soft, hard)
+
+        # Instantiate solver (will check if solver is installed and licensed)
+        s = cls(m)
+        grb_model = s.grb_model
+
+        # Force all hard constraints into the IIS
+        grb_model.update()
+        for constr in grb_model.getConstrs():
+            constr.IISConstrForce = 1
+        for constr in grb_model.getGenConstrs():
+            constr.IISGenConstrForce = 1
+
+        # Add each assumption as a soft constraint `a>=1` using Gurobi directly,
+        # to gain access to the returned Gurobi constraints for IISConstr check
+        solver_assumptions = s.solver_vars(assumptions)
+        grb_model.update()
+        grb_assumptions = grb_model.addConstrs(a >= 1 for a in solver_assumptions).values()
+
+        try:
+            grb_model.computeIIS()
+        except gp.GurobiError as e:
+            if e.errno == gp.GRB.Error.IIS_NOT_INFEASIBLE:
+                raise AssertionError("MUS: model must be UNSAT")
+            raise
+
+        # Find which assumptions are in the IIS/MUS
+        return [s for s, grb_a in zip(soft, grb_assumptions) if grb_a.IISConstr]
+
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
