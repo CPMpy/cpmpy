@@ -70,10 +70,10 @@ def mus_native(soft, hard=[], solver="exact"):
     :param hard: hard constraints, optional, list of expressions
     :param solver: which solver to use (`exact` or `gurobi`)
     """
-
+    
     # get solver class
     solver_class = cp.SolverLookup.lookup(solver)
-
+    
     return solver_class.mus_native(soft, hard)
 
 

@@ -540,49 +540,46 @@ class CPM_gurobi(SolverInterface):
         # Post hard constraints to Gurobi
         s = cls(cp.Model(hard))
 
-        s.grb_model.update()  # update the model to get all posted hard constraints
-        grb_hard = s.grb_model.getConstrs() + s.grb_model.getGenConstrs()
         grb_soft = []  # each soft constraint will be represented by a *single* gurobi constraint
         for con in soft:
             get_variables(con, collect=s.user_vars)  # manually add soft constraint user vars to model
             match s.transform(con):
-                case [con]:  # if a constraint is represented by a single Gurobi constraint, no need to reify it
-                    grb_soft.append(s._add_transformed(con))
-                case cons:  # if a constraint is represented by multiple Gurobi constraints, group `C`
-                    assump = cp.boolvar()  # we introduce an auxiliary assumption variable, `a`
-                    assump_soft = assump.implies(cp.all(cons))  # we add `a -> /\ C` as a *hard* constraint
-                    grb_hard += [s._add_transformed(t) for t in s.transform(assump_soft)]  # re-transform required due to the added implication
-                    grb_soft.append(s._add_transformed(assump >= 1))  # then `a>=1` will be the single soft constraint whether group `C` is in the MUS
-
-        assert len(soft) == len(grb_soft), "Expected each soft constraint to be represented by a single Gurobi constraint"
+                case [con]:  # if a constraint is represented by a single Gurobi constraint, it can be added as-is
+                    grb_soft.append(con)
+                case cons:  # if a constraint is represented by multiple Gurobi constraints, `C`
+                    assumption = cp.boolvar()  # we introduce an auxiliary assumption variable, `a`
+                    s.add(assumption.implies(cp.all(cons)))  # we add `a -> /\ C` as a *hard* constraint (requires re-transform due to the added implication)
+                    grb_soft.append(assumption >= 1)  # then `a>=1` will be the single soft constraint whether group `C` is in the MUS
 
         # update required to avoid `gurobipy._exception.GurobiError: GenConstr has not yet been added to the model`
-        s.grb_model.update()
+        s.native_model.update()
 
-        # force all hard constraints (and reified soft constraints) into the IIS
-        for c in grb_hard:
-            if isinstance(c, gp.Constr):
-                c.IISConstrForce = 1
-            if isinstance(c, gp.GenConstr):
-                c.IISGenConstrForce = 1
+        # force all hard constraints (including reified soft constraints) into the IIS
+        for constr in s.native_model.getConstrs():
+            constr.IISConstrForce = 1
+        for constr in s.native_model.getGenConstrs():
+            constr.IISGenConstrForce = 1
+
+        # now add each soft constraint or the assumption representing it
+        grb_soft = [s._add_transformed(c) for c in grb_soft]  # note: now grb_soft contains gurobi constraint objects
 
         if DEBUG:
-            s.grb_model.write("/tmp/model.lp")
+            s.native_model.write("/tmp/model.lp")
 
         try:  # compute IIS (conveniently fails if original model was SAT)
-            s.grb_model.computeIIS()
+            s.native_model.computeIIS()
         except gp.GurobiError as e:
             if e.errno == gp.GRB.Error.IIS_NOT_INFEASIBLE:
                 raise AssertionError("MUS: model must be UNSAT")
             raise
 
         if DEBUG:
-            for constr in s.grb_model.getConstrs():
+            for constr in s.native_model.getConstrs():
                 print(f"  {constr.ConstrName}: IISConstr={constr.IISConstr}, IISConstrForce={constr.IISConstrForce}")
-            for constr in s.grb_model.getGenConstrs():
+            for constr in s.native_model.getGenConstrs():
                 print(f"  {constr.GenConstrName}: IISGenConstr={constr.IISGenConstr}, IISGenConstrForce={constr.IISGenConstrForce}")
 
-        # return a MUS consistent of each soft constraint of which its representing Gurobi soft constraint is in the IIS
+        # return a MUS consisting of each soft constraint of which its representing Gurobi soft constraint is in the IIS
         return [
             soft_i for soft_i, grb_soft_i in zip(soft, grb_soft)
             if (grb_soft_i.IISConstr if isinstance(grb_soft_i, gp.Constr) else grb_soft_i.IISGenConstr)
