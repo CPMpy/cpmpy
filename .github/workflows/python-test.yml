@@ -1,23 +1,26 @@
 name: Github Tests
 on: [push] # Can also put pull_request here, but then we dont run it when directly pushing to master
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install ".[test, z3, exact, pysat, pysdd, choco, minizinc, pindakaas, pumpkin]"
-          pip install pypblib  # dependency of pysat for PB constraints
-          pip install pytest-xdist
-          sudo snap install minizinc --classic          
-
-      - name: Test with pytest
-        run: |
-          python -m pytest -n auto tests/ --solver all -ref
+  test:
+    strategy:
+      fail-fast: true # cancel all jobs as soon as one solver test suite fails
+      matrix:
+        include:
+          - solver: ortools
+          - solver: z3
+          - solver: pysat
+            install_commands: |
+              pip install pypblib
+          - solver: choco
+          - solver: exact
+          - solver: gcs
+          - solver: minizinc
+            install_commands: |
+              sudo snap install minizinc --classic
+          - solver: pindakaas
+          - solver: pumpkin
+          - solver: scip
+    uses: ./.github/workflows/test-solver.yml
+    with:
+      solver: ${{ matrix.solver }}
+      install_commands: ${{ matrix.install_commands || '' }}

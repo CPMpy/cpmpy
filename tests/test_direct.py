@@ -1,14 +1,14 @@
 import numpy as np
 import pytest
 
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.solvers import CPM_gurobi, CPM_pysat, CPM_minizinc, CPM_pysdd, CPM_z3, CPM_exact, CPM_choco, CPM_hexaly
 
 
 class TestDirectORTools:
 
     def test_direct_automaton(self):
-        trans_vars = boolvar(shape=4, name="trans")
+        trans_vars = cp.boolvar(shape=4, name="trans")
         trans_tabl = [ # corresponds to regex 0* 1+ 0+
             (0, 0, 0),
             (0, 1, 1),
@@ -17,10 +17,10 @@ class TestDirectORTools:
             (2, 0, 2)
         ]
 
-        model = SolverLookup.get("ortools")
+        model = cp.SolverLookup.get("ortools")
 
-        model += DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
-                                  novar=[1, 2, 3])  # optional, what not to scan for vars
+        model += cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
+                                     novar=[1, 2, 3])  # optional, what not to scan for vars
 
         assert model.solveAll() == 6
 
@@ -29,12 +29,12 @@ class TestDirectORTools:
 class TestDirectExact:
 
     def test_direct_left_reif(self):
-        x,y = boolvar(2)
+        x,y = cp.boolvar(2)
 
-        model = SolverLookup.get("exact")
+        model = cp.SolverLookup.get("exact")
         print(model)
         # add x -> y>=1
-        model += DirectConstraint("addRightReification", (x, 1, [(1, y)], 1), novar=[1,3])
+        model += cp.DirectConstraint("addRightReification", (x, 1, [(1, y)], 1), novar=[1,3])
         print(model)
         assert model.solveAll() == 3
 
@@ -44,11 +44,11 @@ class TestDirectExact:
 class TestDirectPySAT:
 
     def test_direct_clause(self):
-        x,y = boolvar(2)
+        x,y = cp.boolvar(2)
 
-        model = SolverLookup.get("pysat")
+        model = cp.SolverLookup.get("pysat")
 
-        model += DirectConstraint("add_clause", [x, y])
+        model += cp.DirectConstraint("add_clause", [x, y])
 
         assert model.solve()
         assert x.value() or y.value()
@@ -58,11 +58,11 @@ class TestDirectPySAT:
 class TestDirectPySDD:
 
     def test_direct_clause(self):
-        x,y = boolvar(2)
+        x,y = cp.boolvar(2)
 
-        model = SolverLookup.get("pysdd")
+        model = cp.SolverLookup.get("pysdd")
 
-        model += DirectConstraint("conjoin", (x, y))
+        model += cp.DirectConstraint("conjoin", (x, y))
 
         assert model.solve()
         assert x.value() or y.value()
@@ -72,33 +72,33 @@ class TestDirectPySDD:
 class TestDirectZ3:
 
     def test_direct_clause(self):
-        iv = intvar(1,9, shape=3)
+        iv = cp.intvar(1,9, shape=3)
 
-        model = SolverLookup.get("z3")
+        model = cp.SolverLookup.get("z3")
 
-        model += DirectConstraint("Distinct", iv)
+        model += cp.DirectConstraint("Distinct", iv)
 
         assert model.solve()
-        assert AllDifferent(iv).value()
+        assert cp.AllDifferent(iv).value()
 
 @pytest.mark.skipif(not CPM_minizinc.supported(),
                     reason="MinZinc not installed")
 class TestDirectMiniZinc:
 
     def test_direct_clause(self):
-        iv = intvar(1,9, shape=3)
+        iv = cp.intvar(1,9, shape=3)
 
-        model = SolverLookup.get("minizinc")
+        model = cp.SolverLookup.get("minizinc")
 
         # MiniZinc is oddly different for DirectConstraint, because it is a text-based language
         # so, as DirectConstraint name, you need to give the name of a text-based constraint,
         # NOT a name of a function of the mzn_model class...
 
         # this just to demonstrate, there are no 0's in the domains...
-        model += DirectConstraint("alldifferent_except_0", iv)
+        model += cp.DirectConstraint("alldifferent_except_0", iv)
 
         assert model.solve()
-        assert AllDifferent(iv).value()
+        assert cp.AllDifferent(iv).value()
 
 
 @pytest.mark.skipif(not CPM_gurobi.supported(),
@@ -107,14 +107,14 @@ class TestDirectGurobi:
 
     def test_direct_poly(self):
 
-        x = intvar(0,10,name="x")
-        y = intvar(0,100,name="y")
+        x = cp.intvar(0,10,name="x")
+        y = cp.intvar(0,100,name="y")
 
-        model = SolverLookup.get("gurobi")
+        model = cp.SolverLookup.get("gurobi")
 
         # y = 2 x^3 + 1.5 x^2 + 1
         p = [2, 1.5, 0, 1]
-        model += DirectConstraint("addGenConstrPoly", (x, y, p),
+        model += cp.DirectConstraint("addGenConstrPoly", (x, y, p),
                                   novar=[2])  # optional, what not to scan for vars
 
         assert model.solve()
@@ -130,11 +130,11 @@ class TestDirectGurobi:
 class TestDirectChoco:
 
     def test_direct_global(self):
-        iv = intvar(1,9, shape=3)
+        iv = cp.intvar(1,9, shape=3)
 
-        model = SolverLookup.get("choco")
+        model = cp.SolverLookup.get("choco")
 
-        model += DirectConstraint("increasing", iv)
+        model += cp.DirectConstraint("increasing", iv)
         model += iv[1] < iv[0]
 
         assert not model.solve()
@@ -146,11 +146,11 @@ class TestDirectHexaly:
 
     def test_direct_distance(self):
 
-        a,b = intvar(0,10,shape=2, name=tuple("ab"))
+        a,b = cp.intvar(0,10,shape=2, name=tuple("ab"))
 
-        model = SolverLookup.get("hexaly")
+        model = cp.SolverLookup.get("hexaly")
 
-        model += DirectConstraint("dist",(a,b)) >= 3 # model distance between two variables
+        model += cp.DirectConstraint("dist",(a,b)) >= 3 # model distance between two variables
         assert model.solve()
 
         assert abs(a.value() - b.value()) >=3

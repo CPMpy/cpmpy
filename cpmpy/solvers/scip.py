@@ -27,10 +27,11 @@ from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import *
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
+from ..expressions.core import BoolVal, Comparison, Operator
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, boolvar
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
-from ..expressions.globalfunctions import GlobalFunction, Multiplication, Division
+from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.utils import is_num, is_true_cst, is_false_cst
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -38,7 +39,6 @@ from ..transformations.linearize import decompose_linear, decompose_linear_objec
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..expressions.utils import is_true_cst, is_false_cst
 
 
 class CPM_scip(SolverInterface):
@@ -59,19 +59,23 @@ class CPM_scip(SolverInterface):
 
     # Globals we keep and how they are translated in add():
     # - "xor": addConsXor();
-    # - "abs": addCons(abs(x) <= k); 
-    # - "mul", "div": addCons(mul,div == rhs).
-    supported_global_constraints = frozenset({"xor", "abs", "mul", "div"})
+    # - "abs": addCons(abs(x) <= k);
+    # - "mul": addCons(mul == rhs).
+    # No native "div": PySCIPOpt uses real division, which does not match CPMpy integer division
+    # (round toward zero); same rationale as Gurobi — decompose via Division.decompose().
+    supported_global_constraints = frozenset({"xor", "abs", "mul"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
     def supported():
         # try to import the package
         try:
-            import pyscipopt as scip
+            import pyscipopt
             return True
-        except Exception:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     @classmethod
     def version(cls) -> Optional[str]:
@@ -299,16 +303,13 @@ class CPM_scip(SolverInterface):
         if cpm_expr.name == "wsum":
             return scip.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
-        # GlobalFunction: abs, mul, div (PySCIPOpt supports these in constraints/objective)
+        # GlobalFunction: abs, mul (PySCIPOpt supports these in constraints/objective)
         if isinstance(cpm_expr, GlobalFunction):
             if cpm_expr.name == "abs":
                 return abs(self._make_numexpr(cpm_expr.args[0]))
             if cpm_expr.name == "mul":
                 a, b = self._make_numexpr(cpm_expr.args[0]), self._make_numexpr(cpm_expr.args[1])
                 return a * b
-            if cpm_expr.name == "div":
-                a, b = self._make_numexpr(cpm_expr.args[0]), self._make_numexpr(cpm_expr.args[1])
-                return a / b
 
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
 

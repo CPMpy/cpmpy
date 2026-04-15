@@ -48,14 +48,15 @@
 """
 import sys  # for stdout checking
 import time
+import warnings
 from typing import Optional, List
 
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -64,7 +65,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval
+from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num
 from ..exceptions import NotSupportedError
 
 import numpy as np
@@ -353,10 +354,11 @@ class CPM_exact(SolverInterface):
                 if display is not None:
                     self._fillVars()
                     if isinstance(display, Expression):
-                        print(argval(display))
-                    elif isinstance(display, list):
+                        print(display.value())
+                    elif is_any_list(display):
                         print(argvals(display))
                     else:
+                        assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                         display()  # callback
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
@@ -575,7 +577,7 @@ class CPM_exact(SolverInterface):
                     # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
                     if lhs.name == "mul":
                         if is_num(rhs): # make dummy var
-                            rhs = cp.intvar(rhs, rhs)
+                            rhs = intvar(rhs, rhs)
                         xct_rhs = self.solver_var(rhs)
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
                                                                                   "rewritten by linearize"
@@ -650,6 +652,28 @@ class CPM_exact(SolverInterface):
 
         # return cpm_variables corresponding to Exact core
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
+    
+    @classmethod
+    def mus_native(cls, soft, hard=[]):        
+        # Create assumption variables and model with hard + (assumption -> soft)
+        from cpmpy.tools.explain.utils import make_assump_model # avoid circular import
+        m, soft, assumptions = make_assump_model(soft, hard)
+        
+        # initialize solver object with model
+        s = cls(m)
+        
+        # set up assumptions for exact
+        xct_assumptions = [s.solver_var(x) for x in assumptions]
+        s.xct_solver.setAssumptions([(x, 1) for x in xct_assumptions])
+
+        # call native MUS extractor
+        res_xct, mus_xct = s.xct_solver.extractMUS()
+        
+        assert res_xct != "SAT", "MUS: model must be UNSAT"
+
+        # get the constraints back from the assumption variables
+        dmap = dict(zip(xct_assumptions, soft))
+        return [dmap[c] for c in mus_xct]
 
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):

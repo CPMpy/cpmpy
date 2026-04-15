@@ -25,14 +25,14 @@ import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression
+from ..expressions.core import Expression, ListLike
 from ..expressions.variables import _NumVarImpl
 from ..transformations.get_variables import get_variables
-from ..expressions.utils import is_any_list
+from ..expressions.utils import is_any_list, argvals
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
 
-Callback: TypeAlias = Expression | List[Expression] | Callable # type alias to use in solveAll
+Callback: TypeAlias = Expression | ListLike[Expression] | Callable # type alias to use in solveAll
 
 class SolverInterface(object):
     """
@@ -270,10 +270,11 @@ class SolverInterface(object):
             if display is not None:
                 if isinstance(display, Expression):
                     print(display.value())
-                elif isinstance(display, list):
-                    print([v.value() for v in display])
+                elif is_any_list(display):
+                    print(argvals(display))
                 else:
-                    display() # callback
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                    display()  # callback
 
             # count and stop
             solution_count += 1
@@ -326,6 +327,19 @@ class SolverInterface(object):
         Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
         """
         raise NotSupportedError("Solver does not support unsat core extraction")
+    
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        For using the solver's internal MUS extractor 
+
+        Args:
+            soft: List of soft constraints over which a MUS needs to be found
+            hard: List of hard constraints that always need to be satisfied
+
+        Returns a MUS.
+        """
+        raise NotSupportedError("Solver does not support MUS extraction")
 
 
     # shared helper functions
@@ -382,7 +396,7 @@ class SolverStatus(object):
         Status and statistics of a solver run
     """
     exitstatus: ExitStatus
-    runtime: time
+    runtime: Optional[float]
 
     def __init__(self, name):
         self.solver_name = name
