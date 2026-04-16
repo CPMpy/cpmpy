@@ -352,6 +352,7 @@ class CPM_exact(SolverInterface):
                 solsfound += 1
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
+                    self._fillVars()
                     self.print_display(display)
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
