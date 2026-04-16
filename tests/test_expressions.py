@@ -3,7 +3,8 @@ import pytest
 import cpmpy as cp
 import numpy as np
 
-from cpmpy.expressions import *
+from cpmpy.expressions.variables import boolvar, intvar, cpm_array
+from cpmpy.expressions.globalfunctions import Maximum, Abs
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
@@ -91,6 +92,10 @@ class TestWeightedSum:
         expr2 = 3 + self.ivs[0] * 4
         assert isinstance(expr2, Operator)
         assert expr2.name == 'sum'
+        expr3 = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
+        assert isinstance(expr3, Operator)
+        assert expr3.name == 'sum'
+
 
     def test_weightedadd_iv(self):
 
@@ -126,11 +131,6 @@ class TestWeightedSum:
         expr4 = - self.ivs[0] + self.ivs[1] * 4 - 6 * self.ivs[2]
         assert isinstance(expr4, Operator)
         assert expr4.name == 'wsum'
-
-    def test_weightedadd_int(self):
-        expr = self.ivs[0] * 4 + 5 * self.ivs[1] + 6
-        assert isinstance(expr, Operator)
-        assert expr.name == 'sum'
 
     def test_weightedadd_sub(self):
         expr = self.ivs[0] * 4 - 5 * self.ivs[1]
@@ -240,7 +240,7 @@ class TestMul:
         prod = x * a
 
         assert isinstance(prod, NDVarArray)
-        for expr in prod.args:
+        for expr in prod:
             assert isinstance(expr, Expression) or expr == 0
 
 class TestArrayExpressions:

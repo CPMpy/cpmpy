@@ -62,7 +62,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callbac
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, argval, argvals
+from ..expressions.utils import is_num, argval, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
@@ -186,8 +186,9 @@ class CPM_gcs(SolverInterface):
         prove |= verify
         # Set default proof name to name of file containing __main__
         if prove and proof_name is None:
-            if hasattr(sys.modules['__main__'], "__file__"):
-                self.proof_name = path.splitext(path.basename(sys.modules['__main__'].__file__))[0]
+            main_file = sys.modules['__main__'].__file__
+            if main_file is not None:
+                self.proof_name = path.splitext(path.basename(main_file))[0]
             else:
                 self.proof_name = "gcs_proof"
         else:
@@ -262,7 +263,7 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def solveAll(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, solution_limit:Optional[int]=None, call_from_model=False,
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False,
                  prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
                  verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
@@ -295,8 +296,9 @@ class CPM_gcs(SolverInterface):
         prove |= verify
         # Set default proof name to name of file containing __main__
         if prove and proof_name is None:
-            if hasattr(sys.modules['__main__'], "__file__"):
-                self.proof_name = path.splitext(path.basename(sys.modules['__main__'].__file__))[0]
+            main_file = sys.modules['__main__'].__file__
+            if main_file is not None:
+                self.proof_name = path.splitext(path.basename(main_file))[0]
             else:
                 self.proof_name = "gcs_proof"
         self.proof_location = proof_location
@@ -312,17 +314,16 @@ class CPM_gcs(SolverInterface):
                     cpm_var._value = solution_map[sol_var]
 
             if isinstance(display, Expression):
-                print(argval(display))
-            elif isinstance(display, list):
-                # explicit list of expressions to display
+                print(display.value())
+            elif is_any_list(display):
                 print(argvals(display))
-            elif callable(display):
-                display()
             else:
-                raise NotImplementedError("Glasgow Constraint Solver: Unknown display type.".format(cpm_var))
-            return 
+                assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                display()  # callback
+            return
+
         sol_callback = None
-        if display:
+        if display is not None:
             sol_callback=display_callback
 
         self.gcs_result = self.gcs.solve(

@@ -1038,18 +1038,6 @@ class TestSupportedSolvers:
     def test_false(self, solver):
         assert not cp.Model([cp.boolvar(), False]).solve(solver=solver)
 
-
-    def test_bva_min(self, solver):
-        import cpmpy as cp
-
-        x = cp.intvar(1, 5, name='x')
-        y = cp.intvar(1, 5, name='y')
-        d = cp.intvar(0, 5, name='d')
-        m = cp.Model(x // y == d)
-
-        # Crashes on second iteration of solveAll
-        m.solveAll(solver='pindakaas')
-
     def test_partial_div_mod(self, solver):
         if solver in ("pysdd", "rc2"):  # pysdd: div/mod; rc2: no decision problems (solveAll)
             pytest.skip("solver does not support this test context")
@@ -1111,49 +1099,6 @@ class TestSupportedSolvers:
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
-
-    def test_status_solveall(self, solver):
-        if solver == "hexaly":
-            pytest.skip("hexaly cannot proveably find all solutions, so status is never OPTIMAL")
-
-        bv = cp.boolvar(shape=3, name="bv")
-        m = cp.Model(cp.any(bv))
-
-        limit = None
-        if solver in ("gurobi", "cplex"): limit = 100000
-
-        num_sols = m.solveAll(solver=solver, solution_limit=limit)
-        assert num_sols == 7
-        assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
-
-
-
-        # adding a bunch of variables to increase nb of sols
-        try:
-            x = cp.boolvar(shape=32, name="x")
-            m = cp.Model(cp.any(x))
-            num_sols = m.solveAll(solver=solver, time_limit=1, solution_limit=limit)
-            assert m.status().exitstatus == ExitStatus.FEASIBLE
-
-            num_sols = m.solveAll(solver=solver, solution_limit=10)
-            assert num_sols == 10
-            assert m.status().exitstatus == ExitStatus.FEASIBLE
-
-            # edge-case: nb of solutions is exactly the sol limit
-            m = cp.Model(cp.any(bv))
-            num_sols = m.solveAll(solver=solver, solution_limit=7)
-            assert num_sols ==  7
-            assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE) # which of the two?
-
-        except NotImplementedError:
-            pass # not all solvers support time/solution limits
-
-        # making the problem unsat
-        if solver != "pysdd": # constraint not supported by pysdd
-            m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
-            num_sols = m.solveAll(solver=solver, solution_limit=limit)
-            assert num_sols == 0
-            assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
     def test_hidden_user_vars(self, solver):

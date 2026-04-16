@@ -2,7 +2,7 @@
 
 CPMpy can be used as a declarative modeling language: you create a `Model()`, add constraints and call `solve()` on it.
 
-The default solver is OR-Tools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, a conflict-driven cutting-planes solver (Exact), even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
+The default solver is OR-Tools CP-SAT, an award winning constraint solver. But CPMpy supports multiple other solvers: more CP solvers (IBM-CPO, Choco, GCS, Pumpkin), ILP solvers (Gurobi, IBM ILOG CPLEX), SAT solvers (those in PySAT and Pindakaas), the RC2 MaxSAT solver, the Z3 SMT solver, a conflict-driven cutting-planes solver (Exact), even a knowledge compiler (PySDD), a global optimisation solver (Hexaly) and any CP solver supported by the text-based MiniZinc language.
 
 See the list of solvers known by CPMpy with:
 
@@ -15,17 +15,17 @@ Note that many require additional packages to be installed. For example, try `So
 You can specify a solvername when calling `solve()` on a model:
 
 ```python
-from cpmpy import *
-x = intvar(0,10, shape=3)
-m = Model()
-m += sum(x) <= 5
+import cpmpy as cp
+x = cp.intvar(0,10, shape=3)
+m = cp.Model()
+m.add(cp.sum(x) <= 5)
 # use named solver
 m.solve(solver="ortools")
 ```
 
 In this case, a model is a **lazy container**. It simply stores the constraints. Only when `solve()` is called will it instantiate a solver, and send the entire model to it at once. The last line above is equivalent to:
 ```python
-s = SolverLookup.get("ortools", m)
+s = cp.SolverLookup.get("ortools", m)
 s.solve()
 ```
 
@@ -35,10 +35,10 @@ Solver interfaces allow more than the generic model interface, because, well, th
 Importantly, the solver interface supports the same functions as the `Model()` object (for adding constraints, an objective, solve, solveAll, status, ...). So if you want to make use of some features of a solver, simply replace `m = Model()` by `m = SolverLookup.get("your-preferred-solvername")` and your code remains valid. Below, we replace `m` by `s` for readability.
 
 ```python
-from cpmpy import *
-x = intvar(0,10, shape=3)
-s = SolverLookup.get("ortools")
-s += sum(x) <= 5
+import cpmpy as cp
+x = cp.intvar(0,10, shape=3)
+s = cp.SolverLookup.get("ortools")
+s.add(cp.sum(x) <= 5)
 # we are operating on the ortools interface here
 s.solve()
 ```
@@ -76,10 +76,10 @@ We sometimes add solver-specific features to the CPMpy interface, for convenient
 
 `solution_hint()` tells the solver that it could use these variable-values first during search, e.g. typically from a previous solution:
 ```python
-from cpmpy import *
-x = intvar(0,10, shape=3)
-s = SolverLookup.get("ortools")
-s += sum(x) <= 5
+import cpmpy as cp
+x = cp.intvar(0,10, shape=3)
+s = cp.SolverLookup.get("ortools")
+s.add(cp.sum(x) <= 5)
 # we are operating on a ortools' interface here
 s.solution_hint(x, [1,2,3])
 s.solve()
@@ -102,10 +102,10 @@ This has two potential benefits for incremental solving, whereby you add more co
 ```python
 gs = SolverLookup.get("gurobi")
 
-gs += sum(ivar) <= 5 
+gs.add(cp.sum(ivar) <= 5)
 gs.solve()
 
-gs += sum(ivar) == 3
+gs.add(cp.sum(ivar) == 3)
 # the underlying gurobi instance is reused, only the new constraint is added to it.
 # gurobi is an incremental solver and will look for solutions starting from the previous one.
 gs.solve()
@@ -122,13 +122,13 @@ The `DirectConstraint` will directly call a function of the underlying solver wh
 You provide it with the name of the function you want to call, as well as the arguments:
 
 ```python
-from cpmpy import *
-iv = intvar(1,9, shape=3)
+import cpmpy as cp
+iv = cp.intvar(1,9, shape=3)
 
-s = SolverLookup.get("ortools")
+s = cp.SolverLookup.get("ortools")
 
-s += AllDifferent(iv)
-s += DirectConstraint("AddAllDifferent", iv)  # a DirectConstraint equivalent to the above for OrTools
+s.add(cp.AllDifferent(iv))
+s.add(cp.DirectConstraint("AddAllDifferent", iv))  # a DirectConstraint equivalent to the above for OrTools
 ```
 
 This requires knowledge of the API of the underlying solver, as any function name that you give to it will be called. The only special thing that the DirectConstraint does, is automatically translate any CPMpy variable in the argument to the native solver variable.
@@ -136,10 +136,10 @@ This requires knowledge of the API of the underlying solver, as any function nam
 Note that any argument given will be checked for whether it needs to be mapped to a native solver variable. This may give errors on complex arguments, or be inefficient. You can tell the `DirectConstraint` not to scan for variables with `noarg` argument, for example:
 
 ```python
-from cpmpy import *
-trans_vars = boolvar(shape=4, name="trans")
+import cpmpy as cp
+trans_vars = cp.boolvar(shape=4, name="trans")
 
-s = SolverLookup.get("ortools")
+s = cp.SolverLookup.get("ortools")
 
 trans_tabl = [ # corresponds to regex 0* 1+ 0+
     (0, 0, 0),
@@ -148,8 +148,8 @@ trans_tabl = [ # corresponds to regex 0* 1+ 0+
     (1, 0, 2),
     (2, 0, 2)
 ]
-s += DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
-                      novar=[1, 2, 3])  # optional, what not to scan for vars
+s.add(cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
+                          novar=[1, 2, 3])  # optional, what not to scan for vars
 ```
 
 A minimal example of the DirectConstraint for every supported solver is [in the test suite](https://github.com/CPMpy/cpmpy/tree/master/tests/test_direct.py).
@@ -161,12 +161,12 @@ The `DirectConstraint` is a very powerful primitive to get the most out of speci
 The `DirectConstraint("AddAllDifferent", iv)` is equivalent to the following code, which demonstrates that you can mix the use of CPMpy with calling the underlying solver directly: 
 
 ```python
-from cpmpy import *
-iv = intvar(1,9, shape=3)
+import cpmpy as cp
+iv = cp.intvar(1,9, shape=3)
 
-s = SolverLookup.get("ortools")
+s = cp.SolverLookup.get("ortools")
 
-s += AllDifferent(iv)  # the traditional way, equivalent to:
+s.add(cp.AllDifferent(iv))  # the traditional way, equivalent to:
 s.ort_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API, has to be with native variables
 ```
 

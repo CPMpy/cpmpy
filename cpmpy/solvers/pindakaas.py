@@ -39,7 +39,7 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
@@ -78,9 +78,6 @@ class CPM_pindakaas(SolverInterface):
     supported_global_constraints = frozenset()
     supported_reified_global_constraints = frozenset()
 
-
-    DEBUG = True
-
     @staticmethod
     def supported():
         try:
@@ -118,6 +115,7 @@ class CPM_pindakaas(SolverInterface):
         self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
         # TODO workaround for upstream issue https://github.com/pindakaashq/pindakaas/issues/189
+        self.pdk_solver._set_option("factor", 0)
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
         super().__init__(name=name, cpm_model=cpm_model)
@@ -156,12 +154,13 @@ class CPM_pindakaas(SolverInterface):
 
         self.user_vars = self._int2bool_user_vars()
 
+        time_limit_delta: Optional[timedelta] = None
         if time_limit is not None:
-            time_limit = timedelta(seconds=time_limit)
-        solver_assumptions = None if assumptions is None else self.solver_vars(assumptions)
+            time_limit_delta = timedelta(seconds=time_limit)
+        solver_assumptions: Optional[List[Any]] = None if assumptions is None else self.solver_vars(assumptions)
 
         t = time.time()
-        with self.pdk_solver.solve(time_limit=time_limit, assumptions=solver_assumptions) as result:
+        with self.pdk_solver.solve(time_limit=time_limit_delta, assumptions=solver_assumptions) as result:
             self.cpm_status.runtime = time.time() - t
 
             # translate pindakaas result status to cpmpy status
@@ -192,7 +191,6 @@ class CPM_pindakaas(SolverInterface):
                         raise ValueError(
                             f"Integer variables should have been encoded using `int2bool` transformation, but {cpm_var} is integer, please report on GitHub"
                         )
-                    print(f"result.value({self._dbg_lit(lit)})")
                     value = result.value(lit)
                     assert value is not None, (
                         f"All user variables should have been assigned, but {cpm_var} (literal {lit}) was not."
@@ -209,6 +207,7 @@ class CPM_pindakaas(SolverInterface):
                     cpm_var._value = None
                 # we have to save the unsat core here, as the result object does not live beyond this solve call
                 if assumptions is not None:
+                    assert solver_assumptions is not None and len(assumptions) == len(solver_assumptions), "Number of assumptions and solver assumptions must match"
                     self.core = [x for x, s_x in zip(assumptions, solver_assumptions) if result.failed(s_x)]
 
         return has_sol
@@ -220,9 +219,7 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
             # insert if new
             if cpm_var.name not in self._varmap:
-                x = self.pdk_solver.new_var()
-                print(f"x_{x.id()} = self.pdk_solver.new_var()")
-                self._varmap[cpm_var.name] = x
+                self._varmap[cpm_var.name] = self.pdk_solver.new_var()
             return self._varmap[cpm_var.name]
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
@@ -272,22 +269,12 @@ class CPM_pindakaas(SolverInterface):
 
     __add__ = add  # avoid redirect in superclass
 
-    def _dbg_lit(self, l):
-        v = abs(l.id())
-        p = '' if l.id() > 0 else "~"
-        return f"{p}x_{v}"
-
     def _add_clause(self, clause, conditions=[]):
         """Add a clause implied by conditions; both arguments are lists of CPMpy literals."""
-        if not isinstance(clause, list):
+        if not isinstance(clause, (tuple, list)):
             raise TypeError
 
-        clause = self.solver_vars([~c for c in conditions] + clause)
-        if self.__class__.DEBUG:
-            cls = ','.join(self._dbg_lit(l) for l in clause)
-            print(f"pdk_solver.add_clause([{cls}])")
-
-        self.pdk_solver.add_clause(clause)
+        self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + list(clause)))
 
     def _post_constraint(self, cpm_expr, conditions=[]):
         if not isinstance(conditions, list):
@@ -330,12 +317,7 @@ class CPM_pindakaas(SolverInterface):
             # Create `pindakaas` Boolean linear expression object
             lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
 
-            conditions = self.solver_vars(conditions)
-            constraint = eval_comparison(cpm_expr.name, lhs, rhs)
-            if self.__class__.DEBUG:
-                lhs = " + ".join(f"{c} * {self._dbg_lit(l)}" for c, l in zip(coefficients, self.solver_vars(literals)))
-                print(f"pdk_solver.add_encoding({lhs} {cpm_expr.name} {rhs}, conditions=[{','.join(self._dbg_lit(c) for c in conditions)}])")
-            self.pdk_solver.add_encoding(constraint, conditions=conditions)
+            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=self.solver_vars(conditions))
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 
