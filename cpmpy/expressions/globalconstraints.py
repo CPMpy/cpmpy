@@ -112,6 +112,7 @@
         ShortTable
         NegativeTable
         Regular
+        MDD
         IfThenElse
         InDomain
         Xor
@@ -133,6 +134,7 @@
 
 """
 import warnings
+from collections import defaultdict
 from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
 
@@ -141,7 +143,7 @@ import cpmpy as cp
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, _IntVarImpl, NDVarArray
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
+from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, argval
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -824,6 +826,151 @@ class Regular(GlobalConstraint):
             else:
                 return False
         return curr_node in accepting
+
+
+class MDD(GlobalConstraint):
+    """
+    MDD-constraint: an MDD (Multi-valued Decision Diagram) is an acyclic layered graph starting from a single node and
+    ending in one. Each path of the MDD corresponds to a solution.
+    The values of the variables in 'array' correspond to a path in the MDD formed by the transitions in 'transitions'.
+    The root node is the first node used as a start in the first transition (i.e. transitions[0][0])
+    spec:
+        - array: an array of CPMpy expressions (integer variable, global functions,...)
+        - transitions: an array of tuples (nodeID, int, nodeID) where nodeID is some unique identifier for the nodes
+        (int or str are fine)
+    Example:
+        The following transitions depict a 3 layer MDD, starting at 'r' and ending in 't'
+        ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+        ("n4", 0, "t"), ("n5", 1, "t")
+        Its graphical representation is:
+                  r
+              0/ |1  \2     X
+            n1   n2   n3
+            2| /2    /O     Y
+             n4     n5
+              0\   /1       Z
+                 t
+        It has 3 paths, corresponding to 3 solution for (X,Y,Z): (0,2,0), (1,2,0) and (2,0,1)
+    """
+
+    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]]):
+        """
+        Arguments:
+            array (ListLike[Expression]): List of expressions representing the input sequence
+            transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (source, value, destination)
+        """
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
+
+        def is_transition(arg):
+            """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
+            a transition value and an ending node"""
+            return len(arg) == 3 and \
+                isinstance(arg[0], (int, str)) and is_int(arg[1]) and isinstance(arg[2], (int, str))
+
+
+        if not all(is_transition(transition) for transition in transitions):
+            raise TypeError("The second argument of an MDD constraint should be collection of transitions")
+        super().__init__("mdd", (array, transitions))
+        self.root_node = transitions[0][0]
+        self.mapping = defaultdict(dict)
+        for s, v, e in transitions:
+            self.mapping[s][v] = e
+
+        self.levels = {self.root_node: 0}
+        current_nodes = [self.root_node]
+        for i in range(len(array)):
+            new_nodes = []
+            for n in current_nodes:
+                for v in self.mapping[n]:
+                    new_nodes.append(self.mapping[n][v])
+                    self.levels[self.mapping[n][v]] = i + 1
+            current_nodes = new_nodes
+
+    def _reduce(self):
+        """
+            Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes (to be implemented)
+        """
+        pass
+
+
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+            Flow decomposition of the MDD global constraint.
+            Enforces that the condition is satisfied.
+
+            Returns:
+                tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, _ = self.args
+
+        flow = {k: {"in" : [], "out" : []} for k in self.levels.keys()}
+        transition_counter = {(level, d): 0 for level in range(len(arr)) for d in range(arr[level].lb, arr[level].ub+1)}
+
+        for (src, edges) in self.mapping.items():
+            for (value, dst) in edges.items():
+                transition = (self.levels[src], value)
+                transition_counter[transition] += 1
+                flow[src]["out"].append((transition, transition_counter[transition]))
+                flow[dst]["in"].append((transition, transition_counter[transition]))
+
+        cons = []
+        substitution = {}
+        for key in transition_counter.keys():
+            (level, value) = key
+            if transition_counter[key] == 0:
+                continue
+            elif transition_counter[key] == 1:
+                substitution[(key, 1)] = (arr[level] == value)
+            else:
+                bvs = cp.boolvar(shape=transition_counter[key]) # edge variables must be defined
+                for n in range(1, transition_counter[key] + 1):
+                    substitution[(key, n)] = bvs[n - 1]
+
+        for i, key in enumerate(sorted(flow.keys(), key=lambda k: self.levels[k])):
+
+            if ((len(flow[key]["in"]) == 1) and (len(flow[key]["out"]) == 1) and
+                    transition_counter[flow[key]["in"][0][0]] > 1 and transition_counter[flow[key]["out"][0][0]] > 1):
+                substitution[flow[key]["out"][0]] = substitution[flow[key]["in"][0]] # substitute equivalent edge variables
+
+            elif (len(flow[key]["in"]) > 0) and (len(flow[key]["out"]) > 0):
+                cons += [cp.sum([substitution[edge] for edge in flow[key]["in"]]) ==
+                         cp.sum([substitution[edge] for edge in flow[key]["out"]])]
+
+            elif len(flow[key]["in"]) == 0:
+                cons += [cp.sum([substitution[edge] for edge in flow[key]["out"]]) == 1]
+
+            elif len(flow[key]["out"]) == 0:
+                cons += [cp.sum([substitution[edge] for edge in flow[key]["in"]]) == 1]
+
+        for key in transition_counter.keys():
+            if transition_counter[key] > 1:
+                (level, value) = key
+                cons += [cp.sum([substitution[(key, n)] for n in range(1, transition_counter[key] + 1)]) == (arr[level] == value)]
+
+        return cons, []
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        arr, transitions = self.args
+        arrvals = [argval(a) for a in arr]
+        curr_node = self.root_node
+        for v in arrvals:
+            if v is None:
+                return None
+            if curr_node in self.mapping:
+                if v in self.mapping[curr_node]:
+                    curr_node = self.mapping[curr_node][v]
+                else:
+                    return False
+            else:
+                return False
+        return True # can only have reached end node
+
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
