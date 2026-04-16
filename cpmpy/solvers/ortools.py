@@ -894,6 +894,7 @@ try:
         def __init__(self, solver, display=None, solution_limit=None, verbose=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
+            self._solver = solver
             # we only need the cpmpy->solver varmap from the solver
             self._varmap = solver._varmap
             # identify which variables to populate with their values
@@ -918,14 +919,7 @@ try:
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                # print the desired display
-                if isinstance(self._display, Expression):
-                    print(self._display.value())
-                elif is_any_list(self._display):
-                    print(argvals(self._display))
-                else:
-                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    self._display()  # callback
+                self._solver.print_display(self._display)
 
             # check for count limit
             if self.solution_count() == self._solution_limit:
