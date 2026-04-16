@@ -4,8 +4,9 @@
     - Deletion-based MUS
     - QuickXplain
     - Optimal MUS
-    - Native MUS for given solvers
-    - IIS-based MUS extraction
+    - Native MUS for given solvers:
+        - Exact: deletion-based MUS extraction
+        - Gurobi: IIS-based MUS extraction
 """
 import warnings
 import numpy as np
