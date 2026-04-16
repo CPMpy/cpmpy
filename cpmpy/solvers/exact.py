@@ -352,14 +352,7 @@ class CPM_exact(SolverInterface):
                 solsfound += 1
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
-                    self._fillVars()
-                    if isinstance(display, Expression):
-                        print(display.value())
-                    elif is_any_list(display):
-                        print(argvals(display))
-                    else:
-                        assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                        display()  # callback
+                    self.print_display(display)
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout
