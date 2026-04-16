@@ -1198,6 +1198,9 @@ class TestSupportedSolvers:
 @pytest.mark.generate_constraints.with_args(numexprs)
 def test_objective_numexprs(solver, constraint):
 
+    if solver == "exact" and constraint.name == "circuit":
+        pytest.xfail(reason="Upstream bug in Exact when using MTZ-circuit constraint, see issue #896")
+
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
     try:
         model.minimize(constraint)
