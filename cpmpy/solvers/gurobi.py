@@ -330,7 +330,7 @@ class CPM_gurobi(SolverInterface):
 
         def add_(cpm_expr, depth):
             if self.verbose:
-                print(f"{"  " * depth}Add:", cpm_expr, type(cpm_expr))
+                print(f"{'  ' * depth}Add:", cpm_expr, type(cpm_expr))
 
             depth += 1
 
