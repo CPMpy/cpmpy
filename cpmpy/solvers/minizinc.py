@@ -306,7 +306,7 @@ class CPM_minizinc(SolverInterface):
         import minizinc
 
         if time_limit is not None:
-            kwargs['timeout'] = timedelta(seconds=time_limit)
+            kwargs['time_limit'] = timedelta(seconds=time_limit)
 
         # hack, we need to add the objective in a way that it can be changed
         # later, so make copy of the mzn_model
