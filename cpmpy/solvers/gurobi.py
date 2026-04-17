@@ -532,50 +532,64 @@ class CPM_gurobi(SolverInterface):
         Returns a MUS (list of constraints from soft).
         """
 
-        hard = toplevel_list(hard)
-        soft = toplevel_list(soft, merge_and=False)
+        # TODO unsure if needed?
+        soft_cons = toplevel_list(soft, merge_and=False)
 
-        # post hard constraints to Gurobi
-        s = cls(cp.Model(hard))
+        # instantiate Gurobi solver
+        s = cls()
 
-        # The Gurobi IIS algorithm minimizes constraints directly, unlike assumption-based solvers. However, a user-level constraint may be transformed to a group of multiple Gurobi constraints. In this case, we have to represent this group by a *single* soft constraint, otherwise the Gurobi IIS may not map to the user-level constraint MUS. We collect `tf_soft` so that `tf_soft[i]` is a single soft constraint representing `soft[i]`.
-        tf_soft = []
+        # we collect the Gurobi constraint objects, so we can enable their `IISConstrForce` attribute later
+        grb_hard_cons = []
 
-        # note: we collect `tf_soft` here but do not add them to the solver yet, so we can first enable the `IISConstrForce` for all hard constraints
-        # note: we use `s.transform`, then `_add_transformed`, to add some of the constraints to the solver. This bypasses normal creation of `user_vars`. This is safe to do since `user_vars` are not used in this algorithm, and the solver object does not leave this function.
-        for con in soft:
-            # manually transform the constraint so we can see whether `con` is represented by more than one constraint
-            tf_cons = s.transform(con)
-            if len(tf_cons) == 0:
-                # this uncommon case ensures `tf_soft` maps to `soft`
-                tf_soft.append(cp.BoolVal(True))
-            elif len(tf_cons) == 1:
+        # transform and add all hard constraints
+        for cpm_con in s.transform(hard):
+            # note: we use `s.transform`, then `_add_transformed`, to add some of the constraints to the solver, because need to introspect the transformation and require access to the Gurobi constraints. This bypasses normal creation of `user_vars`. This is safe to do since `user_vars` are not used in this algorithm, and the solver object does not leave this function.
+            grb_con = s._add_transformed(cpm_con)
+            grb_hard_cons.append(grb_con)
+
+        # The Gurobi IIS algorithm minimizes constraints directly, unlike assumption-based solvers. However, a user-level constraint may be transformed to a group of multiple Gurobi constraints. In this case, we have to represent this group by a *single* soft constraint, otherwise the Gurobi IIS may not map to the user-level constraint MUS. We collect `tf_soft` so that `tf_soft[i]` is a single soft constraint representing `soft[i]`. After calling `computeIIS`, we can read the `IISConstr` attribute to see which are in the IIS/MUS.
+        grb_soft_cons = []
+
+        for soft_con in soft_cons:
+            # manually transform the constraint so we can see whether `soft_con` is represented by more than one constraint
+            soft_con_tf = s.transform(soft_con)
+
+            if len(soft_con_tf) == 0:
+                # this uncommon case ensures `grb_soft_cons` maps to `soft_cons`
+                soft_con_rep = cp.BoolVal(True)
+            elif len(soft_con_tf) == 1:
                 # if `con` represented by a single transformed constraint, it can be added as-is
-                tf_soft.append(tf_cons[0])
+                soft_con_rep = soft_con_tf[0]
             else:
-                # we represent the group of multiple Gurobi constraints `tf_cons` with a new auxiliary assumption variable `a` and adding *hard* constraint `a -> /\ C`
+                # `soft_con_tf` is a group of multiple constraints. We introduce an assumption variable `a` and add *hard* constraint `a -> /\ tf_cons`. Then, `a` be a single soft constraint implying `soft_con`
                 assumption = cp.boolvar()
+
                 # adding `a -> /\ C` may require re-transform due to the added implication
-                s.add(assumption.implies(cp.all(tf_cons)))
-                # then `a>=1` will be the single soft constraint to group `C` is in the MUS
-                tf_soft.append(assumption >= 1)
+                additional_hard_constraint = assumption.implies(cp.all(soft_con_tf))
+                for tf_con in s.transform(additional_hard_constraint):
+                    grb_hard_cons.append(s._add_transformed(tf_con))
 
-        # update required to avoid `gurobipy._exception.GurobiError: GenConstr has not yet been added to the model`
+                # `a >= 1` will be the single soft constraint to indicate whether `soft_cons[i]` is in the MUS
+                soft_con_rep = assumption >= 1
+
+            grb_soft_cons.append(s._add_transformed(soft_con_rep))
+
+
+        # update required to avoid `gurobipy._exception.GurobiError: GenConstr has not yet been added to the model` when accessing constraint attribute.
+        # model updates can be expensive, so we do this only once!
         s.native_model.update()
-
-        # force all hard constraints (including the reified soft constraints) into the IIS by enabling the `IISConstrForce`. Different constraint types have different names for this attritube.
-        for con in s.native_model.getConstrs():
-            con.setAttr("IISConstrForce", 1)
-        for con in s.native_model.getGenConstrs():
-            con.setAttr("IISGenConstrForce", 1)
-        # we don't use these latter two at the time of writing, but future-proof anyway
-        for con in s.native_model.getQConstrs():
-            con.setAttr("IISQConstrForce", 1)
-        for con in s.native_model.getSOSs():
-            con.setAttr("IISSOSForce", 1)
-
-        # now add each soft constraint or the assumption representing it
-        grb_soft = [s._add_transformed(c) for c in tf_soft]
+        for grb_con in grb_hard_cons:
+            # Different Gurobi constraint types have different names for this `IIS*Force` attritube
+            if isinstance(grb_con, gp.Constr):
+                grb_con.IISConstrForce = 1
+            elif isinstance(grb_con, gp.GenConstr):
+                grb_con.IISGenConstrForce = 1
+            elif isinstance(grb_con, gp.QConstr):
+                grb_con.IISQConstrForce = 1
+            elif isinstance(grb_con, gp.SOS):
+                grb_con.IISSOSForce = 1
+            else:
+                raise TypeError(f"Unexpected Gurobi constraint {grb_con} of type {type(grb_con)}")
 
         # compute IIS (conveniently fails if original model was SAT since it will solve the model)
         try:
@@ -586,7 +600,7 @@ class CPM_gurobi(SolverInterface):
             raise
 
         mus = []
-        for soft_i, grb_soft_i in zip(soft, grb_soft):
+        for soft_i, grb_soft_i in zip(soft_cons, grb_soft_cons):
             # if grb_soft_i has the `IISConstr` attribute enabled, then `soft_i` is in the MUS. Again, the exact attribute depends on the constraint type.
             if any(getattr(grb_soft_i, attr, False) for attr in ("IISConstr", "IISGenConstr", "IISQConstr", "IISSOS")):
                 mus.append(soft_i)
