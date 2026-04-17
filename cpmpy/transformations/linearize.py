@@ -311,7 +311,7 @@ def only_positive_bv(lst_of_expr, csemap=None):
                         if nbv:
                             aux = cp.boolvar()
                             new_args.append(aux)
-                            new_cons += [aux + lhs.args[i]._bv == 1]  # aux == 1 - arg._bv
+                            new_cons.append(aux + lhs.args[i]._bv == 1)  # aux == 1 - arg._bv
                         else:
                             new_args.append(lhs.args[i])
 
