@@ -47,7 +47,7 @@ EXCLUDE_OPERATORS = {"pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [cp.intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
-NUM_ARGS_2D = cp.intvar(-3, 5, shape=(10,10), name="MD") # 2D numerical variables
+NUM_ARGS_2D = cp.intvar(-3, 5, shape=(11,11), name="MD") # 2D numerical variables
 SMALL_NUM_ARG = [cp.intvar(-2, 2, name=n) for n in "w"]   # Small domain numerical vars
 NN_VAR = cp.intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
 POS_VAR = cp.intvar(1,10, name="s_pos")                # A strictly positive variable
