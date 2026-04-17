@@ -212,8 +212,6 @@ def _decompose_in_tree(lst_of_expr: ListLike[Any],
 
                         if (csemap is not None):
                             csemap.save_decomposition(expr, newexpr)
-                    elif isinstance(decomp, list): # retrieved list of expr from cache above
-                            newexpr = cpm_all(decomp)
                     else: # retrieved expr from cache above
                         newexpr = decomp
 
