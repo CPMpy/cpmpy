@@ -17,17 +17,15 @@ The base classes standardize:
 
 Main classes:
 
-- :class:`Dataset`: minimal dataset base
-- :class:`IndexedDataset`: indexable dataset base, instances are accessible by index
+- :class:`Dataset`: minimal dataset base, instances are accessible by index and through iteration
 - :class:`FileDataset`: file-based dataset base with download + metadata support
 
 Class hierarchy::
 
     Dataset (ABC)
-    └── IndexedDataset (ABC)
-        └── FileDataset (ABC)
-            └── XCSP3Dataset
-            └── (your dataset here)
+    └── FileDataset (ABC)
+        └── XCSP3Dataset
+        └── (your dataset here)
 
 To implement a new dataset, one needs to subclass one of the abstract dataset classes,
 and provide implementation for the following methods:
