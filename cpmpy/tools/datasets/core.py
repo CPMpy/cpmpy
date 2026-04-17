@@ -288,11 +288,11 @@ class FileDataset(IndexedDataset):
             **kwargs: Advanced options. Currently supports:
                 - ignore_sidecar (bool): If True, do not read/write metadata
                   sidecars and collect metadata on demand at iteration time
-                  using ``collect_instance_metadata()`` (default: False).
+                  using ``collect_instance_metadata()`` (default=False).
 
         Raises:
             ValueError: If the dataset directory does not exist and `download=False`,
-                or if the requested year/track combination is not available.
+                or if the requested dataset variant (e.g. year/track) is not available.
             ValueError: If the dataset directory does not contain any instance files.
         """
 
@@ -663,7 +663,7 @@ class FileDataset(IndexedDataset):
             chunk_size (int): Size of each chunk for download in bytes (default=1MB).
 
         Returns:
-            str: The destination path where the downloaded file is saved.
+            os.PathLike: The destination path where the downloaded file is saved.
         """
 
         if desc is None:
