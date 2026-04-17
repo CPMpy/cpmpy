@@ -91,7 +91,8 @@ class CPM_scip(SolverInterface):
         Constructor of the native solver object
 
         Arguments:
-        - cpm_model: a CPMpy Model()
+        - cpm_model: str: a CPMpy Model()
+        - subsolver: str: None, not used
         """
         if not self.supported():
             raise ModuleNotFoundError(
@@ -99,10 +100,9 @@ class CPM_scip(SolverInterface):
         assert subsolver is None, "SCIP does not support subsolvers"
         import pyscipopt as scip
 
-        self.scip_model = scip.Model("From CPMpy")
-        self.scip_model.setParam("display/verblevel", 0) # remove solver logs from output
-        # initialise everything else and post the constraints/objective
-        # it is sufficient to implement __add__() and minimize/maximize() below
+        self.scip_model = scip.Model()
+        self.scip_model.setParam("display/verblevel", 0)  # remove solver logs from output
+        self.objective_value_ = None
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
@@ -116,12 +116,9 @@ class CPM_scip(SolverInterface):
 
             Arguments:
             - time_limit:  maximum solve time in seconds (float, optional). Persists across solve() calls until overridden.
-            - kwargs:      any keyword argument, sets parameters of solver object (e.g. "limits/time" overrides time_limit).
+            - kwargs:      any keyword argument, sets parameters of solver object. 
 
-            Arguments that correspond to solver parameters (passed via setParams):
-            Examples: limits/nodes=1000, limits/solutions=1, parallel/maxnthreads=4,
-                display/verblevel=4, separating/maxrounds=0.
-            For a full list see https://www.scipopt.org/doc/html/PARAMETERS.php
+            Arguments correspond to solver parameters (passed via `setParams`). Due to naming `/`, you can pass these options as a dict with e.g. `solve(**{"limits/nodes": 1000, "limits/solutions": 1, "parallel/maxnthreads": 4, "display/verblevel": 4, "separating/maxrounds": 0})`. For a full list see https://www.scipopt.org/doc/html/PARAMETERS.php. Note, passing `limits/time` overrides `time_limit`.
         """
         if time_limit is not None:
             if time_limit <= 0:
@@ -129,7 +126,7 @@ class CPM_scip(SolverInterface):
             self.scip_model.setParam("limits/time", float(time_limit))
 
         if solution_callback is not None:
-            raise NotSupportedError("SCIP: solution callback not (yet?) implemented")
+            raise NotSupportedError("SCIP: solution callback not (yet?) supported by CPMpy")
 
         # apply any solver parameters (can override time limit if e.g. "limits/time" in kwargs)
         self.scip_model.setParams(kwargs)
@@ -141,8 +138,6 @@ class CPM_scip(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.scip_model.getSolvingTime()
 
-        unknown_stati = {"unknown", "userinterrupt", "unbounded", "inforunbd", "terminate"}
-
         # translate exit status
         if scip_status == "optimal":
             if self.has_objective():
@@ -151,45 +146,36 @@ class CPM_scip(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif scip_status == "infeasible":  # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        else:
-            n_sols = self.scip_model.getSols()
-            n_sols = len(n_sols) if isinstance(n_sols, list) else n_sols
-            if scip_status.endswith("limit"):  # timelimit, nodelimit, etc.
-                self.cpm_status.exitstatus = ExitStatus.FEASIBLE if n_sols > 0 else ExitStatus.UNKNOWN
-            elif n_sols > 0:  # at least one feasible solution found, not proven optimal
-                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-            elif scip_status in unknown_stati:
-                self.cpm_status.exitstatus = ExitStatus.UNKNOWN
-            else:
-                raise NotImplementedError(
-                    f"Translation of scip status {scip_status} to CPMpy status not implemented")  # a non-mapped status type, please report on github
+        else:  # decide between unknown and feasible
+            # We have not implemented finding all solutions, so this status is dangerous (arguably we should set `cpm_status` to OPTIMAL in this case)
+            assert scip_status != "bestsollimit", f"Unexpected status {scip_status}, this SCIP usage was not implemented"
+            # distinguish unknown from feasible using whether number of solutions in the SCIP solution storage was non-zero, easier and more reliable than matching on a status.
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE if self.scip_model.getNSols() else ExitStatus.UNKNOWN
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
 
         # translate solution values (of user specified variables only)
         # use best solution object so values are correct (getVal can be wrong after transform)
-        self.objective_value_ = None
         if has_sol:
             best_sol = self.scip_model.getBestSol()
+            assert best_sol is not None, f"Due to status {scip_status}, we expected a solution from SCIP, but there was none. This is a bug, please report on GitHub."
             for cpm_var in self.user_vars:
-                if cpm_var not in self._varmap:
-                    continue  # variable never posted (e.g. unused); skip to avoid addVar after solve
-                scip_var = self._varmap[cpm_var]
-                if best_sol is not None:
-                    solver_val = self.scip_model.getSolVal(best_sol, scip_var)
-                else:
-                    solver_val = self.scip_model.getVal(scip_var)
+                assert cpm_var in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub."
+                scip_var = self.solver_var(cpm_var)
+                solver_val = self.scip_model.getSolVal(best_sol, scip_var)
                 if cpm_var.is_bool():
                     cpm_var._value = solver_val >= 0.5
                 else:
-                    cpm_var._value = int(solver_val)
-            # set _objective_value
+                    cpm_var._value = round(solver_val)
+
             if self.has_objective():
                 self.objective_value_ = self.scip_model.getObjVal()
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+
+            self.objective_value_ = None
 
         # From SCIP's Mark Turner:
         # SCIP transforms the problem that you are actual solving into something it believes
@@ -267,18 +253,13 @@ class CPM_scip(SolverInterface):
             self.scip_model.setObjective(scip_obj, sense='maximize')
 
     def has_objective(self):
-        try:
-            obj = self.scip_model.getObjective()
-            return obj is not None and (hasattr(obj, 'terms') and len(obj.terms) != 0)
-        except (AttributeError, TypeError):
-            return False
+        obj = self.scip_model.getObjective()
+        return obj is not None and getattr(obj, 'terms', False)  # obj could be `Expr({})`
 
     def _make_numexpr(self, cpm_expr):
         """
             Turns a numeric CPMpy 'flat' expression into a solver-specific
             numeric expression
-
-            Used especially to post an expression as objective function
         """
         import pyscipopt as scip
 
@@ -287,6 +268,7 @@ class CPM_scip(SolverInterface):
 
         # negated bool (e.g. in objective): 1 - bv
         if isinstance(cpm_expr, NegBoolView):
+            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
             return 1 - self.solver_var(cpm_expr._bv)
 
         # decision variables, check in varmap
@@ -342,29 +324,10 @@ class CPM_scip(SolverInterface):
         return cpm_cons
 
     def add(self, cpm_expr_orig):
-        """
-            Eagerly add a constraint to the underlying solver.
-
-            Any CPMpy expression given is immediately transformed (through `transform()`)
-            and then posted to the solver in this function.
-
-            This can raise 'NotImplementedError' for any constraint not supported after transformation
-
-            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-            the user knows and cares about (and will be populated with a value after solve). All other variables
-            are auxiliary variables created by transformations.
-
-        :param cpm_expr_orig: CPMpy expression, or list thereof
-        :type cpm_expr_orig: Expression or list of Expression
-
-        :return: self
-        """
         get_variables(cpm_expr_orig, collect=self.user_vars)
         # Ensure every user var has a solver variable (so we get values after solve even if
         # the constraint was simplified away and the var never appears in transformed constraints)
-        for cpm_var in self.user_vars:
-            if not is_num(cpm_var):
-                self.solver_var(cpm_var)
+        self.solver_vars(list(self.user_vars))
 
         for cpm_expr in self.transform(cpm_expr_orig):
             if isinstance(cpm_expr, Comparison):
@@ -379,9 +342,7 @@ class CPM_scip(SolverInterface):
                         sciplhs <= sciprhs - 1,
                         sciplhs >= sciprhs + 1
                     ])
-                    continue
-
-                if cpm_expr.name == '<=':
+                elif cpm_expr.name == '<=':
                     if (lhs_is_operator and lhs.name == "sum" and all(a.is_bool() and not isinstance(a, NegBoolView) for a in lhs.args)):
                         if rhs == 1:
                             self.scip_model.addConsSOS1(self.solver_vars(lhs.args))
@@ -390,7 +351,6 @@ class CPM_scip(SolverInterface):
                     else:
                         sciplhs = self._make_numexpr(lhs)
                         self.scip_model.addCons(sciplhs <= sciprhs)
-
                 elif cpm_expr.name == '>=':
                     sciplhs = self._make_numexpr(lhs)
                     self.scip_model.addCons(sciplhs >= sciprhs)
