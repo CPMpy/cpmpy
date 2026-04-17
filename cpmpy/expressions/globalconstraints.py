@@ -875,9 +875,6 @@ class IfThenElse(GlobalConstraint):
         condition, if_true, if_false = self.args
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
 
-    def negate(self) -> Expression:
-        return IfThenElse(self.args[0], self.args[2], self.args[1])
-
 
 
 class InDomain(GlobalConstraint):

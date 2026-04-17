@@ -65,6 +65,7 @@ from ..expressions.utils import flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables
+from ..transformations.negation import push_down_negation
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
 from ..transformations.safening import no_partial_functions
@@ -363,6 +364,7 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(
             cpm_cons,
             supported=self.supported_global_constraints,

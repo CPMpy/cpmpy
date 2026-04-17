@@ -64,9 +64,9 @@ from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, \
     only_positive_bv_wsum_const, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
+from ..transformations.negation import push_down_negation
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
-
 
 class CPM_cplex(SolverInterface):
     """
@@ -378,6 +378,7 @@ class CPM_cplex(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
