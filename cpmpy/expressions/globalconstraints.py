@@ -894,65 +894,80 @@ class MDD(GlobalConstraint):
         """
         pass
 
-
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-            Flow decomposition of the MDD global constraint.
-            Enforces that the condition is satisfied.
+        Flow decomposition of the MDD global constraint.
+        Enforces that the condition is satisfied.
 
-            Returns:
-                tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        Returns:
+            tuple[list[Expression], list[Expression]]:
+                A tuple containing the constraints representing the constraint value and the defining constraints.
         """
         arr, _ = self.args
 
-        flow_in: dict[int | str, list[tuple[tuple[int, int], int]]] = defaultdict(list)
-        flow_out: dict[int | str, list[tuple[tuple[int, int], int]]] = defaultdict(list)
-        transition_counter = {
-            (level, d): 0 for level in range(len(arr)) for d in range(arr[level].lb, arr[level].ub + 1)
-        }
+        flow_in: dict[int | str, list[tuple[tuple[int, int], Expression]]] = defaultdict(list)
+        flow_out: dict[int | str, list[tuple[tuple[int, int], Expression]]] = defaultdict(list)
+        edge_vars = defaultdict(list)
 
-        for (src, edges) in self.mapping.items():
-            for (value, dst) in edges.items():
-                transition = (self.levels[src], value)
-                transition_counter[transition] += 1
-                flow_out[src].append((transition, transition_counter[transition]))
-                flow_in[dst].append((transition, transition_counter[transition]))
+        for src, edges in self.mapping.items():
+            for value, dst in edges.items():
+                tr = (self.levels[src], value)
+                edge_var = cp.boolvar()
+
+                flow_out[src].append((tr, edge_var))
+                flow_in[dst].append((tr, edge_var))
+                edge_vars[tr].append(edge_var)
 
         cons = []
-        substitution = {}
-        for key in transition_counter.keys():
-            (level, value) = key
-            if transition_counter[key] == 0:
-                continue
-            elif transition_counter[key] == 1:
-                substitution[(key, 1)] = (arr[level] == value)
+        b = cp.boolvar()
+        invalid_edge_vars = []
+
+        # Go over the nodes in the MDD, and enforce flow constraints
+        for node in self.levels.keys():
+            incoming = flow_in[node]
+            outgoing = flow_out[node]
+            missing = []
+
+            if outgoing:
+                valid_transitions = [tr for tr, _ in outgoing]
+                lvl = valid_transitions[0][0]
+
+                # Find all transition values for which there is no valid path, in order to direct them to a dummy node
+                for val in range(arr[lvl].lb, arr[lvl].ub + 1):
+                    tr = (lvl, val)
+
+                    if tr not in valid_transitions:
+                        var = cp.boolvar()
+                        edge_vars[tr].append(var)
+                        invalid_edge_vars.append(var)
+                        missing.append(var)
+
+            if incoming and outgoing:
+                cons += [
+                    cp.sum([e for _, e in incoming]) ==
+                    cp.sum([e for _, e in outgoing]) + cp.sum(missing)
+                ]
+
+            elif outgoing:
+                cons += [
+                    cp.sum([e for _, e in outgoing]) + cp.sum(missing) == 1
+                ]
+
             else:
-                bvs = cp.boolvar(shape=transition_counter[key]) # edge variables must be defined
-                for n in range(1, transition_counter[key] + 1):
-                    substitution[(key, n)] = bvs[n - 1]
+                cons += [
+                    cp.sum([e for _, e in incoming]) == b
+                ]
 
-        for node in sorted(flow_in.keys() | flow_out.keys(), key=lambda k: self.levels[k]):
+        # Link direct encoding variables with edge variables
+        for (level, value), vars_ in edge_vars.items():
+            cons += [
+                cp.sum(set(vars_)) == (arr[level] == value)
+            ]
 
-            if ((len(flow_in[node]) == 1) and (len(flow_out[node]) == 1) and
-                    transition_counter[flow_in[node][0][0]] > 1 and transition_counter[flow_out[node][0][0]] > 1):
-                substitution[flow_out[node][0]] = substitution[flow_in[node][0]] # substitute equivalent edge variables
+        # Ensure that if an invalid edge is taken, the constraint is not satisfied
+        cons += [cp.sum(invalid_edge_vars) == ~b]
 
-            elif (len(flow_in[node]) > 0) and (len(flow_out[node]) > 0):
-                cons += [cp.sum([substitution[edge] for edge in flow_in[node]]) ==
-                         cp.sum([substitution[edge] for edge in flow_out[node]])]
-
-            elif len(flow_in[node]) == 0:
-                cons += [cp.sum([substitution[edge] for edge in flow_out[node]]) == 1]
-
-            elif len(flow_out[node]) == 0:
-                cons += [cp.sum([substitution[edge] for edge in flow_in[node]]) == 1]
-
-        for key in transition_counter.keys():
-            if transition_counter[key] > 1:
-                (level, value) = key
-                cons += [cp.sum([substitution[(key, n)] for n in range(1, transition_counter[key] + 1)]) == (arr[level] == value)]
-
-        return cons, []
+        return [b], cons
 
     def value(self) -> Optional[bool]:
         """
