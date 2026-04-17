@@ -838,11 +838,12 @@ class MultiDimElement(GlobalFunction):
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
 
-    def _arr_and_indices(self):
-        return self.args[0], self.args[1:]
-
     def value(self) -> Optional[int]:
-        arr, indices = self._arr_and_indices()
+        """
+        Returns:
+            Optional[int]: The value of the array element at the given indices, or None if any index is not assigned or the array element is not assigned
+        """
+        arr, indices = self.args
         vidxs = [argval(idx) for idx in indices]
         if any(v is None for v in vidxs):
             return None
@@ -855,24 +856,52 @@ class MultiDimElement(GlobalFunction):
         return argval(arr[tuple(vidxs)])
 
     def _flat_index(self, shape, indices):
-        # calculate index for flat array
+        """Linear index into ``arr.reshape(-1)`` (NumPy C-order).
+
+        Arguments:
+            shape (tuple[int, ...]): ``arr.shape``.
+            indices (tuple): One index expression per axis, same order as ``shape``.
+
+        Returns:
+            Expression or int: flat index for 1-D ``Element``.
+        """
         flat_index = indices[-1]
         for dim, idx in enumerate(indices[:-1]):
-            flat_index += idx * math.prod(shape[dim+1:])
+            flat_index += idx * math.prod(shape[dim + 1 :])  # stride on dim: flat offset per +1 (product of later axis sizes)
         return flat_index
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
-        arr, indices = self._arr_and_indices()
+        """
+        Decomposition of MultiDimElement global function.
+
+        Rewritten as 1-D Element with a linear index into the flattened array.
+
+        Returns:
+            tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
+        """
+        arr, indices = self.args
         flat_index = self._flat_index(arr.shape, indices)
         return Element(arr.reshape(-1), flat_index), []
 
     def get_bounds(self) -> tuple[int, int]:
-        arr, _ = self._arr_and_indices()
+        """
+        Returns the bounds of the global function
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the element value
+        """
+        arr, _ = self.args
         bnds = [get_bounds(x) for x in arr.flat]
         return min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
     def __repr__(self) -> str:
-        arr, indices = self._arr_and_indices()
+        """
+        Custom string representation of the MultiDimElement global function in 'Arr[i0, i1, ...]' format.
+
+        Returns:
+            str: String representation of the MultiDimElement global function.
+        """
+        arr, indices = self.args
         idx_repr = ", ".join(str(i) for i in indices)
         return f"{arr}[{idx_repr}]"
 
