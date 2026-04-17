@@ -128,6 +128,13 @@ class Dataset(ABC):
     Each instance in a dataset is characterised by a (x, y) pair of:
         x: instance reference (e.g., file path, database key, generated seed, ...)
         y: instance metadata  (solution, features, origin, etc.)
+
+    Instances are indexed by a unique identifier can be accessed by that identifier. 
+    For example its positional index within the dataset.
+
+    Implementing this class requires implementing the following methods:
+    - ``__len__``: return the total number of instances
+    - ``__getitem__``: return the instance and metadata at the given index / identifier
     """
     
 
@@ -166,6 +173,24 @@ class Dataset(ABC):
     # ---------------------------------------------------------------------------- #
 
     @abstractmethod
+    def __len__(self) -> int:
+        """
+        Return the total number of instances.
+        """
+        pass
+    
+    @abstractmethod
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        """
+        Return the instance and metadata at the given index / identifier.
+
+        Returns:
+            x: instance reference (e.g., file path, database key, generated seed, ...)
+            y: instance metadata  (solution, features, origin, etc.)
+        """
+        pass
+
+    @abstractmethod
     def instance_metadata(self, instance) -> dict:
         """
         Return the metadata for a given instance.
@@ -199,35 +224,9 @@ class Dataset(ABC):
         }
 
 
-class IndexedDataset(Dataset):
-    """
-    Abstract base class for indexed datasets.
-
-    Indexed datasets are datasets where the instances are indexed by a unique identifier and 
-    can be accessed by that identifier. For example its positional index within the dataset.
-
-    Implementing this class requires implementing the following methods:
-    - ``__len__``: return the total number of instances
-    - ``__getitem__``: return the instance and metadata at the given index / identifier
-    """
-
-    @abstractmethod
-    def __len__(self) -> int:
-        """
-        Return the total number of instances.
-        """
-        pass
-    
-    @abstractmethod
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
-        """
-        Return the instance and metadata at the given index / identifier.
-
-        Returns:
-            x: instance reference (e.g., file path, database key, generated seed, ...)
-            y: instance metadata  (solution, features, origin, etc.)
-        """
-        pass
+    # ---------------------------------------------------------------------------- #
+    #                                   Internals                                  #
+    # ---------------------------------------------------------------------------- #
 
     def __iter__(self):
         """
@@ -237,7 +236,7 @@ class IndexedDataset(Dataset):
             yield self[i]
 
 
-class FileDataset(IndexedDataset):
+class FileDataset(Dataset):
     """
     Abstract base class for PyTorch-style datasets of file-based CO benchmarking sets.
 
