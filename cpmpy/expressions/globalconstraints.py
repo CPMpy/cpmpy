@@ -1117,12 +1117,13 @@ class Cumulative(GlobalConstraint):
         # tasks are uninterruptible, so we only need to check each starting point of each task
         # I.e., for each task, we check if it can be started, given the tasks that are already running.
         for t in range(len(start)):
+            st = start[t]
             demand_at_start_of_t = []
             for j in range(len(start)):
                 if t != j:
-                    demand_at_start_of_t += [demand[j] * ((start[j] <= start[t]) & (end[j] > start[t]))]
+                    demand_at_start_of_t.append(demand[j] * ((start[j] <= st) & (end[j] > st)))
 
-            cons += [(demand[t] + sum(demand_at_start_of_t)) <= capacity]
+            cons.append((demand[t] + sum(demand_at_start_of_t)) <= capacity)
 
         return cons, []
 
@@ -1314,12 +1315,13 @@ class CumulativeOptional(GlobalConstraint):
         # tasks are uninterruptible, so we only need to check each starting point of each task
         # I.e., for each task, we check if it can be started, given the tasks that are already running.
         for t in range(len(start)):
+            st = start[t]
             demand_at_start_of_t = []
             for j in range(len(start)):
                 if t != j:
-                    demand_at_start_of_t += [demand[j] * (is_present[j] & (start[j] <= start[t]) & (end[j] > start[t]))]
+                    demand_at_start_of_t.append(demand[j] * (is_present[j] & (start[j] <= st) & (end[j] > st)))
 
-            cons += [implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity)]
+            cons.append(implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity))
 
         return cons, []
 

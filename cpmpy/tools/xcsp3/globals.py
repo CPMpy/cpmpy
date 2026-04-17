@@ -942,7 +942,7 @@ class DynamicCumulative(GlobalConstraint):
         if version == "time":
             # set duration of tasks
             for t in range(len(start)):
-                cons += [start[t] + duration[t] == end[t]]
+                cons.append(start[t] + duration[t] == end[t])
 
             # demand doesn't exceed capacity
             for t in range(lb,ub+1):
@@ -953,16 +953,18 @@ class DynamicCumulative(GlobalConstraint):
                     else:
                         demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
 
-                cons += [demand_at_t <= capacity]
+                cons.append(demand_at_t <= capacity)
                 
         elif version == "task":
 
             # set duration of tasks
+            ends = [start[t] + duration[t] for t in range(num_tasks)]
             for t in range(num_tasks):
-                cons += [start[t] + duration[t] == end[t]]
+                cons.append(ends[t] == end[t])
 
             for j in range(num_tasks):
-                cons += [capacity >= demand[j] + cp.sum([(start[i] <= start[j]) & (start[j] < start[i] + duration[i]) for i in range(num_tasks) if i != j])]
+                sj = start[j]
+                cons.append(capacity >= demand[j] + cp.sum([(start[i] <= sj) & (sj < ends[i]) for i in range(num_tasks) if i != j]))
 
         return cons, []
 
