@@ -440,7 +440,7 @@ class TesttestCanonical_comparison:
         a, b, c = [cp.intvar(0, 10, name=n) for n in "abc"]
         rhs = 5
 
-        cons = canonical_comparison([ a / b <= rhs])[0]
+        cons = canonical_comparison([a // b <= rhs])[0]
         assert "(a) div (b) <= 5" == str(cons)
 
         #when adding division
