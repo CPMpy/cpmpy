@@ -94,13 +94,11 @@ class CPM_cplex(SolverInterface):
         try:
             import docplex.mp as domp
         except ModuleNotFoundError as e:
-            warnings.warn(f"CPM_cplex: Could not import docplex: {e}")
             return False
         try:
             import cplex
             return True
         except ModuleNotFoundError as e:
-            warnings.warn(f"CPM_cplex: Could not import cplex: {e}")
             return False
 
     @staticmethod

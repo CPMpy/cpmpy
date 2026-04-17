@@ -327,6 +327,19 @@ class SolverInterface(object):
         Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
         """
         raise NotSupportedError("Solver does not support unsat core extraction")
+    
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        For using the solver's internal MUS extractor 
+
+        Args:
+            soft: List of soft constraints over which a MUS needs to be found
+            hard: List of hard constraints that always need to be satisfied
+
+        Returns a MUS.
+        """
+        raise NotSupportedError("Solver does not support MUS extraction")
 
 
     # shared helper functions

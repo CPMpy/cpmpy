@@ -1208,17 +1208,17 @@ class TestGlobal:
         val = [0,1,2]
         occ = cp.intvar(0, len(iv), shape=3)
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         val = [1, 4, 5]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         occ = [2, 3, 0]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val)))
-        assert ~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
+        assert not cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
 
     def test_gcc_onearg(self):
         iv = cp.intvar(0, 10)
