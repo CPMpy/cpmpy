@@ -32,7 +32,7 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
                 for b in newexpr.args:
                     if isinstance(b, Expression):
                         newlist.append(b)
-                    elif not b:
+                    elif not b: # either BoolVal(False) or False
                         newlist.append(BoolVal(b))
                         break  # stop early if a False
             else:
@@ -43,6 +43,17 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
 
 
 def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
+    """
+    Well-typed helper function to eliminate negation in an Expression.
+    calls :func:`recurse_negation()` when `expr` is a negation operator and 
+    uses :func:`_push_down_negation_args()` to recurse into the arguments of all other expressions.
+    
+    Arguments:
+        expr: Expression to eliminate negation from
+
+    Returns:
+        tuple[bool, Expression]: (changed, newexpr)
+    """
     # special cases, _recurse_negation() will handle recursive calls into the args
     if expr.name == "not":
         # the negative case, negate
@@ -93,6 +104,15 @@ def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
 
 
 def _push_down_negation_args(args: list[Any]|tuple[Any, ...]) -> tuple[bool, list[Any]|tuple[Any, ...]]:
+    """
+    Well-typed recursive helper function to eliminate negation from the arguments of an Expression.
+    
+    Arguments:
+        args: list of Expressions arguments (list[Any] | tuple[Any, ...]) to eliminate negation from
+
+    Returns:
+        tuple[bool, list[Any] | tuple[Any, ...]]: (changed, newargs)
+    """
     changed = False
     newargs: list[Any] = []
     for arg in args:
@@ -105,22 +125,22 @@ def _push_down_negation_args(args: list[Any]|tuple[Any, ...]) -> tuple[bool, lis
 
         elif isinstance(arg, np.ndarray):
             if isinstance(arg, NDVarArray):
-                # NDVarArray: only if it contains subexpressions
+                # optimization for NDVarArray: only if it contains subexpressions
                 if arg.has_subexpr():
                     rec_changed, rec_newargs = _push_down_negation_args(tuple(arg.flat))
                     if rec_changed:
                         changed = True
-                        newargs.append(cpm_array(rec_newargs).reshape(arg.shape))
+                        newargs.append(cpm_array(rec_newargs).reshape(arg.shape)) # reshape to original
                         continue
             elif arg.dtype == object:
-                # not sure we need this... an np.array that might contain expressions (or we only allow NDVarArray in that case?)
+                # user can create an np.array with Expressions, without converting to NDVarArray first
                 rec_changed, rec_newargs = _push_down_negation_args(tuple(arg.flat))
                 if rec_changed:
                     changed = True
                     newargs.append(np.array(rec_newargs).reshape(arg.shape))
                     continue
 
-            # if still here, only data
+            # ndarray with constants, keep as is
             newargs.append(arg)
             continue
 
@@ -160,7 +180,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
     
     # recurse_negation is called before simplify_boolean, 
     # so handle Boolean constants here too
-    elif isinstance(expr, bool|np.bool_):
+    elif isinstance(expr, (bool, np.bool_)):
         return BoolVal(not bool(expr))
 
     elif isinstance(expr, Comparison):
