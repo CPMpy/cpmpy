@@ -4,7 +4,7 @@ from ..expressions.utils import is_int
 from ..expressions.variables import boolvar, intvar, _IntVarImpl
 
 
-class flat_map:
+class CSEMap:
 
     def __init__(self):
         self.flat_map = dict[Expression, _IntVarImpl]()   # map expression to variable filled during flattening
@@ -34,7 +34,7 @@ class flat_map:
         """Get the decomposition of the given global constraint or global function."""
         return self.decomp_map.get(expr)
 
-    def get_reified_predicates(self) -> dict[_IntVarImpl, list[tuple[int, _IntVarImpl]]]:
+    def get_reified_varvals(self) -> dict[_IntVarImpl, list[tuple[int, _IntVarImpl]]]:
         """collect all bv <-> var == val expressions in flat_map"""
         
         var_vals = dict[_IntVarImpl, list[tuple[int, _IntVarImpl]]]()  # var: [val, bv]
