@@ -348,7 +348,7 @@ class CPM_pumpkin(SolverInterface):
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
         if expr.is_bool():
             ivar = intvar(0,1)
-            obj_cons += [ivar == obj_var]
+            obj_cons.append(ivar == obj_var)
             obj_var = ivar
 
         self.add(safe_cons + decomp_cons + obj_cons)

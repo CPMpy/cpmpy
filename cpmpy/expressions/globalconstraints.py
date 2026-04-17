@@ -387,7 +387,7 @@ class AllEqualExceptN(GlobalConstraint):
         constraints = []
         for x, y in all_pairs(arr):
             # x and y are equal, or one of them is equal to an excluded value
-            constraints += [cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n)]
+            constraints.append(cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n))
         return constraints, []
 
     def value(self) -> Optional[bool]:
@@ -1426,7 +1426,7 @@ class NoOverlap(GlobalConstraint):
             cons += [s + d == e for s,d,e in zip(start, dur, end)]
             
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
-            cons += [(e1 <= s2) | (e2 <= s1)]
+            cons.append((e1 <= s2) | (e2 <= s1))
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -1578,7 +1578,7 @@ class Precedence(GlobalConstraint):
                 lhs = args[j] == t
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
-                constraints += [lhs.implies(cp.any(args[:j] == s))]
+                constraints.append(lhs.implies(cp.any(args[:j] == s)))
         return constraints, []
 
     def value(self) -> Optional[bool]:
