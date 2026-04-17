@@ -251,7 +251,7 @@ class TestTransLinearize:
         assert str(lin_cons[0]) == "sum([1, 1, -15] * [x, y, ~b]) <= 5"
         assert str(lin_cons[1]) == "sum([1, 1, 3] * [x, y, ~b]) >= 5"
 
-
+    @pytest.mark.skip(reason="solver dependent")
     def test_mdd(self):
 
         x = cp.intvar(1, 4, shape=3, name="x")

@@ -874,7 +874,7 @@ class MDD(GlobalConstraint):
             raise TypeError("The second argument of an MDD constraint should be collection of transitions")
         super().__init__("mdd", (array, transitions))
         self.root_node = transitions[0][0]
-        self.mapping = defaultdict(dict)
+        self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
         for s, v, e in transitions:
             self.mapping[s][v] = e
 
@@ -905,15 +905,18 @@ class MDD(GlobalConstraint):
         """
         arr, _ = self.args
 
-        flow = {k: {"in" : [], "out" : []} for k in self.levels.keys()}
-        transition_counter = {(level, d): 0 for level in range(len(arr)) for d in range(arr[level].lb, arr[level].ub+1)}
+        flow_in: dict[int | str, list[tuple[tuple[int, int], int]]] = defaultdict(list)
+        flow_out: dict[int | str, list[tuple[tuple[int, int], int]]] = defaultdict(list)
+        transition_counter = {
+            (level, d): 0 for level in range(len(arr)) for d in range(arr[level].lb, arr[level].ub + 1)
+        }
 
         for (src, edges) in self.mapping.items():
             for (value, dst) in edges.items():
                 transition = (self.levels[src], value)
                 transition_counter[transition] += 1
-                flow[src]["out"].append((transition, transition_counter[transition]))
-                flow[dst]["in"].append((transition, transition_counter[transition]))
+                flow_out[src].append((transition, transition_counter[transition]))
+                flow_in[dst].append((transition, transition_counter[transition]))
 
         cons = []
         substitution = {}
@@ -928,21 +931,21 @@ class MDD(GlobalConstraint):
                 for n in range(1, transition_counter[key] + 1):
                     substitution[(key, n)] = bvs[n - 1]
 
-        for i, key in enumerate(sorted(flow.keys(), key=lambda k: self.levels[k])):
+        for node in sorted(flow_in.keys() | flow_out.keys(), key=lambda k: self.levels[k]):
 
-            if ((len(flow[key]["in"]) == 1) and (len(flow[key]["out"]) == 1) and
-                    transition_counter[flow[key]["in"][0][0]] > 1 and transition_counter[flow[key]["out"][0][0]] > 1):
-                substitution[flow[key]["out"][0]] = substitution[flow[key]["in"][0]] # substitute equivalent edge variables
+            if ((len(flow_in[node]) == 1) and (len(flow_out[node]) == 1) and
+                    transition_counter[flow_in[node][0][0]] > 1 and transition_counter[flow_out[node][0][0]] > 1):
+                substitution[flow_out[node][0]] = substitution[flow_in[node][0]] # substitute equivalent edge variables
 
-            elif (len(flow[key]["in"]) > 0) and (len(flow[key]["out"]) > 0):
-                cons += [cp.sum([substitution[edge] for edge in flow[key]["in"]]) ==
-                         cp.sum([substitution[edge] for edge in flow[key]["out"]])]
+            elif (len(flow_in[node]) > 0) and (len(flow_out[node]) > 0):
+                cons += [cp.sum([substitution[edge] for edge in flow_in[node]]) ==
+                         cp.sum([substitution[edge] for edge in flow_out[node]])]
 
-            elif len(flow[key]["in"]) == 0:
-                cons += [cp.sum([substitution[edge] for edge in flow[key]["out"]]) == 1]
+            elif len(flow_in[node]) == 0:
+                cons += [cp.sum([substitution[edge] for edge in flow_out[node]]) == 1]
 
-            elif len(flow[key]["out"]) == 0:
-                cons += [cp.sum([substitution[edge] for edge in flow[key]["in"]]) == 1]
+            elif len(flow_out[node]) == 0:
+                cons += [cp.sum([substitution[edge] for edge in flow_in[node]]) == 1]
 
         for key in transition_counter.keys():
             if transition_counter[key] > 1:
