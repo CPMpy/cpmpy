@@ -4,13 +4,13 @@ from ..expressions.utils import is_int
 from ..expressions.variables import boolvar, intvar, _IntVarImpl
 
 
-class CSEMap:
+class flat_map:
 
     def __init__(self):
         self.flat_map = dict[Expression, _IntVarImpl]()   # map expression to variable filled during flattening
         self.decomp_map = dict[Expression, Expression]()  # map global constraint/function to its decomposition
 
-    # pass special methods to internal csemap
+    # pass special methods to internal flat_map
     def __len__(self):
         return len(self.flat_map)
 
@@ -18,7 +18,7 @@ class CSEMap:
         return self.flat_map[expr]
 
     def __setitem__(self, attr, val):
-        raise ValueError("__setitem__ is not supported for csemap, use get_or_make_var instead")
+        raise ValueError("__setitem__ is not supported for flat_map, use get_or_make_var instead")
 
     def get(self, expr: Expression) -> Optional[_IntVarImpl]:
         try:
@@ -35,7 +35,7 @@ class CSEMap:
         return self.decomp_map.get(expr)
 
     def get_reified_predicates(self) -> dict[_IntVarImpl, list[tuple[int, _IntVarImpl]]]:
-        """collect all bv <-> var == val expressions in csemap"""
+        """collect all bv <-> var == val expressions in flat_map"""
         
         var_vals = dict[_IntVarImpl, list[tuple[int, _IntVarImpl]]]()  # var: [val, bv]
         for expr, bv in self.flat_map.items():
@@ -49,14 +49,14 @@ class CSEMap:
     def get_or_make_var(self, expr: Expression) -> tuple[_IntVarImpl, Optional[Expression]]:
         """
         Make an auxiliary variable for the given expression
-        
+
         Arguments:
             expr: Expression to make an auxiliary variable for
 
         Returns:
             tuple[_IntVarImpl, Optional[Expression]]: (variable, equality constraint)
             - variable: the auxiliary variable for the expression
-            - equality constraint: the equality constraint between the expression and the variable, or None if the expression is already in the csemap
+            - equality constraint: the equality constraint between the expression and the variable, or None if the expression is already in the flat_map
         """
 
         if isinstance(expr, _IntVarImpl):
