@@ -843,7 +843,7 @@ class MultiDimElement(GlobalFunction):
         Returns:
             Optional[int]: The value of the array element at the given indices, or None if any index is not assigned or the array element is not assigned
         """
-        arr, indices = self.args
+        arr, *indices = self.args
         vidxs = [argval(idx) for idx in indices]
         if any(v is None for v in vidxs):
             return None
@@ -879,7 +879,7 @@ class MultiDimElement(GlobalFunction):
         Returns:
             tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
         """
-        arr, indices = self.args
+        arr, *indices = self.args
         flat_index = self._flat_index(arr.shape, indices)
         return Element(arr.reshape(-1), flat_index), []
 
@@ -890,7 +890,7 @@ class MultiDimElement(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the element value
         """
-        arr, _ = self.args
+        arr, *_ = self.args
         bnds = [get_bounds(x) for x in arr.flat]
         return min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
 
@@ -901,7 +901,7 @@ class MultiDimElement(GlobalFunction):
         Returns:
             str: String representation of the MultiDimElement global function.
         """
-        arr, indices = self.args
+        arr, *indices = self.args
         idx_repr = ", ".join(str(i) for i in indices)
         return f"{arr}[{idx_repr}]"
 
