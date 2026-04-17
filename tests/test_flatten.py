@@ -90,48 +90,163 @@ class TestFlattenExpr:
         (a,b,c,d,e) = self.ivars[:5]
         (x,y,z) = self.bvars[:3]
 
-        assert  str(get_or_make_var(x)) == "(BV0, [])"
-        assert  str(get_or_make_var(~x)) == "(~BV0, [])"
+        v, cons = get_or_make_var(x)
+        assert str(v) == "BV0"
+        assert {str(c) for c in cons} == set()
 
-        assert  str(get_or_make_var(x == y)) == "(BV3, [((BV0) == (BV1)) == (BV3)])"
-        assert  str(get_or_make_var(x != y)) == "(BV4, [((BV0) == (~BV1)) == (BV4)])"
-        assert  str(get_or_make_var(x > y)) == "(BV5, [((BV0) > (BV1)) == (BV5)])"
-        assert  str(get_or_make_var(x <= y)) == "(BV6, [((BV0) <= (BV1)) == (BV6)])"
+        v, cons = get_or_make_var(~x)
+        assert str(v) == "~BV0"
+        assert {str(c) for c in cons} == set()
 
-        assert  str(get_or_make_var((a > 10) == x)) == "(BV8, [((BV7) == (BV0)) == (BV8), (IV0 > 10) == (BV7)])"
-        assert  str(get_or_make_var( (a > 10) == (d > 5) )) == "(BV11, [((BV10) == (BV9)) == (BV11), (IV0 > 10) == (BV10), (IV3 > 5) == (BV9)])"
-        assert  str(get_or_make_var( a > c )) == "(BV12, [((IV0) > (IV2)) == (BV12)])"
-        assert  str(get_or_make_var( a + b > c )) == "(BV13, [(((IV0) + (IV1)) > (IV2)) == (BV13)])"
+        v, cons = get_or_make_var(x == y)
+        assert str(v) == "BV3"
+        assert {str(c) for c in cons} == {"((BV0) == (BV1)) == (BV3)"}
+
+        v, cons = get_or_make_var(x != y)
+        assert str(v) == "BV4"
+        assert {str(c) for c in cons} == {"((BV0) == (~BV1)) == (BV4)"}
+
+        v, cons = get_or_make_var(x > y)
+        assert str(v) == "BV5"
+        assert {str(c) for c in cons} == {"((BV0) > (BV1)) == (BV5)"}
+
+        v, cons = get_or_make_var(x <= y)
+        assert str(v) == "BV6"
+        assert {str(c) for c in cons} == {"((BV0) <= (BV1)) == (BV6)"}
+
+        v, cons = get_or_make_var((a > 10) == x)
+        assert str(v) == "BV8"
+        assert {str(c) for c in cons} == {
+            "((BV7) == (BV0)) == (BV8)",
+            "(IV0 > 10) == (BV7)",
+        }
+
+        v, cons = get_or_make_var((a > 10) == (d > 5))
+        assert str(v) == "BV11"
+        assert {str(c) for c in cons} == {
+            "((BV10) == (BV9)) == (BV11)",
+            "(IV0 > 10) == (BV10)",
+            "(IV3 > 5) == (BV9)",
+        }
+
+        v, cons = get_or_make_var(a > c)
+        assert str(v) == "BV12"
+        assert {str(c) for c in cons} == {"((IV0) > (IV2)) == (BV12)"}
+
+        v, cons = get_or_make_var(a + b > c)
+        assert str(v) == "BV13"
+        assert {str(c) for c in cons} == {"(((IV0) + (IV1)) > (IV2)) == (BV13)"}
         cp.intvar(0,2) # increase counter
 
-        assert  str(get_or_make_var( (a>b).implies(x) )) == "(BV15, [((~BV14) or (BV0)) == (BV15), ((IV0) > (IV1)) == (BV14)])"
-        assert  str(get_or_make_var( x&y )) == "(BV16, [((BV0) and (BV1)) == (BV16)])"
-        assert  str(get_or_make_var( x|y )) == "(BV17, [((BV0) or (BV1)) == (BV17)])"
-        assert  str(get_or_make_var( x.implies(y) )) == "(BV18, [((~BV0) or (BV1)) == (BV18)])"
-        assert  str(get_or_make_var( x.implies(y|z) )) == "(BV20, [((~BV0) or (BV19)) == (BV20), ((BV1) or (BV2)) == (BV19)])"
-        assert  str(get_or_make_var( (x&y).implies(y&z) )) == "(BV23, [((~BV21) or (BV22)) == (BV23), ((BV0) and (BV1)) == (BV21), ((BV1) and (BV2)) == (BV22)])"
-        assert  str(get_or_make_var( x.implies(y.implies(z)) )) == "(BV25, [((~BV0) or (BV24)) == (BV25), ((~BV1) or (BV2)) == (BV24)])"
+        v, cons = get_or_make_var((a > b).implies(x))
+        assert str(v) == "BV15"
+        assert {str(c) for c in cons} == {
+            "((~BV14) or (BV0)) == (BV15)",
+            "((IV0) > (IV1)) == (BV14)",
+        }
 
-        assert  str(get_or_make_var( (a > 10) )) == "(BV26, [(IV0 > 10) == (BV26)])"
-        assert  str(get_or_make_var( (a > 10)&x&y )) == "(BV28, [(and(BV27, BV0, BV1)) == (BV28), (IV0 > 10) == (BV27)])"
+        v, cons = get_or_make_var(x & y)
+        assert str(v) == "BV16"
+        assert {str(c) for c in cons} == {"((BV0) and (BV1)) == (BV16)"}
 
-        assert  str(get_or_make_var(Operator('not', [x]) == y)) == '(BV29, [((~BV0) == (BV1)) == (BV29)])'
+        v, cons = get_or_make_var(x | y)
+        assert str(v) == "BV17"
+        assert {str(c) for c in cons} == {"((BV0) or (BV1)) == (BV17)"}
+
+        v, cons = get_or_make_var(x.implies(y))
+        assert str(v) == "BV18"
+        assert {str(c) for c in cons} == {"((~BV0) or (BV1)) == (BV18)"}
+
+        v, cons = get_or_make_var(x.implies(y | z))
+        assert str(v) == "BV20"
+        assert {str(c) for c in cons} == {
+            "((~BV0) or (BV19)) == (BV20)",
+            "((BV1) or (BV2)) == (BV19)",
+        }
+
+        v, cons = get_or_make_var((x & y).implies(y & z))
+        assert str(v) == "BV23"
+        assert {str(c) for c in cons} == {
+            "((~BV21) or (BV22)) == (BV23)",
+            "((BV0) and (BV1)) == (BV21)",
+            "((BV1) and (BV2)) == (BV22)",
+        }
+
+        v, cons = get_or_make_var(x.implies(y.implies(z)))
+        assert str(v) == "BV25"
+        assert {str(c) for c in cons} == {
+            "((~BV0) or (BV24)) == (BV25)",
+            "((~BV1) or (BV2)) == (BV24)",
+        }
+
+        v, cons = get_or_make_var(a > 10)
+        assert str(v) == "BV26"
+        assert {str(c) for c in cons} == {"(IV0 > 10) == (BV26)"}
+
+        v, cons = get_or_make_var((a > 10) & x & y)
+        assert str(v) == "BV28"
+        assert {str(c) for c in cons} == {
+            "(and(BV27, BV0, BV1)) == (BV28)",
+            "(IV0 > 10) == (BV27)",
+        }
+
+        v, cons = get_or_make_var(Operator('not', [x]) == y)
+        assert str(v) == "BV29"
+        assert {str(c) for c in cons} == {"((~BV0) == (BV1)) == (BV29)"}
 
     def test_get_or_make_var__num(self):
         (a,b,c,d,e) = self.ivars[:5]
 
-        assert  str(get_or_make_var( a+b )) == "(IV5, [((IV0) + (IV1)) == (IV5)])"
-        assert  str(get_or_make_var( a+b+c )) == "(IV6, [(sum(IV0, IV1, IV2)) == (IV6)])"
-        assert  str(get_or_make_var( 2*a )) == "(IV7, [(sum([2] * [IV0])) == (IV7)])"
-        assert  str(get_or_make_var( a*b )) == "(IV8, [((IV0) * (IV1)) == (IV8)])"
-        assert  str(get_or_make_var( a//b )) == "(IV9, [((IV0) div (IV1)) == (IV9)])"
-        assert  str(get_or_make_var( 1//b )) == "(IV10, [(1 div (IV1)) == (IV10)])"
-        assert  str(get_or_make_var( a//1 )) == "(IV0, [])"
-        assert  str(get_or_make_var( abs(cp.intvar(-5,5, name="x")) )) == "(IV11, [(abs(x)) == (IV11)])"
-        assert  str(get_or_make_var( 1*a + 2*b + 3*c )) == "(IV12, [(sum([1, 2, 3] * [IV0, IV1, IV2])) == (IV12)])"
-        assert  str(get_or_make_var( cp.cpm_array([1,2,3])[a] )) == "(IV13, [([1 2 3][IV0]) == (IV13)])"
-        assert  str(get_or_make_var( cp.cpm_array([b+c,2,3])[a] )) == "(IV15, [((IV14, 2, 3)[IV0]) == (IV15), ((IV1) + (IV2)) == (IV14)])"
-        assert  str(get_or_make_var( a*2 )) == "(IV16, [(sum([2] * [IV0])) == (IV16)])"
+        v, cons = get_or_make_var(a + b)
+        assert str(v) == "IV5"
+        assert {str(c) for c in cons} == {"((IV0) + (IV1)) == (IV5)"}
+
+        v, cons = get_or_make_var(a + b + c)
+        assert str(v) == "IV6"
+        assert {str(c) for c in cons} == {"(sum(IV0, IV1, IV2)) == (IV6)"}
+
+        v, cons = get_or_make_var(2 * a)
+        assert str(v) == "IV7"
+        assert {str(c) for c in cons} == {"(sum([2] * [IV0])) == (IV7)"}
+
+        v, cons = get_or_make_var(a * b)
+        assert str(v) == "IV8"
+        assert {str(c) for c in cons} == {"((IV0) * (IV1)) == (IV8)"}
+
+        v, cons = get_or_make_var(a // b)
+        assert str(v) == "IV9"
+        assert {str(c) for c in cons} == {"((IV0) div (IV1)) == (IV9)"}
+
+        v, cons = get_or_make_var(1 // b)
+        assert str(v) == "IV10"
+        assert {str(c) for c in cons} == {"(1 div (IV1)) == (IV10)"}
+
+        v, cons = get_or_make_var(a // 1)
+        assert str(v) == "IV0"
+        assert {str(c) for c in cons} == set()
+
+        v, cons = get_or_make_var(abs(cp.intvar(-5, 5, name="x")))
+        assert str(v) == "IV11"
+        assert {str(c) for c in cons} == {"(abs(x)) == (IV11)"}
+
+        v, cons = get_or_make_var(1 * a + 2 * b + 3 * c)
+        assert str(v) == "IV12"
+        assert {str(c) for c in cons} == {"(sum([1, 2, 3] * [IV0, IV1, IV2])) == (IV12)"}
+
+        v, cons = get_or_make_var(cp.cpm_array([1, 2, 3])[a])
+        assert str(v) == "IV13"
+        assert {str(c) for c in cons} == {"([1 2 3][IV0]) == (IV13)"}
+
+        v, cons = get_or_make_var(cp.cpm_array([b + c, 2, 3])[a])
+        assert str(v) == "IV15"
+        assert {str(c) for c in cons} == {
+            "((IV14, 2, 3)[IV0]) == (IV15)",
+            "((IV1) + (IV2)) == (IV14)",
+        }
+
+        v, cons = get_or_make_var(a * 2)
+        assert str(v) == "IV16"
+        assert {str(c) for c in cons} == {"(sum([2] * [IV0])) == (IV16)"}
 
     def test_objective(self):
         (a,b,c,d,e) = self.ivars[:5]
