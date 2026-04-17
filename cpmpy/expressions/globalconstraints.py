@@ -915,8 +915,8 @@ class InDomain(GlobalConstraint):
         """
         expr, arr = self.args
         lb, ub = expr.get_bounds()
-        
-        return [expr != val for val in range(lb, ub + 1) if val not in arr], []
+        arr_set = frozenset(arr)
+        return [expr != val for val in range(lb, ub + 1) if val not in arr_set], []
 
     def value(self) -> Optional[bool]:
         """
@@ -938,7 +938,8 @@ class InDomain(GlobalConstraint):
         lb, ub = expr.get_bounds()
 
         # complement of arr
-        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr])
+        arr_set = frozenset(arr)
+        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr_set])
 
 
 class Xor(GlobalConstraint):
