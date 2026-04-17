@@ -17,7 +17,9 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
         E.g., not(x >= 3 | y == 2) is simplified to (x < 3) & (y != 2).
 
         Input is expected to be a flat list of Expressions.
-        Argument `toplevel` is deprecated and will be removed in a future version.
+        'Toplevel' means 'merge_and': if a toplevel 'and' is created and the flag is True,
+          then the 'and' will not be added to the toplevel list, but all its arguments will be merged in.
+          (actually only Expressions, and if a constant 'False' is found it adds BoolVal(False) and stops merging)
 
         Return:
             list of Expressions
@@ -27,7 +29,6 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
         changed, newexpr = _push_down_negation_expr(expr)
         if changed:
             if toplevel and newexpr.name == "and":
-                # TODO: newexpr.args are ExprLike, check for constants
                 for b in newexpr.args:
                     if isinstance(b, Expression):
                         newlist.append(b)
@@ -47,12 +48,15 @@ def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
         # the negative case, negate
         return True, recurse_negation(expr.args[0])
 
-    # rewrite 'BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+    # rewrite 'BoolExpr != const',
+    # also rewrite BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+    # but if rhs is not flat and lhs is, then do '~FlatExpr == NonFlatExpr'
     elif expr.name == '!=':
         lexpr, rexpr = expr.args
 
         if is_boolexpr(lexpr):
             if isinstance(rexpr, (bool, BoolVal)):
+                # rewrite 'BoolExpr != const'
                 if rexpr:  # lexpr != True :: ~lexpr, simplify by pushing down the negation on lhs
                     return True, recurse_negation(lexpr)
                 else:  # lexpr != False :: lexpr, simplify and recurse
@@ -60,19 +64,23 @@ def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
                     return True, newlexpr
                     
             elif isinstance(rexpr, Expression) and rexpr.is_bool():
-                if isinstance(rexpr, _BoolVarImpl):  # if rhs is a var, just negate that
-                    lhs_changed, lhs_newexpr = _push_down_negation_expr(lexpr)
-                    if lhs_changed:
-                        lexpr = lhs_newexpr
-                    return True, lexpr == (~rexpr)
+                # special case: prefer flat lhs over non-flat rhs
+                if rexpr.has_subexpr():
+                    if isinstance(lexpr, Expression) and lexpr.has_subexpr():
+                        pass # also not flat, dont shortcut
+                    else:
+                        neglexpr = recurse_negation(lexpr)
+                        rhs_changed, rhs_newexpr = _push_down_negation_expr(rexpr)
+                        if rhs_changed:
+                            rexpr = rhs_newexpr
+                        return True, neglexpr == rexpr
 
-                else:
-                    # change lhs, keep/recurse rhs
-                    lexpr = recurse_negation(lexpr)
-                    rhs_changed, rhs_newexpr = _push_down_negation_expr(rexpr)
-                    if rhs_changed:
-                        rexpr = rhs_newexpr
-                    return True, lexpr == rexpr
+                # rewrite BoolExpr != BoolExpr' to normalized 'BoolExpr == ~BoolExpr'
+                negrexpr = recurse_negation(rexpr)
+                lhs_changed, lhs_newexpr = _push_down_negation_expr(lexpr)
+                if lhs_changed:
+                    lexpr = lhs_newexpr
+                return True, lexpr == negrexpr
     
     if expr.has_subexpr():
         rec_changed, rec_newargs = _push_down_negation_args(expr.args)
@@ -84,7 +92,7 @@ def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
     return False, expr
 
 
-def _push_down_negation_args(args: list[Any] | tuple[Any, ...]) -> tuple[bool, list[Any] | tuple[Any, ...]]:
+def _push_down_negation_args(args: list[Any]|tuple[Any, ...]) -> tuple[bool, list[Any]|tuple[Any, ...]]:
     changed = False
     newargs: list[Any] = []
     for arg in args:
