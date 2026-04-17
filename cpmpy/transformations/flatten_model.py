@@ -358,7 +358,7 @@ def get_or_make_var(expr, csemap=None):
         # save both original expression and flattened expression to the csemap
         # maybe the flattened expression is already in the map?
         new_var = csemap.get(flatexpr)
-        expr_eq_var = []
+        expr_eq_var = None
         if new_var is None: # it's not in the map
             new_var, expr_eq_var = csemap.get_or_make_var(flatexpr)
         if flatexpr is not expr: # avoid additional hash call if expr was flat already
@@ -366,9 +366,12 @@ def get_or_make_var(expr, csemap=None):
 
     else:
         # this will have some overhead, but it nicely stores all logic in the csemap object
-        new_var, expr_eq_var = CSEMap().get_or_make_var(flatexpr) # some ove
+        new_var, expr_eq_var = CSEMap().get_or_make_var(flatexpr)
 
-    return new_var, expr_eq_var + flatcons
+    if expr_eq_var is not None:
+        flatcons.append(expr_eq_var)
+
+    return new_var, flatcons
 
 def get_or_make_var_or_list(expr, csemap = None):
     """ Like get_or_make_var() but also accepts and recursively transforms lists

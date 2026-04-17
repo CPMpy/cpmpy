@@ -46,19 +46,30 @@ class CSEMap:
 
         return var_vals
 
-    def get_or_make_var(self, expr: Expression) -> tuple[_IntVarImpl, list[Expression]]:
+    def get_or_make_var(self, expr: Expression) -> tuple[_IntVarImpl, Optional[Expression]]:
+        """
+        Make an auxiliary variable for the given expression
+        
+        Arguments:
+            expr: Expression to make an auxiliary variable for
+
+        Returns:
+            tuple[_IntVarImpl, Optional[Expression]]: (variable, equality constraint)
+            - variable: the auxiliary variable for the expression
+            - equality constraint: the equality constraint between the expression and the variable, or None if the expression is already in the csemap
+        """
 
         if isinstance(expr, _IntVarImpl):
-            return expr, []
+            return expr, None
 
         if expr in self.flat_map:
-            return self.flat_map[expr], []
+            return self.flat_map[expr], None
 
         elif expr.is_bool():
             bv = boolvar()
             self.flat_map[expr] = bv
-            return bv, [Comparison("==", expr, bv)]
+            return bv, Comparison("==", expr, bv)
         else:
             iv = intvar(*expr.get_bounds())
             self.flat_map[expr] = iv
-            return iv, [Comparison("==", expr, iv)]
+            return iv, Comparison("==", expr, iv)
