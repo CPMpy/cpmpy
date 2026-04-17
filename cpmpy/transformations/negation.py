@@ -210,10 +210,14 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
         assert(expr.is_bool()), f"Can only negate boolean expressions but got {expr}"
 
         if expr.name == "not":
-            # negation while in negative context = switch back to positive case
-            _, rec_args = _push_down_negation_args(expr.args)
-            assert len(rec_args) == 1, f"not has only 1 argument but got {rec_args}"
-            return rec_args[0]
+            # ~(~x) :: x
+            arg0 = expr.args[0]
+            if isinstance(arg0, bool):
+                return BoolVal(arg0)
+            changed, newarg0 = _push_down_negation_expr(arg0)
+            if changed:
+                return newarg0
+            return arg0
 
         elif expr.name == "->":
             # ~(x -> y) :: x & ~y
