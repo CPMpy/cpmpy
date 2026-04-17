@@ -618,12 +618,14 @@ class FileDataset(IndexedDataset):
             instance_meta = {}
             metadata_error = str(e)
 
-        # Derive instance name (strip format-specific extensions) TODO
-        stem = file_path.stem
-        for ext in (".xml", ".wcnf", ".opb"):
-            if stem.endswith(ext):
-                stem = stem[:len(stem) - len(ext)]
-                break
+        # Derive logical instance name from dataset-specific extension (strict)
+        filename = file_path.name
+        suffix_len = len(self.extension)
+        if suffix_len and not filename.endswith(self.extension):
+            raise ValueError(
+                f"Instance file '{filename}' does not end with dataset extension '{self.extension}'."
+            )
+        stem = filename[:-suffix_len] if suffix_len else filename
 
         # Build structured sidecar
         sidecar = {
