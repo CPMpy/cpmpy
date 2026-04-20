@@ -251,7 +251,18 @@ class TestTransLinearize:
         assert str(lin_cons[0]) == "sum([1, 1, -15] * [x, y, ~b]) <= 5"
         assert str(lin_cons[1]) == "sum([1, 1, 3] * [x, y, ~b]) >= 5"
 
+    @pytest.mark.skip(reason="solver dependent")
+    def test_mdd(self):
 
+        x = cp.intvar(1, 4, shape=3, name="x")
+
+        cons = cp.MDD(x, [("src", 2, "2"), ("src", 1, "1"), ("src", 4, "4"), ("src", 3, "3"),
+                          ("2", 1, "2,1"), ("1", 2, "1,2"), ("4", 3, "1,2"), ("3", 2, "3,2"),
+                          ("2,1", 1, "snk"), ("2,1", 2, "snk"), ("1,2", 3, "snk"), ("3,2", 2, "snk")])
+        lin_cons = linearize_constraint(decompose_linear([cons]))
+        print("Lin cons: ", lin_cons)
+        assert len(lin_cons) == 1
+        assert str(lin_cons) == "[sum(sum(x[0] == 2, x[0] == 1, x[0] == 4, x[0] == 3) == 1, (sum(x[0] == 2)) == (sum(x[1] == 1)), (sum(x[0] == 1)) == (sum(BV3)), (sum(x[0] == 4)) == (sum(x[1] == 3)), (sum(x[0] == 3)) == (sum(BV4)), (sum(x[1] == 1)) == ((x[2] == 1) + (BV5)), ((BV3) + (x[1] == 3)) == (sum(x[2] == 3)), sum(x[2] == 1, BV5, x[2] == 3, BV4) == 1, ((BV3) + (BV4)) == (x[1] == 2), ((BV5) + (BV4)) == (x[2] == 2)) >= 10]"
 
 
 
