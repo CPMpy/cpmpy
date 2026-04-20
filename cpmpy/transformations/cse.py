@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional, Any, overload, Literal
 from ..expressions.core import Expression, Comparison
 from ..expressions.utils import is_int
 from ..expressions.variables import boolvar, intvar, _IntVarImpl, _BoolVarImpl
@@ -20,6 +20,12 @@ class CSEMap:
     def __setitem__(self, attr, val):
         raise ValueError("__setitem__ is not supported for flat_map, use get_or_make_var instead")
 
+    @overload
+    def get(self, expr: Expression) -> Optional[_IntVarImpl]: ...
+    @overload
+    def get(self, expr: Expression, default: Literal[None]) -> Optional[_IntVarImpl]: ...
+    @overload
+    def get(self, expr: Expression, default: Any) -> Any: ...
     def get(self, expr: Expression, default: Any = None) -> Any:
         return self.flat_map.get(expr, default)
 
@@ -27,9 +33,15 @@ class CSEMap:
         """Save the decomposition of the given global constraint or global function."""
         self.decomp_map[expr] = newexpr
 
-    def get_decomposition(self, expr: Expression) -> Optional[Expression]:
+    @overload   
+    def get_decomposition(self, expr: Expression) -> Optional[Expression]: ...
+    @overload
+    def get_decomposition(self, expr: Expression, default: Literal[None]) -> Optional[Expression]: ...
+    @overload
+    def get_decomposition(self, expr: Expression, default: Any) -> Any: ...
+    def get_decomposition(self, expr: Expression, default: Any = None) -> Any:
         """Get the decomposition of the given global constraint or global function."""
-        return self.decomp_map.get(expr)
+        return self.decomp_map.get(expr, default)
 
     def get_reified_varvals(self) -> dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]:
         """collect all bv <-> var == val expressions in flat_map"""
