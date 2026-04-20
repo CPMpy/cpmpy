@@ -856,7 +856,7 @@ class MultiDimElement(GlobalFunction):
                 )
         return argval(arr[tuple(vidxs)])
 
-    def _flat_index(self, shape, indices):
+    def _flat_index(self, shape: tuple[int, ...], indices: ListLike[ExprLike]) -> ExprLike:
         """Linear index into ``arr.reshape(-1)`` (NumPy C-order).
 
         Arguments:
