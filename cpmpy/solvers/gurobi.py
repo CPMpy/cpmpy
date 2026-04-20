@@ -44,6 +44,7 @@
 
 from typing import Optional, List
 import warnings
+import cpmpy as cp
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
@@ -399,6 +400,15 @@ class CPM_gurobi(SolverInterface):
 
       # transform and post the constraints
       for cpm_expr in self.transform(cpm_expr_orig):
+          self._add_transformed(cpm_expr)
+
+      return self
+
+    __add__ = add  # avoid redirect in superclass
+
+    def _add_transformed(self, cpm_expr):
+        """Post a single already-transformed constraint to the Gurobi model. Returns the Gurobi constraint. Also used in for `mus_native` to post transformed CPMpy constraints and gain access to the Gurobi constraint."""
+        from gurobipy import GRB
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
@@ -409,28 +419,28 @@ class CPM_gurobi(SolverInterface):
             # Thanks to `only_numexpr_equality()` only supported comparisons should remain
             if cpm_expr.name == '<=':
                 grblhs = self._make_numexpr(lhs)
-                self.grb_model.addLConstr(grblhs, GRB.LESS_EQUAL, grbrhs)
+                return self.grb_model.addLConstr(grblhs, GRB.LESS_EQUAL, grbrhs)
             elif cpm_expr.name == '>=':
                 grblhs = self._make_numexpr(lhs)
-                self.grb_model.addLConstr(grblhs, GRB.GREATER_EQUAL, grbrhs)
+                return self.grb_model.addLConstr(grblhs, GRB.GREATER_EQUAL, grbrhs)
             elif cpm_expr.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
                         or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
                     # a BoundedLinearExpression LHS, special case, like in objective
                     grblhs = self._make_numexpr(lhs)
-                    self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs)
+                    return self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs)
 
                 elif lhs.name == 'mul':
                     assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
                     a, b = self.solver_vars(lhs.args)
                     self.grb_model.setParam("NonConvex", 2)
-                    self.grb_model.addConstr(a * b == grbrhs)
+                    return self.grb_model.addConstr(a * b == grbrhs)
 
                 elif lhs.name == 'div':
                     if not is_num(lhs.args[1]):
                         raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
                     a, b = self.solver_vars(lhs.args)
-                    self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
+                    return self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
 
                 else:
                     # General constraints
@@ -439,14 +449,14 @@ class CPM_gurobi(SolverInterface):
                         grbrhs = self.solver_var(intvar(lb=grbrhs, ub=grbrhs))
 
                     if lhs.name == 'min':
-                        self.grb_model.addGenConstrMin(grbrhs, self.solver_vars(lhs.args))
+                        return self.grb_model.addGenConstrMin(grbrhs, self.solver_vars(lhs.args))
                     elif lhs.name == 'max':
-                        self.grb_model.addGenConstrMax(grbrhs, self.solver_vars(lhs.args))
+                        return self.grb_model.addGenConstrMax(grbrhs, self.solver_vars(lhs.args))
                     elif lhs.name == 'abs':
-                        self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
+                        return self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
                     elif lhs.name == 'pow':
                         x, a = self.solver_vars(lhs.args)
-                        self.grb_model.addGenConstrPow(x, grbrhs, a)
+                        return self.grb_model.addGenConstrPow(x, grbrhs, a)
                     else:
                         raise NotImplementedError(
                         "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
@@ -471,17 +481,17 @@ class CPM_gurobi(SolverInterface):
             else:
                 raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
             if sub_expr.name == "<=":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs))
+                return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs))
             elif sub_expr.name == ">=":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
+                return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
             elif sub_expr.name == "==":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
+                return self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
             else:
                 raise Exception(f"Unknown linear expression {sub_expr} name")
 
         # True or False
         elif isinstance(cpm_expr, BoolVal):
-            self.grb_model.addConstr(cpm_expr.args[0])
+            return self.grb_model.addConstr(cpm_expr.args[0])
 
         # a direct constraint, pass to solver
         elif isinstance(cpm_expr, DirectConstraint):
@@ -489,9 +499,6 @@ class CPM_gurobi(SolverInterface):
 
         else:
             raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-
-      return self
-    __add__ = add  # avoid redirect in superclass
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
         """
@@ -512,6 +519,92 @@ class CPM_gurobi(SolverInterface):
         """
         for cpm_var, val in zip(cpm_vars, vals):
             self.solver_var(cpm_var).setAttr("VarHintVal", val)
+
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using Gurobi's native IIS (Irreducible Inconsistent Subsystem) algorithm.
+
+        Args:
+            soft: List of soft constraints over which a MUS needs to be found
+            hard: List of hard constraints that always need to be satisfied
+
+        Returns a MUS (list of constraints from soft).
+        """
+
+        # TODO unsure if needed?
+        soft_cons = toplevel_list(soft, merge_and=False)
+
+        # instantiate Gurobi solver
+        s = cls()
+
+        # we collect the Gurobi constraint objects, so we can enable their `IISConstrForce` attribute later
+        grb_hard_cons = []
+
+        # transform and add all hard constraints
+        for cpm_con in s.transform(hard):
+            # note: we use `s.transform`, then `_add_transformed`, to add some of the constraints to the solver, because need to introspect the transformation and require access to the Gurobi constraints. This bypasses normal creation of `user_vars`. This is safe to do since `user_vars` are not used in this algorithm, and the solver object does not leave this function.
+            grb_con = s._add_transformed(cpm_con)
+            grb_hard_cons.append(grb_con)
+
+        # The Gurobi IIS algorithm minimizes constraints directly, unlike assumption-based solvers. However, a user-level constraint may be transformed to a group of multiple Gurobi constraints. In this case, we have to represent this group by a *single* soft constraint, otherwise the Gurobi IIS may not map to the user-level constraint MUS. We collect `tf_soft` so that `tf_soft[i]` is a single soft constraint representing `soft[i]`. After calling `computeIIS`, we can read the `IISConstr` attribute to see which are in the IIS/MUS.
+        grb_soft_cons = []
+
+        for soft_con in soft_cons:
+            # manually transform the constraint so we can see whether `soft_con` is represented by more than one constraint
+            soft_con_tf = s.transform(soft_con)
+
+            if len(soft_con_tf) == 0:
+                # this uncommon case ensures `grb_soft_cons` maps to `soft_cons`
+                soft_con_rep = cp.BoolVal(True)
+            elif len(soft_con_tf) == 1:
+                # if `con` represented by a single transformed constraint, it can be added as-is
+                soft_con_rep = soft_con_tf[0]
+            else:
+                # `soft_con_tf` is a group of multiple constraints. We introduce an assumption variable `a` and add *hard* constraint `a -> /\ tf_cons`. Then, `a` be a single soft constraint implying `soft_con`
+                assumption = cp.boolvar()
+
+                # adding `a -> /\ C` may require re-transform due to the added implication
+                additional_hard_constraint = assumption.implies(cp.all(soft_con_tf))
+                for tf_con in s.transform(additional_hard_constraint):
+                    grb_hard_cons.append(s._add_transformed(tf_con))
+
+                # `a >= 1` will be the single soft constraint to indicate whether `soft_cons[i]` is in the MUS
+                soft_con_rep = assumption >= 1
+
+            grb_soft_cons.append(s._add_transformed(soft_con_rep))
+
+
+        # update required to avoid `gurobipy._exception.GurobiError: GenConstr has not yet been added to the model` when accessing constraint attribute.
+        # model updates can be expensive, so we do this only once!
+        s.native_model.update()
+        for grb_con in grb_hard_cons:
+            # Different Gurobi constraint types have different names for this `IIS*Force` attritube
+            if isinstance(grb_con, gp.Constr):
+                grb_con.IISConstrForce = 1
+            elif isinstance(grb_con, gp.GenConstr):
+                grb_con.IISGenConstrForce = 1
+            elif isinstance(grb_con, gp.QConstr):
+                grb_con.IISQConstrForce = 1
+            elif isinstance(grb_con, gp.SOS):
+                grb_con.IISSOSForce = 1
+            else:
+                raise TypeError(f"Unexpected Gurobi constraint {grb_con} of type {type(grb_con)}")
+
+        # compute IIS (conveniently fails if original model was SAT since it will solve the model)
+        try:
+            s.native_model.computeIIS()
+        except gp.GurobiError as e:
+            if e.errno == gp.GRB.Error.IIS_NOT_INFEASIBLE:
+                raise AssertionError("MUS: model must be UNSAT")
+            raise
+
+        mus = []
+        for soft_i, grb_soft_i in zip(soft_cons, grb_soft_cons):
+            # if grb_soft_i has the `IISConstr` attribute enabled, then `soft_i` is in the MUS. Again, the exact attribute depends on the constraint type.
+            if any(getattr(grb_soft_i, attr, False) for attr in ("IISConstr", "IISGenConstr", "IISQConstr", "IISSOS")):
+                mus.append(soft_i)
+        return mus
 
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
