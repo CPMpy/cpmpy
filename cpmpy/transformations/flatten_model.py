@@ -92,6 +92,7 @@ import copy
 import math
 import builtins
 import cpmpy as cp
+from .cse import CSEMap
 
 from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import Expression, Comparison, Operator
@@ -335,42 +336,44 @@ def get_or_make_var(expr, csemap=None):
 
     if is_any_list(expr):
         raise Exception(f"Expected single variable, not a list for: {expr}")
+    
+    # check if the expression is already in the csemap
+    new_var = None
+    if (csemap is not None):
+        new_var = csemap.get(expr)
+    if new_var is not None:
+        return (new_var, [])
 
-    if csemap is not None and expr in csemap:
-        return csemap[expr], []
-
+    # expression is not in the csemap
+    # need to recursively flatten
     if expr.is_bool():
-        # normalize expr into a boolexpr LHS, reify LHS == bvar
-        (flatexpr, flatcons) = normalized_boolexpr(expr, csemap=csemap)
-
-        if isinstance(flatexpr,_BoolVarImpl):
+        flatexpr, flatcons = normalized_boolexpr(expr, csemap=csemap)
+        if isinstance(flatexpr, _BoolVarImpl):
             # avoids unnecessary bv == bv or bv == ~bv assignments
-            return flatexpr,flatcons
-        bvar = _BoolVarImpl()
+            return flatexpr, flatcons
+    else:
+        flatexpr, flatcons = normalized_numexpr(expr, csemap=csemap)
 
-        # save expr in dict
-        if csemap is not None:
-            csemap[expr] = bvar
-        return bvar, [flatexpr == bvar] + flatcons
+    if csemap is not None:
+        # save both original expression and flattened expression to the csemap
+        # maybe the flattened expression is already in the map?
+        new_var = csemap.get(flatexpr)
+        expr_eq_var = None
+        if new_var is None: # it's not in the map
+            new_var, expr_eq_var = csemap.get_or_make_var(flatexpr)
+        if flatexpr is not expr: # avoid additional hash call if expr was flat already
+            csemap.flat_map[expr] = new_var
 
     else:
-        # normalize expr into a numexpr LHS,
-        # then compute bounds and return (newintvar, LHS == newintvar)
-        (flatexpr, flatcons) = normalized_numexpr(expr, csemap=csemap)
+        # this will have some overhead, but it nicely stores all logic in the csemap object
+        new_var, expr_eq_var = CSEMap().get_or_make_var(flatexpr)
 
-        lb, ub = flatexpr.get_bounds()
-        if not is_int(lb) or not is_int(ub):
-            warnings.warn(f"CPMpy only uses integer variables, but found expression ({expr}) with domain {lb}({type(lb)}"
-                          f" - {ub}({type(ub)}. CPMpy will rewrite this constriants with integer bounds instead.")
-            lb, ub = math.floor(lb), math.ceil(ub)
-        ivar = _IntVarImpl(lb, ub)
+    if expr_eq_var is not None:
+        flatcons.append(expr_eq_var)
 
-        # save expr in dict
-        if csemap is not None:
-            csemap[expr] = ivar
-        return ivar, [flatexpr == ivar] + flatcons
+    return new_var, flatcons
 
-def get_or_make_var_or_list(expr, csemap=None):
+def get_or_make_var_or_list(expr, csemap = None):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
         Used to convert arguments of globals
     """
