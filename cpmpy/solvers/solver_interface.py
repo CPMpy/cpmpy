@@ -92,7 +92,7 @@ class SolverInterface(object):
         # rest uses own API
         if cpm_model is not None:
             # post all constraints at once, implemented in `add()`
-            self += cpm_model.constraints
+            self.add(cpm_model.constraints)
 
             # post objective
             if cpm_model.objective_ is not None:
@@ -282,7 +282,7 @@ class SolverInterface(object):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
+            self.add(any([v != v.value() for v in self.user_vars if v.value() is not None]))
 
             if time_limit is not None: # update remaining time
                 time_limit -= self.status().runtime
