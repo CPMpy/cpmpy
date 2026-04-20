@@ -493,7 +493,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += cpm_any([v != v.value() for v in self.user_vars])
+            self.add(cpm_any([v != v.value() for v in self.user_vars]))
 
         if solution_count == 0:
             # clear user vars if no solution found
