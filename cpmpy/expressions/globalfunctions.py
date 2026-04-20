@@ -709,10 +709,7 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
-        if isinstance(arr, NDVarArray):
-            if arr.ndim != 1:
-                raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
-        elif isinstance(arr, np.ndarray):
+        if isinstance(arr, np.ndarray):
             if arr.ndim != 1:
                 raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
         elif is_any_list(arr) and any(is_any_list(el) for el in arr):
