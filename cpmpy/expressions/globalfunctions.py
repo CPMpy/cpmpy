@@ -835,7 +835,7 @@ class MultiDimElement(GlobalFunction):
         if len(indices) != arr.ndim:
             raise ValueError(f"MultiDimElement expects {arr.ndim} indices, got {len(indices)}")
 
-        super().__init__("multidim_element", (arr, *tuple(indices)))
+        super().__init__("multidim_element", (arr, *tuple(indices))) # Indices as separate arguments to allow safening with _safen_range
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
