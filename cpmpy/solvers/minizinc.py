@@ -306,7 +306,12 @@ class CPM_minizinc(SolverInterface):
         import minizinc
 
         if time_limit is not None:
-            kwargs['time_limit'] = timedelta(seconds=time_limit)
+            from packaging.version import Version
+            # timeout is deprecated from version 0.10.0 onwards, but cpmpy also supports older versions
+            if self.version().split("/")[0] >= Version("0.10.0"):
+                kwargs['time_limit'] = timedelta(seconds=time_limit)
+            else:
+                kwargs['timeout'] = timedelta(seconds=time_limit)
 
         # hack, we need to add the objective in a way that it can be changed
         # later, so make copy of the mzn_model
