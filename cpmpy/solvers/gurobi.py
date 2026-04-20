@@ -46,18 +46,17 @@ from typing import Optional, List
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.utils import argvals, argval, is_any_list, is_num
+from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.utils import argvals, is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..expressions.globalfunctions import GlobalFunction
+from ..transformations.into_tree import into_tree, into_tree_expr
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective
+from ..transformations.linearize import decompose_linear
 from ..transformations.normalize import toplevel_list
-from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
+from ..exceptions import NotSupportedError
 
 try:
     import gurobipy as gp
@@ -80,8 +79,12 @@ class CPM_gurobi(SolverInterface):
     https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
 
+    verbose = False  # log debug ouput
+
     supported_global_constraints = frozenset({"min", "max", "abs", "mul", "pow"})
     supported_reified_global_constraints = frozenset()
+    supported_tree_exprs = frozenset({"sum", "wsum", "-", "sub", "mul", "pow", "div"})
+    general_constraints = frozenset({"max", "min", "abs", "and", "or"})
 
     @staticmethod
     def supported():
@@ -192,6 +195,10 @@ class CPM_gurobi(SolverInterface):
         for param, val in kwargs.items():
             self.grb_model.setParam(param, val)
 
+        if self.verbose:
+            # write LP file for debugging
+            self.grb_model.write("/tmp/model.lp")
+
         _ = self.grb_model.optimize(callback=solution_callback)
         grb_objective = self.grb_model.getObjective()
 
@@ -259,7 +266,9 @@ class CPM_gurobi(SolverInterface):
 
         # special case, negative-bool-view. Should be eliminated in linearize
         if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+            return 1 - self.solver_var(cpm_var._bv)
+            # TODO eliminate again
+            # raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
 
         # create if it does not exit
         if cpm_var not in self._varmap:
@@ -291,19 +300,22 @@ class CPM_gurobi(SolverInterface):
         # save user variables
         get_variables(expr, self.user_vars)
 
-        # transform objective
+        # transform objective into expression tree
         obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(obj,
-                                                      supported=self.supported_global_constraints,
-                                                      supported_reified=self.supported_reified_global_constraints,
-                                                      csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+        self.add(safe_cons)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+        obj, obj_cons = into_tree_expr(
+            obj,
+            csemap=self._csemap,
+            # only linear/quadratic objectives supported
+            supported=self.supported_tree_exprs - {"pow"},
+            reified=True,  # TODO this is a bit hacky to ensure e.g. Comparison's are reified
+            general_constraints=self.general_constraints,
+            verbose=self.verbose,
+        )
+        self.add(obj_cons)
 
-        # make objective function or variable and post
-        grb_obj = self._make_numexpr(obj)
+        grb_obj = self._to_grb_expr(obj)
         if minimize:
             self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
         else:
@@ -313,33 +325,88 @@ class CPM_gurobi(SolverInterface):
     def has_objective(self):
         return self.grb_model.getObjective().size() != 0  # TODO: check if better way to do this...
 
-    def _make_numexpr(self, cpm_expr):
-        """
-            Turns a numeric CPMpy 'flat' expression into a solver-specific
-            numeric expression
+    def _to_grb_expr(self, cpm_expr):
+        """Convert a transformed CPMpy expression to a native Gurobi expression."""
 
-            Used especially to post an expression as objective function
-        """
-        import gurobipy as gp
+        def add_(cpm_expr, depth):
+            if self.verbose:
+                print(f"{'  ' * depth}Add:", cpm_expr, type(cpm_expr))
 
-        if is_num(cpm_expr):
-            return cpm_expr
+            depth += 1
 
-        # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
-            return self.solver_var(cpm_expr)
+            if isinstance(cpm_expr, (int, float)):
+                return cpm_expr
+            elif isinstance(cpm_expr, _NumVarImpl):
+                return self.solver_var(cpm_expr)
+            elif isinstance(cpm_expr, (Operator, GlobalFunction)):
+                match cpm_expr.name:
+                    case "->":  # Gurobi indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
+                        a, b = cpm_expr.args
+                        is_pos = not isinstance(a, NegBoolView)
+                        p = add_(a if is_pos else a._bv, depth)
+                        return (p == int(is_pos)) >> add_(b, depth)
+                    case "-":
+                        return -add_(cpm_expr.args[0], depth=depth)
+                    case "sum":
+                        return sum(add_(arg, depth) for arg in cpm_expr.args)
+                    case "wsum":
+                        return sum(weight * add_(arg, depth) for weight, arg in zip(cpm_expr.args[0], cpm_expr.args[1]))
+                    case "sub":
+                        return add_(cpm_expr.args[0], depth) - add_(cpm_expr.args[1], depth)
+                    case "mul":
+                        return add_(cpm_expr.args[0], depth) * add_(cpm_expr.args[1], depth)
+                    case "pow":
+                        return add_(cpm_expr.args[0], depth) ** add_(cpm_expr.args[1], depth)
+                    case name if name in self.general_constraints:
+                        args = [add_(a, depth) for a in cpm_expr.args]
+                        match name:
+                            case "or":
+                                return gp.or_(*args)
+                            case "and":
+                                return gp.and_(*args)
+                            case "abs":
+                                return gp.abs_(*args)
+                            case "min":
+                                return gp.min_(*args)
+                            case "max":
+                                return gp.max_(*args)
+                    case _:
+                        raise NotSupportedError(f"Unexpected constraint {cpm_expr} cannot be made into Gurobi expression")
+            elif isinstance(cpm_expr, Comparison):
+                a, b = cpm_expr.args
+                a, b = add_(a, depth), add_(b, depth)
 
-        # sum
-        if cpm_expr.name == "sum":
-            return gp.quicksum(self.solver_vars(cpm_expr.args))
-        if cpm_expr.name == "sub":
-            a,b = self.solver_vars(cpm_expr.args)
-            return a - b
-        # wsum
-        if cpm_expr.name == "wsum":
-            return gp.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
+                def _reify_nl(expr):
+                    """Gurobi requires NLExpr in y=f(x) form; reify to aux var."""
+                    if isinstance(expr, gp.NLExpr):
+                        y = self.grb_model.addVar(lb=-gp.GRB.INFINITY)
+                        self.grb_model.addConstr(y == expr)
+                        return y
+                    return expr
 
-        raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
+                match cpm_expr.name:
+                    case "==":
+                        if isinstance(a, gp.NLExpr) or isinstance(b, gp.NLExpr):
+                            # NLExpr can stay in ==, just ensure other side is a Var
+                            if isinstance(b, gp.NLExpr):
+                                y = a if isinstance(a, gp.Var) else self.grb_model.addVar(lb=a, ub=a)
+                                return y == b
+                            else:
+                                y = b if isinstance(b, gp.Var) else self.grb_model.addVar(lb=b, ub=b)
+                                return y == a
+                        return a == b
+                    case "<=" | ">=":
+                        a, b = _reify_nl(a), _reify_nl(b)
+                        return (a <= b) if cpm_expr.name == "<=" else (a >= b)
+                    case _:
+                        raise Exception(f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}")
+            elif isinstance(cpm_expr, DirectConstraint):
+                cpm_expr.callSolver(self, self.grb_model)
+                return True
+            else:
+                raise NotImplementedError(f"add_() not implemented for {cpm_expr} of type {type(cpm_expr)} w/ name {getattr(cpm_expr, 'name', None)}")
+
+        return add_(cpm_expr, 0)
 
     def transform(self, cpm_expr):
         """
@@ -358,139 +425,72 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset(["mod", "div", "element"]))  # linearize and decompose expect safe exprs
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
                                     csemap=self._csemap)
-        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
-        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
-        # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","->","sub","min","max","mul","abs","pow"}), csemap=self._csemap)  # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
+        cpm_cons = into_tree(
+            cpm_cons,
+            csemap=self._csemap,
+            supported=self.supported_tree_exprs,
+            general_constraints=self.general_constraints,
+            verbose=self.verbose,
+        )
+
+        if self.verbose:
+            with open("/tmp/model.txt", "w") as f:
+                f.write("# Original constraints:\n")
+                for c in toplevel_list(cpm_expr):
+                    f.write(str(c) + "\n")
+                f.write("\n# Transformed constraints:\n")
+                for c in cpm_cons:
+                    f.write(str(c) + "\n")
+
         return cpm_cons
 
     def add(self, cpm_expr_orig):
-      """
-            Eagerly add a constraint to the underlying solver.
+        """
+              Eagerly add a constraint to the underlying solver.
 
-            Any CPMpy expression given is immediately transformed (through `transform()`)
-            and then posted to the solver in this function.
+              Any CPMpy expression given is immediately transformed (through `transform()`)
+              and then posted to the solver in this function.
 
-            This can raise 'NotImplementedError' for any constraint not supported after transformation
+              This can raise 'NotImplementedError' for any constraint not supported after transformation
 
-            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-            the user knows and cares about (and will be populated with a value after solve). All other variables
-            are auxiliary variables created by transformations.
+              The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+              the user knows and cares about (and will be populated with a value after solve). All other variables
+              are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+          :param cpm_expr: CPMpy expression, or list thereof
+          :type cpm_expr: Expression or list of Expression
 
-        :return: self
-      """
-      from gurobipy import GRB
+          :return: self
+        """
+        import gurobipy as gp
 
-      # add new user vars to the set
-      get_variables(cpm_expr_orig, collect=self.user_vars)
+        # add new user vars to the set
+        get_variables(cpm_expr_orig, collect=self.user_vars)
 
-      # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
-
-        # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
-        # numexpr `comp` bvar|const
-        if isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
-            grbrhs = self.solver_var(rhs)
-
-            # Thanks to `only_numexpr_equality()` only supported comparisons should remain
-            if cpm_expr.name == '<=':
-                grblhs = self._make_numexpr(lhs)
-                self.grb_model.addLConstr(grblhs, GRB.LESS_EQUAL, grbrhs)
-            elif cpm_expr.name == '>=':
-                grblhs = self._make_numexpr(lhs)
-                self.grb_model.addLConstr(grblhs, GRB.GREATER_EQUAL, grbrhs)
-            elif cpm_expr.name == '==':
-                if isinstance(lhs, _NumVarImpl) \
-                        or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
-                    # a BoundedLinearExpression LHS, special case, like in objective
-                    grblhs = self._make_numexpr(lhs)
-                    self.grb_model.addLConstr(grblhs, GRB.EQUAL, grbrhs)
-
-                elif lhs.name == 'mul':
-                    assert len(lhs.args) == 2, "Gurobi only supports multiplication with 2 variables"
-                    a, b = self.solver_vars(lhs.args)
-                    self.grb_model.setParam("NonConvex", 2)
-                    self.grb_model.addConstr(a * b == grbrhs)
-
-                elif lhs.name == 'div':
-                    if not is_num(lhs.args[1]):
-                        raise NotSupportedError(f"Gurobi only supports division by constants, but got {lhs.args[1]}")
-                    a, b = self.solver_vars(lhs.args)
-                    self.grb_model.addLConstr(a / b, GRB.EQUAL, grbrhs)
-
-                else:
-                    # General constraints
-                    # grbrhs should be a variable for gurobi in the subsequent, fake it
-                    if is_num(grbrhs):
-                        grbrhs = self.solver_var(intvar(lb=grbrhs, ub=grbrhs))
-
-                    if lhs.name == 'min':
-                        self.grb_model.addGenConstrMin(grbrhs, self.solver_vars(lhs.args))
-                    elif lhs.name == 'max':
-                        self.grb_model.addGenConstrMax(grbrhs, self.solver_vars(lhs.args))
-                    elif lhs.name == 'abs':
-                        self.grb_model.addGenConstrAbs(grbrhs, self.solver_var(lhs.args[0]))
-                    elif lhs.name == 'pow':
-                        x, a = self.solver_vars(lhs.args)
-                        self.grb_model.addGenConstrPow(x, grbrhs, a)
-                    else:
-                        raise NotImplementedError(
-                        "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
+        # transform and post the constraints
+        for cpm_expr in self.transform(cpm_expr_orig):
+            grb_expr = self._to_grb_expr(cpm_expr)
+            if isinstance(grb_expr, (bool, int, float)):
+                if not grb_expr:
+                    self.grb_model.addConstr(0 >= 1)  # infeasible
+                continue
+            elif isinstance(grb_expr, (gp.Var, gp.LinExpr)):
+                # If add() returned a Gurobi Var (not a constraint), wrap it as >= 1
+                grb_con = grb_expr >= 1
+            elif isinstance(grb_expr, gp.TempConstr):
+                grb_con = grb_expr
             else:
-                raise NotImplementedError(
-                "Not a known supported gurobi comparison '{}' {}".format(lhs.name, cpm_expr))
+                grb_con = self.grb_model.addVar(lb=1, ub=1) == grb_expr
+            if self.verbose: self.grb_model.update()
+            if self.verbose: print("OUT", grb_con)
+            self.native_model.addConstr(grb_con)
 
-        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            # Indicator constraints
-            # Take form bvar -> sum(x,y,z) >= rvar
-            cond, sub_expr = cpm_expr.args
-            assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
-            assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
-            if isinstance(cond, NegBoolView):
-                cond, bool_val = self.solver_var(cond._bv), False
-            else:
-                cond, bool_val = self.solver_var(cond), True
-
-            lhs, rhs = sub_expr.args
-            if isinstance(lhs, _NumVarImpl) or lhs.name == "sum" or lhs.name == "wsum":
-                lin_expr = self._make_numexpr(lhs)
-            else:
-                raise Exception(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
-            if sub_expr.name == "<=":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.LESS_EQUAL, self.solver_var(rhs))
-            elif sub_expr.name == ">=":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.GREATER_EQUAL, self.solver_var(rhs))
-            elif sub_expr.name == "==":
-                self.grb_model.addGenConstrIndicator(cond, bool_val, lin_expr, GRB.EQUAL, self.solver_var(rhs))
-            else:
-                raise Exception(f"Unknown linear expression {sub_expr} name")
-
-        # True or False
-        elif isinstance(cpm_expr, BoolVal):
-            self.grb_model.addConstr(cpm_expr.args[0])
-
-        # a direct constraint, pass to solver
-        elif isinstance(cpm_expr, DirectConstraint):
-            cpm_expr.callSolver(self, self.grb_model)
-
-        else:
-            raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
-
-      return self
+        return self
     __add__ = add  # avoid redirect in superclass
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
