@@ -71,7 +71,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             todolist.extend(exprs)
             if len(toplevel_exprs) > 0:
                 todolist.extend(toplevel_exprs)
-        elif isinstance(expr, bool):
+        elif isinstance(expr, (bool, np.bool_)):
             # TODO: violates type!!!
             newlist.append(BoolVal(expr))
         elif expr.has_subexpr():
