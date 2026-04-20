@@ -532,10 +532,10 @@ class NDVarArray(np.ndarray):
             new_indices = []
             for idx in index:
                 if isinstance(idx, Expression):
-                    selector.append(slice(None))
+                    selector.append(slice(None))  # keep this axis (equivalent to `:` when used as index), to pass to element constraint
                     new_indices.append(idx)
                 else:
-                    selector.append(idx)
+                    selector.append(idx)  # constant index
             arr = arr[tuple(selector)]
 
             if len(new_indices) == 1:
