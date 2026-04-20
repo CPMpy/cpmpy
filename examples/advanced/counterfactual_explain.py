@@ -110,7 +110,7 @@ def generate_knapsack_model(n=10):
     R = 1000
     values = np.random.randint(1, R, n)
     weights = np.random.randint(1, R, n)
-    capacity = int(cp.max([0.5 * cp.sum(weights), R]))
+    capacity = int(max([0.5 * sum(weights), R]))
 
     return values, weights, capacity
 
@@ -126,7 +126,7 @@ def generate_foil_knapsack(values, weights, capacity, x, m, tries=1):
     foil_idx = np.random.choice(n, m, replace=False)
     foil_vals = np.abs(1 - x[foil_idx])
 
-    if cp.sum(foil_vals * weights[foil_idx]) > capacity:
+    if sum(foil_vals * weights[foil_idx]) > capacity:
         if verbose:
             print(f"\rGenerated unfeasable user query, retrying...({tries})", end="")
         return generate_foil_knapsack(values, weights, capacity, x, m, tries + 1)
@@ -204,10 +204,11 @@ def inverse_optimize(values, weights, capacity, x_d, foil_idx):
         if verbose:
             print(f"\nStarting iteration {i}")
             print(f"d* = {d_star}")
-            print(f"d* * x_d = {cp.sum(d_star * x_d)}")
-            print(f"d* * x_0 = {cp.sum(d_star * x_0.value())}")
+            print(f"d* * x_d = {sum(d_star * x_d)}")
+            print(f"d* * x_0 = {sum(d_star * x_0.value())}")
+            
 
-        if cp.sum(d_star * x_d) >= cp.sum(d_star * x_0.value()):
+        if sum(d_star * x_d) >= sum(d_star * x_0.value()):
             return d_star
         else:
             master_model += [cp.sum(d * x_d) >= cp.sum(d * x_0.value())]
@@ -229,8 +230,9 @@ def print_knapsack_model(values, weights, capacity, x):
     print(f"Capacity: {capacity}")
 
     print("\nis:", x)
-    print(f"Resulting in an objective value of {cp.sum(x * values)}")
-    print(f"Capacity used: {cp.sum(x*weights)}")
+    print(f"Resulting in an objective value of {sum(x * values)}")
+    print(f"Capacity used: {sum(x*weights)}")
+
 
 
 def pp_uquery(x, f_items):
