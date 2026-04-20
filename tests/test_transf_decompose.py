@@ -1,4 +1,3 @@
-import unittest
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.globalfunctions import GlobalFunction
@@ -19,7 +18,7 @@ class TestTransfDecomp:
         bv = cp.boolvar(name="bv")
 
         cons = [cp.AllDifferent(ivs)]
-        assert str(decompose_in_tree(cons)) == "[and((x) != (y), (x) != (z), (y) != (z))]"
+        assert str(decompose_in_tree(cons)) == "[(x) != (y), (x) != (z), (y) != (z)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == str(cons)
 
         # reified
@@ -137,13 +136,16 @@ class TestTransfDecomp:
 
         cons = MyGlobal1([x])
         assert set(map(str,decompose_in_tree([cons], supported={"myglobalfunc","max"}))) == \
-                            {'((myglobalfunc(x[0],x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
+                            {'(myglobalfunc(x[0],x[1])) + 5 <= 0',
+                             'max(x[0],x[1]) == 1',
                              '(x[0]) + (x[1]) >= 3'}
 
         # decompose all
         assert set(map(str, decompose_in_tree([cons], supported={"max"}))) == \
-                            {'(((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
-                             '(x[0]) + (x[1]) >= 3','x[0] != 0'}
+                            {'((x[0]) + (x[1])) + 5 <= 0',
+                             'max(x[0],x[1]) == 1',
+                             '(x[0]) + (x[1]) >= 3',
+                             'x[0] != 0'}
 
         # nested case
         bv = cp.boolvar(name="bv")
@@ -155,7 +157,8 @@ class TestTransfDecomp:
 
         assert set(map(str, decompose_in_tree([cons], supported={"max"}))) == \
                             {'(bv) == ((((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1))',
-                             '(x[0]) + (x[1]) >= 3', 'x[0] != 0'}
+                             '(x[0]) + (x[1]) >= 3',
+                             'x[0] != 0'}
 
 
     def test_decompose_linear(self):
@@ -165,10 +168,14 @@ class TestTransfDecomp:
 
         cons = cp.AllDifferent(x)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"and((a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1)"}
+                            {'(a == 1) + (b == 1) <= 1',
+                             '(a == 2) + (b == 2) <= 1',
+                             '(a == 3) + (b == 3) <= 1'}
         # second call gives same result (no ivarmap state)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"and((a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1)"}
+                            {'(a == 1) + (b == 1) <= 1',
+                             '(a == 2) + (b == 2) <= 1',
+                             '(a == 3) + (b == 3) <= 1'}
 
         # nested
         cons = bv == cp.AllDifferent(x)
@@ -202,9 +209,9 @@ class TestTransfDecomp:
 
         cons = cp.AllDifferent(arr)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {'and(sum(a == 1, b == 1, False) <= 1, '
-                             'sum(a == 2, b == 2, True) <= 1, '
-                             'sum(a == 3, b == 3, False) <= 1)'}
+                            {'sum(a == 1, b == 1, False) <= 1',
+                             'sum(a == 2, b == 2, True) <= 1',
+                             'sum(a == 3, b == 3, False) <= 1'}
 
         # also test full transformation stack
         if "gurobi" in cp.SolverLookup.solvernames():  # otherwise, not supported
