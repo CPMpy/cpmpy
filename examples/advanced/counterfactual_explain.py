@@ -52,7 +52,7 @@ Sub problem:
 
 """
 
-from cpmpy import *
+import cpmpy as cp
 import numpy as np
 
 INFINITY = 10000
@@ -84,7 +84,7 @@ def main():
         f"\n\nValues {d_star} results in a solution satisfying the user query being optimal"
     )
     print(f"Optimal knapsack satisfying user query: {x_user}")
-    print(f"Value of objective function using d* = {sum(d_star * x_user)}")
+    print(f"Value of objective function using d* = {cp.sum(d_star * x_user)}")
 
 
 def solve_knapsack_problem(values, weights, capacity):
@@ -94,8 +94,8 @@ def solve_knapsack_problem(values, weights, capacity):
 
     Based on the Numberjack model of Hakan Kjellerstrand
     """
-    x = boolvar(len(values), name="x")
-    model = Model([sum(x * weights) <= capacity], maximize=sum(x * values))
+    x = cp.boolvar(len(values), name="x")
+    model = cp.Model([cp.sum(x * weights) <= capacity], maximize=cp.sum(x * values))
     if model.solve() is not False:
         return x.value()
     else:
@@ -143,11 +143,11 @@ def extend_to_full_solution(values, weights, capacity, foil_idx, foil_vals):
     Formally:
         Given v and X, solve the COP (c, v ∩ X)
     """
-    xv = boolvar(shape=len(values), name="xv")
+    xv = cp.boolvar(shape=len(values), name="xv")
     constraints = [xv[foil_idx] == foil_vals]
-    constraints += [sum(xv * weights) <= capacity]
+    constraints += [cp.sum(xv * weights) <= capacity]
 
-    model = Model(constraints, maximize=sum(xv * values))
+    model = cp.Model(constraints, maximize=cp.sum(xv * values))
 
     if model.solve() is not False:
         return xv.value()
@@ -160,9 +160,9 @@ def make_master_problem(values, foil_idx):
     This way the variables can be used to add new constraints outside this building function.
     """
 
-    d = intvar(0, INFINITY, values.shape, name="d")
+    d = cp.intvar(0, INFINITY, values.shape, name="d")
     # Minimize the change to the values vector
-    m = Model(minimize=np.linalg.norm(values - d, ord=1))
+    m = cp.Model(minimize=np.linalg.norm(values - d, ord=1))
 
     # Ensure values are only modified at foil indices
     m += [d[i] == values[i] for i in range(len(values)) if i not in foil_idx]
@@ -175,8 +175,8 @@ def make_sub_problem(values, weights, capacity):
     Returns both the model itself as well as the variables in it.
     This way the variables can be used to add new constraints outside this building function.
     """
-    x = boolvar(shape=len(values))
-    return Model([sum(weights * x) <= capacity]), x
+    x = cp.boolvar(shape=len(values))
+    return cp.Model([cp.sum(weights * x) <= capacity]), x
 
 
 def inverse_optimize(values, weights, capacity, x_d, foil_idx):
@@ -199,18 +199,19 @@ def inverse_optimize(values, weights, capacity, x_d, foil_idx):
     i = 1
     while master_model.solve() is not False:
         d_star = d.value()
-        sub_model.maximize(sum(x_0 * d.value()))
+        sub_model.maximize(cp.sum(x_0 * d.value()))
         sub_model.solve()
         if verbose:
             print(f"\nStarting iteration {i}")
             print(f"d* = {d_star}")
             print(f"d* * x_d = {sum(d_star * x_d)}")
             print(f"d* * x_0 = {sum(d_star * x_0.value())}")
+            
 
         if sum(d_star * x_d) >= sum(d_star * x_0.value()):
             return d_star
         else:
-            master_model += [sum(d * x_d) >= sum(d * x_0.value())]
+            master_model += [cp.sum(d * x_d) >= cp.sum(d * x_0.value())]
         i += 1
 
     raise ValueError("Master model is UNSAT!")
@@ -231,6 +232,7 @@ def print_knapsack_model(values, weights, capacity, x):
     print("\nis:", x)
     print(f"Resulting in an objective value of {sum(x * values)}")
     print(f"Capacity used: {sum(x*weights)}")
+
 
 
 def pp_uquery(x, f_items):
