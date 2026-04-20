@@ -330,7 +330,7 @@ class CPM_exact(SolverInterface):
                 return 0
             else:
                 assert my_status == "SAT", "Unexpected status from Exact"
-            self += self.objective_ == objval # fix obj val
+            self.add(self.objective_ == objval) # fix obj val
             end = time.time()
             timelim = self._update_time(timelim, start, end) # update remaining time
 
