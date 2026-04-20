@@ -1032,6 +1032,49 @@ class TestSupportedSolvers:
         #test unique sols, should be same number
         assert len(sols) == 8
 
+    def test_solution_callback(self, solver, capsys):
+        import random
+        random.seed(0)
+
+        n = 5
+        kwargs = dict()
+        solver_obj = cp.SolverLookup.get(solver)
+        if "display" not in inspect.signature(solver_obj.solve).parameters:
+            pytest.skip(f"{solver} does not support solution callbacking")
+        if solver == "hexaly":
+            kwargs['time_between_ticks'] = 1
+            n = 20 # need a bigger model to see the ticks
+
+        vars = cp.intvar(0,n, shape=n)
+        obj = cp.sum([random.randint(1,n) * (a - b) for a in vars for b in vars])
+        model = cp.Model(cp.AllDifferent(vars), maximize=obj)
+
+        assert model.solve(solver=solver, display=vars, time_limit=3, **kwargs)
+        captured = capsys.readouterr().out
+        assert len(captured) > 0
+
+        # collect solutions using callback
+        collector = list()
+        assert model.solve(solver=solver, display=lambda :  collector.append(argvals(vars)), time_limit=3, **kwargs)
+        assert len(collector) >= 1
+
+        # print some more information using callback
+        from time import time
+        def display():
+            print("Time elapsed:", time() - t0, "Obj:", obj.value(),  "Sol:", argvals(vars))
+
+        solver = cp.SolverLookup.get(solver, model)
+        t0 = time()
+        assert solver.solve(display=display, time_limit=3, **kwargs)
+        captured1 = capsys.readouterr().out
+        assert len(captured1) > 0
+
+        solver.minimize(obj)
+        assert solver.solve(display=display, time_limit=3, **kwargs)
+        captured2 = capsys.readouterr().out
+        assert len(captured2) > 0 # resets after previous capture
+
+
 
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")

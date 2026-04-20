@@ -24,7 +24,7 @@
     Requires that the 'z3-solver' python package is installed:
 
     .. code-block:: console
-    
+
         $ pip install z3-solver
 
     See detailed installation instructions at:
@@ -45,16 +45,16 @@
     Module details
     ==============
 """
-from typing import Optional, List
+from typing import Optional, List, Callable
 
 from cpmpy.transformations.get_variables import get_variables
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, NDVarArray
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison, argvals
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -65,7 +65,7 @@ class CPM_z3(SolverInterface):
     Interface to Z3's Python API.
 
     Creates the following attributes (see parent constructor for more):
-        
+
     - ``z3_solver``: object, z3's Solver() object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function in the `z3` namespace and ``z3_solver.add()``'s the result.
@@ -90,7 +90,7 @@ class CPM_z3(SolverInterface):
             return False
         except Exception as e:
             raise e
-        
+
     @classmethod
     def version(cls) -> Optional[str]:
         """
@@ -101,7 +101,7 @@ class CPM_z3(SolverInterface):
             return version('z3-solver')
         except PackageNotFoundError:
             return None
-        
+
     def __init__(self, cpm_model=None, subsolver="sat"):
         """
         Constructor of the native solver object
@@ -142,7 +142,7 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the z3 solver
 
@@ -151,6 +151,10 @@ class CPM_z3(SolverInterface):
                 assumptions:                        list of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                                     For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                                     get_core() returns a small subset of assumption variables that are unsat together.
+                display:                            generic solution callback for use during optimization.
+                                                    either a list of CPMpy expressions, OR a callback function which
+                                                    gets called after the variable-value mapping of the intermediate solution.
+                                                    default/None: nothing is displayed
                 **kwargs:                           any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -158,7 +162,7 @@ class CPM_z3(SolverInterface):
             - ... (no common examples yet)
 
             The full list doesn't seem to be documented online, you have to run its help() function:
-            
+
             .. code-block:: python
 
                 import z3
@@ -168,7 +172,7 @@ class CPM_z3(SolverInterface):
                 Warning! Some parameternames in z3 have a '.' in their name,
                 such as (arbitrarily chosen): ``sat.lookahead_simplify``
                 You have to construct a dictionary of keyword arguments upfront:
-                
+
                 .. code-block:: python
 
                     params = {"sat.lookahead_simplify": True}
@@ -186,6 +190,9 @@ class CPM_z3(SolverInterface):
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
 
+        if display is not None and self.has_objective():
+            callback = self._get_callback(display)
+            self.z3_solver.set_on_model(callback)
 
         if assumptions is None:
             assumptions = []
@@ -255,7 +262,7 @@ class CPM_z3(SolverInterface):
             # translate objective, for optimisation problems only
             if self.has_objective():
                 obj = self.z3_solver.objectives()[0]
-                self.objective_value_ = sol.evaluate(obj).as_long() 
+                self.objective_value_ = sol.evaluate(obj).as_long()
                 if not self._minimize:
                     self.objective_value_ = -1*self.objective_value_ # Z3 negates the objective function to turn a maximisation problem into a minimisation one, undoing negation here
 
@@ -498,7 +505,7 @@ class CPM_z3(SolverInterface):
                 # minimic modulo with integer division (round towards o)
                 x,y = self._z3_expr(cpm_con.args)
                 return z3.If(z3.And(x >= 0), x % y, -(-x % y))
-            
+
             elif cpm_con.name == "mul":
                 x, y = self._z3_expr(cpm_con.args)
                 if isinstance(x, z3.BoolRef):
@@ -569,6 +576,37 @@ class CPM_z3(SolverInterface):
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
         return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
+
+
+    def _get_callback(self, display:Callback) -> Callable:
+
+        if isinstance(display, Expression) or is_any_list(display):
+            cpm_vars = get_variables(display) # only fill in relevant vars for callback
+        else:
+            cpm_vars = list(self.user_vars) # function can use any variables
+        z3_vars = self.solver_vars(cpm_vars)
+
+        from z3.z3 import ModelRef
+
+        def callback(sol: ModelRef) -> None:
+            # fill in values of current solution
+            for cpm_var, sol_var in zip(cpm_vars, z3_vars):
+                if isinstance(cpm_var, _BoolVarImpl):
+                    cpm_var._value = bool(sol[sol_var])
+                elif isinstance(cpm_var, _NumVarImpl):
+                    cpm_var._value = sol[sol_var].as_long()
+
+            # display callback
+            if isinstance(display, Expression) or isinstance(display, NDVarArray):
+                print(display.value())
+            elif is_any_list(display):
+                print(argvals(display))
+            else:
+                assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+                display()  # callback
+
+        return callback
+
 
 
 
