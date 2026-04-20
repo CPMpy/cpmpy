@@ -860,12 +860,12 @@ class TestGlobal:
         assert all_sols == decomp_sols# same on decision vars
         assert count == decomp_count# same on all vars
 
-    def test_xor(self):
+    def test_xor(self, solver):
         bv = cp.boolvar(5)
-        assert cp.Model(cp.Xor(bv)).solve()
+        assert cp.Model(cp.Xor(bv)).solve(solver=solver)
         assert cp.Xor(bv).value()
 
-    def test_xor_with_constants(self):
+    def test_xor_with_constants(self, solver):
 
         bvs = cp.boolvar(shape=3)
 
@@ -880,17 +880,18 @@ class TestGlobal:
             expr = cp.Xor(args)
             model = cp.Model(expr)
 
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
             # also check with decomposition
             model = cp.Model(expr.decompose())
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
         # edge case with False constants
-        assert not cp.Model(cp.Xor([False, False])).solve()
-        assert not cp.Model(cp.Xor([False, False, False])).solve()
+        assert not cp.Model(cp.Xor([False, False])).solve(solver=solver)
+        assert not cp.Model(cp.Xor([False, False, False])).solve(solver=solver)
+        assert cp.Model(cp.Xor([False, True, False])).solve(solver=solver)
 
     def test_ite_with_constants(self):
         x,y,z = cp.boolvar(shape=3)
