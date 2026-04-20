@@ -848,6 +848,21 @@ class TestGlobal:
             assert set(map(str, decomp)) == expected
             assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
 
+    def test_multid_element_index_dom_mismatched(self):
+        """
+            Check solving `arr[a,b] == 3` where arr has shape (3,3) and a, b have bounds 0..10.
+            The unsafe index domains should be handled by safening with no_partial_functions, so only in-bounds
+            index assignments satisfy the model.
+        """
+        arr = cp.cpm_array(np.full((3, 3), 3))
+        a, b = cp.intvar(0, 10, shape=2, name=tuple("ab"))
+        model = cp.Model(arr[a, b] == 3)
+
+        sols = set()
+        n_sols = model.solveAll(display=lambda: sols.add((a.value(), b.value())))
+        assert n_sols == 9
+        assert sols == {(i, j) for i in range(3) for j in range(3)}
+
     def test_modulo(self):
 
         x, z = cp.intvar(-2,2, shape=2, name=["x","z"])
