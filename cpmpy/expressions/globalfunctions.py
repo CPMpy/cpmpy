@@ -876,6 +876,10 @@ class MultiDimElement(GlobalFunction):
         Decomposition of MultiDimElement global function.
 
         Rewritten as 1-D Element with a linear index into the flattened array.
+        Example: ``arr = [[10, 20, 30], [40, 50, 60]]`` and indices ``(1, 2)``
+        gives ``arr[1, 2] == 60``. After Decomposing to 1-D Element, ``arr.reshape(-1)`` is
+        ``[10, 20, 30, 40, 50, 60]`` and the linear index is ``1*3 + 2 = 5``,
+        so this becomes ``Element(arr.reshape(-1), 5) == 60``.
 
         Returns:
             tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
