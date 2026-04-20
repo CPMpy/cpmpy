@@ -184,22 +184,25 @@ def _decompose_in_tree_args(args: ListLike[Any],
                     continue
                 else:
                     # nested global function, decompose
-                    if decompose_custom is not None and arg.name in decompose_custom:
-                        newarg, toplevel_exprs = cast(Tuple[Expression, List[Expression]], decompose_custom[arg.name](arg))
-                    else:
-                        newarg, toplevel_exprs = arg.decompose()
-
                     orig_for_csemap = arg
-                    arg = newarg
-                    if len(toplevel_exprs) > 0:
-                        toplevel.extend(toplevel_exprs)
+                    # this is a bit awkward, but the decompose can return a new GlobFunc to decompose...
+                    while isinstance(arg, GlobalFunction) and arg.name not in supported:
+                        if decompose_custom is not None and arg.name in decompose_custom:
+                            newarg, toplevel_exprs = cast(Tuple[Expression, List[Expression]], decompose_custom[arg.name](arg))
+                        else:
+                            newarg, toplevel_exprs = arg.decompose()
+                        arg = newarg
+                        if len(toplevel_exprs) > 0:
+                            toplevel.extend(toplevel_exprs)
 
-                    # TODO: violates type!!!
-                    # apparently in #630 we decided that decompose may return an int (e.g. for element)...
-                    # we should change that (Element constructor requires variable index; the []/__get__ override can still take anything)
+                        # TODO: violates type!!!
+                        # apparently in #630 we decided that decompose may return an int (e.g. for element)...
+                        # we should change that (Element constructor requires variable index; the []/__get__ override can still take anything)
+                        if isinstance(arg, int):
+                            # no need to recurse further, stop here
+                            newargs.append(arg)
+                            break
                     if isinstance(arg, int):
-                        # no need to recurse further, stop here
-                        newargs.append(arg)
                         continue
             
             # if it has subexprs, decompose its arguments too
