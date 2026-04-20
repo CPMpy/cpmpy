@@ -110,7 +110,7 @@ class TestTransfDecomp:
         class MyGlobal1(GlobalConstraint):
 
             def __init__(self, arr):
-                super().__init__("myglobal1", flatlist(arr))
+                super().__init__("myglobal1", tuple(flatlist(arr)))
 
             def decompose(self):
                 return ([MyGlobalFunc(self.args)+5 <= 0, cp.max(self.args) == 1],
@@ -119,7 +119,7 @@ class TestTransfDecomp:
         class MyGlobalFunc(GlobalFunction):
 
             def __init__(self, arr):
-                super().__init__("myglobalfunc", flatlist(arr))
+                super().__init__("myglobalfunc", tuple(flatlist(arr)))
 
             def decompose(self):
                 return cp.sum(self.args), [self.args[0] != 0]
@@ -127,7 +127,7 @@ class TestTransfDecomp:
         class MyGlobal2(GlobalConstraint):
 
             def __init__(self, arr):
-                super().__init__("myglobal2", flatlist(arr))
+                super().__init__("myglobal2", tuple(flatlist(arr)))
             def decompose(self):
                 return [cp.sum(self.args) >= 3], []
 

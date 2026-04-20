@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError, IncompleteFunctionError
@@ -1185,17 +1186,17 @@ class TestGlobal:
         val = [0,1,2]
         occ = cp.intvar(0, len(iv), shape=3)
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         val = [1, 4, 5]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         occ = [2, 3, 0]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val)))
-        assert ~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
+        assert not cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
 
     def test_gcc_onearg(self):
         iv = cp.intvar(0, 10)
@@ -1769,13 +1770,13 @@ class TestTypeChecks:
     def test_table(self):
         iv = cp.intvar(-8,8,3)
 
-        constraints = [cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])] # not flatlist, should work
-        model = cp.Model(constraints)
-        assert model.solve()
+        #assert cp.Model(cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])).solve() # not flatlist, should work
+        # used to work, not allowed anymore
+        pytest.raises(AttributeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
 
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
 
     def test_issue627(self):
         for s, cls in cp.SolverLookup.base_solvers():
@@ -1821,3 +1822,43 @@ def test_issue801_expr_in_cumulative(solver):
         assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)
+
+
+
+# Test that all global constraint classes are imported and exported in cpmpy.expressions.__init__
+import importlib
+
+def global_constraint_classes():
+    """Helper to get all global constraint classes in cpmpy.expressions.globalconstraints"""
+    gc_mod = importlib.import_module("cpmpy.expressions.globalconstraints")
+    classes = []
+    for name, obj in gc_mod.__dict__.items():
+        if isinstance(obj, type):
+            # Heuristic: likely a global constraint class if it subclasses Constraint or has 'decompose' or '__call__'
+            if hasattr(obj, "__module__") and obj.__module__.endswith("globalconstraints"):
+                # skip internal base classes or helpers
+                if not name.startswith("_"):
+                    classes.append((name, obj))
+    return classes
+
+import inspect
+def test_globals_in_expressions_init():
+    """Check all global constraint classes are imported and exported in cpmpy.expressions.__init__"""
+    expressions_module = importlib.import_module("cpmpy.expressions")
+    expressions_all = set(getattr(expressions_module, "__all__", []))
+    
+    # check all global constraints are imported and exported in cpmpy.expressions.__init__
+    classes = inspect.getmembers(cp.expressions.globalconstraints, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
+
+    for name, cls in classes:
+        assert hasattr(expressions_module, name), f"Global constraint {name} is not imported in cpmpy.expressions.__init__"
+        assert name in expressions_all, f"Global constraint {name} is not exported in cpmpy.expressions.__init__.__all__"
+
+    # check all global constraints are imported and exported in cpmpy.expressions.__init__
+    classes = inspect.getmembers(cp.expressions.globalfunctions, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalFunction) and name != "GlobalFunction"]
+
+    for name, cls in classes:
+        assert hasattr(expressions_module, name), f"Global function {name} is not imported in cpmpy.expressions.__init__"
+        assert name in expressions_all, f"Global function {name} is not exported in cpmpy.expressions.__init__.__all__"

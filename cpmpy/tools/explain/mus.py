@@ -4,6 +4,7 @@
     - Deletion-based MUS
     - QuickXplain
     - Optimal MUS
+    - Native MUS for given solvers
 """
 import warnings
 import numpy as np
@@ -59,6 +60,20 @@ def mus(soft, hard=[], solver="ortools"):
             core = set(s.get_core())
 
     return [dmap[avar] for avar in core]
+
+def mus_native(soft, hard=[], solver="exact"):
+    """
+    Compute a MUS using a solver's native MUS extractor.
+
+    :param soft: soft constraints, list of expressions
+    :param hard: hard constraints, optional, list of expressions
+    :param solver: which solver to use (only `gurobi` and `exact` supported)
+    """
+    
+    # get solver class
+    solver_class = cp.SolverLookup.lookup(solver)
+    
+    return solver_class.mus_native(soft, hard)
 
 
 def quickxplain(soft, hard=[], solver="ortools"):

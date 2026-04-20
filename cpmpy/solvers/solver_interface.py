@@ -92,7 +92,7 @@ class SolverInterface(object):
         # rest uses own API
         if cpm_model is not None:
             # post all constraints at once, implemented in `add()`
-            self += cpm_model.constraints
+            self.add(cpm_model.constraints)
 
             # post objective
             if cpm_model.objective_ is not None:
@@ -282,7 +282,7 @@ class SolverInterface(object):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
+            self.add(any([v != v.value() for v in self.user_vars if v.value() is not None]))
 
             if time_limit is not None: # update remaining time
                 time_limit -= self.status().runtime
@@ -327,6 +327,19 @@ class SolverInterface(object):
         Setting these literals to True makes the model UNSAT, setting any to False makes it SAT
         """
         raise NotSupportedError("Solver does not support unsat core extraction")
+    
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        For using the solver's internal MUS extractor 
+
+        Args:
+            soft: List of soft constraints over which a MUS needs to be found
+            hard: List of hard constraints that always need to be satisfied
+
+        Returns a MUS.
+        """
+        raise NotSupportedError("Solver does not support MUS extraction")
 
 
     # shared helper functions

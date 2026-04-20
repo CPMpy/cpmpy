@@ -31,7 +31,7 @@ solver_dependencies = {
     "gcs": ["gcspy>=0.1.9"], # first version to pass all tests
     "cpo": ["docplex>=2.28.240"],
     "pumpkin": ["pumpkin-solver>=0.3.0"], # CPMpy requires features only available from Pumpkin version >=0.3.0
-    "pindakaas": ["pindakaas>=0.4.1"],
+    "pindakaas": ["pindakaas>=0.5.0"],
     "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
@@ -54,6 +54,7 @@ setup(
         'numpy>=1.5',
         'setuptools',
         'packaging', # to check solver versions
+        'frozendict', # standard in newer Python versions
     ],
     extras_require={
         # Solvers
