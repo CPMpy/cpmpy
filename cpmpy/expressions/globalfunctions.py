@@ -730,6 +730,8 @@ class Element(GlobalFunction):
             Optional[int]: The value of the array element at the given index, or None if the index is not assigned or the array element is not assigned
         """
         arr, idx = self.args
+        if any(argval(v) is None for v in arr):
+            return None
         vidx = argval(idx)
         if vidx is None:
             return None
@@ -844,6 +846,8 @@ class MultiDimElement(GlobalFunction):
             Optional[int]: The value of the array element at the given indices, or None if any index is not assigned or the array element is not assigned
         """
         arr, *indices = self.args
+        if any(argval(v) is None for v in arr.flat):
+            return None
         vidxs = [argval(idx) for idx in indices]
         if any(v is None for v in vidxs):
             return None
