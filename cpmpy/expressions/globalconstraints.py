@@ -965,7 +965,8 @@ class Xor(GlobalConstraint):
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Xor global constraint.
-        Recursively decomposes the constraint into a chain of binary xor-constraints, represented using a sum.
+        Recursively decomposes the constraint into a chain of sums.
+        E.g., xor(a,b,c) :: (((a + b) == 1) + c) == 1
         
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
@@ -994,6 +995,7 @@ class Xor(GlobalConstraint):
 
         # There are multiple decompositions possible,
         # recursively using sum allows it to be efficient for all solvers.
+        # E.g., xor(a,b,c) :: (((a + b) == 1) + c) == 1
         prev: Expression = new_args[0]
         for a in new_args[1:]:
             prev = (prev + a == 1)  # recursive pairwise Xor decomposition
