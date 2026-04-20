@@ -28,7 +28,7 @@ NUM_GLOBAL = {
     "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
+    "Abs", "Element", "MultiDElement", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
 }
 
 # Solvers not supporting arithmetic constraints (numeric comparisons)
@@ -47,10 +47,13 @@ EXCLUDE_OPERATORS = {"pysdd": {"sum", "wsum", "sub", "abs", "mul","-"},
 
 # Variables to use in the rest of the test script
 NUM_ARGS = [cp.intvar(-3, 5, name=n) for n in "xyz"]   # Numerical variables
+NUM_ARGS_2D = cp.intvar(-3, 5, shape=(5,5), name="MD") # 2D numerical variables
 SMALL_NUM_ARG = [cp.intvar(-2, 2, name=n) for n in "w"]   # Small domain numerical vars
 NN_VAR = cp.intvar(0, 10, name="n_neg")                # Non-negative variable, needed in power functions
 POS_VAR = cp.intvar(1,10, name="s_pos")                # A strictly positive variable
 NUM_VAR = cp.intvar(0, 10, name="l")                   # A numerical variable
+INDEX_VAR = cp.intvar(0, 4, name="i")
+INDEX_VAR2 = cp.intvar(0, 4, name="j")
 
 BOOL_ARGS = [cp.boolvar(name=n) for n in "abc"]        # Boolean variables
 BOOL_VAR = cp.boolvar(name="p")                        # A boolean variable
@@ -265,6 +268,8 @@ def global_functions(solver):
             yield cp.Count(NUM_ARGS, NUM_VAR)
         elif name == "Element":
             yield cp.Element(NUM_ARGS, POS_VAR)
+        elif name == "MultiDElement":
+            yield cp.MultiDElement(NUM_ARGS_2D, [INDEX_VAR, INDEX_VAR2])
         elif name == "NValueExcept":
             yield cp.NValueExcept(NUM_ARGS, 3)
         elif name == "Among":

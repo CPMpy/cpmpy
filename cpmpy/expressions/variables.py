@@ -510,36 +510,37 @@ class NDVarArray(np.ndarray):
     def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing
 
-        # index is single expression: direct element
+        # index is single expression: direct element (1D only)
         if isinstance(index, Expression):
+            if self.ndim != 1:
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
             return cp.Element(self, index)
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
 
             if len(index) != self.ndim:
-                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
 
             # find dimension of expression in index
             expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
-            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
-                # TODO can we do the same for more than one Expression? Not sure...
-                index  = list(index)
-                index += [index.pop(expr_dim[0])]
-
-                arr = np.moveaxis(self, expr_dim[0], -1)
-                return cp.Element(arr[(*index[:-1],)], index[-1])
-
-
             arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
-            index = index[expr_dim[0]:]
+            index = list(index[expr_dim[0]:])
 
-            # calculate index for flat array
-            flat_index = index[-1]
-            for dim, idx in enumerate(index[:-1]):
-                flat_index += idx * math.prod(arr.shape[dim+1:])
-            # using index expression as single var for flat array
-            return cp.Element(arr.flatten(), flat_index)
+            # eliminate constant indices to reduce dimensionality
+            selector = []
+            new_indices = []
+            for idx in index:
+                if isinstance(idx, Expression):
+                    selector.append(slice(None))  # keep this axis (equivalent to `:` when used as index), to pass to element constraint
+                    new_indices.append(idx)
+                else:
+                    selector.append(idx)  # constant index
+            arr = arr[tuple(selector)]
+
+            if len(new_indices) == 1:
+                return cp.Element(arr, new_indices[0])
+            return cp.MultiDElement(arr, new_indices)
 
         return super().__getitem__(index)
 

@@ -771,6 +771,28 @@ class TestGlobal:
         expr = x[1,2,a]
         assert str(expr) == "[x[1,2,0] x[1,2,1] x[1,2,2] x[1,2,3] x[1,2,4]][a]"
 
+    def test_multid_element(self):
+        x = cp.intvar(1,9, shape=(3,4,5), name="x")
+        a = cp.intvar(0,2, name="a")
+        b = cp.intvar(0,3, name="b")
+        c = cp.intvar(0,4, name="c")
+
+        expr = x[a,b,c]
+        assert isinstance(expr, cp.MultiDElement)
+        cons = expr == 7
+        model = cp.Model(cons)
+        assert model.solve()
+        assert cons.value()
+        assert x.value()[a.value(), b.value(), c.value()] == 7
+
+        expr = x[a,b,2]
+        assert isinstance(expr, cp.MultiDElement)
+        cons = expr == 4
+        model = cp.Model(cons)
+        assert model.solve()
+        assert cons.value()
+        assert x.value()[a.value(), b.value(), 2] == 4
+
     def test_element_onearg(self):
 
         iv = cp.intvar(0, 10)
@@ -825,6 +847,21 @@ class TestGlobal:
             }
             assert set(map(str, decomp)) == expected
             assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+
+    def test_multid_element_index_dom_mismatched(self):
+        """
+            Check solving `arr[a,b] == 3` where arr has shape (3,3) and a, b have bounds 0..10.
+            The unsafe index domains should be handled by safening with no_partial_functions, so only in-bounds
+            index assignments satisfy the model.
+        """
+        arr = cp.cpm_array(np.full((3, 3), 3))
+        a, b = cp.intvar(0, 10, shape=2, name=tuple("ab"))
+        model = cp.Model(arr[a, b] == 3)
+
+        sols = set()
+        n_sols = model.solveAll(display=lambda: sols.add((a.value(), b.value())))
+        assert n_sols == 9
+        assert sols == {(i, j) for i in range(3) for j in range(3)}
 
     def test_modulo(self):
 
