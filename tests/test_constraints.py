@@ -28,7 +28,7 @@ NUM_GLOBAL = {
     "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
     # also global functions
-    "Abs", "Element", "MultiDimElement", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
+    "Abs", "Element", "MultiDElement", "Minimum", "Maximum", "Count", "Among", "NValue", "NValueExcept", "Division", "Modulo", "Power"
 }
 
 # Solvers not supporting arithmetic constraints (numeric comparisons)
@@ -268,8 +268,8 @@ def global_functions(solver):
             yield cp.Count(NUM_ARGS, NUM_VAR)
         elif name == "Element":
             yield cp.Element(NUM_ARGS, POS_VAR)
-        elif name == "MultiDimElement":
-            yield cp.MultiDimElement(NUM_ARGS_2D, [INDEX_VAR, INDEX_VAR2])
+        elif name == "MultiDElement":
+            yield cp.MultiDElement(NUM_ARGS_2D, [INDEX_VAR, INDEX_VAR2])
         elif name == "NValueExcept":
             yield cp.NValueExcept(NUM_ARGS, 3)
         elif name == "Among":

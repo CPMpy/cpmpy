@@ -66,7 +66,7 @@
         Modulo
         Power
         Element
-        MultiDimElement
+        MultiDElement
         Count
         Among
         NValue
@@ -696,7 +696,7 @@ class Element(GlobalFunction):
 
     Note: because Element is a numeric global function, the return type of the `Element` function
     is always numeric, even if `Arr` only contains Boolean variables.
-    Element only supports 1D arrays; use MultiDimElement for multi-dimensional indexing.
+    Element only supports 1D arrays; use MultiDElement for multi-dimensional indexing.
     """
 
     def __init__(self, arr: ListLike[ExprLike], idx: ExprLike):
@@ -711,9 +711,9 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
         if isinstance(arr, np.ndarray):
             if arr.ndim != 1:
-                raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
+                raise TypeError("Element only supports 1D arrays. Use MultiDElement for multi-dimensional arrays.")
         elif is_any_list(arr) and any(is_any_list(el) for el in arr):
-            raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
+            raise TypeError("Element only supports 1D arrays. Use MultiDElement for multi-dimensional arrays.")
         assert len(arr) > 0, "Element: array should not be empty"
 
         super().__init__("element", (arr, idx))
@@ -805,9 +805,9 @@ class Element(GlobalFunction):
         return f"{self.args[0]}[{self.args[1]}]"
 
 
-class MultiDimElement(GlobalFunction):
+class MultiDElement(GlobalFunction):
     """
-    The `MultiDimElement(Arr, Indices)` global function allows indexing into a multi-dimensional array
+    The `MultiDElement(Arr, Indices)` global function allows indexing into a multi-dimensional array
     with multiple decision variables.
     """
 
@@ -818,9 +818,9 @@ class MultiDimElement(GlobalFunction):
             indices (ListLike[ExprLike]): Integer expressions or constants for each dimension index
         """
         if not is_any_list(indices):
-            raise TypeError(f"MultiDimElement(arr, indices) takes a list of index expressions, not: {indices}")
+            raise TypeError(f"MultiDElement(arr, indices) takes a list of index expressions, not: {indices}")
         if any(is_boolexpr(idx) for idx in indices):
-            raise TypeError("MultiDimElement(arr, indices) takes integer expressions as indices, not boolean expressions")
+            raise TypeError("MultiDElement(arr, indices) takes integer expressions as indices, not boolean expressions")
 
         if isinstance(arr, NDVarArray):
             arr = arr
@@ -828,9 +828,9 @@ class MultiDimElement(GlobalFunction):
             arr = cpm_array(arr)
 
         if arr.ndim <= 1:
-            raise TypeError("MultiDimElement only supports multi-dimensional arrays. Use Element for 1D arrays.")
+            raise TypeError("MultiDElement only supports multi-dimensional arrays. Use Element for 1D arrays.")
         if len(indices) != arr.ndim:
-            raise ValueError(f"MultiDimElement expects {arr.ndim} indices, got {len(indices)}")
+            raise ValueError(f"MultiDElement expects {arr.ndim} indices, got {len(indices)}")
 
         super().__init__("multidim_element", (arr, *tuple(indices))) # Indices as separate arguments to allow safening with _safen_range
 
@@ -873,7 +873,7 @@ class MultiDimElement(GlobalFunction):
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-        Decomposition of MultiDimElement global function.
+        Decomposition of MultiDElement global function.
 
         Rewritten as 1-D Element with a linear index into the flattened array.
         Example: ``arr = [[10, 20, 30], [40, 50, 60]]`` and indices ``(1, 2)``
@@ -901,10 +901,10 @@ class MultiDimElement(GlobalFunction):
 
     def __repr__(self) -> str:
         """
-        Custom string representation of the MultiDimElement global function in 'Arr[i0, i1, ...]' format.
+        Custom string representation of the MultiDElement global function in 'Arr[i0, i1, ...]' format.
 
         Returns:
-            str: String representation of the MultiDimElement global function.
+            str: String representation of the MultiDElement global function.
         """
         arr, *indices = self.args
         idx_repr = ", ".join(str(i) for i in indices)

@@ -778,7 +778,7 @@ class TestGlobal:
         c = cp.intvar(0,4, name="c")
 
         expr = x[a,b,c]
-        assert isinstance(expr, cp.MultiDimElement)
+        assert isinstance(expr, cp.MultiDElement)
         cons = expr == 7
         model = cp.Model(cons)
         assert model.solve()
@@ -786,7 +786,7 @@ class TestGlobal:
         assert x.value()[a.value(), b.value(), c.value()] == 7
 
         expr = x[a,b,2]
-        assert isinstance(expr, cp.MultiDimElement)
+        assert isinstance(expr, cp.MultiDElement)
         cons = expr == 4
         model = cp.Model(cons)
         assert model.solve()

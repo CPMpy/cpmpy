@@ -540,7 +540,7 @@ class NDVarArray(np.ndarray):
 
             if len(new_indices) == 1:
                 return cp.Element(arr, new_indices[0])
-            return cp.MultiDimElement(arr, new_indices)
+            return cp.MultiDElement(arr, new_indices)
 
         return super().__getitem__(index)
 
