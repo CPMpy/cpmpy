@@ -312,14 +312,7 @@ class CPM_gcs(SolverInterface):
                     cpm_var._value = bool(solution_map[sol_var])
                 else:
                     cpm_var._value = solution_map[sol_var]
-
-            if isinstance(display, Expression):
-                print(display.value())
-            elif is_any_list(display):
-                print(argvals(display))
-            else:
-                assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                display()  # callback
+            self.print_display(display)
             return
 
         sol_callback = None

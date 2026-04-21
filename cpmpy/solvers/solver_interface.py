@@ -186,7 +186,6 @@ class SolverInterface(object):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
 
-
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -235,8 +234,26 @@ class SolverInterface(object):
         return self.add(cpm_expr)
 
 
-    # OPTIONAL functions
+    def print_display(self, display: Optional[Callback]) -> None:
+        """
+            Helper function for printing the `display` argument used in `solveAll()`.
 
+            Arguments:
+                display: either a CPMpy Expression, OR a list of expressions,
+                         OR a callback function (no-arg) to call.
+        """
+        if display is None:
+            return
+
+        if isinstance(display, Expression):
+            print(display.value())
+        elif is_any_list(display):
+            print(argvals(display))
+        else:
+            assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+            display()  # callback
+    
+    # OPTIONAL functions
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
@@ -268,14 +285,7 @@ class SolverInterface(object):
         start = time.time()
         while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
             # display if needed
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:
-                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    display()  # callback
+            self.print_display(display)
 
             # count and stop
             solution_count += 1

@@ -615,14 +615,7 @@ class CPM_cplex(SolverInterface):
                 if self.has_objective():
                     self.objective_value_ = sol_obj_val + self._obj_offset
 
-                if display is not None:
-                    if isinstance(display, Expression):
-                        print(display.value())
-                    elif is_any_list(display):
-                        print(argvals(display))
-                    else:
-                        assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                        display()  # callback
+                self.print_display(display)
 
         # Reset pool search mode to default
         self.cplex_model.context.cplex_parameters.mip.limits.populate = 1
