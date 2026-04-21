@@ -387,7 +387,7 @@ class AllEqualExceptN(GlobalConstraint):
         constraints = []
         for x, y in all_pairs(arr):
             # x and y are equal, or one of them is equal to an excluded value
-            constraints += [cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n)]
+            constraints.append(cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n))
         return constraints, []
 
     def value(self) -> Optional[bool]:
@@ -915,8 +915,8 @@ class InDomain(GlobalConstraint):
         """
         expr, arr = self.args
         lb, ub = expr.get_bounds()
-        
-        return [expr != val for val in range(lb, ub + 1) if val not in arr], []
+        arr_set = frozenset(arr)
+        return [expr != val for val in range(lb, ub + 1) if val not in arr_set], []
 
     def value(self) -> Optional[bool]:
         """
@@ -938,7 +938,8 @@ class InDomain(GlobalConstraint):
         lb, ub = expr.get_bounds()
 
         # complement of arr
-        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr])
+        arr_set = frozenset(arr)
+        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr_set])
 
 
 class Xor(GlobalConstraint):
@@ -1117,12 +1118,13 @@ class Cumulative(GlobalConstraint):
         # tasks are uninterruptible, so we only need to check each starting point of each task
         # I.e., for each task, we check if it can be started, given the tasks that are already running.
         for t in range(len(start)):
+            st = start[t]
             demand_at_start_of_t = []
             for j in range(len(start)):
                 if t != j:
-                    demand_at_start_of_t += [demand[j] * ((start[j] <= start[t]) & (end[j] > start[t]))]
+                    demand_at_start_of_t.append(demand[j] * ((start[j] <= st) & (end[j] > st)))
 
-            cons += [(demand[t] + sum(demand_at_start_of_t)) <= capacity]
+            cons.append((demand[t] + sum(demand_at_start_of_t)) <= capacity)
 
         return cons, []
 
@@ -1314,12 +1316,13 @@ class CumulativeOptional(GlobalConstraint):
         # tasks are uninterruptible, so we only need to check each starting point of each task
         # I.e., for each task, we check if it can be started, given the tasks that are already running.
         for t in range(len(start)):
+            st = start[t]
             demand_at_start_of_t = []
             for j in range(len(start)):
                 if t != j:
-                    demand_at_start_of_t += [demand[j] * (is_present[j] & (start[j] <= start[t]) & (end[j] > start[t]))]
+                    demand_at_start_of_t.append(demand[j] * (is_present[j] & (start[j] <= st) & (end[j] > st)))
 
-            cons += [implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity)]
+            cons.append(implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity))
 
         return cons, []
 
@@ -1424,7 +1427,7 @@ class NoOverlap(GlobalConstraint):
             cons += [s + d == e for s,d,e in zip(start, dur, end)]
             
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
-            cons += [(e1 <= s2) | (e2 <= s1)]
+            cons.append((e1 <= s2) | (e2 <= s1))
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -1576,7 +1579,7 @@ class Precedence(GlobalConstraint):
                 lhs = args[j] == t
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
-                constraints += [lhs.implies(cp.any(args[:j] == s))]
+                constraints.append(lhs.implies(cp.any(args[:j] == s)))
         return constraints, []
 
     def value(self) -> Optional[bool]:
