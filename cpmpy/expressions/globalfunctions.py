@@ -73,7 +73,7 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Any, Iterable, Optional, cast
+from typing import Optional
 import numpy as np
 import cpmpy as cp
 
@@ -514,7 +514,8 @@ class Division(GlobalFunction):
         r = intvar(*get_bounds(x % y))  # remainder
         _div = intvar(*self.get_bounds())
         defining.append(Comparison("==", x, (y * _div) + r))  # explicit expression for type checking (x can be const)
-        defining.extend([abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)])
+        defining.append(abs(r) < abs(y))
+        defining.append(abs(y) * abs(_div) <= abs(x))
         return _div, defining
 
     def value(self) -> Optional[int]:
@@ -619,11 +620,9 @@ class Modulo(GlobalFunction):
 
         _mod = intvar(*self.get_bounds())
         k = intvar(*get_bounds((x - _mod) // y))  # integer quotient (multiplier)
-        defining.extend([
-            k * y + _mod == x,   # module is remainder of integer division
-            abs(_mod) < abs(y),  # remainder is smaller than divisor
-            x * _mod >= 0        # remainder is negative iff x is negative
-        ])
+        defining.append(k * y + _mod == x)  # module is remainder of integer division
+        defining.append(abs(_mod) < abs(y))  # remainder is smaller than divisor
+        defining.append(x * _mod >= 0)  # remainder is negative iff x is negative
         return _mod, defining
 
     def value(self) -> Optional[int]:
