@@ -269,30 +269,22 @@ class CPM_scip(SolverInterface):
 
         if is_num(cpm_expr):
             return cpm_expr
-
-        # negated bool (e.g. in objective): 1 - bv
-        if isinstance(cpm_expr, NegBoolView):
+        elif isinstance(cpm_expr, NegBoolView):  # negated bool (e.g. in objective): 1 - bv
             raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
-            return 1 - self.solver_var(cpm_expr._bv)
-
-        # decision variables, check in varmap
-        if isinstance(cpm_expr, _NumVarImpl):  # _BoolVarImpl is subclass of _NumVarImpl
+        elif isinstance(cpm_expr, _NumVarImpl):  # decision variables, check in varmap (_BoolVarImpl is subclass of _NumVarImpl)
             return self.solver_var(cpm_expr)
-
-        # sum
-        if cpm_expr.name == "sum":
+        elif cpm_expr.name == "sum":
             return scip.quicksum(self.solver_vars(cpm_expr.args))
-        # wsum
-        if cpm_expr.name == "wsum":
+        elif cpm_expr.name == "wsum":
             return scip.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
-
-        # GlobalFunction: abs, mul (PySCIPOpt supports these in constraints/objective)
-        if isinstance(cpm_expr, GlobalFunction):
+        elif isinstance(cpm_expr, GlobalFunction):  # GlobalFunction: abs, mul (PySCIPOpt supports these in constraints/objective)
             if cpm_expr.name == "abs":
                 return abs(self._make_numexpr(cpm_expr.args[0]))
-            if cpm_expr.name == "mul":
+            elif cpm_expr.name == "mul":
                 a, b = self._make_numexpr(cpm_expr.args[0]), self._make_numexpr(cpm_expr.args[1])
                 return a * b
+            else:
+                raise NotImplementedError("scip: Not a known supported GlobalFunction {}".format(cpm_expr))
 
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
 
