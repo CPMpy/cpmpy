@@ -323,7 +323,7 @@ class CPM_scip(SolverInterface):
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "abs", "->", "!="}) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
@@ -346,14 +346,7 @@ class CPM_scip(SolverInterface):
             lhs_is_operator = isinstance(lhs, Operator)
             sciprhs = self.solver_var(rhs)
 
-            if cpm_expr.name == '!=':
-                # sum(x) != k  =>  (lhs <= k-1) or (lhs >= k+1); use SCIP's native disjunction (no extra binary)
-                sciplhs = self._make_numexpr(lhs)
-                self.scip_model.addConsDisjunction([
-                    sciplhs <= sciprhs - 1,
-                    sciplhs >= sciprhs + 1
-                ])
-            elif cpm_expr.name == '<=':
+            if cpm_expr.name == '<=':
                 if (lhs_is_operator and lhs.name == "sum" and all(a.is_bool() and not isinstance(a, NegBoolView) for a in lhs.args)):
                     if rhs == 1:
                         self.scip_model.addConsSOS1(self.solver_vars(lhs.args))
