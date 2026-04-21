@@ -130,7 +130,7 @@ class CPM_scip(SolverInterface):
 
         # apply any solver parameters (can override time limit if e.g. "limits/time" in kwargs)
         self.scip_model.setParams(kwargs)
-        _ = self.scip_model.optimize()
+        self.scip_model.optimize()
 
         scip_status = self.scip_model.getStatus()
 
@@ -316,13 +316,13 @@ class CPM_scip(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+    def add(self, cpm_expr):
+        get_variables(cpm_expr, collect=self.user_vars)
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
         self.solver_vars(list(self.user_vars))
 
-        for cpm_expr in self.transform(cpm_expr_orig):
-            self._add_transformed_constraint(cpm_expr)
+        for con in self.transform(cpm_expr):
+            self._add_transformed_constraint(con)
 
         return self
 
