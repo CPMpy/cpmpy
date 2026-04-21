@@ -240,7 +240,7 @@ class Expression(object):
         return True
 
     def value(self) -> Optional[int]:
-        return None  # default
+        raise NotImplementedError(f"`value` is not yet implemented for type {self}")
 
     def get_bounds(self) -> tuple[int, int]:
         if self.is_bool():
@@ -263,7 +263,7 @@ class Expression(object):
 
         Args:
             other (ExprLike): the right-hand-side of the implication
-            simplify (bool): if True, simplify True/False constants (might remove expressions & their variables from user-view)
+            simplify (bool): if True, simplify by eliminating True/False constants (might remove expressions & their variables from user-view)
 
         Returns:
             Expression: the implication constraint or a BoolVal if simplified

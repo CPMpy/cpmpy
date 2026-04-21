@@ -209,7 +209,7 @@ def get_bounds(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
 
-# first to are declarations for typing purposes only
+# first two are declarations for typing purposes only
 @overload
 def implies(expr: NDVarArray, other: ExprLike, simplify: bool = False) -> NDVarArray: ...
 @overload
