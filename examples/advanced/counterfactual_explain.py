@@ -84,7 +84,7 @@ def main():
         f"\n\nValues {d_star} results in a solution satisfying the user query being optimal"
     )
     print(f"Optimal knapsack satisfying user query: {x_user}")
-    print(f"Value of objective function using d* = {cp.sum(d_star * x_user)}")
+    print(f"Value of objective function using d* = {sum(d_star * x_user)}")
 
 
 def solve_knapsack_problem(values, weights, capacity):
@@ -232,7 +232,6 @@ def print_knapsack_model(values, weights, capacity, x):
     print("\nis:", x)
     print(f"Resulting in an objective value of {sum(x * values)}")
     print(f"Capacity used: {sum(x*weights)}")
-
 
 
 def pp_uquery(x, f_items):
