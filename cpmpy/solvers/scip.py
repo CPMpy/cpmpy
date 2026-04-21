@@ -379,21 +379,9 @@ class CPM_scip(SolverInterface):
 
             lhs, rhs = sub_expr.args
             assert is_num(rhs), f"linearize should only leave constants on rhs of comparison but got {rhs}"
-            assert isinstance(lhs, _NumVarImpl) or (isinstance(lhs, (GlobalFunction, Operator)) and lhs.name in ("abs", "sum", "wsum")), f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
+            assert isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in ("sum", "wsum")), f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
 
-            # SCIP supports abs natively, but not reified abs; we ad-hoc transform into linear indicator constraints
-            if lhs.name == "abs":
-                (arg,) = lhs.args
-                if sub_expr.name == "<=":
-                    self._add_transformed_constraint(cond.implies(arg <= rhs))
-                    self._add_transformed_constraint(cond.implies(arg >= -rhs))
-                elif sub_expr.name == ">=":
-                    self._add_transformed_constraint(cond.implies((arg >= rhs) | (arg <= -rhs)))
-                elif sub_expr.name == "==":
-                    self._add_transformed_constraint(cond.implies((arg == rhs) | (arg == -rhs)))
-                else:
-                    raise NotImplementedError(f"Reified abs with {sub_expr.name} not supported in SCIP")
-            elif sub_expr.name in ("<=", ">="):
+            if sub_expr.name in ("<=", ">="):
                 lin_expr = self._make_numexpr(lhs)
                 if sub_expr.name == "<=":
                     scip_cons = lin_expr <= rhs
