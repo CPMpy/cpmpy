@@ -966,16 +966,42 @@ class Xor(GlobalConstraint):
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Xor global constraint.
-        Recursively decomposes the constraint into a chain of binary xor-constraints, represented using a sum.
+        Recursively decomposes the constraint into a chain of sums.
+        E.g., xor(a,b,c) :: (((a + b) == 1) + c) == 1
         
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
-        decomp = [sum(self.args[:2]) == 1]
-        if len(self.args) > 2:
-            decomp = Xor(decomp + list(self.args[2:])).decompose()[0]
-        return decomp, []
+        # lets first simplify the Xor by removing all constants:
+        # True Xor x :: ~x  and  False Xor x :: x
+        new_args: list[Expression] = []
+        parity = False  # base case
+        for a in self.args:
+            if isinstance(a, Expression) and not isinstance(a, BoolVal):
+                new_args.append(a)
+            else:  # a constant, don't store but update parity
+                if a:  # True Xor x :: ~x
+                    parity = not parity
+        if len(new_args) == 0:
+            return [BoolVal(parity)], []
+        if parity:  # negate first Boolean variable
+            changed = False
+            for i, a in enumerate(self.args):
+                if isinstance(a, _BoolVarImpl):
+                    new_args[i] = ~a
+                    changed = True
+                    break
+            if not changed:  # no variables, negate first argument
+                new_args[0] = ~new_args[0]  # Warning, creates a negated expression during decompose
+
+        # There are multiple decompositions possible,
+        # recursively using sum allows it to be efficient for all solvers.
+        # E.g., xor(a,b,c) :: (((a + b) == 1) + c) == 1
+        prev: Expression = new_args[0]
+        for a in new_args[1:]:
+            prev = (prev + a == 1)  # recursive pairwise Xor decomposition
+
+        return [prev], []
 
     def value(self) -> Optional[bool]:
         arrvals = argvals(self.args)
@@ -1001,7 +1027,7 @@ class Xor(GlobalConstraint):
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
             from cpmpy.transformations.negation import recurse_negation
-            new_args[0] = recurse_negation(self.args[0])
+            new_args[0] = recurse_negation(self.args[0])           
 
         return Xor(new_args)
 
