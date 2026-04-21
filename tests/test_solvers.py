@@ -1047,7 +1047,7 @@ class TestSupportedSolvers:
         vars = [x,y,d,r]
         m = cp.Model()
         # modulo toplevel
-        m += x / y == d
+        m += x // y == d
         m += x % y == r
         sols = set()
         solution_limit = 15  # ILP solvers don't like this model and tend to get stuck finding all solutions

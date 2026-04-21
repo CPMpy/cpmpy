@@ -37,6 +37,7 @@ if str(REPO_ROOT) not in sys.path:
 import cpmpy as cp
 from cpmpy.tools.xcsp3 import XCSP3Dataset, _parse_xcsp3, _load_xcsp3, decompress_lzma
 from cpmpy.solvers.pysat import CPM_pysat
+from cpmpy.transformations.negation import push_down_negation
 from cpmpy.transformations.normalize import toplevel_list, simplify_boolean
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.transformations.flatten_model import flatten_constraint
@@ -108,6 +109,13 @@ def _process_instance(args):
             supported_reified=solver.supported_reified_global_constraints,
             csemap=solver._csemap,
         )
+        records.append((instance_id, step, time.perf_counter() - t0))
+        if stop_after and step == stop_after:
+            return records, _calc_stats(start_time, cpm_expr)
+
+        step = "push_down_negation"
+        t0 = time.perf_counter()
+        cpm_expr = push_down_negation(cpm_expr)
         records.append((instance_id, step, time.perf_counter() - t0))
         if stop_after and step == stop_after:
             return records, _calc_stats(start_time, cpm_expr)

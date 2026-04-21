@@ -478,14 +478,7 @@ class CPM_minizinc(SolverInterface):
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
             # display if needed
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:
-                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    display()  # callback
+            self.print_display(display)
 
             # count and stop
             solution_count += 1
@@ -493,7 +486,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += cpm_any([v != v.value() for v in self.user_vars])
+            self.add(cpm_any([v != v.value() for v in self.user_vars]))
 
         if solution_count == 0:
             # clear user vars if no solution found

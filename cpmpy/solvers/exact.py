@@ -330,7 +330,7 @@ class CPM_exact(SolverInterface):
                 return 0
             else:
                 assert my_status == "SAT", "Unexpected status from Exact"
-            self += self.objective_ == objval # fix obj val
+            self.add(self.objective_ == objval) # fix obj val
             end = time.time()
             timelim = self._update_time(timelim, start, end) # update remaining time
 
@@ -353,13 +353,7 @@ class CPM_exact(SolverInterface):
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
                     self._fillVars()
-                    if isinstance(display, Expression):
-                        print(display.value())
-                    elif is_any_list(display):
-                        print(argvals(display))
-                    else:
-                        assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                        display()  # callback
+                    self.print_display(display)
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout

@@ -8,6 +8,7 @@ from cpmpy import SolverLookup
 from cpmpy.expressions.core import BoolVal, Comparison, Expression, Operator
 from cpmpy.expressions.utils import argvals
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, boolvar, intvar
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.int2bool import int2bool, IntVarEnc
@@ -103,7 +104,7 @@ class TestTransInt2Bool:
     def test_transforms(self, solver, constraint, encoding, setup):
         user_vars = tuple(get_variables(constraint))
         ivarmap = dict()
-        csemap = dict()
+        csemap = CSEMap()
         flat = int2bool(flatten_constraint(constraint), ivarmap=ivarmap, encoding=encoding, csemap=csemap)
 
         cons_sols = []
