@@ -92,8 +92,8 @@ import copy
 import math
 import builtins
 import cpmpy as cp
-from .cse import CSEMap
 
+from .cse import CSEMap
 from .normalize import toplevel_list, simplify_boolean
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.core import _wsum_should, _wsum_make
