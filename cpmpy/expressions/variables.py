@@ -525,7 +525,7 @@ class NDVarArray(np.ndarray):
             if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
                 # TODO can we do the same for more than one Expression? Not sure...
                 index  = list(index)
-                index += [index.pop(expr_dim[0])]
+                index.append(index.pop(expr_dim[0]))
 
                 arr = np.moveaxis(self, expr_dim[0], -1)
                 return cp.Element(arr[(*index[:-1],)], index[-1])

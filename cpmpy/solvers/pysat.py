@@ -333,7 +333,7 @@ class CPM_pysat(SolverInterface):
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                self += cons
+                self.add(cons)
             else:
                 enc = self.ivarmap[cpm_var.name]
             return self.solver_vars(enc.vars())

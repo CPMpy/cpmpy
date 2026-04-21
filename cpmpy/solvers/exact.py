@@ -56,7 +56,7 @@ from packaging.version import Version
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.variables import intvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -330,7 +330,7 @@ class CPM_exact(SolverInterface):
                 return 0
             else:
                 assert my_status == "SAT", "Unexpected status from Exact"
-            self += self.objective_ == objval # fix obj val
+            self.add(self.objective_ == objval) # fix obj val
             end = time.time()
             timelim = self._update_time(timelim, start, end) # update remaining time
 
@@ -353,13 +353,7 @@ class CPM_exact(SolverInterface):
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
                     self._fillVars()
-                    if isinstance(display, Expression):
-                        print(display.value())
-                    elif is_any_list(display):
-                        print(argvals(display))
-                    else:
-                        assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                        display()  # callback
+                    self.print_display(display)
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
             elif my_status == "TIMEOUT": # found timeout
@@ -652,6 +646,28 @@ class CPM_exact(SolverInterface):
 
         # return cpm_variables corresponding to Exact core
         return [self.assumption_dict[i][1] for i in self.xct_solver.getLastCore()]
+    
+    @classmethod
+    def mus_native(cls, soft, hard=[]):        
+        # Create assumption variables and model with hard + (assumption -> soft)
+        from cpmpy.tools.explain.utils import make_assump_model # avoid circular import
+        m, soft, assumptions = make_assump_model(soft, hard)
+        
+        # initialize solver object with model
+        s = cls(m)
+        
+        # set up assumptions for exact
+        xct_assumptions = [s.solver_var(x) for x in assumptions]
+        s.xct_solver.setAssumptions([(x, 1) for x in xct_assumptions])
+
+        # call native MUS extractor
+        res_xct, mus_xct = s.xct_solver.extractMUS()
+        
+        assert res_xct != "SAT", "MUS: model must be UNSAT"
+
+        # get the constraints back from the assumption variables
+        dmap = dict(zip(xct_assumptions, soft))
+        return [dmap[c] for c in mus_xct]
 
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):

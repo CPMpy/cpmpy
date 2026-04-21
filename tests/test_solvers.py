@@ -1047,7 +1047,7 @@ class TestSupportedSolvers:
         vars = [x,y,d,r]
         m = cp.Model()
         # modulo toplevel
-        m += x / y == d
+        m += x // y == d
         m += x % y == r
         sols = set()
         solution_limit = None

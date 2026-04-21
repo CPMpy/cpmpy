@@ -586,7 +586,7 @@ class TestNullifyingArguments:
 
     def test_num(self):
         funcs = ["__add__", "__radd__", "__sub__", "__rsub__", "__mul__", "__rmul__",
-                 "__truediv__", "__rtruediv__", "__floordiv__", "__rfloordiv__",
+                 "__floordiv__", "__rfloordiv__",
                  "__mod__", "__rmod__"]
 
         for func in funcs:
@@ -596,6 +596,14 @@ class TestNullifyingArguments:
 
             expr = getattr(self.x, func)(0)
             assert get_variables(expr) == [self.x]
+
+        with pytest.warns(SyntaxWarning, match="We only support floordivision"):
+            expr = self.x / 1
+        assert get_variables(expr) == [self.x]
+
+        with pytest.warns(SyntaxWarning, match="We only support floordivision"):
+            expr = 1 / self.x
+        assert get_variables(expr) == [self.x]
 
 
 

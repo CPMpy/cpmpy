@@ -947,8 +947,11 @@ class DynamicCumulative(GlobalConstraint):
             # demand doesn't exceed capacity
             for t in range(lb,ub+1):
                 demand_at_t = 0
-                for start_j, end_j, demand_j in zip(start, end, demand):
-                    demand_at_t += demand_j * ((start_j <= t) & (t < end_j))
+                for job in range(len(start)):
+                    if is_num(demand):
+                        demand_at_t += demand * ((start[job] <= t) & (t < end[job]))
+                    else:
+                        demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
 
                 cons.append(demand_at_t <= capacity)
                 
