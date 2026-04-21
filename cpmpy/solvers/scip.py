@@ -87,13 +87,6 @@ class CPM_scip(SolverInterface):
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
-        """
-        Constructor of the native solver object
-
-        Arguments:
-        - cpm_model: str: a CPMpy Model()
-        - subsolver: str: None, not used
-        """
         if not self.supported():
             raise ModuleNotFoundError(
                 "CPM_scip: Install SCIPOptSuite and the python package 'pyscipopt' to use this solver interface.")
@@ -195,10 +188,6 @@ class CPM_scip(SolverInterface):
 
 
     def solver_var(self, cpm_var):
-        """
-            Creates solver variable for cpmpy variable
-            or returns from cache if previously created
-        """
         if is_num(cpm_var): # shortcut, eases posting constraints
             return cpm_var
 
@@ -223,16 +212,6 @@ class CPM_scip(SolverInterface):
 
 
     def objective(self, expr, minimize=True):
-        """
-            Post the given expression to the solver as objective to minimize/maximize
-
-            'objective()' can be called multiple times, only the last one is stored
-
-            (technical side note: any constraints created during conversion of the objective
-                are permanently posted to the solver)
-        """
-        import pyscipopt as scip
-
         get_variables(expr, collect=self.user_vars)
         self.solver_vars(list(self.user_vars))
 
@@ -262,8 +241,7 @@ class CPM_scip(SolverInterface):
 
     def _make_numexpr(self, cpm_expr):
         """
-            Turns a numeric CPMpy 'flat' expression into a solver-specific
-            numeric expression
+            Turns a numeric CPMpy 'flat' expression into a solver-specific numeric expression
         """
         import pyscipopt as scip
 
@@ -290,19 +268,6 @@ class CPM_scip(SolverInterface):
 
 
     def transform(self, cpm_expr):
-        """
-            Transform arbitrary CPMpy expressions to constraints the solver supports
-
-            Implemented through chaining multiple solver-independent **transformation functions** from
-            the `cpmpy/transformations/` directory.
-
-            See the 'Adding a new solver' docs on readthedocs for more information.
-
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
-
-        :return: list of Expression
-        """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
@@ -329,7 +294,7 @@ class CPM_scip(SolverInterface):
     __add__ = add
 
     def _add_transformed_constraint(self, cpm_expr):
-        """Add already transformed CPMpy constraints to the solver. """
+        """Add already transformed CPMpy constraints to the solver. Some constraints are further transformed in this file, such as reified linear equality constraints `b -> ... == k` into `b -> ... >= k /\ b -> ... <= k`. In this case, we recursively call this function instead of `self.add`, which avoids both the full transformation pipeline overhead and also does not polute `user_vars` with `b`."""
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             lhs_is_operator = isinstance(lhs, Operator)
@@ -414,29 +379,11 @@ class CPM_scip(SolverInterface):
             raise NotImplementedError(cpm_expr)
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
-        """
-            Compute all solutions and optionally display the solutions.
-
-            This is the generic implementation, solvers can overwrite this with
-            a more efficient native implementation
-
-            Arguments:
-                - display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
-                        default/None: nothing displayed
-                - time_limit: stop after this many seconds (default: None)
-                - solution_limit: stop after this many solutions (default: None)
-                - call_from_model: whether the method is called from a CPMpy Model instance or not
-                - any other keyword argument
-
-            Returns: number of solutions found
-        """
-
         warnings.warn("Solution enumeration is not implemented in PyScipOPT, defaulting to CPMpy's naive implementation")
         """
             Issues to track for future reference:
                 https://github.com/scipopt/PySCIPOpt/issues/549 and
                 https://github.com/scipopt/PySCIPOpt/issues/248
         """
-        
         return super().solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
 
