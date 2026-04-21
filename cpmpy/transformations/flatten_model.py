@@ -354,7 +354,10 @@ def get_or_make_var(expr, csemap=None):
     else:
         flatexpr, flatcons = normalized_numexpr(expr, csemap=csemap)
 
-    if csemap is not None:
+    if csemap is None:
+        # this will have some overhead, but it nicely stores all logic in the csemap object
+        new_var, expr_eq_var = CSEMap().get_or_make_var(flatexpr)
+    else:
         # save both original expression and flattened expression to the csemap
         # maybe the flattened expression is already in the map?
         new_var = csemap.get(flatexpr)
@@ -364,9 +367,6 @@ def get_or_make_var(expr, csemap=None):
         if flatexpr is not expr: # avoid additional hash call if expr was flat already
             csemap.flat_map[expr] = new_var
 
-    else:
-        # this will have some overhead, but it nicely stores all logic in the csemap object
-        new_var, expr_eq_var = CSEMap().get_or_make_var(flatexpr)
 
     if expr_eq_var is not None:
         flatcons.append(expr_eq_var)
