@@ -28,7 +28,7 @@ from typing import Optional
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Operator
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, boolvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_num, is_true_cst, is_false_cst
@@ -138,6 +138,9 @@ class CPM_scip(SolverInterface):
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.scip_model.getSolvingTime()
 
+        # We have not implemented finding all solutions, so the "bestsollimit" status is unexpected (arguably we should set `cpm_status` to OPTIMAL in this case)
+        assert scip_status != "bestsollimit", f"Unexpected status {scip_status}, this SCIP usage was not implemented"
+
         # translate exit status
         if scip_status == "optimal":
             if self.has_objective():
@@ -146,11 +149,10 @@ class CPM_scip(SolverInterface):
                 self.cpm_status.exitstatus = ExitStatus.FEASIBLE
         elif scip_status == "infeasible":  # proven unsat
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
-        else:  # decide between unknown and feasible
-            # We have not implemented finding all solutions, so this status is dangerous (arguably we should set `cpm_status` to OPTIMAL in this case)
-            assert scip_status != "bestsollimit", f"Unexpected status {scip_status}, this SCIP usage was not implemented"
-            # distinguish unknown from feasible using whether number of solutions in the SCIP solution storage was non-zero, easier and more reliable than matching on a status.
-            self.cpm_status.exitstatus = ExitStatus.FEASIBLE if self.scip_model.getNSols() else ExitStatus.UNKNOWN
+        elif self.scip_model.getNSols() > 0:  # decide between unknown and feasible based on number of solutions (easier and more reliable than matching on a status)
+            self.cpm_status.exitstatus = ExitStatus.FEASIBLE
+        else:
+            self.cpm_status.exitstatus = ExitStatus.UNKNOWN
 
         # True/False depending on self.cpm_status
         has_sol = self._solve_return(self.cpm_status)
@@ -161,7 +163,7 @@ class CPM_scip(SolverInterface):
             best_sol = self.scip_model.getBestSol()
             assert best_sol is not None, f"Due to status {scip_status}, we expected a solution from SCIP, but there was none. This is a bug, please report on GitHub."
             for cpm_var in self.user_vars:
-                assert cpm_var in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub."
+                assert cpm_var in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub. User vars: {self.user_vars}"
                 scip_var = self.solver_var(cpm_var)
                 solver_val = self.scip_model.getSolVal(best_sol, scip_var)
                 if cpm_var.is_bool():
@@ -208,7 +210,6 @@ class CPM_scip(SolverInterface):
 
         # create if it does not exit
         if cpm_var not in self._varmap:
-            import pyscipopt as scip
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.scip_model.addVar(vtype='B', name=cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
@@ -233,6 +234,7 @@ class CPM_scip(SolverInterface):
         import pyscipopt as scip
 
         get_variables(expr, collect=self.user_vars)
+        self.solver_vars(list(self.user_vars))
 
         obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_linear_objective(
@@ -244,7 +246,9 @@ class CPM_scip(SolverInterface):
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj = only_positive_bv_wsum(obj)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+        # transform and add constraints (via `_add_transformed_constraint` as to not polute `user_vars`)
+        for cpm_expr in self.transform(safe_cons + decomp_cons + flat_cons):
+            self._add_transformed_constraint(cpm_expr)
 
         scip_obj = self._make_numexpr(obj)
         if minimize:
@@ -279,7 +283,7 @@ class CPM_scip(SolverInterface):
         if cpm_expr.name == "sum":
             return scip.quicksum(self.solver_vars(cpm_expr.args))
         if cpm_expr.name == "sub":
-            a,b = self.solver_vars(cpm_expr.args)
+            a, b = self.solver_vars(cpm_expr.args)
             return a - b
         # wsum
         if cpm_expr.name == "wsum":
@@ -325,125 +329,119 @@ class CPM_scip(SolverInterface):
 
     def add(self, cpm_expr_orig):
         get_variables(cpm_expr_orig, collect=self.user_vars)
-        # Ensure every user var has a solver variable (so we get values after solve even if
-        # the constraint was simplified away and the var never appears in transformed constraints)
+        # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
         self.solver_vars(list(self.user_vars))
 
         for cpm_expr in self.transform(cpm_expr_orig):
-            if isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
-                lhs_is_operator = isinstance(lhs, Operator)
-                sciprhs = self.solver_var(rhs)
-
-                if cpm_expr.name == '!=':
-                    # sum(x) != k  =>  (lhs <= k-1) or (lhs >= k+1); use SCIP's native disjunction (no extra binary)
-                    sciplhs = self._make_numexpr(lhs)
-                    self.scip_model.addConsDisjunction([
-                        sciplhs <= sciprhs - 1,
-                        sciplhs >= sciprhs + 1
-                    ])
-                elif cpm_expr.name == '<=':
-                    if (lhs_is_operator and lhs.name == "sum" and all(a.is_bool() and not isinstance(a, NegBoolView) for a in lhs.args)):
-                        if rhs == 1:
-                            self.scip_model.addConsSOS1(self.solver_vars(lhs.args))
-                        else:
-                            self.scip_model.addConsCardinality(self.solver_vars(lhs.args), int(rhs))
-                    else:
-                        sciplhs = self._make_numexpr(lhs)
-                        self.scip_model.addCons(sciplhs <= sciprhs)
-                elif cpm_expr.name == '>=':
-                    sciplhs = self._make_numexpr(lhs)
-                    self.scip_model.addCons(sciplhs >= sciprhs)
-                elif cpm_expr.name == '==':
-                    sciplhs = self._make_numexpr(lhs)
-                    self.scip_model.addCons(sciplhs == sciprhs)
-                else:
-                    raise NotImplementedError(
-                        "Not a known supported scip comparison '{}' {}".format(cpm_expr.name, cpm_expr))
-
-            elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-                cond, sub_expr = cpm_expr.args
-                assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
-                assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
-
-                lhs, rhs = sub_expr.args
-                lhs_is_globalfunc = isinstance(lhs, GlobalFunction)
-                lhs_is_operator = isinstance(lhs, Operator)
-                if lhs_is_globalfunc and lhs.name == "abs":
-                    (arg,) = lhs.args
-                    if sub_expr.name == "<=":
-                        self.add([cond.implies(arg <= rhs), cond.implies(arg >= -rhs)])
-                    elif sub_expr.name == ">=":
-                        self.add([cond.implies((arg >= rhs) | (arg <= -rhs))])
-                    elif sub_expr.name == "==":
-                        self.add([cond.implies((arg == rhs) | (arg == -rhs))])
-                    else:
-                        raise NotImplementedError(f"Reified abs with {sub_expr.name} not supported in SCIP")
-                    continue
-
-                assert isinstance(lhs, _NumVarImpl) or (lhs_is_operator and lhs.name in ("sum", "wsum")), f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
-                assert is_num(rhs), f"linearize should only leave constants on rhs of comparison but got {rhs}"
-
-                if sub_expr.name == ">=":
-                    if lhs_is_operator and lhs.name == "sum":
-                        lhs = Operator("wsum", [[-1] * len(lhs.args), lhs.args])
-                    elif lhs_is_operator and lhs.name == "wsum":
-                        lhs = Operator("wsum", [[-w for w in lhs.args[0]], lhs.args[1]])
-                    else:
-                        lhs = Operator("wsum", [[-1], [lhs]])
-                    sub_expr = lhs <= -rhs
-
-                if sub_expr.name == "<=":
-                    lhs, rhs = sub_expr.args
-                    lin_expr = self._make_numexpr(lhs)
-                    if isinstance(cond, NegBoolView):
-                        self.scip_model.addConsIndicator(lin_expr <= rhs,
-                                                         binvar=self.solver_var(cond._bv), activeone=False)
-                    else:
-                        self.scip_model.addConsIndicator(lin_expr <= rhs,
-                                                         binvar=self.solver_var(cond), activeone=True)
-                elif sub_expr.name == "==":
-                    self.add([cond.implies(lhs <= rhs), cond.implies(lhs >= rhs)])
-                else:
-                    raise Exception(f"Unknown linear expression {sub_expr} name")
-
-            elif isinstance(cpm_expr, BoolVal):
-                if cpm_expr.args[0] is False:
-                    bv = self.solver_var(boolvar())
-                    self.scip_model.addCons(bv <= -1)
-
-            elif isinstance(cpm_expr, DirectConstraint):
-                cpm_expr.callSolver(self, self.scip_model)
-
-            elif isinstance(cpm_expr, GlobalConstraint):
-                if cpm_expr.name == "xor":
-                    # SCIP addConsXor(vars, rhs): rhs is the value the xor must equal (True for top-level)
-                    args = [a for a in cpm_expr.args if not is_false_cst(a)]
-                    if not args:
-                        # only false constants: xor() is False -> no solution
-                        if not hasattr(self, "_scip_infeasible_aux"):
-                            self._scip_infeasible_aux = self.scip_model.addVar(vtype='B', lb=0, ub=0, name='_false')
-                            self.scip_model.addCons(self._scip_infeasible_aux >= 1)
-                        continue
-                    if any(is_true_cst(a) for a in args):
-                        if not hasattr(self, "_scip_true_var"):
-                            self._scip_true_var = self.scip_model.addVar(vtype='B', lb=1, ub=1, name='true')
-                        args = [self._scip_true_var if is_true_cst(a) else self.solver_var(a) for a in args]
-                    else:
-                        args = self.solver_vars(args)
-                    self.scip_model.addConsXor(args, True)
-                else:
-                    raise NotImplementedError(
-                        f"SCIP does not translate global constraint '{cpm_expr.name}' natively; "
-                        f"supported globals: {sorted(self.supported_global_constraints)}. "
-                        "It should have been decomposed by transform(); please report if you see this."
-                    )
-
-            else:
-                raise NotImplementedError(cpm_expr)
+            self._add_transformed_constraint(cpm_expr)
 
         return self
+
     __add__ = add
+
+    def _add_transformed_constraint(self, cpm_expr):
+        """Add already transformed CPMpy constraints to the solver. """
+        if isinstance(cpm_expr, Comparison):
+            lhs, rhs = cpm_expr.args
+            lhs_is_operator = isinstance(lhs, Operator)
+            sciprhs = self.solver_var(rhs)
+
+            if cpm_expr.name == '!=':
+                # sum(x) != k  =>  (lhs <= k-1) or (lhs >= k+1); use SCIP's native disjunction (no extra binary)
+                sciplhs = self._make_numexpr(lhs)
+                self.scip_model.addConsDisjunction([
+                    sciplhs <= sciprhs - 1,
+                    sciplhs >= sciprhs + 1
+                ])
+            elif cpm_expr.name == '<=':
+                if (lhs_is_operator and lhs.name == "sum" and all(a.is_bool() and not isinstance(a, NegBoolView) for a in lhs.args)):
+                    if rhs == 1:
+                        self.scip_model.addConsSOS1(self.solver_vars(lhs.args))
+                    else:
+                        self.scip_model.addConsCardinality(self.solver_vars(lhs.args), int(rhs))
+                else:
+                    sciplhs = self._make_numexpr(lhs)
+                    self.scip_model.addCons(sciplhs <= sciprhs)
+            elif cpm_expr.name == '>=':
+                sciplhs = self._make_numexpr(lhs)
+                self.scip_model.addCons(sciplhs >= sciprhs)
+            elif cpm_expr.name == '==':
+                sciplhs = self._make_numexpr(lhs)
+                self.scip_model.addCons(sciplhs == sciprhs)
+            else:
+                raise NotImplementedError(
+                    "Not a known supported scip comparison '{}' {}".format(cpm_expr.name, cpm_expr))
+
+        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+            cond, sub_expr = cpm_expr.args
+            assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+            assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
+
+            lhs, rhs = sub_expr.args
+            assert is_num(rhs), f"linearize should only leave constants on rhs of comparison but got {rhs}"
+            assert isinstance(lhs, _NumVarImpl) or (isinstance(lhs, (GlobalFunction, Operator)) and lhs.name in ("abs", "sum", "wsum")), f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}"
+
+            # SCIP supports abs natively, but not reified abs; we ad-hoc transform into linear indicator constraints
+            if lhs.name == "abs":
+                (arg,) = lhs.args
+                if sub_expr.name == "<=":
+                    self._add_transformed_constraint(cond.implies(arg <= rhs))
+                    self._add_transformed_constraint(cond.implies(arg >= -rhs))
+                elif sub_expr.name == ">=":
+                    self._add_transformed_constraint(cond.implies((arg >= rhs) | (arg <= -rhs)))
+                elif sub_expr.name == "==":
+                    self._add_transformed_constraint(cond.implies((arg == rhs) | (arg == -rhs)))
+                else:
+                    raise NotImplementedError(f"Reified abs with {sub_expr.name} not supported in SCIP")
+            elif sub_expr.name in ("<=", ">="):
+                lin_expr = self._make_numexpr(lhs)
+                if sub_expr.name == "<=":
+                    scip_cons = lin_expr <= rhs
+                else:
+                    scip_cons = lin_expr >= rhs
+                if isinstance(cond, NegBoolView):
+                    self.scip_model.addConsIndicator(scip_cons, binvar=self.solver_var(cond._bv), activeone=False)
+                else:
+                    self.scip_model.addConsIndicator(scip_cons, binvar=self.solver_var(cond), activeone=True)
+            elif sub_expr.name == "==":
+                self._add_transformed_constraint(cond.implies(lhs <= rhs))
+                self._add_transformed_constraint(cond.implies(lhs >= rhs))
+            else:
+                raise Exception(f"Unknown linear expression {sub_expr} name")
+
+        elif isinstance(cpm_expr, BoolVal):
+            if cpm_expr.args[0] is False:
+                self.scip_model.addConsXor([], True)  # easiest way to post False to SCIP (e.g. 0 <= -1 is not allowed, bv <= -1 requires adding a dummy variables, ...)
+
+        elif isinstance(cpm_expr, DirectConstraint):
+            cpm_expr.callSolver(self, self.scip_model)
+
+        elif isinstance(cpm_expr, GlobalConstraint):
+            if cpm_expr.name == "xor":
+                # Convert to SCIP arguments, handling constants, post `xor(args) == rhsvar` to SCIP
+                scip_args = []
+                rhsvar = True
+                for arg in cpm_expr.args:
+                    if is_false_cst(arg):
+                        continue
+                    elif is_true_cst(arg):
+                        # note: `xor` is "parity" (i.e. it enforces an odd number of true arguments)
+                        # every time we see True, we can just flip the RHS
+                        rhsvar = not rhsvar
+                    else:
+                        scip_args.append(self.solver_var(arg))
+
+                # post constraint (note: `addConsXor` is tested to work for empty lists)
+                self.scip_model.addConsXor(scip_args, rhsvar)
+            else:
+                raise NotImplementedError(
+                    f"SCIP does not translate global constraint '{cpm_expr.name}' natively; "
+                    f"supported globals: {sorted(self.supported_global_constraints)}. "
+                    "It should have been decomposed by transform(); please report if you see this."
+                )
+
+        else:
+            raise NotImplementedError(cpm_expr)
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         """
