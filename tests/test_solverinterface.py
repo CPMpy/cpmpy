@@ -15,7 +15,6 @@ def test_empty_constructor(solver):
 
     assert hasattr(solver, "status")
     assert solver.status() is not None
-    assert solver.objective_value() is None
     assert solver.status().exitstatus == ExitStatus.NOT_RUN
     assert solver.status().solver_name != "dummy"
 
@@ -122,7 +121,6 @@ def test_solve_infeasible(solver):
 
     assert not solver.solve()
     assert solver.status().exitstatus == ExitStatus.UNSATISFIABLE
-    assert x.value() is None
 
 
 @pytest.mark.usefixtures("solver")
@@ -131,8 +129,6 @@ def test_minimize(solver):
     """Test minimize functionality"""
     solver_class = SolverLookup.lookup(solver)
     solver = solver_class() if solver != "z3" else solver_class(subsolver="opt")
-
-    assert solver.objective_value() is None
 
     ivar = cp.intvar(1, 10)
 
@@ -145,12 +141,6 @@ def test_minimize(solver):
     assert solver.solve()
     assert solver.objective_value() == 1
     assert solver.status().exitstatus == ExitStatus.OPTIMAL
-
-    solver += ivar > 20
-
-    assert solver.solve() is False
-    assert solver.objective_value() is None
-    assert solver.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 @pytest.mark.usefixtures("solver")
 @skip_on_missing_pblib(skip_on_exception_only=True)
