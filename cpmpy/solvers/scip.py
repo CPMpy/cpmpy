@@ -156,7 +156,7 @@ class CPM_scip(SolverInterface):
             best_sol = self.scip_model.getBestSol()
             assert best_sol is not None, f"Due to status {scip_status}, we expected a solution from SCIP, but there was none. This is a bug, please report on GitHub."
             for cpm_var in self.user_vars:
-                assert cpm_var in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub. User vars: {self.user_vars}"
+                assert cpm_var in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub."
                 scip_var = self.solver_var(cpm_var)
                 solver_val = self.scip_model.getSolVal(best_sol, scip_var)
                 if cpm_var.is_bool():
@@ -225,7 +225,7 @@ class CPM_scip(SolverInterface):
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj = only_positive_bv_wsum(obj)
 
-        # transform and add constraints (via `_add_transformed_constraint` as to not polute `user_vars`)
+        # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
         for cpm_expr in self.transform(safe_cons + decomp_cons + flat_cons):
             self._add_transformed_constraint(cpm_expr)
 
@@ -294,7 +294,7 @@ class CPM_scip(SolverInterface):
     __add__ = add
 
     def _add_transformed_constraint(self, cpm_expr):
-        """Add already transformed CPMpy constraints to the solver. Some constraints are further transformed in this file, such as reified linear equality constraints `b -> ... == k` into `b -> ... >= k /\ b -> ... <= k`. In this case, we recursively call this function instead of `self.add`, which avoids both the full transformation pipeline overhead and also does not polute `user_vars` with `b`."""
+        """Add already transformed CPMpy constraints to the solver. Some constraints are further transformed in this file, such as reified linear equality constraints `b -> ... == k` into `b -> ... >= k /\ b -> ... <= k`. In this case, we recursively call this function instead of `self.add`, which avoids both the full transformation pipeline overhead and also does not pollute `user_vars` with `b`."""
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             lhs_is_operator = isinstance(lhs, Operator)
@@ -380,10 +380,8 @@ class CPM_scip(SolverInterface):
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         warnings.warn("Solution enumeration is not implemented in PyScipOPT, defaulting to CPMpy's naive implementation")
-        """
-            Issues to track for future reference:
-                https://github.com/scipopt/PySCIPOpt/issues/549 and
-                https://github.com/scipopt/PySCIPOpt/issues/248
-        """
+        # Issues to track for future reference:
+        # - https://github.com/scipopt/PySCIPOpt/issues/549 and
+        # - https://github.com/scipopt/PySCIPOpt/issues/248
         return super().solveAll(display, time_limit, solution_limit, call_from_model, **kwargs)
 
