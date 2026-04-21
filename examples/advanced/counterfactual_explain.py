@@ -94,7 +94,7 @@ def solve_knapsack_problem(values, weights, capacity):
 
     Based on the Numberjack model of Hakan Kjellerstrand
     """
-    x = cp.boolvar(len(values), name="x")
+    x = cp.boolvar(shape=len(values), name="x")
     model = cp.Model([cp.sum(x * weights) <= capacity], maximize=cp.sum(x * values))
     if model.solve() is not False:
         return x.value()
@@ -160,7 +160,7 @@ def make_master_problem(values, foil_idx):
     This way the variables can be used to add new constraints outside this building function.
     """
 
-    d = cp.intvar(0, INFINITY, values.shape, name="d")
+    d = cp.intvar(0, INFINITY, shape=values.shape, name="d")
     # Minimize the change to the values vector
     m = cp.Model(minimize=np.linalg.norm(values - d, ord=1))
 
