@@ -239,7 +239,7 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 new_rhs, cons = get_or_make_var(rhs + 1, csemap=csemap) # if rhs is constant, will return new constant
                 newlist.append(lhs >= new_rhs)
                 newlist += linearize_constraint(cons, csemap=csemap)
-            elif cpm_expr.name == "!=":
+            elif cpm_expr.name == "!=" and "!=" not in supported:
                 # Special case: BV != BV
                 if isinstance(lhs, _BoolVarImpl) and isinstance(rhs, _BoolVarImpl):
                     newlist.append(lhs + rhs == 1)
