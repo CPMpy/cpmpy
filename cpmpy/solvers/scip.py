@@ -282,9 +282,6 @@ class CPM_scip(SolverInterface):
         # sum
         if cpm_expr.name == "sum":
             return scip.quicksum(self.solver_vars(cpm_expr.args))
-        if cpm_expr.name == "sub":
-            a, b = self.solver_vars(cpm_expr.args)
-            return a - b
         # wsum
         if cpm_expr.name == "wsum":
             return scip.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
@@ -318,12 +315,12 @@ class CPM_scip(SolverInterface):
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
