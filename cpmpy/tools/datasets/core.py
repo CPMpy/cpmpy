@@ -40,13 +40,13 @@ Datasets must also implement the following dataset metadata attributes:
 - ``name``: the name of the dataset
 - ``description``: a short description of the dataset
 - ``homepage``: a URL to the homepage of the dataset
-- ``citation``: a list of citations for the dataset
+- ``citation``: optionally, a list of citations for the dataset
 
 All parts for which an implementation must be provided are marked with an @abstractmethod decorator, 
 raising a NotImplementedError if not overwritten.
 
-Dataset files should be downloaded as-is, without any preprocessing or decompression. Upon initial download,
-instance-level metadata gets auto collected and stored in a JSON sidecar file. All subsequent accesses to the dataset
+Dataset files are preferably downloaded as-is, without any preprocessing or decompression. Upon initial download,
+instance-level metadata gets automatically collected and stored in a JSON sidecar file. All subsequent accesses to the dataset
 will use the sidecar file to avoid re-collecting the metadata.
 
 Iterating over the dataset is done in the same way as a PyTorch dataset. It returns 2-tuples (x,y) of:
@@ -58,8 +58,8 @@ Example:
 .. code-block:: python
 
     dataset = MyDataset(download=True)
-    for x, y in dataset:
-        print(x, y)
+    for instance, info in dataset:
+        print(instance, info)
 
 The dataset also supports PyTorch-style transforms and target transforms.
 
@@ -247,7 +247,7 @@ class FileDataset(Dataset):
 
     - Model-defined instances: files directly encode variables/constraints/objective
       (for example XCSP3, OPB, DIMACS, FlatZinc). In this case, users typically
-      pass a loader as ``transform``, converting the raw file instance into a model.
+      pass a model-builder as ``transform``, converting the raw file instance into a model.
     - Data-only instances: files encode problem data for a fixed family, but no
       model. In this case, subclasses should override ``parse()`` and users can
       enable ``parse=True`` to obtain parsed intermediate data structures
