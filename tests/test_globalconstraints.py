@@ -794,10 +794,9 @@ class TestGlobal:
 
         expected = {
             # safening constraints
-            "(BV0) == ((x >= 0) and (x <= 2))",
-            "(BV0) -> ((IV0) == (x))",
-            "(~BV0) -> (IV0 == 0)",
-            "BV0",
+            "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
+            "(not((x >= 0) and (x <= 2))) -> (IV0 == 0)",
+            "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
             '(IV0 == 1) -> (IV1 == 1)',
