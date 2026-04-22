@@ -250,8 +250,6 @@ class CPM_scip(SolverInterface):
 
         if is_num(cpm_expr):
             return cpm_expr
-        elif isinstance(cpm_expr, NegBoolView):  # negated bool (e.g. in objective): 1 - bv
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
         elif isinstance(cpm_expr, _NumVarImpl):  # decision variables, check in varmap (_BoolVarImpl is subclass of _NumVarImpl)
             return self.solver_var(cpm_expr)
         elif cpm_expr.name == "sum":
