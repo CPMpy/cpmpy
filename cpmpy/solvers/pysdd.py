@@ -249,14 +249,7 @@ class CPM_pysdd(SolverInterface):
                 # fill in variable values
                 for i, cpm_var in enumerate(self.user_vars):
                     cpm_var._value = sol[i]
-
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:
-                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    display()  # callback
+                self.print_display(display)
         
         return len(projected_sols)
 

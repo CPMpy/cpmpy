@@ -570,14 +570,7 @@ class HexSolutionPrinter:
                 if self._solver.has_objective():
                     self._solver.objective_value_ = int(hex_sol.get_objective_bound(0))
 
-                # display
-                if isinstance(self._display, Expression):
-                    print(self._display.value())
-                elif is_any_list(self._display):
-                    print(argvals(self._display))
-                else:
-                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {self._display} of type {type(self._display)}"
-                    self._display()  # callback
+                self._solver.print_display(self._display)
                 
             # update data
             self.__solution_count += 1

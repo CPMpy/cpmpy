@@ -25,6 +25,7 @@ from .mcs import mcs, mcs_grow, mcs_grow_naive, mcs_opt
 from .mss import mss, mss_grow, mss_grow_naive, mss_opt
 from .mus import (
     mus,
+    mus_native,
     mus_naive,
     ocus,
     ocus_naive,
@@ -48,6 +49,7 @@ __all__ = [
     "mss_grow_naive",
     "mss_opt",
     "mus",
+    "mus_native",
     "mus_naive",
     "ocus",
     "ocus_naive",

@@ -599,14 +599,7 @@ class CPM_gurobi(SolverInterface):
             if self.has_objective():
                 self.objective_value_ = self.grb_model.PoolObjVal
 
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:
-                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    display()  # callback
+            self.print_display(display)
 
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
