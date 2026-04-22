@@ -362,6 +362,12 @@ class CPM_scip(SolverInterface):
 
                 # post constraint (note: `addConsXor` is tested to work for empty lists)
                 self.scip_model.addConsXor(scip_args, rhsvar)
+            else:
+                raise NotImplementedError(
+                    f"SCIP does not translate global constraint '{cpm_expr.name}' natively; "
+                    f"supported globals: {sorted(self.supported_global_constraints)}. "
+                    "It should have been decomposed by transform(); please report if you see this."
+                )
         elif isinstance(cpm_expr, BoolVal):
             if cpm_expr.args[0] is False:
                 self.scip_model.addConsXor([], True)  # easiest way to post False to SCIP (e.g. 0 <= -1 is not allowed, bv <= -1 requires adding a dummy variables, ...)
@@ -369,12 +375,6 @@ class CPM_scip(SolverInterface):
         elif isinstance(cpm_expr, DirectConstraint):
             cpm_expr.callSolver(self, self.scip_model)
 
-            else:
-                raise NotImplementedError(
-                    f"SCIP does not translate global constraint '{cpm_expr.name}' natively; "
-                    f"supported globals: {sorted(self.supported_global_constraints)}. "
-                    "It should have been decomposed by transform(); please report if you see this."
-                )
 
         else:
             raise NotImplementedError(cpm_expr)
