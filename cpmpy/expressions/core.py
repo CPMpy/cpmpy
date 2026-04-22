@@ -104,6 +104,7 @@ from ..exceptions import TypeError
 # Common typing helpers
 T = TypeVar("T")
 ListLike: TypeAlias = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
+BoolExprLike: TypeAlias = Union["Expression", bool, np.bool_]  # expression or bool (incl np variant)
 ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
 
 
@@ -574,25 +575,26 @@ class BoolVal(Expression):
 
         Args:
             other (ExprLike): the right-hand-side of the implication
-            simplify (bool): if True, simplify True/False constants (might remove expressions & their variables from user-view)
+            simplify (bool): simplify the implication, even if it means `other` dissappears from user-view
+
+        Simplification rule:
+            - BoolVal(False) -> other :: BoolVal(True)
+        
+        Note: `BoolVal(True).implies(other)` will always return `other`
 
         Returns:
-            Expression: the implication constraint or a BoolVal if simplified
-
-        Simplification rules:
-            - BoolVal(True) -> other :: other (BoolVal-ified if needed)
-            - BoolVal(False) -> other :: BoolVal(True)
+            Expression: the implication constraint or a BoolVal or other
         """
-        if not simplify:
-            return Operator('->', (self, other))
-
-        if self.args[0]:
+        if self.args[0]:  # True -> other
             if not isinstance(other, Expression):
                 assert isinstance(other, bool) or isinstance(other, np.bool_), f"implies: other must be a boolean, got {other}"
                 return BoolVal(other)
             return other
-        else:
-            return BoolVal(True)
+        else:  # False -> other
+            if simplify:
+                return BoolVal(True)
+            else:
+                return Operator('->', (self, other))
 
 class Comparison(Expression):
     """Represents a comparison between two sub-expressions
