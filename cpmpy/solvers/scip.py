@@ -345,13 +345,6 @@ class CPM_scip(SolverInterface):
             else:
                 raise Exception(f"Unknown linear expression {sub_expr} name")
 
-        elif isinstance(cpm_expr, BoolVal):
-            if cpm_expr.args[0] is False:
-                self.scip_model.addConsXor([], True)  # easiest way to post False to SCIP (e.g. 0 <= -1 is not allowed, bv <= -1 requires adding a dummy variables, ...)
-
-        elif isinstance(cpm_expr, DirectConstraint):
-            cpm_expr.callSolver(self, self.scip_model)
-
         elif isinstance(cpm_expr, GlobalConstraint):
             if cpm_expr.name == "xor":
                 # Convert to SCIP arguments, handling constants, post `xor(args) == rhsvar` to SCIP
@@ -369,6 +362,13 @@ class CPM_scip(SolverInterface):
 
                 # post constraint (note: `addConsXor` is tested to work for empty lists)
                 self.scip_model.addConsXor(scip_args, rhsvar)
+        elif isinstance(cpm_expr, BoolVal):
+            if cpm_expr.args[0] is False:
+                self.scip_model.addConsXor([], True)  # easiest way to post False to SCIP (e.g. 0 <= -1 is not allowed, bv <= -1 requires adding a dummy variables, ...)
+
+        elif isinstance(cpm_expr, DirectConstraint):
+            cpm_expr.callSolver(self, self.scip_model)
+
             else:
                 raise NotImplementedError(
                     f"SCIP does not translate global constraint '{cpm_expr.name}' natively; "
