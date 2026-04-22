@@ -2,7 +2,7 @@
 """
     Interface to the SCIP's python "PySCIPOpt" package
 
-    First install the ScipOptSuite on your machine, follow:
+    First install the SCIPOptSuite on your machine, follow:
     https://scipopt.org/index.php#download
 
     Then install the 'pyscipopt' python package:
@@ -197,7 +197,7 @@ class CPM_scip(SolverInterface):
                 "Negative literals should not be part of any equation. See /transformations/linearize for more details"
             )
 
-        # create if it does not exit
+        # create if it does not exist
         if cpm_var not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.scip_model.addVar(vtype='B', name=cpm_var.name)
@@ -379,7 +379,7 @@ class CPM_scip(SolverInterface):
             raise NotImplementedError(cpm_expr)
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
-        warnings.warn("Solution enumeration is not implemented in PyScipOPT, defaulting to CPMpy's naive implementation")
+        warnings.warn("Solution enumeration is not implemented in PySCIPOpt, defaulting to CPMpy's naive implementation")
         # Issues to track for future reference:
         # - https://github.com/scipopt/PySCIPOpt/issues/549 and
         # - https://github.com/scipopt/PySCIPOpt/issues/248
