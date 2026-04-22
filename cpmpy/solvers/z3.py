@@ -596,14 +596,7 @@ class CPM_z3(SolverInterface):
                 elif isinstance(cpm_var, _NumVarImpl):
                     cpm_var._value = sol[sol_var].as_long()
 
-            # display callback
-            if isinstance(display, Expression) or isinstance(display, NDVarArray):
-                print(display.value())
-            elif is_any_list(display):
-                print(argvals(display))
-            else:
-                assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                display()  # callback
+            self.print_display(display)
 
         return callback
 

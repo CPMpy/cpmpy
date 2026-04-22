@@ -646,13 +646,6 @@ class CPM_gurobi(SolverInterface):
                 else:
                     cpm_var._value = int(solver_val)
 
-            if isinstance(display, Expression):
-                print(display.value())
-            elif is_any_list(display):
-                print(argvals(display))
-            else:
-                assert callable(
-                    display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                display()  # callback
+            self.print_display(display)
 
         return callback

@@ -51,7 +51,6 @@
 from typing import Optional
 import warnings
 
-from docplex.cp.catalog import Oper_float_to_int
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -220,13 +219,7 @@ class CPM_template(SolverInterface):
                 for cpm_var, tpl_var in zip(_cpm_vars, _tpl_vars):
                     cpm_var._value = self.TPL_solver.value(tpl_var)
                     raise NotImplementedError("TEMPLATE: back-translating the solution values")
-
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:
-                    display()
+                self.print_display(display)
 
             self.TPL_solver.set_solution_callback(callback)
 
