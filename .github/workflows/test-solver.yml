@@ -31,7 +31,7 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install ".[test, ${{ inputs.solver }}]"
-          pip install pytest-xdist
+          pip install pytest-xdist pytest-cov
 
       - name: Install solver dependencies
         if: ${{ inputs.install_commands != '' }}
@@ -44,4 +44,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pytest -n auto tests/ --solver "${{ inputs.solver }}" -ref
+          python -m pytest -n auto tests/ --solver "${{ inputs.solver }}" -ref \
+            --cov=cpmpy --cov-report=html:coverage-html --cov-report=xml:coverage.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ inputs.solver }}
+          path: coverage-html/
