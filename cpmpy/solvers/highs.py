@@ -209,7 +209,7 @@ class CPM_highs(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -217,48 +217,48 @@ class CPM_highs(SolverInterface):
             and then posted to the solver in this function.
         """
         # track user vars and ensure newly seen ones have solver columns
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
-        for cpm_expr in self.transform(cpm_expr_orig):
-            if isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
+        for con in self.transform(cpm_expr):
+            if isinstance(con, Comparison):
+                lhs, rhs = con.args
                 assert is_num(rhs), f"RHS of comparison should be numeric after transformations, got {rhs}"
 
                 indices, values, const = self._row_from_linexpr(lhs)
                 # effective rhs: lhs_vars + const <op> rhs  =>  lhs_vars <op> rhs - const
-                bound = float(rhs) - const
+                bound = rhs - const
 
-                if cpm_expr.name == "<=":
+                if con.name == "<=":
                     lower = -self._inf
                     upper = bound
-                elif cpm_expr.name == ">=":
+                elif con.name == ">=":
                     lower = bound
                     upper = self._inf
-                elif cpm_expr.name == "==":
+                elif con.name == "==":
                     lower = bound
                     upper = bound
                 else:
                     raise NotSupportedError(
-                        f"HiGHS: unexpected comparison operator after linearization: {cpm_expr.name}"
+                        f"HiGHS: unexpected comparison operator after linearization: {con.name}"
                     )
 
                 indices_arr = np.array(indices, dtype=np.int32)
                 values_arr = np.array(values, dtype=np.double)
                 self.highs.addRow(lower, upper, len(indices), indices_arr, values_arr)
 
-            elif isinstance(cpm_expr, BoolVal):
-                if cpm_expr.args[0] is False:
+            elif isinstance(con, BoolVal):
+                if con.args[0] is False:
                     # add an always-infeasible row: 1 <= 0
                     indices_arr = np.array([], dtype=np.int32)
                     values_arr = np.array([], dtype=np.double)
-                    self.highs.addRow(1.0, 0.0, 0, indices_arr, values_arr)
+                    self.highs.addRow(1, 0, 0, indices_arr, values_arr)
 
-            elif isinstance(cpm_expr, DirectConstraint):
+            elif isinstance(con, DirectConstraint):
                 # delegate to user-provided function with native model
-                cpm_expr.callSolver(self, self.highs)
+                con.callSolver(self, self.highs)
 
             else:
-                raise NotImplementedError(f"HiGHS: unsupported transformed constraint {cpm_expr}")
+                raise NotImplementedError(f"HiGHS: unsupported transformed constraint {con}")
 
         return self
 
