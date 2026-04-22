@@ -133,6 +133,7 @@
         DirectConstraint
 
 """
+import copy
 import warnings
 from collections import defaultdict
 from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
@@ -863,15 +864,12 @@ class MDD(GlobalConstraint):
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
 
-        def is_transition(arg):
-            """ test if the argument is a transition, i.e. a 3-elements-tuple specifying a starting state,
-            a transition value and an ending node"""
-            return len(arg) == 3 and \
-                isinstance(arg[0], (int, str)) and is_int(arg[1]) and isinstance(arg[2], (int, str))
+        _node_type = type(transitions[0][0])
+        for s, v, e in transitions:
+            if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
+                raise TypeError(
+                    f"The second argument of an MDD constraint should be a collection of transitions ({_node_type}, int, {_node_type})")
 
-
-        if not all(is_transition(transition) for transition in transitions):
-            raise TypeError("The second argument of an MDD constraint should be collection of transitions")
         super().__init__("mdd", (array, transitions))
         self.root_node = transitions[0][0]
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
@@ -888,6 +886,25 @@ class MDD(GlobalConstraint):
                     self.levels[self.mapping[n][v]] = i + 1
             current_nodes = new_nodes
 
+    def _extend_mdd(self):
+        """
+            Auxiliary function that extends the MDD with edges for all possible values, directing the new edges to the sink node.
+        """
+        invalid_edges = []
+
+        extended_mapping = copy.deepcopy(self.mapping)
+        sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
+        for s in self.mapping.keys():
+            level = self.levels[s]
+            domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
+            for v in domain:
+                if v not in self.mapping[s]:
+                    extended_mapping[s][v] = sink_node
+                    invalid_edges.append((s, v))
+        return extended_mapping, invalid_edges
+
+
+
     def _reduce(self):
         """
             Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes (to be implemented)
@@ -897,7 +914,7 @@ class MDD(GlobalConstraint):
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Flow decomposition of the MDD global constraint.
-        Enforces that the condition is satisfied.
+        Enforces that the condition is satisfied, by ensuring that the flow in equals the flow out for every node.
 
         Returns:
             tuple[list[Expression], list[Expression]]:
@@ -905,69 +922,47 @@ class MDD(GlobalConstraint):
         """
         arr, _ = self.args
 
-        flow_in: dict[int | str, list[tuple[tuple[int, int], Expression]]] = defaultdict(list)
-        flow_out: dict[int | str, list[tuple[tuple[int, int], Expression]]] = defaultdict(list)
+        extended_mapping, invalid_edges = self._extend_mdd()
+
+        # Represents the ingoing and outgoing flow for a certain node: for every node, the edge variables are listed
+        flow_in: dict[int | str, list[Expression]] = defaultdict(list)
+        flow_out: dict[int | str, list[Expression]] = defaultdict(list)
+
         edge_vars = defaultdict(list)
+        invalid_edge_vars = []
 
-        for src, edges in self.mapping.items():
+        for src, edges in extended_mapping.items():
             for value, dst in edges.items():
-                tr = (self.levels[src], value)
+                level = self.levels[src]
                 edge_var = cp.boolvar()
+                flow_out[src].append(edge_var)
+                flow_in[dst].append(edge_var)
+                edge_vars[(level, value)].append(edge_var)
 
-                flow_out[src].append((tr, edge_var))
-                flow_in[dst].append((tr, edge_var))
-                edge_vars[tr].append(edge_var)
+                if (src, value) in invalid_edges:
+                    invalid_edge_vars.append(edge_var)
 
         cons = []
-        b = cp.boolvar()
-        invalid_edge_vars = []
 
         # Go over the nodes in the MDD, and enforce flow constraints
         for node in self.levels.keys():
             incoming = flow_in[node]
             outgoing = flow_out[node]
-            missing = []
 
-            if outgoing:
-                valid_transitions = [tr for tr, _ in outgoing]
-                lvl = valid_transitions[0][0]
-
-                # Find all transition values for which there is no valid path, in order to direct them to a dummy node
-                for val in range(arr[lvl].lb, arr[lvl].ub + 1):
-                    tr = (lvl, val)
-
-                    if tr not in valid_transitions:
-                        var = cp.boolvar()
-                        edge_vars[tr].append(var)
-                        invalid_edge_vars.append(var)
-                        missing.append(var)
 
             if incoming and outgoing:
-                cons += [
-                    cp.sum([e for _, e in incoming]) ==
-                    cp.sum([e for _, e in outgoing]) + cp.sum(missing)
-                ]
-
+                cons.append(cp.sum(incoming) == cp.sum(outgoing))
             elif outgoing:
-                cons += [
-                    cp.sum([e for _, e in outgoing]) + cp.sum(missing) == 1
-                ]
-
+                cons.append(cp.sum(outgoing) == 1)
             else:
-                cons += [
-                    cp.sum([e for _, e in incoming]) == b
-                ]
+                cons.append(cp.sum(incoming) == 1)
 
         # Link direct encoding variables with edge variables
         for (level, value), vars_ in edge_vars.items():
-            cons += [
-                cp.sum(set(vars_)) == (arr[level] == value)
-            ]
+            cons.append(cp.sum(vars_) == (arr[level] == value))
 
-        # Ensure that if an invalid edge is taken, the constraint is not satisfied
-        cons += [cp.sum(invalid_edge_vars) == ~b]
+        return [cp.sum(invalid_edge_vars) == 0], cons
 
-        return [b], cons
 
     def value(self) -> Optional[bool]:
         """
@@ -980,6 +975,8 @@ class MDD(GlobalConstraint):
         for v in arrvals:
             if v is None:
                 return None
+
+        for v in arrvals:
             if curr_node in self.mapping:
                 if v in self.mapping[curr_node]:
                     curr_node = self.mapping[curr_node][v]
