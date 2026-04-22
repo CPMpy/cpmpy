@@ -312,14 +312,7 @@ class CPM_gcs(SolverInterface):
                     cpm_var._value = bool(solution_map[sol_var])
                 else:
                     cpm_var._value = solution_map[sol_var]
-
-            if isinstance(display, Expression):
-                print(display.value())
-            elif is_any_list(display):
-                print(argvals(display))
-            else:
-                assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                display()  # callback
+            self.print_display(display)
             return
 
         sol_callback = None
@@ -581,10 +574,10 @@ class CPM_gcs(SolverInterface):
                             # lt == x < y
                             # gt == x > y
                             lt_bool, gt_bool = boolvar(shape=2)
-                            self += (lhs < rhs) == lt_bool
-                            self += (lhs > rhs) == gt_bool
+                            self.add((lhs < rhs) == lt_bool)
+                            self.add((lhs > rhs) == gt_bool)
                             if fully_reify:
-                                self += (~bool_lhs).implies(lhs == rhs)
+                                self.add((~bool_lhs).implies(lhs == rhs))
                             self.gcs.post_or_reif(self.solver_vars([lt_bool, gt_bool]), reif_var, False)
                         else:
                             raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}' {}".format)
@@ -695,7 +688,7 @@ class CPM_gcs(SolverInterface):
             elif isinstance(cpm_expr, GlobalConstraint):
                 # GCS also has SmartTable, Regular Language Membership, Knapsack constraints
                 # which could be added in future. 
-                self += cpm_expr.decompose()  # assumes a decomposition exists...
+                self.add(cpm_expr.decompose())  # assumes a decomposition exists...
             else:
                 # Hopefully we don't end up here.
                 raise NotImplementedError(cpm_expr)

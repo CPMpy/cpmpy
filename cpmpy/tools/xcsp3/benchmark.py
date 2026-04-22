@@ -229,7 +229,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
                 obj = int(line[2:].strip())
                 if result['intermediate'] is None:
                     result['intermediate'] = []
-                result['intermediate'] += [(sol_time, obj)]
+                result['intermediate'].append((sol_time, obj))
                 result['objective_value'] = obj
                 obj = None
             elif line.startswith('c Solution'):

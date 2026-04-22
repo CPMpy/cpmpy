@@ -242,7 +242,7 @@ class CPM_rc2(CPM_pysat):
 
         terms, cons, k = _encode_lin_expr(self.ivarmap, xs, weights, self.encoding)
 
-        self += cons
+        self.add(cons)
         const += k
 
         # remove terms with coefficient 0 (`only_positive_coefficients_` may return them and RC2 does not accept them)
