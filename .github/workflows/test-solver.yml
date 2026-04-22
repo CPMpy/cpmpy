@@ -45,11 +45,12 @@ jobs:
         run: |
           set -euo pipefail
           python -m pytest -n auto tests/ --solver "${{ inputs.solver }}" -ref \
-            --cov=cpmpy --cov-report=html:coverage-html --cov-report=xml:coverage.xml
+            --cov=cpmpy --cov-report=
 
-      - name: Upload coverage report
+      - name: Upload coverage data
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ inputs.solver }}
-          path: coverage-html/
+          name: coverage-data-${{ inputs.solver }}
+          path: .coverage
+          include-hidden-files: true

@@ -23,3 +23,43 @@ jobs:
     with:
       solver: ${{ matrix.solver }}
       install_commands: ${{ matrix.install_commands || '' }}
+
+  coverage:
+    name: Merge coverage
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install coverage
+        run: pip install coverage
+
+      - name: Download all coverage data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-data-*
+
+      - name: Merge coverage reports
+        run: |
+          set -euo pipefail
+          # Each artifact is in its own directory; rename to unique filenames
+          i=0
+          for dir in coverage-data-*/; do
+            mv "${dir}.coverage" ".coverage.${i}"
+            i=$((i + 1))
+          done
+          coverage combine
+          coverage html -d coverage-html
+          coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload merged coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-html/
