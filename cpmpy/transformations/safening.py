@@ -307,7 +307,7 @@ def _safen_hole(cpm_expr: Expression, exclude: int, idx_to_safen: int) -> tuple[
     return is_defined, output_var, toplevel
 
 
-def safen_objective(expr: Expression) -> tuple[ExprLike, list[Expression]]:
+def safen_objective(expr: Expression) -> tuple[Expression, list[Expression]]:
     """
     Safen any partial functions in the objective function expression.
 
@@ -324,7 +324,7 @@ def safen_objective(expr: Expression) -> tuple[ExprLike, list[Expression]]:
 
     changed, safe_expr, toplevel, nbc = _no_partial_functions((expr,), is_toplevel=False, safen_toplevel=frozenset())
     if changed:
-        assert len(safe_expr) == 1, f"Safening should not alter the number of expressions"
+        assert len(safe_expr) == 1, "Safening should not alter the number of expressions"
         return safe_expr[0], toplevel + nbc
     else:
         return expr, []
