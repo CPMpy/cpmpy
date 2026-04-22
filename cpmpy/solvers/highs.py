@@ -151,30 +151,40 @@ class CPM_highs(SolverInterface):
 
         The constant captures any numeric terms that are not column
         variables and must be subtracted from the row bounds by the caller.
+
+        Returns:
+            tuple[list[int], list[float], float]: (col indices, col weights, constant)
         """
         if is_num(lhs):
-            return [], [], float(lhs)
+            return [], [], lhs
 
-        if isinstance(lhs, _NumVarImpl):
+        elif isinstance(lhs, _NumVarImpl):
             col = self.solver_var(lhs)
-            return [col], [1.0], 0.0
+            return [col], [1], 0
 
-        if isinstance(lhs, Operator) and lhs.name in ("sum", "wsum"):
-            if lhs.name == "sum":
-                pairs = [(1.0, v) for v in lhs.args]
-            else:
-                weights, vars_ = lhs.args
-                pairs = list(zip(weights, vars_))
+        elif isinstance(lhs, Operator):  # sum or wsum
 
+            # accumulate weights per column (variable) index
             acc = {}
-            const = 0.0
-            for w, v in pairs:
-                if is_num(v):
-                    const += float(w) * float(v)
-                else:
-                    col = self.solver_var(v)
-                    acc[col] = acc.get(col, 0.0) + float(w)
-            idxs = [i for i in sorted(acc.keys()) if acc[i] != 0.0]
+            const = 0
+            if lhs.name == "sum":
+                for v in lhs.args:
+                    if is_num(v):
+                        const += v
+                    else:
+                        col_idx = self.solver_var(v)
+                        acc[col_idx] = acc.get(col_idx, 0) + 1
+            elif lhs.name == "wsum":
+                for w, v in zip(*lhs.args):
+                    if is_num(v):
+                        const += w * v
+                    else:
+                        col_idx = self.solver_var(v)
+                        acc[col_idx] = acc.get(col_idx, 0) + w
+            else:
+                raise NotImplementedError(f"HiGHS: unsupported operator {lhs}")
+
+            idxs = [i for i in sorted(acc.keys()) if acc[i] != 0]
             return idxs, [acc[i] for i in idxs], const
 
         raise NotImplementedError(f"HiGHS: unsupported linear expression {lhs}")
