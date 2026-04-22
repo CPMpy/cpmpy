@@ -40,7 +40,7 @@ from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ExprLike, Expression
+    from cpmpy.expressions.core import ExprLike, ListLike, Expression
     from cpmpy.expressions.variables import NDVarArray
 
 
