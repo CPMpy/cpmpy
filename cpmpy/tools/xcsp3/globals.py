@@ -962,12 +962,9 @@ class DynamicCumulative(GlobalConstraint):
             for t in range(num_tasks):
                 cons.append(ends[t] == end[t])
 
-            for j, (start_j, demand_j) in enumerate(zip(start, demand)):
-                others = []
-                for i, (start_i, end_i) in enumerate(zip(start, ends)):
-                    if i != j:
-                        others.append((start_i <= start_j) & (start_j < end_i))
-                cons.append(capacity >= demand_j + cp.sum(others))
+            for j in range(num_tasks):
+                sj = start[j]
+                cons.append(capacity >= demand[j] + cp.sum([(start[i] <= sj) & (sj < ends[i]) for i in range(num_tasks) if i != j]))
 
         return cons, []
 
