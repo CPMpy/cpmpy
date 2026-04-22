@@ -44,13 +44,13 @@
     ==============
 """
 import sys
-from typing import Optional, List
+from typing import Optional, List, Any
 import warnings  # for stdout checking
 import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, ExprLike
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
@@ -309,30 +309,29 @@ class CPM_ortools(SolverInterface):
         return cb.solution_count()
 
 
-    def solver_var(self, cpm_var):
+    def solver_var(self, cpm_var: ExprLike) -> Any:
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
-            return cpm_var
+        solver_var = self._varmap.get(cpm_var, None)
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return self.solver_var(cpm_var._bv).Not()
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
+        if solver_var is None:
             if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.ort_model.NewBoolVar(str(cpm_var))
+                if isinstance(cpm_var, NegBoolView):
+                    # special case: work direclty on var inside the view
+                    return self.solver_var(cpm_var._bv).Not()
+                solver_var = self.ort_model.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                solver_var = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+            elif is_num(cpm_var):
+                # allowed to ease posting of constraints with mixed arguments
+                return cpm_var
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var] = solver_var
 
-        return self._varmap[cpm_var]
+        return solver_var
 
 
     def objective(self, expr, minimize):
