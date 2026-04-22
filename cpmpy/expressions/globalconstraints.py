@@ -139,7 +139,7 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import TypeError
-from .core import Expression, BoolVal, ExprLike, ListLike
+from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, _IntVarImpl, NDVarArray
 from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 
@@ -833,12 +833,12 @@ class IfThenElse(GlobalConstraint):
     Enforces a conditional expression of the form: if condition then if_true else if_false.
     `condition`, `if_true` and `if_false` are be boolean expressions.
     """
-    def __init__(self, condition: ExprLike, if_true: ExprLike, if_false: ExprLike):
+    def __init__(self, condition: BoolExprLike, if_true: BoolExprLike, if_false: BoolExprLike):
         """
         Arguments:
-            condition (ExprLike): Boolean expression or constant
-            if_true (ExprLike): Boolean expression or constant
-            if_false (ExprLike): Boolean expression or constant
+            condition (BoolExprLike): Boolean expression or constant
+            if_true (BoolExprLike): Boolean expression or constant
+            if_false (BoolExprLike): Boolean expression or constant
         """
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
@@ -949,10 +949,10 @@ class Xor(GlobalConstraint):
     Equivalent to `sum(args) % 2 == 1`
     """
 
-    def __init__(self, arg_list: ListLike[ExprLike]):
+    def __init__(self, arg_list: ListLike[BoolExprLike]):
         """
         Arguments:
-            arg_list (ListLike[ExprLike]): List of expressions or constants, to be xor'ed
+            arg_list (ListLike[BoolExprLike]): List of expressions or constants, to be xor'ed
         """
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))

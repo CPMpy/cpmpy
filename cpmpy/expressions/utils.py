@@ -40,7 +40,7 @@ from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ExprLike, Expression
+    from cpmpy.expressions.core import BoolExprLike, Expression
     from cpmpy.expressions.variables import NDVarArray
 
 
@@ -211,18 +211,38 @@ def get_bounds(expr):
 
 # first two are declarations for typing purposes only
 @overload
-def implies(expr: NDVarArray, other: ExprLike, simplify: bool = False) -> NDVarArray: ...
+def implies(expr: NDVarArray, other: BoolExprLike, simplify: bool = False) -> NDVarArray: ...
 @overload
-def implies(expr: Expression|bool|np.bool_, other: ExprLike, simplify: bool = False) -> Expression: ...
+def implies(expr: Expression|bool|np.bool_, other: BoolExprLike, simplify: bool = False) -> Expression: ...
 
-def implies(expr: NDVarArray|Expression|bool|np.bool_, other: ExprLike, simplify: bool = False) -> NDVarArray|ExprLike:
-    """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
+def implies(expr: NDVarArray|BoolExprLike, other: BoolExprLike, simplify: bool = False) -> NDVarArray|Expression:
+    """Implication constraint: ``self -> other``.
+
+    Like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe when 'expr' is not an Expression
+
+    Args:
+        expr (NDVarArray|BoolExprLike): the left-hand-side of the implication
+        other (BoolExprLike): the right-hand-side of the implication
+        simplify (bool): if True, simplify by eliminating True/False constants (might remove expressions & their variables from user-view)
+
+    Returns:
+        Expression: the implication constraint or a BoolVal if simplified
+
+    Simplification rules:
+        - Expr -> True :: BoolVal(True)  (by expr.implies())
+        - Expr -> False :: ~Expr         (by expr.implies())
+        - True -> other :: other
+        - False -> other :: BoolVal(True)
+    """
     if isinstance(expr, (cp.expressions.core.Expression, cp.expressions.variables.NDVarArray)):
         # both implement .implies()
         return expr.implies(other, simplify=simplify)
-    elif is_true_cst(expr):
-        return other
-    elif is_false_cst(expr):
+    elif is_true_cst(expr):  # True -> other :: other
+        if isinstance(other, cp.expressions.core.Expression):
+            return other
+        else:
+            return cp.BoolVal(other)
+    elif is_false_cst(expr):  # False -> other :: BoolVal(True)
         return cp.BoolVal(True)
     else:
         raise ValueError(f"implies: expr must be an Expression or a boolean, got {type(expr)}")
