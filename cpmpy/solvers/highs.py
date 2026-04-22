@@ -29,7 +29,8 @@ import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import *
+from ..expressions.core import BoolVal, Comparison, Operator
+from ..expressions.utils import is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -53,6 +54,8 @@ class CPM_highs(SolverInterface):
     Creates the following attributes (see parent constructor for more):
 
     - highs: object, HiGHS `Highs` instance
+    - _inf: numeric, HiGHS' infinity constant (`highspy.kHighsInf`)
+    - _has_obj: bool, tracks whether an objective was posted
     """
 
     # HiGHS does not have native global constraints in the CPMpy sense
@@ -61,12 +64,14 @@ class CPM_highs(SolverInterface):
 
     @staticmethod
     def supported():
+        # try to import the package
         try:
             import highspy  # noqa: F401
-
             return True
-        except Exception:
+        except ModuleNotFoundError:
             return False
+        except Exception as e:
+            raise e
 
     @classmethod
     def version(cls) -> Optional[str]:
@@ -94,16 +99,11 @@ class CPM_highs(SolverInterface):
 
         import highspy
 
-        self._inf = highspy.kHighsInf
         self.highs = highspy.Highs()
-        # by default, keep HiGHS quiet
-        try:
-            self.highs.setOptionValue("log_to_console", False)
-        except Exception:
-            pass
+        self.highs.setOptionValue("log_to_console", False)
 
-        # track whether an objective was posted
-        self._has_obj = False
+        self._inf = highspy.kHighsInf
+        self._has_obj = False  # track whether an objective was posted
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
