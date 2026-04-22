@@ -238,7 +238,9 @@ class CPM_scip(SolverInterface):
 
     def has_objective(self):
         obj = self.scip_model.getObjective()
-        return obj is not None and getattr(obj, 'terms', False)  # obj could be `Expr({})`
+        import pyscipopt as scip
+        assert isinstance(obj, scip.Expr)
+        return len(obj.terms) > 0  # a scip Expression with 0 terms means no objective was set
 
     def _make_numexpr(self, cpm_expr):
         """
