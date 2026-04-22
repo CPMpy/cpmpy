@@ -773,7 +773,7 @@ class NDVarArray(np.ndarray):
     def __rxor__(self, other):
         return self._vectorized(other, '__rxor__')
 
-    def implies(self, other, simplify=False):
+    def implies(self, other: ExprLike|Iterable[ExprLike], simplify=False) -> NDVarArray:
         if not isinstance(other, Iterable):
             other = [other] * len(self)
         return cpm_array([s.implies(o, simplify=simplify) for s, o in zip(self, other)])
