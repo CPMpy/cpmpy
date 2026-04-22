@@ -312,7 +312,8 @@ class CPM_highs(SolverInterface):
 
             Arguments:
             - time_limit: maximum solve time in seconds (float, optional)
-            - kwargs:     any keyword argument, mapped to HiGHS options via setOptionValue
+            - kwargs:     any keyword argument, mapped to HiGHS options via setOptionValue.
+                          Unknown/invalid options are ignored with a warning.
         """
         import highspy
 
@@ -327,7 +328,7 @@ class CPM_highs(SolverInterface):
         if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
-            self.highs.setOptionValue("time_limit", float(time_limit))
+            self.highs.setOptionValue("time_limit", time_limit)
 
         # map additional kwargs to HiGHS options
         for key, val in kwargs.items():
@@ -344,7 +345,8 @@ class CPM_highs(SolverInterface):
         model_status = self.highs.getModelStatus()
 
         self.cpm_status = SolverStatus(self.name)
-        self.cpm_status.runtime = end - start
+        # prefer solver-reported runtime when available, else fallback to wall-clock
+        self.cpm_status.runtime = getattr(info, "run_time", end - start)
 
         # map HiGHS model status to CPMpy ExitStatus
         _has_feasible_sol = (info.primal_solution_status
