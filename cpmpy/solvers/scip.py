@@ -214,7 +214,7 @@ class CPM_scip(SolverInterface):
     def objective(self, expr, minimize=True):
         get_variables(expr, collect=self.user_vars)
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
-        self.solver_vars(self.user_vars)
+        self.solver_vars(list(self.user_vars))
 
         obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_linear_objective(
@@ -285,7 +285,7 @@ class CPM_scip(SolverInterface):
     def add(self, cpm_expr):
         get_variables(cpm_expr, collect=self.user_vars)
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
-        self.solver_vars(self.user_vars)
+        self.solver_vars(list(self.user_vars))
 
         for con in self.transform(cpm_expr):
             self._add_transformed_constraint(con)
