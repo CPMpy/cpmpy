@@ -104,7 +104,6 @@ from ..exceptions import TypeError
 # Common typing helpers
 T = TypeVar("T")
 ListLike: TypeAlias = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
-BoolExprLike: TypeAlias = Union["Expression", bool, np.bool_]  # expression or bool (incl np variant)
 ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
 
 
@@ -461,7 +460,7 @@ class Expression(object):
     def __abs__(self):
         return cp.Abs(self)
 
-    def __invert__(self) -> "Expression":
+    def __invert__(self):
         if not (self.is_bool()):
             raise TypeError("Not operator is only allowed on boolean expressions: {0}".format(self))
         return Operator("not", (self,))
