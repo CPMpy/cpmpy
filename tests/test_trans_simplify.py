@@ -25,7 +25,11 @@ class TestTransSimplify:
 
         expr = Operator("->", [self.bvs[0], True])
         assert str(self.transform(expr)) == "[boolval(True)]"
+        expr = Operator("->", [self.bvs[0], BoolVal(True)])
+        assert str(self.transform(expr)) == "[boolval(True)]"
         expr = Operator("->", [self.bvs[0], False])
+        assert str(self.transform(expr)) == "[~bv[0]]"
+        expr = Operator("->", [self.bvs[0], BoolVal(False)])
         assert str(self.transform(expr)) == "[~bv[0]]"
         expr = Operator("->", [True, self.bvs[0]])
         assert str(self.transform(expr)) == "[bv[0]]"
