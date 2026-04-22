@@ -19,14 +19,14 @@
         ExitStatus
 
 """
-from typing import Optional, List, Callable, TypeAlias
+from typing import Optional, List, Callable, TypeAlias, Iterable, Any
 import warnings
 import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, ListLike
-from ..expressions.variables import _NumVarImpl
+from ..expressions.core import Expression, ListLike, ExprLike
+from ..expressions.variables import _NumVarImpl, NDVarArray
 from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_any_list, argvals
@@ -185,6 +185,24 @@ class SolverInterface(object):
         if is_any_list(cpm_vars):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
+
+    def solver_vars_1d(self, cpm_vars: Iterable[ExprLike]) -> list[Any]:
+        """
+           Faster `solver_vars()` for 1 dimensional iterables of ExprLikes
+        """
+        res: list[Any] = []
+        for cpm_var in cpm_vars:
+            solver_var = self._varmap.get(cpm_var, None)
+            if solver_var is not None:
+                # fast path
+                res.append(solver_var)
+            elif isinstance(cpm_var, int):
+                # reasonably fast path
+                res.append(cpm_var)
+            else:
+                # slow path, will check the varmap again
+                res.append(self.solver_var(cpm_var))
+        return res
 
     def transform(self, cpm_expr):
         """
