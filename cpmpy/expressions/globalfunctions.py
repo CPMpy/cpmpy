@@ -156,13 +156,14 @@ class Minimum(GlobalFunction):
     """
     Computes the minimum value of the arguments
     """
+    name = "min"
 
     def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
         """
-        super().__init__("min", tuple(flatlist(arg_list)))
+        super().__init__(self.name, tuple(flatlist(arg_list)))
 
     def value(self) -> Optional[int]:
         """
@@ -204,13 +205,14 @@ class Maximum(GlobalFunction):
     """
     Computes the maximum value of the arguments
     """
+    name = "max"
 
     def __init__(self, arg_list: ListLike[ExprLike]):
         """
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
         """
-        super().__init__("max", tuple(flatlist(arg_list)))
+        super().__init__(self.name, tuple(flatlist(arg_list)))
 
     def value(self) -> Optional[int]:
         """
@@ -252,13 +254,14 @@ class Abs(GlobalFunction):
     """
     Computes the absolute value of the argument
     """
+    name = "abs"
 
     def __init__(self, expr: Expression):
         """
         Arguments:
             expr (Expression): Expression of which to compute the absolute value
         """
-        super().__init__("abs", (expr,))
+        super().__init__(self.name, (expr,))
 
     def value(self) -> Optional[int]:
         """
@@ -314,6 +317,7 @@ class Multiplication(GlobalFunction):
     Created when the user writes ``*`` with at least one variable (e.g. ``x * y``, ``2 * x``).
     Supports decomposition into linear constraints for MIP solvers via :meth:`decompose`.
     """
+    name = "mul"
 
     def __init__(self, x: ExprLike, y: ExprLike):
         """
@@ -332,7 +336,7 @@ class Multiplication(GlobalFunction):
             (x, y) = (y, x)
             is_lhs_num = True
 
-        super().__init__("mul", (x, y))
+        super().__init__(self.name, (x, y))
         self.is_lhs_num = is_lhs_num
 
     def update_args(self, args):
@@ -443,6 +447,7 @@ class Division(GlobalFunction):
         * integer division (ours): `-7 div 3` = `int(-7/3)` = -2 (truncation)
         * floor division (Python): `-7 // 3` = `math.floor(-7/3)` = -3
     """
+    name = "div"
 
     def __init__(self, x: ExprLike, y: ExprLike):
         """
@@ -450,7 +455,7 @@ class Division(GlobalFunction):
             x (ExprLike): Expression or constant to divide
             y (ExprLike): Expression or constant to divide by
         """
-        super().__init__("div", (x, y))
+        super().__init__(self.name, (x, y))
 
     def __repr__(self):
         """
@@ -538,6 +543,7 @@ class Modulo(GlobalFunction):
         * modulo (ours): `7 mod -5` = 2 because `7 div -5` = -1 and `7 - (-5*-1)` = 2. Note how the sign of x is preserved.
         * modulo (Python): `7 % -5` = -3 because `7 // -5` = -2 and `7 - (-5*-2)` = -3. Note how the sign of y is preserved.
     """
+    name = "mod"
 
     def __init__(self, x: ExprLike, y: ExprLike):
         """
@@ -545,7 +551,7 @@ class Modulo(GlobalFunction):
             x (ExprLike): Expression or constant for the dividend
             y (ExprLike): Expression or constant for the divisor
         """
-        super().__init__("mod", (x, y))
+        super().__init__(self.name, (x, y))
 
     def __repr__(self):
         """
@@ -624,6 +630,7 @@ class Power(GlobalFunction):
 
     Only non-negative constant integer exponents are supported.
     """
+    name = "pow"
 
     def __init__(self, base: ExprLike, exponent: int|np.integer):
         """
@@ -635,7 +642,7 @@ class Power(GlobalFunction):
             raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
         if exponent < 0:
             raise ValueError(f"Power constraint only supports non-negative integer exponents, not: {exponent}")
-        super().__init__("pow", (base, exponent))
+        super().__init__(self.name, (base, exponent))
 
     def decompose(self):
         """
@@ -695,6 +702,7 @@ class Element(GlobalFunction):
     Note: because Element is a numeric global function, the return type of the `Element` function
     is always numeric, even if `Arr` only contains Boolean variables.
     """
+    name = "element"
 
     def __init__(self, arr: ListLike[ExprLike], idx: ExprLike):
         """
@@ -708,7 +716,7 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
         assert len(arr) > 0, "Element: array should not be empty"
 
-        super().__init__("element", (arr, idx))
+        super().__init__(self.name, (arr, idx))
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array, e.g. instead of Arr[Idx1][Idx2], do Arr[Idx1, Idx2].")
@@ -813,6 +821,7 @@ class Count(GlobalFunction):
     """
     The Count global function represents the number of occurrences of a value in an array
     """
+    name = "count"
 
     def __init__(self, arr: ListLike[ExprLike], val: ExprLike):
         """
@@ -824,7 +833,7 @@ class Count(GlobalFunction):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
-        super().__init__("count", (arr, val))
+        super().__init__(self.name, (arr, val))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -874,6 +883,7 @@ class Among(GlobalFunction):
     it counts occurrences of any value in a set. For example, `Among([x1, x2, x3, x4], [1, 2])`
     returns the number of variables among x1, x2, x3, x4 that take the value 1 or 2.
     """
+    name = "among"
 
     def __init__(self, arr: ListLike[ExprLike], vals: ListLike[int|np.integer]):
         """
@@ -885,7 +895,7 @@ class Among(GlobalFunction):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
-        super().__init__("among", (arr, vals))
+        super().__init__(self.name, (arr, vals))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -930,6 +940,7 @@ class NValue(GlobalFunction):
     For example, if variables [x1, x2, x3, x4] take values [1, 2, 1, 3] respectively,
     then `NValue([x1, x2, x3, x4])` returns 3 (the distinct values are 1, 2, and 3).
     """
+    name = "nvalue"
 
     def __init__(self, arr: ListLike[ExprLike]):
         """
@@ -938,7 +949,7 @@ class NValue(GlobalFunction):
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
-        super().__init__("nvalue", tuple(arr))
+        super().__init__(self.name, tuple(arr))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -992,6 +1003,7 @@ class NValueExcept(GlobalFunction):
     then `NValueExcept([x1, x2, x3, x4], 0)` returns 2 (the distinct values are 1 and 2,
     excluding 0).
     """
+    name = "nvalue_except"
 
     def __init__(self, arr: ListLike[ExprLike], n: int|np.integer):
         """
@@ -1003,7 +1015,7 @@ class NValueExcept(GlobalFunction):
             raise ValueError("NValueExcept takes an array as input")
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
-        super().__init__("nvalue_except", (arr, n))
+        super().__init__(self.name, (arr, n))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
