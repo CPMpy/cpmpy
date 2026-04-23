@@ -856,21 +856,6 @@ class MultiDElement(GlobalFunction):
                 )
         return argval(arr[tuple(vidxs)])
 
-    def _flat_index(self, shape: tuple[int, ...], indices: ListLike[ExprLike]) -> ExprLike:
-        """Linear index into ``arr.reshape(-1)`` (NumPy C-order).
-
-        Arguments:
-            shape (tuple[int, ...]): ``arr.shape``.
-            indices (tuple): One index expression per axis, same order as ``shape``.
-
-        Returns:
-            Expression or int: flat index for 1-D ``Element``.
-        """
-        flat_index = indices[-1]
-        for dim, idx in enumerate(indices[:-1]):
-            flat_index += idx * math.prod(shape[dim + 1 :])  # stride on dim: flat offset per +1 (product of later axis sizes)
-        return flat_index
-
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of MultiDElement global function.
@@ -885,7 +870,12 @@ class MultiDElement(GlobalFunction):
             tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
         """
         arr, *indices = self.args
-        flat_index = self._flat_index(arr.shape, indices)
+
+        # flatten index
+        flat_index = indices[-1]
+        for dim, idx in enumerate(indices[:-1]):
+            flat_index += idx * math.prod(arr.shape[dim + 1 :])  # stride on dim: flat offset per +1 (product of later axis sizes)
+
         return Element(arr.reshape(-1), flat_index), []
 
     def get_bounds(self) -> tuple[int, int]:
