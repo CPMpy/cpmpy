@@ -1,4 +1,4 @@
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.transformations.flatten_model import flatten_constraint
 
 import numpy as np
@@ -41,9 +41,9 @@ References:
 
 def main(verbose=1):
     weights = [10, 10, 10, 1, 1, 40, 20, 20, 20, 1]
-    x = intvar(-9, 9, name="x")
-    y = intvar(-9, 9, name="y")
-    m = Model(
+    x = cp.intvar(-9, 9, name="x")
+    y = cp.intvar(-9, 9, name="y")
+    m = cp.Model(
         x < 0, 
         x < 1,
         x > 2,
@@ -53,7 +53,7 @@ def main(verbose=1):
         (y >= 0) | (x >= 0),
         (y < 0) | (x < 0),
         (y > 0) | (x < 0),
-        AllDifferent(x,y) # invalid for musx_assum
+        cp.AllDifferent(x,y) # invalid for musx_assum
     )
     assert (m.solve() is False)
 
@@ -77,8 +77,8 @@ def omus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', 
     for con in soft_constraints:
         # see if solver supports reification of 'con'
         try:
-            m = Model([boolvar().implies(con)])
-            SolverLookup.lookup(solver)(m).solve()
+            m = cp.Model([cp.boolvar().implies(con)])
+            cp.SolverLookup.lookup(solver)(m).solve()
         except:
             # it did not
             use_assumption_literals = False
@@ -95,20 +95,20 @@ def omus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortoo
     soft = [flatten_constraint(c) for c in soft_constraints]
 
     ## Mip model
-    if Model(hard+soft).solve():
+    if cp.Model(hard+soft).solve():
         if verbose:
             print("Unexpectedly, the model is SAT")
         return []
 
-    hs_vars = boolvar(shape=len(soft_constraints), name="hs_vars")
+    hs_vars = cp.boolvar(shape=len(soft_constraints), name="hs_vars")
 
-    hs_mip_model = Model(
+    hs_mip_model = cp.Model(
         # Objective: min sum(x_l * w_l)
-        minimize=sum(var * soft_weights[id] for id, var in enumerate(hs_vars))
+        minimize=cp.sum(var * soft_weights[id] for id, var in enumerate(hs_vars))
     )
 
     # instantiate hitting set solver
-    hittingset_solver = SolverLookup.lookup(solver)(hs_mip_model)
+    hittingset_solver = cp.SolverLookup.lookup(solver)(hs_mip_model)
 
     while(True):
         hittingset_solver.solve()
@@ -117,7 +117,7 @@ def omus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortoo
         hs_ids = [i for i, hs_var in enumerate(hs_vars) if hs_var.value() == 1]
         hs_soft = [soft[i] for i in hs_ids]
 
-        if not Model(hard+hs_soft).solve():
+        if not cp.Model(hard+hs_soft).solve():
             if verbose > 1:
                 cost = sum([soft_weights[i] for i in hs_ids])
                 print("\t hitting set with cost", cost, "is UNSAT:", [soft_constraints[i] for i in hs_ids])
@@ -132,21 +132,21 @@ def omus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortoo
         C = hs_vars[hs_vars.value() != 1]
 
         # Add complement as a new set to hit: sum x[j] * hij >= 1
-        hittingset_solver += (sum(C) >= 1)
+        hittingset_solver += (cp.sum(C) >= 1)
 
 
 def omus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', verbose=1):
     # init with hard constraints
-    assum_model = Model(hard_constraints)
+    assum_model = cp.Model(hard_constraints)
 
     # make assumption indicators, add reified constraints
-    ind = boolvar(shape=len(soft_constraints), name="ind")
+    ind = cp.boolvar(shape=len(soft_constraints), name="ind")
     for i,bv in enumerate(ind):
         assum_model += [bv.implies(soft_constraints[i])]
     # to map indicator variable back to soft_constraints
     indmap = dict((v,i) for (i,v) in enumerate(ind))
 
-    assum_solver = SolverLookup.lookup(solver)(assum_model)
+    assum_solver = cp.SolverLookup.lookup(solver)(assum_model)
 
     if assum_solver.solve(assumptions=ind):
         if verbose:
@@ -154,13 +154,13 @@ def omus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='orto
         return []
 
     ## ----------------- MODEL ------------------
-    hs_mip_model = Model(
+    hs_mip_model = cp.Model(
         # Objective: min sum(x_l * w_l)
-        minimize=sum(var * soft_weights[id] for id, var in enumerate(ind))
+        minimize=cp.sum(var * soft_weights[id] for id, var in enumerate(ind))
     )
 
     # instantiate hitting set solver
-    hittingset_solver = SolverLookup.lookup(solver)(hs_mip_model)
+    hittingset_solver = cp.SolverLookup.lookup(solver)(hs_mip_model)
 
     while(True):
         hittingset_solver.solve()
@@ -183,7 +183,7 @@ def omus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='orto
         C = set(v for v in ind if not v.value())
 
         # Add complement as a new set to hit: sum x[j] * hij >= 1
-        hittingset_solver += (sum(C) >= 1)
+        hittingset_solver += (cp.sum(C) >= 1)
 
 
 if __name__ == '__main__':
