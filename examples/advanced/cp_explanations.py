@@ -78,7 +78,7 @@ def omus(soft_constraints, soft_weights, hard_constraints=[], solver='ortools', 
         # see if solver supports reification of 'con'
         try:
             m = cp.Model([cp.boolvar().implies(con)])
-            cp.SolverLookup.lookup(solver)(m).solve()
+            cp.SolverLookup.get(solver, m).solve()
         except:
             # it did not
             use_assumption_literals = False
@@ -108,7 +108,7 @@ def omus_pure(soft_constraints, soft_weights, hard_constraints=[], solver='ortoo
     )
 
     # instantiate hitting set solver
-    hittingset_solver = cp.SolverLookup.lookup(solver)(hs_mip_model)
+    hittingset_solver = cp.SolverLookup.get(solver, hs_mip_model)
 
     while(True):
         hittingset_solver.solve()
@@ -146,7 +146,7 @@ def omus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='orto
     # to map indicator variable back to soft_constraints
     indmap = dict((v,i) for (i,v) in enumerate(ind))
 
-    assum_solver = cp.SolverLookup.lookup(solver)(assum_model)
+    assum_solver = cp.SolverLookup.get(solver, assum_model)
 
     if assum_solver.solve(assumptions=ind):
         if verbose:
@@ -160,7 +160,7 @@ def omus_assum(soft_constraints, soft_weights, hard_constraints=[], solver='orto
     )
 
     # instantiate hitting set solver
-    hittingset_solver = cp.SolverLookup.lookup(solver)(hs_mip_model)
+    hittingset_solver = cp.SolverLookup.get(solver, hs_mip_model)
 
     while(True):
         hittingset_solver.solve()
