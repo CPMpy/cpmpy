@@ -100,7 +100,7 @@ class CPM_minizinc(SolverInterface):
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
                                               "precedence", "no_overlap",
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among"})
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "multid_element"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
 
     required_version = (2, 8, 2)
@@ -808,6 +808,26 @@ class CPM_minizinc(SolverInterface):
                                                                                              len(expr.args[0]) - 1,
                                                                                              args_str[0])
             txt += f"      arr[{idx}]"
+            return txt
+        elif expr.name == "multid_element":
+            arr = expr.args[0]
+            subtype = "int"
+            if all(isinstance(v, bool) or \
+                   (isinstance(v, Expression) and v.is_bool()) \
+                   for v in arr.flat):
+                subtype = "bool"
+            idx_ranges = ",".join(f"0..{dim - 1}" for dim in arr.shape)
+            idx_tuple = ",".join(args_str[1:])
+
+            # minizinc is offset 1, which can be problematic for element
+            txt = "\n    let {{ array[{}] of var {}: arr=array{}d({},{}) }} in\n".format(
+                ",".join("int" for _ in arr.shape),
+                subtype,
+                arr.ndim,
+                idx_ranges,
+                args_str[0],
+            )
+            txt += f"      arr[{idx_tuple}]"
             return txt
 
         # rest: global constraints
