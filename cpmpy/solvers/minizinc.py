@@ -60,6 +60,7 @@ import sys
 import os
 import json
 from datetime import timedelta  # for mzn's timeout
+from packaging.version import Version
 
 import numpy as np
 
@@ -307,7 +308,6 @@ class CPM_minizinc(SolverInterface):
 
         if time_limit is not None:
             # timeout is deprecated from version 0.10.0 onwards, but cpmpy also supports older versions
-            from packaging.version import Version
             mzn_vers = self.version()
             # should never be an issue here
             assert mzn_vers is not None
