@@ -179,7 +179,7 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
                     cpm_expr = output_expr  # replace partial function by this (total) new output expression
                     changed = True
 
-            elif cpm_expr.name == "multidim_element":
+            elif cpm_expr.name == "multid_element":
 
                 if is_toplevel and cpm_expr.name not in safen_toplevel: # no need to safen
                     new_lst.append(cpm_expr)
