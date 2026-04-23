@@ -83,7 +83,7 @@ class CPM_choco(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "allequal",
                                     "table", 'negative_table', "short_table", "regular", "InDomain",
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
@@ -577,11 +577,11 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
+            if cpm_expr.name in {"alldifferent", "alldifferent_except_0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
-                elif cpm_expr.name == 'alldifferent_except0':
+                elif cpm_expr.name == 'alldifferent_except_0':
                     return self.chc_model.all_different_except_0(chc_args)
                 elif cpm_expr.name == 'allequal':
                     return self.chc_model.all_equal(chc_args)

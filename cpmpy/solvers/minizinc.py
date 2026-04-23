@@ -94,7 +94,7 @@ class CPM_minizinc(SolverInterface):
     https://minizinc-python.readthedocs.io/
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except_0", "allequal",
                                               "inverse", "ite", "xor", "table", "InDomain", "negative_table", "cumulative", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
@@ -685,7 +685,7 @@ class CPM_minizinc(SolverInterface):
             str_rev = zero_based(expr.args[1])
             return "inverse({}, {})".format(str_fwd, str_rev)
 
-        if expr.name == "alldifferent_except0":
+        if expr.name == "alldifferent_except_0":
             args_str = [self._convert_expression(e) for e in expr.args]
             return "alldifferent_except_0([{}])".format(",".join(args_str))
 
