@@ -581,6 +581,42 @@ class Table(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear-friendly decomposition of the Table global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
+
+         Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+         """
+
+        arr, tab = self.args
+
+        transitions : list[tuple[int | str, int, int | str]] = []
+        prefix_to_node = {}
+        next_id = 0
+
+        for row in tab:
+            current = "src"
+            prefix : tuple[int, ...] = ()
+            for i, val in enumerate(row):
+                if i == len(row) - 1:
+                    nxt = "snk"
+                else:
+                    prefix = prefix + (val,)
+                    if prefix not in prefix_to_node:
+                        prefix_to_node[prefix] = f"n{next_id}"
+                        next_id += 1
+                    nxt = prefix_to_node[prefix]
+
+                transition = (current, int(val), nxt)
+                if transition not in transitions:
+                    transitions.append(transition)
+                current = nxt
+
+        return [MDD(arr, transitions)], []
+
+
+
     def value(self) -> Optional[bool]:
         """
         Returns:
