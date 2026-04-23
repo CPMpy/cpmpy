@@ -310,12 +310,15 @@ class AllDifferentExcept0(AllDifferentExceptN):
     """
     Enforces that all arguments, except those equal to 0, have a different (distinct) value.
     """
+    name = "alldifferent_except_0"
+
     def __init__(self, *args: ExprLike | ListLike[ExprLike]):
         """
         Arguments:
             args (ListLike[ExprLike]): List of expressions or constants to be different from each other, except those equal to 0
         """
         super().__init__(flatlist(args), 0)
+        self.name = AllDifferentExcept0.name # superclass __init__ will set name of `self` to "alldifferent_except_n"
 
 
 def allequal(args):
