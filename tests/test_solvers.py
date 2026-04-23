@@ -6,6 +6,8 @@ import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
+from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
@@ -1146,6 +1148,29 @@ class TestSupportedSolvers:
         solver_version = SolverLookup.lookup(solver).version()
         assert solver_version is not None
         assert isinstance(solver_version, str)
+
+    def test_supported_global_names_exist(self, solver):
+        """
+        Ensure that every string listed in a solver's supported globals is actually
+        a defined global constraint/function name in CPMpy's expression definitions.
+        Prevents issues with typos and when a forgotten comma concatentates two global constraint/function names.
+        """
+
+        solver_cls = SolverLookup.lookup(solver)
+        supported = getattr(solver_cls, "supported_global_constraints", frozenset())
+        supported_reif = getattr(solver_cls, "supported_reified_global_constraints", frozenset())
+
+        global_constraints = inspect.getmembers(cp.expressions.globalconstraints, inspect.isclass)
+        global_constraint_names = [cls.name for class_name, cls in global_constraints if issubclass(cls, GlobalConstraint) and class_name != "GlobalConstraint"]
+        global_functions = inspect.getmembers(cp.expressions.globalfunctions, inspect.isclass)
+        global_function_names = [cls.name for class_name, cls in global_functions if issubclass(cls, GlobalFunction) and class_name != "GlobalFunction"]
+        
+        names = set(global_constraint_names) | set(global_function_names)
+        
+        for name in supported:
+            assert name in names
+        for name in supported_reif:
+            assert name in names
 
     def test_optimisation_direction(self, solver):
         x = cp.intvar(0, 10, shape=1)
