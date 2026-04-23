@@ -886,25 +886,6 @@ class MDD(GlobalConstraint):
                     self.levels[self.mapping[n][v]] = i + 1
             current_nodes = new_nodes
 
-    def _extend_mdd(self):
-        """
-            Auxiliary function that extends the MDD with edges for all possible values, directing the new edges to the sink node.
-        """
-        invalid_edges = []
-
-        extended_mapping = copy.deepcopy(self.mapping)
-        sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
-        for s in self.mapping.keys():
-            level = self.levels[s]
-            domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
-            for v in domain:
-                if v not in self.mapping[s]:
-                    extended_mapping[s][v] = sink_node
-                    invalid_edges.append((s, v))
-        return extended_mapping, invalid_edges
-
-
-
     def _reduce(self):
         """
             Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes (to be implemented)
@@ -915,6 +896,8 @@ class MDD(GlobalConstraint):
         """
         Flow decomposition of the MDD global constraint.
         Enforces that the condition is satisfied, by ensuring that the flow in equals the flow out for every node.
+        To do this, we introduce auxiliary boolean variables for every edge in the MDD, use them in flow constraints,
+        and link them to all variable assignments in the array.
 
         Returns:
             tuple[list[Expression], list[Expression]]:
@@ -922,15 +905,27 @@ class MDD(GlobalConstraint):
         """
         arr, _ = self.args
 
-        extended_mapping, invalid_edges = self._extend_mdd()
+        # MDD is extended with invalid edges, which are directed to the sink node
+        invalid_edges = []
+        extended_mapping = copy.deepcopy(self.mapping)
+        sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
+        for s in self.mapping.keys():
+            level = self.levels[s]
+            domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
+            for v in domain:
+                if v not in self.mapping[s]:
+                    extended_mapping[s][v] = sink_node
+                    invalid_edges.append((s, v))
 
         # Represents the ingoing and outgoing flow for a certain node: for every node, the edge variables are listed
         flow_in: dict[int | str, list[Expression]] = defaultdict(list)
         flow_out: dict[int | str, list[Expression]] = defaultdict(list)
 
+        # Used to link edge variables to direct encoding variables in a later step
         edge_vars = defaultdict(list)
         invalid_edge_vars = []
 
+        # Flow in and flow out calculated for every node
         for src, edges in extended_mapping.items():
             for value, dst in edges.items():
                 level = self.levels[src]
@@ -944,11 +939,10 @@ class MDD(GlobalConstraint):
 
         cons = []
 
-        # Go over the nodes in the MDD, and enforce flow constraints
+        # Nodes in the MDD are iterated over, and flow constraints are enforced
         for node in self.levels.keys():
             incoming = flow_in[node]
             outgoing = flow_out[node]
-
 
             if incoming and outgoing:
                 cons.append(cp.sum(incoming) == cp.sum(outgoing))
