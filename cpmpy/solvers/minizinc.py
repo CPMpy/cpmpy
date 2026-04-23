@@ -309,7 +309,7 @@ class CPM_minizinc(SolverInterface):
         if time_limit is not None:
             # timeout is deprecated from version 0.10.0 onwards, but cpmpy also supports older versions
             mzn_vers = self.version()
-            # should never be an issue here
+            # minizinc should always be installed in this part of the code, assert for mypy
             assert mzn_vers is not None
             if Version(mzn_vers.split("/")[0]) >= Version("0.10.0"):
                 kwargs['time_limit'] = timedelta(seconds=time_limit)
