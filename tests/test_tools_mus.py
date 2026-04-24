@@ -89,7 +89,7 @@ class TestMus:
 class TestNativeMus(TestMus):
     # use solver from conftest.py
     @pytest.fixture(autouse=True)
-    def setup_method(self, solver):
+    def setup_solver(self, solver):
         self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
         self.naive_func = mus_naive
 
