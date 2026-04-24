@@ -612,7 +612,7 @@ class CPM_gurobi(SolverInterface):
             else:
                 raise TypeError(f"Unexpected Gurobi constraint {grb_con} of type {type(grb_con)}")
 
-        # TODO once the bug is resolved, we should only perform this check for older versions of Gurobi (see ticket TODO)
+        # TODO once the bug is resolved, we should only perform this check for older versions of Gurobi (see ticket https://support.gurobi.com/hc/en-us/requests/116323)
         assert all(in_iis(grb_hard_con) for grb_hard_con in grb_hard_cons), "Due to an upstream bug in Gurobi, the hard constraints have not properly been enforced for this instance, which has led to a potentially non-minimal MUS. Until the bug is resolved, you should use another MUS algorithm."
 
         # Return `soft_con` if its representing Gurobi constraint is in the IIS
