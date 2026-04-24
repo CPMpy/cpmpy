@@ -924,56 +924,43 @@ class MDD(GlobalConstraint):
 
         self.sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
 
-        self.reverse_mapping = defaultdict(list)
-        for s in self.mapping.keys():
-            transition_function = self.mapping[s]
-            self.reverse_mapping[tuple(sorted(transition_function.items()))].append(s)
-
-        print("Reverse mapping: ", self.reverse_mapping)
-
-        self.reduced_mapping = defaultdict(dict)
 
 
-    def _reduce(self, node):
+    def _reduce(self):
         """
-            Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
+        Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
         """
-        level = self.levels[node]
+        self.reduced_mapping = copy.deepcopy(self.mapping)
+        substitutions = {}
 
-        if node == self.sink_node:
-            return node
+        for i in range(len(self.args[0])-1, -1, -1):
+            level_nodes = [n for n in self.levels if self.levels[n] == i]
+            groups = {}
 
-        for v in self.mapping[node].keys():
-            dst = self.mapping[node][v]
-            new_node = self._reduce(dst)
-            self.reduced_mapping[node][v] = new_node
+            for node in level_nodes:
+                tf = self.reduced_mapping[node]
+                signature = tuple(sorted(tf.items()))
+                if signature not in groups:
+                    groups[signature] = []
 
-        for k, v in self.levels.items():
-            if k != node and v == level:
-                if self.reduced_mapping[k] == self.reduced_mapping[node]:
-                    print("this happens!")
-                    return k
-        return node
+                groups[signature].append(node)
 
 
-        '''transition_function = tuple(sorted(self.reduced_mapping[node].items()))
+            for equiv_nodes in groups.values():
+                rep = equiv_nodes[0]
+                for node in equiv_nodes[1:]:
+                    substitutions[node] = rep
+                    self.reduced_mapping.pop(node, None)
 
-        if node not in self.reverse_mapping[transition_function]:
-            self.reverse_mapping[transition_function].append(node)
 
-        equivalent_nodes = self.reverse_mapping[tuple(sorted(self.mapping[node].items()))]
+        for node in self.reduced_mapping:
+            for value in self.reduced_mapping[node]:
+                dst = self.reduced_mapping[node][value]
 
-        if len(equivalent_nodes) == 1:
-            return node
+                while dst in substitutions:
+                    dst = substitutions[dst]
 
-        else:
-            for i, node in enumerate(equivalent_nodes):
-                if i != len(equivalent_nodes):
-                    print("Popped node: ", node)
-                    self.reverse_mapping.pop(node, None)
-
-            print("Current reduced mapping: ", self.reduced_mapping)
-            return equivalent_nodes[-1]'''
+                self.reduced_mapping[node][value] = dst
 
 
 
@@ -992,21 +979,20 @@ class MDD(GlobalConstraint):
         arr, _ = self.args
 
         # MDD is reduced by merging nodes with equivalent suffixes
-        print("Mapping: ", self.mapping)
 
-        _ = self._reduce(self.root_node)
-
-        print("Reduced mapping: ", self.reduced_mapping)
+        self._reduce()
 
         # MDD is extended with invalid edges, which are directed to the sink nodes
         invalid_edges = []
         extended_mapping = copy.deepcopy(self.reduced_mapping)
 
-        for s in self.mapping.keys():
+        for s in extended_mapping.keys():
             level = self.levels[s]
+            if level == len(arr):
+                continue
             domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
             for v in domain:
-                if v not in self.mapping[s]:
+                if v not in extended_mapping[s]:
                     extended_mapping[s][v] = self.sink_node
                     invalid_edges.append((s, v))
 
