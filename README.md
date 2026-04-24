@@ -49,7 +49,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 
 ### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling
 
-An [example ](https://github.com/CPMpy/cpmpy/blob/master/examples/flexible_jobshop.py) that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
+An [example](https://github.com/CPMpy/cpmpy/blob/master/examples/flexible_jobshop.py) that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
 
 ```python
 # Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
