@@ -60,6 +60,7 @@ import sys
 import os
 import json
 from datetime import timedelta  # for mzn's timeout
+from packaging.version import Version
 
 import numpy as np
 
@@ -306,7 +307,14 @@ class CPM_minizinc(SolverInterface):
         import minizinc
 
         if time_limit is not None:
-            kwargs['timeout'] = timedelta(seconds=time_limit)
+            # timeout is deprecated from version 0.10.0 onwards, but cpmpy also supports older versions
+            mzn_vers = self.version()
+            # minizinc should always be installed in this part of the code, assert for mypy
+            assert mzn_vers is not None
+            if Version(mzn_vers.split("/")[0]) >= Version("0.10.0"):
+                kwargs['time_limit'] = timedelta(seconds=time_limit)
+            else:
+                kwargs['timeout'] = timedelta(seconds=time_limit)
 
         # hack, we need to add the objective in a way that it can be changed
         # later, so make copy of the mzn_model
