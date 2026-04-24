@@ -88,7 +88,7 @@ class TestMus:
 @pytest.mark.requires_solver("exact")       
 class TestNativeMus(TestMus):
     def setup_method(self, solver):
-        self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver=solver)
+        self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
         self.naive_func = mus_naive
 
 class TestQuickXplain(TestMus):
