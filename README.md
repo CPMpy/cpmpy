@@ -169,4 +169,4 @@ You can cite CPMpy as follows: "Guns, T. (2019). Increasing modeling language co
 }
 ```
 
-If you work in academia, please cite us. If you work in industry, we'd love to hear how you are using it. The lab of Prof. Guns is open to collaborations and contract research.
+If you work in academia, please cite us. If you work in industry, we'd love to hear how you are using it. The lab of Prof. Guns is open to [collaborations and contract research](https://cpmpy.cs.kuleuven.be).
