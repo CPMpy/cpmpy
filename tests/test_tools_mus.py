@@ -57,7 +57,7 @@ class TestMus:
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
         assert set(mus_naive_cons) == set(soft)
 
-    def test_wglobal(self, solver):
+    def test_wglobal(self):
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
 
