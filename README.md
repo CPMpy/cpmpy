@@ -49,7 +49,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 
 ### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling
 
-An example that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
+An [example ](https://github.com/CPMpy/cpmpy/blob/master/examples/flexible_jobshop.py) that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
 
 ```python
 # Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
@@ -115,6 +115,7 @@ if model.solve():
     df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
     df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
     df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
+    import plotly.io as pio; pio.renderers.default = "browser"
     px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
 else:
     print("No solution found.")
