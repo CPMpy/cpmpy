@@ -51,7 +51,7 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import DirectConstraint, Cumulative, NoOverlap
+from ..expressions.globalconstraints import DirectConstraint, Cumulative, CumulativeOptional, NoOverlap, NoOverlapOptional
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_comparison, flatlist, argval, argvals, \
@@ -594,7 +594,6 @@ class CPM_ortools(SolverInterface):
                 if cpm_expr.end_is_none:
                     start, dur, demand, cap = cpm_expr.args
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-                    self.add([s + d == e for s,d,e in zip(start, dur, end)])
                 else:
                     start, dur, end, demand, cap = cpm_expr.args
 
@@ -611,13 +610,16 @@ class CPM_ortools(SolverInterface):
 
                 return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "cumulative_optional":
-                start, dur, end, demand, cap, is_present = cpm_expr.args
+                assert isinstance(cpm_expr, CumulativeOptional) # ensure hasattr end_is_none
+                if cpm_expr.end_is_none:
+                    start, dur, demand, cap, is_present = cpm_expr.args
+                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
+                else:
+                    start, dur, end, demand, cap, is_present = cpm_expr.args
+
                 # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur, is_present)
                 self.add(dur_cons)
-
-                if end is None: # need to make the end-variables ourself
-                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
 
                 # ensure demand is non-negative
                 demand, demand_cons = get_nonneg_args(demand, is_present)
@@ -633,7 +635,6 @@ class CPM_ortools(SolverInterface):
                 if cpm_expr.end_is_none:
                     start, dur = cpm_expr.args
                     end = [intvar(*get_bounds(s + d)) for s, d in zip(start, dur)]
-                    self.add([s + d == e for s, d, e in zip(start, dur, end)])
                 else:
                     start, dur, end = cpm_expr.args
 
@@ -645,7 +646,13 @@ class CPM_ortools(SolverInterface):
 
                 return self.ort_model.AddNoOverlap(intervals)
             elif cpm_expr.name == "no_overlap_optional":
-                start, dur, end, is_present = cpm_expr.args
+                assert isinstance(cpm_expr, NoOverlapOptional) # ensure hasattr end_is_none
+                if cpm_expr.end_is_none:
+                    start, dur, is_present = cpm_expr.args
+                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
+                else:
+                    start, dur, end, is_present = cpm_expr.args
+
                 dur, dur_cons = get_nonneg_args(dur, is_present)
                 self.add(dur_cons)
 

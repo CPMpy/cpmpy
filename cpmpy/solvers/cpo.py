@@ -48,7 +48,7 @@ import warnings
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
@@ -540,16 +540,27 @@ class CPM_cpo(SolverInterface):
                 arr, table = self._cpo_expr(cpm_con.args)
                 return dom.forbidden_assignments(arr, table)
             elif cpm_con.name == "cumulative" or cpm_con.name == "cumulative_optional":
-                if cpm_con.name == "cumulative_optional":
-                    start, dur, end, demand_lst, capacity, is_present = cpm_con.args
-                else:
-                    start, dur, end, demand_lst, capacity = cpm_con.args
+                if cpm_con.name == "cumulative":
+                    assert isinstance(cpm_con, Cumulative) # ensure hasattr end_is_none
                     is_present = None
+                    if cpm_con.end_is_none:
+                        start, dur, demand, capacity = cpm_con.args
+                        end = None
+                    else:
+                        start, dur, end, demand, capacity = cpm_con.args
+                
+                elif cpm_con.name == "cumulative_optional":
+                    assert isinstance(cpm_con, CumulativeOptional) # ensure hasattr end_is_none
+                    if cpm_con.end_is_none:
+                        start, dur, demand, capacity, is_present = cpm_con.args
+                        end = None
+                    else:
+                        start, dur, end, demand, capacity, is_present = cpm_con.args
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
 
                 # usage constraints
-                demand_lst, demand_cons = get_nonneg_args(demand_lst, is_present)
+                demand_lst, demand_cons = get_nonneg_args(demand, is_present)
                 cons += self._cpo_expr(demand_cons)
 
                 total_usage = []
@@ -567,12 +578,23 @@ class CPM_cpo(SolverInterface):
                
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
-            elif cpm_con.name == "no_overlap" or cpm_con.name == "no_overlap_optional":
-                if cpm_con.name == "no_overlap_optional":
-                    start, dur, end, is_present = cpm_con.args
+            elif cpm_con.name == "no_overlap":
+                assert isinstance(cpm_con, NoOverlap) # ensure hasattr end_is_none
+                if cpm_con.end_is_none:
+                    start, dur = cpm_con.args
+                    end = None
                 else:
                     start, dur, end = cpm_con.args
-                    is_present = None
+                tasks, cons = self._make_tasks(start, dur, end, is_present)
+                return cons + [dom.no_overlap(tasks)]
+            
+            elif cpm_con.name == "no_overlap_optional":
+                assert isinstance(cpm_con, NoOverlapOptional) # ensure hasattr end_is_none
+                if cpm_con.end_is_none:
+                    start, dur, is_present = cpm_con.args
+                    end = None
+                else:
+                    start, dur, end, is_present = cpm_con.args
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
                 return cons + [dom.no_overlap(tasks)]

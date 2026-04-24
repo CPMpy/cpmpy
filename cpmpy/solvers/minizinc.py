@@ -63,12 +63,14 @@ from datetime import timedelta  # for mzn's timeout
 
 import numpy as np
 
+from cpmpy.expressions import NoOverlap
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
-from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount
+from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -703,17 +705,21 @@ class CPM_minizinc(SolverInterface):
             return f"{expr.name}({{}})".format(str_X)
 
         elif expr.name == "cumulative":
-            start, dur, end, demand, capacity = expr.args
+            assert isinstance(expr, Cumulative) # ensure hasattr end_is_none
+            extra_cons = []
+            if expr.end_is_none:
+                start, dur, demand, capacity = expr.args
+            else:
+                start, dur, end, demand, capacity = expr.args
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
             global_str = "cumulative({},{},{},{})"
             # ensure duration is non-negative
-            dur, extra_cons = get_nonneg_args(dur)
+            dur, dur_cons = get_nonneg_args(dur)
+            extra_cons += dur_cons
             # ensure demand is non-negative
             demand, demand_cons = get_nonneg_args(demand)
             extra_cons += demand_cons
-
-            if end is not None:
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
@@ -723,12 +729,18 @@ class CPM_minizinc(SolverInterface):
                                      self._convert_expression(capacity))
 
         elif expr.name == "no_overlap":
-            start, dur, end = expr.args
+            assert isinstance(expr, NoOverlap) # ensure hasattr end_is_none
+            extra_cons = []
+            if expr.end_is_none:
+                start, dur = expr.args
+            else:
+                start, dur, end = expr.args
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+            
             global_str = "disjunctive({},{})"
             # ensure duration is non-negative
-            dur, extra_cons = get_nonneg_args(dur)
-            if end is not None:
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+            dur, dur_cons = get_nonneg_args(dur)
+            extra_cons += dur_cons
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
