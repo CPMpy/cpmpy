@@ -24,6 +24,8 @@ class TestMus:
 
         assert set(self.mus_func(cons)) == set(cons[:3])
         assert set(self.naive_func(cons)) == set(cons[:3])
+        assert False
+
 
     def test_bug_191(self):
         """
