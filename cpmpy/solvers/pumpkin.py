@@ -572,8 +572,9 @@ class CPM_pumpkin(SolverInterface):
                     start, dur, demand, cap = cpm_expr.args
                 else:
                     start, dur, end, demand, cap = cpm_expr.args
-                    for s,d,e in zip(start, dur, end):
-                        pum_cons.append(self._get_constraint(self.transform(s + d == e), tag=tag)[0])
+                    end_cons = [s + d == e for s,d,e in zip(start, dur, end)]
+                    for cons in self.transform(end_cons):
+                        pum_cons.extend(self._get_constraint(cons, tag=tag))
 
                 assert all(is_num(d) for d in dur), "Pumpkin only accepts Cumulative with fixed durations"
                 assert all(is_num(h) for h in demand), "Pumpkin only accepts Cumulative with fixed demand"

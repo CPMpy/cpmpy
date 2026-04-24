@@ -585,7 +585,7 @@ class CPM_cpo(SolverInterface):
                     end = None
                 else:
                     start, dur, end = cpm_con.args
-                tasks, cons = self._make_tasks(start, dur, end, is_present)
+                tasks, cons = self._make_tasks(start, dur, end, None)
                 return cons + [dom.no_overlap(tasks)]
             
             elif cpm_con.name == "no_overlap_optional":
