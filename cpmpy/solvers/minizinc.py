@@ -646,6 +646,9 @@ class CPM_minizinc(SolverInterface):
         if isinstance(expr, (bool, np.bool_)):
             expr = BoolVal(expr)
 
+        if isinstance(expr, str):
+            return f'\"{expr}\"'
+
         if not isinstance(expr, Expression):
             return self.solver_var(expr)  # constants
 
@@ -871,24 +874,37 @@ class CPM_minizinc(SolverInterface):
             return "({} in {})".format(arg0_str, domain_str)
 
         elif expr.name == "regular":
-            # regular(array, transitions, start, accepting)
-            # MiniZinc regular constraint expects: regular(array, transitions_table, start, accepting)
-            # where transitions_table is a 2D array
+            # MiniZinc: `regular(array[int] of var int: x, array[int,int] of opt int: d, int: q0, set of int: F)`
+            # We map CPMpy's named states to 1-indexed integers.
+            # Example:
+            #   CPMpy:   `Regular([IV0,IV1,IV2], [('a',1,'b'),('b',1,'c'),('b',0,'b'),('c',1,'c'),('c',0,'b')], 'a', ['c'])`
+            #   MiniZinc: `constraint regular([IV0,IV1,IV2], array2d(1..3, 0..1, [<>,2,2,3,2,3]), 1, {3})`
+            #            note: `d` is a 2D array `[|<>,2|2,3|2,3|]` with rows=states, cols=values
             array, transitions, start, accepting = expr.args
+
+            # Map states to 1..Q (MiniZinc states are 1-indexed)
+            node_map = {n: i + 1 for i, n in enumerate(expr.nodes)}
+            Q = len(expr.nodes)
+
+            # Determine value range for the alphabet
+            values = sorted(set(v for _, v, _ in transitions))
+            val_min, val_max = min(values), max(values)
+
+            # Build transition dict: (state, value) -> next_state
+            trans = {(node_map[s], v): node_map[e] for s, v, e in transitions}
+
+            # Build 2D transition table d[1..Q, val_min..val_max] with <> for undefined
+            d_entries = []
+            for q in range(1, Q + 1):
+                for v in range(val_min, val_max + 1):
+                    d_entries.append(str(trans.get((q, v), "<>")))
+            d_str = "array2d(1..{}, {}..{}, [{}])".format(Q, val_min, val_max, ",".join(d_entries))
+
             array_str = self._convert_expression(array)
-            # Convert transitions to a 2D array format for MiniZinc
-            # transitions is a list of (src, value, dst) tuples
-            transitions_list = []
-            for src, val, dst in transitions:
-                transitions_list.append("[{}, {}, {}]".format(
-                    self._convert_expression(src),
-                    self._convert_expression(val),
-                    self._convert_expression(dst)
-                ))
-            transitions_str = "[{}]".format(",".join(transitions_list))
-            start_str = self._convert_expression(start)
-            accepting_str = self._convert_expression(accepting)
-            return "regular({}, {}, {}, {})".format(array_str, transitions_str, start_str, accepting_str)
+            q0 = node_map[start]
+            F = "{{{}}}".format(",".join(str(node_map[a]) for a in accepting))
+
+            return "regular({}, {}, {}, {})".format(array_str, d_str, q0, F)
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
