@@ -305,13 +305,7 @@ class CPM_choco(SolverInterface):
                         cpm_var._value = bool(value)
                     else:
                         cpm_var._value = value
-                # print the desired display
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
+                self.print_display(display)
 
         return len(sols)
 

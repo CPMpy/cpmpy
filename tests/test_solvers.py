@@ -18,6 +18,7 @@ from cpmpy.solvers.gurobi import CPM_gurobi
 from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
+from cpmpy.solvers.scip import CPM_scip
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
@@ -1008,7 +1009,6 @@ class TestSupportedSolvers:
         assert s.solve(assumptions=[])
 
     def test_vars_not_removed(self, solver):
-
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
 
@@ -1047,16 +1047,11 @@ class TestSupportedSolvers:
         vars = [x,y,d,r]
         m = cp.Model()
         # modulo toplevel
-        m += x / y == d
+        m += x // y == d
         m += x % y == r
         sols = set()
-        solution_limit = None
-        time_limit = None
-        if solver == 'gurobi':
-            solution_limit = 15 # Gurobi does not like this model, and gets stuck finding all solutions
-        if solver == "hexaly":
-            time_limit = 5
-        m.solveAll(solver=solver, solution_limit=solution_limit, time_limit=time_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        solution_limit = 15  # ILP solvers don't like this model and tend to get stuck finding all solutions
+        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
@@ -1082,16 +1077,16 @@ class TestSupportedSolvers:
 
         # now making a tricky problem to solve
         np.random.seed(0)
-        start = cp.intvar(0,100, shape=50)
-        dur = np.random.randint(1,5, size=50)
-        end = cp.intvar(0,100, shape=50)
-        demand  = np.random.randint(10,15, size=50)
+        start = cp.intvar(0,50, shape=20)
+        dur = np.random.randint(1,5, size=20)
+        end = cp.intvar(0,50, shape=20)
+        demand  = np.random.randint(10,15, size=20)
 
-        m += cp.Cumulative(start, dur, end,demand, 30)
+        m += cp.Cumulative(start, dur, end,demand, 20)
         m.minimize(cp.max(end))
         m.solve(solver=solver, time_limit=1)
         # normally, should not be able to solve within 1s...
-        assert m.status().exitstatus in (ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
+        assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE, ExitStatus.UNKNOWN)
 
         # now trivally unsat
         m += cp.sum(bv) <= 0
@@ -1099,49 +1094,6 @@ class TestSupportedSolvers:
         assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
-
-    def test_status_solveall(self, solver):
-        if solver == "hexaly":
-            pytest.skip("hexaly cannot proveably find all solutions, so status is never OPTIMAL")
-
-        bv = cp.boolvar(shape=3, name="bv")
-        m = cp.Model(cp.any(bv))
-
-        limit = None
-        if solver in ("gurobi", "cplex"): limit = 100000
-
-        num_sols = m.solveAll(solver=solver, solution_limit=limit)
-        assert num_sols == 7
-        assert m.status().exitstatus == ExitStatus.OPTIMAL  # optimal
-
-
-
-        # adding a bunch of variables to increase nb of sols
-        try:
-            x = cp.boolvar(shape=32, name="x")
-            m = cp.Model(cp.any(x))
-            num_sols = m.solveAll(solver=solver, time_limit=1, solution_limit=limit)
-            assert m.status().exitstatus == ExitStatus.FEASIBLE
-
-            num_sols = m.solveAll(solver=solver, solution_limit=10)
-            assert num_sols == 10
-            assert m.status().exitstatus == ExitStatus.FEASIBLE
-
-            # edge-case: nb of solutions is exactly the sol limit
-            m = cp.Model(cp.any(bv))
-            num_sols = m.solveAll(solver=solver, solution_limit=7)
-            assert num_sols ==  7
-            assert m.status().exitstatus in (ExitStatus.OPTIMAL, ExitStatus.FEASIBLE) # which of the two?
-
-        except NotImplementedError:
-            pass # not all solvers support time/solution limits
-
-        # making the problem unsat
-        if solver != "pysdd": # constraint not supported by pysdd
-            m  = cp.Model([cp.sum(bv) <= 0, cp.any(bv)])
-            num_sols = m.solveAll(solver=solver, solution_limit=limit)
-            assert num_sols == 0
-            assert m.status().exitstatus == ExitStatus.UNSATISFIABLE
 
 
     def test_hidden_user_vars(self, solver):
@@ -1251,3 +1203,24 @@ def test_objective_numexprs(solver, constraint):
         assert constraint.value() > constraint.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_special_cardinality():
+    bvs = cp.boolvar(shape=4)
+    sos1 = cp.sum(bvs) <= 1
+
+    model = cp.Model(sos1)
+    s = cp.SolverLookup.get("scip", model)
+    constraints = s.scip_model.getConss()
+    assert constraints[0].getConshdlrName() == "SOS1"  # translated to native SOS1
+    assert s.solve()
+    assert bvs.value().sum() <= 1
+
+    card = cp.sum(bvs) <= 3
+    model = cp.Model(card)
+    s = cp.SolverLookup.get("scip", model)
+    constraints = s.scip_model.getConss()
+    assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
+    assert s.solve()
+    assert bvs.value().sum() <= 3

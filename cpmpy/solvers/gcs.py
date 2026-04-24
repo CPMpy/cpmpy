@@ -62,7 +62,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callbac
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, argval, argvals
+from ..expressions.utils import is_num, argval, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
@@ -312,19 +312,11 @@ class CPM_gcs(SolverInterface):
                     cpm_var._value = bool(solution_map[sol_var])
                 else:
                     cpm_var._value = solution_map[sol_var]
+            self.print_display(display)
+            return
 
-            if isinstance(display, Expression):
-                print(argval(display))
-            elif isinstance(display, list):
-                # explicit list of expressions to display
-                print(argvals(display))
-            elif callable(display):
-                display()
-            else:
-                raise NotImplementedError("Glasgow Constraint Solver: Unknown display type {}.".format(cpm_var))
-            return 
         sol_callback = None
-        if display:
+        if display is not None:
             sol_callback=display_callback
 
         self.gcs_result = self.gcs.solve(
@@ -582,10 +574,10 @@ class CPM_gcs(SolverInterface):
                             # lt == x < y
                             # gt == x > y
                             lt_bool, gt_bool = boolvar(shape=2)
-                            self += (lhs < rhs) == lt_bool
-                            self += (lhs > rhs) == gt_bool
+                            self.add((lhs < rhs) == lt_bool)
+                            self.add((lhs > rhs) == gt_bool)
                             if fully_reify:
-                                self += (~bool_lhs).implies(lhs == rhs)
+                                self.add((~bool_lhs).implies(lhs == rhs))
                             self.gcs.post_or_reif(self.solver_vars([lt_bool, gt_bool]), reif_var, False)
                         else:
                             raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}' {}".format)
@@ -696,7 +688,7 @@ class CPM_gcs(SolverInterface):
             elif isinstance(cpm_expr, GlobalConstraint):
                 # GCS also has SmartTable, Regular Language Membership, Knapsack constraints
                 # which could be added in future. 
-                self += cpm_expr.decompose()  # assumes a decomposition exists...
+                self.add(cpm_expr.decompose())  # assumes a decomposition exists...
             else:
                 # Hopefully we don't end up here.
                 raise NotImplementedError(cpm_expr)

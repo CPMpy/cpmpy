@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError, IncompleteFunctionError
@@ -793,10 +794,9 @@ class TestGlobal:
 
         expected = {
             # safening constraints
-            "(BV0) == ((x >= 0) and (x <= 2))",
-            "(BV0) -> ((IV0) == (x))",
-            "(~BV0) -> (IV0 == 0)",
-            "BV0",
+            "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
+            "(not((x >= 0) and (x <= 2))) -> (IV0 == 0)",
+            "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
             '(IV0 == 1) -> (IV1 == 1)',
@@ -859,12 +859,12 @@ class TestGlobal:
         assert all_sols == decomp_sols# same on decision vars
         assert count == decomp_count# same on all vars
 
-    def test_xor(self):
+    def test_xor(self, solver):
         bv = cp.boolvar(5)
-        assert cp.Model(cp.Xor(bv)).solve()
+        assert cp.Model(cp.Xor(bv)).solve(solver=solver)
         assert cp.Xor(bv).value()
 
-    def test_xor_with_constants(self):
+    def test_xor_with_constants(self, solver):
 
         bvs = cp.boolvar(shape=3)
 
@@ -879,17 +879,18 @@ class TestGlobal:
             expr = cp.Xor(args)
             model = cp.Model(expr)
 
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
             # also check with decomposition
             model = cp.Model(expr.decompose())
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
         # edge case with False constants
-        assert not cp.Model(cp.Xor([False, False])).solve()
-        assert not cp.Model(cp.Xor([False, False, False])).solve()
+        assert not cp.Model(cp.Xor([False, False])).solve(solver=solver)
+        assert not cp.Model(cp.Xor([False, False, False])).solve(solver=solver)
+        assert cp.Model(cp.Xor([False, True, False])).solve(solver=solver)
 
     def test_ite_with_constants(self):
         x,y,z = cp.boolvar(shape=3)
@@ -1093,8 +1094,63 @@ class TestGlobal:
         assert cp.Model(bv == expr).solve()
         assert not bv.value()
 
+    def test_optional_cumulative(self):
+        start = cp.intvar(0, 10, shape=4, name="start")
+        duration = [1, 4, 3, 2]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        demand = [11, 4, 8, 7]
+        is_present = cp.boolvar(shape=4)
+        capacity = 10
+        expr = cp.CumulativeOptional(start, duration, end, demand, capacity, is_present)
+        assert cp.Model(expr).solve()
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+        # also test decomposition
+        assert cp.Model(expr.decompose()).solve()
+        assert expr.value()
+        assert is_present[0].value() is False, "Task 0 cannot be scheduled as it exceeds the capacity"
+
+        # weird cases, allow negative duration or demand when task is not present
+        expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, False])
+        assert cp.Model(expr).solve()
+        assert cp.Model(expr.decompose()).solve()
+
+        expr = cp.CumulativeOptional(start, [1,4,3,-2], end, demand, capacity, [False, True, True, True])
+        assert cp.Model(expr).solve() is False
+        assert cp.Model(expr.decompose()).solve() is False
+
+        expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, False])
+        assert cp.Model(expr).solve()
+        assert cp.Model(expr.decompose()).solve()
+
+        expr = cp.CumulativeOptional(start, duration, end, [11,4,8,-7], capacity, [False, True, True, True])
+        assert cp.Model(expr).solve() is False
+        assert cp.Model(expr.decompose()).solve() is False
 
 
+    def test_optional_no_overlap(self):
+        start = cp.intvar(0, 10, shape=4, name="start")
+        duration = [1, 4, 6, 2]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        is_present = cp.boolvar(shape=4)
+        expr = cp.NoOverlapOptional(start, duration, end, is_present)
+        assert cp.Model(expr, cp.any(is_present)).solve()
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+        # also test decomposition
+        assert cp.Model(expr.decompose(), cp.any(is_present)).solve()
+        assert expr.value()
+        assert not all(is_present.value()), "Not all tasks can be scheduled without overlapping, given the domains"
+
+        # test large task
+        start = cp.intvar(0, 10, shape=4, name="start")
+        duration = [20,30,40,50]
+        end = cp.intvar(0, 10, shape=4, name="end")
+        is_present = cp.boolvar(shape=4)
+        expr = cp.NoOverlapOptional(start, duration, end, is_present)
+        assert cp.Model(expr, cp.any(is_present)).solve() is False
+
+    
     def test_ite(self):
         x = cp.intvar(0, 5, shape=3, name="x")
         iter = cp.IfThenElse(x[0] > 2, x[1] > x[2], x[1] == x[2])
@@ -1135,17 +1191,17 @@ class TestGlobal:
         val = [0,1,2]
         occ = cp.intvar(0, len(iv), shape=3)
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         val = [1, 4, 5]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         occ = [2, 3, 0]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val)))
-        assert ~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
+        assert not cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
 
     def test_gcc_onearg(self):
         iv = cp.intvar(0, 10)
@@ -1719,13 +1775,13 @@ class TestTypeChecks:
     def test_table(self):
         iv = cp.intvar(-8,8,3)
 
-        constraints = [cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])] # not flatlist, should work
-        model = cp.Model(constraints)
-        assert model.solve()
+        #assert cp.Model(cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])).solve() # not flatlist, should work
+        # used to work, not allowed anymore
+        pytest.raises(AttributeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
 
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
 
     def test_issue627(self):
         for s, cls in cp.SolverLookup.base_solvers():
@@ -1771,3 +1827,43 @@ def test_issue801_expr_in_cumulative(solver):
         assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)
+
+
+
+# Test that all global constraint classes are imported and exported in cpmpy.expressions.__init__
+import importlib
+
+def global_constraint_classes():
+    """Helper to get all global constraint classes in cpmpy.expressions.globalconstraints"""
+    gc_mod = importlib.import_module("cpmpy.expressions.globalconstraints")
+    classes = []
+    for name, obj in gc_mod.__dict__.items():
+        if isinstance(obj, type):
+            # Heuristic: likely a global constraint class if it subclasses Constraint or has 'decompose' or '__call__'
+            if hasattr(obj, "__module__") and obj.__module__.endswith("globalconstraints"):
+                # skip internal base classes or helpers
+                if not name.startswith("_"):
+                    classes.append((name, obj))
+    return classes
+
+import inspect
+def test_globals_in_expressions_init():
+    """Check all global constraint classes are imported and exported in cpmpy.expressions.__init__"""
+    expressions_module = importlib.import_module("cpmpy.expressions")
+    expressions_all = set(getattr(expressions_module, "__all__", []))
+    
+    # check all global constraints are imported and exported in cpmpy.expressions.__init__
+    classes = inspect.getmembers(cp.expressions.globalconstraints, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
+
+    for name, cls in classes:
+        assert hasattr(expressions_module, name), f"Global constraint {name} is not imported in cpmpy.expressions.__init__"
+        assert name in expressions_all, f"Global constraint {name} is not exported in cpmpy.expressions.__init__.__all__"
+
+    # check all global constraints are imported and exported in cpmpy.expressions.__init__
+    classes = inspect.getmembers(cp.expressions.globalfunctions, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalFunction) and name != "GlobalFunction"]
+
+    for name, cls in classes:
+        assert hasattr(expressions_module, name), f"Global function {name} is not imported in cpmpy.expressions.__init__"
+        assert name in expressions_all, f"Global function {name} is not exported in cpmpy.expressions.__init__.__all__"

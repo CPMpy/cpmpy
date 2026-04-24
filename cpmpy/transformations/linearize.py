@@ -1,60 +1,74 @@
 """
-Transforms flat constraints into linear constraints.
+Transform constraints to a linear form.
 
-Linearized constraints have one of the following forms:
+This transformation is necessary for Integer Linear Programming (ILP) solvers, and also
+for translating to Pseudo-Boolean or SAT solvers.
 
-Linear comparison:
-------------------
-- ``LinExpr == Constant``
-- ``LinExpr >= Constant``
-- ``LinExpr <= Constant``
+There are a number of components to getting a good linearisation:
+- **Decomposing global constraints/functions** in a 'linear friendly' way.
+  A common pattern is that constraints that enforce domain consistency on integer variables,
+  that these constraints should be decomposed over a Boolean representation of the domain. This is the
+  case for :class:`~cpmpy.expressions.globalconstraints.AllDifferent`, :class:`~cpmpy.expressions.globalfunctions.Element`
+  and other functions listed in :func:`get_linear_decompositions`.
+  Their default decomposition does not do it this way, hence we use a more linear-friendly decomposition.
+  This is done by :func:`decompose_linear`.
 
-LinExpr can be any of:
+- **Domain encodings** constraint `(x == 3) + (x == 5) + (x == 7) >= 1` after flattening will introduce Boolean auxiliary
+  variables and constraints `Bx3 == (x == 3)`, `Bx5 == (x == 5)`, `Bx7 == (x == 7)` and `sum(Bx3, Bx5, Bx7) >= 1`.
+  However each `Bxi == (x == i)` would be linearized into 3 Big-M constraints. Instead we can linearise the entire
+  domain encoding of `x` for all `i` values in its domain with just two constraints: `sum_i(Bxi) = 1` and `x = sum_i(i*Bxi)`.
+  This is done by :func:`linearize_reified_variables` (as a pre-linearization optimization step).
 
-- `NumVar`
-- `sum`
-- `wsum`
+- **Disequalities and Inequalities** e.g. `sum(X) != 5` should be rewritten as `(sum(X) < 5) | (sum(X) > 5)`,
+  which is then further flattened into implications. Strict equalities like `sum(X) > 5` are in turn
+  rewritten to non-strict inequalities, e.g. `sum(X) >= 6`. This is done by :func:`linearize_constraint`.
 
-Indicator constraints:
-----------------------
+- **Implications and Big-M** e.g. `B -> sum(X) <= 4` should be linearised with the Big-M method,
+  if not natively supported. This is done by :func:`linearize_constraint`.
+  If it is natively supported, then the `supported` argument should contain '->'.
 
-+------------------------------------+
-| ``BoolVar -> LinExpr == Constant`` |
-+------------------------------------+
-| ``BoolVar -> LinExpr >= Constant`` |
-+------------------------------------+
-| ``BoolVar -> LinExpr <= Constant`` |
-+------------------------------------+
+To get a good linearisation, solver backends typically apply these transformations in roughly this order:
 
-========================================   ==============================================
-``BoolVar -> GenExpr``                     (GenExpr.name in supported, GenExpr.is_bool()) 
-``BoolVar -> GenExpr >= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-``BoolVar -> GenExpr <= Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-``BoolVar -> GenExpr == Var/Constant``     (GenExpr.name in supported, GenExpr.is_num())  
-========================================   ==============================================
-
-Where ``BoolVar`` is a boolean variable or its negation.
-
-General comparisons or expressions
------------------------------------
-
-============================  ==============================================
-``GenExpr``                   (GenExpr.name in supported, GenExpr.is_bool())  
-``GenExpr == Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
-``GenExpr <= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num())  
-``GenExpr >= Var/Constant``   (GenExpr.name in supported, GenExpr.is_num()) 
-============================  ============================================== 
+- Call :func:`decompose_linear` / :func:`decompose_linear_objective` instead of the standard 'decompose_in_tree'.
+- Put constraints in flat normal form (:func:`~cpmpy.transformations.flatten_model.flatten_constraint`).
+- Apply :func:`linearize_reified_variables` to replace reified equalities of the form
+  ``bv == (x == val)`` by a single direct encoding of ``x`` (must be done before implication-only normalisation).
+- Ensure implications are of the form ``bv -> <expr>`` (:func:`~cpmpy.transformations.reification.only_implies`).
+- Call :func:`linearize_constraint` to transform the inequalities, strict equalities and implications.
+- Optionally run post-passes such as :func:`only_positive_bv` (e.g. for ILP solvers that do not support NegBoolView)
+  and :func:`only_positive_coefficients` (e.g. for PB solvers that want it in this normal form)
 
 
+Module functions
+----------------
 
+Main transformations:
+- :func:`linearize_constraint`: Transforms a list of constraints to a linear form.
+- :func:`decompose_linear`: Decompose unsupported global constraints in a linear-friendly way.
+- :func:`decompose_linear_objective`: Decompose objective using linear-friendly decompositions.
+- :func:`linearize_reified_variables`: For an integer x with (BV == (x == val)) constraints, replace them with the direct encoding of 'x'.
+
+Helper functions:
+- :func:`canonical_comparison`: Canonicalize comparison expressions (variables on left, constants on right).
+- :func:`get_linear_decompositions`: Returns the custom linear decomposition map for global constraints.
+
+Optional post-linearisation transformations:
+- :func:`only_positive_bv`: Transforms constraints so only :class:`~cpmpy.expressions.variables._BoolVarImpl` variables appear positively
+  (no :class:`~cpmpy.expressions.variables.NegBoolView`).
+- :func:`only_positive_bv_wsum`: Helper function that replaces :class:`~cpmpy.expressions.variables.NegBoolView`
+  in var/sum/wsum expressions with equivalent expressions using only :class:`~cpmpy.expressions.variables._BoolVarImpl`.
+- :func:`only_positive_bv_wsum_const`: Same as :func:`only_positive_bv_wsum` but returns the constant
+  term separately.
+- :func:`only_positive_coefficients`: Transforms constraints so only positive coefficients appear
+  in linear constraints.
 """
-import copy
-import warnings
-from typing import Set, AbstractSet, Sequence, Optional
 
-import numpy as np
+import copy
+from typing import AbstractSet, Sequence, Optional
+
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
+from .cse import CSEMap
 
 from .flatten_model import flatten_constraint, get_or_make_var
 from .decompose_global import decompose_in_tree, decompose_objective
@@ -62,8 +76,8 @@ from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, NegativeTable
-from ..expressions.globalfunctions import GlobalFunction, Element, NValue, Count
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent
+from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 from .int2bool import _encode_int_var
@@ -135,26 +149,27 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                         else: # need to linearize the implication constraint itself
                             # either -> is not supported, or we are in a reified context (nested -> constraints are not linear)
                             assert isinstance(lin, Comparison), f"Expected a comparison as rhs of implication constraint, got {lin}"
-                            if lin.args[0].name not in {"sum", "wsum"}:
-                                assert lin.args[0].name in supported, f"Unexpected rhs of implication: {lin}, it is not supported ({supported})"
+                            lin_lhs, lin_rhs = lin.args
+                            if lin_lhs.name not in {"sum", "wsum"}:
+                                assert lin_lhs.name in supported, f"Unexpected lhs of rhs of implication: {cpm_expr}, it is not supported ({supported})"
                                 indicator_constraints.append(cond.implies(lin))
                                 continue
 
                             # need to write as big-M
-                            assert lin.args[0].name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as rhs of implication constraint, but got {lin}"
-                            assert is_num(lin.args[1])
-                            lb, ub = get_bounds(lin.args[0])
+                            assert lin_lhs.name in frozenset({'sum', 'wsum'}), f"Expected sum or wsum as lhs of rhs of implication constraint, but got {lin_lhs}"
+                            assert is_num(lin_rhs)
+                            lb, ub = get_bounds(lin_lhs)
                             if lin.name == "<=":
-                                M = lin.args[1] - ub # subtracting M from lhs will always satisfy the implied constraint
-                                lin.args[0] += M * ~cond
-                                indicator_constraints.append(lin)
+                                M = lin_rhs - ub # subtracting M from lhs will always satisfy the implied constraint
+                                lin_lhs += M * ~cond
+                                indicator_constraints.append(Comparison(lin.name, lin_lhs, lin_rhs))
                             elif lin.name == ">=":
-                                M = lin.args[1] - lb # adding M to lhs will always satisfy the implied constraint
-                                lin.args[0] += M * ~cond
-                                indicator_constraints.append(lin)
+                                M = lin_rhs - lb # adding M to lhs will always satisfy the implied constraint
+                                lin_lhs += M * ~cond
+                                indicator_constraints.append(Comparison(lin.name, lin_lhs, lin_rhs))
                             elif lin.name == "==":
-                                indicator_constraints += linearize_constraint([cond.implies(lin.args[0] <= lin.args[1]),
-                                                                               cond.implies(lin.args[0] >= lin.args[1])],
+                                indicator_constraints += linearize_constraint([cond.implies(lin_lhs <= lin_rhs),
+                                                                               cond.implies(lin_lhs >= lin_rhs)],
                                                                               supported=supported, reified=reified, csemap=csemap)
                             else:
                                 raise ValueError(f"Unexpected linearized rhs of implication {lin} in {cpm_expr}")
@@ -297,7 +312,7 @@ def only_positive_bv(lst_of_expr, csemap=None):
                         if nbv:
                             aux = cp.boolvar()
                             new_args.append(aux)
-                            new_cons += [aux + lhs.args[i]._bv == 1]  # aux == 1 - arg._bv
+                            new_cons.append(aux + lhs.args[i]._bv == 1)  # aux == 1 - arg._bv
                         else:
                             new_args.append(lhs.args[i])
 
@@ -562,7 +577,7 @@ def only_positive_coefficients(lst_of_expr):
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Optional[AbstractSet[str]] = None,
                      supported_reified: Optional[AbstractSet[str]] = None,
-                     csemap: Optional[dict[Expression, Expression]] = None):
+                     csemap: Optional[CSEMap] = None):
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
 
@@ -582,12 +597,12 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
 
     decompose_custom = get_linear_decompositions()
 
-    return decompose_in_tree(lst_of_expr, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
 
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,
                                supported_reified: Optional[AbstractSet[str]] = None,
-                               csemap: Optional[dict[Expression, Expression]] = None):
+                               csemap: Optional[CSEMap] = None):
     """Decompose objective using linear-friendly (var == val) decompositions."""
     if supported is None:
         supported = frozenset[str]()
@@ -630,13 +645,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     if csemap is None:
         return constraints
 
-    # Collect bv -> (var == val)'s in csemap
-    var_vals = {}  # var: [val, bv]
-    for expr, bv in csemap.items():
-        if expr.name == '==':
-            var,val = expr.args
-            if isinstance(var, _NumVarImpl) and is_int(val):
-                var_vals.setdefault(var, []).append((val, bv))
+    var_vals = csemap.get_reified_varvals()
     
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}

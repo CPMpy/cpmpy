@@ -20,6 +20,7 @@ Implementation based on Minizinc model in CSPlib.
 Model created by Ignace Bleukx, ignace.bleukx@kuleuven.be
 """
 
+from pathlib import Path
 from cpmpy import *
 
 def template_design(n_slots, n_templates, n_var, demand,**kwargs):
@@ -84,10 +85,9 @@ if __name__ == "__main__":
     import numpy as np
 
     # argument parsing
-    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob002_template_design.json"
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-instance', default="catfood2", help="Name of the problem instance found in file 'filename'")
-    parser.add_argument('-filename', default=url, help="File containing problem instances, can be local file or url")
+    parser.add_argument('-filename', default=str(Path(__file__).with_name("prob002_template_design.json")), help="File containing problem instances, can be local file or url")
     parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
     args = parser.parse_args()

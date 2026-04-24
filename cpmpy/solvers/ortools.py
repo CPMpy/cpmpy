@@ -54,8 +54,9 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint, Cumulative, NoOverlap
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import get_nonneg_args, is_num, is_int, eval_comparison, flatlist, argval, argvals, get_bounds, is_true_cst, \
-    is_false_cst
+from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_comparison, flatlist, argval, argvals, \
+    get_bounds, is_true_cst, \
+    is_false_cst, implies, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
@@ -81,7 +82,7 @@ class CPM_ortools(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
-                                              "inverse", "no_overlap", "regular",
+                                              "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
@@ -546,7 +547,7 @@ class CPM_ortools(SolverInterface):
                     x,y = lhs.args
                     if get_bounds(y)[0] <= 0: # not supported, but result of modulo is agnositic to sign of second arg
                         y, link = get_or_make_var(-lhs.args[1], csemap=self._csemap)
-                        self += link
+                        self.add(link)
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars([x,y]))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
@@ -560,7 +561,7 @@ class CPM_ortools(SolverInterface):
                         new_lhs = 1
                         for exp in range(n):
                             new_lhs, new_cons = get_or_make_var(b * new_lhs, csemap=self._csemap)
-                            self += new_cons
+                            self.add(new_cons)
                         return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
 
 
@@ -609,6 +610,24 @@ class CPM_ortools(SolverInterface):
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
 
                 return self.ort_model.AddCumulative(intervals, demand, cap)
+            elif cpm_expr.name == "cumulative_optional":
+                start, dur, end, demand, cap, is_present = cpm_expr.args
+                # ensure duration is non-negative
+                dur, dur_cons = get_nonneg_args(dur, is_present)
+                self.add(dur_cons)
+
+                if end is None: # need to make the end-variables ourself
+                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
+
+                # ensure demand is non-negative
+                demand, demand_cons = get_nonneg_args(demand, is_present)
+                self.add(demand_cons)
+
+                start, dur, end, demand, cap, is_present = self.solver_vars([start, dur, end, demand, cap, is_present])
+                is_present = [bool(p) if is_bool(p) else p for p in is_present] # convert BoolVals to booleans
+                intervals = [self.ort_model.NewOptionalIntervalVar(s,d,e,p,f"interval_{s}-{d}-{e}-{p}") for s,d,e,p in zip(start,dur,end,is_present)]
+                return self.ort_model.AddCumulative(intervals, demand, cap)
+
             elif cpm_expr.name == "no_overlap":
                 assert isinstance(cpm_expr, NoOverlap) # ensure hasattr end_is_none
                 if cpm_expr.end_is_none:
@@ -625,6 +644,19 @@ class CPM_ortools(SolverInterface):
                 intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, dur, end)]
 
                 return self.ort_model.AddNoOverlap(intervals)
+            elif cpm_expr.name == "no_overlap_optional":
+                start, dur, end, is_present = cpm_expr.args
+                dur, dur_cons = get_nonneg_args(dur, is_present)
+                self.add(dur_cons)
+
+                if end is None: # need to make the end-variables ourself
+                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
+
+                start, dur, end, is_present = self.solver_vars([start, dur, end, is_present])
+                is_present = [bool(p) if is_bool(p) else p for p in is_present] # convert BoolVals
+                intervals = [self.ort_model.NewOptionalIntervalVar(s, d, e, p, f"interval_{s}-{d}-{e}-{p}") for s, d, e, p in zip(start, dur, end, is_present)]
+
+                return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars direclty is recommended
@@ -633,7 +665,7 @@ class CPM_ortools(SolverInterface):
                 N = len(x)
                 arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
-                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                self.add([b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)])
                 # post the global constraint
                 # when posting arcs on diagonal (i==j), it would do subcircuit
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
@@ -870,12 +902,13 @@ try:
         def __init__(self, solver, display=None, solution_limit=None, verbose=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
+            self._solver = solver
             # we only need the cpmpy->solver varmap from the solver
             self._varmap = solver._varmap
             # identify which variables to populate with their values
             self._cpm_vars = []
             self._display = display
-            if isinstance(display, (list,Expression)):
+            if isinstance(display, Expression) or is_any_list(display):
                 self._cpm_vars = get_variables(display)
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
@@ -887,22 +920,14 @@ try:
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            cpm_subvar._value = self.Value(self._varmap[cpm_subvar])
-                    elif isinstance(cpm_var, _BoolVarImpl):
+                    if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(self.Value(self._varmap[cpm_var]))
+                    elif isinstance(cpm_var, _IntVarImpl):
+                        cpm_var._value = int(self.Value(self._varmap[cpm_var]))
                     else:
-                        cpm_var._value = self.Value(self._varmap[cpm_var])
+                        raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                if isinstance(self._display, Expression):
-                    print(argval(self._display))
-                elif isinstance(self._display, list):
-                    # explicit list of expressions to display
-                    print(argvals(self._display))
-                else: # callable
-                    self._display()
+                self._solver.print_display(self._display)
 
             # check for count limit
             if self.solution_count() == self._solution_limit:

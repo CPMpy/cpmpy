@@ -114,8 +114,6 @@ class CPM_pindakaas(SolverInterface):
         self.ivarmap = dict()  # for the integer to boolean encoders
         self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
-        # TODO workaround for upstream issue https://github.com/pindakaashq/pindakaas/issues/189
-        self.pdk_solver._set_option("factor", 0)
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
         super().__init__(name=name, cpm_model=cpm_model)
@@ -224,7 +222,7 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                self += cons
+                self.add(cons)
             else:
                 enc = self.ivarmap[cpm_var.name]
             return self.solver_vars(enc.vars())
@@ -271,10 +269,10 @@ class CPM_pindakaas(SolverInterface):
 
     def _add_clause(self, clause, conditions=[]):
         """Add a clause implied by conditions; both arguments are lists of CPMpy literals."""
-        if not isinstance(clause, list):
+        if not isinstance(clause, (tuple, list)):
             raise TypeError
 
-        self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + clause))
+        self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + list(clause)))
 
     def _post_constraint(self, cpm_expr, conditions=[]):
         if not isinstance(conditions, list):

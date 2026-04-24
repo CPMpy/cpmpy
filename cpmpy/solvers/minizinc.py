@@ -478,13 +478,7 @@ class CPM_minizinc(SolverInterface):
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
             # display if needed
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
+            self.print_display(display)
 
             # count and stop
             solution_count += 1
@@ -492,7 +486,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += cpm_any([v != v.value() for v in self.user_vars])
+            self.add(cpm_any([v != v.value() for v in self.user_vars]))
 
         if solution_count == 0:
             # clear user vars if no solution found
@@ -701,9 +695,9 @@ class CPM_minizinc(SolverInterface):
             return f"{expr.name}({{}}, {{}})".format(X, Y)
 
         if expr.name in ["lex_chain_less", "lex_chain_lesseq"]:
-            X = cpm_array([[self._convert_expression(e) for e in row] for row in expr.args])
+            arr = np.array([[self._convert_expression(e) for e in row] for row in expr.args])  # use np.array because its plain strings
             str_X = "[|\n"  # opening
-            for row in X.T:  # Minizinc enforces lexicographic order on columns
+            for row in arr.T:  # Minizinc enforces lexicographic order on columns
                 str_X += ",".join(map(str, row)) + " |"  # rows
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)

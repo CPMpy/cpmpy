@@ -333,7 +333,7 @@ class CPM_pysat(SolverInterface):
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                self += cons
+                self.add(cons)
             else:
                 enc = self.ivarmap[cpm_var.name]
             return self.solver_vars(enc.vars())
@@ -418,7 +418,7 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.add_clause(self.solver_vars(args))
             elif isinstance(a1, Operator) and a1.name == 'or':
                 # BoolVar() -> or(...)
-                args = [~a0]+a1.args
+                args = [~a0]+list(a1.args)
                 self.pysat_solver.add_clause(self.solver_vars(args))
             elif isinstance(a1, Comparison) and a1.args[0].name == "sum":  # implied sum comparison (a0->sum(bvs)<>val)
                 # implied sum comparison (a0->sum(bvs)<>val)
@@ -430,10 +430,8 @@ class CPM_pysat(SolverInterface):
                 self.pysat_solver.append_formula(cnf)
             elif isinstance(a1, Comparison) and a1.args[0].name == "wsum":  # implied pseudo-boolean comparison (a0->wsum(ws,bvs)<>val)
                 # implied sum comparison (a0->wsum([w,bvs])<>val or a0->(w*bv<>val))
-                cnf = self._pysat_pseudoboolean(a1)
-                # implication of conjunction is conjunction of individual implications
-                antecedent = [self.solver_var(~a0)]
-                self.pysat_solver.append_formula([antecedent+c for c in cnf])
+                cnf = self._pysat_pseudoboolean(a1, conditional=a0)
+                self.pysat_solver.append_formula(cnf)
             else:
                 raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
 
@@ -556,7 +554,7 @@ class CPM_pysat(SolverInterface):
         else:
             raise ValueError(f"PySAT: Expected Comparison to be either <=, ==, or >=, but was {cpm_expr.name}")
 
-    def _pysat_pseudoboolean(self, cpm_expr):
+    def _pysat_pseudoboolean(self, cpm_expr, conditional=None):
         """Convert CPMpy comparison of `wsum` (over Boolean variables) into PySAT list of clauses."""
         if self._pb is None:
             raise ImportError("The model contains a PB constraint, for which PySAT needs an additional dependency (PBLib). To install it, run `pip install pypblib`.")
@@ -571,6 +569,8 @@ class CPM_pysat(SolverInterface):
         lits = self.solver_vars(lhs.args[1])
         pysat_args = {"weights": lhs.args[0], "lits": lits, "bound": rhs, "vpool":self.pysat_vpool }
 
+        if conditional is not None:
+            pysat_args["conditionals"] = [self.solver_var(conditional)]
 
         if cpm_expr.name == "<=":
             return self._pb.PBEnc.atmost(**pysat_args).clauses

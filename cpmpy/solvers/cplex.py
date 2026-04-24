@@ -54,9 +54,8 @@ import warnings
 from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..exceptions import NotSupportedError
-from ..expressions.core import *
-from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_bool
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -95,13 +94,11 @@ class CPM_cplex(SolverInterface):
         try:
             import docplex.mp as domp
         except ModuleNotFoundError as e:
-            warnings.warn(f"CPM_cplex: Could not import docplex: {e}")
             return False
         try:
             import cplex
             return True
         except ModuleNotFoundError as e:
-            warnings.warn(f"CPM_cplex: Could not import cplex: {e}")
             return False
 
     @staticmethod
@@ -618,13 +615,7 @@ class CPM_cplex(SolverInterface):
                 if self.has_objective():
                     self.objective_value_ = sol_obj_val + self._obj_offset
 
-                if display is not None:
-                    if isinstance(display, Expression):
-                        print(argval(display))
-                    elif isinstance(display, list):
-                        print(argvals(display))
-                    else:
-                        display()  # callback
+                self.print_display(display)
 
         # Reset pool search mode to default
         self.cplex_model.context.cplex_parameters.mip.limits.populate = 1

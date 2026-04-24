@@ -33,7 +33,6 @@ import numpy as np
 
 from .exceptions import NotSupportedError
 from .expressions.core import Expression
-from .expressions.variables import NDVarArray
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -70,9 +69,9 @@ class Model(object):
         if is_any_list(args):
             # add (and type-check) one by one
             for a in args:
-                self += a
+                self.add(a)
         else:
-            self += args
+            self.add(args)
 
         # store objective if present
         if maximize is not None:
@@ -100,7 +99,7 @@ class Model(object):
         if is_any_list(con):
             # catch some beginner mistakes: check that top-level Expressions in the list have Boolean return type
             for elem in con:
-                if isinstance(elem, Expression) and not elem.is_bool() and not isinstance(elem, NDVarArray):
+                if isinstance(elem, Expression) and not elem.is_bool():
                     raise Exception(f"Model error: constraints must be expressions that return a Boolean value, `{elem}` does not.")
 
             if len(con) == 0:

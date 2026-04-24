@@ -3,7 +3,8 @@ import pytest
 import cpmpy as cp
 import numpy as np
 
-from cpmpy.expressions import *
+from cpmpy.expressions.variables import boolvar, intvar, cpm_array
+from cpmpy.expressions.globalfunctions import Maximum, Abs
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
@@ -239,7 +240,7 @@ class TestMul:
         prod = x * a
 
         assert isinstance(prod, NDVarArray)
-        for expr in prod.args:
+        for expr in prod:
             assert isinstance(expr, Expression) or expr == 0
 
 class TestArrayExpressions:
@@ -585,7 +586,7 @@ class TestNullifyingArguments:
 
     def test_num(self):
         funcs = ["__add__", "__radd__", "__sub__", "__rsub__", "__mul__", "__rmul__",
-                 "__truediv__", "__rtruediv__", "__floordiv__", "__rfloordiv__",
+                 "__floordiv__", "__rfloordiv__",
                  "__mod__", "__rmod__"]
 
         for func in funcs:
@@ -595,6 +596,14 @@ class TestNullifyingArguments:
 
             expr = getattr(self.x, func)(0)
             assert get_variables(expr) == [self.x]
+
+        with pytest.warns(SyntaxWarning, match="We only support floordivision"):
+            expr = self.x / 1
+        assert get_variables(expr) == [self.x]
+
+        with pytest.warns(SyntaxWarning, match="We only support floordivision"):
+            expr = 1 / self.x
+        assert get_variables(expr) == [self.x]
 
 
 

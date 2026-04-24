@@ -43,11 +43,12 @@
 """
 
 from typing import Optional, List
+import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import *
-from ..expressions.utils import argvals, argval
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.utils import argvals, argval, is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -586,13 +587,7 @@ class CPM_gurobi(SolverInterface):
             if self.has_objective():
                 self.objective_value_ = self.grb_model.PoolObjVal
 
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
+            self.print_display(display)
 
         # Reset pool search mode to default
         self.grb_model.setParam("PoolSearchMode", 0)
