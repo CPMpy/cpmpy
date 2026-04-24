@@ -579,7 +579,7 @@ class CPM_gurobi(SolverInterface):
         # model updates can be expensive, so we do this only once!
         s.native_model.update()
         for grb_con in grb_hard_cons:
-            # Different Gurobi constraint types have different names for this `IIS*Force` attritube
+            # Different Gurobi constraint types have different names for this `IIS*Force` attribute
             if isinstance(grb_con, gp.Constr):
                 grb_con.IISConstrForce = 1
             elif isinstance(grb_con, gp.GenConstr):
@@ -599,12 +599,24 @@ class CPM_gurobi(SolverInterface):
                 raise AssertionError("MUS: model must be UNSAT")
             raise
 
-        mus = []
-        for soft_i, grb_soft_i in zip(soft_cons, grb_soft_cons):
-            # if grb_soft_i has the `IISConstr` attribute enabled, then `soft_i` is in the MUS. Again, the exact attribute depends on the constraint type.
-            if any(getattr(grb_soft_i, attr, False) for attr in ("IISConstr", "IISGenConstr", "IISQConstr", "IISSOS")):
-                mus.append(soft_i)
-        return mus
+        def in_iis(grb_con):
+            """Check if `grb_con` is in the IIS. The exact attribute name depends on the type of Gurobi constraint."""
+            if isinstance(grb_con, gp.Constr):
+                return grb_con.IISConstr == 1
+            elif isinstance(grb_con, gp.GenConstr):
+                return grb_con.IISGenConstr == 1
+            elif isinstance(grb_con, gp.QConstr):
+                return grb_con.IISQConstr == 1
+            elif isinstance(grb_con, gp.SOS):
+                return grb_con.IISSOSForce == 1
+            else:
+                raise TypeError(f"Unexpected Gurobi constraint {grb_con} of type {type(grb_con)}")
+
+        # TODO once the bug is resolved, we should only perform this check for older versions of Gurobi (see ticket TODO)
+        assert all(in_iis(grb_hard_con) for grb_hard_con in grb_hard_cons), "Due to an upstream bug in Gurobi, the hard constraints have not properly been enforced for this instance, which has led to a potentially non-minimal MUS. Until the bug is resolved, you should use another MUS algorithm."
+
+        # Return `soft_con` if its representing Gurobi constraint is in the IIS
+        return [soft_con for soft_con, grb_soft_con in zip(soft_cons, grb_soft_cons) if in_iis(grb_soft_con)]
 
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
