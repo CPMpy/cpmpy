@@ -922,11 +922,61 @@ class MDD(GlobalConstraint):
                     self.levels[self.mapping[n][v]] = i + 1
             current_nodes = new_nodes
 
-    def _reduce(self):
+        self.sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
+
+        self.reverse_mapping = defaultdict(list)
+        for s in self.mapping.keys():
+            transition_function = self.mapping[s]
+            self.reverse_mapping[tuple(sorted(transition_function.items()))].append(s)
+
+        print("Reverse mapping: ", self.reverse_mapping)
+
+        self.reduced_mapping = defaultdict(dict)
+
+
+    def _reduce(self, node):
         """
-            Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes (to be implemented)
+            Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
         """
-        pass
+        level = self.levels[node]
+
+        if node == self.sink_node:
+            return node
+
+        for v in self.mapping[node].keys():
+            dst = self.mapping[node][v]
+            new_node = self._reduce(dst)
+            self.reduced_mapping[node][v] = new_node
+
+        for k, v in self.levels.items():
+            if k != node and v == level:
+                if self.reduced_mapping[k] == self.reduced_mapping[node]:
+                    print("this happens!")
+                    return k
+        return node
+
+
+        '''transition_function = tuple(sorted(self.reduced_mapping[node].items()))
+
+        if node not in self.reverse_mapping[transition_function]:
+            self.reverse_mapping[transition_function].append(node)
+
+        equivalent_nodes = self.reverse_mapping[tuple(sorted(self.mapping[node].items()))]
+
+        if len(equivalent_nodes) == 1:
+            return node
+
+        else:
+            for i, node in enumerate(equivalent_nodes):
+                if i != len(equivalent_nodes):
+                    print("Popped node: ", node)
+                    self.reverse_mapping.pop(node, None)
+
+            print("Current reduced mapping: ", self.reduced_mapping)
+            return equivalent_nodes[-1]'''
+
+
+
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -941,16 +991,23 @@ class MDD(GlobalConstraint):
         """
         arr, _ = self.args
 
-        # MDD is extended with invalid edges, which are directed to the sink node
+        # MDD is reduced by merging nodes with equivalent suffixes
+        print("Mapping: ", self.mapping)
+
+        _ = self._reduce(self.root_node)
+
+        print("Reduced mapping: ", self.reduced_mapping)
+
+        # MDD is extended with invalid edges, which are directed to the sink nodes
         invalid_edges = []
-        extended_mapping = copy.deepcopy(self.mapping)
-        sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
+        extended_mapping = copy.deepcopy(self.reduced_mapping)
+
         for s in self.mapping.keys():
             level = self.levels[s]
             domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
             for v in domain:
                 if v not in self.mapping[s]:
-                    extended_mapping[s][v] = sink_node
+                    extended_mapping[s][v] = self.sink_node
                     invalid_edges.append((s, v))
 
         # Represents the ingoing and outgoing flow for a certain node: for every node, the edge variables are listed
@@ -976,7 +1033,7 @@ class MDD(GlobalConstraint):
         cons = []
 
         # Nodes in the MDD are iterated over, and flow constraints are enforced
-        for node in self.levels.keys():
+        for node in set(extended_mapping.keys()) | {self.sink_node}:
             incoming = flow_in[node]
             outgoing = flow_out[node]
 
