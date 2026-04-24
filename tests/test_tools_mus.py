@@ -34,7 +34,7 @@ class TestMus:
         hard = [~bv]
         soft = [bv]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver="ortools") # crashes
+        mus_cons = self.mus_func(soft=soft, hard=hard) # crashes
         assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
         assert set(mus_naive_cons) == set(soft)
@@ -89,7 +89,7 @@ class TestMus:
 class TestNativeMus(TestMus):
     # use solver from conftest.py
     @pytest.fixture(autouse=True)
-    def setup_solver(self, solver):
+    def setup_method(self, solver):
         self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
         self.naive_func = mus_naive
 
