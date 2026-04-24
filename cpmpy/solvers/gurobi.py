@@ -525,11 +525,18 @@ class CPM_gurobi(SolverInterface):
         """
         Compute a MUS using Gurobi's native IIS (Irreducible Inconsistent Subsystem) algorithm.
 
+        The main 'difficulty' is that Gurobi's native IIS algorithm expects individual constraints,
+        while CPMpy always takes a 'grouped' perspective (e.g. one soft constraint can be a conjunction,
+        or it can be a global that is decomposed/rewritten into multiple constraints).
+
+        The code takes care to leave soft constraints corresponding to a single Gurobi constraint as-is,
+        and adds a new 01 variable plus an implication/'indicator' constraint for each constraint in the group.
+
         Args:
             soft: List of soft constraints over which a MUS needs to be found
             hard: List of hard constraints that always need to be satisfied
 
-        Returns a MUS (list of constraints from soft).
+        Returns a MUS (list of constraints from soft that is unsatisfiable together, and subset minimal).
         """
 
         # TODO unsure if needed?
