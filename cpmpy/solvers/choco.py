@@ -577,12 +577,10 @@ class CPM_choco(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
 
             # many globals require all variables as arguments
-            if cpm_expr.name in {"alldifferent", "alldifferent_except_0", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
+            if cpm_expr.name in {"alldifferent", "allequal", "circuit", "inverse","increasing","decreasing","strictly_increasing","strictly_decreasing","lex_lesseq","lex_less"}:
                 chc_args = self._to_vars(cpm_expr.args)
                 if cpm_expr.name == 'alldifferent':
                     return self.chc_model.all_different(chc_args)
-                elif cpm_expr.name == 'alldifferent_except_0':
-                    return self.chc_model.all_different_except_0(chc_args)
                 elif cpm_expr.name == 'allequal':
                     return self.chc_model.all_equal(chc_args)
                 elif cpm_expr.name == "circuit":
@@ -606,6 +604,10 @@ class CPM_choco(SolverInterface):
 #                    return self.chc_model.lex_chain_less(chc_args)
 
             # but not all
+            elif cpm_expr.name == 'alldifferent_except_0':
+                args, n = cpm_expr.args
+                assert len(n) == 1 and n[0] == 0, f"Choco only supports alldifferent_except_n with n=0, got {n}"
+                return self.chc_model.all_different_except_0(self._to_vars(args))
             elif cpm_expr.name == 'table':
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = self.solver_vars(cpm_expr.args)
