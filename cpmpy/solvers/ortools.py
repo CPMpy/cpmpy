@@ -52,6 +52,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callbac
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_comparison, flatlist, argval, argvals, \
@@ -349,21 +350,36 @@ class CPM_ortools(SolverInterface):
                 are premanently posted to the solver
         """
 
-        # save user varables
-        get_variables(expr, self.user_vars)
+        # special case: a FloatSum objective
+        if isinstance(expr, FloatSum):
+            # save user varables
+            get_variables(expr.terms, self.user_vars)
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(obj,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            # transform objective
+            vars_ = []
+            flat_cons = []
+            for term in expr.terms:
+                var, cons = get_or_make_var(term, csemap=self._csemap)
+                vars_.append(var)
+                flat_cons.extend(cons)
+            self.add(flat_cons)
+            ort_obj = ort.LinearExpr.weighted_sum(self.solver_vars(vars_), expr.coeffs)
+        
+        else:  # normal case, a CPMpy Expression
+            # save user varables
+            get_variables(expr, self.user_vars)
 
-        self.add(safe_cons+decomp_cons+flat_cons)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_objective(obj,
+                                                supported=self.supported_global_constraints,
+                                                supported_reified=self.supported_reified_global_constraints,
+                                                csemap=self._csemap)
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 
-        # make objective function or variable and post
-        ort_obj = self._make_numexpr(obj)
+            self.add(safe_cons+decomp_cons+flat_cons)
+            ort_obj = self._make_numexpr(obj)
+
         if minimize:
             self.ort_model.Minimize(ort_obj)
         else:

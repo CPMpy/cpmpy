@@ -20,7 +20,7 @@ from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy.solvers.scip import CPM_scip
 from cpmpy import SolverLookup
-from cpmpy.exceptions import MinizincNameException, NotSupportedError
+from cpmpy.exceptions import MinizincNameException, NotSupportedError, TypeError as CPMpyTypeError
 
 from test_constraints import numexprs
 from utils import skip_on_missing_pblib
@@ -283,12 +283,26 @@ class TestSolvers:
         m = cp.Model()
         # this works in OR-Tools
         x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
-        m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
+        with pytest.warns(DeprecationWarning, match="Non-integer scalar multiplication is deprecated"):
+            m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
         assert m.solve()
         assert m.objective_value() == 1.4
         # this does not
-        m += 0.7 * x + 0.8 * y >= 1
+        with pytest.warns(DeprecationWarning, match="Non-integer scalar multiplication is deprecated"):
+            m += 0.7 * x + 0.8 * y >= 1
         pytest.raises(TypeError, m.solve)
+
+    def test_ortools_floatsum_objective(self):
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        m = cp.Model(maximize=cp.FloatSum([0.3, 0.5, 0.6], [x, y, z]))
+        assert m.solve(solver="ortools")
+        assert m.objective_value() == pytest.approx(1.4, abs=1e-05)
+
+    def test_floatsum_objective_only(self):
+        x = cp.boolvar(name="x")
+        fs = cp.FloatSum([0.5], [x])
+        with pytest.raises(CPMpyTypeError, match="objective-only"):
+            _ = fs >= 1
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")

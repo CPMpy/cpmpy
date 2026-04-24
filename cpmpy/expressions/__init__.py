@@ -65,6 +65,7 @@ from .globalfunctions import (
     Among,
     NValue,
     NValueExcept,
+    FloatSum,
 )
 from .core import BoolVal
 from .python_builtins import all, any, max, min, sum, abs
@@ -91,6 +92,7 @@ __all__ = [
     "Among",
     "NValue",
     "NValueExcept",
+    "FloatSum",
 # Global constraints
     "AllDifferent",
     "AllDifferentExcept0",
