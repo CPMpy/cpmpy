@@ -74,7 +74,7 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Optional, NoReturn
+from typing import Optional, NoReturn, Final
 import numpy as np
 import cpmpy as cp
 
@@ -1083,11 +1083,11 @@ class FloatSum:
 
     Accepts only (numpy) floats as coefficients, and Expressions as terms.
     """
-    name: str = "floatsum"
+    name: Final = "floatsum"
     coeffs: np.ndarray
     terms: NDVarArray
 
-    def __init__(self, coeffs: ListLike[float|np.floating], terms: ListLike[ExprLike]):
+    def __init__(self, coeffs: ListLike[float|np.floating], terms: ListLike[Expression]):
         self.coeffs = np.asarray(coeffs, dtype=float).reshape(-1)
         if isinstance(terms, NDVarArray):
             self.terms = terms
