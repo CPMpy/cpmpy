@@ -87,7 +87,7 @@ class TestMus:
 # add solvers that implement the native_mus method
 @pytest.mark.requires_solver("exact")       
 class TestNativeMus(TestMus):
-    # use solver from conftest.py
+    # use modern hook to add solver argument to setup method
     @pytest.fixture(autouse=True)
     def setup_method(self, solver):
         self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
