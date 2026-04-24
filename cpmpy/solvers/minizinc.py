@@ -100,8 +100,8 @@ class CPM_minizinc(SolverInterface):
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
                                               "precedence", "no_overlap",
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among"})
-    supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "regular"})
+    supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence", "regular"}
 
     required_version = (2, 8, 2)
 
