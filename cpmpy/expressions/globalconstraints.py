@@ -1197,18 +1197,18 @@ class Cumulative(GlobalConstraint):
         """
 
         if self.end_is_none:
-            start, dur, demand, capacity = argvals(self.args)
+            start, duration,demand, capacity = argvals(self.args)
             if any(a is None for a in start + dur + demand + [capacity]):
                 return None
             end = [start[i] + dur[i] for i in range(len(start))]
         else:
-            start, dur, end, demand, capacity = argvals(self.args)
+            start, duration,end, demand, capacity = argvals(self.args)
             if any(a is None for a in start + dur + end + demand + [capacity]):
                 return None
                 
         if any(d < 0 for d in dur):
             return False
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
+        if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
 
         if any(d < 0 for d in demand):
@@ -1403,18 +1403,18 @@ class CumulativeOptional(GlobalConstraint):
         """        
 
         if self.end_is_none:
-            start, dur, demand, capacity, is_present = argvals(self.args)
+            start, duration,demand, capacity, is_present = argvals(self.args)
             if any(a is None for a in start + dur + demand + [capacity] + is_present):
                 return None
             end = [s + d for s,d in zip(start, dur)]
         else:
-            start, dur, end, demand, capacity, is_present = argvals(self.args)
+            start, duration,end, demand, capacity, is_present = argvals(self.args)
             if any(a is None for a in start + dur + end + demand + [capacity] + is_present):
                 return None
 
-        if any(p and d < 0 for d,p in zip(dur, is_present)):
+        if any(p and d < 0 for d,p in zip(duration,is_present)):
             return False
-        if any(p and s + d != e for s,d,e,p in zip(start, dur, end, is_present)):
+        if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
 
         if any(p and d < 0 for d,p in zip(demand, is_present)):
@@ -1496,13 +1496,13 @@ class NoOverlap(GlobalConstraint):
                 return None
             end = [s + d for s,d in zip(start, dur)]
         else:
-            start, dur, end = argvals(self.args)
-            if any(a is None for a in [start, dur, end]):
+            start, duration,end = argvals(self.args)
+            if any(a is None for a in [start, duration,end]):
                 return None
        
         if any(d < 0 for d in dur):
             return False
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
+        if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
         for (s1,d1), (s2,d2) in all_pairs(zip(start,dur)):
             if s1 + d1 > s2 and s2 + d2 > s1:
@@ -1581,18 +1581,18 @@ class NoOverlapOptional(GlobalConstraint):
         """
 
         if self.end_is_none:
-            start, dur, is_present = argvals(self.args)
+            start, duration,is_present = argvals(self.args)
             if any(a is None for a in start + dur + is_present):
                 return None
             end = [s + d for s,d in zip(start, dur)]
         else:
-            start, dur, end, is_present = argvals(self.args)
+            start, duration,end, is_present = argvals(self.args)
             if any(a is None for a in start + dur + end + is_present):
                 return None
 
-        if any(p and d < 0 for d,p in zip(dur, is_present)):
+        if any(p and d < 0 for d,p in zip(duration,is_present)):
             return False
-        if any(p and s + d != e for s,d,e,p in zip(start, dur, end, is_present)):
+        if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
         for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,dur,is_present)):
             if p1 and p2 and (s1 + d1 > s2) and (s2 + d2 > s1):
