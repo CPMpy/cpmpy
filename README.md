@@ -74,7 +74,6 @@ assert list(df_data.index) == list(range(num_alternatives)), "Index must be defa
 
 # --- Decision variables ---
 start = cp.intvar(0, horizon, name="start", shape=num_alternatives)
-end   = cp.intvar(0, horizon, name="end", shape=num_alternatives)
 active = cp.boolvar(name="active", shape=num_alternatives)
 
 # --- Constraints ---
@@ -84,24 +83,20 @@ model = cp.Model()
 for job_id, group in df_data.groupby('job_id'):
     model += (cp.sum(active[group.index]) == 1)
 
-# For all jobs ensure start + dur = end (also for inactives, thats OK)
-model += (start + df_data['duration'] == end)
-
-# No two active alternatives on the same machine may overlap; (ab)use cumulative with 'active' as demand.
+# No two active alternatives on the same machine may overlap
 for mach_id, group in df_data.groupby('machine_id'):
-    sel = group.index
-    model += cp.Cumulative(start[sel], group['duration'].values, end[sel], active[sel], capacity=1)
+    sel = group.index  # array of indices of the tasks in this group
+    model += cp.NoOverlapOptional(start=start[sel], duration=group['duration'].values, is_present=active[sel])
 
 # --- Objectives ---
-# Makespan: max over all active alternatives
-makespan = cp.intvar(0, horizon, name="makespan")
-for i in range(num_alternatives):
-    model += active[i].implies(makespan >= end[i])  # end times of actives determines makespan
+# Makespan: max over end times (including inactive tasks, not bounded anyway)
+end = start + df_data['duration']
+makespan = cp.max(end)
 
 # Total energy consumption
 total_energy = cp.sum(df_data['energy'] * active)
 
-# Minimize makespan first, then total energy
+# Minimize especially makespan, also consider total energy
 model.minimize(100 * makespan + total_energy)
 
 
