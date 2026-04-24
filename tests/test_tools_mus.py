@@ -83,13 +83,13 @@ class TestMus:
         assert len(ms) < len(cons)
         assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
+
+# add solvers that implement the native_mus method
 @pytest.mark.requires_solver("exact")       
 class TestNativeMus(TestMus):
     def setup_method(self, solver):
-        # solvers that implement native mus
-        if solver in ["exact"]:
-            self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver=solver)
-            self.naive_func = mus_naive
+        self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver=solver)
+        self.naive_func = mus_naive
 
 class TestQuickXplain(TestMus):
 
