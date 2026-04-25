@@ -180,6 +180,16 @@ def expression_tree_cases_():
         None,
     )
 
+    """Indicator body linearization should not leak into subexpressions:
+    x*y+z<=3 linearizes the sum (reifying x*y into IV0), but the defining
+    constraint IV0==x*y should keep x*y as a tree node, not linearize further."""
+    yield (
+        "implies_nested_quad",
+        p.implies(2*(x * y) + 3*z <= 5),
+        ["(p) -> (sum([2, 3] * [IV0, z]) <= 5)", "(IV0) == ((x) * (y))"],
+        ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> 2 IV0 + 3 z <= 5"],
+    )
+
     # TODO improve?
     # yield (
     #     "quad_implies",
