@@ -105,6 +105,13 @@ To run the testsuite on your solver, go to `/tests/test_constraints.py` and set 
 As not every solver should support all possible constraints, you can exclude some using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` and `EXCLUDE_IMPL` dictionaries.
 After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
 
+Once your solver is passing the test suite, it is a good idea to check test coverage to see which lines of your solver code are never executed during the tests. Missing coverage may indicate missing tests, but it could also mean that code you intended to run was silently bypassed. For example, if you added native support for a constraint but a transformation is decomposing it before it reaches your solver, performance could suffer. You can generate an HTML coverage report in `htmlcov` using the [pytest-cov](https://pypi.org/project/pytest-cov/) plugin:
+
+```bash
+pip install pytest-cov
+pytest --cov=cpmpy --cov-report=html -n auto
+```
+
 ## Tunable hyperparameters
 CPMpy offers a tool for searching the best hyperparameter configuration for a given model on a solver (see [corresponding documentation](./solver_parameters.md)).
 Solvers wanting to support this tool should add the following attributes to their interface: `tunable_params` and `default_params` (see [OR-Tools](https://github.com/CPMpy/cpmpy/blob/11ae35b22357ad9b8d6f47317df2c236c3ef5997/cpmpy/solvers/ortools.py#L473) for an example).

@@ -387,7 +387,7 @@ class AllEqualExceptN(GlobalConstraint):
         constraints = []
         for x, y in all_pairs(arr):
             # x and y are equal, or one of them is equal to an excluded value
-            constraints += [cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n)]
+            constraints.append(cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n))
         return constraints, []
 
     def value(self) -> Optional[bool]:
@@ -915,8 +915,8 @@ class InDomain(GlobalConstraint):
         """
         expr, arr = self.args
         lb, ub = expr.get_bounds()
-        
-        return [expr != val for val in range(lb, ub + 1) if val not in arr], []
+        arr_set = frozenset(arr)
+        return [expr != val for val in range(lb, ub + 1) if val not in arr_set], []
 
     def value(self) -> Optional[bool]:
         """
@@ -938,7 +938,8 @@ class InDomain(GlobalConstraint):
         lb, ub = expr.get_bounds()
 
         # complement of arr
-        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr])
+        arr_set = frozenset(arr)
+        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr_set])
 
 
 class Xor(GlobalConstraint):
@@ -965,16 +966,42 @@ class Xor(GlobalConstraint):
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Xor global constraint.
-        Recursively decomposes the constraint into a chain of binary xor-constraints, represented using a sum.
+        Recursively decomposes the constraint into a chain of sums.
+        E.g., xor(a,b,c) :: (((a + b) == 1) + c) == 1
         
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
-        decomp = [sum(self.args[:2]) == 1]
-        if len(self.args) > 2:
-            decomp = Xor(decomp + list(self.args[2:])).decompose()[0]
-        return decomp, []
+        # lets first simplify the Xor by removing all constants:
+        # True Xor x :: ~x  and  False Xor x :: x
+        new_args: list[Expression] = []
+        parity = False  # base case
+        for a in self.args:
+            if isinstance(a, Expression) and not isinstance(a, BoolVal):
+                new_args.append(a)
+            else:  # a constant, don't store but update parity
+                if a:  # True Xor x :: ~x
+                    parity = not parity
+        if len(new_args) == 0:
+            return [BoolVal(parity)], []
+        if parity:  # negate first Boolean variable
+            changed = False
+            for i, a in enumerate(self.args):
+                if isinstance(a, _BoolVarImpl):
+                    new_args[i] = ~a
+                    changed = True
+                    break
+            if not changed:  # no variables, negate first argument
+                new_args[0] = ~new_args[0]  # Warning, creates a negated expression during decompose
+
+        # There are multiple decompositions possible,
+        # recursively using sum allows it to be efficient for all solvers.
+        # E.g., xor(a,b,c) :: (((a + b) == 1) + c) == 1
+        prev: Expression = new_args[0]
+        for a in new_args[1:]:
+            prev = (prev + a == 1)  # recursive pairwise Xor decomposition
+
+        return [prev], []
 
     def value(self) -> Optional[bool]:
         arrvals = argvals(self.args)
@@ -1000,7 +1027,7 @@ class Xor(GlobalConstraint):
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
             from cpmpy.transformations.negation import recurse_negation
-            new_args[0] = recurse_negation(self.args[0])
+            new_args[0] = recurse_negation(self.args[0])           
 
         return Xor(new_args)
 
@@ -1117,12 +1144,13 @@ class Cumulative(GlobalConstraint):
         # tasks are uninterruptible, so we only need to check each starting point of each task
         # I.e., for each task, we check if it can be started, given the tasks that are already running.
         for t in range(len(start)):
+            st = start[t]
             demand_at_start_of_t = []
             for j in range(len(start)):
                 if t != j:
-                    demand_at_start_of_t += [demand[j] * ((start[j] <= start[t]) & (end[j] > start[t]))]
+                    demand_at_start_of_t.append(demand[j] * ((start[j] <= st) & (end[j] > st)))
 
-            cons += [(demand[t] + sum(demand_at_start_of_t)) <= capacity]
+            cons.append((demand[t] + sum(demand_at_start_of_t)) <= capacity)
 
         return cons, []
 
@@ -1314,12 +1342,13 @@ class CumulativeOptional(GlobalConstraint):
         # tasks are uninterruptible, so we only need to check each starting point of each task
         # I.e., for each task, we check if it can be started, given the tasks that are already running.
         for t in range(len(start)):
+            st = start[t]
             demand_at_start_of_t = []
             for j in range(len(start)):
                 if t != j:
-                    demand_at_start_of_t += [demand[j] * (is_present[j] & (start[j] <= start[t]) & (end[j] > start[t]))]
+                    demand_at_start_of_t.append(demand[j] * (is_present[j] & (start[j] <= st) & (end[j] > st)))
 
-            cons += [implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity)]
+            cons.append(implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity))
 
         return cons, []
 
@@ -1424,7 +1453,7 @@ class NoOverlap(GlobalConstraint):
             cons += [s + d == e for s,d,e in zip(start, dur, end)]
             
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
-            cons += [(e1 <= s2) | (e2 <= s1)]
+            cons.append((e1 <= s2) | (e2 <= s1))
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -1576,7 +1605,7 @@ class Precedence(GlobalConstraint):
                 lhs = args[j] == t
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
-                constraints += [lhs.implies(cp.any(args[:j] == s))]
+                constraints.append(lhs.implies(cp.any(args[:j] == s)))
         return constraints, []
 
     def value(self) -> Optional[bool]:

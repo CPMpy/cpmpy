@@ -82,7 +82,7 @@ class CPM_ortools(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
-                                              "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional"
+                                              "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
@@ -547,7 +547,7 @@ class CPM_ortools(SolverInterface):
                     x,y = lhs.args
                     if get_bounds(y)[0] <= 0: # not supported, but result of modulo is agnositic to sign of second arg
                         y, link = get_or_make_var(-lhs.args[1], csemap=self._csemap)
-                        self += link
+                        self.add(link)
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars([x,y]))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
@@ -561,7 +561,7 @@ class CPM_ortools(SolverInterface):
                         new_lhs = 1
                         for exp in range(n):
                             new_lhs, new_cons = get_or_make_var(b * new_lhs, csemap=self._csemap)
-                            self += new_cons
+                            self.add(new_cons)
                         return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
 
 
@@ -657,7 +657,7 @@ class CPM_ortools(SolverInterface):
                 N = len(x)
                 arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
-                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                self.add([b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)])
                 # post the global constraint
                 # when posting arcs on diagonal (i==j), it would do subcircuit
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
@@ -894,6 +894,7 @@ try:
         def __init__(self, solver, display=None, solution_limit=None, verbose=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
+            self._solver = solver
             # we only need the cpmpy->solver varmap from the solver
             self._varmap = solver._varmap
             # identify which variables to populate with their values
@@ -918,14 +919,7 @@ try:
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                # print the desired display
-                if isinstance(self._display, Expression):
-                    print(self._display.value())
-                elif is_any_list(self._display):
-                    print(argvals(self._display))
-                else:
-                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    self._display()  # callback
+                self._solver.print_display(self._display)
 
             # check for count limit
             if self.solution_count() == self._solution_limit:
