@@ -73,9 +73,9 @@ def handle_strict_ineq(cpm_expr, depth, reified, _supported, ctx):
 
 def handle_neq(cpm_expr, depth, reified, _supported, ctx):
     """Decompose != into a disjunction of strict inequalities using one-directional indicators."""
-    (cpm_expr,) = push_down_negation([cpm_expr], toplevel=not reified)
-    if cpm_expr.name == "!=":
-        a, b = cpm_expr.args
+    result = push_down_negation([cpm_expr], toplevel=not reified)
+    if len(result) == 1 and result[0].name == "!=":
+        a, b = result[0].args
         if reified:
             return ctx.recurse((a > b) | (a < b), depth, reified=reified, _supported=_supported)
         else:
@@ -83,8 +83,12 @@ def handle_neq(cpm_expr, depth, reified, _supported, ctx):
             ctx.add(z.implies(a > b))
             ctx.add((~z).implies(a < b))
             return True
-    else:  # push_down_negation may have changed e.g. != into ==
-        return ctx.recurse(cpm_expr, depth, reified=reified, _supported=_supported)
+    elif len(result) == 1:  # push_down_negation changed the expression (e.g. bool != to ==)
+        return ctx.recurse(result[0], depth, reified=reified, _supported=_supported)
+    else:  # push_down_negation decomposed into multiple constraints (toplevel only)
+        for c in result:
+            ctx.add(c)
+        return True
 
 
 def handle_general_constraint(cpm_expr, depth, reified, _supported, ctx, y=None):
@@ -131,7 +135,8 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, reified=F
     """Same as into_tree, but returns a tuple of the root node of the tree and the new top-level (definining) constraints."""
 
     if csemap is None:
-        csemap = {}
+        from ..transformations.cse import CSEMap
+        csemap = CSEMap()
     if handlers is None:
         handlers = {}
 
@@ -144,11 +149,12 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, reified=F
 
     def get_or_make_var(cpm_expr, define=True):
         """Get or make (Boolean/integer) var `b` which represent the expression. Add defining constraints b == cpm_expr if `define=True`."""
-        if cpm_expr in csemap:
-            return csemap[cpm_expr]
+        cached = csemap.get(cpm_expr)
+        if cached is not None:
+            return cached
 
         r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
-        csemap[cpm_expr] = r
+        csemap.flat_map[cpm_expr] = r
         if define:
             add(r == cpm_expr)
         return r
