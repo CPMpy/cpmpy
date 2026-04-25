@@ -25,11 +25,12 @@ import numpy as np
 import cpmpy as cp
 from ..expressions.core import Comparison, Operator, is_boolexpr
 from ..exceptions import NotSupportedError
-from ..expressions.utils import is_num
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
+from ..expressions.utils import is_num, is_int
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from .negation import recurse_negation, push_down_negation
+from .int2bool import _encode_int_var
 
 
 def handle_implication(cpm_expr, depth, reified, _supported, ctx):
@@ -142,6 +143,7 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, reified=F
 
     # constraints will be added to this list
     cpm_cons = []
+    ivarmap = {}  # int2bool encoding map for direct encoding of integer variables
 
     def add(cpm_expr):
         """Add this expression to the tree, flattening if unsupported."""
@@ -152,6 +154,22 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, reified=F
         cached = csemap.get(cpm_expr)
         if cached is not None:
             return cached
+
+        # For x ==/!= val with integer x, eagerly create direct encoding
+        if (isinstance(cpm_expr, Comparison) and cpm_expr.name in ("==", "!=")
+                and isinstance(cpm_expr.args[0], _IntVarImpl)
+                and not isinstance(cpm_expr.args[0], _BoolVarImpl)
+                and is_int(cpm_expr.args[1])):
+            var, val = cpm_expr.args
+            enc, domain_cons = _encode_int_var(ivarmap, var, "direct", csemap=csemap)
+            if domain_cons:  # first time encoding this variable
+                for dc in domain_cons:
+                    add(dc)
+                # channeling: var == wsum(vals, bvs) + k
+                terms, k = enc.encode_term()
+                add(cp.sum(w * b for w, b in terms) + k == var)
+            bv = enc.eq(val)
+            return ~bv if cpm_expr.name == "!=" else bv
 
         r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
         csemap.flat_map[cpm_expr] = r
