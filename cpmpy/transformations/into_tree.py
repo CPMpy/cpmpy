@@ -127,7 +127,7 @@ def _propagate_boolconst(name, args):
             return args
 
 
-def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_constraints={}, reified=False, handlers=None):
+def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, reified=False, handlers=None):
     """Same as into_tree, but returns a tuple of the root node of the tree and the new top-level (definining) constraints."""
 
     if csemap is None:
@@ -193,31 +193,19 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
                 case "not":
                     (a,) = cpm_expr.args
                     return into_tree_expr_(recurse_negation(a), depth, reified=True)
+                case "wsum" if "wsum" in _supported:  # Just for efficiency, don't call add on the weights
+                    ws, xs = cpm_expr.args
+                    return _with_args(
+                        cpm_expr, [ws, [into_tree_expr_(x, depth, reified=True, _supported=_supported) for x in xs]]
+                    )
                 case name if name in _supported:
                     assert name != "div", "TODO"
-                    if name == "wsum":  # Just for efficiency, don't call add on the weights
-                        ws, xs = cpm_expr.args
-                        return _with_args(
-                            cpm_expr, [ws, [into_tree_expr_(x, depth, reified=True, _supported=_supported) for x in xs]]
-                        )
-                    else:
-                        return _with_args(
-                            cpm_expr, [into_tree_expr_(a, depth, reified=True, _supported=_supported) for a in cpm_expr.args]
-                        )
+                    return _with_args(
+                        cpm_expr, [into_tree_expr_(a, depth, reified=True, _supported=_supported) for a in cpm_expr.args]
+                    )
                 case name if name in supported:
                     # Not in current _supported set (e.g. non-linear op in linear context): reify
                     return reify(cpm_expr, depth)
-                case "==" if (
-                    not reified
-                    and isinstance(cpm_expr.args[0], (int, _NumVarImpl))
-                    and isinstance(cpm_expr.args[1], (GlobalFunction, Operator))
-                    and cpm_expr.args[1].name in general_constraints
-                    and cpm_expr.args[1].name in handlers
-                ):
-                    # already of the form: y = f(x), delegate to the general constraint handler
-                    a, b = cpm_expr.args
-                    handlers[b.name](b, depth, reified, _supported, ctx, y=a)
-                    return True
                 case "==" if (
                     isinstance(cpm_expr.args[0], _BoolVarImpl)
                     and is_boolexpr(cpm_expr.args[1])
@@ -227,16 +215,16 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
                     a, b = cpm_expr.args
                     add(a.implies(b))
                     add((~a).implies(recurse_negation(b)))
-                    con = True
+                    return True
                 case "==" | "<=" | ">=":
                     a, b = (
                         into_tree_expr_(cpm_expr.args[0], depth, reified=True, _supported=_supported),
                         into_tree_expr_(cpm_expr.args[1], depth, reified=True, _supported=_supported),
                     )
                     con = _with_args(cpm_expr, [a, b])
+                    return reify(con, depth) if reified else con
                 case _:
                     raise_unexpected_expr(cpm_expr)
-            return reify(con, depth) if reified else con
         elif isinstance(cpm_expr, DirectConstraint):
             return cpm_expr  # pass through to solver-specific posting
         else:
@@ -257,16 +245,15 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
     return into_tree_expr_(cpm_expr, 0, reified=reified), cpm_cons
 
 
-def into_tree(cpm_expr, csemap=None, verbose=False, supported={}, general_constraints={}, handlers=None):
+def into_tree(cpm_expr, csemap=None, verbose=False, supported={}, handlers=None):
     """Transform CPMpy expressions into an expression tree, flattening unsupported expressions but keeping supported ones as tree nodes.
 
-    Recursively processes expressions, keeping mul/pow/sum as tree nodes and reifying only what the solver cannot handle natively (general constraints, non-linear indicator bodies, !=). Side-effect constraints (from reification and decomposition) are collected and returned alongside the main constraints.
+    Recursively processes expressions, keeping mul/pow/sum as tree nodes and reifying only what the solver cannot handle natively. Side-effect constraints (from reification and decomposition) are collected and returned alongside the main constraints.
 
     Args:
         cpm_expr: CPMpy expression or list of expressions to transform
         csemap: dict for common subexpression elimination (shared across calls)
         supported: set of supported constraints (will not be flattened)
-        general_constraints: set of Gurobi general constraints (will be left as y = f(x1, x2, ...) with xi being integer/Boolean variables).
         handlers: dict mapping expression names to handler functions for solver-specific logic.
             Each handler receives (cpm_expr, depth, reified, _supported, ctx).
         verbose: if True, print debug trace of the transformation
@@ -282,7 +269,6 @@ def into_tree(cpm_expr, csemap=None, verbose=False, supported={}, general_constr
             csemap=csemap,
             verbose=verbose,
             supported=supported,
-            general_constraints=general_constraints,
             handlers=handlers,
         )
         cpm_cons += [root] + cons

@@ -310,7 +310,6 @@ class CPM_gurobi(SolverInterface):
             # only linear/quadratic objectives supported
             supported=self.supported_tree_exprs - {"pow"},
             reified=True,  # TODO this is a bit hacky to ensure e.g. Comparison's are reified
-            general_constraints=self.general_constraints,
             handlers={
                 "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
                 **{name: handle_general_constraint for name in self.general_constraints},
@@ -438,7 +437,6 @@ class CPM_gurobi(SolverInterface):
             cpm_cons,
             csemap=self._csemap,
             supported=self.supported_tree_exprs,
-            general_constraints=self.general_constraints,
             handlers={
                 "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
                 **{name: handle_general_constraint for name in self.general_constraints},
