@@ -112,7 +112,7 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
         else:
             return get_or_make_var(cpm_expr)
 
-    def add_comparison(cpm_expr, depth, reified=False):
+    def add_comparison(cpm_expr, depth, reified=False, linear=False):
         """Process a Comparison expression. Returns a Comparison or True (posted as side effect).
         If reified=True, returns a BoolVar representing the truth value of the comparison."""
         a, b = cpm_expr.args
@@ -133,7 +133,7 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
                 add((~a).implies(recurse_negation(b)))
                 con = True
             case "==" | "<=" | ">=":
-                a, b = into_tree_expr_(a, depth, reified=True), into_tree_expr_(b, depth, reified=True)
+                a, b = into_tree_expr_(a, depth, reified=True, linear=linear), into_tree_expr_(b, depth, reified=True, linear=linear)
                 con = with_args(cpm_expr, [a, b])
             case "!=":
                 # One-directional indicator split: d=1 -> a>b, e=1 -> a<b
@@ -141,19 +141,18 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
                 if cpm_expr.name == "!=":
                     a, b = cpm_expr.args
                     if reified:
-                        return into_tree_expr_((a > b) | (a < b), depth, reified=reified)
+                        return into_tree_expr_((a > b) | (a < b), depth, reified=reified, linear=linear)
                     else:
                         z = cp.boolvar()
-                        # return add_(z.implies(a > b) & (~z).implies(a < b), depth, reified=reified)
                         add(z.implies(a > b))
                         add((~z).implies(a < b))
                         return True
                 else:  # push_down_negation may have changed e.g. != into ==
-                    return into_tree_expr_(cpm_expr, depth, reified=reified)
+                    return into_tree_expr_(cpm_expr, depth, reified=reified, linear=linear)
             case ">":
-                return into_tree_expr_(a >= b + 1, depth, reified=reified)
+                return into_tree_expr_(a >= b + 1, depth, reified=reified, linear=linear)
             case "<":
-                return into_tree_expr_(a <= b - 1, depth, reified=reified)
+                return into_tree_expr_(a <= b - 1, depth, reified=reified, linear=linear)
             case _:
                 raise Exception(
                     f"Expected comparator to be ==,<=,>= in Comparison expression {cpm_expr}, but was {cpm_expr.name}"
@@ -161,47 +160,18 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
 
         return reify(con, depth) if reified else con
 
-    def linearize(cpm_expr, depth):
-        """Ensure expression is linear (no mul/pow) by reifying non-linear parts into aux vars."""
-        if verbose:
-            print(f"{'  ' * depth}lin", cpm_expr)
-
-        # Only comparisons (except !=) can be indicator bodies directly;
-        # everything else (!=, BoolVars, and/or/etc.) needs reification into a BV
-        can_be_linear = isinstance(cpm_expr, Comparison) and cpm_expr.name != "!="
-        cpm_expr = into_tree_expr_(cpm_expr, depth, reified=not can_be_linear)
-        if isinstance(cpm_expr, _NumVarImpl):
-            return cpm_expr >= 1
-        elif isinstance(cpm_expr, Comparison):
-
-            def linearize_expr(expr):
-                if is_num(expr) or isinstance(expr, _NumVarImpl):
-                    return expr
-                elif isinstance(expr, Operator):
-                    match expr.name:
-                        case "sum":
-                            return with_args(expr, [reify(a_i, depth) for a_i in expr.args])
-                        case "wsum":
-                            w, x = expr.args
-                            return with_args(expr, [w, [reify(x_i, depth) for x_i in x]])
-                        case _:
-                            return reify(expr, depth)
-                else:
-                    return reify(expr, depth)
-
-            a, b = cpm_expr.args
-            return with_args(cpm_expr, [linearize_expr(a), linearize_expr(b)])
-        else:
-            return reify(cpm_expr, depth) >= 1
+    # Linear operators that can remain as tree nodes in indicator bodies
+    linear_supported = supported & {"sum", "wsum", "sub", "-"}
 
     def raise_unexpected_expr(cpm_expr):
         raise NotSupportedError(f"Unexpected constraint {cpm_expr} in `into_tree`")
 
-    def into_tree_expr_(cpm_expr, depth, reified=False):
+    def into_tree_expr_(cpm_expr, depth, reified=False, linear=False):
         indent = "  " * depth
         depth += 1
+        effective_supported = linear_supported if linear else supported
         if verbose:
-            print(f"{indent}Con:", cpm_expr, type(cpm_expr), "reif" if reified else "root")
+            print(f"{indent}Con:", cpm_expr, type(cpm_expr), "reif" if reified else "root", "lin" if linear else "")
 
         if is_num(cpm_expr):
             # TODO clean this up ; currently overly complicated due to float expressions
@@ -219,9 +189,16 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
                         if is_num(p):  # propagate fixed antecedent
                             return into_tree_expr_(b, depth, reified=reified) if a else True
                         assert isinstance(p, _BoolVarImpl)
-                        q = linearize(b, depth)
-                        if is_num(q):
-                            return True if q else into_tree_expr_(p, depth, reified=reified)
+                        # Indicator body must be linear; use linear=True to reify non-linear operators
+                        can_be_linear = isinstance(b, Comparison) and b.name != "!="
+                        q = into_tree_expr_(b, depth, reified=not can_be_linear, linear=True)
+                        # Ensure result is a Comparison (indicator body requirement)
+                        if isinstance(q, _NumVarImpl):
+                            q = q >= 1
+                        elif not isinstance(q, Comparison):
+                            if is_num(q):
+                                return True if q else into_tree_expr_(p, depth, reified=reified)
+                            q = reify(q, depth) >= 1
                         assert isinstance(q, Comparison), f"Expected linear constraint, but got {q}"
                         return with_args(cpm_expr, [p, q])
                     else:
@@ -230,19 +207,22 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, supported={}, general_c
                 case "not":  # not is not handled by gurobi
                     (a,) = cpm_expr.args
                     return into_tree_expr_(recurse_negation(a), depth, reified=True)
-                case name if name in supported:  # Expression tree nodes (w/ args)
+                case name if name in effective_supported:  # Expression tree nodes (w/ args)
                     assert cpm_expr.name != "div", "TODO"
                     if name == "wsum":  # Just for efficiency, don't call add on the weights
                         ws, xs = cpm_expr.args
-                        return with_args(cpm_expr, [ws, [into_tree_expr_(x, depth, reified=True) for x in xs]])
+                        return with_args(cpm_expr, [ws, [into_tree_expr_(x, depth, reified=True, linear=linear) for x in xs]])
                     else:
-                        return with_args(cpm_expr, [into_tree_expr_(a, depth, reified=True) for a in cpm_expr.args])
+                        return with_args(cpm_expr, [into_tree_expr_(a, depth, reified=True, linear=linear) for a in cpm_expr.args])
                 case name if name in general_constraints:
                     return add_general_constraint(cpm_expr, depth, reified=reified)
                 case _:
+                    # When linearizing, non-linear operators not in general_constraints get reified
+                    if linear and cpm_expr.name in supported:
+                        return reify(cpm_expr, depth)
                     raise_unexpected_expr(cpm_expr)
         elif isinstance(cpm_expr, Comparison):
-            return add_comparison(cpm_expr, depth, reified=reified)
+            return add_comparison(cpm_expr, depth, reified=reified, linear=linear)
         elif isinstance(cpm_expr, DirectConstraint):
             return cpm_expr  # pass through to solver-specific posting
         else:
