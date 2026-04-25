@@ -51,7 +51,7 @@ from ..expressions.utils import argvals, is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..transformations.into_tree import into_tree, into_tree_expr
+from ..transformations.into_tree import into_tree, into_tree_expr, handle_implication, handle_strict_ineq, handle_neq, handle_general_constraint
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import decompose_linear
 from ..transformations.normalize import toplevel_list
@@ -311,6 +311,10 @@ class CPM_gurobi(SolverInterface):
             supported=self.supported_tree_exprs - {"pow"},
             reified=True,  # TODO this is a bit hacky to ensure e.g. Comparison's are reified
             general_constraints=self.general_constraints,
+            handlers={
+                "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
+                **{name: handle_general_constraint for name in self.general_constraints},
+            },
             verbose=self.verbose,
         )
         self.add(obj_cons)
@@ -435,6 +439,10 @@ class CPM_gurobi(SolverInterface):
             csemap=self._csemap,
             supported=self.supported_tree_exprs,
             general_constraints=self.general_constraints,
+            handlers={
+                "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
+                **{name: handle_general_constraint for name in self.general_constraints},
+            },
             verbose=self.verbose,
         )
 
