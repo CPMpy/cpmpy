@@ -54,7 +54,7 @@
     ==============
 """
 import re
-from typing import Optional
+from typing import cast, Optional
 import warnings
 import sys
 import os
@@ -68,7 +68,7 @@ from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
-from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount
+from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, Regular
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -880,6 +880,8 @@ class CPM_minizinc(SolverInterface):
             #   CPMpy:   `Regular([IV0,IV1,IV2], [('a',1,'b'),('b',1,'c'),('b',0,'b'),('c',1,'c'),('c',0,'b')], 'a', ['c'])`
             #   MiniZinc: `constraint regular([IV0,IV1,IV2], array2d(1..3, 0..1, [<>,2,2,3,2,3]), 1, {3})`
             #            note: `d` is a 2D array `[|<>,2|2,3|2,3|]` with rows=states, cols=values
+
+            expr = cast(expr, Regular)
             array, transitions, start, accepting = expr.args
 
             # Map states to 1..Q (MiniZinc states are 1-indexed)
