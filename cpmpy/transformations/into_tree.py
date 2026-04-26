@@ -258,6 +258,16 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
                     a, b = cpm_expr.args
                     add(a.implies(b) & (~a).implies(recurse_negation(b)))
                     return True
+                case "==" if (
+                    isinstance(cpm_expr.args[0], _NumVarImpl)
+                    and isinstance(cpm_expr.args[1], (Operator, GlobalFunction))
+                    and cpm_expr.args[1].name in handlers
+                    and handlers[cpm_expr.args[1].name] is handle_general_constraint
+                ):
+                    # y == f(...) already in normal form: use y directly as defining variable
+                    y, f = cpm_expr.args
+                    handlers[f.name](f, depth, reified, handlers, ctx, y=y)
+                    return True
                 case "==" | "<=" | ">=":
                     a, b = (
                         into_tree_expr_(cpm_expr.args[0], depth, reified=True, handlers=handlers),

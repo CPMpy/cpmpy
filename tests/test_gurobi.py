@@ -368,6 +368,16 @@ def expression_tree_cases_():
         ["R0: IV0 = 1", "GC0: IV0 = MAX ( p , q )"],
     )
 
+
+    """If we find a general constraint already in the proper form of `y = f(x)`, we should not reify"""
+    yield (
+        "general_constraint_in_normal_form",
+        x == cp.Maximum([y, z]),
+        ["True", "(x) == (max(y,z))"],
+        ["GC0: x = MAX ( y , z )"],
+    )
+
+
     # (x) * (pow(y,2)) <= 4
     # (x) * (pow(y,2)) - 4 <= 0
     # y <= 0, y = (x) * (pow(y,2)) - 4
