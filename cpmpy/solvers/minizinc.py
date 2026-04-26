@@ -70,7 +70,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount
-from ..expressions.globalfunctions import Multiplication
+from ..expressions.globalfunctions import Multiplication, FloatSum
 from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
@@ -570,18 +570,31 @@ class CPM_minizinc(SolverInterface):
             'objective()' can be called multiple times, only the last one is stored
         """
 
-        # save user variables
-        get_variables(expr, collect=self.user_vars) # add objvars to vars
+        if isinstance(expr, FloatSum):
+            get_variables(expr.terms, self.user_vars)
+            mzn_parts = []
+            for c, t in zip(expr.coeffs, expr.terms):
+                obj_t, decomp_cons = decompose_objective(
+                    t,
+                    supported=self.supported_global_constraints,
+                    supported_reified=self.supported_reified_global_constraints,
+                    csemap=self._csemap,
+                )
+                self.add(decomp_cons)
+                mzn_sub = self._convert_expression(obj_t)
+                mzn_parts.append("({0:g}) * ({1})".format(float(c), mzn_sub))
+            mzn_obj = " + ".join(mzn_parts)
+        else:
+            get_variables(expr, collect=self.user_vars)  # add objvars to vars
+            obj, decomp_cons = decompose_objective(
+                expr,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            self.add(decomp_cons)
+            mzn_obj = self._convert_expression(obj)
 
-        obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
-        self.add(decomp_cons)
-
-        # make objective function or variable and post
-
-        mzn_obj = self._convert_expression(obj)
         # do not add it to the mzn_model yet, supports only one 'solve' entry
         if minimize:
             self.mzn_txt_solve = "solve minimize {};\n".format(mzn_obj)
