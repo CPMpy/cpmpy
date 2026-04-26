@@ -123,18 +123,18 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     Used for constraints like max, min, abs, and, or that solvers like Gurobi
     require in the form y = f(x1, x2, ...) with all xi being variables.
     """
+    # at root level, and-constraints can be split into individual constraints
+    # (before reifying args, to preserve indicator structure)
+    if not reified and y is None and cpm_expr.name == "and":
+        for arg in cpm_expr.args:
+            ctx.add(ctx.recurse(arg, depth, reified=False, handlers=handlers))
+        return True
     # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
     args = [ctx.reify(ctx.recurse(arg, depth, reified=True), depth) for arg in cpm_expr.args]
     # require non-constants
     args = _propagate_boolconst(cpm_expr.name, args)
     if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
         return args
-    # at root level, and-constraints can be split into individual constraints
-    if not reified and cpm_expr.name == "and":
-        assert y is None
-        for arg in args:
-            ctx.add(arg)
-        return True
     # require the form: y = f(x)
     if y is None:
         y = ctx.get_or_make_var(cpm_expr, define=False) if reified else 1
@@ -256,10 +256,7 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
                 ):
                     # BV == boolexpr === BV <-> boolexpr: post as bi-implications
                     a, b = cpm_expr.args
-                    # TODO use &
-                    # add(a.implies(b) & (~a).implies(recurse_negation(b)))
-                    add(a.implies(b))
-                    add((~a).implies(recurse_negation(b)))
+                    add(a.implies(b) & (~a).implies(recurse_negation(b)))
                     return True
                 case "==" | "<=" | ">=":
                     a, b = (
