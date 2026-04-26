@@ -8,7 +8,7 @@
 
     .. note::
         [GUIDELINE] Replace <TEMPLATE> by the solver's name, and implement the missing pieces
-        The functions are ordered in a way that could be convenient to 
+        The functions are ordered in a way that could be convenient to
         start from the top and continue in that order.
 
     .. note::
@@ -30,7 +30,7 @@
     Requires that the 'TEMPLATEpy' python package is installed:
 
     .. code-block:: console
-    
+
         $ pip install TEMPLATEpy
 
     See detailed installation instructions at:
@@ -50,12 +50,13 @@
 
 from typing import Optional
 import warnings
+
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import is_num, is_any_list, is_boolexpr
+from ..expressions.utils import is_num, is_any_list, is_boolexpr, argvals
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions
@@ -111,7 +112,7 @@ class CPM_template(SolverInterface):
             return version('TEMPLATEpy')
         except PackageNotFoundError:
             return None
-        
+
     # [GUIDELINE] If your solver supports different subsolvers, implement below method to return a list of subsolver names
     @staticmethod
     def solvernames(installed:bool=True):
@@ -120,7 +121,7 @@ class CPM_template(SolverInterface):
 
             Arguments:
                 installed (boolean): whether to filter the solvernames to those installed on your system (default True)
-               
+
             Returns:
                 list of solver names
         """
@@ -144,7 +145,7 @@ class CPM_template(SolverInterface):
             subsolver (str): name of the subsolver
 
         Returns:
-            Version number of the subsolver if installed, else None 
+            Version number of the subsolver if installed, else None
         """
         # return version of requested subsolver (if installed)
         # if requested subsolver does not exist, raise ValueError
@@ -159,7 +160,7 @@ class CPM_template(SolverInterface):
         - subsolver: str, name of a subsolver (optional)
         """
         if not self.supported():
-            raise ModuleNotFoundError("CPM_TEMPLATE: Install the python package 'cpmpy[TEMPLATE]' to use this solver interface.")   
+            raise ModuleNotFoundError("CPM_TEMPLATE: Install the python package 'cpmpy[TEMPLATE]' to use this solver interface.")
 
         import TEMPLATEpy
 
@@ -184,7 +185,7 @@ class CPM_template(SolverInterface):
         """
         return self.TPL_model
 
-    def solve(self, time_limit:Optional[float]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, display=Optional[Callback], **kwargs):
         """
             Call the TEMPLATE solver
 
@@ -207,6 +208,20 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] if your solver supports solving under assumptions, add `assumptions` as argument in header
         #       e.g., def solve(self, time_limit=None, assumptions=None, **kwargs):
         #       then translate assumptions here; assumptions are a list of Boolean variables or NegBoolViews
+
+        # [GUIDELINE] if your solver supports callbacks when a solution is found (during optimization), convert callback here
+        if display is not None:
+            _cpm_vars = get_variables(display) if isinstance(display, Expression) or is_any_list(display) else list(self.user_vars)
+            _tpl_vars = self.solver_vars(_cpm_vars)
+
+            def callback():
+                # first update values of current solution
+                for cpm_var, tpl_var in zip(_cpm_vars, _tpl_vars):
+                    cpm_var._value = self.TPL_solver.value(tpl_var)
+                    raise NotImplementedError("TEMPLATE: back-translating the solution values")
+                self.print_display(display)
+
+            self.TPL_solver.set_solution_callback(callback)
 
         # call the solver, with parameters
         my_status = self.TPL_solver.solve(**kwargs)

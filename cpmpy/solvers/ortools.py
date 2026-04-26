@@ -4,12 +4,12 @@
 ## ortools.py
 ##
 """
-    Interface to OR-Tools' CP-SAT Python API. 
+    Interface to OR-Tools' CP-SAT Python API.
 
     Google OR-Tools is open source software for combinatorial optimization, which seeks
     to find the best solution to a problem out of a very large set of possible solutions.
     The OR-Tools CP-SAT solver is an award-winning constraint programming solver
-    that uses SAT (satisfiability) methods and lazy-clause generation 
+    that uses SAT (satisfiability) methods and lazy-clause generation
     (see https://developers.google.com/optimization).
 
     Always use :func:`cp.SolverLookup.get("ortools") <cpmpy.solvers.utils.SolverLookup.get>` to instantiate the solver object.
@@ -17,12 +17,12 @@
     ============
     Installation
     ============
-    
+
     The 'ortools' python package is bundled by default with CPMpy.
     It can also be installed separately through `pip`:
 
     .. code-block:: console
-    
+
         $ pip install ortools
 
     Detailed installation instructions available at:
@@ -68,7 +68,7 @@ from ..transformations.safening import no_partial_functions, safen_objective
 
 class CPM_ortools(SolverInterface):
     """
-    Interface to OR-Tools' CP-SAT Python API. 
+    Interface to OR-Tools' CP-SAT Python API.
 
     Creates the following attributes (see parent constructor for more):
 
@@ -96,7 +96,7 @@ class CPM_ortools(SolverInterface):
             return False
         except Exception as e:
             raise e
-        
+
     @staticmethod
     def version() -> Optional[str]:
         """
@@ -149,20 +149,23 @@ class CPM_ortools(SolverInterface):
         return self.ort_model
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the CP-SAT solver
 
             Arguments:
-                time_limit (float, optional):  maximum solve time in seconds 
-                assumptions:    list of CPMpy Boolean variables (or their negation) that are assumed to be true.
-                                For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
-                                get_core() returns a small subset of assumption variables that are unsat together.
-                                Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
-                solution_callback (an `ort.CpSolverSolutionCallback` object):   CPMpy includes its own, namely `OrtSolutionCounter`. If you want to count all solutions, 
-                                                                                don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
-                
-                
+                time_limit (float, optional):  maximum solve time in seconds
+                assumptions:                   list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                                               For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
+                                               get_core() returns a small subset of assumption variables that are unsat together.
+                                               Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
+                solution_callback:             Optional CP-SAT ``CpSolverSolutionCallback`` object.
+                                               Takes precedence over ``display`` when both are set.
+                display:                       generic solution callback for use during optimization.
+                                               either a list of CPMpy expressions, OR a callback function which
+                                               gets called after the variable-value mapping of the intermediate solution.
+                                               default/None: nothing is displayed
+
             The ortools solver parameters are defined in its 'sat_parameters.proto' description:
             https://github.com/google/or-tools/blob/stable/ortools/sat/sat_parameters.proto
 
@@ -182,12 +185,12 @@ class CPM_ortools(SolverInterface):
             ``polish_lp_solution=True``       to spend time in lp propagator searching integer values (default: False)
             ``symmetry_level=1``              only do symmetry breaking in presolve (default: 2, also possible: 0)
             =============================   ============
-           
+
 
             Examples:
 
                 .. code-block:: python
-                
+
                     o.solve(num_search_workers=8, log_search_progress=True)
 
         """
@@ -212,6 +215,13 @@ class CPM_ortools(SolverInterface):
             # still present in v9.0
             self.ort_solver.parameters.keep_all_feasible_solutions_in_presolve = True
 
+        # setup solution callback
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
+        elif display is not None:
+            callback = OrtSolutionPrinter(self, display)
+
         # set additional keyword arguments in sat_parameters.proto
         for (kw, val) in kwargs.items():
             # Convert integer values to enum values for parameters that require enums (OR-Tools >= 9.15)
@@ -227,7 +237,7 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.log_callback = print
 
         # call the solver, with parameters
-        self.ort_status = self.ort_solver.solve(self.ort_model, solution_callback=solution_callback)
+        self.ort_status = self.ort_solver.solve(self.ort_model, solution_callback=callback)
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -293,12 +303,12 @@ class CPM_ortools(SolverInterface):
             It is just a wrapper around the use of `OrtSolutionPrinter()` in fact.
 
             Arguments:
-                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping. 
+                display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
                         default/None: nothing displayed
                 solution_limit: stop after this many solutions (default: None)
                 call_from_model: whether the method is called from a CPMpy Model instance or not
 
-            Returns: 
+            Returns:
                 number of solutions found
         """
         if self.has_objective():
@@ -587,7 +597,7 @@ class CPM_ortools(SolverInterface):
             elif cpm_expr.name == "regular":
                 array, transitions, start, accepting = cpm_expr.args
                 array = self.solver_vars(array)
-                return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting], 
+                return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting],
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
             elif cpm_expr.name == "cumulative":
                 start, dur, end, demand, cap = cpm_expr.args
@@ -755,13 +765,13 @@ class CPM_ortools(SolverInterface):
         Returns the value unchanged if no conversion is needed.
         """
         import numpy as np
-        
+
         if param_name not in self._ENUM_PARAMS:
             return value
         # Check for int or numpy integer types
         if not isinstance(value, (int, np.integer)):
             return value  # Already an enum or other type
-        
+
         # Get the enum class from SatParameters
         try:
             from ortools.sat.python.cp_model_helper import SatParameters
@@ -829,14 +839,14 @@ try:
         use with CPM_ortools as follows:
 
         .. code-block:: python
-            
+
             cb = OrtSolutionCounter()
             s.solve(enumerate_all_solutions=True, solution_callback=cb)
 
         then retrieve the solution count with ``cb.solution_count()``
 
         Arguments:
-            verbose (bool, default: False): whether to print info on every solution found 
+            verbose (bool, default: False): whether to print info on every solution found
     """
 
         def __init__(self, verbose=False):
@@ -876,7 +886,7 @@ try:
             ``cb = OrtSolutionPrinter(s, display=[v, x, z])``.
 
             For a custom print function, use for example:
-            
+
             .. code-block:: python
 
                 def myprint():
@@ -886,10 +896,10 @@ try:
             Optionally retrieve the solution count with ``cb.solution_count()``.
 
             Arguments:
-                verbose (bool, default = False): whether to print info on every solution found 
+                verbose (bool, default = False): whether to print info on every solution found
                 display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                             default/None: nothing displayed
-                solution_limit (default = None): stop after this many solutions 
+                solution_limit (default = None): stop after this many solutions
         """
         def __init__(self, solver, display=None, solution_limit=None, verbose=False):
             super().__init__(verbose)

@@ -37,7 +37,7 @@
         If for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
 
     For the verifier functionality, the 'veripb' tool is also required.
-    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb. 
+    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb.
 
     The rest of this documentation is for advanced users.
 
@@ -51,7 +51,7 @@
         CPM_gcs
 """
 import warnings
-from typing import Optional
+from typing import Optional, Callable
 
 from packaging.version import Version
 
@@ -60,7 +60,7 @@ from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar, NDVarArray
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_num, argval, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -112,7 +112,7 @@ class CPM_gcs(SolverInterface):
             return False
         except Exception as e:
             raise e
-        
+
     @staticmethod
     def version() -> Optional[str]:
         """
@@ -156,32 +156,40 @@ class CPM_gcs(SolverInterface):
             Returns the solver's underlying native model (for direct solver access).
         """
         return self.gcs
-    
+
     def has_objective(self):
         return self.objective_var is not None
     
-    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
+    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
               verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds.
+                display:                        generic solution callback for use during optimization.
+                                                either a list of CPMpy expressions, OR a callback function which
+                                                gets called after the variable-value mapping of the intermediate solution.
+                                                default/None: nothing is displayed
                 prove:                          whether to produce a VeriPB proof (.opb model file and .pbp proof file).
                 proof_name:                     name for the the proof files.
                 proof_location:                 location for the proof files (default to current working directory).
                 verify:                         whether to verify the result of the solve run (overrides prove if prove is False)
-                verify_time_limit:              time limit for verification (ignored if verify=False) 
+                verify_time_limit:              time limit for verification (ignored if verify=False)
                 veripb_args:                    list of command line arguments to pass to veripb e.g. ``--trace --useColor`` (run ``veripb --help`` for a full list)
                 display_verifier_output:        whether to print the output from VeriPB
                 **kwargs:                       currently GCS does not support any additional keyword arguments.
 
-            Returns: 
+            Returns:
                 whether a solution was found.
         """
         # ensure all user vars are known to solver
         self.solver_vars(list(self.user_vars))
-        
+
+        callback = None
+        if display is not None:
+            callback = self._get_callback(display)
+
         # If we're verifying we must be proving
         prove |= verify
         # Set default proof name to name of file containing __main__
@@ -198,12 +206,12 @@ class CPM_gcs(SolverInterface):
         # set time limit
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
-                 
-        # call the solver, with parameters    
+
+        # call the solver, with parameters
         self.gcs_result = self.gcs.solve(
             all_solutions=self.has_objective(), 
             timeout=time_limit,
-            callback=None,
+            callback=callback,
             prove=prove,
             proof_name=self.proof_name,
             proof_location=proof_location,
@@ -263,6 +271,26 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
+    def _get_callback(self, display:Callback) -> Callable[[dict[str,int]], None]:
+        if isinstance(display, Expression) or is_any_list(Expression):
+            cpm_vars = get_variables(display)
+        else:
+            cpm_vars = list(self.user_vars)
+        gcs_vars = self.solver_vars(cpm_vars)
+
+        def callback(solution_map: dict[str, int]) -> None:
+            for cpm_var, gcs_var in zip(cpm_vars, gcs_vars):
+                if isinstance(cpm_var, _BoolVarImpl):
+                    # Convert back to bool
+                    cpm_var._value = bool(solution_map[gcs_var])
+                else:
+                    cpm_var._value = solution_map[gcs_var]
+
+            self.print_display(display)
+            return
+
+        return callback
+
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False,
                  prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
                  verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
@@ -279,12 +307,12 @@ class CPM_gcs(SolverInterface):
                 proof_name:                     name for the the proof files.
                 proof_location:                 location for the proof files (default to current working directory).
                 verify:                         whether to verify the result of the solve run (overrides prove if prove is False)
-                verify_time_limit:              time limit for verification (ignored if verify=False) 
+                verify_time_limit:              time limit for verification (ignored if verify=False)
                 veripb_args:                    list of command line arguments to pass to veripb e.g. ``--trace --useColor`` (run ``veripb --help`` for a full list)
                 display_verifier_output:        whether to print the output from VeriPB
                 **kwargs:                       currently GCS does not support any additional keyword arguments.
 
-            Returns: 
+            Returns:
                 number of solutions found
         """
         if self.has_objective():
@@ -303,21 +331,9 @@ class CPM_gcs(SolverInterface):
                 self.proof_name = "gcs_proof"
         self.proof_location = proof_location
 
-        # Set display callback
-        def display_callback(solution_map):
-            for cpm_var in self.user_vars:
-                sol_var = self.solver_var(cpm_var)
-                if isinstance(cpm_var, _BoolVarImpl):
-                    # Convert back to bool
-                    cpm_var._value = bool(solution_map[sol_var])
-                else:
-                    cpm_var._value = solution_map[sol_var]
-            self.print_display(display)
-            return
-
         sol_callback = None
         if display is not None:
-            sol_callback=display_callback
+            sol_callback=self._get_callback(display)
 
         self.gcs_result = self.gcs.solve(
             all_solutions=True, 
@@ -451,7 +467,7 @@ class CPM_gcs(SolverInterface):
         Verify a solver-produced proof using VeriPB.
 
         Requires that the 'veripb' tool is installed and on system path. 
-        See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions. 
+        See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions.
 
         Arguments:
             - name:             name for the the proof files (default to self.proof_name)
