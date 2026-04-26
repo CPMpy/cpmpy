@@ -1215,7 +1215,7 @@ class Cumulative(GlobalConstraint):
 
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
-        np_start, np_end = np.array(start), np.array(end) # eases check below
+        np_start, np_end = np.asanyarray(start), np.asanyarray(end) # eases check below
         for t in range(lb, ub+1):
             if capacity < sum(demand * ((np_start <= t) & (np_end > t))):
                 return False
@@ -1420,7 +1420,7 @@ class CumulativeOptional(GlobalConstraint):
 
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
-        np_start, np_end, np_present = np.array(start), np.array(end), np.array(is_present) # eases check below
+        np_start, np_end, np_present = np.asanyarray(start), np.asanyarray(end), np.asanyarray(is_present) # eases check below
         for t in range(lb, ub+1):
             if capacity < sum(demand * (np_present & (np_start <= t) & (np_end > t))):
                 return False
