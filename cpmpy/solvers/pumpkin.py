@@ -565,10 +565,8 @@ class CPM_pumpkin(SolverInterface):
                 return [constraints.AllDifferent(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
             
             elif cpm_expr.name == "cumulative":
-                assert isinstance(cpm_expr, Cumulative) # ensure hasattr end_is_none
-                
                 pum_cons = []
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 4:
                     start, dur, demand, cap = cpm_expr.args
                 else:
                     start, dur, end, demand, cap = cpm_expr.args
@@ -584,8 +582,7 @@ class CPM_pumpkin(SolverInterface):
                 return pum_cons
 
             elif cpm_expr.name == "no_overlap":
-                assert isinstance(cpm_expr, NoOverlap) # ensure hasattr end_is_none
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 2:
                     start, dur = cpm_expr.args
                     return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1), tag=tag)
                 else:
