@@ -863,6 +863,8 @@ class TestSolvers:
 
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
+    _floatsum_supported_solvers = frozenset({"ortools", "gurobi", "cplex", "scip", "z3"})
+
     def test_installed_solvers(self, solver):
         # basic model
         v = cp.boolvar(3)
@@ -936,6 +938,15 @@ class TestSupportedSolvers:
         m.maximize(cp.min(iv))
         assert m.solve(solver=solver)
         assert m.objective_value() == 5
+
+    def test_floatsum_objective(self, solver):
+        if solver not in self._floatsum_supported_solvers:
+            pytest.skip(f"{solver} does not support FloatSum objective")
+
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        m = cp.Model(maximize=cp.FloatSum([0.3, 0.5, 0.6], [x, y, z]))
+        assert m.solve(solver=solver)
+        assert m.objective_value() == pytest.approx(1.4, abs=1e-05)
 
     def test_value_cleared(self, solver):
         x, y, z = cp.boolvar(shape=3)
