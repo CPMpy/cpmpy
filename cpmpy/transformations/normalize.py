@@ -81,7 +81,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
         if expr.has_subexpr():
             changed, rec_args = _simplify_boolean_args(args, num_context=not expr.is_bool())
             if changed:
-                args = rec_args
+                args = tuple(rec_args)
 
         if expr.name == "or":
             newargs = None
@@ -272,9 +272,9 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
     elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
         rec_changed, rec_args = _simplify_boolean_args(expr.args, num_context=False)
         if rec_changed:
-            newexpr = copy.copy(expr)
-            newexpr.update_args(rec_args)
-            return True, newexpr
+            newerexpr = copy.copy(expr)
+            newerexpr.update_args(rec_args)
+            return True, newerexpr
 
     return False, expr
 
@@ -295,10 +295,10 @@ def _simplify_boolean_args(args: list[Any]|tuple[Any, ...], num_context=False) -
                 newargs.append(rec_arg)
                 continue
         elif isinstance(arg, (list, tuple)):
-            rec_changed, rec_arg = _simplify_boolean_args(arg, num_context=num_context)
+            rec_changed, rec_args = _simplify_boolean_args(arg, num_context=num_context)
             if rec_changed:
                 changed = True
-                newargs.append(rec_arg)
+                newargs.append(rec_args)
                 continue
         elif is_bool(arg):
             changed = True
