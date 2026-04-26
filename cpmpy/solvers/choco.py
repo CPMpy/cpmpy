@@ -645,8 +645,7 @@ class CPM_choco(SolverInterface):
                 expr, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.member(expr, table)
             elif cpm_expr.name == "cumulative":
-                assert isinstance(cpm_expr, Cumulative) # ensure hasattr end_is_none
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 4:
                     start, dur, demand, cap = cpm_expr.args
                 else:
                     start, dur, end, demand, cap = cpm_expr.args
@@ -657,7 +656,7 @@ class CPM_choco(SolverInterface):
                 extra_cons = dur_cons + demand_cons
 
                 # make choco task variables
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 4:
                     tasks = [self.chc_model.task(s,d) for s,d in zip(self._to_vars(start), self.solver_vars(dur))]
                 else:
                     tasks = [self.chc_model.task(s,d,e) for s,d,e in zip(self._to_vars(start), self.solver_vars(dur), self._to_vars(end))]
@@ -668,7 +667,7 @@ class CPM_choco(SolverInterface):
                     return self.chc_model.and_([chc_cumulative] + [self._get_constraint(c) for c in extra_cons])
                 return chc_cumulative
             elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 2:
                     start, dur = cpm_expr.args
                     return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1))
                 else:

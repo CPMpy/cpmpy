@@ -590,8 +590,7 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting], 
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
             elif cpm_expr.name == "cumulative":
-                assert isinstance(cpm_expr, Cumulative) # ensure hasattr end_is_none
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 4:
                     start, dur, demand, cap = cpm_expr.args
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
                 else:
@@ -610,8 +609,7 @@ class CPM_ortools(SolverInterface):
 
                 return self.ort_model.AddCumulative(intervals, demand, cap)
             elif cpm_expr.name == "cumulative_optional":
-                assert isinstance(cpm_expr, CumulativeOptional) # ensure hasattr end_is_none
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 5:
                     start, dur, demand, cap, is_present = cpm_expr.args
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
                 else:
@@ -631,8 +629,7 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddCumulative(intervals, demand, cap)
 
             elif cpm_expr.name == "no_overlap":
-                assert isinstance(cpm_expr, NoOverlap) # ensure hasattr end_is_none
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 2:
                     start, dur = cpm_expr.args
                     end = [intvar(*get_bounds(s + d)) for s, d in zip(start, dur)]
                 else:
@@ -646,8 +643,7 @@ class CPM_ortools(SolverInterface):
 
                 return self.ort_model.AddNoOverlap(intervals)
             elif cpm_expr.name == "no_overlap_optional":
-                assert isinstance(cpm_expr, NoOverlapOptional) # ensure hasattr end_is_none
-                if cpm_expr.end_is_none:
+                if len(cpm_expr.args) == 3:
                     start, dur, is_present = cpm_expr.args
                     end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
                 else:

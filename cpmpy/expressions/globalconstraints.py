@@ -140,8 +140,8 @@ import cpmpy as cp
 
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, ListLike
-from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, _IntVarImpl, NDVarArray
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray
+from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -1078,7 +1078,6 @@ class Cumulative(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        self.end_is_none = end is None
         if end is None:
             super(Cumulative, self).__init__("cumulative", (list(start), list(duration), demand_list, capacity))
         else:
@@ -1123,7 +1122,7 @@ class Cumulative(GlobalConstraint):
 
 
         cons = []
-        if self.end_is_none:
+        if len(self.args) == 4:
             start, duration, demand, capacity = self.args
         else:
             start, duration, end, demand, capacity = self.args
@@ -1145,7 +1144,7 @@ class Cumulative(GlobalConstraint):
         """
 
         cons = self._consistency_constraints()
-        if self.end_is_none:
+        if len(self.args) == 4:
             start, duration, demand, capacity = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
@@ -1175,7 +1174,7 @@ class Cumulative(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         cons = self._consistency_constraints()
-        if self.end_is_none:
+        if len(self.args) == 4:
             start, duration, demand, capacity = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
@@ -1196,7 +1195,7 @@ class Cumulative(GlobalConstraint):
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
 
-        if self.end_is_none:
+        if len(self.args) == 4:
             start, duration,demand, capacity = argvals(self.args)
             if any(a is None for a in start + duration + demand + [capacity]):
                 return None
@@ -1284,7 +1283,6 @@ class CumulativeOptional(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        self.end_is_none = end is None
         if end is None:
             super().__init__("cumulative_optional", (list(start), list(duration), demand_list, capacity, list(is_present)))
         else:
@@ -1327,7 +1325,7 @@ class CumulativeOptional(GlobalConstraint):
         """
 
         cons = []
-        if self.end_is_none:
+        if len(self.args) == 5:
             start, duration, demand, capacity, is_present = self.args
         else:
             start, duration, end, demand, capacity, is_present = self.args
@@ -1350,7 +1348,7 @@ class CumulativeOptional(GlobalConstraint):
         """
         
         cons = self._consistency_constraints()
-        if self.end_is_none:
+        if len(self.args) == 5:
             start, duration, demand, capacity, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
@@ -1381,7 +1379,7 @@ class CumulativeOptional(GlobalConstraint):
         """
         
         cons = self._consistency_constraints()
-        if self.end_is_none:
+        if len(self.args) == 5:
             start, duration, demand, capacity, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
@@ -1402,7 +1400,7 @@ class CumulativeOptional(GlobalConstraint):
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """        
 
-        if self.end_is_none:
+        if len(self.args) == 5:
             start, duration,demand, capacity, is_present = argvals(self.args)
             if any(a is None for a in start + duration + demand + [capacity] + is_present):
                 return None
@@ -1457,7 +1455,6 @@ class NoOverlap(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        self.end_is_none = end is None
         if end is None:
             super().__init__("no_overlap", (list(start), list(duration)))
         else:
@@ -1472,7 +1469,7 @@ class NoOverlap(GlobalConstraint):
         """
         cons = []
 
-        if self.end_is_none:
+        if len(self.args) == 2:
             start, duration = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
@@ -1490,7 +1487,7 @@ class NoOverlap(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        if self.end_is_none:
+        if len(self.args) == 2:
             start, duration = argvals(self.args)
             if any(a is None for a in start+duration):
                 return None
@@ -1547,7 +1544,6 @@ class NoOverlapOptional(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
 
-        self.end_is_none = end is None
         if end is None:
             super().__init__("no_overlap_optional", (list(start), list(duration), list(is_present)))
         else:
@@ -1563,7 +1559,7 @@ class NoOverlapOptional(GlobalConstraint):
 
         cons = []
 
-        if self.end_is_none:
+        if len(self.args) == 3:
             start, duration, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
         else:
@@ -1580,7 +1576,7 @@ class NoOverlapOptional(GlobalConstraint):
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
 
-        if self.end_is_none:
+        if len(self.args) == 3:
             start, duration,is_present = argvals(self.args)
             if any(a is None for a in start + duration + is_present):
                 return None

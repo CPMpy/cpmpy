@@ -541,17 +541,15 @@ class CPM_cpo(SolverInterface):
                 return dom.forbidden_assignments(arr, table)
             elif cpm_con.name == "cumulative" or cpm_con.name == "cumulative_optional":
                 if cpm_con.name == "cumulative":
-                    assert isinstance(cpm_con, Cumulative) # ensure hasattr end_is_none
                     is_present = None
-                    if cpm_con.end_is_none:
+                    if len(cpm_con.args) == 4:
                         start, dur, demand, capacity = cpm_con.args
                         end = None
                     else:
                         start, dur, end, demand, capacity = cpm_con.args
                 
                 elif cpm_con.name == "cumulative_optional":
-                    assert isinstance(cpm_con, CumulativeOptional) # ensure hasattr end_is_none
-                    if cpm_con.end_is_none:
+                    if len(cpm_con.args) == 5:
                         start, dur, demand, capacity, is_present = cpm_con.args
                         end = None
                     else:
@@ -579,8 +577,7 @@ class CPM_cpo(SolverInterface):
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
             elif cpm_con.name == "no_overlap":
-                assert isinstance(cpm_con, NoOverlap) # ensure hasattr end_is_none
-                if cpm_con.end_is_none:
+                if len(cpm_con.args) == 2:
                     start, dur = cpm_con.args
                     end = None
                 else:
@@ -589,8 +586,7 @@ class CPM_cpo(SolverInterface):
                 return cons + [dom.no_overlap(tasks)]
             
             elif cpm_con.name == "no_overlap_optional":
-                assert isinstance(cpm_con, NoOverlapOptional) # ensure hasattr end_is_none
-                if cpm_con.end_is_none:
+                if len(cpm_con.args) == 3:
                     start, dur, is_present = cpm_con.args
                     end = None
                 else:

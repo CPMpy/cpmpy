@@ -705,9 +705,8 @@ class CPM_minizinc(SolverInterface):
             return f"{expr.name}({{}})".format(str_X)
 
         elif expr.name == "cumulative":
-            assert isinstance(expr, Cumulative) # ensure hasattr end_is_none
             extra_cons = []
-            if expr.end_is_none:
+            if len(expr.args) == 4:
                 start, dur, demand, capacity = expr.args
             else:
                 start, dur, end, demand, capacity = expr.args
@@ -729,9 +728,8 @@ class CPM_minizinc(SolverInterface):
                                      self._convert_expression(capacity))
 
         elif expr.name == "no_overlap":
-            assert isinstance(expr, NoOverlap) # ensure hasattr end_is_none
             extra_cons = []
-            if expr.end_is_none:
+            if len(expr.args) == 2:
                 start, dur = expr.args
             else:
                 start, dur, end = expr.args
