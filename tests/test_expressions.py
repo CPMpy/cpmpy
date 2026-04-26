@@ -269,13 +269,13 @@ class TestArrayExpressions:
             res *= v.value()
         assert y.value() == res
         # with axis arg
-        x = intvar(0,5,shape=(10,10), name="x")
+        x = intvar(0,5,shape=(10,4), name="x")
         y = intvar(0, 1000, shape=10, name="y")
-        model = cp.Model(y == x.prod(axis=0))
+        model = cp.Model(y == x.prod(axis=1))
         model.solve()
-        for i,vv in enumerate(x):
+        for i in range(y.shape[0]):
             res = 1
-            for v in vv:
+            for v in x[i]:
                 res *= v.value()
             assert y[i].value() == res
 
