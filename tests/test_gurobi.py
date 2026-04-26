@@ -333,19 +333,10 @@ def expression_tree_cases_():
     yield (
         "reification",
         z * (x == 2) == 1,
-        # TODO apply direct encoding Should help a lot here
         [
-            "(z) * (BV0) == 1",
-            "(BV0) -> (x == 2)",
-            "(BV1) -> (x >= 3)",
-            "(~BV1) -> (x <= 2)",
-            "True",
-            "(BV2) -> (x <= 1)",
-            "(~BV2) -> (x >= 2)",
-            "True",
-            "(BV3) == ((BV1) or (BV2))",
-            "(~BV0) -> (BV3 >= 1)",
-            "True",
+            "(z) * (BV[x == 2]) == 1",
+            "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
+            "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",
         ],
         None,
     )
@@ -400,21 +391,12 @@ def expression_tree_cases_():
         "normalize_nonlinear_on_rhs",
         (p | q) <= (x == 2) + (y**2),
         [
-            "(BV0) <= ((BV1) + (pow(y,2)))",
+            "(BV0) <= ((BV[x == 2]) + (pow(y,2)))",
             "(BV0) == ((p) or (q))",
-            "(BV1) -> (x == 2)",
-            "(BV2) -> (x >= 3)",
-            "(~BV2) -> (x <= 2)",
-            "True",
-            "(BV3) -> (x <= 1)",
-            "(~BV3) -> (x >= 2)",
-            "True",
-            "(BV4) == ((BV2) or (BV3))",
-            "(~BV1) -> (BV4 >= 1)",
-            "True",
-        ],  # TODO avoid BV0
+            "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
+            "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",
+        ],
         None,
-        # TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
 
     yield (
@@ -424,12 +406,12 @@ def expression_tree_cases_():
         ["R0: BV2 >= 1", "R1: - p - BV0 = -1", "R2: - q - BV1 = -1", "GC0: BV2 = AND ( BV0 , BV1 )"],
     )
 
-    # yield (
-    #     "conjunction",
-    #     p & q,
-    #     ["(p) and (q)"],
-    #     ["R0: BV0 >= 1", "GC0: BV0 = OR ( p , q )"],
-    # )
+    yield (
+        "conjunction",
+        p & q,
+        ["p", "q"],
+        ["R0: p >= 1", "R1: q >= 1"],
+    )
 
     yield (
         "conjunction_in_disjunction",

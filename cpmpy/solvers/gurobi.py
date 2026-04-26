@@ -46,6 +46,7 @@ from typing import Optional, List
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
+import cpmpy as cp
 from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.utils import argvals, is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -319,8 +320,7 @@ class CPM_gurobi(SolverInterface):
         obj_supported["wsum"] = handle_wsum
         def _reify_pow(cpm_expr, depth, reified, handlers, ctx):
             var = ctx.get_or_make_var(cpm_expr, define=False)
-            for c in self._into_grb_tree([var == cpm_expr]):
-                ctx.post(c)
+            ctx.post(cp.all(self._into_grb_tree([var == cpm_expr])))  # post as single and-constraint
             return var
         obj, obj_cons = into_tree_expr(
             obj,
