@@ -863,7 +863,7 @@ class TestSolvers:
 
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
-    _floatsum_supported_solvers = frozenset({"ortools", "gurobi", "cplex", "scip", "z3"})
+    _floatsum_supported_solvers = frozenset({"ortools", "gurobi", "cplex", "scip", "z3", "hexaly"})
 
     def test_installed_solvers(self, solver):
         # basic model
