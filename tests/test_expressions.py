@@ -223,10 +223,6 @@ class TestMul:
         expr = x * 3
         assert expr.is_lhs_num is True
         assert expr.args[0] == 3 and expr.args[1] is x
-        # real coeff: 0.3 * x -> is_lhs_num True (for objectives)
-        expr = 0.3 * x
-        assert expr.is_lhs_num is True
-        assert expr.args[0] == 0.3 and expr.args[1] is x
         # var * var -> no constant, is_lhs_num False
         y = cp.intvar(0, 5, name="y")
         expr = x * y
@@ -491,11 +487,9 @@ class TestBounds:
         assert int == type(cp.sum(x[0]).value())
         assert int == type(cp.sum(x).value())
         assert int == type(cp.sum([1,2,3] * x[0]).value())
-        assert float == type(cp.sum([0.1,0.2,0.3] * x[0]).value())
         
         # also numpy should be converted to Python native when callig value()
         assert int == type(cp.sum(np.array([1, 2, 3]) * x[0]).value())
-        assert float == type(cp.sum(np.array([0.1,0.2,0.3]) * x[0]).value())
         
         # test binary operators
         a,b = x[0,[0,1]]

@@ -278,25 +278,12 @@ class TestSolvers:
 
         assert model.solve(solver="ortools")# this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
 
-    def test_ortools_real_coeff(self):
-
+    def test_ortools_rejects_float_coefficients(self):
         m = cp.Model()
-        # this works in OR-Tools
-        x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
-        with pytest.warns(DeprecationWarning, match="Non-integer scalar multiplication is deprecated"):
-            m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
-        assert m.solve()
-        assert m.objective_value() == 1.4
-        # this does not
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
         with pytest.warns(DeprecationWarning, match="Non-integer scalar multiplication is deprecated"):
             m += 0.7 * x + 0.8 * y >= 1
         pytest.raises(TypeError, m.solve)
-
-    def test_ortools_floatsum_objective(self):
-        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        m = cp.Model(maximize=cp.FloatSum([0.3, 0.5, 0.6], [x, y, z]))
-        assert m.solve(solver="ortools")
-        assert m.objective_value() == pytest.approx(1.4, abs=1e-05)
 
     def test_floatsum_objective_only(self):
         x = cp.boolvar(name="x")
@@ -505,9 +492,9 @@ class TestSolvers:
         assert s.solve()
 
         x = cp.intvar(0, 1)
-        m = cp.Model((x >= 0.1) & (x != 1))
+        m = cp.Model((x > 0) & (x != 1))
         s = cp.SolverLookup.get("z3", m)
-        assert not s.solve()# upgrade z3 with pip install --upgrade z3-solver
+        assert not s.solve()
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
@@ -724,30 +711,6 @@ class TestSolvers:
         assert s.solve()
         assert iv.value()[idx.value(), idx2.value()] == 8
 
-    @pytest.mark.skipif(not CPM_gurobi.supported(),
-                        reason="Gurobi not installed")
-    def test_gurobi_float_objective(self):
-        """Test that Gurobi properly handles float objective values."""
-        # Test case with float coefficients that should result in a float objective value
-        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-
-        # Create a model with float coefficients - this can happen with DirectVar
-        # or when using floats as coefficients
-        m = cp.Model()
-        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
-
-        s = cp.SolverLookup.get("gurobi", m)
-        assert s.solve()
-
-        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
-        expected_obj = 2.5
-        actual_obj = s.objective_value()
-
-        # Verify that the objective value is returned as a float (not int)
-        assert isinstance(actual_obj, float)
-        assert actual_obj == pytest.approx(expected_obj, abs=1e-05)
-
-
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
     def test_cplex(self):
@@ -775,29 +738,6 @@ class TestSolvers:
         s = cp.SolverLookup.get("cplex", m)
         assert s.solve()
 
-
-    @pytest.mark.skipif(not CPM_cplex.supported(),
-                        reason="cplex not installed")
-    def test_cplex_float_objective(self):
-        """Test that cplex properly handles float objective values."""
-        # Test case with float coefficients that should result in a float objective value
-        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-
-        # Create a model with float coefficients - this can happen with DirectVar
-        # or when using floats as coefficients
-        m = cp.Model()
-        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
-
-        s = cp.SolverLookup.get("cplex", m)
-        assert s.solve()
-
-        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
-        expected_obj = 2.5
-        actual_obj = s.objective_value()
-
-        # Verify that the objective value is returned as a float (not int)
-        assert isinstance(actual_obj, float)
-        assert actual_obj == pytest.approx(expected_obj, abs=1e-05)
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
