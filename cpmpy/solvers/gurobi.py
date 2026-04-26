@@ -314,12 +314,13 @@ class CPM_gurobi(SolverInterface):
         self.add(obj_list[1:])  # any side constraints from decomposition
 
         # only linear/quadratic objectives supported (no pow);
-        # pow handler reifies via self.add so defining constraint goes through full transform
+        # pow handler reifies via _into_grb_tree so defining constraint uses full handler set
         obj_supported = {n: handle_supported_expr for n in self.supported_tree_exprs - {"pow"}}
         obj_supported["wsum"] = handle_wsum
-        def _reify_pow_via_transform(cpm_expr, depth, reified, handlers, ctx):
+        def _reify_pow(cpm_expr, depth, reified, handlers, ctx):
             var = ctx.get_or_make_var(cpm_expr, define=False)
-            self.add([var == cpm_expr])
+            for c in self._into_grb_tree([var == cpm_expr]):
+                ctx.post(c)
             return var
         obj, obj_cons = into_tree_expr(
             obj,
@@ -327,7 +328,7 @@ class CPM_gurobi(SolverInterface):
             reified=True,  # TODO this is a bit hacky to ensure e.g. Comparison's are reified
             handlers={
                 **obj_supported,
-                "pow": _reify_pow_via_transform,
+                "pow": _reify_pow,
                 "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
                 **{name: handle_general_constraint for name in self.general_constraints},
             },
@@ -428,6 +429,20 @@ class CPM_gurobi(SolverInterface):
 
         return add_(cpm_expr, 0)
 
+    def _into_grb_tree(self, cpm_cons):
+        """Apply into_tree with the full Gurobi handler set."""
+        return into_tree(
+            cpm_cons,
+            csemap=self._csemap,
+            handlers={
+                **{n: handle_supported_expr for n in self.supported_tree_exprs},
+                "wsum": handle_wsum,
+                "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
+                **{name: handle_general_constraint for name in self.general_constraints},
+            },
+            verbose=self.verbose,
+        )
+
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -450,17 +465,7 @@ class CPM_gurobi(SolverInterface):
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
                                     csemap=self._csemap)
-        cpm_cons = into_tree(
-            cpm_cons,
-            csemap=self._csemap,
-            handlers={
-                **{n: handle_supported_expr for n in self.supported_tree_exprs},
-                "wsum": handle_wsum,
-                "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
-                **{name: handle_general_constraint for name in self.general_constraints},
-            },
-            verbose=self.verbose,
-        )
+        cpm_cons = self._into_grb_tree(cpm_cons)
 
         if self.verbose:
             with open("/tmp/model.txt", "w") as f:

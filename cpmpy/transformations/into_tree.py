@@ -158,7 +158,7 @@ def _propagate_boolconst(name, args):
 
 
 def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers=None):
-    """Same as into_tree, but returns a tuple of the root node of the tree and the new top-level (definining) constraints."""
+    """Same as into_tree, but returns a tuple of the root node of the tree and the new top-level (defining) constraints."""
 
     if csemap is None:
         from ..transformations.cse import CSEMap
@@ -250,6 +250,7 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
                 ):
                     # BV == boolexpr === BV <-> boolexpr: post as bi-implications
                     a, b = cpm_expr.args
+                    # TODO use &
                     add(a.implies(b))
                     add((~a).implies(recurse_negation(b)))
                     return True
