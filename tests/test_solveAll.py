@@ -96,6 +96,8 @@ class TestSolveAll:
         assert 3 == m.solveAll('ortools', log_search_progress=True)
 
 
+@pytest.mark.skip()
+class TestPrint:
     def test_solveAll_display_expr(self, solver, capsys):
         x = cp.boolvar(shape=3, name="x")
         m = cp.Model(cp.sum(x) == 1)

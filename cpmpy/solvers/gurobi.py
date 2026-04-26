@@ -51,7 +51,7 @@ from ..expressions.utils import argvals, is_any_list, is_num
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..transformations.into_tree import into_tree, into_tree_expr, handle_implication, handle_strict_ineq, handle_neq, handle_general_constraint
+from ..transformations.into_tree import into_tree, into_tree_expr, handle_implication, handle_strict_ineq, handle_neq, handle_general_constraint, handle_supported_expr, handle_wsum
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import decompose_linear
 from ..transformations.normalize import toplevel_list
@@ -304,13 +304,30 @@ class CPM_gurobi(SolverInterface):
         obj, safe_cons = safen_objective(expr)
         self.add(safe_cons)
 
+        # decompose global functions in objective (e.g. among, nvalue)
+        obj_list = decompose_linear([obj],
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
+        assert len(obj_list) >= 1
+        obj = obj_list[0]
+        self.add(obj_list[1:])  # any side constraints from decomposition
+
+        # only linear/quadratic objectives supported (no pow);
+        # pow handler reifies via self.add so defining constraint goes through full transform
+        obj_supported = {n: handle_supported_expr for n in self.supported_tree_exprs - {"pow"}}
+        obj_supported["wsum"] = handle_wsum
+        def _reify_pow_via_transform(cpm_expr, depth, reified, handlers, ctx):
+            var = ctx.get_or_make_var(cpm_expr, define=False)
+            self.add([var == cpm_expr])
+            return var
         obj, obj_cons = into_tree_expr(
             obj,
             csemap=self._csemap,
-            # only linear/quadratic objectives supported
-            supported=self.supported_tree_exprs - {"pow"},
             reified=True,  # TODO this is a bit hacky to ensure e.g. Comparison's are reified
             handlers={
+                **obj_supported,
+                "pow": _reify_pow_via_transform,
                 "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
                 **{name: handle_general_constraint for name in self.general_constraints},
             },
@@ -436,8 +453,9 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = into_tree(
             cpm_cons,
             csemap=self._csemap,
-            supported=self.supported_tree_exprs,
             handlers={
+                **{n: handle_supported_expr for n in self.supported_tree_exprs},
+                "wsum": handle_wsum,
                 "->": handle_implication, ">": handle_strict_ineq, "<": handle_strict_ineq, "!=": handle_neq,
                 **{name: handle_general_constraint for name in self.general_constraints},
             },
