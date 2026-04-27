@@ -6,6 +6,7 @@ from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, 
 
 @pytest.mark.requires_solver("ortools")
 class TestMus:
+    @pytest.fixture
     def setup_method(self):
         self.mus_func = mus
         self.naive_func = mus_naive
@@ -95,13 +96,11 @@ class TestMus:
         assert len(set(mus_naive_cons)) == 1
         
 # add solvers that implement the native_mus method
-@pytest.mark.requires_solver("exact", "gurobi")       
+@pytest.mark.requires_solver("exact", "gurobi")
 class TestNativeMus(TestMus):
     def setup_method(self):
         self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver=solver)
         self.naive_func = mus_naive
-
-
 
 
 class TestQuickXplain(TestMus):
