@@ -10,7 +10,7 @@ class TestMus:
         self.mus_func = mus
         self.naive_func = mus_naive
 
-    def test_circular(self):
+    def test_circular(self, solver):
         x = cp.intvar(0, 3, shape=4, name="x")
         # circular "bigger then", UNSAT
         cons = [
@@ -22,7 +22,7 @@ class TestMus:
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
 
-        assert set(self.mus_func(cons)) == set(cons[:3])
+        assert set(self.mus_func(cons, solver=solver)) == set(cons[:3])
         assert set(self.naive_func(cons)) == set(cons[:3])
 
     def test_bug_191(self, solver):
