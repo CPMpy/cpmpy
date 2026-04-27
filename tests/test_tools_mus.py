@@ -6,7 +6,6 @@ from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, 
 
 @pytest.mark.requires_solver("ortools")
 class TestMus:
-    @pytest.fixture
     def setup_method(self):
         self.mus_func = mus
         self.naive_func = mus_naive
