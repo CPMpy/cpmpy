@@ -514,7 +514,9 @@ class CPM_gurobi(SolverInterface):
             elif isinstance(grb_expr, gp.TempConstr):
                 grb_con = grb_expr
             else:
-                grb_con = self.grb_model.addVar(lb=1, ub=1) == grb_expr
+                if not hasattr(self, "_true"):
+                    self._true = self.grb_model.addVar(lb=1, ub=1)
+                grb_con = self._true == grb_expr
             if self.verbose: self.grb_model.update()
             if self.verbose: print("OUT", grb_con)
             self.native_model.addConstr(grb_con)
