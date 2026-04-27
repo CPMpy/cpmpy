@@ -8,7 +8,7 @@ from cpmpy.solvers import param_combinations
 from cpmpy.transformations.flatten_model import flatten_model
 
 def main():
-    model = nqueens(n=25)
+    model = nqueens(n=50)
     # flatten once upfront, reduces overhead of multiple solves
     model = flatten_model(model)
 
@@ -41,8 +41,8 @@ def main():
 
     # Outputs:
     # Fastest in 0.01 seconds, config: {'cp_model_probing_level': 0, 'linearization_level': 2, 'symmetry_level': 0}
-    # Comparing best -- worst: 0.01 -- 0.03
-    # With default parameters: 0.03
+    # Comparing best -- worst: 0.05 -- 0.24
+    # With default parameters: 0.16
 
 
 
