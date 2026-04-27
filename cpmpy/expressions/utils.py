@@ -35,12 +35,12 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, overload
+from typing import TYPE_CHECKING, TypeGuard, Optional, overload
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ExprLike, Expression
+    from cpmpy.expressions.core import ExprLike, ListLike, Expression
     from cpmpy.expressions.variables import NDVarArray
 
 
@@ -153,6 +153,25 @@ def argvals(arr):
         return [argvals(arg) for arg in arr]
     return argval(arr)
 
+def argvals_listlike(lst: ListLike[ExprLike]) -> Optional[list[int]]:
+    """ The well-typed way to get the values of a list of ExprLike's, or None if any expression is not assigned """
+    _Expr = cp.expressions.core.Expression
+
+    vals: list[int] = []
+    for e in lst:
+        if isinstance(e, _Expr):
+            v = e.value()
+            if v is None:
+                return None
+            vals.append(v)
+        elif isinstance(e, int):
+            vals.append(e)
+        else:  # only np.integer is still in ExprLike
+            vals.append(int(e))
+    return vals
+
+
+
 
 def eval_comparison(str_op, lhs, rhs):
     """
@@ -208,6 +227,25 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+    
+def get_bounds_listlike(lst: ListLike[ExprLike]) -> tuple[list[int], list[int]]:
+    """ The well-typed way to get the bounds of a list of ExprLike's """
+    _Expr = cp.expressions.core.Expression
+
+    lbs: list[int] = []
+    ubs: list[int] = []
+    for e in lst:
+        if isinstance(e, _Expr):
+            (lb, ub) = e.get_bounds()
+            lbs.append(lb)
+            ubs.append(ub)
+        elif isinstance(e, int):
+            lbs.append(e)
+            ubs.append(e)
+        else:  # only np.integer is still in ExprLike
+            lbs.append(int(e))
+            ubs.append(int(e))
+    return lbs, ubs
 
 # first two are declarations for typing purposes only
 @overload
