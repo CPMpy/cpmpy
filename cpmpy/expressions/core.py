@@ -103,7 +103,7 @@ from ..exceptions import TypeError
 
 # Common typing helpers
 T = TypeVar("T")
-ListLike: TypeAlias = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
+ListLike: TypeAlias = Union[Sequence[T], np.ndarray]  # similar to is_any_list() check  (Sequence a bit more general than list/tuple)
 ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
 
 
