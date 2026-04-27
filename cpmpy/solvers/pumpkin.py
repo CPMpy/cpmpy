@@ -47,7 +47,7 @@ from packaging.version import Version
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import Cumulative, GlobalConstraint
+from ..expressions.globalconstraints import Cumulative, GlobalConstraint, NoOverlap
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.utils import is_num, is_any_list, get_bounds
 from ..transformations.get_variables import get_variables
@@ -566,19 +566,29 @@ class CPM_pumpkin(SolverInterface):
                 return [constraints.AllDifferent(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
             
             elif cpm_expr.name == "cumulative":
-                start, dur, end, demand, cap = cpm_expr.args
+                pum_cons = []
+                if len(cpm_expr.args) == 4:
+                    start, dur, demand, cap = cpm_expr.args
+                else:
+                    start, dur, end, demand, cap = cpm_expr.args
+                    end_cons = [s + d == e for s,d,e in zip(start, dur, end)]
+                    for cons in self.transform(end_cons):
+                        pum_cons.extend(self._get_constraint(cons, tag=tag))
+
                 assert all(is_num(d) for d in dur), "Pumpkin only accepts Cumulative with fixed durations"
-                assert all(is_num(d) for d in demand), "Pumpkin only accepts Cumulative with fixed demand"
+                assert all(is_num(h) for h in demand), "Pumpkin only accepts Cumulative with fixed demand"
                 assert is_num(cap), "Pumpkin only accepts Cumulative with fixed capacity"
 
-                pum_cons = [constraints.Cumulative(self.solver_vars(start),dur, demand, cap, constraint_tag=tag)]
-                if end is not None:
-                    pum_cons += [self._get_constraint(c, tag=tag)[0] for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)])]
+                pum_cons += [constraints.Cumulative(self.solver_vars(start),dur, demand, cap, constraint_tag=tag)]
                 return pum_cons
 
             elif cpm_expr.name == "no_overlap":
-                start, dur, end = cpm_expr.args
-                return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1), tag=tag)
+                if len(cpm_expr.args) == 2:
+                    start, dur = cpm_expr.args
+                    return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1), tag=tag)
+                else:
+                    start, dur, end = cpm_expr.args
+                    return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1), tag=tag)
 
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args
