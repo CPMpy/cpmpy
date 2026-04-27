@@ -3,13 +3,12 @@ Example of gridsearch over solver parameters
 
 Generally applicable, and demonstrated on n-queens with ortools
 """
-import sys
-from cpmpy import *
-from cpmpy.solvers import CPM_ortools, param_combinations
+import cpmpy as cp
+from cpmpy.solvers import param_combinations
 from cpmpy.transformations.flatten_model import flatten_model
 
 def main():
-    model = nqueens(n=25)
+    model = nqueens(n=50)
     # flatten once upfront, reduces overhead of multiple solves
     model = flatten_model(model)
 
@@ -22,7 +21,7 @@ def main():
     configs = [] # (runtime, param)
     for params in param_combinations(all_params):
         print("Running with", params)
-        s = CPM_ortools(model)
+        s = cp.SolverLookup.get("ortools", model)
         s.solve(**params)
         print(s.status())
 
@@ -36,24 +35,25 @@ def main():
     print("Fastest in", round(best[0],2), "seconds, config:", best[1])
     print("Comparing best -- worst:", round(configs[0][0],2), "--", round(configs[-1][0],2))
 
-    s = CPM_ortools(model); s.solve()
+    s = cp.SolverLookup.get("ortools", model)
+    s.solve()
     print("With default parameters:", round(s.status().runtime,2))
 
     # Outputs:
-    # Fastest in 0.02 seconds, config: {'cp_model_probing_level': 0, 'linearization_level': 0, 'symmetry_level': 1}
-    # Comparing best -- worst: 0.02 -- 0.2
-    # With default parameters: 0.13
+    # Fastest in 0.01 seconds, config: {'cp_model_probing_level': 0, 'linearization_level': 2, 'symmetry_level': 0}
+    # Comparing best -- worst: 0.05 -- 0.24
+    # With default parameters: 0.16
 
 
 
 def nqueens(n=8):
     """ N-queens problem
     """
-    queens = intvar(1,n, shape=n)
-    return Model(
-             AllDifferent(queens),
-             AllDifferent([queens[i] + i for i in range(n)]),
-             AllDifferent([queens[i] - i for i in range(n)]),
+    queens = cp.intvar(1,n, shape=n)
+    return cp.Model(
+             cp.AllDifferent(queens),
+             cp.AllDifferent([queens[i] + i for i in range(n)]),
+             cp.AllDifferent([queens[i] - i for i in range(n)]),
            )
 
 
