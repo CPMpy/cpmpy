@@ -81,6 +81,7 @@ class CPM_gurobi(SolverInterface):
     """
 
     verbose = False  # log debug ouput
+    log = False
 
     supported_global_constraints = frozenset({"min", "max", "abs", "mul", "pow"})
     supported_reified_global_constraints = frozenset()
@@ -111,7 +112,7 @@ class CPM_gurobi(SolverInterface):
             global GRB_ENV
             if GRB_ENV is None:
                 # initialise the native gurobi model object
-                GRB_ENV = gp.Env(params={"OutputFlag": 0})
+                GRB_ENV = gp.Env(params={"LogToConsole": CPM_gurobi.log, "OutputFlag": CPM_gurobi.log})
                 GRB_ENV.start()
             return True
         except Exception as e:
