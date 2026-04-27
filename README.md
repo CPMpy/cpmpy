@@ -49,7 +49,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 
 ### <span style="font-family: monospace; font-size: 1.2em;">&lt;/&gt;</span> Example: flexible jobshop scheduling
 
-An example that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
+An [example](https://github.com/CPMpy/cpmpy/blob/master/examples/flexible_jobshop.py) that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
 
 ```python
 # Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
@@ -74,7 +74,6 @@ assert list(df_data.index) == list(range(num_alternatives)), "Index must be defa
 
 # --- Decision variables ---
 start = cp.intvar(0, horizon, name="start", shape=num_alternatives)
-end   = cp.intvar(0, horizon, name="end", shape=num_alternatives)
 active = cp.boolvar(name="active", shape=num_alternatives)
 
 # --- Constraints ---
@@ -84,24 +83,20 @@ model = cp.Model()
 for job_id, group in df_data.groupby('job_id'):
     model += (cp.sum(active[group.index]) == 1)
 
-# For all jobs ensure start + dur = end (also for inactives, thats OK)
-model += (start + df_data['duration'] == end)
-
-# No two active alternatives on the same machine may overlap; (ab)use cumulative with 'active' as demand.
+# No two active alternatives on the same machine may overlap
 for mach_id, group in df_data.groupby('machine_id'):
-    sel = group.index
-    model += cp.Cumulative(start[sel], group['duration'].values, end[sel], active[sel], capacity=1)
+    sel = group.index  # array of indices of the tasks in this group
+    model += cp.NoOverlapOptional(start=start[sel], duration=group['duration'].values, is_present=active[sel])
 
 # --- Objectives ---
-# Makespan: max over all active alternatives
-makespan = cp.intvar(0, horizon, name="makespan")
-for i in range(num_alternatives):
-    model += active[i].implies(makespan >= end[i])  # end times of actives determines makespan
+# Makespan: max over end times (including inactive tasks, not bounded anyway)
+end = start + df_data['duration']
+makespan = cp.max(end)
 
 # Total energy consumption
 total_energy = cp.sum(df_data['energy'] * active)
 
-# Minimize makespan first, then total energy
+# Minimize especially makespan, also consider total energy
 model.minimize(100 * makespan + total_energy)
 
 
@@ -115,6 +110,7 @@ if model.solve():
     df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
     df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
     df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
+    import plotly.io as pio; pio.renderers.default = "browser"
     px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
 else:
     print("No solution found.")
@@ -168,4 +164,4 @@ You can cite CPMpy as follows: "Guns, T. (2019). Increasing modeling language co
 }
 ```
 
-If you work in academia, please cite us. If you work in industry, we'd love to hear how you are using it. The lab of Prof. Guns is open to collaborations and contract research.
+If you work in academia, please cite us. If you work in industry, we'd love to hear how you are using it. The lab of Prof. Guns is open to [collaborations and contract research](https://cpmpy.cs.kuleuven.be).

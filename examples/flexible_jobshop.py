@@ -1,8 +1,9 @@
-# Flexible job-shop: a set of jobs must be run, each can be run on any of the machines,
+# Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
 # with different duration and energy consumption. Minimize makespan and total energy consumption
 import cpmpy as cp
 import pandas as pd
 import random; random.seed(1)
+SHOW_VISUALISATION = False
 
 # --- Data definition ---
 num_jobs = 15
@@ -20,7 +21,6 @@ assert list(df_data.index) == list(range(num_alternatives)), "Index must be defa
 
 # --- Decision variables ---
 start = cp.intvar(0, horizon, name="start", shape=num_alternatives)
-end   = cp.intvar(0, horizon, name="end", shape=num_alternatives)
 active = cp.boolvar(name="active", shape=num_alternatives)
 
 # --- Constraints ---
@@ -30,24 +30,20 @@ model = cp.Model()
 for job_id, group in df_data.groupby('job_id'):
     model += (cp.sum(active[group.index]) == 1)
 
-# For all jobs ensure start + dur = end (also for inactives, thats OK)
-model += (start + df_data['duration'] == end)
-
-# No two active alternatives on the same machine may overlap; (ab)use cumulative with 'active' as demand.
+# No two active alternatives on the same machine may overlap
 for mach_id, group in df_data.groupby('machine_id'):
-    sel = group.index
-    model += cp.Cumulative(start[sel], group['duration'].values, end[sel], active[sel], capacity=1)
+    sel = group.index  # array of indices of the tasks in this group
+    model += cp.NoOverlapOptional(start=start[sel], duration=group['duration'].values, is_present=active[sel])
 
 # --- Objectives ---
-# Makespan: max over all active alternatives
-makespan = cp.intvar(0, horizon, name="makespan")
-for i in range(num_alternatives):
-    model += active[i].implies(makespan >= end[i])  # end times of actives determines makespan
+# Makespan: max over end times (including inactive tasks, not bounded anyway)
+end = start + df_data['duration']
+makespan = cp.max(end)
 
 # Total energy consumption
 total_energy = cp.sum(df_data['energy'] * active)
 
-# Minimize makespan first, then total energy
+# Minimize especially makespan, also consider total energy
 model.minimize(100 * makespan + total_energy)
 
 
@@ -57,11 +53,13 @@ if model.solve():
     print("Total makespan:", makespan.value(), "energy:", total_energy.value())
 
     # Visualize with Plotly's excellent Gantt chart support
-    import plotly.express as px
-    df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
-    df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
-    df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
-    px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
+    if SHOW_VISUALISATION:
+        import plotly.express as px
+        df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
+        df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
+        df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
+        import plotly.io as pio; pio.renderers.default = "browser"
+        px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
 else:
     print("No solution found.")
 
