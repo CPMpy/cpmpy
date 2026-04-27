@@ -25,7 +25,7 @@ import numpy as np
 import cpmpy as cp
 from ..expressions.core import Comparison, Operator, is_boolexpr
 from ..exceptions import NotSupportedError
-from ..expressions.utils import is_num, is_int
+from ..expressions.utils import is_num, is_int, get_bounds
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
@@ -72,7 +72,7 @@ def handle_implication(cpm_expr, depth, reified, handlers, ctx):
             q = q >= 1
         elif not isinstance(q, Comparison):
             if is_num(q):
-                return True if q else ctx.recurse(p, depth, reified=reified)
+                return True if q else ctx.recurse(~p, depth, reified=reified)
             q = ctx.reify(q, depth) >= 1
         assert isinstance(q, Comparison), f"Expected linear constraint, but got {q}"
         return _with_args(cpm_expr, [p, q])
@@ -175,6 +175,38 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     f = _with_args(cpm_expr, args)
     ctx.post(y == f)  # add directly so that Comparison does not have to deal with it
     return y
+
+
+def _simplify_comparison(name, a, b):
+    """Check if a comparison is trivially True/False based on bounds. Returns True/False or None."""
+    def _get_bounds(x):
+        return get_bounds(x)
+
+    bounds_a = _get_bounds(a)
+    bounds_b = _get_bounds(b)
+    if bounds_a is None or bounds_b is None:
+        return None
+
+    a_lb, a_ub = bounds_a
+    b_lb, b_ub = bounds_b
+
+    if name == "<=":
+        if a_ub <= b_lb:
+            return True
+        if a_lb > b_ub:
+            return False
+    elif name == ">=":
+        if a_lb >= b_ub:
+            return True
+        if a_ub < b_lb:
+            return False
+    elif name == "==":
+        if a_lb > b_ub or a_ub < b_lb:
+            return False
+        if a_lb == a_ub == b_lb == b_ub:
+            return True
+
+    return None
 
 
 def _with_args(cpm_expr, args):
@@ -303,6 +335,11 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
                     handlers[f.name](f, depth, reified, handlers, ctx, y=y)
                     return True
                 case "==" | "<=" | ">=":
+                    # Bounds-based simplification: check if comparison is trivially True/False
+                    if not reified:
+                        simp = _simplify_comparison(cpm_expr.name, cpm_expr.args[0], cpm_expr.args[1])
+                        if simp is not None:
+                            return simp
                     a, b = (
                         into_tree_expr_(cpm_expr.args[0], depth, reified=True, handlers=handlers),
                         into_tree_expr_(cpm_expr.args[1], depth, reified=True, handlers=handlers),
