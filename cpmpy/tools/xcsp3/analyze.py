@@ -212,8 +212,10 @@ def main():
 
     # Read and merge all CSV files
     dfs = []
-    for file in csv_files:
+    for i, file in enumerate(csv_files):
         df = pd.read_csv(file)
+        ts = "_".join(file.stem.split("_")[4:6])
+        df["solver"] = df["solver"] + f"_{ts}"
         dfs.append(df)
     
     merged_df = pd.concat(dfs, ignore_index=True)
