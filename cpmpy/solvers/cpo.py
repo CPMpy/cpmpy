@@ -72,10 +72,10 @@ class CPM_cpo(SolverInterface):
 
     """
 
-    supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'indomain', "negative_table", "gcc",
+    supported_global_constraints = frozenset({"alldifferent", 'inverse', 'table', 'InDomain', "negative_table", "gcc",
                                               'cumulative', 'cumulative_optional', 'no_overlap', 'no_overlap_optional',
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element", "nvalue"})
-    supported_reified_global_constraints = frozenset({"alldifferent", "table", "indomain", "negative_table"})
+    supported_reified_global_constraints = frozenset({"alldifferent", "table", "InDomain", "negative_table"})
 
     _docp = None  # Static attribute to hold the docplex.cp module
 
