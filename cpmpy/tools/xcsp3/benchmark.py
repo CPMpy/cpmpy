@@ -177,14 +177,15 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
     process = ctx.Process(target=xcsp3_wrapper, args=(
                                                     child_conn, 
                                                       {
-                                                          "benchname": filename, 
-                                                          "solver": solver, 
-                                                          "time_limit": time_limit, 
-                                                          "mem_limit": mem_limit, 
-                                                          "intermediate": intermediate, 
+                                                          "benchname": filename,
+                                                          "solver": solver,
+                                                          "time_limit": time_limit,
+                                                          "mem_limit": mem_limit,
+                                                          "intermediate": intermediate,
                                                           "force_mem_limit": True,
                                                           "time_buffer": 1,
                                                           "cores": cores,
+                                                          "verbose": verbose,
                                                         }, 
                                                     verbose))
     process.start()
