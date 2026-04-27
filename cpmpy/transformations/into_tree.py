@@ -336,10 +336,9 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
                     return True
                 case "==" | "<=" | ">=":
                     # Bounds-based simplification: check if comparison is trivially True/False
-                    if not reified:
-                        simp = _simplify_comparison(cpm_expr.name, cpm_expr.args[0], cpm_expr.args[1])
-                        if simp is not None:
-                            return simp
+                    simp = _simplify_comparison(cpm_expr.name, cpm_expr.args[0], cpm_expr.args[1])
+                    if simp is not None:
+                        return simp
                     a, b = (
                         into_tree_expr_(cpm_expr.args[0], depth, reified=True, handlers=handlers),
                         into_tree_expr_(cpm_expr.args[1], depth, reified=True, handlers=handlers),
