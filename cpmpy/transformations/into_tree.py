@@ -82,19 +82,9 @@ def handle_neq(cpm_expr, depth, reified, handlers, ctx):
     result = push_down_negation([cpm_expr], toplevel=not reified)
     if len(result) == 1 and result[0].name == "!=":
         a, b = result[0].args
-        if reified:
-            return ctx.recurse((a > b) | (a < b), depth, reified=reified, handlers=handlers)
-        else:
-            z = cp.boolvar()
-            ctx.add(z.implies(a > b))
-            ctx.add((~z).implies(a < b))
-            return True
-    elif len(result) == 1:  # push_down_negation changed the expression (e.g. bool != to ==)
-        return ctx.recurse(result[0], depth, reified=reified, handlers=handlers)
-    else:  # push_down_negation decomposed into multiple constraints (toplevel only)
-        for c in result:
-            ctx.add(c)
-        return True
+        return ctx.recurse((a > b) | (a < b), depth, reified=reified, handlers=handlers)
+    else:  # push_down_negation changed/decomposed the expression
+        return ctx.recurse(cp.all(result), depth, reified=reified, handlers=handlers)
 
 
 def handle_supported_expr(cpm_expr, depth, reified, handlers, ctx):
@@ -129,6 +119,22 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
         for arg in cpm_expr.args:
             ctx.add(ctx.recurse(arg, depth, reified=False, handlers=handlers))
         return True
+    # or(comp1, ..., compN) at root level: use a selector variable instead of reifying each disjunct.
+    # Only valid at root level (not reified), since the selector always enforces one branch.
+    # n=2: BV -> comp1, ~BV -> comp2 (2 indicators instead of 4 + 1 OR)
+    # n>2: z=intvar(0,n-1), (z==i) -> comp_i (n indicators instead of 2n + 1 OR)
+    if not reified and y is None and cpm_expr.name == "or":
+        args = cpm_expr.args
+        if all(isinstance(a, Comparison) for a in args):
+            if len(args) == 2:
+                bv = cp.boolvar()
+                ctx.add(bv.implies(args[0]))
+                ctx.add((~bv).implies(args[1]))
+            else:
+                z = cp.intvar(0, len(args) - 1)
+                for i, arg in enumerate(args):
+                    ctx.add((z == i).implies(arg))
+            return True
     # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
     args = [ctx.reify(ctx.recurse(arg, depth, reified=True), depth) for arg in cpm_expr.args]
     # require non-constants
