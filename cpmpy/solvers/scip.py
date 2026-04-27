@@ -30,10 +30,10 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
-from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.utils import is_num, is_true_cst, is_false_cst
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective
+from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum
 from ..transformations.normalize import toplevel_list
@@ -212,25 +212,45 @@ class CPM_scip(SolverInterface):
 
 
     def objective(self, expr, minimize=True):
-        get_variables(expr, collect=self.user_vars)
-        # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
-        self.solver_vars(list(self.user_vars))
+        if isinstance(expr, FloatSum):
+            get_variables(expr.terms, collect=self.user_vars)
+            # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
+            self.solver_vars(list(self.user_vars))
 
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(
-            obj,
-            supported=self.supported_global_constraints,
-            supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap,
-        )
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj = only_positive_bv_wsum(obj)
+            vars_ = []
+            flat_cons = []
+            for term in expr.terms:
+                var, cons = get_or_make_var(term, csemap=self._csemap)
+                vars_.append(var)
+                flat_cons.extend(cons)
 
-        # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
-        for cpm_expr in self.transform(safe_cons + decomp_cons + flat_cons):
-            self._add_transformed_constraint(cpm_expr)
+            # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
+            for cpm_expr in self.transform(flat_cons):
+                self._add_transformed_constraint(cpm_expr)
 
-        scip_obj = self._make_numexpr(obj)
+            import pyscipopt as scip
+            scip_obj = scip.quicksum(float(w) * self.solver_var(var) for w, var in zip(expr.coeffs, vars_))
+        else:
+            get_variables(expr, collect=self.user_vars)
+            # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
+            self.solver_vars(list(self.user_vars))
+
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(
+                obj,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            obj = only_positive_bv_wsum(obj)
+
+            # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
+            for cpm_expr in self.transform(safe_cons + decomp_cons + flat_cons):
+                self._add_transformed_constraint(cpm_expr)
+
+            scip_obj = self._make_numexpr(obj)
+
         if minimize:
             self.scip_model.setObjective(scip_obj, sense='minimize')
         else:

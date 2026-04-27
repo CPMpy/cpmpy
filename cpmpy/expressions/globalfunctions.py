@@ -70,16 +70,17 @@
         Among
         NValue
         NValueExcept
+        FloatSum
 
 """
 import warnings  # for deprecation warning
-from typing import Optional
+from typing import Optional, NoReturn, Final
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import boolvar, intvar, cpm_array
+from .variables import intvar, cpm_array, NDVarArray
 from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
 
@@ -327,8 +328,20 @@ class Multiplication(GlobalFunction):
         """
         is_lhs_num = False
         if is_num(x):
+            if not is_int(x):
+                warnings.warn(
+                    "Non-integer scalar multiplication is deprecated and will become an error in a future release. "
+                    "Use FloatSum(coeffs, terms) for float-weight objectives.",
+                    DeprecationWarning,
+                )
             is_lhs_num = True
         elif is_num(y):
+            if not is_int(y):
+                warnings.warn(
+                    "Non-integer scalar multiplication is deprecated and will become an error in a future release. "
+                    "Use FloatSum(coeffs, terms) for float-weight objectives.",
+                    DeprecationWarning,
+                )
             (x, y) = (y, x)
             is_lhs_num = True
 
@@ -342,8 +355,20 @@ class Multiplication(GlobalFunction):
         x, y = args
         is_lhs_num = False
         if is_num(x):
+            if not is_int(x):
+                warnings.warn(
+                    "Non-integer scalar multiplication is deprecated and will become an error in a future release. "
+                    "Use FloatSum(coeffs, terms) for float-weight objectives.",
+                    DeprecationWarning,
+                )
             is_lhs_num = True
         elif is_num(y):
+            if not is_int(y):
+                warnings.warn(
+                    "Non-integer scalar multiplication is deprecated and will become an error in a future release. "
+                    "Use FloatSum(coeffs, terms) for float-weight objectives.",
+                    DeprecationWarning,
+                )
             (x, y) = (y, x)
             is_lhs_num = True
 
@@ -1047,3 +1072,61 @@ class NValueExcept(GlobalFunction):
         """
         arr, n = self.args
         return 0, len(arr)
+
+
+class FloatSum:
+    """
+    Objective-only weighted sum with float coefficients over integer expressions.
+
+    Does not inherit from Expression because it is objective only and has float .value()
+    Basically it is breaking all design rules of CPMpy...
+
+    Accepts only (numpy) floats as coefficients, and Expressions as terms.
+    """
+    name: Final = "floatsum"
+    coeffs: np.ndarray
+    terms: NDVarArray
+
+    def __init__(self, coeffs: ListLike[float|np.floating], terms: ListLike[Expression]):
+        self.coeffs = np.asarray(coeffs, dtype=float).reshape(-1)
+        if isinstance(terms, NDVarArray):
+            self.terms = terms
+        else:
+            self.terms = cpm_array(terms)
+            if self.terms.ndim > 1:  # must reshape to 1D
+                # typing is wrong: numpy preserves our ndarray subclass
+                flat = self.terms.reshape(-1)
+                assert isinstance(flat, NDVarArray)  # true: numpy preserves our ndarray subclass
+                self.terms = flat
+
+        if self.coeffs.size != self.terms.size:
+            raise TypeError(f"FloatSum(coeffs, terms) expects equal lengths, got {self.coeffs.size} coefficients and {self.terms.size} terms")
+        if self.coeffs.size == 0:
+            raise TypeError("FloatSum(coeffs, terms) expects at least one term")
+
+    def __repr__(self) -> str:
+        return f"FloatSum({list(self.coeffs)}, {list(self.terms)})"
+
+    def value(self) -> Optional[float]:
+        vals = argvals(self.terms)
+        if any(v is None for v in vals):
+            return None
+        return sum(c * v for c, v in zip(self.coeffs, vals))
+
+    def _raise_objective_only(self) -> NoReturn:
+        raise TypeError("FloatSum is objective-only. Use it directly in Model.minimize()/maximize().")
+
+    def __eq__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __ne__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __lt__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __le__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __gt__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __ge__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __add__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __radd__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __sub__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rsub__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __mul__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rmul__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __neg__(self) -> NoReturn: self._raise_objective_only()
+    def __abs__(self) -> NoReturn: self._raise_objective_only()
