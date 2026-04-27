@@ -32,6 +32,8 @@ from ..expressions.globalfunctions import GlobalFunction
 from .negation import recurse_negation, push_down_negation
 from .int2bool import _encode_int_var
 
+BIG_M_NEQ = True  # Use Big-M formulation for != instead of indicator-based OR decomposition
+
 
 def handle_implication(cpm_expr, depth, reified, handlers, ctx):
     """Handle implication (indicator) constraints for solvers like Gurobi.
@@ -46,6 +48,17 @@ def handle_implication(cpm_expr, depth, reified, handlers, ctx):
         if is_num(p):  # propagate fixed antecedent
             return ctx.recurse(b, depth, reified=reified) if a else True
         assert isinstance(p, _BoolVarImpl)
+        # p -> (a != b): decompose into (p & z) -> (lhs > rhs), (p & ~z) -> (lhs < rhs)
+        # using Big-M to linearize the conjunction in the antecedent (2 indicators vs 6 + 1 OR)
+        if BIG_M_NEQ and b.name == "!=":
+            lhs, rhs = b.args
+            z = cp.boolvar()
+            _, M1 = (lhs - rhs + 1).get_bounds()
+            _, M2 = (rhs - lhs + 1).get_bounds()
+            ctx.add(p.implies(lhs - M1 * z <= rhs - 1))   # z=1: trivial; z=0: lhs < rhs
+            ctx.add(p.implies(lhs - M2 * z >= rhs - M2 + 1))  # z=0: trivial; z=1: lhs > rhs
+            # ctx.add((~p).implies(z <= 0))  # redundant: z only appears in p's indicator bodies
+            return True
         # Indicator body must be linear; restrict tree-node handlers to linear operators
         can_be_linear = isinstance(b, Comparison) and b.name != "!="
         linear_supported = {
@@ -82,6 +95,16 @@ def handle_neq(cpm_expr, depth, reified, handlers, ctx):
     result = push_down_negation([cpm_expr], toplevel=not reified)
     if len(result) == 1 and result[0].name == "!=":
         a, b = result[0].args
+        if BIG_M_NEQ and not reified:
+            # Big-M formulation: z selects a > b (z=1) or a < b (z=0)
+            # a - b + 1 <= M1*z  (z=0 forces a < b; z=1 is trivially satisfied)
+            # b - a + 1 <= M2*(1-z)  (z=1 forces a > b; z=0 is trivially satisfied)
+            z = cp.boolvar()
+            _, M1 = (a - b + 1).get_bounds()
+            _, M2 = (b - a + 1).get_bounds()
+            ctx.add(a - M1 * z <= b - 1)
+            ctx.add(a - M2 * z >= b - M2 + 1)
+            return True
         return ctx.recurse((a > b) | (a < b), depth, reified=reified, handlers=handlers)
     else:  # push_down_negation changed/decomposed the expression
         return ctx.recurse(cp.all(result), depth, reified=reified, handlers=handlers)

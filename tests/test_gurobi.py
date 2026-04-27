@@ -97,8 +97,8 @@ def expression_tree_cases_():
     yield (
         "neq",
         x != 1,
-        ["True", "(BV0) -> (x >= 2)", "(~BV0) -> (x <= 0)"],
-        ["GC0: BV0 = 1 -> x >= 2", "GC1: BV0 = 0 -> x <= 0"],
+        ["True", "sum([1, -2] * [x, BV0]) <= 0", "sum([1, -4] * [x, BV0]) >= -2"],
+        None,
     )
 
     yield (
@@ -124,16 +124,9 @@ def expression_tree_cases_():
         "implies_neq",
         p.implies(x != 1),
         [
-            "(p) -> (BV2 >= 1)",
-            "(BV0) -> (x >= 2)",
-            "(~BV0) -> (x <= 1)",
             "True",
-            "True",
-            "(BV1) -> (x <= 0)",
-            "(~BV1) -> (x >= 1)",
-            "True",
-            "True",
-            "(BV2) == ((BV0) or (BV1))",
+            "(p) -> (sum([1, -2] * [x, BV0]) <= 0)",
+            "(p) -> (sum([1, -4] * [x, BV0]) >= -2)",
         ],
         None,
     )
