@@ -308,8 +308,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
 def run_solution_checker(JAR, instance_location, out_file, verbose, cpm_time):
 
     start = time.time()
-    command = ["java", "-jar", JAR, "'" + str(instance_location) + "'" + " " + str(out_file)]
-    command = " ".join(command)
+    command = f"{JAR} '{instance_location}' {out_file}"
+    # command = ["java", "-jar", JAR, "'" + str(instance_location) + "'" + " " + str(out_file)]
+    # command = " ".join(command)
     test_res_str = subprocess.run(command, capture_output=True, text=True, shell=True)
     checker_time = time.time() - start
 
