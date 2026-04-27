@@ -82,9 +82,9 @@ def expression_tree_cases_():
     """A quadratic constraint"""
     yield (
         "pow",
-        x**2 + y == 9,
-        ["(pow(x,2)) + (y) == 9"],
-        ["qc0: y + [ x ^2 ] = 9"],
+        x**2 + y == 6,
+        ["(pow(x,2)) + (y) == 6"],
+        ["qc0: y + [ x ^2 ] = 6"],
     )
 
     # yield (
@@ -105,17 +105,14 @@ def expression_tree_cases_():
         "reified_neq",
         (x != 1) | p,
         [
-            "1",
+            "(BV2) + (p) >= 1",
             "(BV0) -> (x >= 2)",
             "(~BV0) -> (x <= 1)",
-            "True",
             "True",
             "(BV1) -> (x <= 0)",
             "(~BV1) -> (x >= 1)",
             "True",
-            "True",
             "(BV2) == ((BV0) or (BV1))",
-            "(BV2) or (p)",
         ],
         None,
     )
@@ -166,13 +163,12 @@ def expression_tree_cases_():
     """An indicator LHS has to be a BV"""
     yield (
         "quad_implies",
-        (x * y >= 2).implies(z <= 3),
+        (x * y >= 2).implies(z <= 1),
         [
-            "(BV0) -> (z <= 3)",
+            "(BV0) -> (z <= 1)",
             "(IV0) == ((x) * (y))",
             "(BV0) -> (IV0 >= 2)",
             "(~BV0) -> (IV0 <= 1)",
-            "True",
             "True",
         ],
         None,
@@ -183,7 +179,7 @@ def expression_tree_cases_():
     constraint IV0==x*y should keep x*y as a tree node, not linearize further."""
     yield (
         "implies_nested_quad",
-        p.implies(2*(x * y) + 3*z <= 5),
+        p.implies(2 * (x * y) + 3 * z <= 5),
         ["(p) -> (sum([2, 3] * [IV0, z]) <= 5)", "(IV0) == ((x) * (y))"],
         ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> 2 IV0 + 3 z <= 5"],
     )
@@ -224,9 +220,9 @@ def expression_tree_cases_():
 
     yield (
         "multiplication",
-        z + x * y == 12,
-        ["(z) + ((x) * (y)) == 12"],
-        ["qc0: z + [ x * y ] = 12"],
+        z + x * y == 6,
+        ["(z) + ((x) * (y)) == 6"],
+        ["qc0: z + [ x * y ] = 6"],
     )
 
     # yield (
@@ -238,16 +234,17 @@ def expression_tree_cases_():
 
     yield (
         "maximum",
-        z + cp.Maximum([x, y]) == 12,
-        ["(z) + (IV0) == 12", "(IV0) == (max(x,y))"],
-        ["R0: z + IV0 = 12", "GC0: IV0 = MAX ( x , y )"],
+        z + cp.Maximum([x, y]) == 4,
+        ["(z) + (IV0) == 4", "(IV0) == (max(x,y))"],
+        ["R0: z + IV0 = 4", "GC0: IV0 = MAX ( x , y )"],
     )
 
     yield (
         "nested",
-        z + (cp.max([x, y]) - 3) * ((-y) ** 2) - 3 == 12,
-        ["sum(z, ((IV0) + -3) * (pow(-(y),2)), -3) == 12", "(IV0) == (max(x,y))"],
+        z + (cp.max([x, y]) - 3) * ((-y) ** 2) - 3 <= -6,
+        ["sum(z, ((IV0) + -3) * (pow(-(y),2)), -3) <= -6", "(IV0) == (max(x,y))"],
         [
+            "R0: C3 <= -6",
             "\\ C3 = (z + (sqr(y) * (-3 + IV0))) + -3",
             "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( PLUS , -1 , 0 ) ( VARIABLE , z , 1 )",
             "( MULTIPLY , -1 , 1 ) ( SQUARE , -1 , 3 ) ( VARIABLE , y , 4 )",
@@ -360,7 +357,6 @@ def expression_tree_cases_():
         None,
     )
 
-
     # yield (
     #     "maximum_root",
     #     1 == cp.Maximum([x, y]),
@@ -375,7 +371,6 @@ def expression_tree_cases_():
         ["R0: IV0 = 1", "GC0: IV0 = MAX ( p , q )"],
     )
 
-
     """If we find a general constraint already in the proper form of `y = f(x)`, we should not reify"""
     yield (
         "general_constraint_in_normal_form",
@@ -384,15 +379,14 @@ def expression_tree_cases_():
         ["GC0: x = MAX ( y , z )"],
     )
 
-
     # (x) * (pow(y,2)) <= 4
     # (x) * (pow(y,2)) - 4 <= 0
     # y <= 0, y = (x) * (pow(y,2)) - 4
     yield (
         "unnormalized_quad",
-        (x * y) <= 4,
-        ["(x) * (y) <= 4"],
-        ["qc0: [ x * y ] <= 4"],
+        (x * y) <= 3,
+        ["(x) * (y) <= 3"],
+        ["qc0: [ x * y ] <= 3"],
         # TODO perhaps ["GC0: C2 = OR ( p , q )"],
     )
 
@@ -411,9 +405,9 @@ def expression_tree_cases_():
 
     yield (
         "normalize_nonlinear_on_rhs",
-        (p | q) <= (x == 2) + (y**2),
+        (p | q) <= (x == 2) + (y**2) - 4,
         [
-            "(BV0) <= ((BV[x == 2]) + (pow(y,2)))",
+            "(BV0) <= (sum(BV[x == 2], pow(y,2), -4))",
             "(BV0) == ((p) or (q))",
             "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
             "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",

@@ -55,10 +55,10 @@ def handle_implication(cpm_expr, depth, reified, handlers, ctx):
             z = cp.boolvar()
             _, M1 = (lhs - rhs + 1).get_bounds()
             _, M2 = (rhs - lhs + 1).get_bounds()
-            ctx.add(p.implies(lhs - M1 * z <= rhs - 1))   # z=1: trivial; z=0: lhs < rhs
-            ctx.add(p.implies(lhs - M2 * z >= rhs - M2 + 1))  # z=0: trivial; z=1: lhs > rhs
+            lhs_lt_rhs = p.implies(lhs - M1 * z <= rhs - 1)   # z=1: True; z=0: lhs < rhs
+            lhs_gt_rhs = p.implies(lhs - M2 * z >= rhs - M2 + 1)  # z=0: True; z=1: lhs > rhs
             # ctx.add((~p).implies(z <= 0))  # redundant: z only appears in p's indicator bodies
-            return True
+            return ctx.recurse(lhs_lt_rhs & lhs_gt_rhs, depth, reified=reified)
         # Indicator body must be linear; restrict tree-node handlers to linear operators
         can_be_linear = isinstance(b, Comparison) and b.name != "!="
         linear_supported = {
@@ -102,9 +102,9 @@ def handle_neq(cpm_expr, depth, reified, handlers, ctx):
             z = cp.boolvar()
             _, M1 = (a - b + 1).get_bounds()
             _, M2 = (b - a + 1).get_bounds()
-            ctx.add(a - M1 * z <= b - 1)
-            ctx.add(a - M2 * z >= b - M2 + 1)
-            return True
+            lhs_lt_rhs = a - M1 * z <= b - 1   # z=1: True; z=0: lhs < rhs
+            lhs_gt_rhs = a - M2 * z >= b - M2 + 1  # z=0: True; z=1: lhs > rhs
+            return ctx.recurse(lhs_lt_rhs & lhs_gt_rhs, depth, reified=reified)
         return ctx.recurse((a > b) | (a < b), depth, reified=reified, handlers=handlers)
     else:  # push_down_negation changed/decomposed the expression
         return ctx.recurse(cp.all(result), depth, reified=reified, handlers=handlers)
@@ -140,7 +140,7 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     # (before reifying args, to preserve indicator structure)
     if not reified and y is None and cpm_expr.name == "and":
         for arg in cpm_expr.args:
-            ctx.add(ctx.recurse(arg, depth, reified=False, handlers=handlers))
+            ctx.post(ctx.recurse(arg, depth, reified=False, handlers=handlers))
         return True
     # or(comp1, ..., compN) at root level: use a selector variable instead of reifying each disjunct.
     # Only valid at root level (not reified), since the selector always enforces one branch.
@@ -151,13 +151,11 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
         if all(isinstance(a, Comparison) for a in args):
             if len(args) == 2:
                 bv = cp.boolvar()
-                ctx.add(bv.implies(args[0]))
-                ctx.add((~bv).implies(args[1]))
+                # TODO reified = reified i/o True?
+                return ctx.recurse(bv.implies(args[0]) & (~bv).implies(args[1]), depth, reified=True)
             else:
                 z = cp.intvar(0, len(args) - 1)
-                for i, arg in enumerate(args):
-                    ctx.add((z == i).implies(arg))
-            return True
+                return ctx.recurse(cp.all((z == i).implies(arg) for i, arg in enumerate(args)), depth, reified=True)
     # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
     args = [ctx.reify(ctx.recurse(arg, depth, reified=True), depth) for arg in cpm_expr.args]
     # require non-constants
@@ -314,7 +312,7 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
                     return handlers[name](cpm_expr, depth, reified, handlers, ctx)
                 case "not":
                     (a,) = cpm_expr.args
-                    return into_tree_expr_(recurse_negation(a), depth, reified=True)
+                    return ctx.recurse(recurse_negation(a), depth, reified=True)
                 case "==" if (
                     isinstance(cpm_expr.args[0], _BoolVarImpl)
                     and is_boolexpr(cpm_expr.args[1])
@@ -322,8 +320,8 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
                 ):
                     # BV == boolexpr === BV <-> boolexpr: post as bi-implications
                     a, b = cpm_expr.args
-                    add(a.implies(b) & (~a).implies(recurse_negation(b)))
-                    return True
+                    # TODO remove recurse_negation for ~
+                    return ctx.recurse(a.implies(b) & (~a).implies(recurse_negation(b)), depth, reified=reified)
                 case "==" if (
                     isinstance(cpm_expr.args[0], _NumVarImpl)
                     and isinstance(cpm_expr.args[1], (Operator, GlobalFunction))
