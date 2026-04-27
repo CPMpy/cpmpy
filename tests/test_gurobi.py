@@ -342,10 +342,24 @@ def expression_tree_cases_():
     yield (
         "disjunction",
         p | q,
-        ["1", "(p) or (q)"],  # TODO avoid BV0
-        ["GC0: C2 = OR ( p , q )"],
-        # TODO perhaps ["GC0: C2 = OR ( p , q )"],
+        ["(p) + (q) >= 1"],
+        ["R0: p + q >= 1"],
     )
+
+    yield (
+        "two_disjunctions",
+        (p | q) & (q | r),
+        None,
+        ["R0: p + q >= 1", "R1: q + r >= 1"],
+    )
+
+    yield (
+        "conjunction_implies_comparison",
+        ((x <= -1) & (y >= 1)).implies(z >= 3),
+        [],
+        None,
+    )
+
 
     # yield (
     #     "maximum_root",
@@ -424,8 +438,8 @@ def expression_tree_cases_():
     yield (
         "conjunction_in_disjunction",
         (p | (q & r)),
-        ["1", "(BV0) == ((q) and (r))", "(p) or (BV0)"],
-        ["GC0: BV0 = AND ( q , r )", "GC1: C4 = OR ( p , BV0 )"],
+        ["(p) + (BV0) >= 1", "(BV0) == ((q) and (r))"],
+        ["R0: p + BV0 >= 1", "GC0: BV0 = AND ( q , r )"],
     )
 
     # yield (
