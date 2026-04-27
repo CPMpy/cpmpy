@@ -443,24 +443,7 @@ class CPM_pysat(SolverInterface):
                 c = self._pysat_pseudoboolean(cpm_expr)
                 self.pysat_solver.append_formula(c)
             else:
-                raise NotSupportedError(f"Implication: {cpm_expr} not supported by CPM_pysat")
-
-        elif isinstance(cpm_expr, Comparison):
-            # comparisons between Booleans will have been transformed out
-            # check if comparison of cardinality/pseudo-boolean constraint
-            if isinstance(cpm_expr.args[0], Operator):
-                if cpm_expr.args[0].name == "sum":
-                    # convert to clauses and post
-                    clauses = self._pysat_cardinality(cpm_expr)
-                    self.pysat_solver.append_formula(clauses)
-                elif cpm_expr.args[0].name == "wsum":
-                    # convert to clauses and post
-                    clauses = self._pysat_pseudoboolean(cpm_expr)
-                    self.pysat_solver.append_formula(clauses)
-                else:
-                    raise NotImplementedError(f"Operator constraint {cpm_expr} not supported by CPM_pysat")
-            else:
-                raise NotImplementedError(f"Non-operator constraint {cpm_expr} not supported by CPM_pysat")
+                raise NotSupportedError(f"Comparison: {cpm_expr} not supported by CPM_pysat")
 
         elif isinstance(cpm_expr, BoolVal):
             # base case: Boolean value
