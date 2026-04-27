@@ -164,6 +164,11 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     args = _propagate_boolconst(cpm_expr.name, args)
     if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
         return args
+
+    # root-level is better posted as `sum(args) >= 1` (rather than `1 = OR ( ... )`)
+    if not reified and y is None and cpm_expr.name == "or":
+        return cp.sum(args) >= 1
+
     # require the form: y = f(x)
     if y is None:
         y = ctx.get_or_make_var(cpm_expr, define=False) if reified else 1
