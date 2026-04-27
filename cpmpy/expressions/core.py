@@ -105,7 +105,7 @@ from ..exceptions import TypeError
 T = TypeVar("T")
 ListLike: TypeAlias = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
 ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
-
+BoolExprLike: TypeAlias = Union["Expression", bool, np.bool_]  # subtype of ExprLike (bool subtype int)
 
 class Expression(object):
     """
@@ -255,14 +255,14 @@ class Expression(object):
         warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
         return copy.deepcopy(self, memodict)
 
-    def implies(self, other: ExprLike, simplify: bool = False) -> "Expression":
+    def implies(self, other: BoolExprLike, simplify: bool = False) -> "Expression":
         """Implication constraint: ``self -> other``.
 
         Python does not offer relevant syntax for implication, call this method instead.
         For double reification (<->), use equivalence ``self == other``.
 
         Args:
-            other (ExprLike): the right-hand-side of the implication
+            other (BoolExprLike): the right-hand-side of the implication
             simplify (bool): if True, simplify by eliminating True/False constants (might remove expressions & their variables from user-view)
 
         Returns:
@@ -569,11 +569,11 @@ class BoolVal(Expression):
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other: ExprLike, simplify: bool = False) -> Expression:
+    def implies(self, other: BoolExprLike, simplify: bool = False) -> Expression:
         """Implication constraint: ``BoolVal -> other``.
 
         Args:
-            other (ExprLike): the right-hand-side of the implication
+            other (BoolExprLike): the right-hand-side of the implication
             simplify (bool): simplify the implication, even if it means `other` dissappears from user-view
 
         Simplification rule:
