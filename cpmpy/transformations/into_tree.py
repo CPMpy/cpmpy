@@ -200,7 +200,6 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     # require the form: y = f(x)
     f = _with_args(cpm_expr, args)
     f = _propagate_boolconst(f)
-    # if is_num(cpm_expr) or isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
     if (
         is_num(f) or isinstance(f, (_BoolVarImpl, _IntVarImpl)) and not isinstance(f, NegBoolView)
     ):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`), or changed into e.g. singleton and
@@ -211,8 +210,6 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
         return y == f
 
     y = ctx.get_or_make_var(f, depth) if reified else 1
-    # y = ctx.get_or_make_var(f, depth, define=False) if reified else 1
-    # ctx.post(y == f)
     return y
 
 

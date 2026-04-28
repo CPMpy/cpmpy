@@ -286,8 +286,8 @@ def main():
 
     # Rename solvers: map auto-generated "solver_timestamp" names to readable labels
     SOLVER_RENAMES = {
-        "gurobi_20260427_183521": "expr",
-        "gurobi_20260427_202010": "base",
+        "gurobi_20260428_191209": "expr",
+        "gurobi_20260428_205922": "base",
     }
 
     # Read and merge all CSV files
@@ -301,8 +301,10 @@ def main():
     df = pd.concat(dfs, ignore_index=True)
 
     if SOLVER_RENAMES:
+        solvers = df['solver'].unique()
         df["solver"] = df["solver"].replace(SOLVER_RENAMES)
         df = df[df["solver"].isin(SOLVER_RENAMES.values())]
+        assert not df.empty, f"no solvers {solvers}"
 
     # Print some stats
     xcsp3_stats(df)
