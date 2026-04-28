@@ -140,8 +140,8 @@ import cpmpy as cp
 
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
-from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, _IntVarImpl, NDVarArray
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray
+from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -1078,7 +1078,10 @@ class Cumulative(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super(Cumulative, self).__init__("cumulative", (list(start), list(duration), list(end) if end is not None else None, demand_list, capacity))
+        if end is None:
+            super(Cumulative, self).__init__("cumulative", (list(start), list(duration), demand_list, capacity))
+        else:
+            super(Cumulative, self).__init__("cumulative", (list(start), list(duration), list(end), demand_list, capacity))
 
     
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
@@ -1116,12 +1119,17 @@ class Cumulative(GlobalConstraint):
         - demand >= 0
         - start + duration == end
         """
-        start, duration, end, demand, capacity = self.args
-        cons = [d >= 0 for d in duration]  # enforce non-negative durations
-        cons += [h >= 0 for h in demand]  # enforce non-negative demand
 
-        if end is not None:
+
+        cons = []
+        if len(self.args) == 4:
+            start, duration, demand, capacity = self.args
+        else:
+            start, duration, end, demand, capacity = self.args
             cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
+        
+        cons += [d >= 0 for d in duration]  # enforce non-negative durations
+        cons += [h >= 0 for h in demand]  # enforce non-negative demand
 
         return cons
 
@@ -1134,11 +1142,13 @@ class Cumulative(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity = self.args
 
         cons = self._consistency_constraints()
-        if end is None:
+        if len(self.args) == 4:
+            start, duration, demand, capacity = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end, demand, capacity = self.args
 
         # demand doesn't exceed capacity
         # tasks are uninterruptible, so we only need to check each starting point of each task
@@ -1163,12 +1173,13 @@ class Cumulative(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity = self.args
-
         cons = self._consistency_constraints()
-        if end is None:
+        if len(self.args) == 4:
+            start, duration, demand, capacity = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
-            
+        else:
+            start, duration, end, demand, capacity = self.args
+
         # demand doesn't exceed capacity
         # for each time-step, we check if the running demand does not exceed the capacity
         lbs, ubs = get_bounds(start)
@@ -1183,21 +1194,20 @@ class Cumulative(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end, demand, capacity = self.args
-        
-        start, dur, demand, capacity = argvals([start, dur, demand, capacity])
-        if any(a is None for a in flatlist([start, dur, demand, capacity])):
-            return None
-        if end is None:
-            end = [s + d for s,d in zip(start, dur)]
+
+        if len(self.args) == 4:
+            start, duration,demand, capacity = argvals(self.args)
+            if any(a is None for a in start + duration + demand + [capacity]):
+                return None
+            end = [start[i] + duration[i] for i in range(len(start))]
         else:
-            end = argvals(end)
-            if any(a is None for a in end):
+            start, duration,end, demand, capacity = argvals(self.args)
+            if any(a is None for a in start + duration + end + demand + [capacity]):
                 return None
                 
-        if any(d < 0 for d in dur):
+        if any(d < 0 for d in duration):
             return False
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
+        if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
 
         if any(d < 0 for d in demand):
@@ -1205,9 +1215,9 @@ class Cumulative(GlobalConstraint):
 
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
-        start, end = np.array(start), np.array(end) # eases check below
+        np_start, np_end = np.asanyarray(start), np.asanyarray(end) # eases check below
         for t in range(lb, ub+1):
-            if capacity < sum(demand * ((start <= t) & (end > t))):
+            if capacity < sum(demand * ((np_start <= t) & (np_end > t))):
                 return False
 
         return True
@@ -1273,8 +1283,10 @@ class CumulativeOptional(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super().__init__("cumulative_optional", (list(start), list(duration), list(end) if end is not None else None,
-                                                 demand_list, capacity, list(is_present)))
+        if end is None:
+            super().__init__("cumulative_optional", (list(start), list(duration), demand_list, capacity, list(is_present)))
+        else:
+            super().__init__("cumulative_optional", (list(start), list(duration), list(end), demand_list, capacity, list(is_present)))
 
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
         """
@@ -1312,13 +1324,15 @@ class CumulativeOptional(GlobalConstraint):
         - start + duration == end if the task is present
         """
 
-        start, duration, end, demand, capacity, is_present = self.args
-        cons = [implies(p,d >= 0) for d, p in zip(duration, is_present)]  # enforce non-negative durations when present
-        cons += [implies(p,h >= 0) for h, p in zip(demand, is_present)]  # enforce non-negative demand when present
-
-        # set duration of tasks, only if end is user-provided and the task is present
-        if end is not None:
+        cons = []
+        if len(self.args) == 5:
+            start, duration, demand, capacity, is_present = self.args
+        else:
+            start, duration, end, demand, capacity, is_present = self.args
             cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
+
+        cons += [implies(p,d >= 0) for d, p in zip(duration, is_present)]  # enforce non-negative durations when present
+        cons += [implies(p,h >= 0) for h, p in zip(demand, is_present)]  # enforce non-negative demand when present
 
         return cons
 
@@ -1332,11 +1346,13 @@ class CumulativeOptional(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity, is_present = self.args
         
         cons = self._consistency_constraints()
-        if end is None:
+        if len(self.args) == 5:
+            start, duration, demand, capacity, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end, demand, capacity, is_present = self.args
 
         # demand of tasks that are present doesn't exceed capacity
         # tasks are uninterruptible, so we only need to check each starting point of each task
@@ -1361,11 +1377,13 @@ class CumulativeOptional(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity, is_present = self.args
-
+        
         cons = self._consistency_constraints()
-        if end is None:
+        if len(self.args) == 5:
+            start, duration, demand, capacity, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end, demand, capacity, is_present = self.args
 
         # demand of tasks that are presentdoesn't exceed capacity
         # for each time-step, we check if the running demand does not exceed the capacity
@@ -1381,18 +1399,20 @@ class CumulativeOptional(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """        
-        start, dur, end, demand, capacity, is_present = argvals(self.args)
-        if end is None:
-            end = [s + d for s,d in zip(start, dur)]
-        else:
-            end = argvals(end)
 
-        if any(a is None for a in flatlist([start, dur, end, demand, capacity, is_present])):
-            return None
-                
-        if any(p and d < 0 for d,p in zip(dur, is_present)):
+        if len(self.args) == 5:
+            start, duration,demand, capacity, is_present = argvals(self.args)
+            if any(a is None for a in start + duration + demand + [capacity] + is_present):
+                return None
+            end = [s + d for s,d in zip(start, duration)]
+        else:
+            start, duration,end, demand, capacity, is_present = argvals(self.args)
+            if any(a is None for a in start + duration + end + demand + [capacity] + is_present):
+                return None
+
+        if any(p and d < 0 for d,p in zip(duration,is_present)):
             return False
-        if any(p and s + d != e for s,d,e,p in zip(start, dur, end, is_present)):
+        if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
 
         if any(p and d < 0 for d,p in zip(demand, is_present)):
@@ -1400,9 +1420,9 @@ class CumulativeOptional(GlobalConstraint):
 
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
-        start, end, present = np.array(start), np.array(end), np.array(is_present) # eases check below
+        np_start, np_end, np_present = np.asanyarray(start), np.asanyarray(end), np.asanyarray(is_present) # eases check below
         for t in range(lb, ub+1):
-            if capacity < sum(demand * (present & (start <= t) & (end > t))):
+            if capacity < sum(demand * (np_present & (np_start <= t) & (np_end > t))):
                 return False
 
         return True
@@ -1435,7 +1455,10 @@ class NoOverlap(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap", (list(start), list(duration), list(end) if end is not None else None))
+        if end is None:
+            super().__init__("no_overlap", (list(start), list(duration)))
+        else:
+            super().__init__("no_overlap", (list(start), list(duration), list(end)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1444,13 +1467,16 @@ class NoOverlap(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, dur, end = self.args
-        cons = [d >= 0 for d in dur]
+        cons = []
+
+        if len(self.args) == 2:
+            start, duration = self.args
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end = self.args
+            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
         
-        if end is None:
-            end = [s+d for s,d in zip(start, dur)]
-        else: # can use the expression directly below
-            cons += [s + d == e for s,d,e in zip(start, dur, end)]
+        cons += [d >= 0 for d in duration]
             
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons.append((e1 <= s2) | (e2 <= s1))
@@ -1461,20 +1487,21 @@ class NoOverlap(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end = argvals(self.args)
-        if end is None:
-            if any(s is None for s in start) or any(d is None for d in dur):
+        if len(self.args) == 2:
+            start, duration = argvals(self.args)
+            if any(a is None for a in start+duration):
                 return None
-            end = [s + d for s,d in zip(start, dur)]
+            end = [s + d for s,d in zip(start, duration)]
         else:
-            if any(s is None for s in start) or any(d is None for d in dur) or any(e is None for e in end):
+            start, duration,end = argvals(self.args)
+            if any(a is None for a in [start, duration,end]):
                 return None
        
-        if any(d < 0 for d in dur):
+        if any(d < 0 for d in duration):
             return False
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
+        if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
-        for (s1,d1), (s2,d2) in all_pairs(zip(start,dur)):
+        for (s1,d1), (s2,d2) in all_pairs(zip(start,duration)):
             if s1 + d1 > s2 and s2 + d2 > s1:
                 return False
         return True
@@ -1516,9 +1543,12 @@ class NoOverlapOptional(GlobalConstraint):
             raise ValueError("Start and is_present should have equal length")
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
-        
-        super().__init__("no_overlap_optional", (start, duration, end, is_present))
 
+        if end is None:
+            super().__init__("no_overlap_optional", (list(start), list(duration), list(is_present)))
+        else:
+            super().__init__("no_overlap_optional", (list(start), list(duration), list(end), list(is_present)))
+        
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
@@ -1526,14 +1556,16 @@ class NoOverlapOptional(GlobalConstraint):
         Returns:
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, dur, end, is_present = self.args
-        cons = [implies(p, d >= 0) for d, p in zip(dur, is_present)]
+
+        cons = []
+
+        if len(self.args) == 3:
+            start, duration, is_present = self.args
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end, is_present = self.args
+            cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
         
-        if end is None:
-            end = [s+d for s,d in zip(start, dur)]
-        else: # can use the expression directly below
-            cons += [implies(p, s + d == e) for s,d,e,p in zip(start, dur, end, is_present)]
-            
         for (s1, e1, p1), (s2, e2, p2) in all_pairs(zip(start, end, is_present)):
             cons += [implies(p1 & p2, (e1 <= s2) | (e2 <= s1))]
         return cons, []
@@ -1543,20 +1575,22 @@ class NoOverlapOptional(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end, is_present = argvals(self.args)
-        if end is None:
-            if any(s is None for s in start) or any(d is None for d in dur):
+
+        if len(self.args) == 3:
+            start, duration,is_present = argvals(self.args)
+            if any(a is None for a in start + duration + is_present):
                 return None
-            end = [s + d for s,d in zip(start, dur)]
+            end = [s + d for s,d in zip(start, duration)]
         else:
-            if any(s is None for s in start) or any(d is None for d in dur) or any(e is None for e in end) or any(p is None for p in is_present):
+            start, duration,end, is_present = argvals(self.args)
+            if any(a is None for a in start + duration + end + is_present):
                 return None
-       
-        if any(p and d < 0 for d,p in zip(dur, is_present)):
+
+        if any(p and d < 0 for d,p in zip(duration,is_present)):
             return False
-        if any(p and s + d != e for s,d,e,p in zip(start, dur, end, is_present)):
+        if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
-        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,dur,is_present)):
+        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,duration,is_present)):
             if p1 and p2 and (s1 + d1 > s2) and (s2 + d2 > s1):
                 return False
         return True
