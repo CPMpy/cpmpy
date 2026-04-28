@@ -33,6 +33,7 @@ from .negation import recurse_negation, push_down_negation
 from .int2bool import _encode_int_var
 
 BIG_M_NEQ = True  # Use Big-M formulation for != instead of indicator-based OR decomposition
+NAMED = False
 
 
 def handle_implication(cpm_expr, depth, reified, handlers, ctx):
@@ -46,7 +47,7 @@ def handle_implication(cpm_expr, depth, reified, handlers, ctx):
         # Indicator constraint: (Var == 0|1) >> (LinExpr sense LinExpr)
         p = a if isinstance(a, NegBoolView) else ctx.reify(a, depth)
         if is_num(p):  # propagate fixed antecedent
-            return ctx.recurse(b, depth, reified=reified) if a else True
+            return ctx.recurse(b, depth, reified=reified) if p else True
         assert isinstance(p, _BoolVarImpl)
         # p -> (a != b): decompose into (p & z) -> (lhs > rhs), (p & ~z) -> (lhs < rhs)
         # using Big-M to linearize the conjunction in the antecedent (2 indicators vs 6 + 1 OR)
@@ -55,18 +56,47 @@ def handle_implication(cpm_expr, depth, reified, handlers, ctx):
             z = cp.boolvar()
             _, M1 = (lhs - rhs + 1).get_bounds()
             _, M2 = (rhs - lhs + 1).get_bounds()
-            lhs_lt_rhs = p.implies(lhs - M1 * z <= rhs - 1)   # z=1: True; z=0: lhs < rhs
+            lhs_lt_rhs = p.implies(lhs - M1 * z <= rhs - 1)  # z=1: True; z=0: lhs < rhs
             lhs_gt_rhs = p.implies(lhs - M2 * z >= rhs - M2 + 1)  # z=0: True; z=1: lhs > rhs
             # ctx.add((~p).implies(z <= 0))  # redundant: z only appears in p's indicator bodies
             return ctx.recurse(lhs_lt_rhs & lhs_gt_rhs, depth, reified=reified)
+
         # Indicator body must be linear; restrict tree-node handlers to linear operators
-        can_be_linear = isinstance(b, Comparison) and b.name != "!="
-        linear_supported = {
-            n: h
-            for n, h in handlers.items()
-            if n in {"sum", "wsum", "sub", "-"} or h not in (handle_supported_expr, handle_wsum)
+        def _contains_general(expr):
+            if hasattr(expr, "name") and expr.name in ("and", "or", "abs", "min", "max", "->"):
+                return True
+            return hasattr(expr, "args") and any(_contains_general(a) for a in expr.args)
+
+        def handle_lin_con(cpm_expr, depth, reified, handlers, ctx):
+            def handle_lin_exp(cpm_expr, depth, reified, handlers, ctx):
+                def handle_lin_term(cpm_expr, depth, reified, handlers, ctx):
+                    def handle_mul_term(cpm_expr, depth, reified, handlers, ctx):
+                        if is_num(cpm_expr.args[0]) or is_num(cpm_expr.args[1]):
+                            return cpm_expr
+                        else:
+                            return ctx.reify(cpm_expr, depth)
+
+                    return handle_supported_expr(
+                        cpm_expr, depth, reified, {"mul": handle_mul_term, "sum": handle_lin_term, "wsum": handle_wsum}, ctx
+                    )
+
+                return ctx.recurse(
+                    cpm_expr,
+                    depth,
+                    True,
+                    {k: handle_lin_term for k in {"sum", "wsum", "sub", "-"}},
+                )
+
+            a, b = cpm_expr.args
+            return _with_args(
+                cpm_expr, [handle_lin_exp(a, depth, reified, handlers, ctx), handle_lin_exp(b, depth, reified, handlers, ctx)]
+            )
+
+        lin_con_handlers = {k: v for k, v in handlers.items() if k not in {"pow", "->"}} | {
+            k: handle_lin_con for k in (">=", "<=", "==")
         }
-        q = ctx.recurse(b, depth, reified=not can_be_linear, handlers=linear_supported)
+        q = ctx.recurse(b, depth, handlers=lin_con_handlers)
+
         # Ensure result is a Comparison (indicator body requirement)
         if isinstance(q, _NumVarImpl):
             q = q >= 1
@@ -102,7 +132,7 @@ def handle_neq(cpm_expr, depth, reified, handlers, ctx):
             z = cp.boolvar()
             _, M1 = (a - b + 1).get_bounds()
             _, M2 = (b - a + 1).get_bounds()
-            lhs_lt_rhs = a - M1 * z <= b - 1   # z=1: True; z=0: lhs < rhs
+            lhs_lt_rhs = a - M1 * z <= b - 1  # z=1: True; z=0: lhs < rhs
             lhs_gt_rhs = a - M2 * z >= b - M2 + 1  # z=0: True; z=1: lhs > rhs
             return ctx.recurse(lhs_lt_rhs & lhs_gt_rhs, depth, reified=reified)
         return ctx.recurse((a > b) | (a < b), depth, reified=reified, handlers=handlers)
@@ -122,9 +152,7 @@ def handle_supported_expr(cpm_expr, depth, reified, handlers, ctx):
         ws, xs = cpm_expr.args
         xs = [ctx.recurse(x, depth, reified=True, handlers=handlers) for x in xs]
         return _with_args(cpm_expr, [ws, xs])
-    return _with_args(
-        cpm_expr, [ctx.recurse(a, depth, reified=True, handlers=handlers) for a in cpm_expr.args]
-    )
+    return _with_args(cpm_expr, [ctx.recurse(a, depth, reified=True, handlers=handlers) for a in cpm_expr.args])
 
 
 handle_wsum = handle_supported_expr
@@ -138,10 +166,11 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     """
     # at root level, and-constraints can be split into individual constraints
     # (before reifying args, to preserve indicator structure)
-    if not reified and y is None and cpm_expr.name == "and":
-        for arg in cpm_expr.args:
-            ctx.post(ctx.recurse(arg, depth, reified=False, handlers=handlers))
-        return True
+    # if not reified and y is None and cpm_expr.name == "and":
+    #     print("root and")
+    #     for arg in cpm_expr.args:
+    #         ctx.post(ctx.recurse(arg, depth, reified=False, handlers=handlers))
+    #     return cpm_expr
     # or(comp1, ..., compN) at root level: use a selector variable instead of reifying each disjunct.
     # Only valid at root level (not reified), since the selector always enforces one branch.
     # n=2: BV -> comp1, ~BV -> comp2 (2 indicators instead of 4 + 1 OR)
@@ -157,26 +186,39 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
                 z = cp.intvar(0, len(args) - 1)
                 return ctx.recurse(cp.all((z == i).implies(arg) for i, arg in enumerate(args)), depth, reified=True)
     # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
-    args = [ctx.reify(ctx.recurse(arg, depth, reified=True), depth) for arg in cpm_expr.args]
-    # require non-constants
-    args = _propagate_boolconst(cpm_expr.name, args)
-    if is_num(args):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
-        return args
+
+    args = [ctx.recurse(arg, depth, reified=True) for arg in cpm_expr.args]
+
+    # assert not (cpm_expr.name == "and" and not reified)
+    if reified or cpm_expr.name != "and" or y is not None:
+        args = [ctx.reify(arg, depth) for arg in args]
 
     # root-level is better posted as `sum(args) >= 1` (rather than `1 = OR ( ... )`)
     if not reified and y is None and cpm_expr.name == "or":
         return cp.sum(args) >= 1
 
     # require the form: y = f(x)
-    if y is None:
-        y = ctx.get_or_make_var(cpm_expr, define=False) if reified else 1
     f = _with_args(cpm_expr, args)
-    ctx.post(y == f)  # add directly so that Comparison does not have to deal with it
+    f = _propagate_boolconst(f)
+    # if is_num(cpm_expr) or isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
+    if (
+        is_num(f) or isinstance(f, (_BoolVarImpl, _IntVarImpl)) and not isinstance(f, NegBoolView)
+    ):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`), or changed into e.g. singleton and
+        # TODO possibility to add to CSE ..
+        return f
+
+    if y is not None:
+        return y == f
+
+    y = ctx.get_or_make_var(f, depth) if reified else 1
+    # y = ctx.get_or_make_var(f, depth, define=False) if reified else 1
+    # ctx.post(y == f)
     return y
 
 
 def _simplify_comparison(name, a, b):
     """Check if a comparison is trivially True/False based on bounds. Returns True/False or None."""
+
     def _get_bounds(x):
         return get_bounds(x)
 
@@ -214,17 +256,25 @@ def _with_args(cpm_expr, args):
     return cpm_expr
 
 
-def _propagate_boolconst(name, args):
+def _propagate_boolconst(cpm_expr):
     """Propagate boolean constants in and/or: and(0,...)=0, or(1,...)=1, filter neutral elements."""
-    match name:
+    if is_num(cpm_expr):
+        return cpm_expr
+    match cpm_expr.name:
         case "and" | "or":
-            absorb = 0 if name == "and" else 1  # absorbing element
-            args = [a for a in args if not (is_num(a) and a == 1 - absorb)]
-            if any(is_num(a) and a == absorb for a in args):
+            absorb = 0 if cpm_expr.name == "and" else 1  # absorbing element
+            args = [a for a in cpm_expr.args if not (is_num(a) and a == 1 - absorb)]
+            if len(args) == 0:
+                return 1 if cpm_expr.name == "and" else 0
+            elif len(args) == 1:
+                return args[0]
+            elif any(is_num(a) and a == absorb for a in args):
                 return absorb
-            return args
+
+            # TODO avoid copy
+            return _with_args(cpm_expr, args)
         case _:
-            return args
+            return cpm_expr
 
 
 def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers=None):
@@ -245,8 +295,10 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
         """Add this expression to the tree, flattening if unsupported."""
         cpm_cons.append(into_tree_expr_(cpm_expr, 0))
 
-    def get_or_make_var(cpm_expr, define=True):
+    def get_or_make_var(cpm_expr, depth, define=True):
         """Get or make (Boolean/integer) var `b` which represent the expression. Add defining constraints b == cpm_expr if `define=True`."""
+        if verbose:
+            print(f"{'  ' * depth}get_or_make_var", cpm_expr)
         cached = csemap.get(cpm_expr)
         if cached is not None:
             return cached
@@ -270,27 +322,47 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
             bv = enc.eq(val)
             return ~bv if cpm_expr.name == "!=" else bv
 
-        r = cp.boolvar() if is_boolexpr(cpm_expr) else cp.intvar(*cpm_expr.get_bounds())
-        csemap.flat_map[cpm_expr] = r
+        if not isinstance(cpm_expr, NegBoolView):
+            cpm_expr = _with_args(cpm_expr, [ctx.recurse(arg, depth, reified=True) for arg in cpm_expr.args])
+
+        cpm_expr_ = _propagate_boolconst(cpm_expr)
+        # if is_num(cpm_expr) or isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`)
+        if (
+            is_num(cpm_expr_) or isinstance(cpm_expr_, (_BoolVarImpl, _IntVarImpl)) and not isinstance(cpm_expr_, NegBoolView)
+        ):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`), or changed into e.g. singleton and
+            # TODO possibility to add to CSE ..
+            return cpm_expr_
+
+        # if is_num(cpm_expr) or isinstance(cpm_expr, (_BoolVarImpl, _IntVarImpl)) and not isinstance(cpm_expr, NegBoolView):
+        if cpm_expr_.name != cpm_expr.name:
+            return get_or_make_var(cpm_expr_, depth)
+
+        r = cp.boolvar() if is_boolexpr(cpm_expr_) else cp.intvar(*cpm_expr_.get_bounds())
+        if NAMED:
+            r.name = f"{'BV' if is_boolexpr(cpm_expr_) else 'IV'}[{cpm_expr_}]"
+            if verbose:
+                print(f"{'  ' * depth}intro", r)
+        csemap.flat_map[cpm_expr_] = r
         if define:
-            add(r == cpm_expr)
+            add(r == cpm_expr_)
+
         return r
 
     def reify(cpm_expr, depth):
         """Return a variable representing the expression, for use as argument in general/indicator constraints."""
         if verbose:
-            print(f"{'  ' * depth}reify", cpm_expr, getattr(cpm_expr, "name", None))
+            print(f"{'  ' * depth}reify", cpm_expr, "name =", getattr(cpm_expr, "name", None))
 
         if is_num(cpm_expr):
             return cpm_expr
         elif isinstance(cpm_expr, _NumVarImpl) and not isinstance(cpm_expr, NegBoolView):
             return cpm_expr
-        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
-            # Convert p -> q to or(~p, q) to avoid circular reification
-            a, b = cpm_expr.args
-            return reify((~a) | b, depth)
+        # elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+        #     # Convert p -> q to or(~p, q) to avoid circular reification
+        #     a, b = cpm_expr.args
+        #     return reify((~a) | b, depth)
         else:
-            return get_or_make_var(cpm_expr)
+            return get_or_make_var(cpm_expr, depth)
 
     def raise_unexpected_expr(cpm_expr):
         raise NotSupportedError(f"Unexpected constraint {cpm_expr} in `into_tree`")
@@ -298,6 +370,7 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
     def into_tree_expr_(cpm_expr, depth, reified=False, handlers=handlers):
         indent = "  " * depth
         depth += 1
+        # assert depth < 10
         if verbose:
             print(f"{indent}Con:", cpm_expr, type(cpm_expr), "reif" if reified else "root")
 
@@ -308,40 +381,60 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
             return cpm_expr
         elif isinstance(cpm_expr, (Operator, GlobalFunction, Comparison)):
             match cpm_expr.name:
+                case "and" if not reified:
+                    for arg in cpm_expr.args:
+                        ctx.add(arg)
+                    return True
                 case name if name in handlers:
                     return handlers[name](cpm_expr, depth, reified, handlers, ctx)
                 case "not":
                     (a,) = cpm_expr.args
-                    return ctx.recurse(recurse_negation(a), depth, reified=True)
+                    # TODO reified = True ?
+                    return ctx.recurse(recurse_negation(a), depth, reified=reified)
+                case "==" if (
+                    isinstance(cpm_expr.args[0], _NumVarImpl)
+                    and not isinstance(cpm_expr.args[0], NegBoolView)
+                    and isinstance(cpm_expr.args[1], (Operator, GlobalFunction))
+                    and cpm_expr.args[1].name in handlers
+                    and handlers[cpm_expr.args[1].name] is handle_general_constraint
+                    and (not is_boolexpr(cpm_expr.args[1]) or isinstance(cpm_expr.args[0], _BoolVarImpl))
+                ):
+                    # y == f(...) already in normal form: use y directly as defining variable
+                    y, f = cpm_expr.args
+                    return handlers[f.name](f, depth, reified, handlers, ctx, y=y)
                 case "==" if (
                     isinstance(cpm_expr.args[0], _BoolVarImpl)
                     and is_boolexpr(cpm_expr.args[1])
                     and not isinstance(cpm_expr.args[1], _NumVarImpl)
+                ) or (
+                    isinstance(cpm_expr.args[1], _BoolVarImpl)
+                    and is_boolexpr(cpm_expr.args[0])
+                    and not isinstance(cpm_expr.args[0], _NumVarImpl)
                 ):
                     # BV == boolexpr === BV <-> boolexpr: post as bi-implications
                     a, b = cpm_expr.args
+                    if not isinstance(a, _BoolVarImpl):
+                        a, b = b, a  # ensure a is the BoolVar
                     # TODO remove recurse_negation for ~
                     return ctx.recurse(a.implies(b) & (~a).implies(recurse_negation(b)), depth, reified=reified)
-                case "==" if (
-                    isinstance(cpm_expr.args[0], _NumVarImpl)
-                    and isinstance(cpm_expr.args[1], (Operator, GlobalFunction))
-                    and cpm_expr.args[1].name in handlers
-                    and handlers[cpm_expr.args[1].name] is handle_general_constraint
-                ):
-                    # y == f(...) already in normal form: use y directly as defining variable
-                    y, f = cpm_expr.args
-                    handlers[f.name](f, depth, reified, handlers, ctx, y=y)
-                    return True
                 case "==" | "<=" | ">=":
                     # Bounds-based simplification: check if comparison is trivially True/False
                     simp = _simplify_comparison(cpm_expr.name, cpm_expr.args[0], cpm_expr.args[1])
                     if simp is not None:
+                        if verbose:
+                            print(f"{indent}Simp:", cpm_expr, simp)
                         return simp
-                    a, b = (
-                        into_tree_expr_(cpm_expr.args[0], depth, reified=True, handlers=handlers),
-                        into_tree_expr_(cpm_expr.args[1], depth, reified=True, handlers=handlers),
+
+                    # con = _with_args(cpm_expr, [ctx.recurse(arg, depth, reified=True) for arg in cpm_expr.args])
+                    con = _with_args(
+                        cpm_expr,
+                        [
+                            # TODO refactor to use recurse.. but will mess up the linearization
+                            into_tree_expr_(cpm_expr.args[0], depth, reified=True, handlers=handlers),
+                            into_tree_expr_(cpm_expr.args[1], depth, reified=True, handlers=handlers),
+                        ],
                     )
-                    con = _with_args(cpm_expr, [a, b])
+                    # return con
                     return reify(con, depth) if reified else con
                 case _:
                     # Expression not in current handlers: reify into a variable

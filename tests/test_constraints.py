@@ -4,6 +4,7 @@ import cpmpy as cp
 import numpy as np
 from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.transformations.get_variables import get_variables
+from cpmpy.transformations.into_tree import NAMED
 from cpmpy.expressions.utils import argval, is_num, eval_comparison, get_bounds
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import GlobalConstraint
@@ -49,6 +50,10 @@ EXCLUDE_GLOBAL = {
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
                   }
 # EXCLUDE_GLOBAL = True
+
+if EXCLUDE_GLOBAL is not True:
+    NAMED = False
+
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy

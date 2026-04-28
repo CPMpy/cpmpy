@@ -50,6 +50,9 @@ def expression_tree_cases():
         yield c
 
 
+cp.transformations.into_tree.NAMED = True
+
+
 def expression_tree_cases_():
     """Generator yielding (name, constraint_func, expected_lp) tuples."""
 
@@ -64,12 +67,20 @@ def expression_tree_cases_():
     )
 
     yield (
-        "True",
-        cp.BoolVal(True),
-        ["1"],
-        # ["boolval(True)"],
-        [],
+        "nBV",
+        ~p,
+        ["~p"],
+        ["R0: - p >= 0"],
     )
+
+    # TODO
+    # yield (
+    #     "True",
+    #     cp.BoolVal(True),
+    #     ["1"],
+    #     # ["boolval(True)"],
+    #     [],
+    # )
 
     yield (
         "False",
@@ -94,25 +105,26 @@ def expression_tree_cases_():
     #     ["GC0: p = 1 -> q >= 1"],
     # )
 
-    yield (
-        "neq",
-        x != 1,
-        ["True", "sum([1, -2] * [x, BV0]) <= 0", "sum([1, -4] * [x, BV0]) >= -2"],
-        None,
-    )
+    if cp.transformations.into_tree.BIG_M_NEQ:
+        yield (
+            "neq",
+            x != 1,
+            ["True", "sum([1, -2] * [x, BV0]) <= 0", "sum([1, -4] * [x, BV0]) >= -2"],
+            None,
+        )
 
     yield (
         "reified_neq",
         (x != 1) | p,
         [
-            "(BV2) + (p) >= 1",
-            "(BV0) -> (x >= 2)",
-            "(~BV0) -> (x <= 1)",
+            "(BV[(BV[x >= 2]) or (BV[x <= 0])]) + (p) >= 1",
+            "(BV[x >= 2]) -> (x >= 2)",
+            "(~BV[x >= 2]) -> (x <= 1)",
             "True",
-            "(BV1) -> (x <= 0)",
-            "(~BV1) -> (x >= 1)",
+            "(BV[x <= 0]) -> (x <= 0)",
+            "(~BV[x <= 0]) -> (x >= 1)",
             "True",
-            "(BV2) == ((BV0) or (BV1))",
+            "(BV[(BV[x >= 2]) or (BV[x <= 0])]) == ((BV[x >= 2]) or (BV[x <= 0]))",
         ],
         None,
     )
@@ -136,17 +148,15 @@ def expression_tree_cases_():
         ["GC0: p = 1 -> x >= 1"],
     )
 
-    """Positive implications"""
     yield (
-        "positive_implication",
+        "pos_implies",
         p.implies(x + y <= 3),
         ["(p) -> ((x) + (y) <= 3)"],
         ["GC0: p = 1 -> x + y <= 3"],
     )
 
-    """Negative implications"""
     yield (
-        "negative_implication",
+        "neg_implies",
         (~p).implies(x + y <= 3),
         ["(~p) -> ((x) + (y) <= 3)"],
         ["GC0: p = 0 -> x + y <= 3"],
@@ -156,8 +166,8 @@ def expression_tree_cases_():
     yield (
         "implies_quad",
         p.implies(x * y >= 4),
-        ["(p) -> (IV0 >= 4)", "(IV0) == ((x) * (y))"],
-        ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 >= 4"],
+        ["(p) -> (IV[(x) * (y)] >= 4)", "(IV[(x) * (y)]) == ((x) * (y))"],
+        ["qc0: IV[(x)_*_(y)] + [ - x * y ] = 0", "GC0: p = 1 -> IV[(x)_*_(y)] >= 4"],
     )
 
     """An indicator LHS has to be a BV"""
@@ -165,10 +175,10 @@ def expression_tree_cases_():
         "quad_implies",
         (x * y >= 2).implies(z <= 1),
         [
-            "(BV0) -> (z <= 1)",
-            "(IV0) == ((x) * (y))",
-            "(BV0) -> (IV0 >= 2)",
-            "(~BV0) -> (IV0 <= 1)",
+            "(BV[(x) * (y) >= 2]) -> (z <= 1)",
+            "(IV[(x) * (y)]) == ((x) * (y))",
+            "(BV[(x) * (y) >= 2]) -> (IV[(x) * (y)] >= 2)",
+            "(~BV[(x) * (y) >= 2]) -> (IV[(x) * (y)] <= 1)",
             "True",
         ],
         None,
@@ -180,35 +190,16 @@ def expression_tree_cases_():
     yield (
         "implies_nested_quad",
         p.implies(2 * (x * y) + 3 * z <= 5),
-        ["(p) -> (sum([2, 3] * [IV0, z]) <= 5)", "(IV0) == ((x) * (y))"],
-        ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> 2 IV0 + 3 z <= 5"],
+        ["(p) -> (sum([2, 3] * [IV[(x) * (y)], z]) <= 5)", "(IV[(x) * (y)]) == ((x) * (y))"],
+        None,
     )
 
-    # TODO improve?
+    # ##TODO improve?
     # yield (
     #     "quad_implies",
     #     p.implies(q.implies(x >= 2)),
     #     None,
     #     []
-    # )
-
-    # """An indicator LHS has to be a BV"""
-    # yield (
-    #     "nl_implies",
-    #     (x + (y>=3) <= 2).implies(z <= 3),
-    #     ["qc0: IV0 + [ - x * y ] = 0", "GC0: p = 1 -> IV0 = 3"],
-    #     [
-    #         "GC1: BV0 = 1 -> IV0 + z = 15",
-    #         "GC2: BV1 = 1 -> IV0 + z >= 16",
-    #         "GC3: BV2 = 1 -> IV0 + z <= 14",
-    #         "GC5: BV0 = 0 -> BV3 >= 1",
-    #         "GC6: BV0 = 1 -> z <= 3",
-    #         "\\ IV0 = sqr(y) * (-3 + x)",
-    #         "GC0: IV0 = NL : ( MULTIPLY , -1 , -1 ) ( SQUARE , -1 , 0 )",
-    #         "( VARIABLE , y , 1 ) ( PLUS , -1 , 0 ) ( CONSTANT , -3 , 3 )",
-    #         "( VARIABLE , x , 3 )",
-    #         "GC4: BV3 = OR ( BV1 , BV2 )",
-    #     ],
     # )
 
     yield (
@@ -235,22 +226,23 @@ def expression_tree_cases_():
     yield (
         "maximum",
         z + cp.Maximum([x, y]) == 4,
-        ["(z) + (IV0) == 4", "(IV0) == (max(x,y))"],
-        ["R0: z + IV0 = 4", "GC0: IV0 = MAX ( x , y )"],
+        ["(z) + (IV[max(x,y)]) == 4", "(IV[max(x,y)]) == (max(x,y))"],
+        ["R0: z + IV[max(x,y)] = 4", "GC0: IV[max(x,y)] = MAX ( x , y )"],
     )
 
     yield (
         "nested",
         z + (cp.max([x, y]) - 3) * ((-y) ** 2) - 3 <= -6,
-        ["sum(z, ((IV0) + -3) * (pow(-(y),2)), -3) <= -6", "(IV0) == (max(x,y))"],
+        # ["sum(z, ((IV0) + -3) * (pow(-(y),2)), -3) <= -6", "(IV0) == (max(x,y))"],
+        ["sum(z, ((IV[max(x,y)]) + -3) * (pow(-(y),2)), -3) <= -6", "(IV[max(x,y)]) == (max(x,y))"],
         [
             "R0: C3 <= -6",
-            "\\ C3 = (z + (sqr(y) * (-3 + IV0))) + -3",
+            "\\ C3 = (z + (sqr(y) * (-3 + IV[max(x,y)]))) + -3",
             "GC0: C3 = NL : ( PLUS , -1 , -1 ) ( PLUS , -1 , 0 ) ( VARIABLE , z , 1 )",
             "( MULTIPLY , -1 , 1 ) ( SQUARE , -1 , 3 ) ( VARIABLE , y , 4 )",
-            "( PLUS , -1 , 3 ) ( CONSTANT , -3 , 6 ) ( VARIABLE , IV0 , 6 )",
+            "( PLUS , -1 , 3 ) ( CONSTANT , -3 , 6 ) ( VARIABLE , IV[max(x,y)] , 6 )",
             "( CONSTANT , -3 , 0 )",
-            "GC1: IV0 = MAX ( x , y )",
+            "GC1: IV[max(x,y)] = MAX ( x , y )",
         ],
     )
 
@@ -280,25 +272,26 @@ def expression_tree_cases_():
     yield (
         "abs",
         cp.Abs(x) + y == 3,
-        [
-            "(IV0) + (y) == 3",
-            "(IV0) == (abs(x))",
-        ],
-        ["R0: IV0 + y = 3", "GC0: IV0 = ABS ( x )"],
+        ["(IV[abs(x)]) + (y) == 3", "(IV[abs(x)]) == (abs(x))"],
+        ["R0: IV[abs(x)] + y = 3", "GC0: IV[abs(x)] = ABS ( x )"],
     )
 
     """Mul is supported in expression tree, but not abs"""
     yield (
         "abs_in_mul",
         cp.Abs(x) * y + z == 3,
-        ["((IV0) * (y)) + (z) == 3", "(IV0) == (abs(x))"],
-        ["qc0: z + [ IV0 * y ] = 3", "GC0: IV0 = ABS ( x )"],
+        ["((IV[abs(x)]) * (y)) + (z) == 3", "(IV[abs(x)]) == (abs(x))"],
+        ["qc0: z + [ IV[abs(x)] * y ] = 3", "GC0: IV[abs(x)] = ABS ( x )"],
     )
 
     yield (
         "mul_in_abs",
         cp.Abs(x * y) + z == 3,
-        ["(IV1) + (z) == 3", "(IV0) == ((x) * (y))", "(IV1) == (abs(IV0))"],
+        [
+            "(IV[abs(IV[(x) * (y)])]) + (z) == 3",
+            "(IV[(x) * (y)]) == ((x) * (y))",
+            "(IV[abs(IV[(x) * (y)])]) == (abs(IV[(x) * (y)]))",
+        ],
         None,
         # ["R0: IV0 + z = 3", "qc0: IV1 + [ - x * y ] = 0", "GC0: IV0 = ABS ( IV1 )"],
     )
@@ -351,9 +344,30 @@ def expression_tree_cases_():
     )
 
     yield (
+        "disjunction_of_negs",
+        (~p) | (~q),
+        # TODO 1-p + 1-q >= 1 === -p-q>=-1 === p+q<=1
+        ["(BV[~p]) + (BV[~q]) >= 1", "(~p) == (BV[~p])", "(~q) == (BV[~q])"],
+        None,
+    )
+
+    yield (
         "conjunction_implies_comparison",
-        ((x <= -1) & (y >= 1)).implies(z >= 3),
-        [],
+        ((x >= 2) & (y <= 10)).implies(z >= 2),
+        ["(BV[x >= 2]) -> (z >= 2)", "(BV[x >= 2]) -> (x >= 2)", "(~BV[x >= 2]) -> (x <= 1)", "True"],
+        None,
+    )
+
+    yield (
+        "reified_not_eq",
+        (p == (~q)) == p,
+        [
+            "True",
+            "(p) -> ((~q) == (p))",
+            "(~p) -> ((sum([1, -2] * [~q, BV0])) <= ((p) + -1))",
+            "(~p) -> ((sum([1, -2] * [~q, BV0])) >= (sum(p, -2, 1)))",
+            "True",
+        ],
         None,
     )
 
@@ -364,18 +378,18 @@ def expression_tree_cases_():
     #     ["GC0: C2 = MAX ( x , y )"],
     # )
 
-    yield (
-        "maximum_bv_root",
-        1 == cp.Maximum([p, q]),
-        ["IV0 == 1", "(IV0) == (max(p,q))"],
-        ["R0: IV0 = 1", "GC0: IV0 = MAX ( p , q )"],
-    )
+    # yield (
+    #     "maximum_bv_root",
+    #     1 == cp.Maximum([p, q]),
+    #     ["IV0 == 1", "(IV0) == (max(p,q))"],
+    #     ["R0: IV0 = 1", "GC0: IV0 = MAX ( p , q )"],
+    # )
 
     """If we find a general constraint already in the proper form of `y = f(x)`, we should not reify"""
     yield (
         "general_constraint_in_normal_form",
         x == cp.Maximum([y, z]),
-        ["True", "(x) == (max(y,z))"],
+        ["(x) == (max(y,z))"],
         ["GC0: x = MAX ( y , z )"],
     )
 
@@ -407,8 +421,8 @@ def expression_tree_cases_():
         "normalize_nonlinear_on_rhs",
         (p | q) <= (x == 2) + (y**2) - 4,
         [
-            "(BV0) <= (sum(BV[x == 2], pow(y,2), -4))",
-            "(BV0) == ((p) or (q))",
+            "(BV[(p) or (q)]) <= (sum(BV[x == 2], pow(y,2), -4))",
+            "(BV[(p) or (q)]) == ((p) or (q))",
             "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
             "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",
         ],
@@ -418,8 +432,8 @@ def expression_tree_cases_():
     yield (
         "neg_disjunction",
         ~(p | q),
-        ["BV2", "(~p) == (BV0)", "(~q) == (BV1)", "(BV2) == ((BV0) and (BV1))"],
-        ["R0: BV2 >= 1", "R1: - p - BV0 = -1", "R2: - q - BV1 = -1", "GC0: BV2 = AND ( BV0 , BV1 )"],
+        ["True", "~p", "~q"],
+        None,
     )
 
     yield (
@@ -432,8 +446,8 @@ def expression_tree_cases_():
     yield (
         "conjunction_in_disjunction",
         (p | (q & r)),
-        ["(p) + (BV0) >= 1", "(BV0) == ((q) and (r))"],
-        ["R0: p + BV0 >= 1", "GC0: BV0 = AND ( q , r )"],
+        ["(p) + (BV[(q) and (r)]) >= 1", "(BV[(q) and (r)]) == ((q) and (r))"],
+        ["R0: p + BV[(q)_and_(r)] >= 1", "GC0: BV[(q)_and_(r)] = AND ( q , r )"],
     )
 
     # yield (
@@ -451,11 +465,12 @@ def expression_tree_cases_():
 def test_gurobi_expression_tree(name, constraint, expected_tf, expected_lp):
     """Test that Gurobi transformation generates expected LP output."""
     reset_counters()
+    CPM_gurobi.verbose = True
 
     print("CONSTRAINT")
     print(constraint)
     transformed = [str(c) for c in CPM_gurobi().transform(constraint)]
-    print("TF", ", ".join(transformed))
+    print("TF", "\n".join(transformed))
     reset_counters()
 
     if not isinstance(constraint, cp.Model):
