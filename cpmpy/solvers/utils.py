@@ -22,6 +22,7 @@ from .gurobi import CPM_gurobi
 from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
+from .scip import CPM_scip
 from .z3 import CPM_z3
 from .gcs import CPM_gcs
 from .pysdd import CPM_pysdd
@@ -90,6 +91,7 @@ class SolverLookup():
                 ("pindakaas", CPM_pindakaas),
                 ("hexaly", CPM_hexaly),
                 ("rc2", CPM_rc2),
+                ("scip", CPM_scip),
                ]
 
     @classmethod

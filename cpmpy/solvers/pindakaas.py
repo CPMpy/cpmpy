@@ -39,7 +39,7 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Optional, List, Any
+from typing import Iterable, Optional, List, Any
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
@@ -115,8 +115,6 @@ class CPM_pindakaas(SolverInterface):
         self.ivarmap = dict()  # for the integer to boolean encoders
         self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
-        # TODO workaround for upstream issue https://github.com/pindakaashq/pindakaas/issues/189
-        self.pdk_solver._set_option("factor", 0)
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
         super().__init__(name=name, cpm_model=cpm_model)
@@ -139,12 +137,12 @@ class CPM_pindakaas(SolverInterface):
                 user_vars.update(self.ivarmap[x.name].vars())
         return user_vars
 
-    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[List[_BoolVarImpl]] = None):
+    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[Iterable[_BoolVarImpl]] = None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
 
         :param time_limit: optional, time limit in seconds
-        :param assumptions: optional, a list of assumptions (Boolean variables which should hold for this solve call)
+        :param assumptions: optional, an iterable (e.g. list, set, tuple) of assumptions (Boolean variables which should hold for this solve call)
         """
         if self.unsatisfiable:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -158,7 +156,11 @@ class CPM_pindakaas(SolverInterface):
         time_limit_delta: Optional[timedelta] = None
         if time_limit is not None:
             time_limit_delta = timedelta(seconds=time_limit)
-        solver_assumptions: Optional[List[Any]] = None if assumptions is None else self.solver_vars(assumptions)
+        if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
+            solver_assumptions = self.solver_vars(assumptions)
+        else:
+            solver_assumptions = None
 
         t = time.time()
         with self.pdk_solver.solve(time_limit=time_limit_delta, assumptions=solver_assumptions) as result:
@@ -225,7 +227,7 @@ class CPM_pindakaas(SolverInterface):
         elif isinstance(cpm_var, _IntVarImpl):  # intvar
             if cpm_var.name not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                self += cons
+                self.add(cons)
             else:
                 enc = self.ivarmap[cpm_var.name]
             return self.solver_vars(enc.vars())
