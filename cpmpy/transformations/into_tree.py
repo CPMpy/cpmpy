@@ -179,12 +179,11 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
         args = cpm_expr.args
         if all(isinstance(a, Comparison) for a in args):
             if len(args) == 2:
-                bv = cp.boolvar()
-                # TODO reified = reified i/o True?
-                return ctx.recurse(bv.implies(args[0]) & (~bv).implies(args[1]), depth, reified=True)
+                z = cp.boolvar()
+                return ctx.recurse(z.implies(args[0]) & (~z).implies(args[1]), depth, reified=reified)
             else:
                 z = cp.intvar(0, len(args) - 1)
-                return ctx.recurse(cp.all((z == i).implies(arg) for i, arg in enumerate(args)), depth, reified=True)
+                return ctx.recurse(cp.all((z == i).implies(arg) for i, arg in enumerate(args)), depth, reified=reified)
     # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
 
     args = [ctx.recurse(arg, depth, reified=True) for arg in cpm_expr.args]
