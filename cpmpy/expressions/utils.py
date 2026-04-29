@@ -35,12 +35,12 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, overload
+from typing import TYPE_CHECKING, TypeGuard, Optional, overload, cast
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import BoolExprLike, Expression
+    from cpmpy.expressions.core import ListLike, ExprLike, BoolExprLike, Expression
     from cpmpy.expressions.variables import NDVarArray
 
 
@@ -153,6 +153,18 @@ def argvals(arr):
         return [argvals(arg) for arg in arr]
     return argval(arr)
 
+def argvals_intexpr(lst: Iterable[int|Expression]) -> Optional[list[int]]:
+    """ The well-typed way to get the values of a list of int|Expression, or None if any expression is not assigned """
+    vals: list[int] = []
+    for e in lst:
+        if isinstance(e, int):
+            vals.append(e)
+        else:  # Expression
+            v = e.value()
+            if v is None:
+                return None
+            vals.append(v)
+    return vals
 
 def eval_comparison(str_op, lhs, rhs):
     """
@@ -208,6 +220,20 @@ def get_bounds(expr):
         if is_bool(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
+
+def get_bounds_intexpr(lst: Iterable[int|Expression]) -> tuple[list[int], list[int]]:
+    """ The well-typed way to get the bounds of a list of ExprLike's """
+    lbs: list[int] = []
+    ubs: list[int] = []
+    for e in lst:
+        if isinstance(e, int):
+            lbs.append(e)
+            ubs.append(e)
+        else:  # Expression
+            (lb, ub) = e.get_bounds()
+            lbs.append(lb)
+            ubs.append(ub)
+    return lbs, ubs
 
 # first two are declarations for typing purposes only
 @overload
@@ -282,3 +308,21 @@ def is_star(arg):
         Check if arg is star as used in the ShortTable global constraint
     """
     return isinstance(arg, type(STAR)) and arg == STAR
+
+def npint2int(lst: ListLike[ExprLike]) -> ListLike[int|Expression]:
+    """ Convert numpy integers in list to Python integers """
+
+    newlst: Optional[list[int|Expression]] = None  # only create when first needed
+    for i,elem in enumerate(lst):
+        if isinstance(elem, np.integer):
+            if newlst is None:
+                newlst = cast(list[int|Expression], lst[:i])
+            newlst.append(int(elem))
+        else:
+            if newlst is not None:
+                newlst.append(elem)
+    if newlst is not None:
+        return newlst
+    return lst  # type: ignore  # typer doesn't see its valid, cant cast because cyclic dependency
+     
+
