@@ -143,10 +143,9 @@ def expression_tree_cases_():
         "reified_neq",
         (x != 1) | p,
         [
-            "(BV[~BV[x == 1]]) + (p) >= 1",
+            "(~BV[x == 1]) + (p) >= 1",
             "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
             "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",
-            "(~BV[x == 1]) == (BV[~BV[x == 1]])",
         ],
         None,
     )
@@ -453,6 +452,11 @@ def expression_tree_cases_():
     yield (
         "disjunction_of_equalities",
         (x == 1) | (y == 2),
+        # [
+        #     "True",
+        #     "(BV0) -> (x == 1)",
+        #     "(~BV0) -> (y == 2)",
+        # ],
         [
             "(BV[x == 1]) + (BV[y == 2]) >= 1",
             "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
@@ -467,12 +471,11 @@ def expression_tree_cases_():
         "disjunction_of_disequalities",
         (x != 1) | (y == 2),
         [
-            "(BV[~BV[x == 1]]) + (BV[y == 2]) >= 1",
+            "(~BV[x == 1]) + (BV[y == 2]) >= 1",
             "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
             "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",
             "sum(BV[y == -2], BV[y == -1], BV[y == 0], BV[y == 1], BV[y == 2]) == 1",
             "((sum([0, 1, 2, 3, 4] * [BV[y == -2], BV[y == -1], BV[y == 0], BV[y == 1], BV[y == 2]])) + -2) == (y)",
-            "(~BV[x == 1]) == (BV[~BV[x == 1]])",
         ],
         None,
     )
@@ -503,7 +506,7 @@ def expression_tree_cases_():
     yield (
         "short_table",
         cp.ShortTable([a, b, c], [[0, 1, STAR], [1, STAR, 0], [STAR, 0, 1]]),
-        [],
+        None,
         None,
     )
 
@@ -517,7 +520,7 @@ def expression_tree_cases_():
     yield (
         "neg_table",
         cp.NegativeTable([a, b], [[0, 1], [1, 2], [2, 0]]),
-        [],
+        None,
         None,
     )
 

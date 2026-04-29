@@ -185,16 +185,26 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     # Only valid at root level (not reified), since the selector always enforces one branch.
     # n=2: BV -> comp1, ~BV -> comp2 (2 indicators instead of 4 + 1 OR)
     # n>2: z=intvar(0,n-1), (z==i) -> comp_i (n indicators instead of 2n + 1 OR)
-    args = [ctx.recurse(a, depth, reified=True) for a in cpm_expr.args]
-
     if not reified and y is None and cpm_expr.name == "or":
-        if all(isinstance(a, Comparison) for a in args):
-            if len(args) == 2:
+        orig_args = cpm_expr.args
+        def _prefer_selector(a):
+            """Check if a comparison is better handled by selector than direct encoding.
+            Equalities/disequalities with a constant (var == const) prefer direct encoding."""
+            if not isinstance(a, Comparison):
+                return False
+            if a.name in ("==", "!=") and (is_num(a.args[0]) or is_num(a.args[1])):
+                return False  # var == const: prefer direct encoding
+            return True
+
+        if all(_prefer_selector(a) for a in orig_args):
+            if len(orig_args) == 2:
                 z = cp.boolvar()
-                return ctx.recurse(z.implies(args[0]) & (~z).implies(args[1]), depth, reified=reified)
+                return ctx.recurse(z.implies(orig_args[0]) & (~z).implies(orig_args[1]), depth, reified=reified)
             elif INT_NARY_DISJUNCTIONS:
-                z = cp.intvar(0, len(args) - 1)
-                return ctx.recurse(cp.all((z == i).implies(arg) for i, arg in enumerate(args)), depth, reified=reified)
+                z = cp.intvar(0, len(orig_args) - 1)
+                return ctx.recurse(cp.all((z == i).implies(arg) for i, arg in enumerate(orig_args)), depth, reified=reified)
+
+    args = [ctx.recurse(a, depth, reified=True) for a in cpm_expr.args]
 
     # root-level is better posted as `sum(args) >= 1` (rather than `1 = OR ( ... )`)
     if not reified and y is None and cpm_expr.name == "or":
