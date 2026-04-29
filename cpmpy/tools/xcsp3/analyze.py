@@ -33,6 +33,7 @@ import pandas as pd  # type: ignore[import-untyped]
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def _extract_cost(solution_str):
     """
     Extract numeric cost from solution string like '<instantiation ... cost="69">'
@@ -70,14 +71,16 @@ def xcsp3_plot(df, time_limit=None):
         solver_data = df[df['solver'] == solver]
         
         # Sort by time_total
-        solver_data = solver_data.sort_values('time_total')
+        # key = "time_total"
+        key = "time_post"
+        solver_data = solver_data.sort_values(key)
         
         # If time_limit is set, truncate data
         if time_limit is not None:
-            solver_data = solver_data[solver_data['time_total'] <= time_limit]
+            solver_data = solver_data[solver_data[key] <= time_limit]
         
         # Build x and y values
-        x = [0.0] + solver_data['time_total'].tolist()
+        x = [0.0] + solver_data[key].tolist()
         y = [0] + list(range(1, len(solver_data) + 1))
         
         # Plot the performance curve
@@ -89,7 +92,7 @@ def xcsp3_plot(df, time_limit=None):
     # Get unique year-track combinations
     year_track_pairs = df[['year', 'track']].drop_duplicates()
     datasets = ', '.join([f'{row.year}:{row.track}' for _, row in year_track_pairs.iterrows()])
-    plt.title(f'Performance Plot ({datasets})')
+    plt.title(f'Performance Plot ({datasets}, {key})')
     plt.grid(True)
     plt.legend()
     
@@ -173,16 +176,108 @@ def xcsp3_objective_performance_profile(df):
 
 def xcsp3_stats(df):
 
-    for phase in ['parse', 'model', 'post']:
-        slowest_idx = df[f'time_{phase}'].idxmax()
-        if slowest_idx is not None and not pd.isna(slowest_idx):
-            print(f"Slowest {phase}: {df.loc[slowest_idx, f'time_{phase}']}s ({df.loc[slowest_idx, 'instance']}, {df.loc[slowest_idx, 'solver']})")
-
     for solver in df['solver'].unique():
-        solver_total = df[df['solver'] == solver]['time_total'].sum()
-        print(f"Grand total for {solver}: {solver_total/60:.2f} minutes")
+        sdf = df[df['solver'] == solver]
+        print(f"\n=== {solver} ({len(sdf)} instances) ===")
+
+        # Status counts
+        status_counts = sdf['status'].value_counts()
+        for status, count in status_counts.items():
+            print(f"  {status}: {count}")
+
+        # Time stats for solved instances
+        solved = sdf[sdf['status'].isin(['SATISFIABLE', 'UNSATISFIABLE', 'OPTIMUM FOUND'])]
+        if not solved.empty:
+            for col in ['time_total', 'time_post', 'time_solve']:
+                if col in solved.columns and solved[col].notna().any():
+                    vals = solved[col].dropna()
+                    print(f"  {col}: mean={vals.mean():.2f}s, median={vals.median():.2f}s, max={vals.max():.2f}s")
+            print(f"  Grand total: {sdf['time_total'].sum()/60:.2f} minutes")
+
+        # Slowest phases
+        for phase in ['parse', 'model', 'post']:
+            col = f'time_{phase}'
+            if col in sdf.columns and sdf[col].notna().any():
+                idx = sdf[col].idxmax()
+                print(f"  Slowest {phase}: {sdf.loc[idx, col]:.2f}s ({sdf.loc[idx, 'instance']})")
     
     
+def xcsp3_time_comparison(df, time_limit=300, solver_order=None):
+    """
+    Compare time differentials between solvers on shared instances.
+    Prints per-instance and aggregate timing differences.
+    NaN time values are replaced with 2*time_limit as a penalty.
+    """
+    solvers = sorted(df['solver'].unique())
+    if len(solvers) < 2:
+        print(f"Time comparison requires at least 2 solvers, got {len(solvers)}: {list(solvers)}")
+        return
+
+    if solver_order and len(solver_order) >= 2:
+        s1, s2 = solver_order[0], solver_order[1]
+    else:
+        # Compare the two most recent runs (sorted alphabetically, timestamps ensure order)
+        s1, s2 = solvers[-2], solvers[-1]
+    print(f"\nComparing: {s1} vs {s2}")
+    df = df[(df['solver'] == s1) | (df['solver'] == s2)]
+
+    # Only keep instances that both solvers attempted
+    instances_s1 = set(df[df['solver'] == s1]['instance'])
+    instances_s2 = set(df[df['solver'] == s2]['instance'])
+    shared_instances = instances_s1 & instances_s2
+    skipped = (instances_s1 | instances_s2) - shared_instances
+    if skipped:
+        print(f"  Skipping {len(skipped)} instances not present in both solvers")
+    df = df[df['instance'].isin(shared_instances)]
+
+    # UNKNOWN instances get 2*time_limit penalty for time_total
+    unknown_mask = df['status'] == 'UNKNOWN'
+    df.loc[unknown_mask, 'time_total'] = 2 * time_limit
+
+    # time_cols = ['time_total']
+    # df["time"] = df['time_parse', 'time_model', 'time_post', 'time_solve'].sum()
+
+    # # Replace NaN time values with 2*time_limit as penalty
+    # time_cols = ['time_total', 'time_parse', 'time_model', 'time_post', 'time_solve']
+
+    for col in ['time_parse', 'time_model', 'time_post']:
+        if col in df.columns:
+            df[col] = df[col].fillna(2 * time_limit)
+
+    time_cols = ['time_total', 'time_post', 'time_solve']
+
+    # Pivot per time column
+    for col in time_cols:
+        pivot = df.pivot_table(index='instance', columns='solver', values=col)
+        # Skip if either solver has no data for this column
+        if s1 not in pivot.columns or s2 not in pivot.columns:
+            continue
+        shared = pivot.dropna()
+        if shared.empty:
+            continue
+
+        diff = shared[s1] - shared[s2]
+
+        print(f"\n=== {col} ({s1} minus {s2}) ===")
+        print(f"  Instances compared: {len(diff)}")
+        print(f"  Mean diff:   {diff.mean():+.3f}s")
+        print(f"  Median diff: {diff.median():+.3f}s")
+        print(f"  Total diff:  {diff.sum():+.3f}s")
+        print(f"  {s1} faster on {(diff < -1).sum()}/{len(diff)} instances")
+        print(f"  {s2} faster on {(diff > 1).sum()}/{len(diff)} instances")
+
+        # Table of instances with |diff| > 1s
+        top = diff[diff.abs() > 1].sort_values()
+        if not top.empty:
+            table = pd.DataFrame({
+                'instance': top.index,
+                s1: [f"{shared.loc[i, s1]:.2f}" for i in top.index],
+                s2: [f"{shared.loc[i, s2]:.2f}" for i in top.index],
+                'diff': [f"{d:+.3f}" for d in top.values],
+            })
+            print(table.to_string(index=False))
+
+
 def main():
     # Set up argument parser
     parser = argparse.ArgumentParser(description='Analyze XCSP3 solver performance data')
@@ -208,20 +303,40 @@ def main():
         print("No CSV files found.")
         return
 
+    SOLVER_RENAMES = None
+    # # Rename solvers: map auto-generated "solver_timestamp" names to readable labels
+    # SOLVER_RENAMES = {
+    #     "gurobi_expr": "expr",
+    #     "gurobi_base": "base",
+    # }
+
     # Read and merge all CSV files
     dfs = []
-    for file in csv_files:
+    for i, file in enumerate(csv_files):
         df = pd.read_csv(file)
+        # ts = "_".join(file.stem.split("_")[4:6])
+        solver = file.stem
+        df["solver"] = df["solver"] + f"_{solver}"
         dfs.append(df)
-    
-    merged_df = pd.concat(dfs, ignore_index=True)
-    
+
+    df = pd.concat(dfs, ignore_index=True)
+
+    if SOLVER_RENAMES:
+        solvers = df['solver'].unique()
+        df["solver"] = df["solver"].replace(SOLVER_RENAMES)
+        df = df[df["solver"].isin(SOLVER_RENAMES.values())]
+        assert not df.empty, f"no solvers {solvers}"
+
     # Print some stats
-    xcsp3_stats(merged_df)
-    
+    xcsp3_stats(df)
+
+    # Compare timing between solvers (when exactly 2)
+    xcsp3_time_comparison(df, time_limit=args.time_limit or 300,
+                          solver_order=list(SOLVER_RENAMES.values()) if SOLVER_RENAMES else None)
+
     # Create performance plot
-    fig = xcsp3_plot(merged_df, args.time_limit)
-    # fig = xcsp3_objective_performance_profile(merged_df)
+    fig = xcsp3_plot(df, args.time_limit)
+    # fig = xcsp3_objective_performance_profile(df)
 
     # Save or show plot
     if args.output:
