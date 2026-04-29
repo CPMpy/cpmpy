@@ -33,6 +33,7 @@ from .negation import recurse_negation, push_down_negation
 from .int2bool import _encode_int_var
 
 BIG_M_NEQ = True  # Use Big-M formulation for != instead of indicator-based OR decomposition
+QUAD_AND = True  # Use quadratic p == a * b for binary AND of 2 vars instead of GenConstr AND
 NAMED = False
 
 
@@ -204,6 +205,16 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     ):  # may have become fixed (e.g. `and(x1, 0, x2) === 0`), or changed into e.g. singleton and
         # TODO possibility to add to CSE ..
         return f
+
+    # y = and(a, b) with 2 boolean args: post as quadratic y == a * b
+    # This gives Gurobi bilinear constraints, enabling spatial branching (NonConvex=2)
+    if QUAD_AND and cpm_expr.name == "and" and len(args) == 2:
+        a, b = args
+        if y is not None:
+            return y == a * b
+        if reified:
+            return ctx.get_or_make_var(a * b, depth)
+        return a * b
 
     if y is not None:
         return y == f
