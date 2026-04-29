@@ -35,6 +35,9 @@ from .int2bool import _encode_int_var
 BIG_M_NEQ = True  # Use Big-M formulation for != instead of indicator-based OR decomposition
 QUAD_AND = True  # Use quadratic p == a * b for binary AND of 2 vars instead of GenConstr AND
 NAMED = False
+INT_NARY_DISJUNCTIONS = True
+
+# TODO with AND/OR as linear constraints, we do not need to reify 1-BV[~p] = ~p
 
 
 def handle_implication(cpm_expr, depth, reified, handlers, ctx):
@@ -123,6 +126,11 @@ def handle_strict_ineq(cpm_expr, depth, reified, handlers, ctx):
 
 def handle_neq(cpm_expr, depth, reified, handlers, ctx):
     """Decompose != into a disjunction of strict inequalities using one-directional indicators."""
+
+    a, b = cpm_expr.args
+    if isinstance(a, _NumVarImpl) and is_num(b) and reified:
+        return ctx.reify(cpm_expr, depth)
+
     result = push_down_negation([cpm_expr], toplevel=not reified)
     if len(result) == 1 and result[0].name == "!=":
         a, b = result[0].args
@@ -176,18 +184,18 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
     # Only valid at root level (not reified), since the selector always enforces one branch.
     # n=2: BV -> comp1, ~BV -> comp2 (2 indicators instead of 4 + 1 OR)
     # n>2: z=intvar(0,n-1), (z==i) -> comp_i (n indicators instead of 2n + 1 OR)
+    args = [ctx.recurse(a, depth, reified=True) for a in cpm_expr.args]
+
     if not reified and y is None and cpm_expr.name == "or":
-        args = cpm_expr.args
         if all(isinstance(a, Comparison) for a in args):
             if len(args) == 2:
                 z = cp.boolvar()
                 return ctx.recurse(z.implies(args[0]) & (~z).implies(args[1]), depth, reified=reified)
-            else:
+            elif INT_NARY_DISJUNCTIONS:
                 z = cp.intvar(0, len(args) - 1)
                 return ctx.recurse(cp.all((z == i).implies(arg) for i, arg in enumerate(args)), depth, reified=reified)
-    # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
 
-    args = [ctx.recurse(arg, depth, reified=True) for arg in cpm_expr.args]
+    # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
 
     # assert not (cpm_expr.name == "and" and not reified)
     if reified or cpm_expr.name != "and" or y is not None:
@@ -208,6 +216,7 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
 
     # y = and(a, b) with 2 boolean args: post as quadratic y == a * b
     # This gives Gurobi bilinear constraints, enabling spatial branching (NonConvex=2)
+    # Skip when original args are all Comparisons: bi-implication (BV -> comp) is cleaner
     if QUAD_AND and cpm_expr.name == "and" and len(args) == 2:
         a, b = args
         if y is not None:
@@ -317,9 +326,10 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
             and cpm_expr.name in ("==", "!=")
             and isinstance(cpm_expr.args[0], _IntVarImpl)
             and not isinstance(cpm_expr.args[0], _BoolVarImpl)
-            and is_int(cpm_expr.args[1])
+            and is_num(cpm_expr.args[1])
         ):
             var, val = cpm_expr.args
+            val = int(val)  # in case of BoolVal
             enc, domain_cons = _encode_int_var(ivarmap, var, "direct", csemap=csemap)
             if domain_cons:  # first time encoding this variable
                 for dc in domain_cons:
@@ -405,6 +415,7 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
                     and isinstance(cpm_expr.args[1], (Operator, GlobalFunction))
                     and cpm_expr.args[1].name in handlers
                     and handlers[cpm_expr.args[1].name] is handle_general_constraint
+                    # and cpm_expr.args[1].name not in ("and", "or")
                     and (not is_boolexpr(cpm_expr.args[1]) or isinstance(cpm_expr.args[0], _BoolVarImpl))
                 ):
                     # y == f(...) already in normal form: use y directly as defining variable
@@ -492,4 +503,11 @@ def into_tree(cpm_expr, csemap=None, verbose=False, handlers=None):
             handlers=handlers,
         )
         cpm_cons += [root] + cons
+
+    if verbose:
+        import pprint
+        print("CONSTRAINT")
+        pprint.pprint(cpm_expr)
+        print("TRANSFORMATION")
+        pprint.pprint(cpm_cons)
     return cpm_cons

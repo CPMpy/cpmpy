@@ -98,6 +98,32 @@ def expression_tree_cases_():
         ["qc0: y + [ x ^2 ] = 6"],
     )
 
+    """Accor"""
+    yield (
+        "accor",
+        (x >= 2) | (y == z),
+        ["True", "(BV0) -> (x >= 2)", "(~BV0) -> ((y) == (z))"],
+        None,
+    )
+
+    """Accor"""
+    yield (
+        # 474. `((pt[12] <= 12) and (pf[12] >= 14)) -> ((x[12][13]) == (x[13][13]))`
+        "accor2",
+        ((x >= 1) & (y >= 1)).implies(x == z),
+        [
+            "(BV[(BV[x >= 1]) and (BV[y >= 1])]) -> ((x) == (z))",
+            "(BV[x >= 1]) -> (x >= 1)",
+            "(~BV[x >= 1]) -> (x <= 0)",
+            "True",
+            "(BV[y >= 1]) -> (y >= 1)",
+            "(~BV[y >= 1]) -> (y <= 0)",
+            "True",
+            "(BV[(BV[x >= 1]) and (BV[y >= 1])]) == ((BV[x >= 1]) and (BV[y >= 1]))",
+        ],
+        None,
+    )
+
     # yield (
     #     "implication",
     #     p.implies(q),
@@ -117,14 +143,10 @@ def expression_tree_cases_():
         "reified_neq",
         (x != 1) | p,
         [
-            "(BV[(BV[x >= 2]) or (BV[x <= 0])]) + (p) >= 1",
-            "(BV[x >= 2]) -> (x >= 2)",
-            "(~BV[x >= 2]) -> (x <= 1)",
-            "True",
-            "(BV[x <= 0]) -> (x <= 0)",
-            "(~BV[x <= 0]) -> (x >= 1)",
-            "True",
-            "(BV[(BV[x >= 2]) or (BV[x <= 0])]) == ((BV[x >= 2]) or (BV[x <= 0]))",
+            "(BV[~BV[x == 1]]) + (p) >= 1",
+            "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
+            "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",
+            "(~BV[x == 1]) == (BV[~BV[x == 1]])",
         ],
         None,
     )
@@ -430,6 +452,33 @@ def expression_tree_cases_():
     )
 
     yield (
+        "disjunction_of_equalities",
+        (x == 1) | (y == 2),
+        [
+            "(BV[x == 1]) + (BV[y == 2]) >= 1",
+            "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
+            "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",
+            "sum(BV[y == -2], BV[y == -1], BV[y == 0], BV[y == 1], BV[y == 2]) == 1",
+            "((sum([0, 1, 2, 3, 4] * [BV[y == -2], BV[y == -1], BV[y == 0], BV[y == 1], BV[y == 2]])) + -2) == (y)",
+        ],
+        None,
+    )
+
+    yield (
+        "disjunction_of_disequalities",
+        (x != 1) | (y == 2),
+        [
+            "(BV[~BV[x == 1]]) + (BV[y == 2]) >= 1",
+            "sum(BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]) == 1",
+            "((sum([0, 1, 2, 3, 4] * [BV[x == -2], BV[x == -1], BV[x == 0], BV[x == 1], BV[x == 2]])) + -2) == (x)",
+            "sum(BV[y == -2], BV[y == -1], BV[y == 0], BV[y == 1], BV[y == 2]) == 1",
+            "((sum([0, 1, 2, 3, 4] * [BV[y == -2], BV[y == -1], BV[y == 0], BV[y == 1], BV[y == 2]])) + -2) == (y)",
+            "(~BV[x == 1]) == (BV[~BV[x == 1]])",
+        ],
+        None,
+    )
+
+    yield (
         "neg_disjunction",
         ~(p | q),
         ["True", "~p", "~q"],
@@ -448,6 +497,29 @@ def expression_tree_cases_():
         (p | (q & r)),
         ["(p) + (BV[(q) and (r)]) >= 1", "(BV[(q) and (r)]) == ((q) and (r))"],
         ["R0: p + BV[(q)_and_(r)] >= 1", "GC0: BV[(q)_and_(r)] = AND ( q , r )"],
+    )
+
+    STAR = "*"
+    a, b, c = cp.intvar(0, 2, shape=3, name="st")
+    yield (
+        "short_table",
+        cp.ShortTable([a, b, c], [[0, 1, STAR], [1, STAR, 0], [STAR, 0, 1]]),
+        [],
+        None,
+    )
+
+    yield (
+        "table",
+        cp.Table([a, b], [[0, 1], [1, 2], [2, 0]]),
+        None,
+        None,
+    )
+
+    yield (
+        "neg_table",
+        cp.NegativeTable([a, b], [[0, 1], [1, 2], [2, 0]]),
+        [],
+        None,
     )
 
     # yield (

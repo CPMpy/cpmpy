@@ -4,7 +4,6 @@ import cpmpy as cp
 import numpy as np
 from cpmpy import Model, SolverLookup, BoolVal
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.into_tree import NAMED
 from cpmpy.expressions.utils import argval, is_num, eval_comparison, get_bounds
 from cpmpy.expressions.core import Comparison, Operator
 from cpmpy.expressions.globalconstraints import GlobalConstraint
@@ -49,11 +48,7 @@ EXCLUDE_GLOBAL = {
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
                   }
-# EXCLUDE_GLOBAL = True
-
-if EXCLUDE_GLOBAL is not True:
-    NAMED = False
-
+EXCLUDE_GLOBAL = True
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy
@@ -361,6 +356,7 @@ def test_constraints(solver, constraint):
         Tests constraint by posting it to the solver and checking the value after solve.
     """
 
+    cp.transformations.into_tree.NAMED = EXCLUDE_GLOBAL is True
     # Show model with variables and their domains
     model = Model(constraint)
     vars_ = get_variables(constraint)
