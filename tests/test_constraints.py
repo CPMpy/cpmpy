@@ -48,7 +48,7 @@ EXCLUDE_GLOBAL = {
                   "pysdd": NUM_GLOBAL | {"Xor"},
                   "minizinc": {"IncreasingStrict"}, # bug #813 reported on libminizinc
                   }
-EXCLUDE_GLOBAL = True
+# EXCLUDE_GLOBAL = True
 
 # Exclude certain operators for solvers.
 # Not all solvers support all operators in CPMpy

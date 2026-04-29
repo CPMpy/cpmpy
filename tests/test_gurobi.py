@@ -119,7 +119,7 @@ def expression_tree_cases_():
             "(BV[y >= 1]) -> (y >= 1)",
             "(~BV[y >= 1]) -> (y <= 0)",
             "True",
-            "(BV[(BV[x >= 1]) and (BV[y >= 1])]) == ((BV[x >= 1]) and (BV[y >= 1]))",
+            "(BV[(BV[x >= 1]) and (BV[y >= 1])]) == ((BV[x >= 1]) * (BV[y >= 1]))",
         ],
         None,
     )
@@ -368,9 +368,8 @@ def expression_tree_cases_():
     yield (
         "disjunction_of_negs",
         (~p) | (~q),
-        # TODO 1-p + 1-q >= 1 === -p-q>=-1 === p+q<=1
-        ["(BV[~p]) + (BV[~q]) >= 1", "(~p) == (BV[~p])", "(~q) == (BV[~q])"],
-        None,
+        ["(~p) + (~q) >= 1"],
+        ["R0: - p - q >= -1"],
     )
 
     yield (
@@ -495,8 +494,8 @@ def expression_tree_cases_():
     yield (
         "conjunction_in_disjunction",
         (p | (q & r)),
-        ["(p) + (BV[(q) and (r)]) >= 1", "(BV[(q) and (r)]) == ((q) and (r))"],
-        ["R0: p + BV[(q)_and_(r)] >= 1", "GC0: BV[(q)_and_(r)] = AND ( q , r )"],
+        ["(p) + (BV[(q) * (r)]) >= 1", "(BV[(q) * (r)]) == ((q) * (r))"],
+        ["R0: p + BV[(q)_*_(r)] >= 1", "qc0: BV[(q)_*_(r)] + [ - q * r ] = 0"],
     )
 
     STAR = "*"

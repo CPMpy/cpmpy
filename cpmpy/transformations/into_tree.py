@@ -25,7 +25,7 @@ import numpy as np
 import cpmpy as cp
 from ..expressions.core import Comparison, Operator, is_boolexpr
 from ..exceptions import NotSupportedError
-from ..expressions.utils import is_num, is_int, get_bounds
+from ..expressions.utils import is_num, get_bounds
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
@@ -34,8 +34,9 @@ from .int2bool import _encode_int_var
 
 BIG_M_NEQ = True  # Use Big-M formulation for != instead of indicator-based OR decomposition
 QUAD_AND = True  # Use quadratic p == a * b for binary AND of 2 vars instead of GenConstr AND
-NAMED = False
 INT_NARY_DISJUNCTIONS = True
+NAMED = False
+
 
 # TODO with AND/OR as linear constraints, we do not need to reify 1-BV[~p] = ~p
 
@@ -195,15 +196,14 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
                 z = cp.intvar(0, len(args) - 1)
                 return ctx.recurse(cp.all((z == i).implies(arg) for i, arg in enumerate(args)), depth, reified=reified)
 
-    # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
+    # root-level is better posted as `sum(args) >= 1` (rather than `1 = OR ( ... )`)
+    if not reified and y is None and cpm_expr.name == "or":
+        return ctx.recurse(cp.sum(args) >= 1, depth, reified=reified, handlers=handlers)
 
-    # assert not (cpm_expr.name == "and" and not reified)
+    # require only variables: f(x1, x2, ..) === f(y1, y2, ..), y1=x1, y2=x2, ..
     if reified or cpm_expr.name != "and" or y is not None:
         args = [ctx.reify(arg, depth) for arg in args]
 
-    # root-level is better posted as `sum(args) >= 1` (rather than `1 = OR ( ... )`)
-    if not reified and y is None and cpm_expr.name == "or":
-        return cp.sum(args) >= 1
 
     # require the form: y = f(x)
     f = _with_args(cpm_expr, args)
@@ -226,6 +226,9 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
         return a * b
 
     if y is not None:
+        if reified:
+            ctx.post(y == f)
+            return y
         return y == f
 
     y = ctx.get_or_make_var(f, depth) if reified else 1
@@ -340,7 +343,8 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
             bv = enc.eq(val)
             return ~bv if cpm_expr.name == "!=" else bv
 
-        if not isinstance(cpm_expr, NegBoolView):
+        # recurse on arguments (NegBoolView has no `args`, no recursion needed)
+        if not isinstance(cpm_expr, _NumVarImpl):
             cpm_expr = _with_args(cpm_expr, [ctx.recurse(arg, depth, reified=True) for arg in cpm_expr.args])
 
         cpm_expr_ = _propagate_boolconst(cpm_expr)
@@ -357,7 +361,9 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
 
         r = cp.boolvar() if is_be or is_boolexpr(cpm_expr_) else cp.intvar(*cpm_expr_.get_bounds())
         if NAMED:
-            r.name = f"{'BV' if is_be or is_boolexpr(cpm_expr_) else 'IV'}[{cpm_expr_}]"
+            name = f"{'BV' if is_be or is_boolexpr(cpm_expr_) else 'IV'}[{cpm_expr_}]"
+            if len(name) <= 255:
+                r.name = name
             if verbose:
                 print(f"{'  ' * depth}intro", r)
         csemap.flat_map[cpm_expr_] = r
