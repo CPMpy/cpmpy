@@ -335,6 +335,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, cores: int=1,
                    output_dir: str = 'results',
                    verbose: bool = False, intermediate: bool = False,
+                    name = None,
                    checker_path: Optional[str] = None) -> str:
     """
     Benchmark a solver on XCSP3 instances.
@@ -357,10 +358,10 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Get current timestamp in a filename-safe format
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name = name if name else datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # Define output file path with timestamp
-    output_file = str(output_dir / f"xcsp3_{year}_{track}_{solver}_{timestamp}.csv")
+    output_file = str(output_dir / f"xcsp3_{year}_{track}_{solver}_{name}.csv")
     
     # Initialize dataset
     dataset = XCSP3Dataset(year=year, track=track, download=True)
@@ -394,6 +395,7 @@ if __name__ == "__main__":
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
     parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign tp a single instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
+    parser.add_argument('--name', type=str, default='results', help='Name of output file')
     parser.add_argument('--verbose', action='store_true', default=True, help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
     parser.add_argument('--checker-path', type=str, default=None,
