@@ -381,8 +381,6 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
                 print(traceback.format_exc())
 
-        raise()
-    
     return output_file
 
 if __name__ == "__main__":
