@@ -51,7 +51,6 @@ import numpy as np
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_comparison, flatlist, argval, argvals, \
@@ -64,6 +63,10 @@ from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.safening import no_partial_functions, safen_objective
+
+from ..expressions.globalconstraints import AllDifferent, Xor, Table, NegativeTable, Cumulative, Circuit, Inverse, NoOverlap, Regular, CumulativeOptional, NoOverlapOptional
+from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalfunctions import Minimum, Maximum, Abs, Multiplication, Division, Modulo, Power, Element
 
 
 class CPM_ortools(SolverInterface):
@@ -81,9 +84,9 @@ class CPM_ortools(SolverInterface):
     https://developers.google.com/optimization/reference/python/sat/python/cp_model
     """
 
-    supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
-                                              "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
+    supported_global_constraints = frozenset({AllDifferent.name, Xor.name, Table.name, NegativeTable.name, Cumulative.name, Circuit.name,
+                                                   Inverse.name, NoOverlap.name, Regular.name, CumulativeOptional.name, NoOverlapOptional.name,
+                                                   Minimum.name, Maximum.name, Abs.name, Multiplication.name, Division.name, Modulo.name, Power.name, Element.name})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -522,17 +525,17 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.Add(eval_comparison(cpm_expr.name, ortlhs, ortrhs))
             elif cpm_expr.name == '==':
                 # NumExpr == IV, supported by ortools (thanks to `only_numexpr_equality()` transformation)
-                if lhs.name == 'min':
+                if lhs.name == Minimum.name:
                     return self.ort_model.AddMinEquality(ortrhs, self.solver_vars(lhs.args))
-                elif lhs.name == 'max':
+                elif lhs.name == Maximum.name:
                     return self.ort_model.AddMaxEquality(ortrhs, self.solver_vars(lhs.args))
-                elif lhs.name == 'abs':
+                elif lhs.name == Abs.name:
                     return self.ort_model.AddAbsEquality(ortrhs, self.solver_var(lhs.args[0]))
-                elif lhs.name == 'mul':
+                elif lhs.name == Multiplication.name:
                     return self.ort_model.AddMultiplicationEquality(ortrhs, self.solver_vars(lhs.args))
-                elif lhs.name == 'div':
+                elif lhs.name == Division.name:
                     return self.ort_model.AddDivisionEquality(ortrhs, *self.solver_vars(lhs.args))
-                elif lhs.name == 'element':
+                elif lhs.name == Element.name:
                     arr, idx = lhs.args
                     if is_int(idx): # OR-Tools does not handle all constant integer cases
                         idx = intvar(idx,idx)
@@ -542,14 +545,14 @@ class CPM_ortools(SolverInterface):
                         self.solver_vars(arr),
                         ortrhs
                     )
-                elif lhs.name == 'mod':
+                elif lhs.name == Modulo.name:
                     # catch tricky-to-find ortools limitation
                     x,y = lhs.args
                     if get_bounds(y)[0] <= 0: # not supported, but result of modulo is agnositic to sign of second arg
                         y, link = get_or_make_var(-lhs.args[1], csemap=self._csemap)
                         self.add(link)
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars([x,y]))
-                elif lhs.name == 'pow':
+                elif lhs.name == Power.name:
                     # only `POW(b,2) == IV` supported, post as b*b == IV
                     if not is_num(lhs.args[1]):
                         raise NotSupportedError(f"OR-Tools does not support power constraints with variable as exponent, got {lhs}")
@@ -571,25 +574,25 @@ class CPM_ortools(SolverInterface):
         # base (Boolean) global constraints
         elif isinstance(cpm_expr, GlobalConstraint):
 
-            if cpm_expr.name == 'alldifferent':
+            if cpm_expr.name == AllDifferent.name:
                 return self.ort_model.AddAllDifferent(self.solver_vars(cpm_expr.args))
-            elif cpm_expr.name == 'table':
+            elif cpm_expr.name == Table.name:
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = cpm_expr.args
                 array = self.solver_vars(array)
                 # table needs to be a list of lists of integers
                 return self.ort_model.AddAllowedAssignments(array, table)
-            elif cpm_expr.name == 'negative_table':
+            elif cpm_expr.name == NegativeTable.name:
                 assert (len(cpm_expr.args) == 2)  # args = [array, table]
                 array, table = cpm_expr.args
                 array = self.solver_vars(array)
                 return self.ort_model.AddForbiddenAssignments(array, table)
-            elif cpm_expr.name == "regular":
+            elif cpm_expr.name == Regular.name:
                 array, transitions, start, accepting = cpm_expr.args
                 array = self.solver_vars(array)
                 return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting], 
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
-            elif cpm_expr.name == "cumulative":
+            elif cpm_expr.name == Cumulative.name:
                 start, dur, end, demand, cap = cpm_expr.args
                 # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur)
@@ -606,7 +609,7 @@ class CPM_ortools(SolverInterface):
                 intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
 
                 return self.ort_model.AddCumulative(intervals, demand, cap)
-            elif cpm_expr.name == "cumulative_optional":
+            elif cpm_expr.name == CumulativeOptional.name:
                 start, dur, end, demand, cap, is_present = cpm_expr.args
                 # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur, is_present)
@@ -624,7 +627,7 @@ class CPM_ortools(SolverInterface):
                 intervals = [self.ort_model.NewOptionalIntervalVar(s,d,e,p,f"interval_{s}-{d}-{e}-{p}") for s,d,e,p in zip(start,dur,end,is_present)]
                 return self.ort_model.AddCumulative(intervals, demand, cap)
 
-            elif cpm_expr.name == "no_overlap":
+            elif cpm_expr.name == NoOverlap.name:
                 start, dur, end  = cpm_expr.args
                 dur, dur_cons = get_nonneg_args(dur)
                 self.add(dur_cons)
@@ -636,7 +639,7 @@ class CPM_ortools(SolverInterface):
                 intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, dur, end)]
 
                 return self.ort_model.AddNoOverlap(intervals)
-            elif cpm_expr.name == "no_overlap_optional":
+            elif cpm_expr.name == NoOverlapOptional.name:
                 start, dur, end, is_present = cpm_expr.args
                 dur, dur_cons = get_nonneg_args(dur, is_present)
                 self.add(dur_cons)
@@ -649,7 +652,7 @@ class CPM_ortools(SolverInterface):
                 intervals = [self.ort_model.NewOptionalIntervalVar(s, d, e, p, f"interval_{s}-{d}-{e}-{p}") for s, d, e, p in zip(start, dur, end, is_present)]
 
                 return self.ort_model.add_no_overlap(intervals)
-            elif cpm_expr.name == "circuit":
+            elif cpm_expr.name == Circuit.name:
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars direclty is recommended
                 # (see PCTSP-path model in the future)
@@ -662,11 +665,11 @@ class CPM_ortools(SolverInterface):
                 # when posting arcs on diagonal (i==j), it would do subcircuit
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
                 return self.ort_model.AddCircuit(ort_arcs)
-            elif cpm_expr.name == 'inverse':
+            elif cpm_expr.name == Inverse.name:
                 assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
                 fwd, rev = self.solver_vars(cpm_expr.args)
                 return self.ort_model.AddInverse(fwd, rev)
-            elif cpm_expr.name == 'xor':
+            elif cpm_expr.name == Xor.name:
                 args = cpm_expr.args
                 if any(is_true_cst(a) for a in cpm_expr.args):
                     # replace with constant variable instead
