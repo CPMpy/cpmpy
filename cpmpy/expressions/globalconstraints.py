@@ -139,7 +139,7 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import TypeError
-from .core import Expression, BoolVal, ExprLike, ListLike
+from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray
 from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
 
@@ -833,12 +833,12 @@ class IfThenElse(GlobalConstraint):
     Enforces a conditional expression of the form: if condition then if_true else if_false.
     `condition`, `if_true` and `if_false` are be boolean expressions.
     """
-    def __init__(self, condition: ExprLike, if_true: ExprLike, if_false: ExprLike):
+    def __init__(self, condition: BoolExprLike, if_true: BoolExprLike, if_false: BoolExprLike):
         """
         Arguments:
-            condition (ExprLike): Boolean expression or constant
-            if_true (ExprLike): Boolean expression or constant
-            if_false (ExprLike): Boolean expression or constant
+            condition (BoolExprLike): Boolean expression or constant
+            if_true (BoolExprLike): Boolean expression or constant
+            if_false (BoolExprLike): Boolean expression or constant
         """
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
@@ -949,10 +949,10 @@ class Xor(GlobalConstraint):
     Equivalent to `sum(args) % 2 == 1`
     """
 
-    def __init__(self, arg_list: ListLike[ExprLike]):
+    def __init__(self, arg_list: ListLike[BoolExprLike]):
         """
         Arguments:
-            arg_list (ListLike[ExprLike]): List of expressions or constants, to be xor'ed
+            arg_list (ListLike[BoolExprLike]): List of expressions or constants, to be xor'ed
         """
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
@@ -1243,7 +1243,7 @@ class CumulativeOptional(GlobalConstraint):
                        end: Optional[ListLike[ExprLike]] = None, 
                        demand: Optional[ListLike[ExprLike]|ExprLike] = None, 
                        capacity: Optional[ExprLike] = None, 
-                       is_present: Optional[ListLike[ExprLike]] = None):
+                       is_present: Optional[ListLike[BoolExprLike]] = None):
         """
             Arguments:
                 start (ListLike[ExprLike]): Start times of the tasks
@@ -1251,7 +1251,7 @@ class CumulativeOptional(GlobalConstraint):
                 end (ListLike[ExprLike] | None): Optional end times of the tasks
                 demand (ListLike[ExprLike] | ExprLike): Per-task demands or a single constant demand, required
                 capacity (ExprLike): Capacity of the resource, required
-                is_present (ListLike[ExprLike]): Presence of the tasks
+                is_present (ListLike[BoolExprLike]): Presence of the tasks
             
             Technical note: demand/capacity marked as Optional because it comes after an Optional argument
         """
@@ -1519,13 +1519,13 @@ class NoOverlapOptional(GlobalConstraint):
         if the task is not present, it does not enforce any of the above.
     """
     
-    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[ExprLike]] = None):
+    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[BoolExprLike]] = None):
         """
         Arguments:
-            start (ListLike[Expression]): List of Expression objects representing the start times of the tasks
-            duration (ListLike[Expression]): List of Expression objects representing the durations of the tasks
-            end (ListLike[Expression] | None): optional, list of Expression objects representing the end times of the tasks
-            is_present (ListLike[Expression]): List of Boolean Expression objects representing the presence of the tasks
+            start (ListLike[ExprLike]): List of Expression objects representing the start times of the tasks
+            duration (ListLike[ExprLike]): List of Expression objects representing the durations of the tasks
+            end (ListLike[ExpLike] | None): optional, list of Expression objects representing the end times of the tasks
+            is_present (ListLike[BoolExprLike]): List of Boolean Expression objects representing the presence of the tasks
         """
        
         if not is_any_list(start):
