@@ -176,16 +176,30 @@ def xcsp3_objective_performance_profile(df):
 
 def xcsp3_stats(df):
 
-    for phase in ['parse', 'model', 'post']:
-        try:
-            slowest_idx = df[f'time_{phase}'].idxmax()
-        except ValueError:
-            continue
-        print(f"Slowest {phase}: {df.loc[slowest_idx, f'time_{phase}']}s ({df.loc[slowest_idx, 'instance']}, {df.loc[slowest_idx, 'solver']})")
-
     for solver in df['solver'].unique():
-        solver_total = df[df['solver'] == solver]['time_total'].sum()
-        print(f"Grand total for {solver}: {solver_total/60:.2f} minutes")
+        sdf = df[df['solver'] == solver]
+        print(f"\n=== {solver} ({len(sdf)} instances) ===")
+
+        # Status counts
+        status_counts = sdf['status'].value_counts()
+        for status, count in status_counts.items():
+            print(f"  {status}: {count}")
+
+        # Time stats for solved instances
+        solved = sdf[sdf['status'].isin(['SATISFIABLE', 'UNSATISFIABLE', 'OPTIMUM FOUND'])]
+        if not solved.empty:
+            for col in ['time_total', 'time_post', 'time_solve']:
+                if col in solved.columns and solved[col].notna().any():
+                    vals = solved[col].dropna()
+                    print(f"  {col}: mean={vals.mean():.2f}s, median={vals.median():.2f}s, max={vals.max():.2f}s")
+            print(f"  Grand total: {sdf['time_total'].sum()/60:.2f} minutes")
+
+        # Slowest phases
+        for phase in ['parse', 'model', 'post']:
+            col = f'time_{phase}'
+            if col in sdf.columns and sdf[col].notna().any():
+                idx = sdf[col].idxmax()
+                print(f"  Slowest {phase}: {sdf.loc[idx, col]:.2f}s ({sdf.loc[idx, 'instance']})")
     
     
 def xcsp3_time_comparison(df, time_limit=300, solver_order=None):
