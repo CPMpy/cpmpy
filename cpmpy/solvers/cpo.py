@@ -688,6 +688,47 @@ class CPM_cpo(SolverInterface):
                 extra_cons += [dom.presence_of(task) == self.solver_var(is_present)]
             return task, extra_cons
 
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using CP Optimizer's native conflict refiner.
+
+        CP Optimizer refines conflicts over native constraints. CPMpy constraints
+        can transform to several native constraints, so keep a map from each
+        native constraint back to the original soft constraint.
+        """
+        soft_cons = toplevel_list(soft, merge_and=False)
+        s = cls()
+
+        def add_cpo_expr(cpo_expr):
+            """Add one native expression and return the top-level expressions added."""
+            before = len(s.cpo_model.get_all_expressions())
+            s.cpo_model.add(cpo_expr)
+            return [expr for expr, _ in s.cpo_model.get_all_expressions()[before:]]
+
+        # Add hard constraints. They may appear in the conflict, but they are
+        # required by definition and are therefore not returned as part of the MUS.
+        for cpm_con in s.transform(hard):
+            add_cpo_expr(s._cpo_expr(cpm_con))
+
+        native_to_soft_idx = {}
+        for i, soft_con in enumerate(soft_cons):
+            for cpm_con in s.transform(soft_con):
+                for native_con in add_cpo_expr(s._cpo_expr(cpm_con)):
+                    native_to_soft_idx[native_con] = i
+
+        refine_res = s.cpo_model.refine_conflict(LogVerbosity='Quiet')
+        assert refine_res.is_conflict(), "MUS: model must be UNSAT"
+
+        mus_idxs = set()
+        conflict_cons = refine_res.get_member_constraints() + refine_res.get_possible_constraints()
+        for native_con in conflict_cons:
+            soft_idx = native_to_soft_idx.get(native_con)
+            if soft_idx is not None:
+                mus_idxs.add(soft_idx)
+
+        return [soft_cons[i] for i in sorted(mus_idxs)]
+
 
 # solvers are optional, so this file should be interpretable
 # even if cpo is not installed...
