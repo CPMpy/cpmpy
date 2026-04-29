@@ -71,7 +71,8 @@ def xcsp3_plot(df, time_limit=None):
         solver_data = df[df['solver'] == solver]
         
         # Sort by time_total
-        key = "time_total"
+        # key = "time_total"
+        key = "time_post"
         solver_data = solver_data.sort_values(key)
         
         # If time_limit is set, truncate data
@@ -219,13 +220,17 @@ def xcsp3_time_comparison(df, time_limit=300, solver_order=None):
     unknown_mask = df['status'] == 'UNKNOWN'
     df.loc[unknown_mask, 'time_total'] = 2 * time_limit
 
-    # Replace NaN time values with 2*time_limit as penalty
+    # time_cols = ['time_total']
+    # df["time"] = df['time_parse', 'time_model', 'time_post', 'time_solve'].sum()
+
+    # # Replace NaN time values with 2*time_limit as penalty
     # time_cols = ['time_total', 'time_parse', 'time_model', 'time_post', 'time_solve']
-    # time_cols = ['time_total', 'time_post', 'time_solve']
-    time_cols = ['time_total']
-    for col in time_cols:
+
+    for col in ['time_parse', 'time_model', 'time_post']:
         if col in df.columns:
             df[col] = df[col].fillna(2 * time_limit)
+
+    time_cols = ['time_total', 'time_post', 'time_solve']
 
     # Pivot per time column
     for col in time_cols:
@@ -284,18 +289,20 @@ def main():
         print("No CSV files found.")
         return
 
+    SOLVER_RENAMES = None
     # Rename solvers: map auto-generated "solver_timestamp" names to readable labels
     SOLVER_RENAMES = {
-        "gurobi_20260428_191209": "expr",
-        "gurobi_20260428_205922": "base",
+        "gurobi_expr": "expr",
+        "gurobi_base": "base",
     }
 
     # Read and merge all CSV files
     dfs = []
     for i, file in enumerate(csv_files):
         df = pd.read_csv(file)
-        ts = "_".join(file.stem.split("_")[4:6])
-        df["solver"] = df["solver"] + f"_{ts}"
+        # ts = "_".join(file.stem.split("_")[4:6])
+        solver = file.stem
+        df["solver"] = df["solver"] + f"_{solver}"
         dfs.append(df)
 
     df = pd.concat(dfs, ignore_index=True)

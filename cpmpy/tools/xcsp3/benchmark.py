@@ -270,18 +270,25 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
             result["solution"] = status["exception"]    
 
     if checker_path is not None and complete_solution is not None:
-        checker_output, checker_time = run_solution_checker(
-            JAR=checker_path,
-            instance_location=file_path,
-            out_file="'" + complete_solution.replace("\n\r", " ").replace("\n", " ").replace("v   ", "").replace("v ", "")+ "'",
-            verbose=verbose,
-            cpm_time=result.get('time_solve', 0)  # or total solve time you have
-        )
+        try:
+            checker_output, checker_time = run_solution_checker(
+                JAR=checker_path,
+                instance_location=file_path,
+                out_file="'" + complete_solution.replace("\n\r", " ").replace("\n", " ").replace("v   ", "").replace("v ", "")+ "'",
+                verbose=verbose,
+                cpm_time=result.get('time_solve', 0)  # or total solve time you have
+            )
 
-        if checker_output is not None:
-            result['checker_result'] = checker_output
-        else:
-            result['checker_result'] = None
+            print("CHECKER")
+            print(checker_output)
+
+            if checker_output is not None:
+                result['checker_result'] = checker_output
+            else:
+                result['checker_result'] = None
+        except Exception as e:
+            print("Error during checker", e)
+            print(traceback.format_exc())
 
     # Use a lock file to prevent concurrent writes
     lock_file = f"{output_file}.lock"
@@ -372,9 +379,8 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                 pass
             except Exception as e:
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
+                print(traceback.format_exc())
 
-        raise()
-    
     return output_file
 
 if __name__ == "__main__":
