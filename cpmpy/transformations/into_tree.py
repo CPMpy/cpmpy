@@ -213,7 +213,7 @@ def handle_general_constraint(cpm_expr, depth, reified, handlers, ctx, y=None):
         if y is not None:
             return y == a * b
         if reified:
-            return ctx.get_or_make_var(a * b, depth)
+            return ctx.get_or_make_var(a * b, depth, is_be=True)
         return a * b
 
     if y is not None:
@@ -302,8 +302,9 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
         """Add this expression to the tree, flattening if unsupported."""
         cpm_cons.append(into_tree_expr_(cpm_expr, 0))
 
-    def get_or_make_var(cpm_expr, depth, define=True):
-        """Get or make (Boolean/integer) var `b` which represent the expression. Add defining constraints b == cpm_expr if `define=True`."""
+    def get_or_make_var(cpm_expr, depth, define=True, is_be=False):
+        """Get or make (Boolean/integer) var `b` which represent the expression. Add defining constraints b == cpm_expr if `define=True`.
+        If `is_be=True`, force creating a boolvar even if the expression is not detected as boolean."""
         if verbose:
             print(f"{'  ' * depth}get_or_make_var", cpm_expr)
         cached = csemap.get(cpm_expr)
@@ -344,9 +345,9 @@ def into_tree_expr(cpm_expr, csemap=None, verbose=False, reified=False, handlers
         if cpm_expr_.name != cpm_expr.name:
             return get_or_make_var(cpm_expr_, depth)
 
-        r = cp.boolvar() if is_boolexpr(cpm_expr_) else cp.intvar(*cpm_expr_.get_bounds())
+        r = cp.boolvar() if is_be or is_boolexpr(cpm_expr_) else cp.intvar(*cpm_expr_.get_bounds())
         if NAMED:
-            r.name = f"{'BV' if is_boolexpr(cpm_expr_) else 'IV'}[{cpm_expr_}]"
+            r.name = f"{'BV' if is_be or is_boolexpr(cpm_expr_) else 'IV'}[{cpm_expr_}]"
             if verbose:
                 print(f"{'  ' * depth}intro", r)
         csemap.flat_map[cpm_expr_] = r
