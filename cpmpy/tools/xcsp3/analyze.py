@@ -305,11 +305,11 @@ def main():
 
     SOLVER_RENAMES = None
 
-    # Rename solvers: map auto-generated "solver_timestamp" names to readable labels
-    SOLVER_RENAMES = {
-        "gurobi_expr": "expr",
-        "gurobi_base": "base",
-    }
+    # # Rename solvers: map auto-generated "solver_timestamp" names to readable labels
+    # SOLVER_RENAMES = {
+    #     "gurobi_expr": "expr",
+    #     "gurobi_base": "base",
+    # }
 
     # Read and merge all CSV files
     dfs = []
