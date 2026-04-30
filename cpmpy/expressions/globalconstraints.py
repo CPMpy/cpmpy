@@ -833,8 +833,7 @@ class MDD(GlobalConstraint):
     """
     An MDD of depth n is an acyclic layered graph with a single root node, and one accepting sink node.
     The constraint takes as input an array of n integer variables and a graph representation using a transition table.
-    The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node
-    , and ending in the accepting sink node.
+    The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node, and ending in the accepting sink node.
 
     The transitions are defined by a list of tuples (id1, value, id2).
     An id is an integer or string representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
@@ -864,7 +863,7 @@ class MDD(GlobalConstraint):
                 raise TypeError(
                     f"The second argument of an MDD constraint should be a collection of transitions ({_node_type}, int, {_node_type})")
 
-        super().__init__("mdd", (array, transitions, start))
+        super().__init__("mdd", (array, transitions))
         self.root_node = start if start is not None else transitions[0][0]
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
         for s, v, e in transitions:
@@ -881,6 +880,10 @@ class MDD(GlobalConstraint):
             current_nodes = new_nodes
         # Check that there is exactly one sink node on level n (with n the number of integer variables)
         assert sum(level == len(array) for node, level in self.levels.items()) == 1
+
+        self.sink_node = next(node for node, level in self.levels.items() if level == len(array))
+        self.nodes = self.levels.keys()
+        self.node_map = {n: (-1 if n == self.sink_node else i) for i, n in enumerate(self.nodes)}
 
     def _reduce(self):
         """
@@ -921,7 +924,7 @@ class MDD(GlobalConstraint):
             tuple[list[Expression], list[Expression]]:
                 A tuple containing the constraints representing the constraint value and the defining constraints.
         """
-        arr, _, _ = self.args
+        arr, _ = self.args
 
         # MDD is extended with invalid edges, which are directed to the sink node
         extended_mapping, invalid_edges_set = self._get_complete_mdd()
@@ -976,7 +979,7 @@ class MDD(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, transitions, _ = self.args
+        arr, transitions = self.args
         argvals = [argval(a) for a in arr]
         curr_node = self.root_node
         if any(v is None for v in argvals):

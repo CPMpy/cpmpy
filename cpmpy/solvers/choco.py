@@ -648,29 +648,15 @@ class CPM_choco(SolverInterface):
                 return self.chc_model.regular(self._to_vars(array), automaton)
             elif cpm_expr.name == "mdd":
                 from pychoco.objects.graphs.multivalued_decision_diagram import MultivaluedDecisionDiagram
-                array, transitions, start = cpm_expr.args
-                root = start if start is not None else transitions[0][0]
+                from pychoco.backend import create_mdd_transitions
+                from pychoco._handle_wrapper import _HandleWrapper
+                from pychoco._utils import make_int_2d_array, make_intvar_array
 
-                from collections import defaultdict
-
-                def transitions_to_tuples(transitions, root, length):
-                    adj = defaultdict(list)
-                    for src, val, dst in transitions:
-                        adj[src].append((val, dst))
-
-                    def depth_first(node, path):
-                        if len(path) == length:
-                            return [tuple(path)]
-                        return [
-                            t
-                            for val, dst in adj.get(node, [])
-                            for t in depth_first(dst, path + [val])
-                        ]
-
-                    return depth_first(root, [])
-                # convert to MultivaluedDecisionDiagram Choco object, requiring list of accepted tuples
-                tuples = transitions_to_tuples(transitions, root, len(array))
-                mdd = MultivaluedDecisionDiagram(self._to_vars(array), tuples)
+                array, transitions = cpm_expr.args
+                transitions_int = [[cpm_expr.node_map[src], val, cpm_expr.node_map[dst]] for src, val, dst in transitions]
+                handle = create_mdd_transitions(make_intvar_array(self._to_vars(array)), make_int_2d_array(transitions_int))
+                mdd = MultivaluedDecisionDiagram.__new__(MultivaluedDecisionDiagram)
+                _HandleWrapper.__init__(mdd, handle)
                 return self.chc_model.mddc(self._to_vars(array), mdd)
 
             elif cpm_expr.name == 'InDomain':
