@@ -921,7 +921,7 @@ class MDD(GlobalConstraint):
             tuple[list[Expression], list[Expression]]:
                 A tuple containing the constraints representing the constraint value and the defining constraints.
         """
-        arr, _ = self.args
+        arr, _, _ = self.args
 
         # MDD is extended with invalid edges, which are directed to the sink node
         extended_mapping, invalid_edges_set = self._get_complete_mdd()
