@@ -76,7 +76,7 @@ from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Circuit
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
@@ -624,6 +624,7 @@ def get_linear_decompositions():
     return dict(
         alldifferent=AllDifferent.decompose_linear,
         element=Element.decompose_linear,
+	    circuit=Circuit.decompose_linear
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
