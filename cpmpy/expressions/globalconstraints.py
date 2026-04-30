@@ -864,7 +864,7 @@ class MDD(GlobalConstraint):
                 raise TypeError(
                     f"The second argument of an MDD constraint should be a collection of transitions ({_node_type}, int, {_node_type})")
 
-        super().__init__("mdd", (array, transitions))
+        super().__init__("mdd", (array, transitions, start))
         self.root_node = start if start is not None else transitions[0][0]
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
         for s, v, e in transitions:
@@ -976,7 +976,7 @@ class MDD(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, transitions = self.args
+        arr, transitions, _ = self.args
         argvals = [argval(a) for a in arr]
         curr_node = self.root_node
         if any(v is None for v in argvals):

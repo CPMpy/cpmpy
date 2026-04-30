@@ -87,7 +87,7 @@ class CPM_choco(SolverInterface):
                                     "table", 'negative_table', "short_table", "regular", "InDomain",
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
-                                    "lex_lesseq", "lex_less",
+                                    "lex_lesseq", "lex_less", "mdd",
                                     "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
 
@@ -646,7 +646,33 @@ class CPM_choco(SolverInterface):
                 automaton.set_initial_state(cpm_expr.node_map[start])
                 automaton.set_final(*[cpm_expr.node_map[a] for a in accepting])
                 return self.chc_model.regular(self._to_vars(array), automaton)
-            
+            elif cpm_expr.name == "mdd":
+                from pychoco.objects.graphs.multivalued_decision_diagram import MultivaluedDecisionDiagram
+                array, transitions, start = cpm_expr.args
+                root = start if start is not None else transitions[0][0]
+
+                from collections import defaultdict
+
+                def transitions_to_tuples(transitions, root, length):
+                    adj = defaultdict(list)
+                    for src, val, dst in transitions:
+                        adj[src].append((val, dst))
+
+                    def depth_first(node, path):
+                        if len(path) == length:
+                            return [tuple(path)]
+                        return [
+                            t
+                            for val, dst in adj.get(node, [])
+                            for t in depth_first(dst, path + [val])
+                        ]
+
+                    return depth_first(root, [])
+                # convert to MultivaluedDecisionDiagram Choco object, requiring list of accepted tuples
+                tuples = transitions_to_tuples(transitions, root, len(array))
+                mdd = MultivaluedDecisionDiagram(self._to_vars(array), tuples)
+                return self.chc_model.mddc(self._to_vars(array), mdd)
+
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)
