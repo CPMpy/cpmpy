@@ -73,14 +73,14 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Optional
+from typing import Optional, Iterable
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
+from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
+from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
 class GlobalFunction(Expression):
@@ -162,18 +162,31 @@ class Minimum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
         """
-        super().__init__("min", tuple(flatlist(arg_list)))
+        has_subexpr: Optional[bool] = None
+
+        arg_iter: Iterable[ExprLike] = arg_list
+        if isinstance(arg_list, np.ndarray):
+            if isinstance(arg_list, NDVarArray):
+                has_subexpr = arg_list.has_subexpr()
+            arg_iter = arg_list.flat
+
+        args: tuple[int|Expression, ...] = npint2int(arg_iter)
+        super().__init__("min", args, has_subexpr=has_subexpr)
+    
+    @property
+    def args(self) -> tuple[int|Expression, ...]:
+        """ READ-ONLY, well-typed argument of this global function """
+        return self._args
 
     def value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The minimum value of the arguments, or None if any argument is not assigned
         """
-        vargs = [argval(a) for a in self.args]
-        if any(val is None for val in vargs):
+        vals = argvals_intexpr(self.args)
+        if vals is None:
             return None
-
-        return min(vargs)
+        return min(vals)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -196,8 +209,8 @@ class Minimum(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the minimum value
         """
-        bnds = [get_bounds(x) for x in self.args]
-        return min(lb for lb, ub in bnds), min(ub for lb, ub in bnds)
+        lbs, ubs = get_bounds_intexpr(self.args)
+        return min(lbs), min(ubs)
 
 
 class Maximum(GlobalFunction):
@@ -210,18 +223,32 @@ class Maximum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
         """
-        super().__init__("max", tuple(flatlist(arg_list)))
+        has_subexpr: Optional[bool] = None
+
+        arg_iter: Iterable[ExprLike] = arg_list
+        if isinstance(arg_list, np.ndarray):
+            if isinstance(arg_list, NDVarArray):
+                has_subexpr = arg_list.has_subexpr()
+            arg_iter = arg_list.flat
+
+        args: tuple[int|Expression, ...] = npint2int(arg_iter)
+        super().__init__("max", args, has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[int|Expression, ...]:
+        """ READ-ONLY, well-typed argument of this global function """
+        return self._args
 
     def value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The maximum value of the arguments, or None if any argument is not assigned
         """
-        vargs = [argval(a) for a in self.args]
-        if any(val is None for val in vargs):
+        vals = argvals_intexpr(self.args)
+        if vals is None:
             return None
 
-        return max(vargs)
+        return max(vals)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -244,8 +271,8 @@ class Maximum(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the maximum value
         """
-        bnds = [get_bounds(x) for x in self.args]
-        return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
+        lbs, ubs = get_bounds_intexpr(self.args)
+        return max(lbs), max(ubs)
 
 
 class Abs(GlobalFunction):
