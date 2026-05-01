@@ -73,14 +73,14 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Optional
+from typing import Optional, Iterable
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import Expression, Operator, Comparison, ExprLike, ListLike
-from .variables import intvar, NDVarArray
-from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, npint2int, argvals_intexpr, get_bounds_intexpr
+from .core import Expression, Operator, ExprLike, ListLike
+from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
+from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
 class GlobalFunction(Expression):
@@ -162,13 +162,16 @@ class Minimum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
         """
-        if isinstance(arg_list, NDVarArray):
-            has_subexpr = arg_list.has_subexpr()
-            return super().__init__("min", tuple(arg_list.flat), has_subexpr=has_subexpr)
+        has_subexpr: Optional[bool] = None
 
-        newarg_list = npint2int(arg_list)
-        # arg: tuple[int|Expression, ...]
-        super().__init__("min", tuple(newarg_list))
+        arg_iter: Iterable[ExprLike] = arg_list
+        if isinstance(arg_list, np.ndarray):
+            if isinstance(arg_list, NDVarArray):
+                has_subexpr = arg_list.has_subexpr()
+            arg_iter = arg_list.flat
+
+        args: tuple[int|Expression, ...] = npint2int(arg_iter)
+        super().__init__("min", args, has_subexpr=has_subexpr)
     
     @property
     def args(self) -> tuple[int|Expression, ...]:
@@ -220,13 +223,16 @@ class Maximum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
         """
-        if isinstance(arg_list, NDVarArray):
-            has_subexpr = arg_list.has_subexpr()
-            return super().__init__("max", tuple(arg_list.flat), has_subexpr=has_subexpr)
+        has_subexpr: Optional[bool] = None
 
-        newarg_list = npint2int(arg_list)
-        # arg: tuple[int|Expression, ...]
-        super().__init__("max", tuple(newarg_list))
+        arg_iter: Iterable[ExprLike] = arg_list
+        if isinstance(arg_list, np.ndarray):
+            if isinstance(arg_list, NDVarArray):
+                has_subexpr = arg_list.has_subexpr()
+            arg_iter = arg_list.flat
+
+        args: tuple[int|Expression, ...] = npint2int(arg_iter)
+        super().__init__("max", args, has_subexpr=has_subexpr)
 
     @property
     def args(self) -> tuple[int|Expression, ...]:

@@ -35,12 +35,12 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, Optional, overload, cast
+from typing import TYPE_CHECKING, TypeGuard, Optional, overload
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ListLike, ExprLike, BoolExprLike, Expression
+    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression
     from cpmpy.expressions.variables import NDVarArray
 
 
@@ -309,20 +309,9 @@ def is_star(arg):
     """
     return isinstance(arg, type(STAR)) and arg == STAR
 
-def npint2int(lst: ListLike[ExprLike]) -> ListLike[int|Expression]:
-    """ Convert numpy integers in list to Python integers """
 
-    newlst: Optional[list[int|Expression]] = None  # only create when first needed
-    for i,elem in enumerate(lst):
-        if isinstance(elem, np.integer):
-            if newlst is None:
-                newlst = cast(list[int|Expression], lst[:i])
-            newlst.append(int(elem))
-        else:
-            if newlst is not None:
-                newlst.append(elem)
-    if newlst is not None:
-        return newlst
-    return lst  # type: ignore  # typer doesn't see its valid, cant cast because cyclic dependency
+def npint2int(iter: Iterable[ExprLike]) -> tuple[int|Expression, ...]:
+    """Convert numpy values in iterable to Python integers, return as tuple."""
+    return tuple(int(el) if isinstance(el, (np.integer, np.bool_)) else el for el in iter)
      
 
