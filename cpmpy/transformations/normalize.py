@@ -75,10 +75,25 @@ def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[E
 
 
 def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, Expression|int]:
+    """
+    Well-typed helper function to eliminate boolean constants in an Expression.
+    Removes Boolean constants from logical operators, and replaces Boolean constants 
+     with ints in a numerical context (sum, comparisons, etc.)
+    Uses :func:`_simplify_boolean_args()` to recurse into the arguments of all other expressions.
+
+    Arguments:
+        expr: Expression to eliminate boolean constants from
+        num_context: Whether the expression is used as a numerical argument in another expression.
+
+    Returns:
+        tuple[bool, Expression]: (changed, newexpr)    
+    """
     changed = False
     if isinstance(expr, Operator):
         args = expr.args
         if expr.has_subexpr():
+            # All operators that return Boolean, also have Boolean arguments, 
+            # so we can use `Operator.is_bool()` to determine type of arguments here
             changed, rec_args = _simplify_boolean_args(args, num_context=not expr.is_bool())
             if changed:
                 args = tuple(rec_args)
@@ -96,7 +111,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                     newargs.append(a)
 
             if changed:
-                if newargs is None:
+                if newargs is None: # when args where simplified recursively above
                     newargs = list(args)
                 newexpr = copy.copy(expr)
                 newexpr.update_args(newargs)
@@ -116,7 +131,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                     newargs.append(a)
 
             if changed:
-                if newargs is None:
+                if newargs is None: # when args where simplified recursively above
                     newargs = list(args)
                 newexpr = copy.copy(expr)
                 newexpr.update_args(newargs)
@@ -165,6 +180,8 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                     newvars.append(int(v))
                 elif newvars is not None:
                     newvars.append(v)
+                else: # still operating on original vars, no need to change
+                    pass 
             if changed:
                 if newvars is not None:
                     vars = newvars
@@ -195,22 +212,26 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
         changed, (lhs, rhs) = _simplify_boolean_args(expr.args, num_context=True)
         name = expr.name
         if is_num(lhs) and is_boolexpr(rhs):  # flip arguments of comparison to reduct nb of cases
-            if name == "<":    name = ">"
-            elif name == ">":  name = "<"
-            elif name == "<=": name = ">="
-            elif name == ">=": name = "<="
+            if name == "<":    
+                name = ">"
+            elif name == ">":  
+                name = "<"
+            elif name == "<=": 
+                name = ">="
+            elif name == ">=": 
+                name = "<="
             lhs, rhs = rhs, lhs
             changed = True
         """
         Simplify expressions according to this table:
-        x  | <0	 0  0.n	 1	>1
-        ----------------------
-        == |  F	~x	 F   x	 F
-        != |  T	 x	 T  ~x	 T
-        >  |  T	 x	 x   F	 F
-        <  |  F	 F	~x  ~x	 T
-        >= |  T	 T	 x   x	 F   
-        <= |  F	~x	~x   T	 T
+        x  | <0  0  1  >1
+        -----------------
+        == |  F  ~x  x  F
+        != |  T  x  ~x  T
+        >  |  T  x   F  F
+        <  |  F  F  ~x  T
+        >= |  T  T   x  F
+        <= |  F  ~x  T  T
         """
         if isinstance(lhs, Expression) and lhs.is_bool() and is_num(rhs):
             # direct simplification of boolean comparisons
@@ -228,15 +249,7 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
                 if name == ">=":
                     return True, (1 if num_context else BoolVal(True))
             elif 0 < rhs < 1:
-                # a floating point value
-                if name == "==":
-                    return True, (0 if num_context else BoolVal(False))
-                if name == "!=":
-                    return True, (1 if num_context else BoolVal(True))
-                if name == "<" or name == "<=":
-                    return True, recurse_negation(lhs)
-                if name == ">" or name == ">=":
-                    return True, lhs
+                raise ValueError(f"Comparison {lhs} {name} {rhs} is not supported, rhs is a floating point value: {rhs} (type: {type(rhs)})")
             elif rhs == 1:
                 if name == "==" or name == ">=":
                     return True, lhs
@@ -263,23 +276,34 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
             changed = True
 
         if changed or (is_num(lhs) and is_num(rhs)):
-            newexpr = eval_comparison(name, lhs, rhs)
-            if is_bool(newexpr): # Result is a Boolean constant
-                return True, (int(newexpr) if num_context else BoolVal(newexpr))
+            new_comp = eval_comparison(name, lhs, rhs)
+            if isinstance(new_comp, bool): # Result is a Boolean constant
+                return True, (int(new_comp) if num_context else BoolVal(new_comp))
             else: # Result is an expression
-                return True, newexpr
+                return True, new_comp
 
     elif isinstance(expr, (GlobalConstraint, GlobalFunction)):
+        # TODO: how to determine which args are bool/int?
         rec_changed, rec_args = _simplify_boolean_args(expr.args, num_context=False)
         if rec_changed:
-            newerexpr = copy.copy(expr)
-            newerexpr.update_args(rec_args)
-            return True, newerexpr
+            new_global = copy.copy(expr)
+            new_global.update_args(rec_args)
+            return True, new_global
 
     return False, expr
 
 
 def _simplify_boolean_args(args: list[Any]|tuple[Any, ...], num_context=False) -> tuple[bool, list[Any]|tuple[Any, ...]]:
+    """
+    Well-typed helper function to remove Boolean constants from the arguments of an Expression.
+   
+    Arguments:
+        args: list of Expressions arguments (list[Any] | tuple[Any, ...]) to remove Boolean constants from
+        num_context: whether the list of arguments are used in a numerical context or not.
+        
+    Returns:
+        tuple[bool, list[Any]|tuple[Any, ...]]: (changed, newargs)
+    """
     changed = False
     newargs: list[Any] = []
 
