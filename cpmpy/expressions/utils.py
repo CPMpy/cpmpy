@@ -37,6 +37,7 @@ from collections.abc import Iterable  # for flatten
 from itertools import combinations
 from typing import TYPE_CHECKING, TypeGuard, overload
 from cpmpy.exceptions import IncompleteFunctionError
+from cpmpy.expressions.core import Comparison
 
 if TYPE_CHECKING:
     # only import for type checking
@@ -154,7 +155,7 @@ def argvals(arr):
     return argval(arr)
 
 
-def eval_comparison(str_op, lhs, rhs):
+def eval_comparison(str_op:str, lhs, rhs) -> Comparison|bool:
     """
         Internal function: evaluates the textual `str_op` comparison operator
         lhs <str_op> rhs
