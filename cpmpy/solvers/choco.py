@@ -654,10 +654,13 @@ class CPM_choco(SolverInterface):
 
                 array, transitions = cpm_expr.args
                 transitions_int = [[cpm_expr.node_map[src], val, cpm_expr.node_map[dst]] for src, val, dst in transitions]
-                handle = create_mdd_transitions(make_intvar_array(self._to_vars(array)), make_int_2d_array(transitions_int))
-                mdd = MultivaluedDecisionDiagram.__new__(MultivaluedDecisionDiagram)
-                _HandleWrapper.__init__(mdd, handle)
-                return self.chc_model.mddc(self._to_vars(array), mdd)
+                # currently no user-friendly way to create MDD objects with transitions in Pychoco.
+                # Manually create the required objects using the backend API.
+                # Issue opened on github: https://github.com/chocoteam/pychoco/issues/43
+                chc_handle = create_mdd_transitions(make_intvar_array(self._to_vars(array)), make_int_2d_array(transitions_int))
+                chc_mdd = MultivaluedDecisionDiagram.__new__(MultivaluedDecisionDiagram)
+                _HandleWrapper.__init__(chc_mdd, chc_handle)
+                return self.chc_model.mddc(self._to_vars(array), chc_mdd)
 
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
