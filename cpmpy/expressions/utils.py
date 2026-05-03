@@ -154,7 +154,7 @@ def argvals(arr):
     return argval(arr)
 
 
-def eval_comparison(str_op, lhs, rhs):
+def eval_comparison(str_op:str, lhs, rhs) -> "Comparison" |bool:
     """
         Internal function: evaluates the textual `str_op` comparison operator
         lhs <str_op> rhs
