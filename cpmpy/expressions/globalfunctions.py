@@ -79,8 +79,8 @@ import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
+from .variables import intvar, _NumVarImpl, BoolVal
+from .utils import flatlist, argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
 
 
 class GlobalFunction(Expression):
@@ -258,18 +258,24 @@ class Abs(GlobalFunction):
         Arguments:
             expr (Expression): Expression of which to compute the absolute value
         """
-        super().__init__("abs", (expr,))
+        has_subexpr = not isinstance(expr, (_NumVarImpl, BoolVal))
+        # args: tuple[Expression]
+        super().__init__("abs", (expr,), has_subexpr=has_subexpr)
+    
+    @property
+    def args(self) -> tuple[Expression]:
+        """ READ-ONLY, well-typed argument of this global function """
+        return self._args
 
     def value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The absolute value of the argument, or None if the argument is not assigned
         """
-        varg = argval(self.args[0])
-        if varg is None:
+        val = self.args[0].value()
+        if val is None:
             return None
-
-        return abs(varg)
+        return abs(val)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -283,14 +289,14 @@ class Abs(GlobalFunction):
             tuple[Expression, list[Expression]]: A tuple containing the expression representing the absolute value (may be the argument itself, its negation, or an auxiliary variable), and a list of constraints defining it (empty if no auxiliary variable is needed)
         """
         arg = self.args[0]
-        lb, ub = get_bounds(arg)
+        lb, ub = arg.get_bounds()
         if lb >= 0: # always positive
             return arg, []
         if ub <= 0: # always negative
             return -arg, []
 
         _abs = intvar(*self.get_bounds())
-        return _abs, [(arg >= 0).implies(_abs == arg), (arg < 0).implies(_abs == -arg)]
+        return _abs, [(arg >= 0).implies(_abs == arg, simplify=True), (arg < 0).implies(_abs == -arg, simplify=True)]
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -299,7 +305,7 @@ class Abs(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the absolute value
         """
-        lb, ub = get_bounds(self.args[0])
+        lb, ub = self.args[0].get_bounds()
         if lb >= 0:
             return lb, ub
         if ub <= 0:
@@ -625,19 +631,38 @@ class Power(GlobalFunction):
     Only non-negative constant integer exponents are supported.
     """
 
-    def __init__(self, base: ExprLike, exponent: int|np.integer):
+    def __init__(self, base: Expression, exponent: int|np.integer):
         """
         Arguments:
             base (ExprLike): Expression or constant to raise to the power
             exponent (int | np.integer): Non-negative integer exponent (constant only, no variable)
         """
-        if not is_num(exponent):
-            raise TypeError(f"Power constraint takes an integer number as second argument, not: {exponent}")
+        if isinstance(exponent, np.integer):
+            exponent = int(exponent)
         if exponent < 0:
             raise ValueError(f"Power constraint only supports non-negative integer exponents, not: {exponent}")
-        super().__init__("pow", (base, exponent))
 
-    def decompose(self):
+        has_subexpr = not isinstance(base, (_NumVarImpl, BoolVal))
+        # args: tuple[Expression, int]
+        super().__init__("pow", (base, exponent), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[Expression, int]:
+        """ READ-ONLY, well-typed argument of this global function """
+        return self._args
+
+    def value(self) -> Optional[int]:
+        """
+        Returns:
+            int: The power of the arguments, or None if the arguments are not assigned
+        """
+        base, exp = self.args
+        val = base.value()
+        if val is None:
+            return None
+        return val**exp
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
         """
         Decomposition of Power global function, using integer multiplication.
 
@@ -648,25 +673,14 @@ class Power(GlobalFunction):
         """
         base, exp = self.args
         if exp == 0:
-            return 1,[]
+            return intvar(1, 1), []  # can't return a constant '1'...
 
-        _pow = base
+        _pow = base  # write out as nested multiplications
         for _ in range(1,exp):
             _pow *= base
-        return _pow,[]
+        return _pow, []
 
-    def value(self):
-        """
-        Returns:
-            int: The power of the arguments, or None if the arguments are not assigned
-        """
-        base, exp = argvals(self.args)
-        if base is None or exp is None:
-            return None
-
-        return base**exp
-
-    def get_bounds(self):
+    def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of the Power global function
 
@@ -674,7 +688,7 @@ class Power(GlobalFunction):
             tuple[int, int]: A tuple of (lower bound, upper bound) for the power
         """
         base, exp = self.args
-        lb_base, ub_base = get_bounds(base)
+        lb_base, ub_base = base.get_bounds()
 
         bounds = [lb_base ** exp, ub_base ** exp]
         return min(bounds), max(bounds)
