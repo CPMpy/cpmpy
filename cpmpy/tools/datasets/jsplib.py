@@ -7,6 +7,7 @@ The `metadata` contains usefull information about the current problem instance.
 https://github.com/tamy0612/JSPLIB
 """
 
+import io
 import os
 import json
 import pathlib
@@ -71,7 +72,8 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-    def parse(self, instance: os.PathLike):
+    @classmethod
+    def parse(cls, instance: os.PathLike):
         """
         Parse a JSPLib instance into task routing and durations.
         """
@@ -161,7 +163,8 @@ class JSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         # Clean up the zip file
         target_download_path.unlink()
 
-    def open(self, instance: os.PathLike) -> callable:
+    @classmethod
+    def open(cls, instance: os.PathLike) -> io.TextIOBase:
         return open(instance, "r")
 
     def _list_instances(self):

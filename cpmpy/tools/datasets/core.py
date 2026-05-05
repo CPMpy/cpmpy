@@ -732,7 +732,8 @@ class FileDataset(IndexedDataset):
         """
         return open(instance, "r")
 
-    def read(self, instance: os.PathLike) -> str:    
+    @classmethod
+    def read(cls, instance: os.PathLike) -> str:    
         """
         Read raw file contents from an instance file.
         Handles optional decompression automatically via dataset.open().
@@ -742,7 +743,7 @@ class FileDataset(IndexedDataset):
         Returns:
             str: The raw file contents.
         """
-        with self.open(instance) as f:
+        with cls.open(instance) as f:
             return f.read()
 
     def parse(self, instance: os.PathLike):

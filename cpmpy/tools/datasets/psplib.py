@@ -80,7 +80,8 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-    def parse(self, instance: os.PathLike):
+    @classmethod
+    def parse(cls, instance: os.PathLike):
         """
         Parse a PSPLIB RCPSP instance into job data and capacities.
         """
