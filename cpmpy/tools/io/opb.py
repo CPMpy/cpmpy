@@ -48,7 +48,6 @@ from cpmpy.expressions.core import Operator, Comparison
 from cpmpy.expressions.utils import is_num
 from cpmpy import __version__
 
-
 # Regular expressions
 HEADER_RE = re.compile(r'(.*)\s*#variable=\s*(\d+)\s*#constraint=\s*(\d+).*')
 TERM_RE = re.compile(r"([+-]?\d+)((?:\s+~?x\d+)+)")
@@ -205,7 +204,7 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
 
     return model
 
-def write_opb(model, fname=None, encoding="auto", header=None, open=None):
+def write_opb(model, fname=None, encoding="auto", header=None, open=None, annotate: Optional[Callable] = None):
     """
     Export a CPMpy model to the OPB (Pseudo-Boolean) format.
 
@@ -224,6 +223,9 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None):
             Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
+        annotate (callable, optional): ``annotate(bool_var, ivarmap) -> str`` for each OPB identifier.
+            If omitted, uses names derived from the integer encoding map:
+            ``source>=threshold``, ``source=value``, or ``source[bit=i]`` (or ``var.name`` for plain Booleans).
 
     Returns:
         str or None: The OPB string if `fname` is None, otherwise nothing (writes to file).
@@ -237,8 +239,7 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None):
         ...
 
     Note:
-        Some solvers only support variable names of the form x<int>. The OPB writer will remap
-        all CPMpy variables to such a format internally.
+        Solvers that only accept ``x<int>`` can pass a custom ``annotate`` callback.
 
     Example:
         >>> from cpmpy import *
@@ -266,8 +267,29 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None):
     if header:
         header_lines = ["* " + line for line in str(header).splitlines()]
         out.extend(header_lines)
-    # Remap variables to 'x1', 'x2', ..., the standard OPB way
-    varmap = {v: f"x{i+1}" for i, v in enumerate(all_vars)}
+
+    # if annotate is None:
+    #     reverse = _build_reverse_map(ivarmap)
+
+    #     # Simple default naming, matching the DIMACS notebook reference.
+    #     def annotate(v, ivarmap):
+    #         info = reverse.get(id(v))
+    #         if info is None:
+    #             if v.name[:2] == "BV": # aux vars introduced by CPMpy
+    #                 return "_" + v.name
+    #         elif info["encoding"] == "order":
+    #             return f"{info['source_name']}_ge_{info['threshold']}"
+    #         elif info["encoding"] == "binary":
+    #             return f"{info['source_name']}_bit{info['bit']}"
+    #         elif info["encoding"] == "direct":
+    #             return f"{info['source_name']}_eq_{info['value']}"
+    #         else:
+    #             return v.name
+
+    if annotate is None:
+        varmap = {v: f"x{i+1}" for i, v in enumerate(all_vars)} 
+    else:
+        varmap = {v: ann for v, ann in zip(all_vars, annotate(all_vars, ivarmap))}
     
     # Write objective, if present
     if model.objective_ is not None:

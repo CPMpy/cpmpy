@@ -32,14 +32,21 @@ from typing import Optional, Callable, Union
 import builtins
 
 
-def _transform_objective(expr, encoding="auto"):
+
+def _transform_objective(expr, encoding="auto", csemap=None, ivarmap=None):
     """
         Transform objective into weighted Boolean literals plus helper constraints.
+
+        :param csemap: optional shared CSE cache dict (populated in-place)
+        :param ivarmap: optional shared integer variable encoding dict (populated in-place)
 
         Returns:
             (weights, xs, const, extra_cons)
     """
-    csemap, ivarmap = dict(), dict()
+    if csemap is None:
+        csemap = dict()
+    if ivarmap is None:
+        ivarmap = dict()
     obj, safe_cons = safen_objective(expr)
     obj, decomp_cons = decompose_linear_objective(
         obj,
@@ -79,7 +86,7 @@ def _transform_objective(expr, encoding="auto"):
     return list(new_weights), list(new_xs), const, extra_cons
 
 
-def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header:Optional[str]="DIMACS file written by CPMpy", open: Optional[Callable]=None):
+def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header:Optional[str]="DIMACS file written by CPMpy", open: Optional[Callable]=None, annotate: Optional[Callable]=None):
     """
         Writes CPMpy model to DIMACS format
         Uses the "to_cnf" transformation from CPMpy
@@ -95,6 +102,13 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
             Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
+        :param annotator: variable annotation strategy. Controls how DIMACS literal IDs are
+            mapped back to original CPMpy variables. Options:
+            - None (default): no annotation, output identical to previous behaviour
+            - "dimacs_comments": Sugar-style 'c <id> <name>' comment lines (self-contained)
+            - "json_sidecar": comments + a .map.json sidecar file (BumbleBee pattern)
+            - "none": explicit no-op (same as None)
+            - VariableAnnotator instance: fully custom strategy
     """
 
     if model.has_objective():
@@ -102,13 +116,19 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
     else:
         hard_prefix = ""
 
+    # Shared dicts so both objective and constraint transformations populate
+    # the same ivarmap — enabling annotation of all integer variable encodings.
+    ivarmap, csemap = dict(), dict()
+
     constraints = toplevel_list(model.constraints)
     objective_lits = []
     objective_weights = []
     if model.has_objective():
-        objective_weights, objective_lits, _, extra_cons = _transform_objective(model.objective_, encoding=encoding)
+        objective_weights, objective_lits, _, extra_cons = _transform_objective(
+            model.objective_, encoding=encoding, csemap=csemap, ivarmap=ivarmap
+        )
         constraints += extra_cons
-    constraints = to_cnf(constraints, encoding=encoding)
+    constraints = to_cnf(constraints, csemap=csemap, ivarmap=ivarmap, encoding=encoding)
 
     vars = get_variables(constraints + objective_lits)
     mapping = {v : i+1 for i, v in enumerate(vars)}
@@ -147,10 +167,19 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
             transformed_weight = max_weight - w if model.objective_is_min else w
             out += f"{transformed_weight} {lit} 0\n"
 
-        if p_header:
+    if annotate is not None:
+        if isinstance(annotate, Callable):
+            comments = annotate(vars, ivarmap)
+            if comments:
+                comment_block = "\n".join(f"c {i+1} " + c for i,c in enumerate(comments)) + "\n"
+                out = comment_block + out
+        else:
+            raise ValueError(f"Expected a Callable annotate, but got {type(annotate)}")
+
+    if p_header:
+        if model.has_objective():
             out = f"p wcnf {len(vars)} {len(constraints)} {max(objective_weights)}\n" + out
-    else:
-        if p_header:
+        else:
             out = f"p cnf {len(vars)} {len(constraints)}\n" + out
 
     if header is not None:
@@ -264,7 +293,7 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open=None):
     if nr_vars_declared is not None:
         assert max_var <= nr_vars_declared, f"Expected at most {nr_vars_declared} variables (from p-line) but found literal index {max_var}"
 
-    bvs = cp.boolvar(shape=nr_vars) if nr_vars > 0 else []
+    bvs = cp.boolvar(shape=(nr_vars,)) if nr_vars > 0 else []
     for cl in clauses:
         lits = []
         for i in cl:
