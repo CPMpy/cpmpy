@@ -41,7 +41,7 @@ def annotate_cpmpy(vars, ivarmap):
     for v in vars:
         info = reverse.get(id(v))
         if info is None:
-            continue
+            name = v.name
         elif info["encoding"] == "order":
             name = f"{info['source_name']}>={info['threshold']}"
         elif info["encoding"] == "binary":
@@ -97,7 +97,7 @@ def annotate_sugar(vars, ivarmap):
         info = reverse.get(id(v))
 
         if info is None:
-            continue
+            name = v.name
 
         src = info["source_name"]
 
