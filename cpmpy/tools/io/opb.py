@@ -363,11 +363,10 @@ def _wsum_to_str(cpm_expr, varmap):
 
     out = []
     for w, var in zip(weights, args):
-        w, var = (w, varmap[var]) if not isinstance(var, NegBoolView) else (-w, varmap[var._bv])
         if w < 0:
-            out.append(f"- {abs(w)} {var}")
+            out.append(f"- {abs(w)} {varmap[var] if not isinstance(var, NegBoolView) else "~" + str(varmap[var._bv])}")
         elif w > 0:
-            out.append(f"+ {abs(w)} {var}")
+            out.append(f"+ {abs(w)} {varmap[var] if not isinstance(var, NegBoolView) else "~" + str(varmap[var._bv])}")
         else:
             pass # zero weight, ignore
     
