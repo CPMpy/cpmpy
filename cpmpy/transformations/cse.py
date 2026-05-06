@@ -89,7 +89,7 @@ class CSEMap:
 
             self.flat_map[expr] = bv
             if negate: # return the negated variable to get the original expression back
-                neg_bv = cast(NegBoolView, ~bv) # __invert__ of _BoolVarImpl returns Expression, but we know it is a NegBoolView
+                neg_bv = NegBoolView(bv) # invert
                 return neg_bv, Comparison("==", expr, bv)
             return bv, Comparison("==", expr, bv)
         else:
@@ -105,8 +105,8 @@ class CSEMap:
             lhs, rhs = expr.args
             if expr.name == "!=" and is_int(rhs):
                 # b <-> (expr != val) :: (~b) <-> (expr == val)
-                expr = copy.copy(expr)
-                expr.name = "=="
-                return expr, True
+                new_expr = Comparison("==", lhs, rhs)
+                new_expr._has_subexpr = expr._has_subexpr
+                return new_expr, True
             
         return expr, False
