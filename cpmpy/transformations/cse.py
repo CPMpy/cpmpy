@@ -2,7 +2,7 @@ import copy
 from typing import Optional, Any, cast, overload, Literal
 from ..expressions.core import Expression, Comparison
 from ..expressions.utils import is_int
-from ..expressions.variables import boolvar, intvar, _IntVarImpl, _BoolVarImpl
+from ..expressions.variables import NegBoolView, boolvar, intvar, _IntVarImpl, _BoolVarImpl
 
 
 class CSEMap:
@@ -89,7 +89,8 @@ class CSEMap:
 
             self.flat_map[expr] = bv
             if negate: # return the negated variable to get the original expression back
-                return ~bv, Comparison("==", expr, bv)
+                neg_bv = cast(NegBoolView, ~bv) # __invert__ of _BoolVarImpl returns Expression, but we know it is a NegBoolView
+                return neg_bv, Comparison("==", expr, bv)
             return bv, Comparison("==", expr, bv)
         else:
             iv = intvar(*expr.get_bounds())
