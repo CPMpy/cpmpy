@@ -4,8 +4,21 @@ from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.solvers.utils import SolverLookup
 import cpmpy as cp
 from cpmpy.expressions.utils import is_any_list
-from cpmpy.exceptions import NotSupportedError
+from cpmpy.exceptions import MaskedSolverValueError, NotSupportedError
 from utils import skip_on_missing_pblib
+
+
+def _assert_value_or_masked(solver_name, cpm_var, expected):
+    try:
+        value = cpm_var.value()
+    except MaskedSolverValueError as exc:
+        assert solver_name == "optalcp"
+        assert "Preview" in str(exc)
+        assert "Academic or Full" in str(exc)
+        return True
+
+    assert value == expected
+    return False
 
 @pytest.mark.usefixtures("solver")
 @skip_on_missing_pblib(skip_on_exception_only=True)
@@ -99,7 +112,11 @@ def test_solve(solver):
     assert solver.solve()
     assert solver.status().exitstatus == ExitStatus.FEASIBLE
 
-    assert [x.value(), y.value(), z.value()] == [0, 1, 0]
+    masked = any(_assert_value_or_masked(solver, var, exp) for var, exp in zip((x, y, z), (0, 1, 0)))
+    if masked:
+        for var in (x, y, z):
+            with pytest.raises(MaskedSolverValueError):
+                var.value()
 
 
 @pytest.mark.usefixtures("solver")

@@ -43,3 +43,8 @@ class GCSVerificationException(CPMpyException):
 class TransformationNotImplementedError(CPMpyException):
     '''Raised when a transformation is not implemented for a certain expression'''
     pass
+
+
+class MaskedSolverValueError(CPMpyException):
+    '''Raised when a solver found a solution but intentionally masked decision-variable values'''
+    pass
