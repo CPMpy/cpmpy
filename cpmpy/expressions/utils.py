@@ -35,7 +35,7 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, Optional, overload
+from typing import TYPE_CHECKING, TypeGuard, Optional, overload, Final
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
@@ -43,6 +43,11 @@ if TYPE_CHECKING:
     from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression
     from cpmpy.expressions.variables import NDVarArray
 
+NP_TYPES: Final = frozenset({
+    np.int8, np.int16, np.int32, np.int64,
+    np.uint8, np.uint16, np.uint32, np.uint64,
+    np.bool_
+})
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
@@ -154,7 +159,7 @@ def argvals(arr):
     return argval(arr)
 
 def argvals_intexpr(lst: Iterable[int|Expression]) -> Optional[list[int]]:
-    """ The well-typed way to get the values of a list of int|Expression, or None if any expression is not assigned """
+    """ A well-typed helper function to get the values of a list of int|Expression, or None if any expression is not assigned """
     vals: list[int] = []
     for e in lst:
         if isinstance(e, int):
@@ -222,7 +227,7 @@ def get_bounds(expr):
         return math.floor(expr), math.ceil(expr)
 
 def get_bounds_intexpr(lst: Iterable[int|Expression]) -> tuple[list[int], list[int]]:
-    """ The well-typed way to get the bounds of a list of ExprLike's """
+    """ A well-typed helper function to get the bounds of a list of int|Expression's """
     lbs: list[int] = []
     ubs: list[int] = []
     for e in lst:
@@ -312,6 +317,6 @@ def is_star(arg):
 
 def npint2int(iter: Iterable[ExprLike]) -> tuple[int|Expression, ...]:
     """Convert numpy values in iterable to Python integers, return as tuple."""
-    return tuple(int(el) if isinstance(el, (np.integer, np.bool_)) else el for el in iter)
+    return tuple(int(el) if type(el) in NP_TYPES else el for el in iter)  # type: ignore  # it can't see we're removing the np.integers
      
 

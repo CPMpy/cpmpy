@@ -170,6 +170,7 @@ class Minimum(GlobalFunction):
                 has_subexpr = arg_list.has_subexpr()
             arg_iter = arg_list.flat
 
+        # convert numpy integers to Python integers
         args: tuple[int|Expression, ...] = npint2int(arg_iter)
         super().__init__("min", args, has_subexpr=has_subexpr)
     
@@ -231,6 +232,7 @@ class Maximum(GlobalFunction):
                 has_subexpr = arg_list.has_subexpr()
             arg_iter = arg_list.flat
 
+        # convert numpy integers to Python integers
         args: tuple[int|Expression, ...] = npint2int(arg_iter)
         super().__init__("max", args, has_subexpr=has_subexpr)
 
