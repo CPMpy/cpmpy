@@ -1,4 +1,5 @@
-from typing import Optional, Any, overload, Literal
+import copy
+from typing import Optional, Any, cast, overload, Literal
 from ..expressions.core import Expression, Comparison
 from ..expressions.utils import is_int
 from ..expressions.variables import boolvar, intvar, _IntVarImpl, _BoolVarImpl
@@ -27,6 +28,13 @@ class CSEMap:
     @overload
     def get(self, expr: Expression, default: Any) -> Any: ...
     def get(self, expr: Expression, default: Any = None) -> Any:
+        if expr.is_bool():
+            expr, negate = self._canonicalize_boolexpr(expr)
+            res = self.flat_map.get(expr, default)
+            if res is not None and negate: # return negated Boolean variable, stored negation in flat_map
+                return ~res
+            return res
+            
         return self.flat_map.get(expr, default)
 
     def save_decomposition(self, expr: Expression, newexpr: Expression):
@@ -71,14 +79,33 @@ class CSEMap:
         if isinstance(expr, _IntVarImpl):
             return expr, None
 
-        if expr in self.flat_map:
-            return self.flat_map[expr], None
+        res = self.get(expr)
+        if res is not None:
+            return res, None # already made a variable for expr
 
-        elif expr.is_bool():
+        if expr.is_bool():
             bv = boolvar()
+            expr, negate = self._canonicalize_boolexpr(expr)
+
             self.flat_map[expr] = bv
+            if negate: # return the negated variable to get the original expression back
+                return ~bv, Comparison("==", expr, bv)
             return bv, Comparison("==", expr, bv)
         else:
             iv = intvar(*expr.get_bounds())
             self.flat_map[expr] = iv
             return iv, Comparison("==", expr, iv)
+
+
+    def _canonicalize_boolexpr(self, expr: Expression) -> tuple[Expression, bool]:
+        """canonicalize a Boolean expression, results in more hits in the flat_map"""
+
+        if isinstance(expr, Comparison):
+            lhs, rhs = expr.args
+            if expr.name == "!=" and is_int(rhs):
+                # b <-> (expr != val) :: (~b) <-> (expr == val)
+                expr = copy.copy(expr)
+                expr.name = "=="
+                return expr, True
+            
+        return expr, False
