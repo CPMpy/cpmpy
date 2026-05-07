@@ -68,6 +68,7 @@
     ..
 
     You can also implement a `.negate()` method if the global constraint has a better way to negate it than negating the decomposition.
+    The expression returned by `.negate()` should be equivalent to the negation of the global constraint, and should introduce any `not` operators.
 
     If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
     then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
