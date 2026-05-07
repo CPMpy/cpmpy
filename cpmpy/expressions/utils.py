@@ -153,8 +153,10 @@ def argvals(arr):
         return [argvals(arg) for arg in arr]
     return argval(arr)
 
+if TYPE_CHECKING:
+    from cpmpy.expressions.core import Comparison
 
-def eval_comparison(str_op:str, lhs, rhs) -> "Comparison" |bool:
+def eval_comparison(str_op:str, lhs, rhs) -> Comparison |bool:
     """
         Internal function: evaluates the textual `str_op` comparison operator
         lhs <str_op> rhs
