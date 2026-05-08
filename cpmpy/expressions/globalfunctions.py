@@ -432,7 +432,8 @@ class Multiplication(GlobalFunction):
             lb_z = min(0, lb_y)  # make sure it can take 0
             ub_z = max(0, ub_y)  # make sure it can take 0
             z = intvar(lb_z, ub_z)
-            return z, [bv.implies(z == iv), (~bv).implies(z == 0)]
+            return z, [bv.implies(z == iv), 
+                       cp.transformations.negation.recurse_negation(bv).implies(z == 0)]
 
         # let a be the one with the smallest domain, leading to the fewest auxiliariy variables
         lb_a, ub_a = get_bounds(a)

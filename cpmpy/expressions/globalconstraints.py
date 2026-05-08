@@ -870,7 +870,8 @@ class IfThenElse(GlobalConstraint):
         condition, if_true, if_false = self.args
         if is_bool(condition):
             condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
-        return [condition.implies(if_true), (~condition).implies(if_false)], []
+        return [condition.implies(if_true), 
+                cp.transformations.negation.recurse_negation(condition).implies(if_false)], []
 
     def __repr__(self) -> str:
         condition, if_true, if_false = self.args
@@ -986,11 +987,11 @@ class Xor(GlobalConstraint):
             changed = False
             for i, a in enumerate(self.args):
                 if isinstance(a, _BoolVarImpl):
-                    new_args[i] = ~a
+                    new_args[i] = ~a # a is var, ok to be negated
                     changed = True
                     break
             if not changed:  # no variables, negate first argument
-                new_args[0] = ~new_args[0]  # Warning, creates a negated expression during decompose
+                new_args[0] = cp.transformations.negation.recurse_negation(new_args[0]) # decompose cannot introduce negation, so push down into arg
 
         # There are multiple decompositions possible,
         # recursively using sum allows it to be efficient for all solvers.
@@ -1018,14 +1019,13 @@ class Xor(GlobalConstraint):
         changed = False
         for i, a in enumerate(self.args):
             if isinstance(a, _BoolVarImpl):
-                new_args[i] = ~a
+                new_args[i] = ~a # a is var, ok to be negated
                 changed = True
                 break
 
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            from cpmpy.transformations.negation import recurse_negation
-            new_args[0] = recurse_negation(self.args[0])           
+            new_args[0] = cp.transformations.negation.recurse_negation(new_args[0]) # .negate() cannot introduce negation, so push down into arg
 
         return Xor(new_args)
 
