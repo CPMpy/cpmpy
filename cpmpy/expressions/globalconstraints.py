@@ -871,11 +871,13 @@ class IfThenElse(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
+        from cpmpy.transformations.negation import recurse_negation
+
         condition, if_true, if_false = self.args
         if is_bool(condition):
             condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
         return [condition.implies(if_true), 
-                cp.transformations.negation.recurse_negation(condition).implies(if_false)], []
+                recurse_negation(condition).implies(if_false)], []
 
     def __repr__(self) -> str:
         condition, if_true, if_false = self.args
@@ -975,6 +977,8 @@ class Xor(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
+        from cpmpy.transformations.negation import recurse_negation
+
         # lets first simplify the Xor by removing all constants:
         # True Xor x :: ~x  and  False Xor x :: x
         new_args: list[Expression] = []
@@ -995,7 +999,7 @@ class Xor(GlobalConstraint):
                     changed = True
                     break
             if not changed:  # no variables, negate first argument
-                new_args[0] = cp.transformations.negation.recurse_negation(new_args[0]) # decompose cannot introduce negation, so push down into arg
+                new_args[0] = recurse_negation(new_args[0]) # decompose cannot introduce negation, so push down into arg
 
         # There are multiple decompositions possible,
         # recursively using sum allows it to be efficient for all solvers.
@@ -1018,6 +1022,8 @@ class Xor(GlobalConstraint):
         return "xor({})".format(self.args)
 
     def negate(self) -> Expression:
+        from cpmpy.transformations.negation import recurse_negation
+        
         # negate one of the arguments, ideally a variable
         new_args = list(self.args)  # takes shallow copy
         changed = False
@@ -1029,7 +1035,7 @@ class Xor(GlobalConstraint):
 
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            new_args[0] = cp.transformations.negation.recurse_negation(new_args[0]) # .negate() cannot introduce negation, so push down into arg
+            new_args[0] = recurse_negation(new_args[0]) # .negate() cannot introduce negation, so push down into arg
 
         return Xor(new_args)
 
