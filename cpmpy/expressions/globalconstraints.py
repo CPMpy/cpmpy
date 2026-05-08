@@ -68,7 +68,8 @@
     ..
 
     You can also implement a `.negate()` method if the global constraint has a better way to negate it than negating the decomposition.
-    The expression returned by `.negate()` should be equivalent to the negation of the global constraint, and should introduce any `not` operators.
+    The expression returned by `.negate()` should be equivalent to the negation of the global constraint, and is not allowed to introduce explicit `not` operators.
+    Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
 
     If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
     then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
@@ -176,6 +177,9 @@ class GlobalConstraint(Expression):
 
             To ensure equivalence of decomposition, we split into constraints determining the value of the global constraint, and defining-constraints.
             Defining constraints (totally) define new auxiliary variables needed for the decomposition, and can always be enforced at top-level.
+
+            The decomposition is not allowed to introduce explicit `not` operators.
+            Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
 
             Tip: avoid creating auxiliary variables and use nested expressions instead!
             (especially, don't create Booleans but use (iv == v) expressions instead, better for common subexpression elimination!)
