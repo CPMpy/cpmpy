@@ -126,6 +126,11 @@ def flatten_constraint(expr, csemap=None, do_simplify=True):
     """
         input is any expression; except is_num(), pure _NumVarImpl,
         or Operator/GlobalConstraint with not is_bool()
+
+        Arguments:
+            expr: the expression to flatten
+            csemap: a CSEMap object to store the flattened expressions
+            do_simplify: whether to simplify -> operators during flattening, might remove variables
         
         output: see definition of 'flat normal form' above.
 
