@@ -52,7 +52,7 @@ CPMpy can translate to a wide variety of constraint solving paradigms, including
 An [example](https://github.com/CPMpy/cpmpy/blob/master/examples/flexible_jobshop.py) that also demonstrates CPMpy's seamless integration into the scientific Python ecosystem:
 
 ```python
-# Simple flexible job-shop: a set of jobs (each 1 task) must be run, each can be run on any of the machines,
+# Parallel machine scheduling: a set of jobs must be scheduled, each can be run on compatible machines,
 # with different duration and energy consumption. Minimize makespan and total energy consumption
 import cpmpy as cp
 import pandas as pd
@@ -67,7 +67,7 @@ data = [[jobid, machid, random.randint(2, 8), random.randint(5, 15)]
 df_data = pd.DataFrame(data, columns=['job_id', 'machine_id', 'duration', 'energy'])
 num_compatible = len(df_data)
 
-# Compute maximal horizon (sum of slowest duration per job)
+# Compute maximal horizon (sum of longest duration per job)
 horizon = df_data.groupby("job_id")["duration"].max().sum()
 
 # Decision `start[j]`: integer start time for each job `j`
