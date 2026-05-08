@@ -106,6 +106,9 @@ class GlobalFunction(Expression):
             The first one will replace the GlobalFunction expression in-place,
             the second one will be added to the list of top-level constraints.
 
+            The decomposition is not allowed to introduce explicit `not` operators.
+            Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
+
             The decomposition might create auxiliary variables
             and use other global constraints as long as
             it does not create a circular dependency.
