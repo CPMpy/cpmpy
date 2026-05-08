@@ -7,7 +7,7 @@ import numpy as np
 
 from ..expressions.variables import boolvar, intvar, NDVarArray, _BoolVarImpl, _NumVarImpl
 from ..expressions.core import Expression, BoolVal, ListLike, ExprLike
-from ..expressions.utils import get_bounds, is_any_list
+from ..expressions.utils import get_bounds, implies, is_any_list
 from ..expressions.python_builtins import all as cpm_all
 from typing import Optional, AbstractSet, Any, Sequence
 
@@ -169,7 +169,6 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
 
                 arr, idx = cpm_expr.args
                 lb, ub = get_bounds(idx)
-                guard: Optional[_BoolVarImpl | BoolVal] = None # for mypy
 
                 if lb < 0 or ub >= len(arr): # index can be out of bounds
                     guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(0, len(arr)-1), idx_to_safen=1)
@@ -215,7 +214,7 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
     nbc = [expr for lst in nbc_for_each_expr for expr in lst] # merge remaining nbc expressions
     return changed, new_lst, toplevel, nbc
 
-def _safen_range(partial_expr:Expression, safe_range:tuple[int,int], idx_to_safen:int) -> tuple[_BoolVarImpl, Expression, list[Expression]]:
+def _safen_range(partial_expr:Expression, safe_range:tuple[int,int], idx_to_safen:int) -> tuple[Expression, Expression, list[Expression]]:
     """
     Replace partial function `cpm_expr` that has potentially unsafe argument at `idx_to_safen`,
     by a total function using a safe argument with domain `safe_range`. Also returns
@@ -243,9 +242,13 @@ def _safen_range(partial_expr:Expression, safe_range:tuple[int,int], idx_to_safe
     total_expr = copy(partial_expr)  # the new total function, with the new arg
     total_expr.update_args([new_arg if i == idx_to_safen else a for i,a in enumerate(partial_expr.args)])
 
-    is_defined = boolvar()
-    toplevel = [is_defined == ((safe_lb <= orig_arg) & (orig_arg <= safe_ub)),
-                is_defined.implies(new_arg == orig_arg),
+    is_defined = (safe_lb <= orig_arg) & (orig_arg <= safe_ub)
+    
+    if not isinstance(orig_arg, Expression): 
+        # unlikely case where `orig_arg` is a constant
+        is_defined = BoolVal(is_defined)
+    
+    toplevel = [is_defined.implies(new_arg == orig_arg),
                 # Extra: avoid additional solutions when new var is unconstrained
                 # (should always work in reified context because total_expr is newly defined?)
                 (~is_defined).implies(new_arg == safe_lb)]
@@ -253,7 +256,7 @@ def _safen_range(partial_expr:Expression, safe_range:tuple[int,int], idx_to_safe
     return is_defined, total_expr, toplevel
 
 
-def _safen_hole(cpm_expr: Expression, exclude: int, idx_to_safen: int) -> tuple[_BoolVarImpl, _NumVarImpl, list[Expression]]:
+def _safen_hole(cpm_expr: Expression, exclude: int, idx_to_safen: int) -> tuple[Expression, _NumVarImpl, list[Expression]]:
     """
     Safen expression where a single value of an argument can cause undefinedness.
     Examples include `div` where 0 has to be removed from the denominator
@@ -282,16 +285,18 @@ def _safen_hole(cpm_expr: Expression, exclude: int, idx_to_safen: int) -> tuple[
     total_expr_upper = copy(cpm_expr)
     total_expr_upper.update_args([new_arg_upper if i == idx_to_safen else a for i, a in enumerate(cpm_expr.args)])
 
-    is_defined = boolvar()
-    is_defined_lower = boolvar()
-    is_defined_upper = boolvar()
+    is_defined_lower =  (orig_arg < exclude)
+    is_defined_upper = (orig_arg > exclude)
+
+    if not isinstance(orig_arg, Expression):
+        # unlikely case where `orig_arg` is a constant
+        is_defined_lower = BoolVal(is_defined_lower)
+        is_defined_upper = BoolVal(is_defined_upper)
+    
+    is_defined = is_defined_lower | is_defined_upper
     output_var = intvar(*get_bounds(cpm_expr))
 
     toplevel = [
-        is_defined_lower == (orig_arg < exclude),
-        is_defined_upper == (orig_arg > exclude),
-        is_defined == (is_defined_lower | is_defined_upper),
-
         is_defined_lower.implies(orig_arg == new_arg_lower),
         is_defined_lower.implies(output_var == total_expr_lower),
         is_defined_upper.implies(orig_arg == new_arg_upper),

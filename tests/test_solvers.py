@@ -19,6 +19,7 @@ from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy.solvers.scip import CPM_scip
+from cpmpy.solvers.highs import CPM_highs
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
@@ -1008,6 +1009,9 @@ class TestSupportedSolvers:
 
         assert s.solve(assumptions=[])
 
+        # better for user experience: allow to use set of assumptions too
+        assert s.solve(assumptions={x,y})
+
     def test_vars_not_removed(self, solver):
         bvs = cp.boolvar(shape=3)
         m = cp.Model([cp.any(bvs) <= 2])
@@ -1224,9 +1228,6 @@ def test_scip_special_cardinality():
     assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
     assert s.solve()
     assert bvs.value().sum() <= 3
-
-
-from cpmpy.solvers.highs import CPM_highs
 
 
 @pytest.mark.skipif(not CPM_highs.supported(), reason="HiGHS (highspy) not installed")

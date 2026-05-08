@@ -295,7 +295,7 @@ class CPM_scip(SolverInterface):
     __add__ = add
 
     def _add_transformed_constraint(self, cpm_expr):
-        """Add already transformed CPMpy constraints to the solver. Some constraints are further transformed in this file, such as reified linear equality constraints `b -> ... == k` into `b -> ... >= k /\ b -> ... <= k`. In this case, we recursively call this function instead of `self.add`, which avoids both the full transformation pipeline overhead and also does not pollute `user_vars` with `b`."""
+        """Add already transformed CPMpy constraints to the solver. Some constraints are further transformed in this file, such as reified linear equality constraints `b -> ... == k` into `b -> ... >= k and b -> ... <= k`. In this case, we recursively call this function instead of `self.add`, which avoids both the full transformation pipeline overhead and also does not pollute `user_vars` with `b`."""
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
             lhs_is_operator = isinstance(lhs, Operator)

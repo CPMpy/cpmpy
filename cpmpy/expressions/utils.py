@@ -35,14 +35,19 @@ import numpy as np
 import math
 from collections.abc import Iterable  # for flatten
 from itertools import combinations
-from typing import TYPE_CHECKING, TypeGuard, overload
+from typing import TYPE_CHECKING, TypeGuard, Optional, overload, Final
 from cpmpy.exceptions import IncompleteFunctionError
 
 if TYPE_CHECKING:
     # only import for type checking
-    from cpmpy.expressions.core import ExprLike, Expression
+    from cpmpy.expressions.core import ExprLike, BoolExprLike, Expression
     from cpmpy.expressions.variables import NDVarArray
 
+NP_TYPES: Final = frozenset({
+    np.int8, np.int16, np.int32, np.int64,
+    np.uint8, np.uint16, np.uint32, np.uint64,
+    np.bool_
+})
 
 def is_bool(arg):
     """ is it a boolean (incl numpy variants)
@@ -153,6 +158,18 @@ def argvals(arr):
         return [argvals(arg) for arg in arr]
     return argval(arr)
 
+def argvals_intexpr(lst: Iterable[int|Expression]) -> Optional[list[int]]:
+    """ A well-typed helper function to get the values of a list of int|Expression, or None if any expression is not assigned """
+    vals: list[int] = []
+    for e in lst:
+        if isinstance(e, int):
+            vals.append(e)
+        else:  # Expression
+            v = e.value()
+            if v is None:
+                return None
+            vals.append(v)
+    return vals
 
 def eval_comparison(str_op, lhs, rhs):
     """
@@ -209,20 +226,54 @@ def get_bounds(expr):
             return int(expr), int(expr)
         return math.floor(expr), math.ceil(expr)
 
+def get_bounds_intexpr(lst: Iterable[int|Expression]) -> tuple[list[int], list[int]]:
+    """ A well-typed helper function to get the bounds of a list of int|Expression's """
+    lbs: list[int] = []
+    ubs: list[int] = []
+    for e in lst:
+        if isinstance(e, int):
+            lbs.append(e)
+            ubs.append(e)
+        else:  # Expression
+            (lb, ub) = e.get_bounds()
+            lbs.append(lb)
+            ubs.append(ub)
+    return lbs, ubs
+
 # first two are declarations for typing purposes only
 @overload
-def implies(expr: NDVarArray, other: ExprLike, simplify: bool = False) -> NDVarArray: ...
+def implies(expr: NDVarArray, other: BoolExprLike, simplify: bool = False) -> NDVarArray: ...
 @overload
-def implies(expr: Expression|bool|np.bool_, other: ExprLike, simplify: bool = False) -> Expression: ...
+def implies(expr: Expression|bool|np.bool_, other: BoolExprLike, simplify: bool = False) -> Expression: ...
 
-def implies(expr: NDVarArray|Expression|bool|np.bool_, other: ExprLike, simplify: bool = False) -> NDVarArray|ExprLike:
-    """ like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe to use for non-expressions """
+def implies(expr: NDVarArray|BoolExprLike, other: BoolExprLike, simplify: bool = False) -> NDVarArray|Expression:
+    """Implication constraint: ``self -> other``.
+
+    Like :func:`~cpmpy.expressions.core.Expression.implies`, but also safe when 'expr' is not an Expression
+
+    Args:
+        expr (NDVarArray|BoolExprLike): the left-hand-side of the implication
+        other (BoolExprLike): the right-hand-side of the implication
+        simplify (bool): if True, simplify by eliminating True/False constants (might remove expressions & their variables from user-view)
+
+    Returns:
+        Expression: the implication constraint or a BoolVal if simplified
+
+    Simplification rules:
+        - Expr -> True :: BoolVal(True)  (by expr.implies())
+        - Expr -> False :: ~Expr         (by expr.implies())
+        - True -> other :: other
+        - False -> other :: BoolVal(True)
+    """
     if isinstance(expr, (cp.expressions.core.Expression, cp.expressions.variables.NDVarArray)):
         # both implement .implies()
         return expr.implies(other, simplify=simplify)
-    elif is_true_cst(expr):
-        return other
-    elif is_false_cst(expr):
+    elif is_true_cst(expr):  # True -> other :: other
+        if isinstance(other, cp.expressions.core.Expression):
+            return other
+        else:
+            return cp.BoolVal(other)
+    elif is_false_cst(expr):  # False -> other :: BoolVal(True)
         return cp.BoolVal(True)
     else:
         raise ValueError(f"implies: expr must be an Expression or a boolean, got {type(expr)}")
@@ -262,3 +313,10 @@ def is_star(arg):
         Check if arg is star as used in the ShortTable global constraint
     """
     return isinstance(arg, type(STAR)) and arg == STAR
+
+
+def npint2int(iter: Iterable[ExprLike]) -> tuple[int|Expression, ...]:
+    """Convert numpy values in iterable to Python integers, return as tuple."""
+    return tuple(int(el) if type(el) in NP_TYPES else el for el in iter)  # type: ignore  # it can't see we're removing the np.integers
+     
+
