@@ -32,6 +32,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _Num
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import is_num, is_true_cst, is_false_cst
+from ..transformations.negation import push_down_negation
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -271,6 +272,7 @@ class CPM_scip(SolverInterface):
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
@@ -356,6 +358,9 @@ class CPM_scip(SolverInterface):
                     elif is_true_cst(arg):
                         # note: `xor` is "parity" (i.e. it enforces an odd number of true arguments)
                         # every time we see True, we can just flip the RHS
+                        rhsvar = not rhsvar
+                    elif isinstance(arg, NegBoolView):
+                        scip_args.append(self.solver_var(arg._bv))
                         rhsvar = not rhsvar
                     else:
                         scip_args.append(self.solver_var(arg))
