@@ -619,7 +619,7 @@ class CPM_gurobi(SolverInterface):
             else:
                 raise TypeError(f"Unexpected Gurobi constraint {grb_con} of type {type(grb_con)}")
 
-        assert all(in_iis(grb_hard_con) for grb_hard_con in grb_hard_cons), "Gurobi did not properly enforce the hard constraints for this instance, which has led to a potentially non-minimal MUS. Until the bug is resolved, you should use another MUS algorithm. Please report on GitHub."
+        assert all(in_iis(grb_hard_con) for grb_hard_con in grb_hard_cons), "Gurobi did not properly enforce the hard constraints for this instance, which has led to a potentially non-minimal MUS. Until Gurobi resolves their bug (requests/116323), you should use another MUS algorithm."
 
         # Return `soft_con` if its representing Gurobi constraint is in the IIS
         return [soft_con for soft_con, grb_soft_con in zip(soft_cons, grb_soft_cons) if in_iis(grb_soft_con)]
