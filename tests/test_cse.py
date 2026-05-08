@@ -196,6 +196,6 @@ class TestCSE:
         assert len(flat_cons) == 3
         assert str(flat_cons[0]) == "(BV0) == (aux)"
         assert str(flat_cons[1]) == "((a) or (b)) == (BV0)"
-        assert str(flat_cons[2]) == "(x) * (IV0) <= 10"
+        assert str(flat_cons[2]) == "(x) * (BV0) <= 10"
 
     ### other transformations only use csemap as argument to flatten_constraint internally, not sure how to easily test them
