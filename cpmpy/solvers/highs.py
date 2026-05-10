@@ -20,12 +20,13 @@
     - https://ergo-code.github.io/HiGHS/dev/interfaces/python/
 """
 
-from typing import Optional
+from typing import Optional, Union
 
 import time
 import warnings
 
 import numpy as np
+import numpy.typing as npt
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
@@ -142,7 +143,7 @@ class CPM_highs(SolverInterface):
 
         return self._varmap[cpm_var]
 
-    def _row_from_linexpr(self, lhs):
+    def _row_from_linexpr(self, lhs) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
         """
         Convert a flat linear numeric expression (var/sum/wsum)
         into HiGHS row data: (indices, values, constant).
@@ -151,20 +152,18 @@ class CPM_highs(SolverInterface):
         variables and must be subtracted from the row bounds by the caller.
 
         Returns:
-            tuple[list[int], list[float], float]: (col indices, col weights, constant)
+            tuple[arr[int], arr[float], float]: (col indices, col weights, constant)
         """
         if is_num(lhs):
-            return [], [], lhs
+            return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.double), lhs
 
         elif isinstance(lhs, _NumVarImpl):
             col = self.solver_var(lhs)
-            return [col], [1], 0
+            return np.array([col], dtype=np.int32), np.array([1.0], dtype=np.double), 0.0
 
-        elif isinstance(lhs, Operator):  # sum or wsum
-
-            # accumulate weights per column (variable) index
-            acc = {}
-            const = 0
+        if isinstance(lhs, Operator):  # sum or wsum
+            acc: dict[int, float] = {}
+            const = 0.0
             if lhs.name == "sum":
                 for v in lhs.args:
                     if is_num(v):
@@ -183,7 +182,10 @@ class CPM_highs(SolverInterface):
                 raise NotImplementedError(f"HiGHS: unsupported operator {lhs}")
 
             idxs = [i for i in sorted(acc.keys()) if acc[i] != 0]
-            return idxs, [acc[i] for i in idxs], const
+            if not idxs:
+                return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.double), const
+            vals = [acc[i] for i in idxs]
+            return np.array(idxs, dtype=np.int32), np.array(vals, dtype=np.double), const
 
         raise NotImplementedError(f"HiGHS: unsupported linear expression {lhs}")
 
@@ -240,16 +242,14 @@ class CPM_highs(SolverInterface):
                         f"HiGHS: unexpected comparison operator after linearization: {con.name}"
                     )
 
-                indices_arr = np.array(indices, dtype=np.int32)
-                values_arr = np.array(values, dtype=np.double)
-                self.highs.addRow(lower, upper, len(indices), indices_arr, values_arr)
+                self.highs.addRow(lower, upper, len(indices), indices, values)
 
             elif isinstance(con, BoolVal):
                 if con.args[0] is False:
                     # add an always-infeasible row: 1 <= 0
-                    indices_arr = np.array([], dtype=np.int32)
-                    values_arr = np.array([], dtype=np.double)
-                    self.highs.addRow(1, 0, 0, indices_arr, values_arr)
+                    indices = np.empty(0, dtype=np.int32)
+                    values = np.empty(0, dtype=np.double)
+                    self.highs.addRow(1, 0, 0, indices, values)
 
             elif isinstance(con, DirectConstraint):
                 # delegate to user-provided function with native model
@@ -283,15 +283,15 @@ class CPM_highs(SolverInterface):
 
         self.add(safe_cons + decomp_cons + flat_cons)
 
-        indices, coeffs, const = self._row_from_linexpr(obj)
+        indices, values, const = self._row_from_linexpr(obj)
 
         # reset all costs to 0 and then apply objective coefficients
         ncol = self.highs.getNumCol()
         if ncol > 0:
             all_indices = np.arange(ncol, dtype=np.int32)
             costs = np.zeros(ncol, dtype=np.double)
-            for idx, c in zip(indices, coeffs):
-                costs[idx] = c
+            if len(indices):
+                costs[indices] = values
             self.highs.changeColsCost(ncol, all_indices, costs)
 
         self.highs.changeObjectiveOffset(const)
