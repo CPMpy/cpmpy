@@ -67,7 +67,7 @@ Supported solvers
      -
    * - :doc:`HiGHS <api/solvers/highs>`
      - ILP
-     - SAT - OPT
+     - SAT ISAT - OPT IOPT - PAR
      - pip
      - Open-source MIP solver (via `highspy`)
    * - :doc:`Gurobi <api/solvers/gurobi>`

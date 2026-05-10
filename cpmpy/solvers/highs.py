@@ -144,6 +144,24 @@ class CPM_highs(SolverInterface):
 
         return self._varmap[cpm_var]
 
+    def solver_vars_1d(self, cpm_vars):
+        """
+           Faster `solver_vars()` for 1 dimensional iterables of ExprLikes
+        """
+        res = []
+        for cpm_var in cpm_vars:
+            solver_var = self._varmap.get(cpm_var, None)
+            if solver_var is not None:
+                # fast path
+                res.append(solver_var)
+            elif isinstance(cpm_var, int):
+                # reasonably fast path
+                res.append(cpm_var)
+            else:
+                # slow path, will check the varmap again
+                res.append(self.solver_var(cpm_var))
+        return res
+
     def _row_from_linexpr(self, lhs) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
         """
         Convert a flat linear numeric expression (var/sum/wsum)
@@ -165,12 +183,12 @@ class CPM_highs(SolverInterface):
         elif isinstance(lhs, Operator):  # sum or wsum (vars only in operand lists)
             coeffs: npt.NDArray[np.float64]
             if lhs.name == "sum":
-                solvars = [self.solver_var(v) for v in lhs.args]
+                solvars = self.solver_vars_1d(lhs.args)
                 idx = np.array(solvars, dtype=np.int32)
                 coeffs = np.ones(idx.size, dtype=np.float64)
             elif lhs.name == "wsum":
                 ws, vs = lhs.args
-                solvars = [self.solver_var(v) for v in vs]
+                solvars = self.solver_vars_1d(vs)
                 idx = np.array(solvars, dtype=np.int32)
                 coeffs = np.asarray(ws, dtype=np.float64)
             else:
@@ -311,13 +329,18 @@ class CPM_highs(SolverInterface):
 
             Arguments:
             - time_limit: maximum solve time in seconds (float, optional)
-            - kwargs:     any keyword argument, mapped to HiGHS options via setOptionValue.
+            - kwargs:     any keyword argument, mapped to HiGHS options via ``setOptionValue``.
                           Unknown/invalid options are ignored with a warning.
+
+            Notable HiGHS options (see upstream option list):
+
+            - ``threads`` (int): number of threads; default ``0`` means automatic (parallelism enabled
+              according to HiGHS defaults).
         """
         import highspy
 
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        self.solver_vars_1d(self.user_vars)
 
         # edge case, empty model, ensure the solver has something to solve
         if not len(self.user_vars):
