@@ -20,7 +20,7 @@
     - https://ergo-code.github.io/HiGHS/dev/interfaces/python/
 """
 
-from typing import Optional, Union
+from typing import Optional
 
 import time
 import warnings
@@ -37,7 +37,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum
+from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum_const
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -161,31 +161,27 @@ class CPM_highs(SolverInterface):
             col = self.solver_var(lhs)
             return np.array([col], dtype=np.int32), np.array([1.0], dtype=np.double), 0.0
 
-        if isinstance(lhs, Operator):  # sum or wsum
-            acc: dict[int, float] = {}
-            const = 0.0
+        elif isinstance(lhs, Operator):  # sum or wsum (vars only in operand lists)
+            coeffs: npt.NDArray[np.float64]
             if lhs.name == "sum":
-                for v in lhs.args:
-                    if is_num(v):
-                        const += v
-                    else:
-                        col_idx = self.solver_var(v)
-                        acc[col_idx] = acc.get(col_idx, 0) + 1
+                solvars = [self.solver_var(v) for v in lhs.args]
+                idx = np.array(solvars, dtype=np.int32)
+                coeffs = np.ones(idx.size, dtype=np.float64)
             elif lhs.name == "wsum":
-                for w, v in zip(*lhs.args):
-                    if is_num(v):
-                        const += w * v
-                    else:
-                        col_idx = self.solver_var(v)
-                        acc[col_idx] = acc.get(col_idx, 0) + w
+                ws, vs = lhs.args
+                solvars = [self.solver_var(v) for v in vs]
+                idx = np.array(solvars, dtype=np.int32)
+                coeffs = np.asarray(ws, dtype=np.float64)
             else:
                 raise NotImplementedError(f"HiGHS: unsupported operator {lhs}")
 
-            idxs = [i for i in sorted(acc.keys()) if acc[i] != 0]
-            if not idxs:
-                return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.double), const
-            vals = [acc[i] for i in idxs]
-            return np.array(idxs, dtype=np.int32), np.array(vals, dtype=np.double), const
+            # if columns repeat, merge coefficients.
+            new_idx, group = np.unique(idx, return_inverse=True)
+            if new_idx.size == idx.size:
+                return idx, coeffs, 0.0
+            new_coeffs = np.bincount(group, weights=coeffs).astype(np.float64)
+            sel = new_coeffs != 0  # keep only the non-zero vars
+            return new_idx[sel], new_coeffs[sel], 0.0
 
         raise NotImplementedError(f"HiGHS: unsupported linear expression {lhs}")
 
@@ -279,11 +275,14 @@ class CPM_highs(SolverInterface):
             csemap=self._csemap,
         )
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj = only_positive_bv_wsum(obj)
+        # only_positive_bv_wsum_const keeps the constant separate so it never ends up
+        # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
+        obj, obj_const = only_positive_bv_wsum_const(obj)
 
         self.add(safe_cons + decomp_cons + flat_cons)
 
         indices, values, const = self._row_from_linexpr(obj)
+        const += obj_const
 
         # reset all costs to 0 and then apply objective coefficients
         ncol = self.highs.getNumCol()
