@@ -103,6 +103,7 @@ class CPM_highs(SolverInterface):
 
         self._inf = highspy.kHighsInf
         self._has_obj = False  # track whether an objective was posted
+        self._obj_col_indices = np.empty(0, dtype=np.int32)  # columns with nonzero cost
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
@@ -155,11 +156,11 @@ class CPM_highs(SolverInterface):
             tuple[arr[int], arr[float], float]: (col indices, col weights, constant)
         """
         if is_num(lhs):
-            return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.double), lhs
+            return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.float64), lhs
 
         elif isinstance(lhs, _NumVarImpl):
             col = self.solver_var(lhs)
-            return np.array([col], dtype=np.int32), np.array([1.0], dtype=np.double), 0.0
+            return np.array([col], dtype=np.int32), np.array([1.0], dtype=np.float64), 0.0
 
         elif isinstance(lhs, Operator):  # sum or wsum (vars only in operand lists)
             coeffs: npt.NDArray[np.float64]
@@ -175,10 +176,10 @@ class CPM_highs(SolverInterface):
             else:
                 raise NotImplementedError(f"HiGHS: unsupported operator {lhs}")
 
-            # if columns repeat, merge coefficients.
-            new_idx, group = np.unique(idx, return_inverse=True)
-            if new_idx.size == idx.size:
+            # if columns repeat, have to merge coefficients.
+            if len(set(solvars)) == len(solvars):
                 return idx, coeffs, 0.0
+            new_idx, group = np.unique(idx, return_inverse=True)
             new_coeffs = np.bincount(group, weights=coeffs).astype(np.float64)
             sel = new_coeffs != 0  # keep only the non-zero vars
             return new_idx[sel], new_coeffs[sel], 0.0
@@ -218,7 +219,8 @@ class CPM_highs(SolverInterface):
         for con in self.transform(cpm_expr):
             if isinstance(con, Comparison):
                 lhs, rhs = con.args
-                assert is_num(rhs), f"RHS of comparison should be numeric after transformations, got {rhs}"
+                if not is_num(rhs):
+                    raise AssertionError(f"RHS of comparison should be numeric after transformations, got {rhs}")
 
                 indices, values, const = self._row_from_linexpr(lhs)
                 # effective rhs: lhs_vars + const <op> rhs  =>  lhs_vars <op> rhs - const
@@ -244,8 +246,9 @@ class CPM_highs(SolverInterface):
                 if con.args[0] is False:
                     # add an always-infeasible row: 1 <= 0
                     indices = np.empty(0, dtype=np.int32)
-                    values = np.empty(0, dtype=np.double)
+                    values = np.empty(0, dtype=np.float64)
                     self.highs.addRow(1, 0, 0, indices, values)
+                # BoolVal(True) is a tautology; nothing to post
 
             elif isinstance(con, DirectConstraint):
                 # delegate to user-provided function with native model
@@ -284,14 +287,13 @@ class CPM_highs(SolverInterface):
         indices, values, const = self._row_from_linexpr(obj)
         const += obj_const
 
-        # reset all costs to 0 and then apply objective coefficients
-        ncol = self.highs.getNumCol()
-        if ncol > 0:
-            all_indices = np.arange(ncol, dtype=np.int32)
-            costs = np.zeros(ncol, dtype=np.double)
-            if len(indices):
-                costs[indices] = values
-            self.highs.changeColsCost(ncol, all_indices, costs)
+        # reset only columns that carried cost in the previous objective, then set new ones
+        if len(self._obj_col_indices):
+            zeros = np.zeros(len(self._obj_col_indices), dtype=np.float64)
+            self.highs.changeColsCost(len(self._obj_col_indices), self._obj_col_indices, zeros)
+        if len(indices):
+            self.highs.changeColsCost(len(indices), indices, values)
+        self._obj_col_indices = indices
 
         self.highs.changeObjectiveOffset(const)
 
@@ -385,7 +387,7 @@ class CPM_highs(SolverInterface):
         self.objective_value_ = None
         if has_sol:
             solution = self.highs.getSolution()
-            col_values = list(solution.col_value)
+            col_values = solution.col_value
             for cpm_var in self.user_vars:
                 if cpm_var not in self._varmap:
                     continue
