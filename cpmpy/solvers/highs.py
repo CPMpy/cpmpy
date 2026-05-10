@@ -70,8 +70,6 @@ class CPM_highs(SolverInterface):
             return True
         except ModuleNotFoundError:
             return False
-        except Exception as e:
-            raise e
 
     @classmethod
     def version(cls) -> Optional[str]:
@@ -324,11 +322,14 @@ class CPM_highs(SolverInterface):
         if not len(self.user_vars):
             self.add(intvar(1, 1) == 1)
 
-        # set time limit, if any
+        # time limit: omitting clears it so it does not carry over between solve() calls
         if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             self.highs.setOptionValue("time_limit", time_limit)
+        else:
+            # (re)set to no limit (for HiGHS: infinity)
+            self.highs.setOptionValue("time_limit", highspy.kHighsInf)
 
         # map additional kwargs to HiGHS options
         for key, val in kwargs.items():
