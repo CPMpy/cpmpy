@@ -133,7 +133,7 @@
 
 """
 import warnings
-from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
+from typing import Callable, cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
 
 import cpmpy as cp
@@ -871,9 +871,9 @@ class IfThenElse(GlobalConstraint):
             condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
         return [condition.implies(if_true), (~condition).implies(if_false)], []
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         condition, if_true, if_false = self.args
-        return "If {} Then {} Else {}".format(repr(condition), repr(if_true), repr(if_false))
+        return "If {} Then {} Else {}".format(str_func(condition), str_func(if_true), str_func(if_false))
 
     def negate(self) -> Expression:
         return IfThenElse(self.args[0], self.args[2], self.args[1])
@@ -929,9 +929,9 @@ class InDomain(GlobalConstraint):
             return None
         return bool(np.any(arr == exprval))
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         expr, arr = self.args
-        return "{} in {}".format(repr(expr), repr(arr))
+        return "{} in {}".format(str_func(expr), str_func(arr))
 
     def negate(self) -> Expression:
         expr, arr = self.args
@@ -1009,10 +1009,10 @@ class Xor(GlobalConstraint):
             return None
         return sum(arrvals) % 2 == 1
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         if len(self.args) == 2:
-            return "{} xor {}".format(repr(self.args[0]), repr(self.args[1]))
-        return "xor({})".format(repr(self.args))
+            return "{} xor {}".format(str_func(self.args[0]), str_func(self.args[1]))
+        return "xor({})".format(str_func(self.args))
 
     def negate(self) -> Expression:
         # negate one of the arguments, ideally a variable

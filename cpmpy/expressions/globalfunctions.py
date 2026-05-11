@@ -73,7 +73,7 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Optional, Iterable
+from typing import Any, Callable, Optional, Iterable
 import numpy as np
 import cpmpy as cp
 
@@ -379,13 +379,13 @@ class Multiplication(GlobalFunction):
         super().update_args((x, y))
         self.is_lhs_num = is_lhs_num
 
-    def __repr__(self):
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         x, y = self.args
 
         if self.is_lhs_num:
-            return "{} * ({})".format(repr(x), repr(y))
+            return "{} * ({})".format(str_func(x), str_func(y))
 
-        return "({}) * ({})".format(repr(x), repr(y))
+        return "({}) * ({})".format(str_func(x), str_func(y))
 
     def __neg__(self):
         """-(c*x) -> (-c)*x when constant c is first (.is_lhs_num)."""
@@ -481,14 +481,14 @@ class Division(GlobalFunction):
         """
         super().__init__("div", (x, y))
 
-    def __repr__(self):
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         """
         Returns:
             str: String representation of integer division as 'x div y'
         """
         x,y = self.args
-        return "{} div {}".format(f"({repr(x)})" if isinstance(x, Expression) else repr(x),
-                                  f"({repr(y)})" if isinstance(y, Expression) else repr(y))
+        return "{} div {}".format(f"({str_func(x)})" if isinstance(x, Expression) else str_func(x),
+                                  f"({str_func(y)})" if isinstance(y, Expression) else str_func(y))
 
     def decompose(self):
         """
@@ -576,14 +576,14 @@ class Modulo(GlobalFunction):
         """
         super().__init__("mod", (x, y))
 
-    def __repr__(self):
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         """
         Returns:
             str: String representation with 'mod' as notation
         """
         x,y = self.args
-        return "{} mod {}".format(f"({repr(x)})" if isinstance(x, Expression) else repr(x),
-                                  f"({repr(y)})" if isinstance(y, Expression) else repr(y))
+        return "{} mod {}".format(f"({str_func(x)})" if isinstance(x, Expression) else str_func(x),
+                                  f"({str_func(y)})" if isinstance(y, Expression) else str_func(y))
 
     def decompose(self):
         """
@@ -814,14 +814,19 @@ class Element(GlobalFunction):
         bnds = [get_bounds(x) for x in arr]
         return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         """
         Custom string representation of the Element global function in 'Arr[Idx]' format.
 
         Returns:
             str: String representation of the Element global function.
         """
-        return f"{repr(self.args[0])}[{repr(self.args[1])}]"
+        arr, idx = self.args
+        if isinstance(arr, np.ndarray):
+            str_arr = str_func(arr.tolist()) # overkill, also converts np int to Python int
+        else:
+            str_arr = str_func(arr)
+        return f"{str_arr}[{str_func(idx)}]"
 
 def element(arg_list):
     """
