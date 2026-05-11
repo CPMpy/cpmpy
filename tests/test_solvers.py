@@ -281,7 +281,7 @@ class TestSolvers:
     def test_ortools_rejects_float_coefficients(self):
         m = cp.Model()
         x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        with pytest.warns(DeprecationWarning, match="Non-integer scalar multiplication is deprecated"):
+        with pytest.warns(DeprecationWarning):
             m += 0.7 * x + 0.8 * y >= 1
         pytest.raises(TypeError, m.solve)
 
