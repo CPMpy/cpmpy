@@ -41,16 +41,16 @@ from cpmpy.transformations.linearize import (
     linearize_constraint,
     only_positive_bv_wsum,
 )
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.expressions.variables import _IntVarImpl, NegBoolView, _BoolVarImpl
+from cpmpy.expressions.variables import _IntVarImpl, NegBoolView, _BoolVarImpl, allow_reserved_var_names
 from cpmpy.expressions.core import Operator, Comparison
 from cpmpy.expressions.utils import is_num
-from cpmpy import __version__
 
 # Regular expressions
 HEADER_RE = re.compile(r'(.*)\s*#variable=\s*(\d+)\s*#constraint=\s*(\d+).*')
-TERM_RE = re.compile(r"([+-]?\d+)((?:\s+~?x\d+)+)")
+TERM_RE = re.compile(r"([+-])\s*((?:(?:\d+\s+)?~?[^\s;]+(?:\s+~?[^\s;]+)*))(?=\s+[+-]|$)")
 OBJ_TERM_RE = re.compile(r'^min:')
 IND_TERM_RE = re.compile(r'([>=|<=|=]+)\s+([+-]?\d+)')
 IND_TERM_RE = re.compile(r'(>=|<=|=)\s*([+-]?\d+)')
@@ -78,20 +78,52 @@ def _parse_term(line, vars):
     """
 
     terms = []
-    for w, vars_str in TERM_RE.findall(line):
-        factors = []
+    text = line.strip()
+    # Keep only the expression fragment for objective/constraint lines.
+    if ":" in text:
+        text = text.split(":", 1)[1]
+    text = text.replace(";", " ").strip()
+    if not text:
+        raise ValueError(f"Could not parse OPB term from empty line: {line}")
 
-        for v in vars_str.split():
-            if v.startswith("~x"):
-                idx = int(v[2:]) - 1 # remove "~x" and opb is 1-based indexing
-                factors.append(~vars[idx])
-            else:
-                idx = int(v[1:]) - 1 # remove "x" and opb is 1-based indexing
-                factors.append(vars[idx])
+    # OPB allows first term without an explicit sign. Normalize by prepending '+'
+    # and then parse term-by-term using TERM_RE.
+    if text and text[0] not in "+-":
+        text = "+ " + text
+
+    parsed_terms = TERM_RE.findall(text)
+    if not parsed_terms:
+        raise ValueError(f"Could not parse any OPB terms from line: {line}")
+
+    for sign_tok, body in parsed_terms:
+        parts = body.split()
+        if not parts:
+            raise ValueError(f"Missing variable token in OPB term: {line}")
+
+        coeff = 1
+        # Support unsigned/signed integer coefficients. Unsigned is interpreted as '+'.
+        if parts[0].lstrip("+-").isdigit():
+            coeff = int(parts[0])
+            parts = parts[1:]
+        if not parts:
+            raise ValueError(f"Missing variable token in OPB term: {line}")
+
+        factors = []
+        for tok in parts:
+            neg = tok.startswith("~")
+            var_name = tok[1:] if neg else tok
+            if var_name not in vars:
+                # OPB annotations may contain reserved prefixes (IV*/BV*); accept them while parsing.
+                with allow_reserved_var_names():
+                    vars[var_name] = cp.boolvar(name=var_name)
+            factors.append(~vars[var_name] if neg else vars[var_name])
         
-        term = int(w) * reduce(mul, factors, 1) # create weighted term
+        weight = -coeff if sign_tok == "-" else coeff
+        term = weight * reduce(mul, factors, 1) # create weighted term
         terms.append(term)
 
+    if len(terms) == 0:
+        raise ValueError(f"Could not parse any OPB terms from line: {line}")
     return cp.sum(terms)
 
 def _parse_constraint(line, vars):
@@ -111,10 +143,13 @@ def _parse_constraint(line, vars):
         sum([-1, -1] * [(IV1*IV14), (IV1*~IV17)]) >= -1
     """
 
-    op, ind_term = IND_TERM_RE.search(line).groups()
-    lhs = _parse_term(line, vars)
+    match = IND_TERM_RE.search(line)
+    if match is None:
+        raise ValueError(f"Could not parse OPB comparator/rhs from line: {line}")
+    op, ind_term = match.groups()
+    lhs = _parse_term(line[:match.start()], vars)
 
-    rhs = int(ind_term) if ind_term.lstrip("+-").isdigit() else vars[int(ind_term)]
+    rhs = int(ind_term) if ind_term.lstrip("+-").isdigit() else vars[ind_term]
 
     return cp.expressions.core.Comparison(
         name="==" if op == "=" else ">=",
@@ -179,15 +214,13 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
         header = HEADER_RE.match(_line)
         if not header:
             raise ValueError(f"Missing or incorrect header: \n0: {line}1: {_line}2: ...")
-    nr_vars = int(header.group(2))
+    nr_vars_declared = int(header.group(2))
 
     # Generator without comment lines
-    reader = (l for l in map(str.strip, f) if l and l[0] != '*')
+    reader = (line_text for line_text in map(str.strip, f) if line_text and line_text[0] != '*')
 
     # CPMpy objects
-    vars = cp.boolvar(shape=nr_vars, name="x")
-    if nr_vars == 1:
-        vars = cp.cpm_array([vars]) # ensure vars is indexable even for single variable case
+    vars = {}
     model = cp.Model()
     
     # Special case for first line -> might contain objective function
@@ -201,6 +234,13 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
     # Start parsing line by line
     for line in reader:
         model.add(_parse_constraint(line, vars))
+
+    if len(vars) > nr_vars_declared:
+        import warnings
+        warnings.warn(
+            f"Header declares {nr_vars_declared} variables but found {len(vars)} unique variables while parsing",
+            stacklevel=2,
+        )
 
     return model
 
@@ -247,7 +287,7 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None, annota
         >>> print(write_opb(m))
     """
 
-    csemap, ivarmap = dict(), dict()
+    csemap, ivarmap = CSEMap(), dict()
     opb_cons = _transform(model.constraints, csemap, ivarmap, encoding)
 
     if model.objective_ is not None:
