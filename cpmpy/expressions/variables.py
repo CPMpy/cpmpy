@@ -62,6 +62,7 @@ from collections.abc import Iterable
 import warnings # for deprecation warning
 from functools import reduce
 from typing import Any, Literal, Optional, overload
+from contextlib import contextmanager
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
@@ -71,6 +72,23 @@ from .utils import is_num, is_int, is_boolexpr, get_bounds
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
 _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
+_ALLOW_RESERVED_NAMES = False
+
+
+@contextmanager
+def allow_reserved_var_names():
+    """
+    Temporarily allow names starting with reserved internal prefixes (``IV``/``BV``).
+
+    Useful for parsers that need to ingest external formats containing such names.
+    """
+    global _ALLOW_RESERVED_NAMES
+    prev = _ALLOW_RESERVED_NAMES
+    _ALLOW_RESERVED_NAMES = True
+    try:
+        yield
+    finally:
+        _ALLOW_RESERVED_NAMES = prev
 
 def BoolVar(shape=1, name=None):
     """
@@ -830,9 +848,6 @@ def _genname(basename: Optional[str], idxs: tuple[int|np.integer, ...]) -> Optio
     stridxs = ",".join(map(str, idxs))
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
 
-def _is_invalid_name(name: Any) -> bool:
-    if isinstance(name, str):
-        return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
-    # rest invalid indeed
-    return True
+def _is_invalid_name(name):
+    return (not _ALLOW_RESERVED_NAMES) and (name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX))
 
