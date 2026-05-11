@@ -66,7 +66,7 @@
         Modulo
         Power
         Element
-        MultiDimElement
+        NDElement
         Count
         Among
         NValue
@@ -81,7 +81,7 @@ import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import intvar, NDVarArray, NDVarArray, _NumVarImpl, BoolVal
+from .variables import cpm_array, intvar, NDVarArray, NDVarArray, _NumVarImpl, BoolVal
 from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
@@ -725,7 +725,7 @@ class Element(GlobalFunction):
 
     Note: because Element is a numeric global function, the return type of the `Element` function
     is always numeric, even if `Arr` only contains Boolean variables.
-    Element only supports 1D arrays; use MultiDimElement for multi-dimensional indexing.
+    Element only supports 1D arrays; use NDElement for multi-dimensional indexing.
     """
 
     def __init__(self, arr: ListLike[ExprLike], idx: ExprLike):
@@ -740,12 +740,12 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
         if isinstance(arr, NDVarArray):
             if arr.ndim != 1:
-                raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
+                raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         elif isinstance(arr, np.ndarray):
             if arr.ndim != 1:
-                raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
+                raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         elif is_any_list(arr) and any(is_any_list(el) for el in arr):
-            raise TypeError("Element only supports 1D arrays. Use MultiDimElement for multi-dimensional arrays.")
+            raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         assert len(arr) > 0, "Element: array should not be empty"
 
         super().__init__("element", (arr, idx))
@@ -835,9 +835,9 @@ class Element(GlobalFunction):
         return f"{self.args[0]}[{self.args[1]}]"
 
 
-class MultiDimElement(GlobalFunction):
+class NDElement(GlobalFunction):
     """
-    The `MultiDimElement(Arr, Indices)` global function allows indexing into a multi-dimensional array
+    The `NDElement(Arr, Indices)` global function allows indexing into a multi-dimensional array
     with multiple decision variables.
     """
 
@@ -848,9 +848,9 @@ class MultiDimElement(GlobalFunction):
             indices (ListLike[ExprLike]): Integer expressions or constants for each dimension index
         """
         if not is_any_list(indices):
-            raise TypeError(f"MultiDimElement(arr, indices) takes a list of index expressions, not: {indices}")
+            raise TypeError(f"NDElement(arr, indices) takes a list of index expressions, not: {indices}")
         if any(is_boolexpr(idx) for idx in indices):
-            raise TypeError("MultiDimElement(arr, indices) takes integer expressions as indices, not boolean expressions")
+            raise TypeError("NDElement(arr, indices) takes integer expressions as indices, not boolean expressions")
 
         if isinstance(arr, NDVarArray):
             arr = arr
@@ -858,11 +858,11 @@ class MultiDimElement(GlobalFunction):
             arr = cpm_array(arr)
 
         if arr.ndim <= 1:
-            raise TypeError("MultiDimElement only supports multi-dimensional arrays. Use Element for 1D arrays.")
+            raise TypeError("NDElement only supports multi-dimensional arrays. Use cpmpy.globalfunctions.Element for 1D arrays.")
         if len(indices) != arr.ndim:
-            raise ValueError(f"MultiDimElement expects {arr.ndim} indices, got {len(indices)}")
+            raise ValueError(f"NDElement expects {arr.ndim} indices, got {len(indices)}")
 
-        super().__init__("multidim_element", (arr, *tuple(indices)))
+        super().__init__("nd_element", (arr, *tuple(indices)))
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
@@ -884,24 +884,9 @@ class MultiDimElement(GlobalFunction):
                 )
         return argval(arr[tuple(vidxs)])
 
-    def _flat_index(self, shape, indices):
-        """Linear index into ``arr.reshape(-1)`` (NumPy C-order).
-
-        Arguments:
-            shape (tuple[int, ...]): ``arr.shape``.
-            indices (tuple): One index expression per axis, same order as ``shape``.
-
-        Returns:
-            Expression or int: flat index for 1-D ``Element``.
-        """
-        flat_index = indices[-1]
-        for dim, idx in enumerate(indices[:-1]):
-            flat_index += idx * math.prod(shape[dim + 1 :])  # stride on dim: flat offset per +1 (product of later axis sizes)
-        return flat_index
-
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
-        Decomposition of MultiDimElement global function.
+        Decomposition of NDElement global function.
 
         Rewritten as 1-D Element with a linear index into the flattened array.
 
@@ -909,7 +894,9 @@ class MultiDimElement(GlobalFunction):
             tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
         """
         arr, *indices = self.args
-        flat_index = self._flat_index(arr.shape, indices)
+        flat_index = indices[-1]
+        for dim, idx in enumerate(indices[:-1]):
+            flat_index += idx * math.prod(arr.shape[dim + 1 :])  # stride on dim: flat offset per +1 (product of later axis sizes)
         return Element(arr.reshape(-1), flat_index), []
 
     def get_bounds(self) -> tuple[int, int]:
@@ -925,10 +912,10 @@ class MultiDimElement(GlobalFunction):
 
     def __repr__(self) -> str:
         """
-        Custom string representation of the MultiDimElement global function in 'Arr[i0, i1, ...]' format.
+        Custom string representation of the NDElement global function in 'Arr[i0, i1, ...]' format.
 
         Returns:
-            str: String representation of the MultiDimElement global function.
+            str: String representation of the NDElement global function.
         """
         arr, *indices = self.args
         idx_repr = ", ".join(str(i) for i in indices)
