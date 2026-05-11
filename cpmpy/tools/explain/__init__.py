@@ -39,6 +39,7 @@ from .utils import OCUSException, make_assump_model
 
 __all__ = [
     "OCUSException",
+    "make_assump_model",
     "marco",
     "mcs",
     "mcs_grow",
@@ -58,5 +59,4 @@ __all__ = [
     "quickxplain",
     "quickxplain_naive",
     "smus",
-    "make_assump_model"
 ]
