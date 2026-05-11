@@ -79,7 +79,7 @@ import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
+from .variables import cpm_array, intvar, NDVarArray, _NumVarImpl, BoolVal
 from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
@@ -383,9 +383,9 @@ class Multiplication(GlobalFunction):
         x, y = self.args
 
         if self.is_lhs_num:
-            return "{} * ({})".format(x, y)
+            return "{} * ({})".format(repr(x), repr(y))
 
-        return "({}) * ({})".format(x, y)
+        return "({}) * ({})".format(repr(x), repr(y))
 
     def __neg__(self):
         """-(c*x) -> (-c)*x when constant c is first (.is_lhs_num)."""
@@ -487,8 +487,8 @@ class Division(GlobalFunction):
             str: String representation of integer division as 'x div y'
         """
         x,y = self.args
-        return "{} div {}".format(f"({x})" if isinstance(x, Expression) else x,
-                                  f"({y})" if isinstance(y, Expression) else y)
+        return "{} div {}".format(f"({repr(x)})" if isinstance(x, Expression) else repr(x),
+                                  f"({repr(y)})" if isinstance(y, Expression) else repr(y))
 
     def decompose(self):
         """
@@ -582,8 +582,8 @@ class Modulo(GlobalFunction):
             str: String representation with 'mod' as notation
         """
         x,y = self.args
-        return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
-                                  f"({y})" if isinstance(y, Expression) else y)
+        return "{} mod {}".format(f"({repr(x)})" if isinstance(x, Expression) else repr(x),
+                                  f"({repr(y)})" if isinstance(y, Expression) else repr(y))
 
     def decompose(self):
         """
@@ -821,7 +821,7 @@ class Element(GlobalFunction):
         Returns:
             str: String representation of the Element global function.
         """
-        return f"{self.args[0]}[{self.args[1]}]"
+        return f"{repr(self.args[0])}[{repr(self.args[1])}]"
 
 def element(arg_list):
     """
@@ -853,6 +853,7 @@ class Count(GlobalFunction):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
+        arr = cpm_array(arr)
         super().__init__("count", (arr, val))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:

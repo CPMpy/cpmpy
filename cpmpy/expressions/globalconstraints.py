@@ -873,7 +873,7 @@ class IfThenElse(GlobalConstraint):
 
     def __repr__(self) -> str:
         condition, if_true, if_false = self.args
-        return "If {} Then {} Else {}".format(condition, if_true, if_false)
+        return "If {} Then {} Else {}".format(repr(condition), repr(if_true), repr(if_false))
 
     def negate(self) -> Expression:
         return IfThenElse(self.args[0], self.args[2], self.args[1])
@@ -931,7 +931,7 @@ class InDomain(GlobalConstraint):
 
     def __repr__(self) -> str:
         expr, arr = self.args
-        return "{} in {}".format(expr, arr)
+        return "{} in {}".format(repr(expr), repr(arr))
 
     def negate(self) -> Expression:
         expr, arr = self.args
@@ -1011,8 +1011,8 @@ class Xor(GlobalConstraint):
 
     def __repr__(self) -> str:
         if len(self.args) == 2:
-            return "{} xor {}".format(*self.args)
-        return "xor({})".format(self.args)
+            return "{} xor {}".format(repr(self.args[0]), repr(self.args[1]))
+        return "xor({})".format(repr(self.args))
 
     def negate(self) -> Expression:
         # negate one of the arguments, ideally a variable

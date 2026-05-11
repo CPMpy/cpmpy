@@ -449,10 +449,10 @@ class TestBounds:
 
         a,b = cp.boolvar(name="a"), cp.boolvar(name="b")
         cons = a | b
-        cons.set_description("either a or b should be true, but not both")
+        cons.set_description("either a or b should be true")
 
         assert repr(cons) == "(a) or (b)"
-        assert str(cons) == "either a or b should be true, but not both"
+        assert str(cons) == "either a or b should be true"
 
         # ensure nothing goes wrong due to calling __str__ on a constraint with a custom description
         for solver,cls in cp.SolverLookup.base_solvers():
@@ -465,18 +465,33 @@ class TestBounds:
 
         ## test extra attributes of set_description
         cons = a | b
-        cons.set_description("either a or b should be true, but not both",
+        cons.set_description("either a or b should be true",
                              override_print=False)
 
         assert repr(cons) == "(a) or (b)"
         assert str(cons) == "(a) or (b)"
 
         cons = a | b
-        cons.set_description("either a or b should be true, but not both",
+        cons.set_description("either a or b should be true",
                              full_print=True)
 
         assert repr(cons) == "(a) or (b)"
-        assert str(cons) == "either a or b should be true, but not both -- (a) or (b)"
+        assert str(cons) == "either a or b should be true -- (a) or (b)"
+
+    def test_nested_description(self):
+
+        a = cp.boolvar(name="a")
+        b = cp.boolvar(name="b")
+        c = cp.boolvar(name="c")
+        cons = a | b
+        cons.set_description("either a or b should be true")
+        assert repr(cons) == "(a) or (b)"
+        assert str(cons) == "either a or b should be true"
+
+        cons2 = c.implies(cons)
+        
+        assert repr(cons2) == "(c) -> ((a) or (b))" # don't use description of nested expression
+        assert str(cons2) ==  "(c) -> ((a) or (b))" # don't use description of nested expression -- TODO: should we use description in str()?
 
 
     def test_dtype(self):

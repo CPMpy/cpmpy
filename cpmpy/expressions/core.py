@@ -183,10 +183,10 @@ class Expression(object):
         for arg in self.args:
             if isinstance(arg, np.ndarray):
                 # flatten
-                strarg = ",".join(map(str, arg.flat))
+                strarg = ", ".join(map(repr, arg.flat))
                 strargs.append(f"[{strarg}]")
             else:
-                strargs.append(f"{arg}")
+                strargs.append(repr(arg)) # repr() to ensure proper representation when description is set to arg
         return "{}({})".format(self.name, ",".join(strargs))
 
     def __hash__(self) -> int:
@@ -614,9 +614,9 @@ class Comparison(Expression):
 
     def __repr__(self) -> str:
         if all(isinstance(x, Expression) for x in self.args):
-            return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
+            return "({}) {} ({})".format(repr(self.args[0]), self.name, repr(self.args[1])) 
         # if not: prettier printing without braces
-        return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+        return "{} {} {}".format(repr(self.args[0]), self.name, repr(self.args[1])) 
     
     def __bool__(self) -> bool:
         # will be called when comparing elements in a container, but always with `==`
@@ -733,22 +733,22 @@ class Operator(Expression):
 
         # special cases
         if self.name == '-': # unary -
-            return "-({})".format(self.args[0])
+            return "-({})".format(repr(self.args[0]))
 
         # weighted sum
         if self.name == 'wsum':
-            return f"sum({self.args[0]} * {self.args[1]})"
+            return f"sum({self.args[0]} * {repr(self.args[1])})"
 
         if len(self.args) == 1:
-            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 omitted in print
+            return "{}({})".format(self.name, repr(self.args[0]))  # tuple of size 1 omitted in print
         elif len(self.args) == 2:  # infix printing of two arguments
             printname = Operator.printmap.get(self.name, self.name) # default to self.name if not in printmap
             arg0, arg1 = self.args
-            str_arg0 = f"({arg0})" if isinstance(arg0, Expression) else str(arg0)
-            str_arg1 = f"({arg1})" if isinstance(arg1, Expression) else str(arg1)
+            str_arg0 = f"({repr(arg0)})" if isinstance(arg0, Expression) else str(arg0)
+            str_arg1 = f"({repr(arg1)})" if isinstance(arg1, Expression) else str(arg1)
             return f"{str_arg0} {printname} {str_arg1}"
         else:  # n-ary
-            return "{}{}".format(self.name, self.args)  # args is a tuple, will be in ()
+            return "{}{}".format(self.name, repr(self.args))  # args is a tuple, will be in ()
 
     def value(self) -> Optional[int]:
         """
