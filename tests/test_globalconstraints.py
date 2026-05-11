@@ -816,10 +816,9 @@ class TestGlobal:
 
         expected = {
             # safening constraints
-            "(BV0) == ((x >= 0) and (x <= 2))",
-            "(BV0) -> ((IV0) == (x))",
-            "(~BV0) -> (IV0 == 0)",
-            "BV0",
+            "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
+            "(not((x >= 0) and (x <= 2))) -> (IV0 == 0)",
+            "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
             '(IV0 == 1) -> (IV1 == 1)',
@@ -882,12 +881,12 @@ class TestGlobal:
         assert all_sols == decomp_sols# same on decision vars
         assert count == decomp_count# same on all vars
 
-    def test_xor(self):
+    def test_xor(self, solver):
         bv = cp.boolvar(5)
-        assert cp.Model(cp.Xor(bv)).solve()
+        assert cp.Model(cp.Xor(bv)).solve(solver=solver)
         assert cp.Xor(bv).value()
 
-    def test_xor_with_constants(self):
+    def test_xor_with_constants(self, solver):
 
         bvs = cp.boolvar(shape=3)
 
@@ -902,17 +901,18 @@ class TestGlobal:
             expr = cp.Xor(args)
             model = cp.Model(expr)
 
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
             # also check with decomposition
             model = cp.Model(expr.decompose())
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
         # edge case with False constants
-        assert not cp.Model(cp.Xor([False, False])).solve()
-        assert not cp.Model(cp.Xor([False, False, False])).solve()
+        assert not cp.Model(cp.Xor([False, False])).solve(solver=solver)
+        assert not cp.Model(cp.Xor([False, False, False])).solve(solver=solver)
+        assert cp.Model(cp.Xor([False, True, False])).solve(solver=solver)
 
     def test_ite_with_constants(self):
         x,y,z = cp.boolvar(shape=3)
@@ -985,6 +985,11 @@ class TestGlobal:
         capacity = 1
         m += cp.Cumulative(start, duration, end, demand, capacity)
         assert m.solve()
+
+    def test_cumulative_subexpr(self):
+        start = cp.intvar(0,10, shape=3)
+        cons = cp.Cumulative(start+start, [1,2,3], None, [1,2,3], 3)
+        assert cp.Model(cons).solve() is True
 
     def test_cumulative_decomposition_capacity(self):
         import numpy as np

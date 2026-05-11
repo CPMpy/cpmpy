@@ -43,6 +43,7 @@ List of solver submodules
     cplex
     hexaly
     rc2
+    scip
 
 =========================
 List of helper submodules
@@ -78,6 +79,7 @@ from .pumpkin import CPM_pumpkin
 from .cplex import CPM_cplex
 from .hexaly import CPM_hexaly
 from .rc2 import CPM_rc2
+from .scip import CPM_scip
 
 __all__ = [
     "CPM_choco",
@@ -94,6 +96,7 @@ __all__ = [
     "CPM_pysat",
     "CPM_pysdd",
     "CPM_rc2",
+    "CPM_scip",
     "CPM_z3",
     "SolverLookup",
     "param_combinations",

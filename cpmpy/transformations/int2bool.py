@@ -50,7 +50,7 @@ def _encode_expr(ivarmap, expr, encoding, csemap=None):
         p, consequent = expr.args
         constraints, domain_constraints = _encode_expr(ivarmap, consequent, encoding, csemap=csemap)
         return (
-            [p.implies(constraint) for constraint in constraints],
+            [p.implies(constraint, simplify=True) for constraint in constraints],
             domain_constraints,
         )
     elif isinstance(expr, Comparison):
@@ -355,7 +355,7 @@ class IntVarEncOrder(IntVarEnc):
         if len(self._xs) <= 1:
             return []
         # Encode implication chain `x>=d -> x>=d-1` (using `zip` to create a sliding window)
-        return [curr.implies(prev) for prev, curr in zip(self._xs, self._xs[1:])]
+        return [curr.implies(prev, simplify=True) for prev, curr in zip(self._xs, self._xs[1:])]
 
     def _offset(self, d):
         return d - self._x.lb - 1

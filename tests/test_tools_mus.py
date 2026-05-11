@@ -89,6 +89,23 @@ class TestNativeMusExact(TestMus):
         self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver="exact")
         self.naive_func = mus_naive
 
+    def test_decomposed_global(self):
+        x = cp.intvar(1, 5, shape=3, name="x")
+        soft = [x[0] == x[1], x[1] == x[2]]
+        hard = [cp.AllDifferent(x)]
+
+        mus_cons = self.mus_func(soft=soft, hard=hard)
+        assert len(set(mus_cons)) == 1
+        mus_naive_cons = self.naive_func(soft=soft, hard=hard)
+        assert len(set(mus_naive_cons)) == 1
+
+
+@pytest.mark.requires_solver("gurobi")
+class TestNativeMusGurobi(TestMus):
+    def setup_method(self):
+        self.mus_func = lambda soft, hard=[], solver="gurobi": mus_native(soft, hard=hard, solver="gurobi")
+        self.naive_func = mus_naive
+
 
 class TestQuickXplain(TestMus):
 
