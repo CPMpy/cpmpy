@@ -74,8 +74,16 @@ def solution_opb(model):
         Returns:
             Formatted model solution according to PB24 specification.
     """
-    variables = [var for var in model.user_vars if var.name[:2] not in ["IV", "BV", "B#"]] # dirty workaround for all missed aux vars in user vars TODO fix with Ignace
-    return " ".join([var.name.replace("[","").replace("]","") if var.value() else "-"+var.name.replace("[","").replace("]","") for var in variables])
+    variables = [
+        var for var in model.user_vars
+        if var.name[:2] not in ["IV", "BV", "B#"]
+        and not var.name.lstrip("+-").isdigit()  # skip OPB constant literals (+1, -1)
+    ]
+    return " ".join([
+        var.name.replace("[","").replace("]","") if var.value()
+        else "-" + var.name.replace("[","").replace("]","")
+        for var in variables
+    ])
 
 class OPBBenchmark(Benchmark):
     """
