@@ -103,7 +103,7 @@ class CPM_minizinc(SolverInterface):
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
                                               "precedence", "no_overlap",
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "multid_element"})
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "nd_element"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
 
     required_version = (2, 8, 2)
@@ -820,7 +820,7 @@ class CPM_minizinc(SolverInterface):
                                                                                              args_str[0])
             txt += f"      arr[{idx}]"
             return txt
-        elif expr.name == "multid_element":
+        elif expr.name == "nd_element":
             arr = expr.args[0]
             subtype = "int"
             if all(isinstance(v, bool) or \
