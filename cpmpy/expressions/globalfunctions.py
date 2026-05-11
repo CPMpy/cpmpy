@@ -738,7 +738,7 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
-        if isinstance(arr, NDVarArray):
+        if isinstance(arr, np.ndarray):
             if arr.ndim != 1:
                 raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         elif isinstance(arr, np.ndarray):
@@ -759,6 +759,8 @@ class Element(GlobalFunction):
             Optional[int]: The value of the array element at the given index, or None if the index is not assigned or the array element is not assigned
         """
         arr, idx = self.args
+        if any(argval(v) is None for v in arr):
+            return None
         vidx = argval(idx)
         if vidx is None:
             return None
@@ -873,6 +875,8 @@ class NDElement(GlobalFunction):
             Optional[int]: The value of the array element at the given indices, or None if any index is not assigned or the array element is not assigned
         """
         arr, *indices = self.args
+        if any(argval(v) is None for v in arr.flat):
+            return None
         vidxs = [argval(idx) for idx in indices]
         if any(v is None for v in vidxs):
             return None
@@ -889,6 +893,10 @@ class NDElement(GlobalFunction):
         Decomposition of NDElement global function.
 
         Rewritten as 1-D Element with a linear index into the flattened array.
+        Example: ``arr = [[10, 20, 30], [40, 50, 60]]`` and indices ``(1, 2)``
+        gives ``arr[1, 2] == 60``. After Decomposing to 1-D Element, ``arr.reshape(-1)`` is
+        ``[10, 20, 30, 40, 50, 60]`` and the linear index is ``1*3 + 2 = 5``,
+        so this becomes ``Element(arr.reshape(-1), 5) == 60``.
 
         Returns:
             tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
