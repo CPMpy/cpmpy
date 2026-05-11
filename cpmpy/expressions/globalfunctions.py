@@ -358,19 +358,11 @@ class Multiplication(GlobalFunction):
         is_lhs_num = False
         if is_num(x):
             if not is_int(x):
-                warnings.warn(
-                    "Non-integer scalar multiplication is deprecated and will become an error in a future release. "
-                    "Use FloatSum(coeffs, terms) for float-weight objectives.",
-                    DeprecationWarning,
-                )
+                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             is_lhs_num = True
         elif is_num(y):
             if not is_int(y):
-                warnings.warn(
-                    "Non-integer scalar multiplication is deprecated and will become an error in a future release. "
-                    "Use FloatSum(coeffs, terms) for float-weight objectives.",
-                    DeprecationWarning,
-                )
+                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             (x, y) = (y, x)
             is_lhs_num = True
 
@@ -385,19 +377,11 @@ class Multiplication(GlobalFunction):
         is_lhs_num = False
         if is_num(x):
             if not is_int(x):
-                warnings.warn(
-                    "Non-integer scalar multiplication is deprecated and will become an error in a future release. "
-                    "Use FloatSum(coeffs, terms) for float-weight objectives.",
-                    DeprecationWarning,
-                )
+                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             is_lhs_num = True
         elif is_num(y):
             if not is_int(y):
-                warnings.warn(
-                    "Non-integer scalar multiplication is deprecated and will become an error in a future release. "
-                    "Use FloatSum(coeffs, terms) for float-weight objectives.",
-                    DeprecationWarning,
-                )
+                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             (x, y) = (y, x)
             is_lhs_num = True
 
