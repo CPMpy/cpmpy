@@ -35,7 +35,7 @@ from .mus import (
     quickxplain_naive,
     smus,
 )
-from .utils import OCUSException
+from .utils import OCUSException, make_assump_model
 
 __all__ = [
     "OCUSException",
@@ -58,4 +58,5 @@ __all__ = [
     "quickxplain",
     "quickxplain_naive",
     "smus",
+    "make_assump_model"
 ]
