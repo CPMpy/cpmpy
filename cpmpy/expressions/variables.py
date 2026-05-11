@@ -65,7 +65,7 @@ from typing import Any, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
-from .core import Expression, ExprLike, ListLike, BoolVal
+from .core import Expression, ExprLike, BoolExprLike, ListLike, BoolVal
 from .utils import is_num, is_int, is_boolexpr, get_bounds
 
 _BV_PREFIX = "BV"
@@ -773,7 +773,7 @@ class NDVarArray(np.ndarray):
     def __rxor__(self, other):
         return self._vectorized(other, '__rxor__')
 
-    def implies(self, other: ExprLike|Iterable[ExprLike], simplify=False) -> NDVarArray:
+    def implies(self, other: BoolExprLike|Iterable[BoolExprLike], simplify=False) -> NDVarArray:
         if not isinstance(other, Iterable):
             other = [other] * len(self)
         return cpm_array([s.implies(o, simplify=simplify) for s, o in zip(self, other)])
