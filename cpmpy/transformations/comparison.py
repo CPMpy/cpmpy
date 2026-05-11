@@ -44,14 +44,14 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
             new_arg, new_cons = _rewrite_comparison(cpm_expr.args[idx], supported=supported,csemap=csemap)
             if new_arg is not cpm_expr.args[idx]: # changed
                 cpm_expr = copy.copy(cpm_expr) # shallow copy
-                cpm_expr.args[idx] = new_arg                
-                cpm_expr.update_args(cpm_expr.args) # XXX redundant? we know it's flat so no subexprs anyway
+                args = list(cpm_expr.args)
+                args[idx] = new_arg                
+                cpm_expr.update_args(args) # XXX redundant? we know it's flat so no subexprs anyway
             
             newlist += [cpm_expr] + new_cons
 
             
         elif isinstance(cpm_expr, Comparison):
-
             lhs, rhs = cpm_expr.args
             if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
                 if not isinstance(lhs, _BoolVarImpl):  # expr == bv
@@ -66,8 +66,9 @@ def only_numexpr_equality(constraints, supported=frozenset(), csemap=None):
                 new_arg, new_cons = _rewrite_comparison(cpm_expr.args[idx], supported=supported,csemap=csemap)
                 if new_arg is not cpm_expr.args[idx]: # changed
                     cpm_expr = copy.copy(cpm_expr) # shallow copy
-                    cpm_expr.args[idx] = new_arg
-                    cpm_expr.update_args(cpm_expr.args) # XXX redundant? we know it's flat so no subexprs anyway
+                    args = list(cpm_expr.args)
+                    args[idx] = new_arg
+                    cpm_expr.update_args(args) # XXX redundant? we know it's flat so no subexprs anyway
 
                 newlist += [cpm_expr] + new_cons
 
@@ -104,8 +105,9 @@ def _rewrite_comparison(cpm_expr, supported=frozenset(), csemap=None):
         # lhs is unsupported, rewrite to `(LHS == A) & (A <op> RHS)`
         cpm_expr = copy.copy(cpm_expr)
         new_lhs, new_cons = get_or_make_var(lhs, csemap=csemap)
-        cpm_expr.args[0] = new_lhs
-        cpm_expr.update_args(cpm_expr.args) # XXX redundant? we know it's flat so no subexprs anyway
+        args = list(cpm_expr.args)
+        args[0] = new_lhs
+        cpm_expr.update_args(args) # XXX redundant? we know it's flat so no subexprs anyway
         return cpm_expr, new_cons
     
     return cpm_expr, []

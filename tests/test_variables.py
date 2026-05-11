@@ -87,7 +87,8 @@ class TestSolvers:
 
     def test_clear(self):
         def n_none(v):
-            return sum(v.value() == None)
+            val = v.value()
+            return sum(x is None for x in np.asarray(val).ravel())
 
         iv = cp.intvar(1,9, shape=9)
         m = cp.Model(cp.AllDifferent(iv))

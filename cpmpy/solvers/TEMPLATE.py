@@ -556,9 +556,10 @@ class CPM_template(SolverInterface):
             if display is not None:
                 if isinstance(display, Expression):
                     print(display.value())
-                elif isinstance(display, list):
-                    print([v.value() for v in display])
+                elif is_any_list(display):
+                    print(argvals(display))
                 else:
+                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
                     display()  # callback
 
         # clear user vars if no solution found
