@@ -5,19 +5,23 @@
     HiGHS is a high-performance open-source linear/mixed-integer
     programming solver.
 
+    Always use :func:`cp.SolverLookup.get("highs") <cpmpy.solvers.utils.SolverLookup.get>`
+    to instantiate the solver object.
+
     ============
     Installation
     ============
 
     Install the Python bindings from PyPI:
 
+    .. code-block:: console
+
         $ pip install highspy
+    
+    Detailed installation instructions available at:
+    https://ergo-code.github.io/HiGHS/dev/interfaces/python/
 
-    Always use :func:`cp.SolverLookup.get("highs") <cpmpy.solvers.utils.SolverLookup.get>`
-    to instantiate the solver object.
-
-    Documentation of the solver's own Python API:
-    - https://ergo-code.github.io/HiGHS/dev/interfaces/python/
+    The rest of this documentation is for advanced users.
 """
 
 from typing import Optional
@@ -47,16 +51,14 @@ class CPM_highs(SolverInterface):
     """
     Interface to HiGHS' Python API (`highspy`).
 
-    This backend treats HiGHS as a pure LP/MIP solver without native
-    indicator, SOS, or global-constraint support. Such features are
-    handled by CPMpy's transformation/linearization pipeline, similar
-    to the Pindakaas backend.
-
     Creates the following attributes (see parent constructor for more):
 
     - highs: object, HiGHS `Highs` instance
     - _inf: numeric, HiGHS' infinity constant (`highspy.kHighsInf`)
-    - _has_obj: bool, tracks whether an objective was posted
+    - _obj_cols: Optional[npt.NDArray[np.int32]], columns with nonzero cost in the previous objective; ``None`` means no objective posted yet
+
+    Documentation of the solver's own Python API:
+    https://ergo-code.github.io/HiGHS/dev/interfaces/python/model-py/
     """
 
     # HiGHS does not have native global constraints in the CPMpy sense
@@ -64,7 +66,7 @@ class CPM_highs(SolverInterface):
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
-    def supported():
+    def supported() -> bool:
         # try to import the package
         try:
             import highspy  # noqa: F401
@@ -102,8 +104,7 @@ class CPM_highs(SolverInterface):
         self.highs.setOptionValue("log_to_console", False)
 
         self._inf = highspy.kHighsInf
-        self._has_obj = False  # track whether an objective was posted
-        self._obj_col_indices = np.empty(0, dtype=np.int32)  # columns with nonzero cost
+        self._obj_cols = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
@@ -154,9 +155,6 @@ class CPM_highs(SolverInterface):
             if solver_var is not None:
                 # fast path
                 res.append(solver_var)
-            elif isinstance(cpm_var, int):
-                # reasonably fast path
-                res.append(cpm_var)
             else:
                 # slow path, will check the varmap again
                 res.append(self.solver_var(cpm_var))
@@ -194,9 +192,11 @@ class CPM_highs(SolverInterface):
             else:
                 raise NotImplementedError(f"HiGHS: unsupported operator {lhs}")
 
-            # if columns repeat, have to merge coefficients.
-            if len(set(solvars)) == len(solvars):
+            # if columns are unique, just post
+            if np.unique(idx).size == idx.size:
                 return idx, coeffs, 0.0
+
+            # merge duplicate columns
             new_idx, group = np.unique(idx, return_inverse=True)
             new_coeffs = np.bincount(group, weights=coeffs).astype(np.float64)
             sel = new_coeffs != 0  # keep only the non-zero vars
@@ -306,22 +306,20 @@ class CPM_highs(SolverInterface):
         const += obj_const
 
         # reset only columns that carried cost in the previous objective, then set new ones
-        if len(self._obj_col_indices):
-            zeros = np.zeros(len(self._obj_col_indices), dtype=np.float64)
-            self.highs.changeColsCost(len(self._obj_col_indices), self._obj_col_indices, zeros)
+        if self._obj_cols is not None and len(self._obj_cols):
+            zeros = np.zeros(len(self._obj_cols), dtype=np.float64)
+            self.highs.changeColsCost(len(self._obj_cols), self._obj_cols, zeros)
         if len(indices):
             self.highs.changeColsCost(len(indices), indices, values)
-        self._obj_col_indices = indices
+        self._obj_cols = indices
 
         self.highs.changeObjectiveOffset(const)
 
         sense = highspy.ObjSense.kMinimize if minimize else highspy.ObjSense.kMaximize
         self.highs.changeObjectiveSense(sense)
 
-        self._has_obj = True
-
     def has_objective(self):
-        return self._has_obj
+        return self._obj_cols is not None
 
     def solve(self, time_limit=None, **kwargs):
         """
