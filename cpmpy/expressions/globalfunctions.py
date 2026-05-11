@@ -854,17 +854,18 @@ class NDElement(GlobalFunction):
         if any(is_boolexpr(idx) for idx in indices):
             raise TypeError("NDElement(arr, indices) takes integer expressions as indices, not boolean expressions")
 
+        nd_array: NDVarArray
         if isinstance(arr, NDVarArray):
-            arr = arr
+            nd_array = arr
         else:
-            arr = cpm_array(arr)
+            nd_array = cpm_array(arr)
 
-        if arr.ndim <= 1:
+        if nd_array.ndim <= 1:
             raise TypeError("NDElement only supports multi-dimensional arrays. Use cpmpy.globalfunctions.Element for 1D arrays.")
-        if len(indices) != arr.ndim:
-            raise ValueError(f"NDElement expects {arr.ndim} indices, got {len(indices)}")
+        if len(indices) != nd_array.ndim:
+            raise ValueError(f"NDElement expects {nd_array.ndim} indices, got {len(indices)}")
 
-        super().__init__("nd_element", (arr, *tuple(indices)))
+        super().__init__("nd_element", (nd_array, *tuple(indices)))
 
     def __getitem__(self, index):
         raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
