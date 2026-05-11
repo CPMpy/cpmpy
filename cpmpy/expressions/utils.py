@@ -158,8 +158,6 @@ def argvals(arr):
         return [argvals(arg) for arg in arr]
     return argval(arr)
 
-if TYPE_CHECKING:
-    from cpmpy.expressions.core import Comparison
 def argvals_intexpr(lst: Iterable[int|Expression]) -> Optional[list[int]]:
     """ A well-typed helper function to get the values of a list of int|Expression, or None if any expression is not assigned """
     vals: list[int] = []
@@ -173,7 +171,7 @@ def argvals_intexpr(lst: Iterable[int|Expression]) -> Optional[list[int]]:
             vals.append(v)
     return vals
 
-def eval_comparison(str_op:str, lhs, rhs) -> Comparison |bool:
+def eval_comparison(str_op, lhs, rhs):
     """
         Internal function: evaluates the textual `str_op` comparison operator
         lhs <str_op> rhs

@@ -78,7 +78,7 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
-from .core import BoolVal, Expression, Operator, ExprLike, ListLike
+from .core import Expression, Operator, ExprLike, ListLike
 from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
 from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
@@ -130,10 +130,7 @@ class GlobalFunction(Expression):
         warnings.warn(f"Deprecated, use {self}.decompose() instead, will be removed in "
                       "stable version", DeprecationWarning)
         valexpr, cons = self.decompose()
-        comp = eval_comparison(cmp_op, valexpr, cmp_rhs)
-        if isinstance(comp, bool):
-            return [BoolVal(comp)], cons
-        return [comp], cons
+        return [eval_comparison(cmp_op, valexpr, cmp_rhs)], cons
 
     def get_bounds(self) -> tuple[int, int]:
         """
