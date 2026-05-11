@@ -237,7 +237,7 @@ class TestFlattenExpr:
 
         v, cons = get_or_make_var(cp.cpm_array([1, 2, 3])[a])
         assert str(v) == "IV13"
-        assert {str(c) for c in cons} == {"([1 2 3][IV0]) == (IV13)"}
+        assert {str(c) for c in cons} == {"([1, 2, 3][IV0]) == (IV13)"}
 
         v, cons = get_or_make_var(cp.cpm_array([b + c, 2, 3])[a])
         assert str(v) == "IV15"
@@ -269,8 +269,8 @@ class TestFlattenExpr:
         assert  str(flatten_objective( 2*a-3*(b - c*2) )) == '(sum([2, -3, 6] * [IV0, IV1, IV2]), [])'
         cp.intvar(0,2) # increase counter
         assert  str(flatten_objective( a//b+c )) == f"((IV6) + ({str(c)}), [(({str(a)}) div ({str(b)})) == (IV6)])"
-        assert  str(flatten_objective( cp.cpm_array([1,2,3])[a] )) == "(IV7, [([1 2 3][IV0]) == (IV7)])"
-        assert  str(flatten_objective( cp.cpm_array([1,2,3])[a]+b )) == "((IV8) + (IV1), [([1 2 3][IV0]) == (IV8)])"
+        assert  str(flatten_objective( cp.cpm_array([1,2,3])[a] )) == "(IV7, [([1, 2, 3][IV0]) == (IV7)])"
+        assert  str(flatten_objective( cp.cpm_array([1,2,3])[a]+b )) == "((IV8) + (IV1), [([1, 2, 3][IV0]) == (IV8)])"
 
 
     def test_constraint(self):
@@ -304,10 +304,10 @@ class TestFlattenExpr:
         #self.assertEqual( str(flatten_constraint( c != a + b )), "[((IV0) + (IV1)) != (IV2)]" ) # TODO, make it do the swap (again)
         assert  str(flatten_constraint( ((a > 5) == (b < 3)) )) == "[(IV0 > 5) == (BV8), (IV1 < 3) == (BV8)]"
 
-        assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] == b )) == "[([1 2 3][IV0]) == (IV1)]"
-        assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] > b )) == "[([1 2 3][IV0]) > (IV1)]"
+        assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] == b )) == "[([1, 2, 3][IV0]) == (IV1)]"
+        assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] > b )) == "[([1, 2, 3][IV0]) > (IV1)]"
         cp.intvar(0,2, 4) # increase counter
-        assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] <= b )) == "[([1 2 3][IV0]) <= (IV1)]"
+        assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] <= b )) == "[([1, 2, 3][IV0]) <= (IV1)]"
         assert  str(flatten_constraint( cp.AllDifferent([a+b,b+c,c+3]) )) == "[alldifferent(IV9,IV10,IV11), ((IV0) + (IV1)) == (IV9), ((IV1) + (IV2)) == (IV10), ((IV2) + 3) == (IV11)]"
 
         # issue #27

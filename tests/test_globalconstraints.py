@@ -753,9 +753,9 @@ class TestGlobal:
         assert arr[a.value(), b.value()] == 1
         # test optimization where 1 dim is index
         cons = iv[2, idx] == 8
-        assert str(cons) == "[iv[2,0] iv[2,1] iv[2,2]][idx] == 8"
+        assert str(cons) == "[iv[2,0], iv[2,1], iv[2,2]][idx] == 8"
         cons = iv[idx, 2] == 8
-        assert str(cons) == "[iv[0,2] iv[1,2] iv[2,2]][idx] == 8"
+        assert str(cons) == "[iv[0,2], iv[1,2], iv[2,2]][idx] == 8"
 
     def test_multid_1expr(self):
 
@@ -763,13 +763,13 @@ class TestGlobal:
         a,b = cp.intvar(0,2, shape=2, name=tuple("ab")) # idx is always safe
 
         expr = x[a,1,3]
-        assert str(expr) == "[x[0,1,3] x[1,1,3] x[2,1,3]][a]"
+        assert str(expr) == "[x[0,1,3], x[1,1,3], x[2,1,3]][a]"
 
         expr = x[1,a,3]
-        assert str(expr) == "[x[1,0,3] x[1,1,3] x[1,2,3] x[1,3,3]][a]"
+        assert str(expr) == "[x[1,0,3], x[1,1,3], x[1,2,3], x[1,3,3]][a]"
 
         expr = x[1,2,a]
-        assert str(expr) == "[x[1,2,0] x[1,2,1] x[1,2,2] x[1,2,3] x[1,2,4]][a]"
+        assert str(expr) == "[x[1,2,0], x[1,2,1], x[1,2,2], x[1,2,3], x[1,2,4]][a]"
 
     def test_element_onearg(self):
 

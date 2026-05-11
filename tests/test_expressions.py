@@ -491,7 +491,32 @@ class TestBounds:
         cons2 = c.implies(cons)
         
         assert repr(cons2) == "(c) -> ((a) or (b))" # don't use description of nested expression
-        assert str(cons2) ==  "(c) -> ((a) or (b))" # don't use description of nested expression -- TODO: should we use description in str()?
+        assert str(cons2) ==  "(c) -> (either a or b should be true)" # don't use description of nested expression -- TODO: should we use description in str()?
+
+
+    def test_expr_list_vs_ndarray(self):
+
+        x = cp.intvar(0,10,shape=3, name=("a","b","c"))
+        assert isinstance(x, NDVarArray)
+
+        cons = cp.AllDifferent(x)
+        assert repr(cons) == "alldifferent(a,b,c)"
+        assert str(cons) == "alldifferent(a,b,c)"
+
+        cons = cp.AllDifferent(list(x))
+        assert repr(cons) == "alldifferent(a,b,c)"
+        assert str(cons) == "alldifferent(a,b,c)"
+
+        cons = cp.Count(x, 3) >= 1
+        assert repr(cons) == "count([a, b, c],3) >= 1"
+        assert str(cons) == "count([a, b, c],3) >= 1"
+
+        cons = cp.Count(list(x), 3) >= 1
+        assert repr(cons) == "count([a, b, c],3) >= 1"
+        assert str(cons) == "count([a, b, c],3) >= 1"
+
+        assert str(cp.Count(x,2)) == str(cp.Count(list(x),2))
+        assert repr(cp.Count(x,2)) == repr(cp.Count(list(x),2)) # should be the same, functionally equivalent
 
 
     def test_dtype(self):
