@@ -383,12 +383,11 @@ def _wsum_to_str(cpm_expr, varmap):
 
     out = []
     for w, var in zip(weights, args):
-        if w < 0:
-            out.append("- " + (str(abs(w)) + " " if abs(w) != 1 else "") + f"{varmap[var] if not isinstance(var, NegBoolView) else "~" + str(varmap[var._bv])}")
-        elif w > 0:
-            out.append("+ " + (str(abs(w)) + " " if abs(w) != 1 else "") + f"{varmap[var] if not isinstance(var, NegBoolView) else "~" + str(varmap[var._bv])}")
-        else:
-            pass # zero weight, ignore
+        if w == 0:
+            continue
+        lit = varmap[var] if not isinstance(var, NegBoolView) else "~" + str(varmap[var._bv])
+        # OPB requires no space between sign and digits (e.g., "-2", "+4").
+        out.append(f"{w:+d} {lit}")
     
     str_out = " ".join(out)
     return str_out
