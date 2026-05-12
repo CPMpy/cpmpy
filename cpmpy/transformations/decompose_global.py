@@ -23,7 +23,7 @@ from typing import List, AbstractSet, Optional, Dict, Tuple, Any, Callable, cast
 import numpy as np
 
 from ..expressions.core import Expression, ListLike, BoolVal, Operator
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import GlobalConstraint, MDD
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import NDVarArray, cpm_array
 
@@ -60,11 +60,15 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 
     newlist: List[Expression] = []
     todolist: List[Expression] = []  # these still need to be decomposed
+    decompose_positive = get_positive_decompositions()
     for expr in lst_of_expr:
         if isinstance(expr, GlobalConstraint) and expr.name not in supported:
             # toplevel/positive global constraint, decompose
             if decompose_custom is not None and expr.name in decompose_custom:
                 exprs, toplevel_exprs = cast(Tuple[List[Expression], List[Expression]], decompose_custom[expr.name](expr))
+            elif expr.name in decompose_positive:
+                global_constraint = expr
+                exprs, toplevel_exprs = global_constraint.decompose_positive()
             else:
                 exprs, toplevel_exprs = expr.decompose()
             # both might contain globals too
@@ -76,6 +80,20 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             newlist.append(BoolVal(expr))
         elif expr.has_subexpr():
             # decompose its arguments
+            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint):
+                if expr.args[1].name in decompose_positive:
+
+                    if decompose_custom is not None and expr.name in decompose_custom:
+                        exprs, toplevel_exprs = cast(Tuple[List[Expression], List[Expression]],
+                                                     decompose_custom[expr.name](expr))
+                    else:
+                        global_constraint = expr.args[1]
+                        exprs, toplevel_exprs = global_constraint.decompose_positive()
+
+                    print("exprs: ", exprs)
+                    newlist.extend(expr.args[0].implies(e) for e in exprs)
+                    newlist.extend(toplevel_exprs)
+
             changed, newargs, rec_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
             if changed:
                 expr = copy.copy(expr)
@@ -249,3 +267,9 @@ def _decompose_in_tree_args(args: ListLike[Any],
             newargs.append(arg)
 
     return (changed, newargs, toplevel)
+
+
+def get_positive_decompositions():
+    return dict(
+        mdd=MDD.decompose_positive
+    )

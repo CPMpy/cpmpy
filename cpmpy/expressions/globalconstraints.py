@@ -974,6 +974,57 @@ class MDD(GlobalConstraint):
         return [cp.sum(invalid_edge_vars) == 0], cons
 
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive flow decomposition of the MDD global constraint.
+        Alternatively to
+
+        Returns:
+            tuple[list[Expression], list[Expression]]:
+                A tuple containing the constraints representing the constraint value and the defining constraints.
+        """
+        arr, _ = self.args
+
+        # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
+        # The default is an empty list, representing no ingoing / outgoing flow.
+        flow_in: dict[int | str, list[Expression]] = defaultdict(list)
+        flow_out: dict[int | str, list[Expression]] = defaultdict(list)
+
+        # Used to link edge variables to direct encoding variables in a later step
+        edge_vars = defaultdict(list)
+
+        # Determine flow in and flow out for each node
+        for src, edges in self.mapping.items():
+            for value, dst in edges.items():
+                level = self.levels[src]
+                edge_var = cp.boolvar()
+                flow_out[src].append(edge_var)
+                flow_in[dst].append(edge_var)
+                edge_vars[(level, value)].append(edge_var)
+
+        cons = []
+
+        # Enforce flow constraints: flow in = flow out, at most one activated in/out edge
+        for node, level in self.levels.items():
+            incoming = flow_in[node]
+            outgoing = flow_out[node]
+
+            if level == 0:
+                cons.append(cp.sum(outgoing) == 1) # root
+            elif level == len(arr):
+                cons.append(cp.sum(incoming) == 1) # sink
+            else:
+                cons.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
+                cons.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
+                cons.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
+
+        # Enforce direct encoding variable arr[i] == v if an edge with label v is activated at level i
+        for (level, value), vars_ in edge_vars.items():
+            cons.append(cp.sum(vars_) == (arr[level] == value))
+
+        return cons, []
+
+
     def value(self) -> Optional[bool]:
         """
         Returns:
