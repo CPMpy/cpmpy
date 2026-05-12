@@ -544,6 +544,8 @@ def main():
             model = read_opb(os.path.expanduser(args.model))
     except Exception as e:
         sys.stderr.write(f"Error reading model: {e}\n")
+        if isinstance(e, AssertionError):
+            raise e
         sys.exit(1)
 
     # Solve the model
