@@ -133,8 +133,8 @@ class OPBDataset(FileDataset):
                 
     def download(self):
                 
-        url = "https://www.cril.univ-artois.fr/PB24/benchs/"
-        target = f"{'normalized' if not self.competition else 'selected'}-PB{str(self.year)[2:]}.tar"
+        url = "https://www.cril.univ-artois.fr/"
+        target = f"PB{str(self.year)[2:]}/benchs/{'normalized' if not self.competition else 'selected'}-PB{str(self.year)[2:]}.tar"
         target_download_path = self.root / target
 
         print(f"Downloading OPB {self.year} {self.track} {'competition' if self.competition else 'non-competition'} instances from www.cril.univ-artois.fr")
