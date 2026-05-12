@@ -1,9 +1,9 @@
 from functools import partial
 import lzma
 
-from cplab.adapter._base import InstanceAdapter
-from cplab.observer import HandlerObserver, RuntimeObserver, ResourceLimitObserver, SolverArgsObserver, SolutionCheckerObserver
-from cplab.observer.dimacs_printing import DIMACSPrintingObserver
+from cpmpy.tools.benchmark.cpbenchy.adapter._base import InstanceAdapter
+from cpmpy.tools.benchmark.cpbenchy.observer import HandlerObserver, RuntimeObserver, ResourceLimitObserver, SolverArgsObserver
+from cpmpy.tools.benchmark.cpbenchy.observer.dimacs_printing import DIMACSPrintingObserver
 from cpmpy.tools.benchmark.xcsp3 import solution_xcsp3
 from cpmpy.tools.xcsp3.parser import read_xcsp3
 
@@ -24,8 +24,7 @@ class XCSP3Adapter(InstanceAdapter):
         RuntimeObserver,
         HandlerObserver,
         SolverArgsObserver,
-        SolutionCheckerObserver,
-        ResourceLimitObserver,
+            ResourceLimitObserver,
     ]
 
     reader = partial(read_xcsp3, open= lambda instance: lzma.open(instance, mode='rt', encoding='utf-8') if str(instance).endswith(".lzma") else open(instance))

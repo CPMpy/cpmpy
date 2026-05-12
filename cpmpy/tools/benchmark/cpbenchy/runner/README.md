@@ -6,6 +6,8 @@ python ./libraries/cpmpy/cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py 
 run an entire dataset:
 python ./libraries/cpmpy/cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py --dataset cpmpy.tools.datasets.opb.OPBDataset --dataset-year 2025 --dataset-track DEC-LIN --dataset-download --runner opb --output ./test_outp
 
+different resource manager:
+python ./libraries/cpmpy/cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py --dataset cpmpy.tools.datasets.opb.OPBDataset --dataset-year 2025 --dataset-track DEC-LIN --dataset-download --runner opb --output ./test_outp --resource-manager python
 
 
 

@@ -26,7 +26,7 @@ from ..adapter.nurserostering import NurseRosteringAdapter
 from ..adapter.jsplib import JSPLibAdapter
 from ..adapter.psplib import PSPLibAdapter
 from ..adapter.mse import MSEAdapter
-from cplab.observer import ResourceLimitObserver
+from ..observer import ResourceLimitObserver
 from ..runner.stream_observer import StreamObserver, HookStreamDispatcher, RunStateStreamObserver, RawStreamObserver
 
 FORCE_EXPLICIT_SYSTEMD_SCOPE = os.environ.get(
@@ -483,7 +483,7 @@ class StreamingResourceManager(ResourceManager):
 
     def _prepare_stream_channel(
             self,
-            dir_prefix: str = "cplab-ipc-",
+            dir_prefix: str = "cpbenchy-ipc-",
             fifo_name: str = "events.fifo",
         ) -> dict:
         """
@@ -848,7 +848,7 @@ class RunExecResourceManager(StreamingResourceManager):
         # Automatically add WriteToFileObserver and MetadataSidecarObserver if output_file is provided
         if output_file is not None:
             from functools import partial
-            from cplab.observer import WriteToFileObserver, MetadataSidecarObserver, IntermediateObjectivesObserver
+            from ..observer import WriteToFileObserver, MetadataSidecarObserver, IntermediateObjectivesObserver
             runner.register_observer(partial(WriteToFileObserver, output_file=output_file, overwrite=True))
             runner.register_observer(IntermediateObjectivesObserver())
             runner.register_observer(partial(MetadataSidecarObserver, output_file=output_file))
@@ -933,10 +933,11 @@ class RunExecResourceManager(StreamingResourceManager):
                         # Always pass core count to solver so it can use the right number of threads
                         if cores:
                             cmd += ["--cores", str(len(cores))]
-                        cmd += [
-                            "--observers",
-                            f"cplab.observer.HookPipeRelayObserver(ipc_events_file={ipc_events_filename!r})",
+                        subprocess_observers = [
+                            *getattr(runner, "subprocess_observers", []),
+                            f"cpmpy.tools.benchmark.cpbenchy.observer.HookPipeRelayObserver(ipc_events_file={ipc_events_filename!r})",
                         ]
+                        cmd += ["--observers", *subprocess_observers]
 
                         # Prepend setup_command if provided - this wraps the entire command invocation
                         # e.g., systemd-run --user --scope --slice=benchexec -p Delegate=yes python script.py --args
@@ -1160,7 +1161,7 @@ class PythonResourceManager(LocalResourceManager):
         # Automatically add WriteToFileObserver and MetadataSidecarObserver if output_file is provided
         if output_file is not None:
             from functools import partial
-            from cplab.observer import WriteToFileObserver, MetadataSidecarObserver, IntermediateObjectivesObserver
+            from ..observer import WriteToFileObserver, MetadataSidecarObserver, IntermediateObjectivesObserver
             runner.register_observer(partial(WriteToFileObserver, output_file=output_file, overwrite=True))
             runner.register_observer(IntermediateObjectivesObserver())
             runner.register_observer(partial(MetadataSidecarObserver, output_file=output_file))

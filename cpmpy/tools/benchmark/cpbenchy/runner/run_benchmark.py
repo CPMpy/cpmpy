@@ -31,7 +31,7 @@ Usage Examples:
     python run_benchmark.py instance.xml --runner cpmpy.tools.benchmark.runner.xcsp3_instance_runner.XCSP3InstanceAdapter
 """
 
-# python sync/cplab/cplab/runner/run_benchmark.py --dataset cpmpy.tools.dataset.xcsp3.XCSP3Dataset --dataset-year 2024 --dataset-track CSP --dataset-download --runner xcsp3 --workers 1 --cores_per_worker 8 --memory-per-worker 2048 --time_limit 60 --output ./results/
+# python -m cpmpy.tools.benchmark.cpbenchy.runner.run_benchmark --dataset cpmpy.tools.dataset.xcsp3.XCSP3Dataset --dataset-year 2024 --dataset-track CSP --dataset-download --runner xcsp3 --workers 1 --cores_per_worker 8 --memory-per-worker 2048 --time_limit 60 --output ./results/
 
 import argparse
 import sys
@@ -43,15 +43,18 @@ from multiprocessing import Manager
 
 from tqdm import tqdm
 
-from cplab.adapter._base import InstanceAdapter
-from cplab.runner.manager import (
+from cpmpy.tools.benchmark.cpbenchy.adapter._base import InstanceAdapter
+from cpmpy.tools.benchmark.cpbenchy.runner.manager import (
     load_instance_runner,
     run_instance,
     PythonResourceManager,
     RunExecResourceManager,
 )
-from cplab.observer import Observer, WriteToFileObserver, WriteToStdoutObserver
-from cplab.observer.utils import OBSERVER_CLASSES, load_observers
+from cpmpy.tools.benchmark.cpbenchy.observer import Observer, WriteToFileObserver, WriteToStdoutObserver
+from cpmpy.tools.benchmark.cpbenchy.observer.utils import OBSERVER_CLASSES, load_observers
+
+
+DEFAULT_SOLUTION_CHECKER_OBSERVER = "SolutionCheckerObserver"
 
 
 def parse_cores(value, /) -> Optional[tuple[List[int], bool]]:
@@ -94,6 +97,39 @@ def create_resource_manager(name: str, pin_cores: bool = True):
     raise ValueError(f"Unknown resource manager: {name}")
 
 
+def _observer_name(observer) -> str:
+    if isinstance(observer, str):
+        return observer
+    func = getattr(observer, "func", None)
+    if func is not None:
+        return _observer_name(func)
+    return getattr(observer, "__name__", observer.__class__.__name__)
+
+
+def _is_solution_checker_observer(observer) -> bool:
+    return "SolutionChecker" in _observer_name(observer)
+
+
+def _runner_has_solution_checker(runner: InstanceAdapter, observer_specs: Optional[List[str]] = None) -> bool:
+    default_observers = getattr(runner, "default_observers", [])
+    additional_observers = getattr(runner, "get_additional_observers", lambda: [])()
+    return any(
+        _is_solution_checker_observer(observer)
+        for observer in [*default_observers, *additional_observers, *(observer_specs or [])]
+    )
+
+
+def solution_checker_observer_specs(
+    runner: InstanceAdapter,
+    observer_specs: Optional[List[str]],
+    enabled: bool,
+) -> List[str]:
+    specs = list(observer_specs or [])
+    if enabled and not _runner_has_solution_checker(runner, specs):
+        specs.append(DEFAULT_SOLUTION_CHECKER_OBSERVER)
+    return specs
+
+
 def run_single_instance(
     instance: str,
     runner: InstanceAdapter,
@@ -113,7 +149,7 @@ def run_single_instance(
     # Automatically add WriteToFileObserver if output_file is provided
     if output_file is not None:
         # Ensure the output file path is absolute or properly constructed
-        from cplab.adapter._base import create_output_file
+        from cpmpy.tools.benchmark.cpbenchy.adapter._base import create_output_file
         from functools import partial
         output_file = create_output_file(output_file, None, solver, instance)
         runner.register_observer(partial(WriteToFileObserver, output_file=output_file, overwrite=True))
@@ -158,6 +194,8 @@ def worker_function(
     intermediate,
     verbose,
     output_dir,
+    observer_specs=None,
+    solution_checker=False,
     resource_manager_name="runexec",
     pin_cores=True,
     completed_count=None,
@@ -174,11 +212,19 @@ def worker_function(
         
         # Create a fresh instance_runner for each instance to avoid observer accumulation
         instance_runner = load_instance_runner(runner_path)
+        effective_observer_specs = solution_checker_observer_specs(
+            instance_runner,
+            observer_specs,
+            solution_checker,
+        )
+        instance_runner.subprocess_observers = effective_observer_specs
+        for observer in load_observers(effective_observer_specs):
+            instance_runner.register_observer(observer)
         
         # Construct output_file path for this instance
         output_file = None
         if output_dir is not None:
-            from cplab.adapter._base import create_output_file    
+            from cpmpy.tools.benchmark.cpbenchy.adapter._base import create_output_file    
             # Extract instance name for filename
             import os
             instance_name = os.path.splitext(os.path.basename(instance))[0]
@@ -323,6 +369,8 @@ def run_batch(
     intermediate: bool = False,
     verbose: bool = False,
     output_dir: Optional[str] = None,
+    observer_specs: Optional[List[str]] = None,
+    solution_checker: bool = False,
     resource_manager: str = "runexec",
     no_pin_cores: bool = False,
 ):
@@ -393,7 +441,7 @@ def run_batch(
     if verbose:
         print(
             f"Total cores: {total_cores}, Workers: {workers}, Cores: {core_list}, "
-            f"Resource manager: {resource_manager}"
+            f"Resource manager: {resource_manager}, Solution checker: {solution_checker}"
         )
         for i, cores in enumerate(worker_cores):
             print(f"Worker {i}: cores {cores}")
@@ -440,6 +488,8 @@ def run_batch(
                     intermediate,
                     verbose,
                     output_dir,
+                    observer_specs,
+                    solution_checker,
                     resource_manager,
                     pin_cores,
                     completed_count,
@@ -561,6 +611,14 @@ def main():
              "Example: 'WriteToFileObserver(file_path=\"/path/to/file.txt\", overwrite=False)'. "
              "Note: WriteToFileObserver is automatically added to write outputs to results/ directory. "
              "To use a custom file path, use format 'WriteToFileObserver(file_path=\"/path/to/file.txt\")'"
+    )
+    parser.add_argument(
+        "--solution-checker",
+        action="store_true",
+        help=(
+            "Enable solution checking via SolutionCheckerObserver. The observer uses "
+            "cpmpy.tools.solution_checker.check_solution by default."
+        )
     )
     
     # Solver settings
@@ -726,7 +784,7 @@ def main():
     try:
         if args.runner == "xcsp3":
             # Special case for xcsp3
-            from cplab.adapter.xcsp3 import XCSP3Adapter
+            from cpmpy.tools.benchmark.cpbenchy.adapter.xcsp3 import XCSP3Adapter
             runner = XCSP3Adapter()
         else:
             runner = load_instance_runner(args.runner)
@@ -734,11 +792,17 @@ def main():
         print(f"Error loading runner '{args.runner}': {e}", file=sys.stderr)
         sys.exit(1)
     
+    observer_specs = solution_checker_observer_specs(
+        runner,
+        args.observers,
+        args.solution_checker,
+    )
+
     # Load observers
     additional_observers = None
-    if args.observers:
+    if observer_specs:
         try:
-            additional_observers = load_observers(args.observers)
+            additional_observers = load_observers(observer_specs)
         except Exception as e:
             print(f"Error loading observers: {e}", file=sys.stderr)
             sys.exit(1)
@@ -830,6 +894,8 @@ def main():
                 intermediate=args.intermediate,
                 verbose=args.verbose,
                 output_dir=args.output,
+                observer_specs=observer_specs,
+                solution_checker=args.solution_checker,
                 resource_manager=args.resource_manager,
                 no_pin_cores=args.no_pin_cores,
             )
@@ -878,6 +944,8 @@ def main():
                 intermediate=args.intermediate,
                 verbose=args.verbose,
                 output_dir=args.output,
+                observer_specs=observer_specs,
+                solution_checker=args.solution_checker,
                 resource_manager=args.resource_manager,
                 no_pin_cores=args.no_pin_cores,
             )

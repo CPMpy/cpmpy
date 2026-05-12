@@ -1,11 +1,10 @@
-from cplab.adapter._base import InstanceAdapter
-from cplab.observer import (
+from cpmpy.tools.benchmark.cpbenchy.adapter._base import InstanceAdapter
+from cpmpy.tools.benchmark.cpbenchy.observer import (
     DIMACSPrintingObserver,
     HandlerObserver,
     RuntimeObserver,
     ResourceLimitObserver,
     SolverArgsObserver,
-    SolutionCheckerObserver,
 )
 from cpmpy.tools.benchmark.xcsp3 import solution_xcsp3
 from cpmpy.tools.io.nurserostering import read_nurserostering
@@ -25,8 +24,7 @@ class NurseRosteringAdapter(InstanceAdapter):
         RuntimeObserver,
         HandlerObserver,
         SolverArgsObserver,
-        SolutionCheckerObserver,
-        ResourceLimitObserver,
+            ResourceLimitObserver,
     ]
 
     # Keep parser as plain callable; avoid instance-method binding.

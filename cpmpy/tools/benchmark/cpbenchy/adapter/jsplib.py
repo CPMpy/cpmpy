@@ -1,11 +1,10 @@
-from cplab.adapter._base import InstanceAdapter
-from cplab.observer import (
+from cpmpy.tools.benchmark.cpbenchy.adapter._base import InstanceAdapter
+from cpmpy.tools.benchmark.cpbenchy.observer import (
     DIMACSPrintingObserver,
     HandlerObserver,
     RuntimeObserver,
     ResourceLimitObserver,
     SolverArgsObserver,
-    SolutionCheckerObserver,
 )
 from cpmpy.tools.benchmark.jsplib import solution_psplib
 from cpmpy.tools.io.jsplib import read_jsplib
@@ -25,8 +24,7 @@ class JSPLibAdapter(InstanceAdapter):
         RuntimeObserver,
         HandlerObserver,
         SolverArgsObserver,
-        SolutionCheckerObserver,
-        ResourceLimitObserver,
+            ResourceLimitObserver,
     ]
 
     reader = staticmethod(read_jsplib)
