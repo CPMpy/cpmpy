@@ -229,7 +229,6 @@ def flatten_constraint(expr, csemap=None):
             exprname = expr.name  # so it can be modified
             lexpr, rexpr = expr.args
             rewritten = False
-
             # rewrite 'Var # Expr' to normalized 'Expr # Var' (where # is any comparator)
             if __is_flat_var(lexpr) and not __is_flat_var(rexpr):
                 assert (expr.name in ('==', '!=', '>', '>=', '<', '<='))
@@ -245,6 +244,12 @@ def flatten_constraint(expr, csemap=None):
                     exprname = '>'
                 elif exprname == '<=':
                     exprname = '>='
+
+            # save expr == var to the csemap, so we don't make a new variable for expr later
+            if csemap is not None and exprname == '==': # cheap checks first
+                if isinstance(lexpr, Expression) and isinstance(rexpr, Expression) and \
+                    lexpr.is_bool() == rexpr.is_bool() and __is_flat_var(rexpr): # types must match
+                    csemap[lexpr] = rexpr # save lexpr == rexpr to the csemap
 
             # already flat?
             if not expr.has_subexpr():
