@@ -66,6 +66,7 @@
         Modulo
         Power
         Element
+        NDElement
         Count
         Among
         NValue
@@ -73,13 +74,14 @@
 
 """
 import warnings  # for deprecation warning
+import math
 from typing import Optional, Iterable
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
+from .variables import cpm_array, intvar, NDVarArray, NDVarArray, _NumVarImpl, BoolVal
 from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
@@ -723,6 +725,7 @@ class Element(GlobalFunction):
 
     Note: because Element is a numeric global function, the return type of the `Element` function
     is always numeric, even if `Arr` only contains Boolean variables.
+    Element only supports 1D arrays; use NDElement for multi-dimensional indexing.
     """
 
     def __init__(self, arr: ListLike[ExprLike], idx: ExprLike):
@@ -735,6 +738,14 @@ class Element(GlobalFunction):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
+        if isinstance(arr, np.ndarray):
+            if arr.ndim != 1:
+                raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
+        elif isinstance(arr, np.ndarray):
+            if arr.ndim != 1:
+                raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
+        elif is_any_list(arr) and any(is_any_list(el) for el in arr):
+            raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         assert len(arr) > 0, "Element: array should not be empty"
 
         super().__init__("element", (arr, idx))
@@ -748,6 +759,8 @@ class Element(GlobalFunction):
             Optional[int]: The value of the array element at the given index, or None if the index is not assigned or the array element is not assigned
         """
         arr, idx = self.args
+        if any(argval(v) is None for v in arr):
+            return None
         vidx = argval(idx)
         if vidx is None:
             return None
@@ -822,6 +835,100 @@ class Element(GlobalFunction):
             str: String representation of the Element global function.
         """
         return f"{self.args[0]}[{self.args[1]}]"
+
+
+class NDElement(GlobalFunction):
+    """
+    The `NDElement(Arr, Indices)` global function allows indexing into a multi-dimensional array
+    with multiple decision variables.
+    """
+
+    def __init__(self, arr: ListLike[ExprLike], indices: ListLike[ExprLike]):
+        """
+        Arguments:
+            arr (ListLike[ExprLike]): Multi-dimensional array of expressions or constants to index into
+            indices (ListLike[ExprLike]): Integer expressions or constants for each dimension index
+        """
+        if not is_any_list(indices):
+            raise TypeError(f"NDElement(arr, indices) takes a list of index expressions, not: {indices}")
+        if any(is_boolexpr(idx) for idx in indices):
+            raise TypeError("NDElement(arr, indices) takes integer expressions as indices, not boolean expressions")
+
+        nd_array: NDVarArray
+        if isinstance(arr, NDVarArray):
+            nd_array = arr
+        else:
+            nd_array = cpm_array(arr)
+
+        if nd_array.ndim <= 1:
+            raise TypeError("NDElement only supports multi-dimensional arrays. Use cpmpy.globalfunctions.Element for 1D arrays.")
+        if len(indices) != nd_array.ndim:
+            raise ValueError(f"NDElement expects {nd_array.ndim} indices, got {len(indices)}")
+
+        super().__init__("nd_element", (nd_array, *tuple(indices)))
+
+    def __getitem__(self, index):
+        raise CPMpyException("For using multi-dimensional Element, use comma-separated indices on the original array.")
+
+    def value(self) -> Optional[int]:
+        """
+        Returns:
+            Optional[int]: The value of the array element at the given indices, or None if any index is not assigned or the array element is not assigned
+        """
+        arr, *indices = self.args
+        if any(argval(v) is None for v in arr.flat):
+            return None
+        vidxs = [argval(idx) for idx in indices]
+        if any(v is None for v in vidxs):
+            return None
+        for v, dim in zip(vidxs, arr.shape):
+            if v < 0 or v >= dim:
+                raise IncompleteFunctionError(
+                    f"Index {v} out of range for dimension size {dim} while calculating value for expression {self}"
+                    + "\n Use argval(expr) to get the value of expr with relational semantics."
+                )
+        return argval(arr[tuple(vidxs)])
+
+    def decompose(self) -> tuple[Expression, list[Expression]]:
+        """
+        Decomposition of NDElement global function.
+
+        Rewritten as 1-D Element with a linear index into the flattened array.
+        Example: ``arr = [[10, 20, 30], [40, 50, 60]]`` and indices ``(1, 2)``
+        gives ``arr[1, 2] == 60``. After Decomposing to 1-D Element, ``arr.reshape(-1)`` is
+        ``[10, 20, 30, 40, 50, 60]`` and the linear index is ``1*3 + 2 = 5``,
+        so this becomes ``Element(arr.reshape(-1), 5) == 60``.
+
+        Returns:
+            tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
+        """
+        arr, *indices = self.args
+        flat_index = indices[-1]
+        for dim, idx in enumerate(indices[:-1]):
+            flat_index += idx * math.prod(arr.shape[dim + 1 :])  # stride on dim: flat offset per +1 (product of later axis sizes)
+        return Element(arr.reshape(-1), flat_index), []
+
+    def get_bounds(self) -> tuple[int, int]:
+        """
+        Returns the bounds of the global function
+
+        Returns:
+            tuple[int, int]: A tuple of (lower bound, upper bound) for the element value
+        """
+        arr, *_ = self.args
+        bnds = [get_bounds(x) for x in arr.flat]
+        return min(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
+
+    def __repr__(self) -> str:
+        """
+        Custom string representation of the NDElement global function in 'Arr[i0, i1, ...]' format.
+
+        Returns:
+            str: String representation of the NDElement global function.
+        """
+        arr, *indices = self.args
+        idx_repr = ", ".join(str(i) for i in indices)
+        return f"{arr}[{idx_repr}]"
 
 def element(arg_list):
     """
