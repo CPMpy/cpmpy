@@ -441,7 +441,7 @@ class Circuit(GlobalConstraint):
         for i in range(1, len(succ)):
             order.append(succ[order[i - 1]])
 
-        # element constraints can be partial
+        # element constraints of 'succ' with 'order[i-1]' as index can be partial (outside of succ bounds)
         from cpmpy.transformations.safening import _no_partial_functions
         changed, safe_order, toplevel, nbc = _no_partial_functions(order, safen_toplevel=frozenset(), is_toplevel=False)
         if changed:
@@ -452,6 +452,31 @@ class Circuit(GlobalConstraint):
                  AllDifferent(succ)    # redundant constraint, strengthens decomposition
                 ]
         return value + nbc, toplevel
+
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the Circuit global constraint, inspired by Miller-Tucker-Zemlin formulation for TSPs
+        """
+        succ = self.args
+        n = len(succ)
+        order = cp.intvar(0, n-1, shape=n)
+        
+        constraints = [x >= 0 for x in succ] + [x < n for x in succ]                    # bounds on successors
+        constraints += [cp.sum(succ[j] == i for j in range(n)) == 1 for i in range(n)]  # each node i has exactly one predecessor
+        constraints += [cp.AllDifferent(order)] # redundant constraint
+        constraints += [order[0] == 0]  # TODO: could replace order[0] with constant 0 instead?
+
+        defining: list[Expression] = []
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    # forbid self-loops
+                    constraints += [succ[i] != j]
+                if j != 0:
+                    # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
+                    defining += [(succ[i] == j) == (order[i] + 1 == order[j])]
+
+        return constraints, defining
 
     def value(self) -> Optional[bool]:
         """
