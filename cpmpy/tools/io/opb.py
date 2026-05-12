@@ -91,7 +91,7 @@ def _parse_term(line, vars):
     if text and text[0] not in "+-":
         text = "+ " + text
 
-    parsed_terms = TERM_RE.findall(text)
+    parsed_terms = TERM_RE.findall(text) # contains each part of the sum we're building
     if not parsed_terms:
         raise ValueError(f"Could not parse any OPB terms from line: {line}")
 
@@ -233,7 +233,12 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
 
     # Start parsing line by line
     for line in reader:
-        model.add(_parse_constraint(line, vars))
+        cons = _parse_constraint(line, vars)
+        assert isinstance(cons, Comparison), cons
+        lhs, rhs = cons.args
+        assert isinstance(lhs, Operator) and lhs.name == "wsum" or lhs.name == "sum", lhs
+        assert isinstance(rhs, int), rhs
+        model.add(cons)
 
     if len(vars) > nr_vars_declared:
         import warnings
