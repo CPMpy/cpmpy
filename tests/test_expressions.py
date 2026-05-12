@@ -491,7 +491,7 @@ class TestBounds:
         cons2 = c.implies(cons)
         
         assert repr(cons2) == "(c) -> ((a) or (b))" # don't use description of nested expression
-        assert str(cons2) ==  "(c) -> (either a or b should be true)" # don't use description of nested expression -- TODO: should we use description in str()?
+        assert str(cons2) ==  "(c) -> (either a or b should be true)" # use description of nested expression
 
 
     def test_expr_list_vs_ndarray(self):
