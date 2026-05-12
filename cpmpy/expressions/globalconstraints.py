@@ -112,6 +112,7 @@
         ShortTable
         NegativeTable
         Regular
+        MDD
         IfThenElse
         InDomain
         Xor
@@ -132,7 +133,9 @@
         DirectConstraint
 
 """
+import copy
 import warnings
+from collections import defaultdict
 from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
 
@@ -141,7 +144,7 @@ import cpmpy as cp
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, ListLike
 from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, _IntVarImpl, NDVarArray
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies
+from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, argval
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -824,6 +827,174 @@ class Regular(GlobalConstraint):
             else:
                 return False
         return curr_node in accepting
+
+
+class MDD(GlobalConstraint):
+    """
+    An MDD of depth n is an acyclic layered graph with a single root node, and one accepting sink node.
+    The constraint takes as input an array of n integer variables and a graph representation using a transition table.
+    The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node, and ending in the accepting sink node.
+
+    The transitions are defined by a list of tuples (id1, value, id2).
+    An id is an integer or string representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
+    If not given explicitly, the root node is the first node in the transition table (i.e., transitions[0][0]), and is on level 0.
+    The sink node is the only node on level n.
+
+    Example: the following MDD accepts the solutions [1,1,1], [2,2,1] and [2,3,2] for the three variables x,y,z. The root node is "A" and the sink node is "F".
+    cp.MDD(array=[x,y,z],
+           transitions = [("A", 1, "B"), ("B", 1, "D"), ("D", 1 "F"),
+                          ("A",2,"C"), ("C", 2, "D"), ("C", 3, "E"), ("E", 2, "F")])
+    """
+
+    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None):
+        """
+        Arguments:
+            array (ListLike[Expression]): List of expressions representing the input sequence
+            transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (source, value, destination)
+            start (Optional[int | str]): Root node id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
+        """
+        array = flatlist(array)
+        if not all(isinstance(x, Expression) for x in array):
+            raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
+
+        _node_type = type(transitions[0][0])
+        for s, v, e in transitions:
+            if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
+                raise TypeError(
+                    f"The second argument of an MDD constraint should be a collection of transitions ({_node_type}, int, {_node_type})")
+
+        super().__init__("mdd", (array, transitions))
+        self.root_node = start if start is not None else transitions[0][0]
+        self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
+        for s, v, e in transitions:
+            self.mapping[s][v] = e
+
+        self.levels = {self.root_node: 0}
+        current_nodes = [self.root_node]
+        for i in range(len(array)):
+            new_nodes = []
+            for n in current_nodes:
+                for v in self.mapping[n]:
+                    new_nodes.append(self.mapping[n][v])
+                    self.levels[self.mapping[n][v]] = i + 1
+            current_nodes = new_nodes
+        # Check that there is exactly one sink node on level n (with n the number of integer variables)
+        assert sum(level == len(array) for node, level in self.levels.items()) == 1
+
+        self.sink_node = next(node for node, level in self.levels.items() if level == len(array))
+        self.nodes = self.levels.keys()
+        self.node_map = {n: (-1 if n == self.sink_node else i) for i, n in enumerate(self.nodes)}
+
+    def _reduce(self):
+        """
+            Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes (to be implemented)
+        """
+        pass
+
+    def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
+        """
+        Auxiliary function that extends the MDD with invalid edges, which are directed to the sink node.
+
+        Returns:
+            tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
+            A tuple containing the extended mapping of the MDD and a set of invalid edges (source node, transition value) that are added to the MDD.
+        """
+        invalid_edges = set()
+        extended_mapping = copy.deepcopy(self.mapping)
+        sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
+        for s in self.mapping.keys():
+            level = self.levels[s]
+            domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
+            for v in domain:
+                if v not in self.mapping[s]:
+                    extended_mapping[s][v] = sink_node
+                    invalid_edges.add((s, v))
+
+        return extended_mapping, invalid_edges
+
+
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Flow decomposition of the MDD global constraint.
+        Enforces that the condition is satisfied, by ensuring that the flow in equals the flow out for every node.
+        To do this, we introduce auxiliary boolean variables for every edge in the MDD, use them in flow constraints,
+        and link them to all variable assignments in the array.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]:
+                A tuple containing the constraints representing the constraint value and the defining constraints.
+        """
+        arr, _ = self.args
+
+        # MDD is extended with invalid edges, which are directed to the sink node
+        extended_mapping, invalid_edges_set = self._get_complete_mdd()
+        invalid_edges = frozenset(invalid_edges_set)
+
+        # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
+        # The default is an empty list, representing no ingoing / outgoing flow.
+        flow_in: dict[int | str, list[Expression]] = defaultdict(list)
+        flow_out: dict[int | str, list[Expression]] = defaultdict(list)
+
+        # Used to link edge variables to direct encoding variables in a later step
+        edge_vars = defaultdict(list)
+        invalid_edge_vars = []
+
+        # Determine flow in and flow out for each node
+        for src, edges in extended_mapping.items():
+            for value, dst in edges.items():
+                level = self.levels[src]
+                edge_var = cp.boolvar()
+                flow_out[src].append(edge_var)
+                flow_in[dst].append(edge_var)
+                edge_vars[(level, value)].append(edge_var)
+
+                if (src, value) in invalid_edges:
+                    invalid_edge_vars.append(edge_var)
+
+        cons = []
+
+        # Enforce flow constraints: flow in = flow out, at most one activated in/out edge
+        for node, level in self.levels.items():
+            incoming = flow_in[node]
+            outgoing = flow_out[node]
+
+            if level == 0:
+                cons.append(cp.sum(outgoing) == 1) # root
+            elif level == len(arr):
+                cons.append(cp.sum(incoming) == 1) # sink
+            else:
+                cons.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
+                cons.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
+                cons.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
+
+        # Enforce direct encoding variable arr[i] == v if an edge with label v is activated at level i
+        for (level, value), vars_ in edge_vars.items():
+            cons.append(cp.sum(vars_) == (arr[level] == value))
+
+        return [cp.sum(invalid_edge_vars) == 0], cons
+
+
+    def value(self) -> Optional[bool]:
+        """
+        Returns:
+            Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
+        """
+        arr, transitions = self.args
+        argvals = [argval(a) for a in arr]
+        curr_node = self.root_node
+        if any(v is None for v in argvals):
+            return None
+
+        for v in argvals:
+            if curr_node in self.mapping:
+                if v in self.mapping[curr_node]:
+                    curr_node = self.mapping[curr_node][v]
+                else:
+                    return False
+            else:
+                return False
+        return True # can only have reached end node
+
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint

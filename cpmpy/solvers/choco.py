@@ -87,7 +87,7 @@ class CPM_choco(SolverInterface):
                                     "table", 'negative_table', "short_table", "regular", "InDomain",
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
-                                    "lex_lesseq", "lex_less",
+                                    "lex_lesseq", "lex_less", "mdd",
                                     "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
 
@@ -646,7 +646,22 @@ class CPM_choco(SolverInterface):
                 automaton.set_initial_state(cpm_expr.node_map[start])
                 automaton.set_final(*[cpm_expr.node_map[a] for a in accepting])
                 return self.chc_model.regular(self._to_vars(array), automaton)
-            
+            elif cpm_expr.name == "mdd":
+                from pychoco.objects.graphs.multivalued_decision_diagram import MultivaluedDecisionDiagram
+                from pychoco.backend import create_mdd_transitions
+                from pychoco._handle_wrapper import _HandleWrapper
+                from pychoco._utils import make_int_2d_array, make_intvar_array
+
+                array, transitions = cpm_expr.args
+                transitions_int = [[cpm_expr.node_map[src], val, cpm_expr.node_map[dst]] for src, val, dst in transitions]
+                # currently no user-friendly way to create MDD objects with transitions in Pychoco.
+                # Manually create the required objects using the backend API.
+                # Issue opened on github: https://github.com/chocoteam/pychoco/issues/43
+                chc_handle = create_mdd_transitions(make_intvar_array(self._to_vars(array)), make_int_2d_array(transitions_int))
+                chc_mdd = MultivaluedDecisionDiagram.__new__(MultivaluedDecisionDiagram)
+                _HandleWrapper.__init__(chc_mdd, chc_handle)
+                return self.chc_model.mddc(self._to_vars(array), chc_mdd)
+
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)

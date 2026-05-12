@@ -253,9 +253,6 @@ class TestTransLinearize:
 
 
 
-
-
-
 class TestConstRhs:
 
     def test_numvar(self):
