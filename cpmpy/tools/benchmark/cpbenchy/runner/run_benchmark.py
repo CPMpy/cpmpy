@@ -34,7 +34,6 @@ Usage Examples:
 # python sync/cplab/cplab/runner/run_benchmark.py --dataset cpmpy.tools.dataset.xcsp3.XCSP3Dataset --dataset-year 2024 --dataset-track CSP --dataset-download --runner xcsp3 --workers 1 --cores_per_worker 8 --memory-per-worker 2048 --time_limit 60 --output ./results/
 
 import argparse
-import importlib
 import sys
 import threading
 import time
@@ -45,7 +44,12 @@ from multiprocessing import Manager
 from tqdm import tqdm
 
 from cplab.adapter._base import InstanceAdapter
-from cplab.runner.manager import load_instance_runner, run_instance, RunExecResourceManager
+from cplab.runner.manager import (
+    load_instance_runner,
+    run_instance,
+    PythonResourceManager,
+    RunExecResourceManager,
+)
 from cplab.observer import Observer, WriteToFileObserver, WriteToStdoutObserver
 from cplab.observer.utils import OBSERVER_CLASSES, load_observers
 
@@ -78,6 +82,16 @@ def parse_cores(value, /) -> Optional[tuple[List[int], bool]]:
     if n <= 0:
         return None
     return (list(range(n)), False)
+
+
+def create_resource_manager(name: str, pin_cores: bool = True):
+    """Create the configured resource manager for worker processes."""
+    normalized = name.lower().replace("_", "-")
+    if normalized == "runexec":
+        return RunExecResourceManager(pin_cores=pin_cores)
+    if normalized == "python":
+        return PythonResourceManager()
+    raise ValueError(f"Unknown resource manager: {name}")
 
 
 def run_single_instance(
@@ -132,9 +146,25 @@ def run_single_instance(
     )
 
 
-def worker_function(worker_id, cores, job_queue, time_limit, memory_limit, runner_path, solver, seed, intermediate, verbose, output_dir, pin_cores=True, completed_count=None, count_lock=None):
+def worker_function(
+    worker_id,
+    cores,
+    job_queue,
+    time_limit,
+    memory_limit,
+    runner_path,
+    solver,
+    seed,
+    intermediate,
+    verbose,
+    output_dir,
+    resource_manager_name="runexec",
+    pin_cores=True,
+    completed_count=None,
+    count_lock=None,
+):
     """Worker function for parallel execution."""
-    resource_manager = RunExecResourceManager(pin_cores=pin_cores)
+    resource_manager = create_resource_manager(resource_manager_name, pin_cores=pin_cores)
     
     while True:
         try:
@@ -293,6 +323,7 @@ def run_batch(
     intermediate: bool = False,
     verbose: bool = False,
     output_dir: Optional[str] = None,
+    resource_manager: str = "runexec",
     no_pin_cores: bool = False,
 ):
     """
@@ -360,7 +391,10 @@ def run_batch(
         idx += size
     
     if verbose:
-        print(f"Total cores: {total_cores}, Workers: {workers}, Cores: {core_list}")
+        print(
+            f"Total cores: {total_cores}, Workers: {workers}, Cores: {core_list}, "
+            f"Resource manager: {resource_manager}"
+        )
         for i, cores in enumerate(worker_cores):
             print(f"Worker {i}: cores {cores}")
     
@@ -406,6 +440,7 @@ def run_batch(
                     intermediate,
                     verbose,
                     output_dir,
+                    resource_manager,
                     pin_cores,
                     completed_count,
                     count_lock,
@@ -592,6 +627,16 @@ def main():
         type=str,
         default="1",
         help="Cores per worker: number (e.g., 3, no pinning) or explicit list (e.g., 0,1,2,3,4,5,6,7,8 for pinning)"
+    )
+    parser.add_argument(
+        "--resource-manager",
+        type=str,
+        default="runexec",
+        choices=("runexec", "python"),
+        help=(
+            "Resource manager for batch/dataset workers: runexec uses benchexec, "
+            "python uses in-process Python limits (default: runexec)"
+        )
     )
     parser.add_argument(
         "--no-pin-cores",
@@ -785,6 +830,7 @@ def main():
                 intermediate=args.intermediate,
                 verbose=args.verbose,
                 output_dir=args.output,
+                resource_manager=args.resource_manager,
                 no_pin_cores=args.no_pin_cores,
             )
         except Exception as e:
@@ -832,6 +878,7 @@ def main():
                 intermediate=args.intermediate,
                 verbose=args.verbose,
                 output_dir=args.output,
+                resource_manager=args.resource_manager,
                 no_pin_cores=args.no_pin_cores,
             )
         except Exception as e:
