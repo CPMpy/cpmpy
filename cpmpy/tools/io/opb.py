@@ -51,6 +51,7 @@ from cpmpy.expressions.utils import is_num
 # Regular expressions
 HEADER_RE = re.compile(r'(.*)\s*#variable=\s*(\d+)\s*#constraint=\s*(\d+).*')
 TERM_RE = re.compile(r"([+-])\s*((?:(?:\d+\s+)?~?[^\s;]+(?:\s+~?[^\s;]+)*))(?=\s+[+-]|$)")
+TERM_RE = re.compile(r"([+-]?)\s*((?:(?:\d+\s+)?~?[^\s;=]+(?:\s+~?[^\s;=]+)*?))(?=\s*[+-]|\s*=|\s*;|$)")
 OBJ_TERM_RE = re.compile(r'^min:')
 IND_TERM_RE = re.compile(r'([>=|<=|=]+)\s+([+-]?\d+)')
 IND_TERM_RE = re.compile(r'(>=|<=|=)\s*([+-]?\d+)')
