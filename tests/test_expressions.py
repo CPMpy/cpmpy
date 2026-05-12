@@ -223,10 +223,6 @@ class TestMul:
         expr = x * 3
         assert expr.is_lhs_num is True
         assert expr.args[0] == 3 and expr.args[1] is x
-        # real coeff: 0.3 * x -> is_lhs_num True (for objectives)
-        expr = 0.3 * x
-        assert expr.is_lhs_num is True
-        assert expr.args[0] == 0.3 and expr.args[1] is x
         # var * var -> no constant, is_lhs_num False
         y = cp.intvar(0, 5, name="y")
         expr = x * y
@@ -269,13 +265,13 @@ class TestArrayExpressions:
             res *= v.value()
         assert y.value() == res
         # with axis arg
-        x = intvar(0,5,shape=(10,10), name="x")
-        y = intvar(0, 1000, shape=10, name="y")
-        model = cp.Model(y == x.prod(axis=0))
+        x = intvar(0,5,shape=(10,4), name="x")
+        y = intvar(0, 200, shape=10, name="y")
+        model = cp.Model(y == x.prod(axis=1))
         model.solve()
-        for i,vv in enumerate(x):
+        for i in range(y.shape[0]):
             res = 1
-            for v in vv:
+            for v in x[i, :]:
                 res *= v.value()
             assert y[i].value() == res
 
@@ -491,11 +487,9 @@ class TestBounds:
         assert int == type(cp.sum(x[0]).value())
         assert int == type(cp.sum(x).value())
         assert int == type(cp.sum([1,2,3] * x[0]).value())
-        assert float == type(cp.sum([0.1,0.2,0.3] * x[0]).value())
         
         # also numpy should be converted to Python native when callig value()
         assert int == type(cp.sum(np.array([1, 2, 3]) * x[0]).value())
-        assert float == type(cp.sum(np.array([0.1,0.2,0.3]) * x[0]).value())
         
         # test binary operators
         a,b = x[0,[0,1]]

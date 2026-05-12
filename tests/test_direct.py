@@ -154,3 +154,9 @@ class TestDirectHexaly:
         assert model.solve()
 
         assert abs(a.value() - b.value()) >=3
+
+    def test_floatsum_objective(self):
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        m = cp.Model(maximize=cp.FloatSum([0.3, 0.5, 0.6], [x, y, z]))
+        assert m.solve(solver="hexaly")
+        assert m.objective_value() == pytest.approx(1.4, abs=1e-05)
