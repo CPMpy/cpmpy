@@ -313,6 +313,20 @@ class SolverArgsObserver(Observer):
 
         return res, None
 
+    def _highs_arguments(
+        self,
+        cores: Optional[int] = None,
+        seed: Optional[int] = None,
+        **kwargs
+    ):
+        res = dict()
+        if cores is not None:
+            res |= {"threads": cores}
+        if seed is not None:
+            res |= {"random_seed": seed}
+
+        return res, None
+
     def _solver_arguments(
             self,
             runner: Runner,
@@ -345,6 +359,8 @@ class SolverArgsObserver(Observer):
             return self._hexaly_arguments(runner, model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
         elif solver == "cplex":
             return self._cplex_arguments(cores=cores, **kwargs)
+        elif solver == "highs":
+            return self._highs_arguments(cores=cores, seed=seed, **kwargs)
         else:
             runner.print_comment(f"setting parameters of {solver} is not (yet) supported")
             return dict(), None
