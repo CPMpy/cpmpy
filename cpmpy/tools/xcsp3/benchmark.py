@@ -177,14 +177,15 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
     process = ctx.Process(target=xcsp3_wrapper, args=(
                                                     child_conn, 
                                                       {
-                                                          "benchname": filename, 
-                                                          "solver": solver, 
-                                                          "time_limit": time_limit, 
-                                                          "mem_limit": mem_limit, 
-                                                          "intermediate": intermediate, 
+                                                          "benchname": filename,
+                                                          "solver": solver,
+                                                          "time_limit": time_limit,
+                                                          "mem_limit": mem_limit,
+                                                          "intermediate": intermediate,
                                                           "force_mem_limit": True,
                                                           "time_buffer": 1,
                                                           "cores": cores,
+                                                          "verbose": verbose,
                                                         }, 
                                                     verbose))
     process.start()
@@ -269,18 +270,25 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
             result["solution"] = status["exception"]    
 
     if checker_path is not None and complete_solution is not None:
-        checker_output, checker_time = run_solution_checker(
-            JAR=checker_path,
-            instance_location=file_path,
-            out_file="'" + complete_solution.replace("\n\r", " ").replace("\n", " ").replace("v   ", "").replace("v ", "")+ "'",
-            verbose=verbose,
-            cpm_time=result.get('time_solve', 0)  # or total solve time you have
-        )
+        try:
+            checker_output, checker_time = run_solution_checker(
+                JAR=checker_path,
+                instance_location=file_path,
+                out_file="'" + complete_solution.replace("\n\r", " ").replace("\n", " ").replace("v   ", "").replace("v ", "")+ "'",
+                verbose=verbose,
+                cpm_time=result.get('time_solve', 0)  # or total solve time you have
+            )
 
-        if checker_output is not None:
-            result['checker_result'] = checker_output
-        else:
-            result['checker_result'] = None
+            print("CHECKER")
+            print(checker_output)
+
+            if checker_output is not None:
+                result['checker_result'] = checker_output
+            else:
+                result['checker_result'] = None
+        except Exception as e:
+            print("Error during checker", e)
+            print(traceback.format_exc())
 
     # Use a lock file to prevent concurrent writes
     lock_file = f"{output_file}.lock"
@@ -307,8 +315,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
 def run_solution_checker(JAR, instance_location, out_file, verbose, cpm_time):
 
     start = time.time()
-    command = ["java", "-jar", JAR, "'" + str(instance_location) + "'" + " " + str(out_file)]
-    command = " ".join(command)
+    command = f"{JAR} '{instance_location}' {out_file}"
+    # command = ["java", "-jar", JAR, "'" + str(instance_location) + "'" + " " + str(out_file)]
+    # command = " ".join(command)
     test_res_str = subprocess.run(command, capture_output=True, text=True, shell=True)
     checker_time = time.time() - start
 
@@ -326,6 +335,7 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                    time_limit: int = 300, mem_limit: Optional[int] = 4096, cores: int=1,
                    output_dir: str = 'results',
                    verbose: bool = False, intermediate: bool = False,
+                    name = None,
                    checker_path: Optional[str] = None) -> str:
     """
     Benchmark a solver on XCSP3 instances.
@@ -348,10 +358,10 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Get current timestamp in a filename-safe format
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name = name if name else datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # Define output file path with timestamp
-    output_file = str(output_dir / f"xcsp3_{year}_{track}_{solver}_{timestamp}.csv")
+    output_file = str(output_dir / f"xcsp3_{year}_{track}_{solver}_{name}.csv")
     
     # Initialize dataset
     dataset = XCSP3Dataset(year=year, track=track, download=True)
@@ -370,9 +380,8 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                 pass
             except Exception as e:
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
+                print(traceback.format_exc())
 
-        raise()
-    
     return output_file
 
 if __name__ == "__main__":
@@ -386,7 +395,8 @@ if __name__ == "__main__":
     parser.add_argument('--mem-limit', type=int, default=8192, help='Memory limit in MB per instance')
     parser.add_argument('--cores', type=int, default=1, help='Number of cores to assign tp a single instance')
     parser.add_argument('--output-dir', type=str, default='results', help='Output directory for CSV files')
-    parser.add_argument('--verbose', action='store_true', help='Show solver output')
+    parser.add_argument('--name', type=str, default='results', help='Name of output file')
+    parser.add_argument('--verbose', action='store_true', default=True, help='Show solver output')
     parser.add_argument('--intermediate', action='store_true', help='Report on intermediate solutions')
     parser.add_argument('--checker-path', type=str, default=None,
                     help='Path to the XCSP3 solution checker JAR file')

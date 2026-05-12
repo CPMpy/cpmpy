@@ -291,6 +291,14 @@ class AllDifferentExceptN(GlobalConstraint):
             cons.append(cond.implies(cp.any([x == a for a in n]))) # equivalent to (x in n) | (y in n) | (x != y)
         return cons, []
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """ Almost the same as AllDifferent """
+        # TODO AllDifferent should subclass AllDifferentExceptN
+        arr, n = self.args
+        lbs, ubs = get_bounds(arr)
+        lb, ub = min(lbs), max(ubs)
+        return [cp.sum(arg_i == val for arg_i in arr) <= 1 for val in range(lb, ub + 1) if val not in n], []
+
     def value(self) -> Optional[bool]:
         """
         Returns:
