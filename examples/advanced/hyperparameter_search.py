@@ -66,9 +66,7 @@ from cpmpy.transformations.flatten_model import flatten_model
 from cpmpy.tools.tune_solver import ParameterTuner, GridSearchTuner
 
 def main():
-    model = nqueens(n=100)
-    # flatten once upfront, reduces overhead of multiple solves
-    model = flatten_model(model)
+    model = nqueens(n=50)
 
     # a selection of parameters, see docs of cpmpy.solvers.ortools
     all_params = {
