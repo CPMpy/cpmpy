@@ -124,7 +124,7 @@ class CPM_pindakaas(SolverInterface):
 
     def _int2bool_user_vars(self):
         # ensure all vars are known to solver
-        self.solver_vars_1d(self.user_vars)
+        self.solver_vars_1d(list(self.user_vars))
 
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         user_vars = set()
@@ -287,7 +287,10 @@ class CPM_pindakaas(SolverInterface):
         if not isinstance(clause, (tuple, list)):
             raise TypeError
 
-        self.pdk_solver.add_clause(self.solver_vars_1d([~c for c in conditions] + list(clause)))
+        pdk_vars = self.solver_vars_1d(clause)
+        if len(conditions) > 0:
+            pdk_vars = self.solver_vars_1d(~c for c in conditions) + pdk_vars
+        self.pdk_solver.add_clause(pdk_vars)
 
     def _post_constraint(self, cpm_expr, conditions=[]):
         if not isinstance(conditions, list):
