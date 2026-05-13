@@ -111,8 +111,8 @@ if model.solve():
     # Visualize with Plotly's excellent Gantt chart support
     import plotly.express as px
     df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
-    df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
-    df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
+    df_solution["start"] = pd.to_datetime(start.value(), unit="m")
+    df_solution["end"] = pd.to_datetime(end.value(), unit="m")
     import plotly.io as pio; pio.renderers.default = "browser"
     px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
 else:
