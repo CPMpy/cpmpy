@@ -710,9 +710,8 @@ class CPM_ortools(SolverInterface):
         """Helper function to create tasks variables for use in Cumulative and NoOverlap constraints."""
         tasks = []
         cons = []
-        for i, (cpm_s, cpm_d) in enumerate(zip(start, duration)):
-
-            ort_s, ort_d = self.solver_vars([cpm_s, cpm_d])
+        ort_start, ort_duration = self.solver_vars_1d(start), self.solver_vars_1d(duration)
+        for i, (cpm_s, cpm_d, ort_s, ort_d) in enumerate(zip(start, duration, ort_start, ort_duration)):
             
             # handle optional intervals
             if is_present is not None:
