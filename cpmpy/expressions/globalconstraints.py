@@ -591,9 +591,8 @@ class Table(GlobalConstraint):
 
         arr, tab = self.args
 
-        transitions : list[tuple[int | str, int, int | str]] = []
-        prefix_to_node = {}
-        next_id = 0
+        transitions : set[tuple[int | str, int, int | str]] = set()
+        prefix_to_node : dict[tuple[int, ...], str] = {}
 
         for row in tab:
             current = "src"
@@ -604,16 +603,15 @@ class Table(GlobalConstraint):
                 else:
                     prefix = prefix + (val,)
                     if prefix not in prefix_to_node:
-                        prefix_to_node[prefix] = f"n{next_id}"
-                        next_id += 1
+                        prefix_to_node[prefix] = f"n{len(prefix_to_node) + 1}"
                     nxt = prefix_to_node[prefix]
 
                 transition = (current, int(val), nxt)
                 if transition not in transitions:
-                    transitions.append(transition)
+                    transitions.add(transition)
                 current = nxt
 
-        return [MDD(arr, transitions)], []
+        return [MDD(arr, list(transitions))], []
 
 
 
