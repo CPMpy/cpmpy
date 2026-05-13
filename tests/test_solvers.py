@@ -19,6 +19,7 @@ from cpmpy.solvers.exact import CPM_exact
 from cpmpy.solvers.choco import CPM_choco
 from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy.solvers.scip import CPM_scip
+from cpmpy.solvers.highs import CPM_highs
 from cpmpy import SolverLookup
 from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
@@ -1227,3 +1228,20 @@ def test_scip_special_cardinality():
     assert constraints[0].getConshdlrName() == "cardinality"  # translated to native cardinality
     assert s.solve()
     assert bvs.value().sum() <= 3
+
+
+@pytest.mark.skipif(not CPM_highs.supported(), reason="HiGHS (highspy) not installed")
+def test_highs_basic_ilp():
+    # simple ILP: 0 <= x <= 10, 0 <= y <= 10, x + 2y >= 10, minimize x + y
+    x = cp.intvar(0, 10, name="x")
+    y = cp.intvar(0, 10, name="y")
+
+    m = cp.Model([x + 2 * y >= 10], minimize=x + y)
+
+    s = SolverLookup.get("highs", m)
+    assert s.solve()
+
+    # unique optimum
+    assert x.value() == 0
+    assert y.value() == 5
+    assert s.objective_value_ == 5
