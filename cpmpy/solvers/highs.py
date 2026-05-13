@@ -158,21 +158,6 @@ class CPM_highs(SolverInterface):
 
         return self._varmap[cpm_var]
 
-    def solver_vars_1d(self, cpm_vars):
-        """
-           Faster `solver_vars()` for 1 dimensional iterables of ExprLikes
-        """
-        res = []
-        for cpm_var in cpm_vars:
-            solver_var = self._varmap.get(cpm_var, None)
-            if solver_var is not None:
-                # fast path
-                res.append(solver_var)
-            else:
-                # slow path, will check the varmap again
-                res.append(self.solver_var(cpm_var))
-        return res
-
     def _row_from_linexpr(self, linexpr) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
         """
         Convert a flat linear numeric expression (var/sum/wsum)
