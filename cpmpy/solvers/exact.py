@@ -394,32 +394,35 @@ class CPM_exact(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
-            return cpm_var
 
-        # special case, negative-bool-view. Should be eliminated in linearize
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+        xct_var = self._varmap.get(cpm_var, None)
 
-        # return it if it already exists
-        if cpm_var in self._varmap:
-            return self._varmap[cpm_var]
+        if xct_var is not None:
+            return xct_var
 
-        # create if it does not exist
-        revar = str(cpm_var)
         if isinstance(cpm_var, _BoolVarImpl):
-            self.xct_solver.addVariable(revar)
-        elif isinstance(cpm_var, _IntVarImpl):
+            if isinstance(cpm_var, NegBoolView):
+                raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+
+            xct_var = cpm_var.name
+            self.xct_solver.addVariable(xct_var) # does not return anything
+                    
+        elif isinstance(cpm_var, _IntVarImpl): # intvar, encode it
             lb, ub = cpm_var.get_bounds()
             if self.encoding is None:
                 encoding = "order" if ub-lb < 8 else "log" # heuristic bound
             else:
                 encoding = self.encoding # can also force it
-            self.xct_solver.addVariable(revar, lb, ub, encoding)
+            
+            xct_var = cpm_var.name
+            self.xct_solver.addVariable(xct_var, lb, ub, encoding)
+        elif is_num (cpm_var):
+            return cpm_var # TODO check if this case is needed
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
-        self._varmap[cpm_var] = revar
-        return revar
+
+        self._varmap[cpm_var] = xct_var
+        return xct_var
 
 
     def objective(self, expr, minimize):
