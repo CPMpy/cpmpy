@@ -657,14 +657,6 @@ class CPM_ortools(SolverInterface):
                 self.add(task_cons)
                 return self.ort_model.AddNoOverlap(tasks)
 
-                if end is None: # need to make the end-variables ourself
-                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-
-                start, dur, end, is_present = self.solver_vars([start, dur, end, is_present])
-                is_present = [bool(p) if is_bool(p) else p for p in is_present] # convert BoolVals
-                intervals = [self.ort_model.NewOptionalIntervalVar(s, d, e, p, f"interval_{s}-{d}-{e}-{p}") for s, d, e, p in zip(start, dur, end, is_present)]
-
-                return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars direclty is recommended
