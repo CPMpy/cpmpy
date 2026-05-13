@@ -912,23 +912,21 @@ class MDD(GlobalConstraint):
 
         return extended_mapping, invalid_edges
 
-
-    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+    def _mdd_to_flow(self,
+                     mapping: dict[int | str, dict[int, int | str]],
+                     invalid_edges: frozenset[tuple[int | str, int]] = frozenset()
+                     ) -> tuple[list[Expression], list[Expression]]:
         """
-        Flow decomposition of the MDD global constraint.
-        Enforces that the condition is satisfied, by ensuring that the flow in equals the flow out for every node.
+        Auxiliary function taking as input a mapping of the MDD and a set of invalid edges,
+        and returning the flow constraints encoding the MDD, and the list of edge variables corresponding to invalid edges.
         To do this, we introduce auxiliary boolean variables for every edge in the MDD, use them in flow constraints,
         and link them to all variable assignments in the array.
-
         Returns:
             tuple[list[Expression], list[Expression]]:
-                A tuple containing the constraints representing the constraint value and the defining constraints.
+                A tuple containing the constraints representing the flow encoding of the MDD and the list of edge variables corresponding to invalid edges.
         """
-        arr, _ = self.args
 
-        # MDD is extended with invalid edges, which are directed to the sink node
-        extended_mapping, invalid_edges_set = self._get_complete_mdd()
-        invalid_edges = frozenset(invalid_edges_set)
+        arr = self.args[0]
 
         # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
         # The default is an empty list, representing no ingoing / outgoing flow.
@@ -937,10 +935,10 @@ class MDD(GlobalConstraint):
 
         # Used to link edge variables to direct encoding variables in a later step
         edge_vars = defaultdict(list)
-        invalid_edge_vars = []
+        invalid_edge_vars : list[Expression] = []
 
         # Determine flow in and flow out for each node
-        for src, edges in extended_mapping.items():
+        for src, edges in mapping.items():
             for value, dst in edges.items():
                 level = self.levels[src]
                 edge_var = cp.boolvar()
@@ -959,25 +957,26 @@ class MDD(GlobalConstraint):
             outgoing = flow_out[node]
 
             if level == 0:
-                cons.append(cp.sum(outgoing) == 1) # root
+                cons.append(cp.sum(outgoing) == 1)  # root
             elif level == len(arr):
-                cons.append(cp.sum(incoming) == 1) # sink
+                cons.append(cp.sum(incoming) == 1)  # sink
             else:
-                cons.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
-                cons.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
-                cons.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
+                cons.append(cp.sum(incoming) == cp.sum(outgoing))  # enforce flow for internal nodes
+                cons.append(cp.sum(incoming) <= 1)  # redundant constraint: at most one incoming edge
+                cons.append(cp.sum(outgoing) <= 1)  # redundant constraint: at most one outgoing edge
 
         # Enforce direct encoding variable arr[i] == v if an edge with label v is activated at level i
         for (level, value), vars_ in edge_vars.items():
             cons.append(cp.sum(vars_) == (arr[level] == value))
+        return cons, invalid_edge_vars
 
-        return [cp.sum(invalid_edge_vars) == 0], cons
 
-
-    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+    def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Positive flow decomposition of the MDD global constraint.
-        Alternatively to
+        Flow decomposition of the MDD global constraint.
+        Enforces that the condition is satisfied, by ensuring that the flow in equals the flow out for every node.
+        First the mapping is extended with invalid edges, which are directed to the sink node, and then the flow constraints are defined.
+        The MDD global evaluates to true iff no invalid edge is taken.
 
         Returns:
             tuple[list[Expression], list[Expression]]:
@@ -985,43 +984,24 @@ class MDD(GlobalConstraint):
         """
         arr, _ = self.args
 
-        # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
-        # The default is an empty list, representing no ingoing / outgoing flow.
-        flow_in: dict[int | str, list[Expression]] = defaultdict(list)
-        flow_out: dict[int | str, list[Expression]] = defaultdict(list)
+        # MDD is extended with invalid edges, which are directed to the sink node
+        extended_mapping, invalid_edges_set = self._get_complete_mdd()
+        invalid_edges = frozenset(invalid_edges_set)
 
-        # Used to link edge variables to direct encoding variables in a later step
-        edge_vars = defaultdict(list)
+        cons, invalid_edge_vars = self._mdd_to_flow(extended_mapping, invalid_edges)
+        return [cp.sum(invalid_edge_vars) == 0], cons
 
-        # Determine flow in and flow out for each node
-        for src, edges in self.mapping.items():
-            for value, dst in edges.items():
-                level = self.levels[src]
-                edge_var = cp.boolvar()
-                flow_out[src].append(edge_var)
-                flow_in[dst].append(edge_var)
-                edge_vars[(level, value)].append(edge_var)
 
-        cons = []
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive flow decomposition of the MDD global constraint.
+        In contrast with decompose(), no extension with invalid edges is needed for the positive decomposition.
 
-        # Enforce flow constraints: flow in = flow out, at most one activated in/out edge
-        for node, level in self.levels.items():
-            incoming = flow_in[node]
-            outgoing = flow_out[node]
-
-            if level == 0:
-                cons.append(cp.sum(outgoing) == 1) # root
-            elif level == len(arr):
-                cons.append(cp.sum(incoming) == 1) # sink
-            else:
-                cons.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
-                cons.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
-                cons.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
-
-        # Enforce direct encoding variable arr[i] == v if an edge with label v is activated at level i
-        for (level, value), vars_ in edge_vars.items():
-            cons.append(cp.sum(vars_) == (arr[level] == value))
-
+        Returns:
+            tuple[list[Expression], list[Expression]]:
+                A tuple containing the constraints representing the constraint value and the defining constraints.
+        """
+        cons, _ = self._mdd_to_flow(self.mapping)
         return cons, []
 
 
