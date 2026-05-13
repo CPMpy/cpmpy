@@ -201,7 +201,7 @@ class CPM_exact(SolverInterface):
             warnings.warn(wrn_txt)
 
         # ensure all vars are known to solver
-        self.solver_vars_1d(list(self.user_vars))
+        self.solver_vars_1d(self.user_vars)
 
         self.xct_solver.clearAssumptions()
 
@@ -296,7 +296,7 @@ class CPM_exact(SolverInterface):
             warnings.warn(f"Exact only supports options at initialization: {kwargs.items()}")
 
         # ensure all vars are known to solver
-        self.solver_vars_1d(list(self.user_vars))
+        self.solver_vars_1d(self.user_vars)
 
         self.xct_solver.clearAssumptions()
 
@@ -682,7 +682,7 @@ class CPM_exact(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
         # clear previous solution hints
-        self.xct_solver.clearSolutionHints(self.solver_vars_1d(list(self.user_vars)))
+        self.xct_solver.clearSolutionHints(self.solver_vars_1d(self.user_vars))
 
         cpm_vars = flatlist(cpm_vars)
         vals = flatlist(vals)

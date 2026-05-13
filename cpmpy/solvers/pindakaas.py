@@ -111,7 +111,7 @@ class CPM_pindakaas(SolverInterface):
         import pindakaas as pdk
 
         assert subsolver is None, "Pindakaas does not support any subsolvers for the moment"
-        self.ivarmap = dict[_IntVarImpl,IntVarEnc]()  # for the integer to boolean encoders
+        self.ivarmap = dict()  # for the integer to boolean encoders
         self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
@@ -124,7 +124,7 @@ class CPM_pindakaas(SolverInterface):
 
     def _int2bool_user_vars(self):
         # ensure all vars are known to solver
-        self.solver_vars_1d(list(self.user_vars))
+        self.solver_vars_1d(self.user_vars)
 
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         user_vars = set()
@@ -133,7 +133,7 @@ class CPM_pindakaas(SolverInterface):
                 user_vars.add(x)
             else:
                 # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x].vars())
+                user_vars.update(self.ivarmap[x.name].vars())
         return user_vars
 
     def solve(self, time_limit: Optional[float] = None, assumptions: Optional[Iterable[_BoolVarImpl]] = None):
@@ -237,9 +237,9 @@ class CPM_pindakaas(SolverInterface):
             if cpm_var not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self.add(cons)
-                self.ivarmap[cpm_var] = enc
+                self.ivarmap[cpm_var.name] = enc # ivarmap still name -- TODO: change _varmap to use str too
             else:
-                enc = self.ivarmap[cpm_var]
+                enc = self.ivarmap[cpm_var.name]
             return self.solver_vars_1d(enc.vars())
         else:
             raise TypeError(f"Unexpected type: {cpm_var}")

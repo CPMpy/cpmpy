@@ -193,7 +193,7 @@ class CPM_ortools(SolverInterface):
         """
         from ortools.sat.python import cp_model as ort
         # ensure all user vars are known to solver
-        self.solver_vars_1d(list(self.user_vars))
+        self.solver_vars_1d(self.user_vars)
 
         # set time limit
         if time_limit is not None:
