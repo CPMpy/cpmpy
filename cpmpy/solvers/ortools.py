@@ -322,9 +322,9 @@ class CPM_ortools(SolverInterface):
                 if isinstance(cpm_var, NegBoolView):
                     # special case: work direclty on var inside the view
                     return self.solver_var(cpm_var._bv).Not()
-                solver_var = self.ort_model.NewBoolVar(str(cpm_var))
+                solver_var = self.ort_model.NewBoolVar(cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
-                solver_var = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                solver_var = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, cpm_var.name)
             elif is_num(cpm_var):
                 # allowed to ease posting of constraints with mixed arguments
                 return cpm_var
