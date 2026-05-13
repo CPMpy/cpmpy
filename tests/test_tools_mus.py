@@ -4,13 +4,13 @@ import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
-
+@pytest.mark.requires_solver("ortools")
 class TestMus:
     def setup_method(self):
         self.mus_func = mus
         self.naive_func = mus_naive
 
-    def test_circular(self):
+    def test_circular(self, solver):
         x = cp.intvar(0, 3, shape=4, name="x")
         # circular "bigger then", UNSAT
         cons = [
@@ -22,10 +22,10 @@ class TestMus:
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
 
-        assert set(self.mus_func(cons)) == set(cons[:3])
+        assert set(self.mus_func(cons, solver=solver)) == set(cons[:3])
         assert set(self.naive_func(cons)) == set(cons[:3])
 
-    def test_bug_191(self):
+    def test_bug_191(self, solver):
         """
         Original Bug request: https://github.com/CPMpy/cpmpy/issues/191
         When assum is a single boolvar and candidates is a list (of length 1), it fails.
@@ -34,12 +34,12 @@ class TestMus:
         hard = [~bv]
         soft = [bv]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver="ortools") # crashes
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver) # crashes
         assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
         assert set(mus_naive_cons) == set(soft)
 
-    def test_bug_191_many_soft(self):
+    def test_bug_191_many_soft(self, solver):
         """
         Checking whether bugfix 191  doesn't break anything in the MUS tool chain,
         when the number of soft constraints > 1.
@@ -52,12 +52,12 @@ class TestMus:
             y == 4
         ]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard) # crashes
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver) # crashes
         assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
         assert set(mus_naive_cons) == set(soft)
 
-    def test_wglobal(self):
+    def test_wglobal(self, solver):
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
 
@@ -76,34 +76,29 @@ class TestMus:
 
         # non-determinstic
         #self.assertEqual(set(mus(cons)), set(cons[1:3]))
-        ms = self.mus_func(cons)
+        ms = self.mus_func(cons, solver=solver)
         assert len(ms) < len(cons)
         assert not cp.Model(ms).solve()
         ms = self.naive_func(cons)
         assert len(ms) < len(cons)
         assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
-@pytest.mark.requires_solver("exact")       
-class TestNativeMusExact(TestMus):
-    def setup_method(self):
-        self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver="exact")
-        self.naive_func = mus_naive
 
-    def test_decomposed_global(self):
+    def test_decomposed_global(self, solver):
         x = cp.intvar(1, 5, shape=3, name="x")
         soft = [x[0] == x[1], x[1] == x[2]]
         hard = [cp.AllDifferent(x)]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard)
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
         assert len(set(mus_cons)) == 1
         mus_naive_cons = self.naive_func(soft=soft, hard=hard)
         assert len(set(mus_naive_cons)) == 1
-
-
-@pytest.mark.requires_solver("gurobi")
-class TestNativeMusGurobi(TestMus):
+        
+# add solvers that implement the native_mus method
+@pytest.mark.requires_solver("exact", "gurobi")
+class TestNativeMus(TestMus):
     def setup_method(self):
-        self.mus_func = lambda soft, hard=[], solver="gurobi": mus_native(soft, hard=hard, solver="gurobi")
+        self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver=solver)
         self.naive_func = mus_naive
 
 
