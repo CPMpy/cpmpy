@@ -80,8 +80,8 @@ def solution_opb(model):
         and not var.name.lstrip("+-").isdigit()  # skip OPB constant literals (+1, -1)
     ]
     return " ".join([
-        var.name.replace("[","").replace("]","") if var.value()
-        else "-" + var.name.replace("[","").replace("]","")
+        var.name if var.value()
+        else "-" + var.name
         for var in variables
     ])
 
