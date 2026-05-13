@@ -60,11 +60,11 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 
     newlist: List[Expression] = []
     todolist: List[Expression] = []  # these still need to be decomposed
-    decompose_positive = get_positive_decompositions()
+    positive_decomps = get_positive_decompositions()
     for expr in lst_of_expr:
         if isinstance(expr, GlobalConstraint) and expr.name not in supported:
             # toplevel/positive global constraint, decompose
-            positive_decomp = decompose_positive.get(expr.name)
+            positive_decomp = positive_decomps.get(expr.name)
             if decompose_custom is not None and expr.name in decompose_custom:
                 exprs, toplevel_exprs = cast(Tuple[List[Expression], List[Expression]], decompose_custom[expr.name](expr))
             elif positive_decomp is not None:
@@ -79,23 +79,37 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             # TODO: violates type!!!
             newlist.append(BoolVal(expr))
         elif expr.has_subexpr():
-
             if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint):
-                # special case: positively reified global constraint, use positive decomposition
-                positive_decomp = decompose_positive.get(expr.args[1].name)
+                global_constraint = expr.args[1]
+                positive_decomp = positive_decomps.get(global_constraint.name)
+
                 if positive_decomp is not None:
-                    global_constraint = expr.args[1]
+                    # Special case: use positive decomposition
                     exprs, toplevel_exprs = positive_decomp(global_constraint)
+
                     newlist.extend(expr.args[0].implies(e) for e in exprs)
                     newlist.extend(toplevel_exprs)
+                    already_decomposed = True
+                else:
+                    already_decomposed = False
             else:
-                # decompose its arguments
-                changed, newargs, rec_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                already_decomposed = False
+
+            if not already_decomposed:
+                changed, newargs, rec_toplevel = _decompose_in_tree_args(
+                    expr.args,
+                    supported=supported,
+                    supported_reified=supported_reified,
+                    csemap=csemap,
+                    decompose_custom=decompose_custom,
+                )
+
                 if changed:
                     expr = copy.copy(expr)
                     expr.update_args(newargs)
-                    if len(rec_toplevel) > 0:
+                    if rec_toplevel:
                         todolist.extend(rec_toplevel)
+
                 newlist.append(expr)
         else:
             newlist.append(expr)
