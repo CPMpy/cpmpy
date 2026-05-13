@@ -87,7 +87,7 @@ class SolverInterface(object):
 
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
-        self._varmap = dict[ExprLike, Any]()  # maps cpmpy variables to native solver variables
+        self._varmap = dict()  # maps cpmpy variables to native solver variables
         self._csemap = CSEMap()  # maps cpmpy expressions to previously created expressions (typically auxiliary variables)
 
         # rest uses own API
