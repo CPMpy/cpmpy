@@ -611,7 +611,7 @@ class Table(GlobalConstraint):
                     transitions.add(transition)
                 current = nxt
 
-        return [MDD(arr, list(transitions))], []
+        return [MDD(arr, list(transitions), start="src")], []
 
 
 
