@@ -93,7 +93,7 @@ from __future__ import annotations
 import copy
 import warnings
 from dataclasses import dataclass
-from typing import Any, Final, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
+from typing import Any, Callable, Final, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
 from frozendict import frozendict
 import numpy as np
 import cpmpy as cp
@@ -168,26 +168,28 @@ class Expression(object):
     def set_description(self, txt: str, override_print: bool = True, full_print: bool = False) -> None:
         self._description = Description(txt, override_print, full_print)
 
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
+        strargs = []
+        for arg in self.args:
+            if isinstance(arg, np.ndarray):
+                # flatten
+                strarg = ", ".join(map(str_func, arg.flat)) # with space to match list printing
+                strargs.append(f"[{strarg}]")
+            else:
+                strargs.append(str_func(arg))
+        return "{}({})".format(self.name, ",".join(strargs))
+
     def __str__(self) -> str:
         d = self._description
         if d is None or not d.override_print:
-            return self.__repr__()
+            return self._to_string(str_func=str)
         out = d.text
         if d.full_print:
             out += " -- " + self.__repr__()
         return out
 
-
     def __repr__(self) -> str:
-        strargs = []
-        for arg in self.args:
-            if isinstance(arg, np.ndarray):
-                # flatten
-                strarg = ",".join(map(str, arg.flat))
-                strargs.append(f"[{strarg}]")
-            else:
-                strargs.append(f"{arg}")
-        return "{}({})".format(self.name, ",".join(strargs))
+        return self._to_string(str_func=repr)
 
     def __hash__(self) -> int:
         return hash(self.__repr__())
@@ -612,11 +614,11 @@ class Comparison(Expression):
         assert (name in Comparison.allowed), f"Symbol {name} not allowed"
         super().__init__(name, (left, right))
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         if all(isinstance(x, Expression) for x in self.args):
-            return "({}) {} ({})".format(self.args[0], self.name, self.args[1]) 
+            return "({}) {} ({})".format(str_func(self.args[0]), self.name, str_func(self.args[1])) 
         # if not: prettier printing without braces
-        return "{} {} {}".format(self.args[0], self.name, self.args[1]) 
+        return "{} {} {}".format(str_func(self.args[0]), self.name, str_func(self.args[1])) 
     
     def __bool__(self) -> bool:
         # will be called when comparing elements in a container, but always with `==`
@@ -729,26 +731,26 @@ class Operator(Expression):
         """
         return Operator.allowed[self.name][1]
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
 
         # special cases
         if self.name == '-': # unary -
-            return "-({})".format(self.args[0])
+            return "-({})".format(str_func(self.args[0]))
 
         # weighted sum
         if self.name == 'wsum':
-            return f"sum({self.args[0]} * {self.args[1]})"
+            return f"sum({self.args[0]} * {str_func(self.args[1])})"
 
         if len(self.args) == 1:
-            return "{}({})".format(self.name, self.args[0])  # tuple of size 1 omitted in print
+            return "{}({})".format(self.name, str_func(self.args[0]))  # tuple of size 1 omitted in print
         elif len(self.args) == 2:  # infix printing of two arguments
             printname = Operator.printmap.get(self.name, self.name) # default to self.name if not in printmap
             arg0, arg1 = self.args
-            str_arg0 = f"({arg0})" if isinstance(arg0, Expression) else str(arg0)
-            str_arg1 = f"({arg1})" if isinstance(arg1, Expression) else str(arg1)
+            str_arg0 = f"({str_func(arg0)})" if isinstance(arg0, Expression) else str(arg0)
+            str_arg1 = f"({str_func(arg1)})" if isinstance(arg1, Expression) else str(arg1)
             return f"{str_arg0} {printname} {str_arg1}"
         else:  # n-ary
-            return "{}{}".format(self.name, self.args)  # args is a tuple, will be in ()
+            return "{}{}".format(self.name, str_func(self.args))  # args is a tuple, will be in ()
 
     def value(self) -> Optional[int]:
         """

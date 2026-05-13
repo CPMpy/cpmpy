@@ -61,7 +61,7 @@ import math
 from collections.abc import Iterable
 import warnings # for deprecation warning
 from functools import reduce
-from typing import Any, Literal, Optional, overload
+from typing import Any, Callable, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
@@ -354,7 +354,7 @@ class _NumVarImpl(Expression):
         """
         self._value = None
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func:Callable[[Any], str]) -> str:
         return self.name
 
     # for sets/dicts. Because names are unique, so is the str repr
@@ -454,7 +454,7 @@ class NegBoolView(_BoolVarImpl):
         """
         self._bv.clear()
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         return "~{}".format(self._bv.name)
 
     def __invert__(self) -> Expression:

@@ -73,13 +73,13 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Optional, Iterable
+from typing import Any, Callable, Optional, Iterable
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
+from .variables import cpm_array, intvar, NDVarArray, _NumVarImpl, BoolVal
 from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
@@ -379,13 +379,13 @@ class Multiplication(GlobalFunction):
         super().update_args((x, y))
         self.is_lhs_num = is_lhs_num
 
-    def __repr__(self):
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         x, y = self.args
 
         if self.is_lhs_num:
-            return "{} * ({})".format(x, y)
+            return "{} * ({})".format(str_func(x), str_func(y))
 
-        return "({}) * ({})".format(x, y)
+        return "({}) * ({})".format(str_func(x), str_func(y))
 
     def __neg__(self):
         """-(c*x) -> (-c)*x when constant c is first (.is_lhs_num)."""
@@ -481,14 +481,14 @@ class Division(GlobalFunction):
         """
         super().__init__("div", (x, y))
 
-    def __repr__(self):
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         """
         Returns:
             str: String representation of integer division as 'x div y'
         """
         x,y = self.args
-        return "{} div {}".format(f"({x})" if isinstance(x, Expression) else x,
-                                  f"({y})" if isinstance(y, Expression) else y)
+        return "{} div {}".format(f"({str_func(x)})" if isinstance(x, Expression) else str_func(x),
+                                  f"({str_func(y)})" if isinstance(y, Expression) else str_func(y))
 
     def decompose(self):
         """
@@ -576,14 +576,14 @@ class Modulo(GlobalFunction):
         """
         super().__init__("mod", (x, y))
 
-    def __repr__(self):
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         """
         Returns:
             str: String representation with 'mod' as notation
         """
         x,y = self.args
-        return "{} mod {}".format(f"({x})" if isinstance(x, Expression) else x,
-                                  f"({y})" if isinstance(y, Expression) else y)
+        return "{} mod {}".format(f"({str_func(x)})" if isinstance(x, Expression) else str_func(x),
+                                  f"({str_func(y)})" if isinstance(y, Expression) else str_func(y))
 
     def decompose(self):
         """
@@ -814,14 +814,19 @@ class Element(GlobalFunction):
         bnds = [get_bounds(x) for x in arr]
         return min(lb for lb,ub in bnds), max(ub for lb,ub in bnds)
 
-    def __repr__(self) -> str:
+    def _to_string(self, str_func: Callable[[Any], str]) -> str:
         """
         Custom string representation of the Element global function in 'Arr[Idx]' format.
 
         Returns:
             str: String representation of the Element global function.
         """
-        return f"{self.args[0]}[{self.args[1]}]"
+        arr, idx = self.args
+        if isinstance(arr, np.ndarray):
+            str_arr = str_func(arr.tolist()) # overkill, also converts np int to Python int
+        else:
+            str_arr = str_func(arr)
+        return f"{str_arr}[{str_func(idx)}]"
 
 def element(arg_list):
     """
@@ -853,6 +858,7 @@ class Count(GlobalFunction):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
+        arr = cpm_array(arr)
         super().__init__("count", (arr, val))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:

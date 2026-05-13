@@ -93,7 +93,7 @@ class TestTransfReif:
         assert f((bvs[0].implies(bvs[1])).implies(rv)) == "[(~rv) -> (bvs[0]), (~rv) -> (~bvs[1])]"
         pytest.raises(ValueError, lambda : f(rv == cp.AllDifferent(ivs)))
         assert fd([rv.implies(cp.AllDifferent(ivs))]) == "[(rv) -> ((ivs[0]) != (ivs[1])), (rv) -> ((ivs[0]) != (ivs[2])), (rv) -> ((ivs[1]) != (ivs[2]))]"
-        assert f(rv == (arr[cp.intvar(0, 2)] != 1)) == "[([0 1 2][IV0]) == (IV1), (IV1 != 1) == (rv)]"
+        assert f(rv == (arr[cp.intvar(0, 2)] != 1)) == "[([0, 1, 2][IV0]) == (IV1), (IV1 != 1) == (rv)]"
         assert f(rv == (cp.max(ivs) > 5)) == "[(max(ivs[0],ivs[1],ivs[2])) == (IV2), (IV2 > 5) == (rv)]"
         assert f(rv.implies(cp.min(ivs) != 0)) == "[(min(ivs[0],ivs[1],ivs[2])) == (IV3), (rv) -> (IV3 != 0)]"
         assert f((cp.min(ivs) != 0).implies(rv)) == "[(min(ivs[0],ivs[1],ivs[2])) == (IV4), (IV4 != 0) -> (rv)]"
