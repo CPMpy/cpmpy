@@ -170,7 +170,7 @@ class CPM_exact(SolverInterface):
 
         # fill in variable values
         lst_vars = list(self.user_vars)
-        exact_vals = self.xct_solver.getLastSolutionFor(self.solver_vars(lst_vars))
+        exact_vals = self.xct_solver.getLastSolutionFor(self.solver_vars_1d(lst_vars))
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
@@ -201,7 +201,7 @@ class CPM_exact(SolverInterface):
             warnings.warn(wrn_txt)
 
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        self.solver_vars_1d(self.user_vars)
 
         self.xct_solver.clearAssumptions()
 
@@ -210,7 +210,7 @@ class CPM_exact(SolverInterface):
             assumptions = list(assumptions)  # iterable to ordered list
             assert all(v.is_bool() for v in assumptions), "Non-Boolean assumptions given to Exact: " + str([v for v in assumptions if not v.is_bool()])
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
-            assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
+            assump_vars = self.solver_vars_1d([v._bv if isinstance(v, NegBoolView) else v for v in assumptions])
             self.assumption_dict = {xct_var: (xct_val,cpm_assump) for (xct_var, xct_val, cpm_assump) in zip(assump_vars,assump_vals,assumptions)}
             self.xct_solver.setAssumptions(list(zip(assump_vars,assump_vals)))
 
@@ -296,7 +296,7 @@ class CPM_exact(SolverInterface):
             warnings.warn(f"Exact only supports options at initialization: {kwargs.items()}")
 
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        self.solver_vars_1d(self.user_vars)
 
         self.xct_solver.clearAssumptions()
 
@@ -394,32 +394,35 @@ class CPM_exact(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
-            return cpm_var
 
-        # special case, negative-bool-view. Should be eliminated in linearize
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+        xct_var = self._varmap.get(cpm_var, None)
 
-        # return it if it already exists
-        if cpm_var in self._varmap:
-            return self._varmap[cpm_var]
+        if xct_var is not None:
+            return xct_var
 
-        # create if it does not exist
-        revar = str(cpm_var)
         if isinstance(cpm_var, _BoolVarImpl):
-            self.xct_solver.addVariable(revar)
-        elif isinstance(cpm_var, _IntVarImpl):
+            if isinstance(cpm_var, NegBoolView):
+                raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+
+            xct_var = cpm_var.name
+            self.xct_solver.addVariable(xct_var) # does not return anything
+                    
+        elif isinstance(cpm_var, _IntVarImpl): # intvar, encode it
             lb, ub = cpm_var.get_bounds()
             if self.encoding is None:
                 encoding = "order" if ub-lb < 8 else "log" # heuristic bound
             else:
                 encoding = self.encoding # can also force it
-            self.xct_solver.addVariable(revar, lb, ub, encoding)
+            
+            xct_var = cpm_var.name
+            self.xct_solver.addVariable(xct_var, lb, ub, encoding)
+        elif is_num (cpm_var):
+            return cpm_var # TODO check if this case is needed
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
-        self._varmap[cpm_var] = revar
-        return revar
+
+        self._varmap[cpm_var] = xct_var
+        return xct_var
 
 
     def objective(self, expr, minimize):
@@ -485,9 +488,9 @@ class CPM_exact(SolverInterface):
         elif isinstance(lhs, _NumVarImpl):
             xcfvars = [(1,self.solver_var(lhs))]
         elif lhs.name == "sum":
-            xcfvars = [(1,x) for x in self.solver_vars(lhs.args)]
+            xcfvars = [(1,x) for x in self.solver_vars_1d(lhs.args)]
         elif lhs.name == "wsum":
-            xcfvars = list(zip([self.fix(c) for c in lhs.args[0]],self.solver_vars(lhs.args[1])))
+            xcfvars = list(zip([self.fix(c) for c in lhs.args[0]],self.solver_vars_1d(lhs.args[1])))
         else:
             raise NotImplementedError("Exact: Unexpected lhs {} for expression {}".format(lhs.name,lhs))
 
@@ -576,7 +579,7 @@ class CPM_exact(SolverInterface):
                         xct_rhs = self.solver_var(rhs)
                         assert all(isinstance(v, _IntVarImpl) for v in lhs.args), "constant * var should be " \
                                                                                   "rewritten by linearize"
-                        self.xct_solver.addMultiplication(self.solver_vars(lhs.args), True, xct_rhs, True, xct_rhs)
+                        self.xct_solver.addMultiplication(self.solver_vars_1d(lhs.args), True, xct_rhs, True, xct_rhs)
 
                     else:
                         assert isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")
@@ -679,9 +682,9 @@ class CPM_exact(SolverInterface):
         :param vals: list of (corresponding) values for the variables
         """
         # clear previous solution hints
-        self.xct_solver.clearSolutionHints(self.solver_vars(list(self.user_vars)))
+        self.xct_solver.clearSolutionHints(self.solver_vars_1d(self.user_vars))
 
         cpm_vars = flatlist(cpm_vars)
         vals = flatlist(vals)
         assert (len(cpm_vars) == len(vals)), "Variables and values must have the same size for hinting"
-        self.xct_solver.setSolutionHints(list(zip(self.solver_vars(cpm_vars), vals)))
+        self.xct_solver.setSolutionHints(list(zip(self.solver_vars_1d(cpm_vars), vals)))

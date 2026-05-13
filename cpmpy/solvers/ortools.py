@@ -193,7 +193,7 @@ class CPM_ortools(SolverInterface):
         """
         from ortools.sat.python import cp_model as ort
         # ensure all user vars are known to solver
-        self.solver_vars_1d(list(self.user_vars))
+        self.solver_vars_1d(self.user_vars)
 
         # set time limit
         if time_limit is not None:
@@ -315,24 +315,24 @@ class CPM_ortools(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        solver_var = self._varmap.get(cpm_var, None)
+        ort_var = self._varmap.get(cpm_var, None)
 
-        if solver_var is None:
+        if ort_var is None:
             if isinstance(cpm_var, _BoolVarImpl):
                 if isinstance(cpm_var, NegBoolView):
                     # special case: work direclty on var inside the view
                     return self.solver_var(cpm_var._bv).Not()
-                solver_var = self.ort_model.NewBoolVar(str(cpm_var))
+                ort_var = self.ort_model.NewBoolVar(cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
-                solver_var = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                ort_var = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, cpm_var.name)
             elif is_num(cpm_var):
                 # allowed to ease posting of constraints with mixed arguments
                 return cpm_var
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = solver_var
+            self._varmap[cpm_var] = ort_var
 
-        return solver_var
+        return ort_var
 
 
     def objective(self, expr, minimize):
@@ -714,10 +714,10 @@ class CPM_ortools(SolverInterface):
         """Helper function to create tasks variables for use in Cumulative and NoOverlap constraints."""
         tasks = []
         cons = []
+        ort_start = self.solver_vars_1d(start)
+        ort_duration = self.solver_vars_1d(duration)
         ort_end = self.solver_vars_1d(end) if end is not None else None
-        for i, (cpm_s, cpm_d) in enumerate(zip(start, duration)):
-
-            ort_s, ort_d = self.solver_vars_1d((cpm_s, cpm_d))
+        for i, (cpm_s, cpm_d, ort_s, ort_d) in enumerate(zip(start, duration, ort_start, ort_duration)):
             
             # handle optional intervals
             if is_present is not None:
