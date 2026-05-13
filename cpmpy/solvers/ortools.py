@@ -675,10 +675,10 @@ class CPM_ortools(SolverInterface):
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
                 return self.ort_model.AddCircuit(ort_arcs)
             elif cpm_expr.name == 'inverse':
-                assert len(cpm_expr.args) == 2, "inverse() expects two args: fwd, rev"
-                fwd = self.solver_vars_1d(cpm_expr.args[0])
-                rev = self.solver_vars_1d(cpm_expr.args[1])
-                return self.ort_model.AddInverse(fwd, rev)
+                fwd, rev = cpm_expr.args
+                ort_fwd = self.solver_vars_1d(fwd)
+                ort_rev = self.solver_vars_1d(rev)
+                return self.ort_model.AddInverse(ort_fwd, ort_rev)
             elif cpm_expr.name == 'xor':
                 args = cpm_expr.args
                 if any(is_true_cst(a) for a in cpm_expr.args):
