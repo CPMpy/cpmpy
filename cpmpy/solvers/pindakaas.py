@@ -124,7 +124,7 @@ class CPM_pindakaas(SolverInterface):
 
     def _int2bool_user_vars(self):
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
+        self.solver_vars_1d(list(self.user_vars))
 
         # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
         user_vars = set()
@@ -157,7 +157,7 @@ class CPM_pindakaas(SolverInterface):
             time_limit_delta = timedelta(seconds=time_limit)
         if assumptions is not None:
             assumptions = list(assumptions)  # iterable to ordered list
-            solver_assumptions = self.solver_vars(assumptions)
+            solver_assumptions = self.solver_vars_1d(assumptions)
         else:
             solver_assumptions = None
 
@@ -215,21 +215,32 @@ class CPM_pindakaas(SolverInterface):
         return has_sol
 
     def solver_var(self, cpm_var):
-        if isinstance(cpm_var, NegBoolView):  # negative literal
-            # get inner variable and return its negated solver var
-            return ~self.solver_var(cpm_var._bv)
-        elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
-            # insert if new
-            if cpm_var.name not in self._varmap:
-                self._varmap[cpm_var.name] = self.pdk_solver.new_var()
-            return self._varmap[cpm_var.name]
-        elif isinstance(cpm_var, _IntVarImpl):  # intvar
+        """
+            Creates solver variable for cpmpy variable
+            or returns from cache if previously created
+        """
+
+        pdk_var = self._varmap.get(cpm_var.name, None)
+
+        if pdk_var is not None:
+            return pdk_var
+        
+        if isinstance(cpm_var, _BoolVarImpl):
+
+            if isinstance(cpm_var, NegBoolView):
+                return ~self.solver_var(cpm_var._bv)
+            pdk_var = self.pdk_solver.new_var()
+            self._varmap[cpm_var.name] = pdk_var
+            return pdk_var
+
+        elif isinstance(cpm_var, _IntVarImpl): # intvar, encode to Boolean
             if cpm_var.name not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self.add(cons)
+                self.ivarmap[cpm_var.name] = enc
             else:
                 enc = self.ivarmap[cpm_var.name]
-            return self.solver_vars(enc.vars())
+            return self.solver_vars_1d(enc.vars())
         else:
             raise TypeError(f"Unexpected type: {cpm_var}")
 
@@ -276,7 +287,7 @@ class CPM_pindakaas(SolverInterface):
         if not isinstance(clause, (tuple, list)):
             raise TypeError
 
-        self.pdk_solver.add_clause(self.solver_vars([~c for c in conditions] + list(clause)))
+        self.pdk_solver.add_clause(self.solver_vars_1d([~c for c in conditions] + list(clause)))
 
     def _post_constraint(self, cpm_expr, conditions=[]):
         if not isinstance(conditions, list):
@@ -317,9 +328,9 @@ class CPM_pindakaas(SolverInterface):
                 raise ValueError(f"Trying to encode non (Boolean) linear constraint: {cpm_expr}")
 
             # Create `pindakaas` Boolean linear expression object
-            lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars(literals)))
+            lhs = sum(c * l for c, l in zip(coefficients, self.solver_vars_1d(literals)))
 
-            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=self.solver_vars(conditions))
+            self.pdk_solver.add_encoding(eval_comparison(cpm_expr.name, lhs, rhs), conditions=self.solver_vars_1d(conditions))
         else:
             raise NotSupportedError(f"{self.name}: Unsupported constraint {cpm_expr}")
 
