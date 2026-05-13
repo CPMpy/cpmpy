@@ -68,6 +68,8 @@
     ..
 
     You can also implement a `.negate()` method if the global constraint has a better way to negate it than negating the decomposition.
+    The expression returned by `.negate()` should be equivalent to the negation of the global constraint, and is not allowed to introduce explicit `not` operators.
+    Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
 
     If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
     then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
@@ -175,6 +177,9 @@ class GlobalConstraint(Expression):
 
             To ensure equivalence of decomposition, we split into constraints determining the value of the global constraint, and defining-constraints.
             Defining constraints (totally) define new auxiliary variables needed for the decomposition, and can always be enforced at top-level.
+
+            The decomposition is not allowed to introduce explicit `not` operators.
+            Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
 
             Tip: avoid creating auxiliary variables and use nested expressions instead!
             (especially, don't create Booleans but use (iv == v) expressions instead, better for common subexpression elimination!)
@@ -866,17 +871,17 @@ class IfThenElse(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
+        from cpmpy.transformations.negation import recurse_negation
+
         condition, if_true, if_false = self.args
         if is_bool(condition):
             condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
-        return [condition.implies(if_true), (~condition).implies(if_false)], []
+        return [condition.implies(if_true), 
+                recurse_negation(condition).implies(if_false)], []
 
     def __repr__(self) -> str:
         condition, if_true, if_false = self.args
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
-
-    def negate(self) -> Expression:
-        return IfThenElse(self.args[0], self.args[2], self.args[1])
 
 
 
@@ -972,6 +977,8 @@ class Xor(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
+        from cpmpy.transformations.negation import recurse_negation
+
         # lets first simplify the Xor by removing all constants:
         # True Xor x :: ~x  and  False Xor x :: x
         new_args: list[Expression] = []
@@ -988,11 +995,11 @@ class Xor(GlobalConstraint):
             changed = False
             for i, a in enumerate(self.args):
                 if isinstance(a, _BoolVarImpl):
-                    new_args[i] = ~a
+                    new_args[i] = ~a # a is var, ok to be negated
                     changed = True
                     break
             if not changed:  # no variables, negate first argument
-                new_args[0] = ~new_args[0]  # Warning, creates a negated expression during decompose
+                new_args[0] = recurse_negation(new_args[0]) # decompose cannot introduce negation, so push down into arg
 
         # There are multiple decompositions possible,
         # recursively using sum allows it to be efficient for all solvers.
@@ -1015,19 +1022,20 @@ class Xor(GlobalConstraint):
         return "xor({})".format(self.args)
 
     def negate(self) -> Expression:
+        from cpmpy.transformations.negation import recurse_negation
+        
         # negate one of the arguments, ideally a variable
         new_args = list(self.args)  # takes shallow copy
         changed = False
         for i, a in enumerate(self.args):
             if isinstance(a, _BoolVarImpl):
-                new_args[i] = ~a
+                new_args[i] = ~a # a is var, ok to be negated
                 changed = True
                 break
 
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            from cpmpy.transformations.negation import recurse_negation
-            new_args[0] = recurse_negation(self.args[0])           
+            new_args[0] = recurse_negation(new_args[0]) # .negate() cannot introduce negation, so push down into arg
 
         return Xor(new_args)
 

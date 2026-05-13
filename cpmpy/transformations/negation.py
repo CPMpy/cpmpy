@@ -254,7 +254,7 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
         rec_changed, rec_args = _push_down_negation_args(expr.args)
         if rec_changed:
             new_glob.update_args(rec_args)
-        return new_glob.negate()
+        return new_glob.negate() # contract says this does not introduce any 'not' operators, no need to recurse into new expression
            
     else:
         raise ValueError(f"Unsupported expression to negate: {expr}")
