@@ -794,10 +794,9 @@ class TestGlobal:
 
         expected = {
             # safening constraints
-            "(BV0) == ((x >= 0) and (x <= 2))",
-            "(BV0) -> ((IV0) == (x))",
-            "(~BV0) -> (IV0 == 0)",
-            "BV0",
+            "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
+            "(not((x >= 0) and (x <= 2))) -> (IV0 == 0)",
+            "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
             '(IV0 == 1) -> (IV1 == 1)',
@@ -964,6 +963,11 @@ class TestGlobal:
         capacity = 1
         m += cp.Cumulative(start, duration, end, demand, capacity)
         assert m.solve()
+
+    def test_cumulative_subexpr(self):
+        start = cp.intvar(0,10, shape=3)
+        cons = cp.Cumulative(start+start, [1,2,3], None, [1,2,3], 3)
+        assert cp.Model(cons).solve() is True
 
     def test_cumulative_decomposition_capacity(self):
         import numpy as np
