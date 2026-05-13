@@ -16,6 +16,7 @@ from . import (
     SolverArgsObserver,
     RuntimeObserver,
     SolutionCheckerObserver,
+    PBCPSolutionCheckerObserver,
     WriteToFileObserver,
     WriteToStdoutObserver,
 )
@@ -30,6 +31,7 @@ OBSERVER_CLASSES = { # Lazy: see load_observer
     "SolverArgsObserver": SolverArgsObserver,
     "RuntimeObserver": RuntimeObserver,
     "SolutionCheckerObserver": SolutionCheckerObserver,
+    "PBCPSolutionCheckerObserver": PBCPSolutionCheckerObserver,
     "IntermediateObjectivesObserver": IntermediateObjectivesObserver,
     "MetadataSidecarObserver": MetadataSidecarObserver,
     "HookPipeRelayObserver": HookPipeRelayObserver,
@@ -47,6 +49,7 @@ OBSERVER_ALIASES = {
     "SolverArgs": "SolverArgsObserver",
     "Runtime": "RuntimeObserver",
     "SolutionChecker": "SolutionCheckerObserver",
+    "PBCPSolutionChecker": "PBCPSolutionCheckerObserver",
     "IntermediateObjectives": "IntermediateObjectivesObserver",
     "MetadataSidecar": "MetadataSidecarObserver",
     "HookPipeRelay": "HookPipeRelayObserver",

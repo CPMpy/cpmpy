@@ -4,6 +4,7 @@ from .handler import HandlerObserver
 from .logger import LoggerObserver
 from .runtime import RuntimeObserver
 from .solution_checker import SolutionCheckerObserver
+from .pb_cp_solution_checker import PBCPSolutionCheckerObserver
 from .write_to_file import WriteToFileObserver
 from .write_to_stdout import WriteToStdoutObserver
 from .intermediate_objectives import IntermediateObjectivesObserver
@@ -20,6 +21,7 @@ __all__ = [
     "LoggerObserver",
     "RuntimeObserver",
     "SolutionCheckerObserver",
+    "PBCPSolutionCheckerObserver",
     "WriteToFileObserver",
     "WriteToStdoutObserver",
     "IntermediateObjectivesObserver",
