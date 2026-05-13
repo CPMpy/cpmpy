@@ -47,7 +47,7 @@ from ..expressions.utils import eval_comparison
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
-from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool
+from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool, IntVarEnc
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear
 from ..transformations.normalize import simplify_boolean, toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies
@@ -111,7 +111,7 @@ class CPM_pindakaas(SolverInterface):
         import pindakaas as pdk
 
         assert subsolver is None, "Pindakaas does not support any subsolvers for the moment"
-        self.ivarmap = dict()  # for the integer to boolean encoders
+        self.ivarmap = dict[_IntVarImpl,IntVarEnc]()  # for the integer to boolean encoders
         self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
@@ -133,7 +133,7 @@ class CPM_pindakaas(SolverInterface):
                 user_vars.add(x)
             else:
                 # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
+                user_vars.update(self.ivarmap[x].vars())
         return user_vars
 
     def solve(self, time_limit: Optional[float] = None, assumptions: Optional[Iterable[_BoolVarImpl]] = None):
@@ -186,9 +186,9 @@ class CPM_pindakaas(SolverInterface):
                 for cpm_var in self.user_vars:
                     # essentially `.solver_var`, but failing if new vars are added
                     if isinstance(cpm_var, NegBoolView):
-                        lit = ~self._varmap[cpm_var._bv.name]
+                        lit = ~self._varmap[cpm_var._bv]
                     elif isinstance(cpm_var, _BoolVarImpl):
-                        lit = self._varmap[cpm_var.name]
+                        lit = self._varmap[cpm_var]
                     else:
                         raise ValueError(
                             f"Integer variables should have been encoded using `int2bool` transformation, but {cpm_var} is integer, please report on GitHub"
@@ -220,7 +220,7 @@ class CPM_pindakaas(SolverInterface):
             or returns from cache if previously created
         """
 
-        pdk_var = self._varmap.get(cpm_var.name, None)
+        pdk_var = self._varmap.get(cpm_var, None)
 
         if pdk_var is not None:
             return pdk_var
@@ -230,16 +230,16 @@ class CPM_pindakaas(SolverInterface):
             if isinstance(cpm_var, NegBoolView):
                 return ~self.solver_var(cpm_var._bv)
             pdk_var = self.pdk_solver.new_var()
-            self._varmap[cpm_var.name] = pdk_var
+            self._varmap[cpm_var] = pdk_var
             return pdk_var
 
         elif isinstance(cpm_var, _IntVarImpl): # intvar, encode to Boolean
-            if cpm_var.name not in self.ivarmap:
+            if cpm_var not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self.add(cons)
-                self.ivarmap[cpm_var.name] = enc
+                self.ivarmap[cpm_var] = enc
             else:
-                enc = self.ivarmap[cpm_var.name]
+                enc = self.ivarmap[cpm_var]
             return self.solver_vars_1d(enc.vars())
         else:
             raise TypeError(f"Unexpected type: {cpm_var}")
