@@ -208,22 +208,24 @@ class Runner:
             else:
                 time_limit = None
 
-            if time_limit is not None:
-                if time_limit < 0:
-                    raise TimeoutError(f"Time limit of {self.time_limit} seconds reached")
+            time_limit_expired_before_solve = time_limit is not None and time_limit < 0
                     
             # 7) [Hook] observe_pre_solve()
             self.observe_pre_solve()
 
             # 8) Solve model ([Hook] observe_intermediate(objective) may occur multiple times).
             t0_solve = time.perf_counter()
-            with self.print_forwarding_context():
-                self.is_sat = self.s.solve(time_limit = time_limit, **self.solver_args)
+            if time_limit_expired_before_solve:
+                self.is_sat = None
+                self.print_comment(f"Timeout: Time limit of {self.time_limit} seconds reached before solve")
+            else:
+                with self.print_forwarding_context():
+                    self.is_sat = self.s.solve(time_limit = time_limit, **self.solver_args)
             t1_solve = time.perf_counter()
             
             # Check if solver timed out (UNKNOWN status with time limit set)
-            termination_reason = None
-            if time_limit is not None and self.s.status().exitstatus == CPMStatus.UNKNOWN:
+            termination_reason = "walltime" if time_limit_expired_before_solve else None
+            if not time_limit_expired_before_solve and time_limit is not None and self.s.status().exitstatus == CPMStatus.UNKNOWN:
                 # Check if we're near the time limit (within 2 seconds)
                 p = psutil.Process()
                 elapsed = _wall_time(p)
