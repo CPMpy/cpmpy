@@ -315,8 +315,11 @@ class SolverArgsObserver(Observer):
 
     def _highs_arguments(
         self,
+        runner: Runner,
+        model: cp.Model,
         cores: Optional[int] = None,
         seed: Optional[int] = None,
+        intermediate: bool = False,
         **kwargs
     ):
         res = dict()
@@ -325,7 +328,37 @@ class SolverArgsObserver(Observer):
         if seed is not None:
             res |= {"random_seed": seed}
 
-        return res, None
+        internal_options = None
+        if intermediate and model.has_objective():
+
+            class HighsSolutionCallback:
+                def __init__(self, runner: Runner, mip_solution_callback_type):
+                    self.__start_time = time.time()
+                    self.__solution_count = 0
+                    self.runner = runner
+                    self.mip_solution_callback_type = mip_solution_callback_type
+
+                def callback(self, callback_type, message, data_out, data_in, user_data):
+                    if callback_type != self.mip_solution_callback_type:
+                        return
+
+                    current_time = time.time()
+                    obj = data_out.objective_function_value
+                    self.runner.print_comment("Solution %i, time = %0.4fs" %
+                                       (self.__solution_count, current_time - self.__start_time))
+                    self.runner.observe_intermediate(int(obj))
+                    self.__solution_count += 1
+
+            def internal_options(solver):
+                from highspy import cb as hscb
+
+                callback_type = hscb.HighsCallbackType.kCallbackMipSolution
+                callback = HighsSolutionCallback(runner, callback_type)
+                solver._cpbenchy_highs_solution_callback = callback
+                solver.highs.setCallback(callback.callback, None)
+                solver.highs.startCallback(callback_type)
+
+        return res, internal_options
 
     def _solver_arguments(
             self,
@@ -360,7 +393,7 @@ class SolverArgsObserver(Observer):
         elif solver == "cplex":
             return self._cplex_arguments(cores=cores, **kwargs)
         elif solver == "highs":
-            return self._highs_arguments(cores=cores, seed=seed, **kwargs)
+            return self._highs_arguments(runner, model, cores=cores, seed=seed, intermediate=intermediate, **kwargs)
         else:
             runner.print_comment(f"setting parameters of {solver} is not (yet) supported")
             return dict(), None
