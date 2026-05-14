@@ -295,16 +295,19 @@ def compute_workers_and_memory(
         # Only one value set - derive the other from total_memory
         if workers is not None:
             # Derive memory_per_worker from total_memory and workers
-            if total_memory % workers != 0:
-                raise ValueError(
-                    f"Measured total-memory ({total_memory} MiB) is not evenly divisible by "
-                    f"workers ({workers})"
-                )
             memory_per_worker = total_memory // workers
             if memory_per_worker < 1:
                 raise ValueError(
                     f"Derived memory-per-worker ({memory_per_worker} MiB) must be at least 1. "
                     f"Check your workers value relative to available memory ({total_memory} MiB)."
+                )
+            remainder = total_memory % workers
+            if remainder:
+                print(
+                    f"WARNING: Measured total-memory ({total_memory} MiB) is not evenly divisible by "
+                    f"workers ({workers}); using {memory_per_worker} MiB per worker and leaving "
+                    f"{remainder} MiB unallocated.",
+                    file=sys.stderr,
                 )
             return workers, memory_per_worker
         else:  # memory_per_worker is not None
