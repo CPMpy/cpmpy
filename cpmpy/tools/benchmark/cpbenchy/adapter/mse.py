@@ -26,12 +26,13 @@ def solution_mse_wcnf(solver):
     return " ".join(str(1 if var.value() else 0) for var in variables)
 
 
-def _open_wcnf(instance):
+def _open_wcnf(instance, mode="rt", *args, **kwargs):
     """Open WCNF instance, handling .xz compression."""
     p = str(instance)
     if p.endswith(".xz"):
-        return lzma.open(instance, mode="rt", encoding="utf-8")
-    return open(instance, "rt")
+        kwargs.setdefault("encoding", "utf-8")
+        return lzma.open(instance, mode=mode, *args, **kwargs)
+    return open(instance, mode, *args, **kwargs)
 
 
 class MSECompetitionPrintingObserver(DIMACSPrintingObserver):
