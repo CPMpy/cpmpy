@@ -57,7 +57,7 @@ class DIMACSPrintingObserver(Observer):
         if s.status().exitstatus == CPMStatus.OPTIMAL:
             self.print_objective(s.objective_value(), runner)
             self.print_value(value, runner)
-            self.print_status("OPTIMAL" + chr(32) + "FOUND", runner)
+            self.print_status("OPTIMUM" + chr(32) + "FOUND", runner)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
             self.print_objective(s.objective_value(), runner)
             self.print_value(value, runner)
