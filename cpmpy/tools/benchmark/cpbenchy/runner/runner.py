@@ -323,8 +323,9 @@ class Runner:
                 # Buffer the output
                 self.buffer.append(text)
                 # Mirror to console only in verbose mode
-                if self.runner.verbose:
-                    self.original_stdout.write(text)
+                # -> skip: handled by auto-added WriteToStdoutObserver
+                # if self.runner.verbose:
+                #     self.original_stdout.write(text)
             
             def flush(self):
                 if self.runner.verbose:
@@ -336,7 +337,7 @@ class Runner:
                     full_text = ''.join(self.buffer)
                     for line in full_text.splitlines(keepends=True):
                         if line.strip():  # Only forward non-empty lines
-                            self.runner.print_comment(line.rstrip())
+                            self.runner.print_raw(line.rstrip())
         
         def warning_handler(message, category, filename, lineno, file=None, line=None):
             """Custom warning handler that forwards warnings to observers."""
