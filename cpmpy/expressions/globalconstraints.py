@@ -845,6 +845,53 @@ class Regular(GlobalConstraint):
         # constraint is satisfied iff last state is accepting
         return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the Regular global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
+        The MDD is obtained by means of constructing a layered directed multigraph for the given automaton, based on Algorithm 1 of:
+        "A Regular Language Membership Constraint for Finite Sequences of Variables", Gilles Pesant, 2004
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, transitions, start, accepting = self.args
+
+        # Keeps track of the supported nodes Q[(i,j)] for variable i taking value j
+        Q = defaultdict(set)
+        # Keeps track of the nodes N[i] that can be reached at layer i of the layered graph
+        N = defaultdict(set)
+        N[0].add(start)
+
+        # Forward phase
+        for i in range(len(arr)):
+            for j in range(arr[i].lb, arr[i].ub + 1):
+                for node in N[i]:
+                    if (node, j) in self.trans_dict.keys():
+                        Q[(i,j)].add(node)
+                        N[i+1].add(self.trans_dict[(node, j)])
+
+        # Backward phase, remove non-accepting nodes
+        N[len(arr)] = N[len(arr)].intersection(accepting)
+
+        mdd_transitions : list[tuple[int | str, int, int | str]] = []
+
+        # Unique ID for every node in the layered graph
+        id_map = {(i, node): idx for idx, (i, node) in enumerate((i, node) for i in range(len(arr)) for node in self.nodes)}
+
+        # All accepting nodes in the final layer are merged into one
+        for node in accepting:
+            id_map[(len(arr), node)] = len(arr) * len(self.nodes)
+
+        # Backward phase, add valid MDD transitions
+        for i in reversed(range(len(arr))):
+            for j in range(arr[i].lb, arr[i].ub + 1):
+                for node in Q[(i,j)]:
+                    if (node, j) in self.trans_dict.keys() and self.trans_dict[(node, j)] in N[i+1]:
+                        next_node = self.trans_dict[(node, j)]
+                        mdd_transitions.append((id_map[(i, node)], j, id_map[(i+1, next_node)]))
+
+        return [MDD(arr, mdd_transitions, start=id_map[(0, start)])], []
+
+
     def value(self) -> Optional[bool]:
         """
         Returns:
@@ -921,11 +968,41 @@ class MDD(GlobalConstraint):
 
     def _reduce(self):
         """
-            Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes (to be implemented)
+        Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
         """
-        pass
+        reduced_mapping = copy.deepcopy(self.mapping)
+        substitutions = {}
 
-    def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
+        for i in range(len(self.args[0]) - 1, -1, -1):
+            level_nodes = [n for n in self.levels if self.levels[n] == i]
+            groups = {}
+
+            for node in level_nodes:
+                tf = reduced_mapping[node]
+                signature = tuple(sorted(tf.items()))
+                if signature not in groups:
+                    groups[signature] = []
+
+                groups[signature].append(node)
+
+            for equiv_nodes in groups.values():
+                rep = equiv_nodes[0]
+                for node in equiv_nodes[1:]:
+                    substitutions[node] = rep
+                    reduced_mapping.pop(node, None)
+
+        for node in reduced_mapping:
+            for value in reduced_mapping[node]:
+                dst = reduced_mapping[node][value]
+
+                while dst in substitutions:
+                    dst = substitutions[dst]
+
+                reduced_mapping[node][value] = dst
+
+        return reduced_mapping
+
+    def _get_complete_mdd(self, mapping : dict[int | str, dict[int, int | str]]) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
         """
         Auxiliary function that extends the MDD with invalid edges, which are directed to the sink node.
 
@@ -934,13 +1011,13 @@ class MDD(GlobalConstraint):
             A tuple containing the extended mapping of the MDD and a set of invalid edges (source node, transition value) that are added to the MDD.
         """
         invalid_edges = set()
-        extended_mapping = copy.deepcopy(self.mapping)
+        extended_mapping = copy.deepcopy(mapping)
         sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
-        for s in self.mapping.keys():
+        for s in mapping.keys():
             level = self.levels[s]
             domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
             for v in domain:
-                if v not in self.mapping[s]:
+                if v not in mapping[s]:
                     extended_mapping[s][v] = sink_node
                     invalid_edges.add((s, v))
 
@@ -1018,8 +1095,11 @@ class MDD(GlobalConstraint):
         """
         arr, _ = self.args
 
+        # Merge equivalent nodes in the original MDD, results in smaller flow encoding
+        reduced_mapping = self._reduce()
+
         # MDD is extended with invalid edges, which are directed to the sink node
-        extended_mapping, invalid_edges_set = self._get_complete_mdd()
+        extended_mapping, invalid_edges_set = self._get_complete_mdd(reduced_mapping)
         invalid_edges = frozenset(invalid_edges_set)
 
         cons, invalid_edge_vars = self._mdd_to_flow(extended_mapping, invalid_edges)
@@ -1035,7 +1115,9 @@ class MDD(GlobalConstraint):
             tuple[list[Expression], list[Expression]]:
                 A tuple containing the constraints representing the constraint value and the defining constraints.
         """
-        cons, _ = self._mdd_to_flow(self.mapping)
+        # Merge equivalent nodes in the original MDD, results in smaller flow encoding
+        reduced_mapping = self._reduce()
+        cons, _ = self._mdd_to_flow(reduced_mapping)
         return cons, []
 
 
