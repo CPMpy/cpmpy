@@ -27,7 +27,7 @@ class XCSP3Adapter(InstanceAdapter):
             ResourceLimitObserver,
     ]
 
-    reader = partial(read_xcsp3, open= lambda instance: lzma.open(instance, mode='rt', encoding='utf-8') if str(instance).endswith(".lzma") else open(instance))
+    reader = staticmethod(partial(read_xcsp3, open= lambda instance: lzma.open(instance, mode='rt', encoding='utf-8') if str(instance).endswith(".lzma") else open(instance)))
 
     def cmd(self, instance: str, solver: str = "ortools", output_file: str = None, **kwargs):
         cmd = self.base_cmd(instance)

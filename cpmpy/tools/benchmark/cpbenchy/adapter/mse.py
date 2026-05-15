@@ -52,7 +52,7 @@ class MSEAdapter(InstanceAdapter):
             ResourceLimitObserver,
     ]
 
-    reader = partial(read_wcnf, open=_open_wcnf)
+    reader = staticmethod(partial(read_wcnf, open=_open_wcnf))
 
     def cmd(self, instance: str, solver: str = "ortools", output_file: str = None, **kwargs):
         cmd = self.base_cmd(instance)

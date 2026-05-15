@@ -39,7 +39,7 @@ class OPBAdapter(InstanceAdapter):
         ResourceLimitObserver,
     ]
 
-    reader = partial(read_opb, open=_open_opb)
+    reader = staticmethod(partial(read_opb, open=_open_opb))
 
     def cmd(self, instance: str, solver: str = "ortools", output_file: str = None, **kwargs):
         cmd = self.base_cmd(instance)
