@@ -23,7 +23,7 @@ def solution_mse_wcnf(solver):
         if var.name.startswith("x") and var.name[1:].isdigit()
     ]
     variables = sorted(variables, key=lambda v: int(v.name[1:]))
-    return " ".join(str(1 if var.value() else 0) for var in variables)
+    return "".join(str(1 if var.value() else 0) for var in variables)
 
 
 def _open_wcnf(instance, mode="rt", *args, **kwargs):
