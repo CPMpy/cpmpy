@@ -169,7 +169,7 @@ def run_single_instance(
             runner.register_observer(WriteToStdoutObserver())
     
     # Run the instance
-    runner.run(
+    return runner.run(
         instance=instance,
         solver=solver,
         time_limit=time_limit,
@@ -965,7 +965,7 @@ def main():
         try:
             parsed = parse_cores(args.cores)
             cores_for_runner = len(parsed[0]) if parsed else None
-            run_single_instance(
+            exit_code = run_single_instance(
                 instance=args.instance,
                 runner=runner,
                 solver=args.solver,
@@ -978,6 +978,7 @@ def main():
                 output_file=args.output,
                 additional_observers=additional_observers,
             )
+            sys.exit(exit_code)
         except Exception as e:
             print(f"Error running instance: {e}", file=sys.stderr)
             import traceback

@@ -1007,7 +1007,12 @@ class RunExecResourceManager(StreamingResourceManager):
                     raw_result = result if isinstance(result, dict) else {}
                     exit_info = _normalize_exit_info(raw_result.get("exitcode"))
                     exit_code = exit_info.get("code") if isinstance(exit_info, dict) else None
-                    if termination_reason is None and isinstance(exit_code, int) and exit_code != 0:
+                    valid_exit_codes = set(getattr(runner, "valid_exit_codes", (0,)))
+                    if (
+                        termination_reason is None
+                        and isinstance(exit_code, int)
+                        and exit_code not in valid_exit_codes
+                    ):
                         termination_reason = f"exitcode:{exit_code}"
                         _runner.termination_reason = termination_reason
                     if raw_result.get("walltime") is not None:

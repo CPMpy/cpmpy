@@ -40,6 +40,7 @@ def create_output_file(output_file: Optional[str], base_dir: Optional[str] = Non
     
     return full_path
 class InstanceAdapter:
+    valid_exit_codes = (0,)
     
     def __init__(self):
         self.additional_observers = []
@@ -152,6 +153,10 @@ class InstanceAdapter:
         """Get the list of additional observers that should be registered."""
         return self.additional_observers
 
+    def exit_code(self) -> int:
+        """Return the process exit code for the latest run."""
+        return 0
+
     def run(
             self,
             instance: str,
@@ -164,3 +169,4 @@ class InstanceAdapter:
 
         self.runner = self.get_runner(instance, solver, output_file, extra_observers=extra_observers, **kwargs)
         self.runner.run(instance=instance, solver=solver, output_file=output_file, **kwargs)
+        return self.exit_code()

@@ -9,6 +9,7 @@ from cpmpy.tools.benchmark.cpbenchy.observer import (
     ResourceLimitObserver,
     SolverArgsObserver,
 )
+from cpmpy.solvers.solver_interface import ExitStatus as CPMStatus
 from cpmpy.tools.io.wcnf import read_wcnf
 
 
@@ -54,6 +55,14 @@ class MSECompetitionPrintingObserver(DIMACSPrintingObserver):
         original_printer = self.solution_printer
         self.solution_printer = lambda solver: solution_mse_wcnf(solver, max_var=max_var)
         try:
+            if (
+                s.status().exitstatus == CPMStatus.FEASIBLE
+                and not runner.model.has_objective()
+            ):
+                self.print_objective(0, runner)
+                self.print_value(self.solution_printer(s), runner)
+                self.print_status("OPTIMUM FOUND", runner)
+                return
             return super().print_result(s, runner)
         finally:
             self.solution_printer = original_printer
@@ -63,6 +72,7 @@ class MSECompetitionPrintingObserver(DIMACSPrintingObserver):
 
 
 class MSEAdapter(InstanceAdapter):
+    valid_exit_codes = (0, 10, 20, 30)
 
     default_observers = [
         MSECompetitionPrintingObserver,
@@ -87,12 +97,27 @@ class MSEAdapter(InstanceAdapter):
     def print_comment(self, comment: str):
         print("c" + chr(32) + comment.rstrip("\n"), end="\r\n", flush=True)
 
+    def exit_code(self) -> int:
+        status = self.runner.s.status().exitstatus if getattr(self, "runner", None) else CPMStatus.UNKNOWN
+        if (
+            status == CPMStatus.FEASIBLE
+            and getattr(self.runner, "model", None) is not None
+            and not self.runner.model.has_objective()
+        ):
+            return 30
+        return {
+            CPMStatus.UNKNOWN: 0,
+            CPMStatus.FEASIBLE: 10,
+            CPMStatus.UNSATISFIABLE: 20,
+            CPMStatus.OPTIMAL: 30,
+        }.get(status, 0)
+
 
 def main():
     runner = MSEAdapter()
     parser = runner.argparser()
     args = parser.parse_args()
-    runner.run(**vars(args))
+    raise SystemExit(runner.run(**vars(args)))
 
 
 if __name__ == "__main__":
