@@ -12,18 +12,23 @@ from cpmpy.tools.benchmark.cpbenchy.observer import (
 from cpmpy.tools.io.wcnf import read_wcnf
 
 
-def solution_mse_wcnf(solver):
+def solution_mse_wcnf(solver, max_var=None):
     """
     Convert a CPMpy WCNF model solution into the MSE solution string format.
     WCNF variables are named x1, x2, ... (cf. read_wcnf); filters for those.
     """
-    variables = [
-        var
+    variables = {
+        int(var.name[1:]): var
         for var in solver.user_vars
         if var.name.startswith("x") and var.name[1:].isdigit()
-    ]
-    variables = sorted(variables, key=lambda v: int(v.name[1:]))
-    return "".join(str(1 if var.value() else 0) for var in variables)
+    }
+    if max_var is None:
+        max_var = max(variables, default=0)
+
+    return "".join(
+        str(1 if variables.get(i) is not None and variables[i].value() else 0)
+        for i in range(1, max_var + 1)
+    )
 
 
 def _open_wcnf(instance, mode="rt", *args, **kwargs):
@@ -40,6 +45,18 @@ class MSECompetitionPrintingObserver(DIMACSPrintingObserver):
 
     def __init__(self, verbose: bool = False, **kwargs):
         super().__init__(solution_printer=solution_mse_wcnf, verbose=verbose, **kwargs)
+
+    def print_result(self, s, runner=None):
+        max_var = getattr(getattr(runner, "model", None), "wcnf_max_var", None)
+        if max_var is None:
+            return super().print_result(s, runner)
+
+        original_printer = self.solution_printer
+        self.solution_printer = lambda solver: solution_mse_wcnf(solver, max_var=max_var)
+        try:
+            return super().print_result(s, runner)
+        finally:
+            self.solution_printer = original_printer
 
 
 class MSEAdapter(InstanceAdapter):

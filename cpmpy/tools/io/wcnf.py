@@ -65,6 +65,7 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
 
     model = cp.Model()
     vars = {}
+    nr_vars_declared = None
     unsatisfied_soft_terms = []
     for raw in f:
         line = raw.strip()
@@ -73,8 +74,11 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
         if not line or line.startswith("c"):
             continue
 
-        # Problem line: ignore header
+        # Problem line
         if line.startswith("p"):
+            parts = line.split()
+            if len(parts) >= 4:
+                nr_vars_declared = int(parts[2])
             continue
 
         # Hard clause
@@ -96,6 +100,8 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
     # WCNF/MaxSAT objective: minimize the sum of unsatisfied soft weights.
     if unsatisfied_soft_terms:
         model.minimize(sum(unsatisfied_soft_terms))
+
+    model.wcnf_max_var = nr_vars_declared if nr_vars_declared is not None else max(vars, default=0)
 
     return model
 
