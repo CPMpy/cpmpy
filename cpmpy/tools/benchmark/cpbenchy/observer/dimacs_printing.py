@@ -47,6 +47,15 @@ class DIMACSPrintingObserver(Observer):
     def print_intermediate(self, objective: int, runner: Runner):
         self.print_objective(objective, runner)
 
+    def _final_objective(self, s, runner: Runner) -> int:
+        model = getattr(runner, "model", None) if runner else None
+        if model is not None and model.has_objective():
+            try:
+                return int(model.objective_.value())
+            except Exception:
+                pass
+        return s.objective_value()
+
     def print_result(self, s, runner: Runner = None):
         if s is None:
             return
@@ -55,11 +64,11 @@ class DIMACSPrintingObserver(Observer):
         include_aux = getattr(adapter, "include_aux_vars", False) if adapter else False
         value = self.solution_printer(s, include_aux_vars=include_aux) if include_aux else self.solution_printer(s)
         if s.status().exitstatus == CPMStatus.OPTIMAL:
-            self.print_objective(s.objective_value(), runner)
+            self.print_objective(self._final_objective(s, runner), runner)
             self.print_value(value, runner)
             self.print_status("OPTIMUM" + chr(32) + "FOUND", runner)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
-            self.print_objective(s.objective_value(), runner)
+            self.print_objective(self._final_objective(s, runner), runner)
             self.print_value(value, runner)
             self.print_status("SATISFIABLE", runner)
         elif s.status().exitstatus == CPMStatus.UNSATISFIABLE:
