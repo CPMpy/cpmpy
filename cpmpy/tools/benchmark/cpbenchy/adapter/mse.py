@@ -41,6 +41,14 @@ def _open_wcnf(instance, mode="rt", *args, **kwargs):
     return open(instance, mode, *args, **kwargs)
 
 
+def _mse_objective_value(objective):
+    if objective is None:
+        return 0
+    if isinstance(objective, bool):
+        return int(objective)
+    return objective
+
+
 class MSECompetitionPrintingObserver(DIMACSPrintingObserver):
     """MSE (MaxSAT Evaluation) competition-style output printer."""
 
@@ -78,7 +86,7 @@ class MSECompetitionPrintingObserver(DIMACSPrintingObserver):
             self.solution_printer = original_printer
 
     def print_objective(self, objective: int, runner):
-        runner.print_raw("o" + chr(32) + str(objective if objective is not None else 0))
+        runner.print_raw("o" + chr(32) + str(_mse_objective_value(objective)))
 
 
 class MSEAdapter(InstanceAdapter):
