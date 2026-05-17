@@ -63,6 +63,16 @@ class MSECompetitionPrintingObserver(DIMACSPrintingObserver):
                 self.print_value(self.solution_printer(s), runner)
                 self.print_status("OPTIMUM FOUND", runner)
                 return
+            if s.status().exitstatus == CPMStatus.OPTIMAL and runner.model.has_objective():
+                self.print_objective(runner.model.objective_value(), runner)
+                self.print_value(self.solution_printer(s), runner)
+                self.print_status("OPTIMUM FOUND", runner)
+                return
+            if s.status().exitstatus == CPMStatus.FEASIBLE and runner.model.has_objective():
+                self.print_objective(runner.model.objective_value(), runner)
+                self.print_value(self.solution_printer(s), runner)
+                self.print_status("SATISFIABLE", runner)
+                return
             return super().print_result(s, runner)
         finally:
             self.solution_printer = original_printer
