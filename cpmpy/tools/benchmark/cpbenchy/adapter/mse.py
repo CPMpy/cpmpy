@@ -58,6 +58,9 @@ class MSECompetitionPrintingObserver(DIMACSPrintingObserver):
         finally:
             self.solution_printer = original_printer
 
+    def print_objective(self, objective: int, runner):
+        runner.print_raw("o" + chr(32) + str(objective if objective is not None else 0))
+
 
 class MSEAdapter(InstanceAdapter):
 
