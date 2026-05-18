@@ -668,6 +668,7 @@ class CPM_cplex(SolverInterface):
         soft_cons = toplevel_list(soft, merge_and=False)
         s = cls()
         model = s.native_model
+        groups = []
         
         # 1. Add hard constraints as a required group.
         for cpm_con in s.transform(hard):
@@ -676,7 +677,6 @@ class CPM_cplex(SolverInterface):
                 groups.append(ConstraintsGroup(preference=0.0, cts=[hard_native]))
         
         # 2. Create ConstraintsGroup for each soft constraint
-        groups = []
         native_to_soft_idx = {}
 
         for i, soft_con in enumerate(soft_cons):
