@@ -66,8 +66,8 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "mod", "pow", "element"})
-    supported_reified_global_constraints = frozenset()
+    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "mod", "pow", "element", "nvalue", "alldifferent"})
+    supported_reified_global_constraints = frozenset({"alldifferent"})
 
 
     @staticmethod
@@ -407,12 +407,13 @@ class CPM_hexaly(SolverInterface):
         elif isinstance(cpm_expr, GlobalConstraint):
             if cpm_expr.name == "alldifferent":
                 hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args))
-                return self.hex_model.distinct(hex_arr)
+                return self.hex_model.count(self.hex_model.distinct(hex_arr)) == len(cpm_expr.args)
             raise ValueError(f"Global constraint {cpm_expr} is not supported by hexaly")
 
         elif isinstance(cpm_expr, GlobalFunction):
-            if cpm_expr.name == "nvalues":
-                return self.hex_model.distinct(self._hex_expr(cpm_expr.args))
+            if cpm_expr.name == "nvalue":
+                hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args))
+                return self.hex_model.count(self.hex_model.distinct(hex_arr))
             if cpm_expr.name == "element":
                 hex_arr = self.hex_model.array(self._hex_expr(cpm_expr.args[0]))
                 idx = self._hex_expr(cpm_expr.args[1])
