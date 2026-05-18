@@ -70,6 +70,11 @@ Supported solvers
      - SAT ISAT - OPT IOPT - PAR
      - pip
      - 
+   * - :doc:`SCIP <api/solvers/scip>`
+     - ILP
+     - SAT ISAT - OPT IOPT - PAR
+     - pip + local install
+     - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
      - SAT ISAT - OPT IOPT - PAR
