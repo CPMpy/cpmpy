@@ -57,7 +57,6 @@ class Model(object):
         """
         assert ((minimize is None) or (maximize is None)), "can not set both minimize and maximize"
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
-        self.objective_value_ = None
 
         # init list of constraints and objective
         self.constraints = []
@@ -148,7 +147,6 @@ class Model(object):
         """
         self.objective_ = expr
         self.objective_is_min = minimize
-        self.objective_value_ = None
 
     def has_objective(self):
         """
@@ -166,10 +164,6 @@ class Model(object):
             Returns:
                 int, optional:  The objective value as an integer or ``None`` if it is not run or is a satisfaction problem
         """
-        if self.objective_ is None:
-            return None
-        if self.objective_value_ is not None:
-            return self.objective_value_
         return self.objective_.value()
 
     def solve(self, solver:Optional[str]=None, time_limit:Optional[int|float]=None, **kwargs):
@@ -203,7 +197,6 @@ class Model(object):
         ret = s.solve(time_limit=time_limit, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
-        self.objective_value_ = s.objective_value()
         return ret
 
     def solveAll(self, solver:Optional[str]=None, display:Optional[Callback]=None, time_limit:Optional[int|float]=None, solution_limit:Optional[int]=None, **kwargs):
@@ -234,7 +227,6 @@ class Model(object):
         ret = s.solveAll(display=display,time_limit=time_limit,solution_limit=solution_limit, call_from_model=True, **kwargs)
         # store CPMpy status (s object has no further use)
         self.cpm_status = s.status()
-        self.objective_value_ = s.objective_value()
         return ret
 
     def status(self):

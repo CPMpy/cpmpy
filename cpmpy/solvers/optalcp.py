@@ -37,7 +37,7 @@ from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
-from ..exceptions import MaskedSolverValueError, NotSupportedError
+from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
@@ -159,11 +159,8 @@ class CPM_optalcp(SolverInterface):
         try:
             return super().solveAll(display=display, time_limit=time_limit,
                                     solution_limit=solution_limit, call_from_model=call_from_model, **kwargs)
-        except MaskedSolverValueError as exc:
-            raise NotSupportedError(
-                "OptalCP solveAll() requires visible decision-variable values. "
-                "The Preview edition masks them."
-            ) from exc
+        except Exception as exc:
+            raise exc
 
     def _populate_values(self, solution):
         if solution is None:

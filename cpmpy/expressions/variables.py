@@ -65,7 +65,6 @@ from typing import Any, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
-from ..exceptions import MaskedSolverValueError
 from .core import Expression, ExprLike, BoolExprLike, ListLike, BoolVal
 from .utils import is_num, is_int, is_boolexpr, get_bounds
 
@@ -328,7 +327,6 @@ class _NumVarImpl(Expression):
         self.ub = ub
         self.name = name
         self._value: Optional[int] = None
-        self._value_error: Optional[str] = None
 
     def has_subexpr(self) -> bool:
         """Does it contains nested Expressions?
@@ -345,8 +343,6 @@ class _NumVarImpl(Expression):
         """ the value obtained in the last solve call
             (or 'None')
         """
-        if self._value_error is not None:
-            raise MaskedSolverValueError(self._value_error)
         return self._value
 
     def get_bounds(self) -> tuple[int, int]:
@@ -357,12 +353,6 @@ class _NumVarImpl(Expression):
         """ clear the value obtained from the last solve call
         """
         self._value = None
-        self._value_error = None
-
-    def _mask_value(self, message: str) -> None:
-        """Mark the last solver value as intentionally unavailable."""
-        self._value = None
-        self._value_error = message
 
     def __repr__(self) -> str:
         return self.name
