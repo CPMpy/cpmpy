@@ -66,8 +66,8 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "pow", "element", "nvalue", "nvalue_except", 
-                                                   "alldifferent", "xor"})
+    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "pow", "element", "nvalue", "nvalue_except",  # no mod, CPMpy rounds towards zero
+                                                   "alldifferent", "xor"}) 
     supported_reified_global_constraints = frozenset({"alldifferent", "xor"})
 
 
