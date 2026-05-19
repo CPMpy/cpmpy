@@ -1049,10 +1049,11 @@ class TestSupportedSolvers:
             pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
 
         kwargs = dict()
-        if solver in ("gurobi", "cplex"):
-            kwargs["solution_limit"] = 15 # ILP solvers don't like this model and tend to get stuck finding all solutions
         if solver == "hexaly":
             kwargs["time_limit"] = 2
+        else:
+            kwargs["solution_limit"] = 15
+            
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
