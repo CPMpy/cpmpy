@@ -145,13 +145,17 @@ class CPM_optalcp(SolverInterface):
         """
         return self.opt_model
 
-    def solve(self, time_limit: Optional[float] = None, **kwargs):
+    def solve(self, time_limit: Optional[float] = None, solution_callback=None, **kwargs):
         """
             Call the OptalCP solver
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds 
-
+                solution_callback (OptalCPSolutionCallback, optional):
+                                                    callback called on every new solution found.
+                                                    CPMpy includes its own, namely
+                                                    :class:`OptalCPSolutionPrinter`.
+                kwargs:                             any keyword argument, sets parameters of the solver object
                 kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -174,6 +178,8 @@ class CPM_optalcp(SolverInterface):
 
             All solver parameters are documented here: https://dev.vilim.eu/python-api/api.html#optalcp.Parameters
         """
+        import optalcp
+
         # ensure all vars are known to solver 
         self.solver_vars(list(self.user_vars))
 
@@ -191,7 +197,14 @@ class CPM_optalcp(SolverInterface):
                 raise ValueError("Time limit must be positive")
             kwargs["timeLimit"] = time_limit
 
-        self.opt_result = self.opt_model.solve(kwargs or None)
+        if solution_callback is not None:
+            # use the async Solver class so we can attach event callbacks
+            opt_solver = optalcp.Solver()
+            opt_solver.on_solution = solution_callback._on_solution
+            self.opt_result = opt_solver.solve(self.opt_model, kwargs or None)
+        else:
+            # simple blocking solve via Model.solve()
+            self.opt_result = self.opt_model.solve(kwargs or None)
         
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -640,3 +653,122 @@ class CPM_optalcp(SolverInterface):
                 extra_cons.append(task.end() == self._opt_expr(end))
 
         return task, extra_cons
+    
+# solvers are optional, so this file should be interpretable
+# even if cpo is not installed...
+try:
+
+    class OptalCPSolutionCallback:
+        """
+        Base class for OptalCP solution callbacks.
+
+        Subclass this and override :meth:`on_solution` to react to each new solution
+        found during solve.
+
+        Use with :class:`CPM_optalcp` as follows:
+
+        .. code-block:: python
+
+            cb = OptalCPSolutionCallback()
+            s.solve(solution_callback=cb)
+        """
+
+        def __init__(self):
+            self._solver_inst = None  # set by CPM_optalcp.solve() before solving
+
+        def _on_solution(self, event):
+            """Internal: called by the OptalCP Solver on each solution event."""
+            # populate CPMpy variable values from the solution in the event
+            if self._solver_inst is not None:
+                self._solver_inst._populate_values(event.solution)
+            self.on_solution()
+
+        def on_solution(self):
+            """Override this method to react to each new solution."""
+            pass
+
+
+    class OptalCPSolutionPrinter(OptalCPSolutionCallback):
+        """
+        Native OptalCP callback for solution printing.
+
+        Subclasses :class:`OptalCPSolutionCallback`, see those docs too.
+
+        Use with :class:`CPM_optalcp` as follows:
+
+        .. code-block:: python
+
+            cb = OptalCPSolutionPrinter(s, display=vars)
+            s.solve(solution_callback=cb)
+
+        For multiple variables (single or NDVarArray), use:
+        ``cb = OptalCPSolutionPrinter(s, display=[v, x, z])``.
+
+        For a custom print function, use for example:
+
+        .. code-block:: python
+
+            def myprint():
+                print(f"x0={x[0].value()}, x1={x[1].value()}")
+
+            cb = OptalCPSolutionPrinter(s, printer=myprint)
+
+        Optionally retrieve the solution count with ``cb.solution_count()``.
+
+        Arguments:
+            solver:             the :class:`CPM_optalcp` instance
+            display:            either a list of CPMpy expressions, OR a callback function,
+                                called with the variables after value-mapping.
+                                Default/None: nothing displayed.
+            solution_limit:     stop after this many solutions (default: None)
+            verbose (bool):     whether to print solve time and objective on every solution
+                                (default: False)
+        """
+
+        def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+            super().__init__()
+            from ..expressions.core import Expression
+            from ..expressions.utils import is_any_list
+            from ..transformations.get_variables import get_variables
+
+            self._solver_inst = solver
+            self._solution_limit = solution_limit
+            self._solution_count = 0
+            self._verbose = verbose
+            self._display = display
+
+            # identify which variables to populate with their values
+            if isinstance(display, Expression) or is_any_list(display):
+                self._cpm_vars = get_variables(display)
+            elif callable(display):
+                # might use any variable, so populate all user variables
+                self._cpm_vars = solver.user_vars
+            else:
+                self._cpm_vars = []
+
+        def on_solution(self):
+            """Called on each new solution; prints display if set."""
+            import time
+            from ..expressions.utils import argval, argvals, is_any_list
+            from ..expressions.core import Expression
+
+            self._solution_count += 1
+
+            if self._verbose:
+                obj = self._solver_inst.objective_value_
+                print(f"Solution {self._solution_count}, objective = {obj}")
+
+            if self._display is not None:
+                if isinstance(self._display, Expression):
+                    print(argval(self._display))
+                elif is_any_list(self._display):
+                    print(argvals(self._display))
+                elif callable(self._display):
+                    self._display()
+
+        def solution_count(self):
+            """Returns the number of solutions found so far."""
+            return self._solution_count
+        
+except ImportError:
+    pass  # Ok, no optalcp installed...
