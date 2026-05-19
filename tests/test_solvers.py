@@ -181,7 +181,7 @@ class TestSolvers:
             def on_solution_callback(self):
                 # populate values before printing
                 for cpm_var in self.x:
-                    cpm_var._value = self.Value(self.varmap[cpm_var])
+                    cpm_var._value = self.Value(self.varmap[cpm_var.name])
         
                 self.solcount += 1
                 print("x:",self.x.value())
