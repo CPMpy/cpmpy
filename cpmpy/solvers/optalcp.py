@@ -11,14 +11,13 @@
 
     Requires the `optalcp` Python package and an OptalCP solver binary.
 
-    Public preview installation currently works via:
+    Using OptalCP through CPMpy requires a full or academic version, which can be installed through:
 
     .. code-block:: console
 
-        $ pip install git+https://github.com/ScheduleOpt/optalcp-py-bin-preview@latest
+        $ pip install git+https://github.com/ScheduleOpt/optalcp-py-bin-academic@latest
 
-    The preview edition solves models and reports objective values, but masks decision-variable assignments.
-    Academic and full editions expose variable values as well.
+    Visit https://dev.vilim.eu/docs/Quick%20Start/editions#installation-1 for more information on how to obtain non-preview versions of OptalCP.
 
     Documentation:
     https://optalcp.com/docs/
@@ -42,7 +41,7 @@ from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison, get_bounds, get_nonneg_args, implies
+from ..expressions.utils import is_num, is_np_int, is_np_bool, is_any_list, eval_comparison, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -63,11 +62,6 @@ class CPM_optalcp(SolverInterface):
         "min", "max", "abs", "mul", "div",
     })
     supported_reified_global_constraints = frozenset()
-
-    _masked_value_message = (
-        "OptalCP Preview solved the model but masks decision-variable values. "
-        "Install an Academic or Full OptalCP edition to retrieve variable assignments."
-    )
 
     @staticmethod
     def installed():
@@ -107,7 +101,6 @@ class CPM_optalcp(SolverInterface):
         assert subsolver is None
         self.opt_model = optalcp.Model()
         self._objective_is_min = None
-        self._values_masked = False
         super().__init__(name="optalcp", cpm_model=cpm_model)
 
     @property
@@ -142,7 +135,6 @@ class CPM_optalcp(SolverInterface):
 
         has_sol = self._solve_return(self.cpm_status)
         self.objective_value_ = None
-        self._values_masked = False
 
         if has_sol:
             self._populate_values(self.opt_result.solution)
@@ -168,20 +160,11 @@ class CPM_optalcp(SolverInterface):
                 cpm_var.clear()
             return
 
-        masked = False
         values = {}
         for cpm_var in self.user_vars:
             opt_var = self.solver_var(cpm_var)
             value = solution.get_value(opt_var)
             values[cpm_var] = value
-            if value is None:
-                masked = True
-
-        if masked:
-            self._values_masked = True
-            for cpm_var in self.user_vars:
-                cpm_var._mask_value(self._masked_value_message)
-            return
 
         for cpm_var, value in values.items():
             cpm_var.clear()
@@ -260,6 +243,12 @@ class CPM_optalcp(SolverInterface):
 
         if isinstance(cpm_con, BoolVal):
             return cpm_con.args[0]
+        
+        if is_np_int(cpm_con):
+            return int(cpm_con)
+        
+        if is_np_bool(cpm_con):
+            return bool(cpm_con)
 
         if is_num(cpm_con):
             return cpm_con
@@ -377,7 +366,19 @@ class CPM_optalcp(SolverInterface):
                 pulses.append(task.pulse(self._opt_expr(h)))
 
         if pulses:
-            cons.append(self.opt_model.sum(pulses) <= self._opt_expr(capacity))
+            # OptalCP requires maxCapacity to be a "present" (non-optional) expression.
+            # If capacity is a complex expression (e.g. 3*bv[0]), reify it into a
+            # fresh auxiliary intvar that is guaranteed present.
+            if is_num(capacity) or isinstance(capacity, _IntVarImpl):
+                opt_cap = self._opt_expr(capacity)
+            else:
+                lb, ub = get_bounds(capacity)
+                cap_aux = intvar(lb, ub)
+                self.user_vars.add(cap_aux)
+                opt_cap = self.solver_var(cap_aux)
+                cons += self._opt_expr([cap_aux == capacity])
+
+            cons.append(self.opt_model.sum(pulses) <= opt_cap)
         return cons
 
     def _make_tasks(self, start, dur, end, is_present):
