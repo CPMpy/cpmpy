@@ -283,7 +283,7 @@ class CPM_z3(SolverInterface):
             return z3.Not(self.solver_var(cpm_var._bv))
 
         # create if it does not exit
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             # we assume al variables are user variables (because nested expressions)
             self.user_vars.add(cpm_var)
             if isinstance(cpm_var, _BoolVarImpl):
@@ -295,9 +295,9 @@ class CPM_z3(SolverInterface):
                 self.z3_solver.add(revar <= cpm_var.ub)
             else:
                 raise NotImplementedError("Not a know var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     def has_objective(self):
