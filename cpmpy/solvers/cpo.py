@@ -724,17 +724,26 @@ class CPM_cpo(SolverInterface):
         native_to_soft_idx = {}
         assumptions = boolvar(shape=len(soft_cons), name="cpo_mus")
         for i, (assumption, soft_con) in enumerate(zip(assumptions, soft_cons)):
-            # Post the possibly decomposed soft constraint as hard implication.
-            indicator = s.solver_var(assumption)
+            native_soft = []
             for cpm_con in s.transform(soft_con):
-                for native_con in flat_cpo_exprs(s._cpo_expr(cpm_con)):
+                native_soft.extend(flat_cpo_exprs(s._cpo_expr(cpm_con)))
+
+            if len(native_soft) == 1:
+                # Simple case: one CPMpy soft constraint is one native CPO
+                # constraint, so no indicator is needed.
+                for native_con in add_cpo_expr(native_soft[0]):
+                    native_to_soft_idx[native_con] = i
+            else:
+                # Expanded case: guard the native CPO constraints by an
+                # indicator, and expose only the indicator as the soft
+                # representative to the conflict refiner.
+                indicator = s.solver_var(assumption)
+                for native_con in native_soft:
                     add_cpo_expr(dom.if_then(indicator, native_con))
 
-            # The conflict refiner now sees exactly one native soft
-            # representative for this CPMpy constraint.
-            for cpm_con in s.transform(assumption):
-                for native_con in add_cpo_expr(s._cpo_expr(cpm_con)):
-                    native_to_soft_idx[native_con] = i
+                for cpm_con in s.transform(assumption):
+                    for native_con in add_cpo_expr(s._cpo_expr(cpm_con)):
+                        native_to_soft_idx[native_con] = i
 
         refine_res = s.cpo_model.refine_conflict(LogVerbosity='Quiet')
         assert refine_res.is_conflict(), "MUS: model must be UNSAT"
