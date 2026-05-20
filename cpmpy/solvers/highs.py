@@ -473,6 +473,9 @@ class CPM_highs(SolverInterface):
         soft_cons = toplevel_list(soft, merge_and=False)
         hard_cons = toplevel_list(hard, merge_and=False)
 
+        if cp.Model(hard_cons).solve(solver="highs") is False:
+            return []
+
         s = cls()
         for cpm_con in s.transform(hard_cons):
             s._add_transformed(cpm_con)
@@ -505,8 +508,7 @@ class CPM_highs(SolverInterface):
         except Exception as e:
             warnings.warn(f"HiGHS: failed to set IIS strategy: {e}")
 
-        iis = highspy.HighsIis()
-        status = s.highs.getIis(iis)
+        status, iis = s.highs.getIis()
         if status == highspy.HighsStatus.kError:
             raise NotSupportedError("HiGHS: native IIS extraction failed. HiGHS currently supports IIS extraction only for LPs.")
         if not getattr(iis, "valid_", False):
