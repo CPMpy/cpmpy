@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+##
+## optalcp.py
+##
 """
     Interface to OptalCP's Python API.
 
