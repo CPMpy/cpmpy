@@ -42,6 +42,7 @@ from typing import Optional
 import time
 import warnings
 
+import cpmpy as cp
 import numpy as np
 import numpy.typing as npt
 
@@ -236,6 +237,57 @@ class CPM_highs(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
         return cpm_cons
 
+    def _add_transformed(self, con):
+        """
+        Post a single already-transformed constraint to the HiGHS model.
+
+        Returns the HiGHS row indices created by the constraint. This is also
+        used by ``mus_native`` to map HiGHS IIS rows back to CPMpy constraints.
+        """
+        if isinstance(con, Comparison):
+            lhs, rhs = con.args
+            if not is_num(rhs):
+                raise AssertionError(f"HiGHS: unexpected non-numeric RHS in comparison {con}, please report on our issue tracker.")
+
+            indices, values, const = self._row_from_linexpr(lhs)
+            # effective rhs: lhs_vars + const <op> rhs  =>  lhs_vars <op> rhs - const
+            bound = rhs - const
+
+            if con.name == "<=":
+                lower = -self._inf
+                upper = bound
+            elif con.name == ">=":
+                lower = bound
+                upper = self._inf
+            elif con.name == "==":
+                lower = bound
+                upper = bound
+            else:
+                raise NotSupportedError(f"HiGHS: unexpected comparison operator after linearization: {con.name}, please report on our issue tracker.")
+
+            row_idx = self.highs.getNumRow()
+            self.highs.addRow(lower, upper, len(indices), indices, values)
+            return [row_idx]
+
+        elif isinstance(con, BoolVal):
+            if con.args[0] is False:
+                # add an always-infeasible row: 1 <= 0
+                indices = np.empty(0, dtype=np.int32)
+                values = np.empty(0, dtype=np.float64)
+                row_idx = self.highs.getNumRow()
+                self.highs.addRow(1, 0, 0, indices, values)
+                return [row_idx]
+            # BoolVal(True) is a tautology; nothing to post
+            return []
+
+        elif isinstance(con, DirectConstraint):
+            # delegate to user-provided function with native model
+            con.callSolver(self, self.highs)
+            return []
+
+        else:
+            raise NotImplementedError(f"HiGHS: unexpected transformed constraint {con}, please report on our issue tracker.")
+
     def add(self, cpm_expr):
         """
             Eagerly add a constraint to the underlying solver.
@@ -247,43 +299,7 @@ class CPM_highs(SolverInterface):
         get_variables(cpm_expr, collect=self.user_vars)
 
         for con in self.transform(cpm_expr):
-            if isinstance(con, Comparison):
-                lhs, rhs = con.args
-                if not is_num(rhs):
-                    raise AssertionError(f"HiGHS: unexpected non-numeric RHS in comparison {con}, please report on our issue tracker.")
-
-                indices, values, const = self._row_from_linexpr(lhs)
-                # effective rhs: lhs_vars + const <op> rhs  =>  lhs_vars <op> rhs - const
-                bound = rhs - const
-
-                if con.name == "<=":
-                    lower = -self._inf
-                    upper = bound
-                elif con.name == ">=":
-                    lower = bound
-                    upper = self._inf
-                elif con.name == "==":
-                    lower = bound
-                    upper = bound
-                else:
-                    raise NotSupportedError(f"HiGHS: unexpected comparison operator after linearization: {con.name}, please report on our issue tracker.")
-
-                self.highs.addRow(lower, upper, len(indices), indices, values)
-
-            elif isinstance(con, BoolVal):
-                if con.args[0] is False:
-                    # add an always-infeasible row: 1 <= 0
-                    indices = np.empty(0, dtype=np.int32)
-                    values = np.empty(0, dtype=np.float64)
-                    self.highs.addRow(1, 0, 0, indices, values)
-                # BoolVal(True) is a tautology; nothing to post
-
-            elif isinstance(con, DirectConstraint):
-                # delegate to user-provided function with native model
-                con.callSolver(self, self.highs)
-
-            else:
-                raise NotImplementedError(f"HiGHS: unexpected transformed constraint {con}, please report on our issue tracker.")
+            self._add_transformed(con)
 
         return self
 
@@ -438,3 +454,83 @@ class CPM_highs(SolverInterface):
 
         return has_sol
 
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using HiGHS' native IIS row extractor as a starting core.
+
+        HiGHS' IIS support is currently LP-only and works at the level of
+        native rows. A CPMpy soft constraint can transform to multiple rows, so
+        multi-row soft constraints are represented by one fresh activation row
+        ``a >= 1`` plus hard implications ``a -> transformed_constraint``.
+
+        HiGHS does not expose a way to force hard rows into the IIS. To keep the
+        returned set minimal relative to all hard constraints, the native IIS
+        result is therefore shrunk with deletion checks using HiGHS itself.
+        """
+        import highspy
+
+        soft_cons = toplevel_list(soft, merge_and=False)
+        hard_cons = toplevel_list(hard, merge_and=False)
+
+        s = cls()
+        for cpm_con in s.transform(hard_cons):
+            s._add_transformed(cpm_con)
+
+        soft_rows = []
+        for soft_con in soft_cons:
+            soft_con_tf = s.transform(soft_con)
+
+            if len(soft_con_tf) == 0:
+                soft_con_rep = cp.BoolVal(True)
+            elif len(soft_con_tf) == 1:
+                soft_con_rep = soft_con_tf[0]
+            else:
+                assumption = cp.boolvar()
+                additional_hard_constraint = assumption.implies(cp.all(soft_con_tf))
+                for tf_con in s.transform(additional_hard_constraint):
+                    s._add_transformed(tf_con)
+                soft_con_rep = assumption >= 1
+
+            soft_rows.append(s._add_transformed(soft_con_rep))
+
+        if s.solve() is not False:
+            raise AssertionError("MUS: model must be UNSAT")
+
+        if not hasattr(s.highs, "getIis") or not hasattr(highspy, "HighsIis"):
+            raise NotSupportedError("HiGHS: native IIS extraction is not available in this highspy version.")
+
+        try:
+            s.highs.setOptionValue("iis_strategy", 6)  # whole LP + IIS reduction
+        except Exception as e:
+            warnings.warn(f"HiGHS: failed to set IIS strategy: {e}")
+
+        iis = highspy.HighsIis()
+        status = s.highs.getIis(iis)
+        if status == highspy.HighsStatus.kError:
+            raise NotSupportedError("HiGHS: native IIS extraction failed. HiGHS currently supports IIS extraction only for LPs.")
+        if not getattr(iis, "valid_", False):
+            raise NotSupportedError("HiGHS: native IIS extraction did not return a valid IIS. The infeasibility may rely on integrality.")
+
+        iis_rows = frozenset(iis.row_index_)
+        native_core = [
+            soft_con
+            for soft_con, rows in zip(soft_cons, soft_rows)
+            if any(row in iis_rows for row in rows)
+        ]
+
+        if not native_core:
+            raise NotSupportedError("HiGHS: native IIS extraction did not identify any soft rows. The infeasibility may rely on integrality.")
+
+        if cp.Model(hard_cons + native_core).solve(solver="highs") is True:
+            raise NotSupportedError("HiGHS: native IIS extraction did not map to an UNSAT CPMpy core.")
+
+        core = list(native_core)
+        for con in list(core):
+            subcore = list(core)
+            subcore.remove(con)
+            if cp.Model(hard_cons + subcore).solve(solver="highs") is True:
+                continue
+            core = subcore
+
+        return core
