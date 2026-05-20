@@ -504,7 +504,7 @@ class CPM_highs(SolverInterface):
             raise NotSupportedError("HiGHS: native IIS extraction is not available in this highspy version.")
 
         try:
-            s.highs.setOptionValue("iis_strategy", 6)  # whole LP + IIS reduction
+            s.highs.setOptionValue("iis_strategy", 15)  # whole LP + IIS reduction
         except Exception as e:
             warnings.warn(f"HiGHS: failed to set IIS strategy: {e}")
 
@@ -520,6 +520,8 @@ class CPM_highs(SolverInterface):
             for soft_con, rows in zip(soft_cons, soft_rows)
             if any(row in iis_rows for row in rows)
         ]
+
+        return native_core
 
         if not native_core:
             raise NotSupportedError("HiGHS: native IIS extraction did not identify any soft rows. The infeasibility may rely on integrality.")
