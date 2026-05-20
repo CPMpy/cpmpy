@@ -7,7 +7,7 @@
     - Native MUS for given solvers:
         - Exact: deletion-based MUS extraction
         - Gurobi: IIS-based MUS extraction
-        - HiGHS: IIS-based MUS extraction for LP infeasibilities
+        - HiGHS: IIS-based MUS extraction
 """
 import warnings
 import numpy as np
