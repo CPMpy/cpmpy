@@ -755,7 +755,7 @@ class CPM_cpo(SolverInterface):
             if soft_idx is not None:
                 mus_idxs.add(soft_idx)
 
-        return [soft_cons[i] for i in sorted(mus_idxs)]
+        return [soft_cons[i] for i in mus_idxs]
 
 
 # solvers are optional, so this file should be interpretable
