@@ -449,10 +449,10 @@ class TestBounds:
 
         a,b = cp.boolvar(name="a"), cp.boolvar(name="b")
         cons = a | b
-        cons.set_description("either a or b should be true, but not both")
+        cons.set_description("either a or b should be true")
 
         assert repr(cons) == "(a) or (b)"
-        assert str(cons) == "either a or b should be true, but not both"
+        assert str(cons) == "either a or b should be true"
 
         # ensure nothing goes wrong due to calling __str__ on a constraint with a custom description
         for solver,cls in cp.SolverLookup.base_solvers():
@@ -465,18 +465,58 @@ class TestBounds:
 
         ## test extra attributes of set_description
         cons = a | b
-        cons.set_description("either a or b should be true, but not both",
+        cons.set_description("either a or b should be true",
                              override_print=False)
 
         assert repr(cons) == "(a) or (b)"
         assert str(cons) == "(a) or (b)"
 
         cons = a | b
-        cons.set_description("either a or b should be true, but not both",
+        cons.set_description("either a or b should be true",
                              full_print=True)
 
         assert repr(cons) == "(a) or (b)"
-        assert str(cons) == "either a or b should be true, but not both -- (a) or (b)"
+        assert str(cons) == "either a or b should be true -- (a) or (b)"
+
+    def test_nested_description(self):
+
+        a = cp.boolvar(name="a")
+        b = cp.boolvar(name="b")
+        c = cp.boolvar(name="c")
+        cons = a | b
+        cons.set_description("either a or b should be true")
+        assert repr(cons) == "(a) or (b)"
+        assert str(cons) == "either a or b should be true"
+
+        cons2 = c.implies(cons)
+        
+        assert repr(cons2) == "(c) -> ((a) or (b))" # don't use description of nested expression
+        assert str(cons2) ==  "(c) -> (either a or b should be true)" # use description of nested expression
+
+
+    def test_expr_list_vs_ndarray(self):
+
+        x = cp.intvar(0,10,shape=3, name=("a","b","c"))
+        assert isinstance(x, NDVarArray)
+
+        cons = cp.AllDifferent(x)
+        assert repr(cons) == "alldifferent(a,b,c)"
+        assert str(cons) == "alldifferent(a,b,c)"
+
+        cons = cp.AllDifferent(list(x))
+        assert repr(cons) == "alldifferent(a,b,c)"
+        assert str(cons) == "alldifferent(a,b,c)"
+
+        cons = cp.Count(x, 3) >= 1
+        assert repr(cons) == "count([a, b, c],3) >= 1"
+        assert str(cons) == "count([a, b, c],3) >= 1"
+
+        cons = cp.Count(list(x), 3) >= 1
+        assert repr(cons) == "count([a, b, c],3) >= 1"
+        assert str(cons) == "count([a, b, c],3) >= 1"
+
+        assert str(cp.Count(x,2)) == str(cp.Count(list(x),2))
+        assert repr(cp.Count(x,2)) == repr(cp.Count(list(x),2)) # should be the same, functionally equivalent
 
 
     def test_dtype(self):
