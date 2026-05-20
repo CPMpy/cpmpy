@@ -76,7 +76,7 @@ class CPM_optalcp(SolverInterface):
     def installed():
         # try to import the package
         try:
-            import optalcp
+            import optalcp # type: ignore[import-not-found] 
             return True
         except ModuleNotFoundError:
             return False
