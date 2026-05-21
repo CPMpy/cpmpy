@@ -6,8 +6,21 @@ from cpmpy.tools.benchmark.cpbenchy.observer import (
     ResourceLimitObserver,
     SolverArgsObserver,
 )
-from cpmpy.tools.benchmark.psplib import solution_psplib
 from cpmpy.tools.io.rcpsp import read_rcpsp
+
+
+def solution_psplib(model):
+    """
+    Convert a CPMpy model solution into the solution string format.
+
+    Arguments:
+        model (cp.solvers.SolverInterface): The solver-specific model for which to print its solution
+
+    Returns:
+        str: formatted solution string.
+    """
+    variables = {var.name: var.value() for var in model.user_vars if var.name[:2] not in ["IV", "BV", "B#"]} # dirty workaround for all missed aux vars in user vars TODO fix with Ignace
+    return str(variables)
 
 
 class PSPLibCompetitionPrintingObserver(DIMACSPrintingObserver):

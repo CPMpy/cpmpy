@@ -12,8 +12,29 @@ from cpmpy.tools.benchmark.cpbenchy.observer import (
     ResourceLimitObserver,
     SolverArgsObserver,
 )
-from cpmpy.tools.benchmark.opb import solution_opb
 from cpmpy.tools.io.opb import read_opb
+
+
+def solution_opb(model):
+    """
+        Formats a solution according to the PB24 specification.
+
+        Arguments:
+            model: CPMpy model for which to format its solution (should be solved first)
+
+        Returns:
+            Formatted model solution according to PB24 specification.
+    """
+    variables = [
+        var for var in model.user_vars
+        if var.name[:2] not in ["IV", "BV", "B#"]
+        and not var.name.lstrip("+-").isdigit()  # skip OPB constant literals (+1, -1)
+    ]
+    return " ".join([
+        var.name if var.value()
+        else "-" + var.name
+        for var in variables
+    ])
 
 
 OPB_HIGHS_INTSIZE_LIMIT = 32
