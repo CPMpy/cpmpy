@@ -1,0 +1,5 @@
+ortools==9.15.6755
+highspy==1.14.0
+pindakaas==0.5.0
+psutil
+filelock
