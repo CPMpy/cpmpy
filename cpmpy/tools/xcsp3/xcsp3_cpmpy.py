@@ -9,7 +9,6 @@
 
         python xcsp3_cpmpy.py <xcsp3_instance.xml>
 
-
     Required Arguments
     ------------------
     benchname : str
