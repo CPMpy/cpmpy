@@ -38,12 +38,6 @@ class SolutionCheckerObserver(Observer):
                 var_map[var.name] = val
 
         declared_objective = getattr(runner, "objective_value", None)
-        if declared_objective is None:
-            try:
-                if runner.model.has_objective():
-                    declared_objective = runner.s.objective_value()
-            except Exception:
-                declared_objective = None
         result = check_solution(
             runner.model,
             exit_status,
