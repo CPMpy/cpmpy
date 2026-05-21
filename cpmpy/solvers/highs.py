@@ -457,16 +457,12 @@ class CPM_highs(SolverInterface):
     @classmethod
     def mus_native(cls, soft, hard=[]):
         """
-        Compute a MUS using HiGHS' native IIS row extractor as a starting core.
+        Compute a MUS using HiGHS' native IIS row extractor.
 
-        HiGHS' IIS support is currently LP-only and works at the level of
-        native rows. A CPMpy soft constraint can transform to multiple rows, so
-        multi-row soft constraints are represented by one fresh activation row
-        ``a >= 1`` plus hard implications ``a -> transformed_constraint``.
-
-        HiGHS does not expose a way to force hard rows into the IIS. To keep the
-        returned set minimal relative to all hard constraints, the native IIS
-        result is therefore shrunk with deletion checks using HiGHS itself.
+        A CPMpy soft constraint can transform to multiple rows, but this is not supported.
+        Also HiGHS' IIS support is currently LP-only and works at the level of
+        native rows. Even when there is a bijection of CPMpy constraints to HiGHS constraints
+        the returned IIS may be invalid and hence raise an error.
         """
         import highspy
 
