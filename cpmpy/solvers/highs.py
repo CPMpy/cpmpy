@@ -473,9 +473,6 @@ class CPM_highs(SolverInterface):
         soft_cons = toplevel_list(soft, merge_and=False)
         hard_cons = toplevel_list(hard, merge_and=False)
 
-        if cp.Model(hard_cons).solve(solver="highs") is False:
-            return []
-
         s = cls()
         for cpm_con in s.transform(hard_cons):
             s._add_transformed(cpm_con)
@@ -489,30 +486,21 @@ class CPM_highs(SolverInterface):
             elif len(soft_con_tf) == 1:
                 soft_con_rep = soft_con_tf[0]
             else:
-                assumption = cp.boolvar()
-                additional_hard_constraint = assumption.implies(cp.all(soft_con_tf))
-                for tf_con in s.transform(additional_hard_constraint):
-                    s._add_transformed(tf_con)
-                soft_con_rep = assumption >= 1
+                raise NotSupportedError("HiGHS only supports MUS extraction for linear constraints.")
 
             soft_rows.append(s._add_transformed(soft_con_rep))
 
         if s.solve() is not False:
             raise AssertionError("MUS: model must be UNSAT")
 
-        if not hasattr(s.highs, "getIis") or not hasattr(highspy, "HighsIis"):
-            raise NotSupportedError("HiGHS: native IIS extraction is not available in this highspy version.")
+        s.highs.setOptionValue("iis_strategy", 15)  # whole LP + IIS reduction
 
-        try:
-            s.highs.setOptionValue("iis_strategy", 15)  # whole LP + IIS reduction
-        except Exception as e:
-            warnings.warn(f"HiGHS: failed to set IIS strategy: {e}")
 
         status, iis = s.highs.getIis()
         if status == highspy.HighsStatus.kError:
-            raise NotSupportedError("HiGHS: native IIS extraction failed. HiGHS currently supports IIS extraction only for LPs.")
+            raise NotSupportedError("HiGHS: native MUS extraction failed.")
         if not getattr(iis, "valid_", False):
-            raise NotSupportedError("HiGHS: native IIS extraction did not return a valid IIS. The infeasibility may rely on integrality.")
+            raise NotSupportedError("HiGHS: native MUS extraction did not return a valid MUS. The infeasibility may rely on integrality.")
 
         iis_rows = frozenset(iis.row_index_)
         native_core = [
@@ -522,19 +510,3 @@ class CPM_highs(SolverInterface):
         ]
 
         return native_core
-
-        if not native_core:
-            raise NotSupportedError("HiGHS: native IIS extraction did not identify any soft rows. The infeasibility may rely on integrality.")
-
-        if cp.Model(hard_cons + native_core).solve(solver="highs") is True:
-            raise NotSupportedError("HiGHS: native IIS extraction did not map to an UNSAT CPMpy core.")
-
-        core = list(native_core)
-        for con in list(core):
-            subcore = list(core)
-            subcore.remove(con)
-            if cp.Model(hard_cons + subcore).solve(solver="highs") is True:
-                continue
-            core = subcore
-
-        return core
