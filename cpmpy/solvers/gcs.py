@@ -51,7 +51,7 @@
         CPM_gcs
 """
 import warnings
-from typing import Optional
+from typing import Optional, Iterable, Any
 
 from packaging.version import Version
 
@@ -59,10 +59,10 @@ from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar, intvar
+from ..expressions.core import Comparison, Operator, BoolVal, ExprLike
+from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, argval, argvals, is_any_list
+from ..expressions.utils import is_num, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
@@ -395,6 +395,29 @@ class CPM_gcs(SolverInterface):
 
         return self._varmap[cpm_var]
 
+    def solver_vars(self, cpm_vars: Iterable[ExprLike]) -> list[Any]:
+        """
+           Like `solver_var()` but for arbitrary shaped lists/tensors
+
+           Can not inherit from parent because 'int' needs special treatment
+        """
+        res: list[Any] = []
+        for cpm_var in cpm_vars:
+            if isinstance(cpm_var, _NumVarImpl):
+                if cpm_var in self._varmap:  # fast path
+                    res.append(self._varmap[cpm_var])
+                else:  # slow path
+                    res.append(self.solver_var(cpm_var))
+            elif isinstance(cpm_var, int):
+                res.append(self.gcs.create_integer_constant(cpm_var))  # GCS special treatment
+            elif is_any_list(cpm_var):
+                # recurse
+                res.append(self.solver_vars(cpm_var))
+            else:
+                # slow path, if any at all
+                res.append(self.solver_var(cpm_var))
+        return res
+
     def objective(self, expr, minimize=True):
         """
             Post the given expression to the solver as objective to minimize/maximize.
@@ -675,7 +698,8 @@ class CPM_gcs(SolverInterface):
                     elif lhs.name == 'min':
                         self.gcs.post_min(self.solver_vars(lhs.args), self.solver_var(rhs))   
                     elif lhs.name == 'element':
-                        self.gcs.post_element(self.solver_var(rhs), self.solver_vars(lhs.args[1]), self.solver_vars(lhs.args[0])) 
+                        arr, idx = self.solver_vars(lhs.args)
+                        self.gcs.post_element(self.solver_var(rhs), idx, arr)
                     elif lhs.name == 'count':
                         self.gcs.post_count(self.solver_vars(lhs.args[0]), self.solver_var(lhs.args[1]), self.solver_var(rhs))
                     elif lhs.name == 'nvalue':
@@ -692,7 +716,8 @@ class CPM_gcs(SolverInterface):
             elif cpm_expr.name == 'circuit':
                 self.gcs.post_circuit(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'inverse':
-                self.gcs.post_inverse(self.solver_vars(cpm_expr.args[0]), self.solver_vars(cpm_expr.args[1]))
+                gcs_args = self.solver_vars(cpm_expr.args)
+                self.gcs.post_inverse(gcs_args[0], gcs_args[1])
             elif cpm_expr.name == 'alldifferent':
                 self.gcs.post_alldifferent(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'table':
