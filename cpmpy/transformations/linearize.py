@@ -628,7 +628,13 @@ def get_linear_decompositions():
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 
-def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
+def linearize_reified_variables(
+    constraints,
+    min_values=3,
+    csemap=None,
+    ivarmap=None,
+    encoding: Optional[str] = None,
+):
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
     has at least min_values such reifications: remove those implications and add
@@ -640,6 +646,11 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     vars, or post the wsums itself anyway.
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
+
+    When ``encoding`` is ``"order"`` or ``"binary"``, this pass is skipped: it only
+    builds :class:`~cpmpy.transformations.int2bool.IntVarEncDirect`, which would
+    contradict the requested global ``int2bool`` encoding (e.g. DIMACS export with
+    ``encoding="order"``).
     """
     # this transformation can only be done if there is a csemap
     if csemap is None:
