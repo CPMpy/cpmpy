@@ -2,9 +2,12 @@ from functools import partial
 import lzma
 import xml.etree.ElementTree as ET
 
+import cpmpy as cp
 from cpmpy.tools.benchmark.cpbenchy.adapter._base import InstanceAdapter
 from cpmpy.tools.benchmark.cpbenchy.observer import HandlerObserver, RuntimeObserver, ResourceLimitObserver, SolverArgsObserver
 from cpmpy.tools.benchmark.cpbenchy.observer.dimacs_printing import DIMACSPrintingObserver
+from cpmpy.tools.benchmark.cpbenchy.runner.runner import Runner
+from cpmpy.tools.xcsp3.natives import apply_solver_native_constraints
 from cpmpy.tools.xcsp3.parser import read_xcsp3
 
 
@@ -54,6 +57,19 @@ def solution_xcsp3(model, useless_style="*", boolean_style="int"):
 
     return str(res)
 
+class XCSP3Runner(Runner):
+    """Runner subclass that applies solver-native XCSP3 constraint substitution in post_model.
+
+    Overriding post_model (rather than using an observer) ensures that any
+    substitution failure raises immediately and is not silently swallowed by
+    Runner.observe_pre_transform's blanket exception handler.
+    """
+
+    def post_model(self, model: cp.Model, solver: str):
+        apply_solver_native_constraints(model, solver)
+        return super().post_model(model, solver)
+
+
 class XCSP3CompetitionPrintingObserver(DIMACSPrintingObserver):
     """XCSP3 competition-style output printer using DIMACS format."""
 
@@ -70,10 +86,12 @@ class XCSP3Adapter(InstanceAdapter):
         RuntimeObserver,
         HandlerObserver,
         SolverArgsObserver,
-            ResourceLimitObserver,
+        ResourceLimitObserver,
     ]
 
     reader = staticmethod(partial(read_xcsp3, open= lambda instance: lzma.open(instance, mode='rt', encoding='utf-8') if str(instance).endswith(".lzma") else open(instance)))
+
+    runner_class = XCSP3Runner
 
     def cmd(self, instance: str, solver: str = "ortools", output_file: str = None, **kwargs):
         cmd = self.base_cmd(instance)

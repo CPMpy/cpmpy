@@ -41,7 +41,8 @@ def create_output_file(output_file: Optional[str], base_dir: Optional[str] = Non
     return full_path
 class InstanceAdapter:
     valid_exit_codes = (0,)
-    
+    runner_class = Runner  # subclasses can override to use a custom Runner subclass
+
     def __init__(self):
         self.additional_observers = []
         # Get the file path of the concrete class, not the base class
@@ -59,7 +60,7 @@ class InstanceAdapter:
             **kwargs,
         ):
 
-        runner = Runner(reader=self.reader)
+        runner = self.runner_class(reader=self.reader)
         # Store reference to instance_runner so observers can access it for formatting
         runner.instance_runner = self
 

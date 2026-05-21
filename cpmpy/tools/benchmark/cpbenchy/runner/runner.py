@@ -157,6 +157,7 @@ class Runner:
         """
 
         # Set up runner attributes
+        self.instance = instance
         self.solver = solver
         self.time_limit = time_limit
         self.mem_limit = mem_limit

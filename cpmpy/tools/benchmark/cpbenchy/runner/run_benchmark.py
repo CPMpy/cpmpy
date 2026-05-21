@@ -623,7 +623,18 @@ def main():
             "cpmpy.tools.solution_checker.check_solution by default."
         )
     )
-    
+    parser.add_argument(
+        "--xcsp3-checker-jar",
+        type=str,
+        default=None,
+        metavar="JAR",
+        dest="xcsp3_checker_jar",
+        help=(
+            "Path to the official XCSP3 Java checker JAR. When set (and runner is xcsp3), "
+            "runs the JAR against each solution and prints the verdict as 'c ...' lines."
+        )
+    )
+
     # Solver settings
     parser.add_argument(
         "--solver",
@@ -809,6 +820,12 @@ def main():
         except Exception as e:
             print(f"Error loading observers: {e}", file=sys.stderr)
             sys.exit(1)
+
+    # Wire XCSP3 JAR checker when requested
+    if getattr(args, "xcsp3_checker_jar", None):
+        from cpmpy.tools.benchmark.cpbenchy.observer.xcsp3_jar_checker import XCSP3JarCheckerObserver
+        jar_observer = XCSP3JarCheckerObserver(jar_path=args.xcsp3_checker_jar)
+        additional_observers = (additional_observers or []) + [jar_observer]
     
     # Run single instance, batch, or dataset
     if args.dataset:
