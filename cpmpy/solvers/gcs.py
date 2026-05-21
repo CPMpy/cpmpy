@@ -404,8 +404,8 @@ class CPM_gcs(SolverInterface):
         res: list[Any] = []
         for cpm_var in cpm_vars:
             if isinstance(cpm_var, _NumVarImpl):
-                if cpm_var in self._varmap:  # fast path
-                    res.append(self._varmap[cpm_var])
+                if cpm_var.name in self._varmap:  # fast path
+                    res.append(self._varmap[cpm_var.name])
                 else:  # slow path
                     res.append(self.solver_var(cpm_var))
             elif isinstance(cpm_var, int):
