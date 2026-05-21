@@ -438,6 +438,7 @@ class CPM_scip(SolverInterface):
         # does not expose a Gurobi-style force flag, so we later shrink on the CPMpy level
         # against the full hard set to recover a valid CPMpy MUS.
         for hard_con in hard_cons:
+            raise NotSupportedError("SCIP, currently does support hard constraints in a MUS which makes the transformation not sound.")
             post_transformed(hard_con)
 
         for soft_con in soft_cons:
@@ -454,9 +455,11 @@ class CPM_scip(SolverInterface):
                 )
                 native_soft_names.append([con.name for con in scip_cons])
             else:
+                raise NotSupportedError("SCIP, currently does support hard constraints in a MUS which makes the transformation not sound.")
+            
                 # One CPMpy soft constraint maps to a group of SCIP constraints. Guard the
                 # group by one activation variable, then make that activation the only soft
-                # native constraint.
+                # native constraint. See 
                 assumption = cp.boolvar()
                 guarded = assumption.implies(cp.all(soft_con_tf))
                 post_transformed(guarded)
