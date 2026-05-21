@@ -64,6 +64,13 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     for expr in lst_of_expr:
         if isinstance(expr, GlobalConstraint) and expr.name not in supported:
             # toplevel/positive global constraint, decompose
+            decomp = None
+            if (csemap is not None):
+                decomp = csemap.get_decomposition(expr)
+            if decomp is not None:
+                newlist.append(decomp)
+                continue
+            # else, global constraint, decompose
             if decompose_custom is not None and expr.name in decompose_custom:
                 exprs, toplevel_exprs = cast(Tuple[List[Expression], List[Expression]], decompose_custom[expr.name](expr))
             else:
@@ -163,48 +170,54 @@ def _decompose_in_tree_args(args: ListLike[Any],
             # a nested expression (its inside an args)
             if isinstance(arg, GlobalConstraint) and arg.name not in supported_reified:
                 changed = True
-                if (csemap is not None) and arg in csemap:  # have we decomposed it before?
-                    newargs.append(csemap[arg])
+                decomp = None
+                if (csemap is not None):
+                    decomp = csemap.get_decomposition(arg)
+                if decomp is not None:
+                    newargs.append(decomp)
                     continue
+                # else, global constraint, decompose
+                if decompose_custom is not None and arg.name in decompose_custom:
+                    exprs, toplevel_exprs = cast(Tuple[List[Expression], List[Expression]], decompose_custom[arg.name](arg))
                 else:
-                    # nested global constraint, decompose
-                    if decompose_custom is not None and arg.name in decompose_custom:
-                        exprs, toplevel_exprs = cast(Tuple[List[Expression], List[Expression]], decompose_custom[arg.name](arg))
-                    else:
-                        exprs, toplevel_exprs = arg.decompose()
+                    exprs, toplevel_exprs = arg.decompose()
 
-                    # replace arg by conjunction of decompose
-                    orig_for_csemap = arg
-                    arg = Operator("and", exprs)  # don't use cpm_all as for len=1 it shortcuts
-                    if len(toplevel_exprs) > 0:
-                        toplevel.extend(toplevel_exprs)
+                # replace arg by conjunction of decompose
+                orig_for_csemap = arg
+                arg = Operator("and", exprs)  # don't use cpm_all as for len=1 it shortcuts
+                if len(toplevel_exprs) > 0:
+                    toplevel.extend(toplevel_exprs)
+            
             elif isinstance(arg, GlobalFunction) and arg.name not in supported:
                 changed = True
-                if (csemap is not None) and arg in csemap:  # have we decomposed it before?
-                    newargs.append(csemap[arg])
+                decomp = None
+                if (csemap is not None):
+                    decomp = csemap.get_decomposition(arg)
+                if decomp is not None:
+                    newargs.append(decomp)
                     continue
-                else:
-                    # nested global function, decompose
-                    orig_for_csemap = arg
-                    # this is a bit awkward, but the decompose can return a new GlobFunc to decompose...
-                    while isinstance(arg, GlobalFunction) and arg.name not in supported:
-                        if decompose_custom is not None and arg.name in decompose_custom:
-                            newarg, toplevel_exprs = cast(Tuple[Expression, List[Expression]], decompose_custom[arg.name](arg))
-                        else:
-                            newarg, toplevel_exprs = arg.decompose()
-                        arg = newarg
-                        if len(toplevel_exprs) > 0:
-                            toplevel.extend(toplevel_exprs)
+                # else nested global function, decompose
+                orig_for_csemap = arg
+                # this is a bit awkward, but the decompose can return a new GlobFunc to decompose...
+                while isinstance(arg, GlobalFunction) and arg.name not in supported:
+                    if decompose_custom is not None and arg.name in decompose_custom:
+                        newarg, toplevel_exprs = cast(Tuple[Expression, List[Expression]], decompose_custom[arg.name](arg))
+                    else:
+                        newarg, toplevel_exprs = arg.decompose()
+                    arg = newarg
+                    if len(toplevel_exprs) > 0:
+                        toplevel.extend(toplevel_exprs)
 
-                        # TODO: violates type!!!
-                        # apparently in #630 we decided that decompose may return an int (e.g. for element)...
-                        # we should change that (Element constructor requires variable index; the []/__get__ override can still take anything)
-                        if isinstance(arg, int):
-                            # no need to recurse further, stop here
-                            newargs.append(arg)
-                            break
+                    # TODO: violates type!!!
+                    # apparently in #630 we decided that decompose may return an int (e.g. for element)...
+                    # we should change that (Element constructor requires variable index; the []/__get__ override can still take anything)
                     if isinstance(arg, int):
-                        continue
+                        # no need to recurse further, stop here
+                        newargs.append(arg)
+                        break
+                            
+                if isinstance(arg, int):
+                    continue
             
             # if it has subexprs, decompose its arguments too
             if arg.has_subexpr():
@@ -221,7 +234,7 @@ def _decompose_in_tree_args(args: ListLike[Any],
                 arg = cast(Expression, arg.args[0])
 
             if orig_for_csemap is not None and csemap is not None:
-                csemap[orig_for_csemap] = arg
+                csemap.save_decomposition(orig_for_csemap, arg)
             newargs.append(arg)
         
         elif isinstance(arg, np.ndarray) and arg.dtype == object:
