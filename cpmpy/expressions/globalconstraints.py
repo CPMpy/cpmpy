@@ -834,9 +834,9 @@ class MDD(GlobalConstraint):
     An MDD is a Multi-valued Decision Diagram, represented as an acyclic layered graph, with a single root node, and a single accepting sink node.
     The constraint takes as input an array of `n` integer variables and an MDD with `n+1` layers, represented through a table of "(from_node, value, to_node)" entries, one for every arc in the MDD.
     The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node, and where the first variable
-    in the array takes the value of the first edge, the second from the second edge, ending in the accepting sink node.
+    in the array takes the value of the first edge, the second from the second edge, etc., ending in the accepting sink node.
 
-    The transitions/edges are given in a nx3 matrix, or more precise a list of tuples (node_id1, value, node_id2).
+    The transitions/edges are given by a `n x 3` matrix, or more precisely a list of `n` tuples `(node_id1, value, node_id2)`.
     A node_id is an integer or string representing a state in the MDD, and value is an integer representing the value of the variable in the sequence.
     If not given explicitly, the root node is the node_id1 of the first entry in the transition table (i.e., transitions[0][0]).
     The root node is at level 0, the sink node is the only node on level n.
@@ -856,24 +856,24 @@ class MDD(GlobalConstraint):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
-            transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (source, value, destination)
-            start (Optional[int | str]): Root node id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
+            transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
+            start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
 
         _node_type = type(transitions[0][0])
-        for s, v, e in transitions:
-            if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
+        for id1, v, id2 in transitions:
+            if not isinstance(id1, _node_type) or not isinstance(v, int) or not isinstance(id2, _node_type):
                 raise TypeError(
-                    f"The second argument of an MDD constraint should be a collection of transitions ({_node_type}, int, {_node_type})")
+                    f"The second argument of an MDD constraint should be a list of transitions ({_node_type}, int, {_node_type})")
 
         super().__init__("mdd", (array, transitions))
-        self.root_node = start if start is not None else transitions[0][0]
+        self.root_node = transitions[0][0] if start is None else start
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
-        for s, v, e in transitions:
-            self.mapping[s][v] = e
+        for id1, v, id2 in transitions:
+            self.mapping[id1][v] = id2
 
         self.levels = {self.root_node: 0}
         current_nodes = [self.root_node]
