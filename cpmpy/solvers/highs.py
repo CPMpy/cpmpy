@@ -462,7 +462,7 @@ class CPM_highs(SolverInterface):
         A CPMpy soft constraint can transform to multiple rows, but this is not supported.
         Also HiGHS' IIS support is currently LP-only and works at the level of
         native rows. Even when there is a bijection of CPMpy constraints to HiGHS constraints
-        the returned IIS may be invalid and hence raise an error.
+        the returned IIS may be invalid and hence raise an
         """
         import highspy
 
@@ -471,6 +471,7 @@ class CPM_highs(SolverInterface):
 
         s = cls()
         for cpm_con in s.transform(hard_cons):
+            raise NotSupportedError("HiGHS does not support hard constraints for MUS extraction.")
             s._add_transformed(cpm_con)
 
         soft_rows = []
@@ -483,6 +484,11 @@ class CPM_highs(SolverInterface):
                 soft_con_rep = soft_con_tf[0]
             else:
                 raise NotSupportedError("HiGHS only supports MUS extraction for linear constraints.")
+                assumption = cp.boolvar()
+                additional_hard_constraint = assumption.implies(cp.all(soft_con_tf))
+                for tf_con in s.transform(additional_hard_constraint):
+                    s._add_transformed(tf_con)
+                soft_con_rep = assumption >= 1
 
             soft_rows.append(s._add_transformed(soft_con_rep))
 
