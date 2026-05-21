@@ -425,6 +425,7 @@ class CPM_scip(SolverInterface):
 
         s = cls()
         native_soft_names = []
+        captured_hard_cons = []
 
         def post_transformed(cpm_con):
             posted = []
@@ -434,12 +435,16 @@ class CPM_scip(SolverInterface):
                 ))
             return posted
 
-        # Hard constraints are part of the SCIP model. PySCIPOpt's IIS interface currently
-        # does not expose a Gurobi-style force flag, so we later shrink on the CPMpy level
-        # against the full hard set to recover a valid CPMpy MUS.
+        def post_hard(cpm_con):
+            posted = post_transformed(cpm_con)
+            for scip_con in posted:
+                s.native_model.captureCons(scip_con)
+                captured_hard_cons.append(scip_con)
+            return posted
+
+        # Captured constraints are kept hard by SCIP's IIS extractor.
         for hard_con in hard_cons:
-            raise NotSupportedError("SCIP, currently does support hard constraints in a MUS which makes the transformation not sound.")
-            post_transformed(hard_con)
+            post_hard(hard_con)
 
         for soft_con in soft_cons:
             soft_con_tf = s.transform(soft_con)
@@ -455,40 +460,42 @@ class CPM_scip(SolverInterface):
                 )
                 native_soft_names.append([con.name for con in scip_cons])
             else:
-                raise NotSupportedError("SCIP, currently does support hard constraints in a MUS which makes the transformation not sound.")
-            
                 # One CPMpy soft constraint maps to a group of SCIP constraints. Guard the
                 # group by one activation variable, then make that activation the only soft
-                # native constraint. See 
+                # native constraint.
                 assumption = cp.boolvar()
                 guarded = assumption.implies(cp.all(soft_con_tf))
-                post_transformed(guarded)
+                post_hard(guarded)
 
                 scip_cons = s._flatten_scip_cons(
                     s._add_transformed_constraint(assumption >= 1)
                 )
                 native_soft_names.append([con.name for con in scip_cons])
 
-        # `generateIIS()` solves the model if needed and raises if the model is feasible.
         try:
-            iis = s.native_model.generateIIS()
-        except Exception as e:
-            # Keep the user-facing contract consistent with other native MUS extractors.
-            status = s.native_model.getStatus()
-            if status not in ("infeasible", "inforunbd"):
-                raise AssertionError("MUS: model must be UNSAT") from e
-            raise
+            # `generateIIS()` solves the model if needed and raises if the model is feasible.
+            try:
+                iis = s.native_model.generateIIS()
+            except Exception as e:
+                # Keep the user-facing contract consistent with other native MUS extractors.
+                status = s.native_model.getStatus()
+                if status not in ("infeasible", "inforunbd"):
+                    raise AssertionError("MUS: model must be UNSAT") from e
+                raise
 
-        subscip = iis.getSubscip()
-        iis_names = {con.name for con in subscip.getConss()}
+            subscip = iis.getSubscip()
+            iis_names = {con.name for con in subscip.getConss()}
 
-        candidate = [
-            soft_con
-            for soft_con, scip_names in zip(soft_cons, native_soft_names)
-            if any(name in iis_names for name in scip_names)
-        ]
+            candidate = [
+                soft_con
+                for soft_con, scip_names in zip(soft_cons, native_soft_names)
+                if any(name in iis_names for name in scip_names)
+            ]
 
-        return candidate
+            return candidate
+        finally:
+            for scip_con in captured_hard_cons:
+                s.native_model.releaseCons(scip_con)
 
     def solveAll(self, display=None, time_limit=None, solution_limit=None, call_from_model=False, **kwargs):
         warnings.warn("Solution enumeration is not implemented in PySCIPOpt, defaulting to CPMpy's naive implementation")
