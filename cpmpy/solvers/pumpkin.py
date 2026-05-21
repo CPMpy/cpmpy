@@ -306,17 +306,17 @@ class CPM_pumpkin(SolverInterface):
 
         # create if it does not exist
         if isinstance(cpm_var, _NumVarImpl):
-            if cpm_var not in self._varmap:
+            if cpm_var.name not in self._varmap:
                 if isinstance(cpm_var, _BoolVarImpl):
                     revar = self.pum_solver.new_boolean_variable(name=str(cpm_var))
                 elif isinstance(cpm_var, _IntVarImpl):
                     revar = self.pum_solver.new_integer_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
                 else:
                     raise NotImplementedError("Not a known var {}".format(cpm_var))
-                self._varmap[cpm_var] = revar
+                self._varmap[cpm_var.name] = revar
 
             # return from cache
-            return self._varmap[cpm_var]
+            return self._varmap[cpm_var.name]
         
         raise ValueError(f"Not a known var {cpm_var}")
 

@@ -19,7 +19,7 @@
         ExitStatus
 
 """
-from typing import Optional, List, Callable, TypeAlias, Iterable, Any
+from typing import Any, Optional, List, Callable, TypeAlias, Iterable, Any
 import warnings
 import time
 from enum import Enum
@@ -77,7 +77,7 @@ class SolverInterface(object):
             - objective_value_: the value of the objective function after solving (or None)
             - user_vars: set(), variables in the original (non-transformed) model,
                            for reverse mapping the values after `solve()`
-            - _varmap: dict(), maps cpmpy variables to native solver variables
+            - _varmap: dict[str, Any], maps cpmpy variable names to native solver variables
         """
         assert(subsolver is None)
 
@@ -87,7 +87,7 @@ class SolverInterface(object):
 
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
-        self._varmap = dict()  # maps cpmpy variables to native solver variables
+        self._varmap: dict[str, Any] = {}  # maps cpmpy variable names to native solver variables
         self._csemap = CSEMap()  # maps cpmpy expressions to previously created expressions (typically auxiliary variables)
 
         # rest uses own API

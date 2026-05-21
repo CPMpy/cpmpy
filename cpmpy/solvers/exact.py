@@ -402,8 +402,8 @@ class CPM_exact(SolverInterface):
             raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
 
         # return it if it already exists
-        if cpm_var in self._varmap:
-            return self._varmap[cpm_var]
+        if cpm_var.name in self._varmap:
+            return self._varmap[cpm_var.name]
 
         # create if it does not exist
         revar = str(cpm_var)
@@ -418,7 +418,7 @@ class CPM_exact(SolverInterface):
             self.xct_solver.addVariable(revar, lb, ub, encoding)
         else:
             raise NotImplementedError("Not a known var {}".format(cpm_var))
-        self._varmap[cpm_var] = revar
+        self._varmap[cpm_var.name] = revar
         return revar
 
 

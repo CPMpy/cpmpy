@@ -382,7 +382,7 @@ class CPM_gcs(SolverInterface):
             return self.gcs.add_constant(self.gcs.negate(self.solver_var(cpm_var._bv)), 1)
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             name = self._gcs_safe_name(str(cpm_var))
             if isinstance(cpm_var, _BoolVarImpl):
                 # Bool vars are just int vars with [0, 1] domain
@@ -391,9 +391,9 @@ class CPM_gcs(SolverInterface):
                 revar = self.gcs.create_integer_variable(cpm_var.lb, cpm_var.ub, name)
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar # save actual name, not gcs_safe name
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
     def solver_vars(self, cpm_vars: Iterable[ExprLike]) -> list[Any]:
         """

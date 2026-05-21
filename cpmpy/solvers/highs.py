@@ -146,7 +146,7 @@ class CPM_highs(SolverInterface):
             )
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 hvar = self.highs.addBinary()
             elif isinstance(cpm_var, _IntVarImpl):
@@ -154,9 +154,9 @@ class CPM_highs(SolverInterface):
             else:
                 raise NotSupportedError(f"Not a known HiGHS variable type: {cpm_var}")
 
-            self._varmap[cpm_var] = hvar.index
+            self._varmap[cpm_var.name] = hvar.index
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
     def _row_from_linexpr(self, linexpr) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
         """
@@ -406,9 +406,9 @@ class CPM_highs(SolverInterface):
             solution = self.highs.getSolution()
             col_values = solution.col_value
             for cpm_var in self.user_vars:
-                if cpm_var not in self._varmap:
+                if cpm_var.name not in self._varmap:
                     continue
-                col_idx = self._varmap[cpm_var]
+                col_idx = self._varmap[cpm_var.name]
                 val = col_values[col_idx]
                 if cpm_var.is_bool():
                     cpm_var._value = val >= 0.5
