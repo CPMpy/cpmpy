@@ -22,6 +22,19 @@
     https://ergo-code.github.io/HiGHS/dev/interfaces/python/
 
     The rest of this documentation is for advanced users.
+
+    ===============
+    List of classes
+    ===============
+
+    .. autosummary::
+        :nosignatures:
+
+        CPM_highs
+
+    ==============
+    Module details
+    ==============
 """
 
 from typing import Optional
@@ -92,11 +105,11 @@ class CPM_highs(SolverInterface):
 
         Arguments:
         - cpm_model: a CPMpy Model()
+        - subsolver: None (not supported)
         """
         if not self.supported():
             raise ModuleNotFoundError("CPM_highs: Install the python package 'highspy' to use this solver interface.")
-        if subsolver is not None:
-            raise NotSupportedError("HiGHS does not support subsolvers")
+        assert subsolver is None, "HiGHS does not support subsolvers"
 
         import highspy
 
@@ -160,7 +173,7 @@ class CPM_highs(SolverInterface):
                 res.append(self.solver_var(cpm_var))
         return res
 
-    def _row_from_linexpr(self, lhs) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
+    def _row_from_linexpr(self, linexpr) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
         """
         Convert a flat linear numeric expression (var/sum/wsum)
         into HiGHS row data: (indices, values, constant).
@@ -171,26 +184,26 @@ class CPM_highs(SolverInterface):
         Returns:
             tuple[arr[int], arr[float], float]: (col indices, col weights, constant)
         """
-        if is_num(lhs):
-            return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.float64), lhs
+        if is_num(linexpr):
+            return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.float64), linexpr
 
-        elif isinstance(lhs, _NumVarImpl):
-            col = self.solver_var(lhs)
+        elif isinstance(linexpr, _NumVarImpl):
+            col = self.solver_var(linexpr)
             return np.array([col], dtype=np.int32), np.array([1.0], dtype=np.float64), 0.0
 
-        elif isinstance(lhs, Operator):  # sum or wsum (vars only in operand lists)
+        elif isinstance(linexpr, Operator):  # sum or wsum (vars only in operand lists)
             coeffs: npt.NDArray[np.float64]
-            if lhs.name == "sum":
-                solvars = self.solver_vars_1d(lhs.args)
+            if linexpr.name == "sum":
+                solvars = self.solver_vars_1d(linexpr.args)
                 idx = np.array(solvars, dtype=np.int32)
                 coeffs = np.ones(idx.size, dtype=np.float64)
-            elif lhs.name == "wsum":
-                ws, vs = lhs.args
+            elif linexpr.name == "wsum":
+                ws, vs = linexpr.args
                 solvars = self.solver_vars_1d(vs)
                 idx = np.array(solvars, dtype=np.int32)
                 coeffs = np.asarray(ws, dtype=np.float64)
             else:
-                raise NotImplementedError(f"HiGHS: unsupported operator {lhs}")
+                raise NotImplementedError(f"HiGHS: unexpected operator {linexpr}, please report on our issue tracker.")
 
             # if columns are unique, just post
             if np.unique(idx).size == idx.size:
@@ -202,14 +215,13 @@ class CPM_highs(SolverInterface):
             sel = new_coeffs != 0  # keep only the non-zero vars
             return new_idx[sel], new_coeffs[sel], 0.0
 
-        raise NotImplementedError(f"HiGHS: unsupported linear expression {lhs}")
+        raise NotImplementedError(f"HiGHS: unexpected linear expression {linexpr}, please report on our issue tracker.")
 
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports.
 
-            Follows the ILP-style pipeline used by SCIP/Gurobi/CPLEX, but
-            without native indicator/SOS handling; those are linearized.
+            Follows the ILP-style pipeline with linearize-friendly decompositions and treatment of reified variables.
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expects safe exprs
@@ -238,7 +250,7 @@ class CPM_highs(SolverInterface):
             if isinstance(con, Comparison):
                 lhs, rhs = con.args
                 if not is_num(rhs):
-                    raise AssertionError(f"RHS of comparison should be numeric after transformations, got {rhs}")
+                    raise AssertionError(f"HiGHS: unexpected non-numeric RHS in comparison {con}, please report on our issue tracker.")
 
                 indices, values, const = self._row_from_linexpr(lhs)
                 # effective rhs: lhs_vars + const <op> rhs  =>  lhs_vars <op> rhs - const
@@ -254,9 +266,7 @@ class CPM_highs(SolverInterface):
                     lower = bound
                     upper = bound
                 else:
-                    raise NotSupportedError(
-                        f"HiGHS: unexpected comparison operator after linearization: {con.name}"
-                    )
+                    raise NotSupportedError(f"HiGHS: unexpected comparison operator after linearization: {con.name}, please report on our issue tracker.")
 
                 self.highs.addRow(lower, upper, len(indices), indices, values)
 
@@ -273,7 +283,7 @@ class CPM_highs(SolverInterface):
                 con.callSolver(self, self.highs)
 
             else:
-                raise NotImplementedError(f"HiGHS: unsupported transformed constraint {con}")
+                raise NotImplementedError(f"HiGHS: unexpected transformed constraint {con}, please report on our issue tracker.")
 
         return self
 
@@ -330,10 +340,15 @@ class CPM_highs(SolverInterface):
             - kwargs:     any keyword argument, mapped to HiGHS options via ``setOptionValue``.
                           Unknown/invalid options are ignored with a warning.
 
-            Notable HiGHS options (see upstream option list):
+            Notable HiGHS options:
 
-            - ``threads`` (int): number of threads; default ``0`` means automatic (parallelism enabled
-              according to HiGHS defaults).
+        - ``threads`` (int): number of threads; default ``0`` means automatic (parallelism enabled
+          according to HiGHS defaults).
+
+        HiGHS option reference: https://ergo-code.github.io/HiGHS/dev/options/definitions/
+
+        Solution callbacks are not connected yet; see HiGHS callback documentation for future reference:
+        https://ergo-code.github.io/HiGHS/stable/callbacks/
         """
         import highspy
 
@@ -360,16 +375,12 @@ class CPM_highs(SolverInterface):
             except Exception as e:
                 warnings.warn(f"HiGHS: failed to set option '{key}' = {val!r}: {e}")
 
-        start = time.time()
         status = self.highs.run()
-        end = time.time()
-
         info = self.highs.getInfo()
         model_status = self.highs.getModelStatus()
 
         self.cpm_status = SolverStatus(self.name)
-        # prefer solver-reported runtime when available, else fallback to wall-clock
-        self.cpm_status.runtime = getattr(info, "run_time", end - start)
+        self.cpm_status.runtime = self.highs.getRunTime()
 
         # map HiGHS model status to CPMpy ExitStatus
         _has_feasible_sol = (info.primal_solution_status

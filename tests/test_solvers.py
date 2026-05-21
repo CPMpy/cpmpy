@@ -1241,7 +1241,7 @@ def test_highs_basic_ilp():
     s = SolverLookup.get("highs", m)
     assert s.solve()
 
-    # check variable types and a feasible objective
-    assert 0 <= x.value() <= 10
-    assert 0 <= y.value() <= 10
-    assert x.value() + 2 * y.value() >= 10
+    # unique optimum
+    assert x.value() == 0
+    assert y.value() == 5
+    assert s.objective_value_ == 5

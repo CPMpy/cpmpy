@@ -25,19 +25,19 @@
 
     Source installation instructions:
 
-    - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
-    - (on Debian-based systems, see https://apt.llvm.org for easy installation)
-    - If necessary ``export CXX=<your up to date C++ compiler (e.g. clang++-15)>``
-    - Ensure you have Boost installed
+    - Ensure you have a C++23 compiler such as GCC 13 (Ubuntu 24.04) or later, or
+      clang 21 or later. GCC 15 and clang 21 are the primary development
+      compilers; on Debian-based systems see https://apt.llvm.org for easy
+      installation of recent clang.
+    - If necessary ``export CXX=<your up to date C++ compiler (e.g. clang++-21)>``.
+    - On Ubuntu, install the Python development headers matching your Python
+      version (e.g. ``sudo apt install python3.12-dev`` for Python 3.12).
     - ``git clone https://github.com/ciaranm/glasgow-constraint-solver.git``
     - ``cd glasgow-constraint-solver/python``
     - ``pip install .``
 
-    .. note::
-        If for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
-
     For the verifier functionality, the 'veripb' tool is also required.
-    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb. 
+    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb.
 
     The rest of this documentation is for advanced users.
 
@@ -354,6 +354,19 @@ class CPM_gcs(SolverInterface):
 
         return num_sols
 
+    @staticmethod
+    def _gcs_safe_name(name):
+        """
+        gcs (and the VeriPB proof format underneath) only guarantees
+        support for variable names matching ``[a-zA-Z][a-zA-Z0-9[\\]{}_^-]+``;
+        commas in particular are not in the guaranteed set. CPMpy's auto-
+        generated names for multi-dimensional array elements use commas as
+        separators (e.g. ``arr[0,0]``), so rewrite each comma to ``][`` so
+        that ``arr[0,0]`` becomes ``arr[0][0]`` — a valid name that also
+        reads as the multi-dimensional index.
+        """
+        return name.replace(",", "][")
+
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
@@ -370,11 +383,12 @@ class CPM_gcs(SolverInterface):
 
         # create if it does not exist
         if cpm_var not in self._varmap:
+            name = self._gcs_safe_name(str(cpm_var))
             if isinstance(cpm_var, _BoolVarImpl):
                 # Bool vars are just int vars with [0, 1] domain
-                revar = self.gcs.create_integer_variable(0, 1, str(cpm_var))
+                revar = self.gcs.create_integer_variable(0, 1, name)
             elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.gcs.create_integer_variable(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                revar = self.gcs.create_integer_variable(cpm_var.lb, cpm_var.ub, name)
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             self._varmap[cpm_var] = revar
