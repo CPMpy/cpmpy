@@ -648,15 +648,15 @@ class TestLinearizeReifiedVariablesThreshold:
         out = linearize_reified_variables(self.linearize((a != 1) | (a != 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
         assert str(out) == "[(~BV[a == 1]) or (~BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1]"
 
+    def test_linearize_reified_inequalities(self):
+        """Use order encoding on inequalities and replace `a>=k` expressions"""
+        a = self.a
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(self.linearize((a >= 2) | (a >= 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
     
     # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
     
-    @pytest.mark.xfail(reason="aspirational")
-    def test_linearize_reified_inequalities(self):
-        """Use order encoding on inequalities and replace `a>=1` expressions"""
-        a = self.a
-        out = linearize_reified_variables(self.linearize((a >= 1) | (a >= 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[(BV[a >= 1]) or (BV[a >= 2]), sum([1, -1] * (BV[a >= 2], BV[a >= 1])) <= 0, sum([1, -1] * (BV[a >= 3], BV[a >= 2])) <= 0]"
 
     @pytest.mark.xfail(reason="aspirational")
     def test_linearize_reified_inequalities_variations(self):

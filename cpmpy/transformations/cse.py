@@ -63,6 +63,18 @@ class CSEMap:
 
         return var_vals
 
+    def get_reified_varbounds(self) -> dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]:
+        """collect all bv <-> var >= val expressions in flat_map"""
+
+        var_bounds = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var: [val, bv]
+        for expr, bv in self.flat_map.items():
+            if expr.name == ">=":
+                var, val = expr.args
+                if isinstance(var, _IntVarImpl) and is_int(val):
+                    var_bounds.setdefault(var, []).append((val, bv))
+
+        return var_bounds
+
     def get_or_make_var(self, expr: Expression) -> tuple[_IntVarImpl, Optional[Expression]]:
         """
         Make an auxiliary variable for the given expression
@@ -108,5 +120,5 @@ class CSEMap:
                 new_expr = Comparison("==", lhs, rhs)
                 new_expr._has_subexpr = expr._has_subexpr
                 return new_expr, True
-            
+
         return expr, False

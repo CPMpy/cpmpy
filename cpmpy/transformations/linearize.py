@@ -80,7 +80,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, 
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
-from .int2bool import _encode_int_var
+from .int2bool import IntVarEncOrder, _encode_int_var
 
 
 
@@ -630,9 +630,10 @@ def get_linear_decompositions():
 
 def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
     """
-    Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
+    Replace reified (BV <-> (x == val)) implications with direct encoding and
+    reified (BV <-> (x >= val)) implications with order encoding when a variable
     has at least min_values such reifications: remove those implications and add
-    the 'direct' encoding of x.
+    the corresponding encoding of x.
 
     If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
     If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
@@ -646,6 +647,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         return constraints
 
     var_vals = csemap.get_reified_varvals()
+    var_bounds = csemap.get_reified_varbounds()
     
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
@@ -675,15 +677,40 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         for val, bv in vals:
             bv_map[bv] = (var, val)
 
-    if len(bv_map) > 0:
-        # Now clean up and remove the '(var == val) == bv' constraints:
+    bound_bv_map = {}  # bv -> (var, val)
+    for var, vals in var_bounds.items():
+        if var.name in my_ivarmap and not isinstance(my_ivarmap[var.name], IntVarEncOrder):
+            continue  # another encoding already represents this variable
+
+        if len(vals) < min_values:
+            continue  # do not encode
+
+        lb, ub = var.lb, var.ub
+        # order encoding has one Boolean per non-trivial lower bound threshold
+        vals = [(val, bv) for val, bv in vals if lb < val <= ub]
+        if len(vals) == 0:
+            continue  # do not encode
+
+        _, domain_constraint = _encode_int_var(my_ivarmap, var, "order", csemap=csemap)
+        toplevel.extend(domain_constraint)
+
+        for val, bv in vals:
+            bound_bv_map[bv] = (var, val)
+
+    if len(bv_map) > 0 or len(bound_bv_map) > 0:
+        # Now clean up and remove the '(var == val) == bv' and '(var >= val) == bv' constraints:
         newcons = []
         for con in constraints:
-            if con.name == '==' and con.args[0].name == '==':
-                # potential '(var == val) == bv'
+            if con.name == '==' and con.args[0].name in {'==', '>='}:
+                # potential '(var == val) == bv' or '(var >= val) == bv'
                 lhs,bv = con.args
-                if bv in bv_map:
+                if lhs.name == '==' and bv in bv_map:
                     (var, val) = bv_map[bv]
+                    (lhs_var, lhs_val) = lhs.args
+                    if lhs_val == val and lhs_var == var:
+                        continue  # do not keep
+                elif lhs.name == '>=' and bv in bound_bv_map:
+                    (var, val) = bound_bv_map[bv]
                     (lhs_var, lhs_val) = lhs.args
                     if lhs_val == val and lhs_var == var:
                         continue  # do not keep
