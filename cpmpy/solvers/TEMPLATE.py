@@ -98,8 +98,6 @@ class CPM_template(SolverInterface):
             return True
         except ModuleNotFoundError: # if solver's Python package is not installed
             return False
-        except Exception as e:
-            raise e
 
     @classmethod
     def version(cls) -> Optional[str]:

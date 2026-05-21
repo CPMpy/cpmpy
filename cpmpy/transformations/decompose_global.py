@@ -22,6 +22,7 @@ import copy
 from typing import List, AbstractSet, Optional, Dict, Tuple, Any, Callable, cast
 import numpy as np
 
+from .cse import CSEMap
 from ..expressions.core import Expression, ListLike, BoolVal, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
@@ -32,7 +33,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                       supported: Optional[AbstractSet[str]] = None,
                       supported_reified: Optional[AbstractSet[str]] = None,
                       _toplevel=None, nested=False,
-                      csemap: Optional[Dict[Expression, Expression]] = None,
+                      csemap: Optional[CSEMap] = None,
                       decompose_custom: Optional[Dict[str, Callable]] = None) -> List[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
@@ -95,7 +96,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 def decompose_objective(expr: Expression,
                         supported: Optional[AbstractSet[str]] = None,
                         supported_reified: Optional[AbstractSet[str]] = None,
-                        csemap: Optional[Dict[Expression, Expression]] = None,
+                        csemap: Optional[CSEMap] = None,
                         decompose_custom: Optional[Dict[str, Callable]]=None) -> Tuple[Expression, List[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver
@@ -133,7 +134,7 @@ def decompose_objective(expr: Expression,
 def _decompose_in_tree_args(args: ListLike[Any],
                             supported: AbstractSet[str],
                             supported_reified: AbstractSet[str],
-                            csemap: Optional[Dict[Expression, Expression]]=None,
+                            csemap: Optional[CSEMap]=None,
                             decompose_custom:Optional[Dict[str, Callable]]=None) -> Tuple[bool, List[Any], List[Expression]]:
     """
     TODO: OUTDATED DOC!!
