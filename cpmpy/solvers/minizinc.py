@@ -538,7 +538,7 @@ class CPM_minizinc(SolverInterface):
         if isinstance(cpm_var, NegBoolView):
             raise NotSupportedError("Negative literals are not handled here. Please report.")
 
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             # clean the varname
             varname = cpm_var.name
             mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
@@ -558,9 +558,9 @@ class CPM_minizinc(SolverInterface):
                     raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
                                                   "of range (-2147483646..2147483646)")
                 self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
-            self._varmap[cpm_var] = mzn_var
+            self._varmap[cpm_var.name] = mzn_var
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
     def objective(self, expr, minimize):
         """

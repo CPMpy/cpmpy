@@ -278,17 +278,17 @@ class CPM_cplex(SolverInterface):
                             "See /transformations/linearize for more details")
 
         # create if it does not exit
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.cplex_model.binary_var(cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.cplex_model.integer_var(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
         # return from cache
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     def objective(self, expr, minimize=True):
