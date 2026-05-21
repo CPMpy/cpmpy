@@ -305,14 +305,7 @@ class CPM_choco(SolverInterface):
                         cpm_var._value = bool(value)
                     else:
                         cpm_var._value = value
-                # print the desired display
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:
-                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    display()  # callback
+                self.print_display(display)
 
         return len(sols)
 
@@ -335,7 +328,7 @@ class CPM_choco(SolverInterface):
             return self.chc_model.bool_not_view(self.solver_var(cpm_var._bv))
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.chc_model.boolvar(name=str(cpm_var.name))
             elif isinstance(cpm_var, _IntVarImpl):
@@ -345,9 +338,9 @@ class CPM_choco(SolverInterface):
                 revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var.name))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
     def objective(self, expr, minimize):
         """
@@ -667,30 +660,34 @@ class CPM_choco(SolverInterface):
                 expr, table = self.solver_vars(cpm_expr.args)
                 return self.chc_model.member(expr, table)
             elif cpm_expr.name == "cumulative":
-                start, dur, end, demand, cap = cpm_expr.args
-                # Choco allows negative durations, but this does not match CPMpy spec
-                dur, extra_cons = get_nonneg_args(dur)
-                # Choco allows negative demand, but this does not match CPMpy spec
-                demand, demand_cons = get_nonneg_args(demand)
-                extra_cons += demand_cons
-                # start, end, demand and cap should be var
-                if end is None:
-                    start, demand, cap = self._to_vars([start, demand, cap])
-                    end = [None for _ in range(len(start))]
+                if len(cpm_expr.args) == 4:
+                    start, dur, demand, cap = cpm_expr.args
                 else:
-                    start, end, demand, cap = self._to_vars([start, end, demand, cap])
-                # duration can be var or int
-                dur = self.solver_vars(dur)
-                # Create task variables. Choco can create them only one by one
-                tasks = [self.chc_model.task(s, d, e) for s, d, e in zip(start, dur, end)]
+                    start, dur, end, demand, cap = cpm_expr.args
 
-                chc_cumulative = self.chc_model.cumulative(tasks, demand, cap)
+                # Choco allows negative durations and demands, but this does not match CPMpy spec
+                dur, dur_cons = get_nonneg_args(dur)
+                demand, demand_cons = get_nonneg_args(demand)
+                extra_cons = dur_cons + demand_cons
+
+                # make choco task variables
+                if len(cpm_expr.args) == 4:
+                    tasks = [self.chc_model.task(s,d) for s,d in zip(self._to_vars(start), self.solver_vars(dur))]
+                else:
+                    tasks = [self.chc_model.task(s,d,e) for s,d,e in zip(self._to_vars(start), self.solver_vars(dur), self._to_vars(end))]
+
+                # construct cumulative constraint with task objects
+                chc_cumulative = self.chc_model.cumulative(tasks, self._to_vars(demand), self._to_vars(cap))
                 if len(extra_cons): # replace some negative durations, part of constraint
                     return self.chc_model.and_([chc_cumulative] + [self._get_constraint(c) for c in extra_cons])
                 return chc_cumulative
             elif cpm_expr.name == "no_overlap": # post as Cumulative with capacity 1
-                start, dur, end = cpm_expr.args
-                return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
+                if len(cpm_expr.args) == 2:
+                    start, dur = cpm_expr.args
+                    return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1))
+                else:
+                    start, dur, end = cpm_expr.args
+                    return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
             elif cpm_expr.name == "precedence":
                 return self.chc_model.int_value_precede_chain(self._to_vars(cpm_expr.args[0]), cpm_expr.args[1])
             elif cpm_expr.name == "gcc":

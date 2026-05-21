@@ -19,7 +19,7 @@
         ExitStatus
 
 """
-from typing import Optional, List, Callable, TypeAlias
+from typing import Any, Optional, List, Callable, TypeAlias
 import warnings
 import time
 from enum import Enum
@@ -27,6 +27,7 @@ from enum import Enum
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, ListLike
 from ..expressions.variables import _NumVarImpl
+from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
 from ..expressions.utils import is_any_list, argvals
 from ..expressions.python_builtins import any
@@ -76,7 +77,7 @@ class SolverInterface(object):
             - objective_value_: the value of the objective function after solving (or None)
             - user_vars: set(), variables in the original (non-transformed) model,
                            for reverse mapping the values after `solve()`
-            - _varmap: dict(), maps cpmpy variables to native solver variables
+            - _varmap: dict[str, Any], maps cpmpy variable names to native solver variables
         """
         assert(subsolver is None)
 
@@ -86,13 +87,13 @@ class SolverInterface(object):
 
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
-        self._varmap = dict()  # maps cpmpy variables to native solver variables
-        self._csemap = dict()  # maps cpmpy expressions to solver expressions
+        self._varmap: dict[str, Any] = {}  # maps cpmpy variable names to native solver variables
+        self._csemap = CSEMap()  # maps cpmpy expressions to previously created expressions (typically auxiliary variables)
 
         # rest uses own API
         if cpm_model is not None:
             # post all constraints at once, implemented in `add()`
-            self += cpm_model.constraints
+            self.add(cpm_model.constraints)
 
             # post objective
             if cpm_model.objective_ is not None:
@@ -185,7 +186,6 @@ class SolverInterface(object):
             return [self.solver_vars(v) for v in cpm_vars]
         return self.solver_var(cpm_vars)
 
-
     def transform(self, cpm_expr):
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
@@ -234,8 +234,26 @@ class SolverInterface(object):
         return self.add(cpm_expr)
 
 
-    # OPTIONAL functions
+    def print_display(self, display: Optional[Callback]) -> None:
+        """
+            Helper function for printing the `display` argument used in `solveAll()`.
 
+            Arguments:
+                display: either a CPMpy Expression, OR a list of expressions,
+                         OR a callback function (no-arg) to call.
+        """
+        if display is None:
+            return
+
+        if isinstance(display, Expression):
+            print(display.value())
+        elif is_any_list(display):
+            print(argvals(display))
+        else:
+            assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
+            display()  # callback
+    
+    # OPTIONAL functions
     def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False, **kwargs):
         """
             Compute all solutions and optionally display the solutions.
@@ -267,14 +285,7 @@ class SolverInterface(object):
         start = time.time()
         while ((time_limit is None) or (time_limit > 0)) and self.solve(time_limit=time_limit, **kwargs):
             # display if needed
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:
-                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    display()  # callback
+            self.print_display(display)
 
             # count and stop
             solution_count += 1
@@ -282,7 +293,7 @@ class SolverInterface(object):
                 break
 
             # add nogood on the user variables
-            self += any([v != v.value() for v in self.user_vars if v.value() is not None])
+            self.add(any([v != v.value() for v in self.user_vars if v.value() is not None]))
 
             if time_limit is not None: # update remaining time
                 time_limit -= self.status().runtime

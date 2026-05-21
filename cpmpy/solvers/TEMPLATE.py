@@ -98,8 +98,6 @@ class CPM_template(SolverInterface):
             return True
         except ModuleNotFoundError: # if solver's Python package is not installed
             return False
-        except Exception as e:
-            raise e
 
     @classmethod
     def version(cls) -> Optional[str]:
@@ -278,17 +276,17 @@ class CPM_template(SolverInterface):
             return TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
         # return from cache
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     # [GUIDELINE] if TEMPLATE does not support objective functions, you can delete this function definition

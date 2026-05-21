@@ -69,9 +69,9 @@ class Model(object):
         if is_any_list(args):
             # add (and type-check) one by one
             for a in args:
-                self += a
+                self.add(a)
         else:
-            self += args
+            self.add(args)
 
         # store objective if present
         if maximize is not None:
