@@ -38,7 +38,7 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
     slv += constraints
 
     # now we read the pdk.CNF back to cpmpy constraints by mapping from `pdk.Lit` to CPMpy lit
-    cpmpy_vars = {str(slv.solver_var(x).var()): x for x in slv._int2bool_user_vars()}
+    cpmpy_vars = {str(slv.solver_var(x).var()): x for x in slv._encoded_vars()}
 
     # if a user variable `x` does not occur in any clause, it should be added as `x | ~x`
     free_vars = set(cpmpy_vars.values())
