@@ -1,10 +1,18 @@
 """
-Run the benchmark for the targets (year and track) across all solvers.
+Deprecated runner script. Use run_benchmark.py with --dataset ... --runner xcsp3 instead.
 """
 
 import subprocess
 import logging
 import sys
+import warnings
+
+warnings.warn(
+    "cpmpy.tools.xcsp3.utils.benchmark is deprecated; "
+    "use run_benchmark.py with --dataset cpmpy.tools.datasets.xcsp3.XCSP3Dataset --runner xcsp3 instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 TIME_LIMIT = 60
 NR_WORKERS = 20
@@ -25,14 +33,17 @@ logging.basicConfig(
 def run_with_solver(solver: str, year:str, track:str, time_limit: int = 60, workers: int=20):
     logging.info(f"Running solver: {solver}")
     command = [
-        sys.executable,
-        "cpmpy/tools/xcsp3/xcsp3_benchmark.py",
-        "--year", year,
-        "--track", track,
+        sys.executable, "-m",
+        "cpmpy.tools.benchmark.cpbenchy.runner.run_benchmark",
+        "--dataset", "cpmpy.tools.datasets.xcsp3.XCSP3Dataset",
+        "--dataset-year", year,
+        "--dataset-track", track,
+        "--dataset-download",
+        "--runner", "xcsp3",
         "--solver", solver,
-        "--time-limit", str(time_limit),
+        "--time_limit", str(time_limit),
         "--workers", str(workers),
-        "--output-dir", f"results/{year}/{track}"
+        "--output", f"results/{year}/{track}"
     ]
     try:
         print(" ".join(command))
