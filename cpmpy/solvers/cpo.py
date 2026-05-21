@@ -353,7 +353,7 @@ class CPM_cpo(SolverInterface):
             return (self.solver_var(cpm_var._bv) == 0)
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
                 # we should add == 1 to turn it into a boolean expression
@@ -362,11 +362,11 @@ class CPM_cpo(SolverInterface):
                 revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
             self.cpo_model.add(revar >= cpm_var.lb) # ensure the model also has the variable
 
         # return from cache
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
     def objective(self, expr, minimize=True):
         """
@@ -787,10 +787,10 @@ try:
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
                     if isinstance(cpm_var, _BoolVarImpl):
-                        sol_var = self._varmap[cpm_var].children[0]
+                        sol_var = self._varmap[cpm_var.name].children[0]
                         cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
                     elif isinstance(cpm_var, _IntVarImpl):
-                        sol_var = self._varmap[cpm_var]
+                        sol_var = self._varmap[cpm_var.name]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")

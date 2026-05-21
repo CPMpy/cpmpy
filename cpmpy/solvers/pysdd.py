@@ -264,7 +264,7 @@ class CPM_pysdd(SolverInterface):
             return -self.solver_var(cpm_var._bv)
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 # make new var, add at end (what is best here??)
                 self.pysdd_manager.add_var_after_last()
@@ -272,9 +272,9 @@ class CPM_pysdd(SolverInterface):
                 revar = self.pysdd_manager.vars[n]
             else:
                 raise NotImplementedError(f"CPM_pysdd: non-Boolean variable {cpm_var} not supported")
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
     def transform(self, cpm_expr):
         """
