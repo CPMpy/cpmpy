@@ -831,19 +831,25 @@ class Regular(GlobalConstraint):
 
 class MDD(GlobalConstraint):
     """
-    An MDD of depth n is an acyclic layered graph with a single root node, and one accepting sink node.
-    The constraint takes as input an array of n integer variables and a graph representation using a transition table.
-    The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node, and ending in the accepting sink node.
+    An MDD is a Multi-valued Decision Diagram, represented as an acyclic layered graph, with a single root node, and a single accepting sink node.
+    The constraint takes as input an array of `n` integer variables and an MDD with `n+1` layers, represented through a table of "(from_node, value, to_node)" entries, one for every arc in the MDD.
+    The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node, and where the first variable
+    in the array takes the value of the first edge, the second from the second edge, ending in the accepting sink node.
 
-    The transitions are defined by a list of tuples (id1, value, id2).
-    An id is an integer or string representing a state in the automaton, and value is an integer representing the value of the variable in the sequence.
-    If not given explicitly, the root node is the first node in the transition table (i.e., transitions[0][0]), and is on level 0.
-    The sink node is the only node on level n.
+    The transitions/edges are given in a nx3 matrix, or more precise a list of tuples (node_id1, value, node_id2).
+    A node_id is an integer or string representing a state in the MDD, and value is an integer representing the value of the variable in the sequence.
+    If not given explicitly, the root node is the node_id1 of the first entry in the transition table (i.e., transitions[0][0]).
+    The root node is at level 0, the sink node is the only node on level n.
 
     Example: the following MDD accepts the solutions [1,1,1], [2,2,1] and [2,3,2] for the three variables x,y,z. The root node is "A" and the sink node is "F".
-    cp.MDD(array=[x,y,z],
-           transitions = [("A", 1, "B"), ("B", 1, "D"), ("D", 1 "F"),
-                          ("A",2,"C"), ("C", 2, "D"), ("C", 3, "E"), ("E", 2, "F")])
+    cp.MDD(array = [x,y,z],
+           transitions = [("A", 1, "B"),
+                          ("A", 2, "C"),
+                          ("B", 1, "D"),
+                          ("C", 2, "D"),
+                          ("C", 3, "E"),
+                          ("D", 1, "F"),
+                          ("E", 2, "F")])
     """
 
     def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None):
