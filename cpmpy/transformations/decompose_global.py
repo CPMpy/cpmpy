@@ -237,7 +237,17 @@ def _decompose_in_tree_args(args: ListLike[Any],
                 csemap.save_decomposition(orig_for_csemap, arg)
             newargs.append(arg)
         
-        elif isinstance(arg, np.ndarray) and arg.dtype == object:
+        elif isinstance(arg, list):
+            rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg, supported=supported,
+                                                                             supported_reified=supported_reified,
+                                                                             csemap=csemap,
+                                                                             decompose_custom=decompose_custom)
+            if rec_changed:
+                changed = True
+                newargs.append(rec_newargs)
+            else:
+                newargs.append(arg)
+        elif (isinstance(arg, np.ndarray) and arg.dtype == object):
             if isinstance(arg, NDVarArray):
                 if arg.has_subexpr():
                     rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.flatten(), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
