@@ -315,25 +315,29 @@ class CPM_ortools(SolverInterface):
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        # fast-path: a CPMpy variable that has already been mapped
+        if isinstance(cpm_var, _NumVarImpl):
+            revar = self._varmap.get(cpm_var.name)
+            if revar is not None:
+                return revar
+
+            # special case, negative-bool-view: work directly on var inside the view
+            if isinstance(cpm_var, NegBoolView):
+                return self.solver_var(cpm_var._bv).Not()
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                revar = self.ort_model.NewBoolVar(str(cpm_var))
+            else:
+                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+            
+            self._varmap[cpm_var.name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return self.solver_var(cpm_var._bv).Not()
-
-        # create if it does not exist
-        if cpm_var.name not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.ort_model.NewBoolVar(str(cpm_var))
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var.name] = revar
-
-        return self._varmap[cpm_var.name]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize):
