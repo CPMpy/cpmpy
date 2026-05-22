@@ -314,24 +314,25 @@ class CPM_ortools(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        # fast-path: a CPMpy variable that has already been mapped
         if isinstance(cpm_var, _NumVarImpl):
-            revar = self._varmap.get(cpm_var.name)
+            name = cpm_var.name
+            revar = self._varmap.get(name)
             if revar is not None:
                 return revar
 
-            # special case, negative-bool-view: work directly on var inside the view
-            if isinstance(cpm_var, NegBoolView):
-                return self.solver_var(cpm_var._bv).Not()
-
             # not yet created, make a new solver var
             if cpm_var.is_bool():
-                revar = self.ort_model.NewBoolVar(str(cpm_var))
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    revar = self.solver_var(cpm_var._bv).Not()
+                else:
+                    revar = self.ort_model.NewBoolVar(name)
             else:
-                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, name)
             
-            self._varmap[cpm_var.name] = revar
+            self._varmap[name] = revar
             return revar
 
         if is_int(cpm_var):  # shortcut, eases posting constraints
