@@ -1041,7 +1041,7 @@ class TestSupportedSolvers:
         import random
         random.seed(0)
 
-        n = 5
+        n = 7
         kwargs = dict()
         solver_obj = cp.SolverLookup.get(solver)
         if "display" not in inspect.signature(solver_obj.solve).parameters:
@@ -1301,11 +1301,6 @@ def _get_tsp_model(n):
     
     x = cp.intvar(0,n-1,shape=n)
 
-    dist = 0
-    at = 0
-    for _ in range(n):
-        dist += distance_matrix[at, x[at]]
-        at = x[at]
-    
-    model = cp.Model(cp.Circuit(x), minimize=dist)
+    travel_distance = sum(distance_matrix[i, x[i]] for i in range(n))
+    model = cp.Model(cp.Circuit(x), minimize=travel_distance)
     return model, x
