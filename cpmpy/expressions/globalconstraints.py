@@ -938,11 +938,11 @@ class MDD(GlobalConstraint):
         edge_vars = defaultdict(list)
         invalid_edge_vars = []
 
-        # Determine flow in and flow out for each node
+        # Determine flow in and flow out for each node, and make a boolvar for each edge
         for id1, edges in extended_mapping.items():
             for value, id2 in edges.items():
-                level = self.levels[id1]
                 edge_var = cp.boolvar()
+                level = self.levels[id1]
                 flow_out[id1].append(edge_var)
                 flow_in[id2].append(edge_var)
                 edge_vars[(level, value)].append(edge_var)
