@@ -890,12 +890,6 @@ class MDD(GlobalConstraint):
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
 
-    def _reduce(self):
-        """
-            Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes (to be implemented)
-        """
-        pass
-
     def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
         """
         Auxiliary function that extends the MDD with invalid edges, which are directed to the sink node.
