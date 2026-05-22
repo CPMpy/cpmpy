@@ -62,7 +62,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callbac
 from ..expressions.core import Comparison, Operator, BoolVal, ExprLike
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, is_any_list
+from ..expressions.utils import is_int, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
@@ -371,29 +371,32 @@ class CPM_gcs(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    # gcs only works with integer variables, so not(x) = -x + 1
+                    revar = self.gcs.add_constant(self.gcs.negate(self.solver_var(cpm_var._bv)), 1)
+                else:
+                    # Bool vars are just int vars with [0, 1] domain
+                    revar = self.gcs.create_integer_variable(0, 1, self._gcs_safe_name(name))
+            else:
+                revar = self.gcs.create_integer_variable(cpm_var.lb, cpm_var.ub, self._gcs_safe_name(name))
+            self._varmap[name] = revar  # save actual name, not gcs_safe name
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return self.gcs.create_integer_constant(cpm_var)
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            # gcs only works with integer variables, so not(x) = -x + 1
-            return self.gcs.add_constant(self.gcs.negate(self.solver_var(cpm_var._bv)), 1)
-
-        # create if it does not exist
-        if cpm_var.name not in self._varmap:
-            name = self._gcs_safe_name(str(cpm_var))
-            if isinstance(cpm_var, _BoolVarImpl):
-                # Bool vars are just int vars with [0, 1] domain
-                revar = self.gcs.create_integer_variable(0, 1, name)
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.gcs.create_integer_variable(cpm_var.lb, cpm_var.ub, name)
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var.name] = revar # save actual name, not gcs_safe name
-
-        return self._varmap[cpm_var.name]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def solver_vars(self, cpm_vars: Iterable[ExprLike]) -> list[Any]:
         """
