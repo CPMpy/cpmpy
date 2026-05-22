@@ -314,14 +314,6 @@ class CPM_choco(SolverInterface):
 
         return len(sols)
 
-    def _check_bounds(self, val):
-        
-        if val > 2e31 / 100:
-            raise ChocoBoundsException("Choco does not accept variables with bounds outside of range (-2e31..2e31)")
-        if val < -2e31 / 100:
-            raise ChocoBoundsException("Choco does not accept variables with bounds outside of range (-2e31..2e31)")
-
-
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
