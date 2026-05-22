@@ -91,6 +91,11 @@ class CPM_choco(SolverInterface):
                                     "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
 
+    # min and max bounds for integer variables
+    # https://github.com/chocoteam/choco-solver/blob/master/solver/src/main/java/org/chocosolver/solver/variables/IntVar.java#L43
+    MIN_INTEGER_BOUND = -2e31 // 100
+    MAX_INTEGER_BOUND = 2e31 // 100
+
     @staticmethod
     def supported():
         # try to import the package
@@ -309,38 +314,46 @@ class CPM_choco(SolverInterface):
 
         return len(sols)
 
+    def _check_bounds(self, val):
+        
+        if val > 2e31 / 100:
+            raise ChocoBoundsException("Choco does not accept variables with bounds outside of range (-2e31..2e31)")
+        if val < -2e31 / 100:
+            raise ChocoBoundsException("Choco does not accept variables with bounds outside of range (-2e31..2e31)")
+
+
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
-            if not is_int(cpm_var):
-                raise ValueError(f"Choco only accepts integer constants, got {cpm_var} of type {type(cpm_var)}")
-            if cpm_var < -2147483646 or cpm_var > 2147483646:
-                raise ChocoBoundsException(
-                    "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    revar = self.chc_model.bool_not_view(self.solver_var(cpm_var._bv))
+                else:
+                    revar = self.chc_model.boolvar(name=name)
+            elif cpm_var.lb >= self.MIN_INTEGER_BOUND and cpm_var.ub <= self.MAX_INTEGER_BOUND:
+                revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=name)
+            else:
+                raise ChocoBoundsException(f"Choco does not accept variables with bounds outside of range ({self.MIN_INTEGER_BOUND}..{self.MAX_INTEGER_BOUND})")
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            if cpm_var < self.MIN_INTEGER_BOUND or cpm_var > self.MAX_INTEGER_BOUND:
+                raise ChocoBoundsException(f"Choco does not accept integer literals with bounds outside of range ({self.MIN_INTEGER_BOUND}..{self.MAX_INTEGER_BOUND})")
             return int(cpm_var)
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return self.chc_model.bool_not_view(self.solver_var(cpm_var._bv))
-
-        # create if it does not exist
-        if cpm_var.name not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.chc_model.boolvar(name=str(cpm_var.name))
-            elif isinstance(cpm_var, _IntVarImpl):
-                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
-                    raise ChocoBoundsException(
-                        "Choco does not accept variables with bounds outside of range (-2147483646..2147483646)")
-                revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var.name))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var.name] = revar
-
-        return self._varmap[cpm_var.name]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def objective(self, expr, minimize):
         """
