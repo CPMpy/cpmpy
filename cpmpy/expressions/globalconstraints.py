@@ -877,19 +877,22 @@ class MDD(GlobalConstraint):
 
         self.levels = {self.root_node: 0}
         current_nodes = [self.root_node]
-        for i in range(len(array)):
+        for level in range(len(array)):
             new_nodes = []
-            for n in current_nodes:
-                for v in self.mapping[n]:
-                    new_nodes.append(self.mapping[n][v])
-                    self.levels[self.mapping[n][v]] = i + 1
+            for id1 in current_nodes:
+                for _,id2 in self.mapping[id1].items():
+                    new_nodes.append(id2)
+                    self.levels[id2] = level + 1
             current_nodes = new_nodes
-        # Check that there is exactly one sink node on level n (with n the number of integer variables)
-        assert sum(level == len(array) for node, level in self.levels.items()) == 1
 
-        self.sink_node = next(node for node, level in self.levels.items() if level == len(array))
+        # Check that there is exactly one sink node on level n (with n the number of integer variables)
+        sink_nodes = [node for node, level in self.levels.items() if level == len(array)]
+        assert len(sink_nodes) == 1
+        self.sink_node = sink_nodes[0]
+
         self.nodes = self.levels.keys()
-        self.node_map = {n: (-1 if n == self.sink_node else i) for i, n in enumerate(self.nodes)}
+        self.node_map = {n: i for i, n in enumerate(self.nodes)}
+        self.node_map[self.sink_node] = -1
 
     def _reduce(self):
         """
@@ -905,15 +908,15 @@ class MDD(GlobalConstraint):
             tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
             A tuple containing the extended mapping of the MDD and a set of invalid edges (source node, transition value) that are added to the MDD.
         """
+        arr = self.args[0]
         invalid_edges = set()
         extended_mapping = copy.deepcopy(self.mapping)
-        sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
         for s in self.mapping.keys():
             level = self.levels[s]
-            domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
+            domain = range(arr[level].lb, arr[level].ub + 1)
             for v in domain:
                 if v not in self.mapping[s]:
-                    extended_mapping[s][v] = sink_node
+                    extended_mapping[s][v] = self.sink_node
                     invalid_edges.add((s, v))
 
         return extended_mapping, invalid_edges
@@ -930,7 +933,7 @@ class MDD(GlobalConstraint):
             tuple[list[Expression], list[Expression]]:
                 A tuple containing the constraints representing the constraint value and the defining constraints.
         """
-        arr, _ = self.args
+        arr = self.args[0]
 
         # MDD is extended with invalid edges, which are directed to the sink node
         extended_mapping, invalid_edges_set = self._get_complete_mdd()
@@ -966,6 +969,7 @@ class MDD(GlobalConstraint):
 
             if level == 0:
                 cons.append(cp.sum(outgoing) == 1) # root
+                cons.append(cp.sum(outgoing) > 0)
             elif level == len(arr):
                 cons.append(cp.sum(incoming) == 1) # sink
             else:
@@ -985,16 +989,16 @@ class MDD(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, transitions = self.args
+        arr = self.args[0]
         argvals = [argval(a) for a in arr]
         curr_node = self.root_node
         if any(v is None for v in argvals):
             return None
 
-        for v in argvals:
+        for curr_v in argvals:
             if curr_node in self.mapping:
-                if v in self.mapping[curr_node]:
-                    curr_node = self.mapping[curr_node][v]
+                if curr_v in self.mapping[curr_node]:
+                    curr_node = self.mapping[curr_node][curr_v]
                 else:
                     return False
             else:
