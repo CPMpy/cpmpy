@@ -607,7 +607,7 @@ class CPM_ortools(SolverInterface):
                 tasks, task_cons = self._get_ort_intervals(start, dur, end)
                 self.add(task_cons)
 
-                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_vars(cap))
+                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
             
             elif cpm_expr.name == "cumulative_optional":
                 if len(cpm_expr.args) == 5:
@@ -626,7 +626,7 @@ class CPM_ortools(SolverInterface):
                 tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
                 self.add(task_cons)
                 
-                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_vars(cap))
+                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
 
             elif cpm_expr.name == "no_overlap":
                 if len(cpm_expr.args) == 2:
