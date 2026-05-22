@@ -1302,7 +1302,7 @@ def _get_tsp_model(n):
     x = cp.intvar(0,n-1,shape=n)
 
     dist = 0
-    at = x[0]
+    at = 0
     for _ in range(n):
         dist += distance_matrix[at, x[at]]
         at = x[at]
