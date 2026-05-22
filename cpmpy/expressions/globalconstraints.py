@@ -911,13 +911,13 @@ class MDD(GlobalConstraint):
         arr = self.args[0]
         invalid_edges = set()
         extended_mapping = copy.deepcopy(self.mapping)
-        for s in self.mapping.keys():
-            level = self.levels[s]
+        for id1 in self.mapping.keys():
+            level = self.levels[id1]
             domain = range(arr[level].lb, arr[level].ub + 1)
             for v in domain:
-                if v not in self.mapping[s]:
-                    extended_mapping[s][v] = self.sink_node
-                    invalid_edges.add((s, v))
+                if v not in self.mapping[id1]:
+                    extended_mapping[id1][v] = self.sink_node
+                    invalid_edges.add((id1, v))
 
         return extended_mapping, invalid_edges
 
@@ -949,15 +949,15 @@ class MDD(GlobalConstraint):
         invalid_edge_vars = []
 
         # Determine flow in and flow out for each node
-        for src, edges in extended_mapping.items():
-            for value, dst in edges.items():
-                level = self.levels[src]
+        for id1, edges in extended_mapping.items():
+            for value, id2 in edges.items():
+                level = self.levels[id1]
                 edge_var = cp.boolvar()
-                flow_out[src].append(edge_var)
-                flow_in[dst].append(edge_var)
+                flow_out[id1].append(edge_var)
+                flow_in[id2].append(edge_var)
                 edge_vars[(level, value)].append(edge_var)
 
-                if (src, value) in invalid_edges:
+                if (id1, value) in invalid_edges:
                     invalid_edge_vars.append(edge_var)
 
         cons = []
@@ -977,10 +977,13 @@ class MDD(GlobalConstraint):
                 cons.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
                 cons.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
 
-        # Enforce direct encoding variable arr[i] == v if an edge with label v is activated at level i
+        # Enforce that when arr[i] == v, exactly one of the edges at level i with label v is true, otherwise none can be true
         for (level, value), vars_ in edge_vars.items():
             cons.append(cp.sum(vars_) == (arr[level] == value))
 
+        # When the MDD is extended to a complete MDD by means of invalid edges, there is always a solution to the flow problem.
+        # As a consequence, all flow constraints and channeling constraints can be top level constraints.
+        # We only need to add as a conditioning constraint that no invalid edge has any flow.
         return [cp.sum(invalid_edge_vars) == 0], cons
 
 
