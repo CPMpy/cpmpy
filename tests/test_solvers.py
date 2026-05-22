@@ -2,6 +2,7 @@ import inspect
 import importlib
 import inspect
 
+import re
 import tempfile
 import pytest
 import numpy as np
@@ -1040,43 +1041,39 @@ class TestSupportedSolvers:
         import random
         random.seed(0)
 
-        n = 5
+        n = 10
         kwargs = dict()
         solver_obj = cp.SolverLookup.get(solver)
         if "display" not in inspect.signature(solver_obj.solve).parameters:
             pytest.skip(f"{solver} does not support solution callbacking")
-        if solver == "hexaly":
-            kwargs['time_between_ticks'] = 1
-            n = 20 # need a bigger model to see the ticks
 
-        vars = cp.intvar(0,n, shape=n)
-        obj = cp.sum([random.randint(1,n) * (a - b) for a in vars for b in vars])
-        model = cp.Model(cp.AllDifferent(vars), maximize=obj)
+        solution_line_pattern = r"\[\d+(?:,? \d+)*\]"
+
+        model, vars = _get_tsp_model(n)
+        obj = model.objective_
 
         assert model.solve(solver=solver, display=vars, time_limit=3, **kwargs)
         captured = capsys.readouterr().out
         assert len(captured) > 0
+        assert re.match(solution_line_pattern, captured.splitlines()[-1])
 
         # collect solutions using callback
         collector = list()
         assert model.solve(solver=solver, display=lambda :  collector.append(argvals(vars)), time_limit=3, **kwargs)
-        assert len(collector) >= 1
+        assert len(collector) > 1
 
         # print some more information using callback
         from time import time
+        t0 = time()
         def display():
             print("Time elapsed:", time() - t0, "Obj:", obj.value(),  "Sol:", argvals(vars))
 
-        solver = cp.SolverLookup.get(solver, model)
-        t0 = time()
-        assert solver.solve(display=display, time_limit=3, **kwargs)
-        captured1 = capsys.readouterr().out
-        assert len(captured1) > 0
+        display_line_pattern = r"Time elapsed: \d+\.\d+ Obj: \d+ Sol: \[\d+(?:,? \d+)*\]"
 
-        solver.minimize(obj)
-        assert solver.solve(display=display, time_limit=3, **kwargs)
+        assert model.solve(solver=solver, display=display, time_limit=3, **kwargs)
         captured2 = capsys.readouterr().out
         assert len(captured2) > 0 # resets after previous capture
+        assert re.match(display_line_pattern, captured2.splitlines()[-1])
 
 
 
@@ -1288,3 +1285,20 @@ def test_highs_basic_ilp():
     assert x.value() == 0
     assert y.value() == 5
     assert s.objective_value_ == 5
+
+def _get_tsp_model(n):
+
+    np.random.seed(0)
+    b = np.random.randint(n,2*n, size=(n,n))
+    distance_matrix= cp.cpm_array(((b + b.T)/2).astype(int))
+    
+    x = cp.intvar(0,n-1,shape=n)
+
+    dist = 0
+    at = x[0]
+    for _ in range(n):
+        dist += distance_matrix[at, x[at]]
+        at = x[at]
+    
+    model = cp.Model(cp.Circuit(x), minimize=dist)
+    return model, x
