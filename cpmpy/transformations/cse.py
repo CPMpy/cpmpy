@@ -108,5 +108,20 @@ class CSEMap:
                 new_expr = Comparison("==", lhs, rhs)
                 new_expr._has_subexpr = expr._has_subexpr
                 return new_expr, True
-            
+            elif isinstance(lhs, _IntVarImpl) and not lhs.is_bool() and expr.name == ">" and is_int(rhs):
+                # b <-> (expr > val) :: b <-> (expr >= val + 1)
+                new_expr = Comparison(">=", lhs, rhs + 1)
+                new_expr._has_subexpr = expr._has_subexpr
+                return new_expr, False
+            elif isinstance(lhs, _IntVarImpl) and not lhs.is_bool() and expr.name == "<=" and is_int(rhs):
+                # b <-> (expr <= val) :: (~b) <-> (expr >= val + 1)
+                new_expr = Comparison(">=", lhs, rhs + 1)
+                new_expr._has_subexpr = expr._has_subexpr
+                return new_expr, True
+            elif isinstance(lhs, _IntVarImpl) and not lhs.is_bool() and expr.name == "<" and is_int(rhs):
+                # b <-> (expr < val) :: (~b) <-> (expr >= val)
+                new_expr = Comparison(">=", lhs, rhs)
+                new_expr._has_subexpr = expr._has_subexpr
+                return new_expr, True
+
         return expr, False
