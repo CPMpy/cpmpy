@@ -795,6 +795,7 @@ try:
                 # might use any, so populate all (user) variables with their values
                 self._cpm_vars = solver.user_vars
             self.events = frozenset(events)
+            self._cpm_solver = solver
 
         def invoke(self, solver:CpoSolver, event: str, sres:CpoSolveResult):
             """Invoke for each relevant event"""
@@ -813,7 +814,7 @@ try:
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                self.solver.print_display(self._display)
+                self._cpm_solver.print_display(self._display)
 
             # check for count limit
             if self.solution_count() == self._solution_limit:
