@@ -642,14 +642,15 @@ class TestLinearizeReifiedVariablesThreshold:
 
         assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1, (BV[a == 3]) or (BV[a == 2])]"
 
-    # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
-    @pytest.mark.xfail(reason="aspirational")
     def test_linearize_reified_disequalities(self):
         """Use direct encoding on disequalities and replace `a != 1` expressions"""
         a = self.a
         out = linearize_reified_variables(self.linearize((a != 1) | (a != 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[(~BV[a == 1]) or (~BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1"
+        assert str(out) == "[(~BV[a == 1]) or (~BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1]"
 
+    
+    # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
+    
     @pytest.mark.xfail(reason="aspirational")
     def test_linearize_reified_inequalities(self):
         """Use order encoding on inequalities and replace `a>=1` expressions"""

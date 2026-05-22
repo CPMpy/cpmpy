@@ -266,7 +266,7 @@ class CPM_hexaly(SolverInterface):
             return ~self.solver_var(cpm_var._bv)
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.hex_model.bool()
             elif isinstance(cpm_var, _IntVarImpl):
@@ -275,10 +275,10 @@ class CPM_hexaly(SolverInterface):
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             # set name of variable
             revar.set_name(str(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
         # return from cache
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     def objective(self, expr, minimize=True):

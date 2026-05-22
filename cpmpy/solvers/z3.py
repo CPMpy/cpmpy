@@ -45,7 +45,7 @@
     Module details
     ==============
 """
-from typing import Optional, List, Callable
+from typing import Optional, Iterable, Callable
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
@@ -142,13 +142,13 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, display:Optional[Callback]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the z3 solver
 
             Arguments:
                 time_limit (float, optional):       maximum solve time in seconds
-                assumptions:                        list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                assumptions:                        iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                                     For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                                     get_core() returns a small subset of assumption variables that are unsat together.
                 display:                            generic solution callback for use during optimization.
@@ -194,11 +194,12 @@ class CPM_z3(SolverInterface):
             callback = self._get_callback(display)
             self.z3_solver.set_on_model(callback)
 
-        if assumptions is None:
-            assumptions = []
-
-        z3_assum_vars = self.solver_vars(assumptions)
-        self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+        if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
+            z3_assum_vars = self.solver_vars(assumptions)
+            self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+        else:
+            z3_assum_vars = []
 
 
         # call the solver, with parameters
@@ -289,7 +290,7 @@ class CPM_z3(SolverInterface):
             return z3.Not(self.solver_var(cpm_var._bv))
 
         # create if it does not exit
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             # we assume al variables are user variables (because nested expressions)
             self.user_vars.add(cpm_var)
             if isinstance(cpm_var, _BoolVarImpl):
@@ -301,9 +302,9 @@ class CPM_z3(SolverInterface):
                 self.z3_solver.add(revar <= cpm_var.ub)
             else:
                 raise NotImplementedError("Not a know var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     def has_objective(self):

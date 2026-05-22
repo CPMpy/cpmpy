@@ -48,7 +48,7 @@ import warnings
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, NDVarArray
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
@@ -362,7 +362,7 @@ class CPM_cpo(SolverInterface):
             return (self.solver_var(cpm_var._bv) == 0)
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
                 # we should add == 1 to turn it into a boolean expression
@@ -371,11 +371,11 @@ class CPM_cpo(SolverInterface):
                 revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
             self.cpo_model.add(revar >= cpm_var.lb) # ensure the model also has the variable
 
         # return from cache
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
     def objective(self, expr, minimize=True):
         """
@@ -549,16 +549,25 @@ class CPM_cpo(SolverInterface):
                 arr, table = self._cpo_expr(cpm_con.args)
                 return dom.forbidden_assignments(arr, table)
             elif cpm_con.name == "cumulative" or cpm_con.name == "cumulative_optional":
-                if cpm_con.name == "cumulative_optional":
-                    start, dur, end, demand_lst, capacity, is_present = cpm_con.args
-                else:
-                    start, dur, end, demand_lst, capacity = cpm_con.args
+                if cpm_con.name == "cumulative":
                     is_present = None
+                    if len(cpm_con.args) == 4:
+                        start, dur, demand, capacity = cpm_con.args
+                        end = None
+                    else:
+                        start, dur, end, demand, capacity = cpm_con.args
+                
+                elif cpm_con.name == "cumulative_optional":
+                    if len(cpm_con.args) == 5:
+                        start, dur, demand, capacity, is_present = cpm_con.args
+                        end = None
+                    else:
+                        start, dur, end, demand, capacity, is_present = cpm_con.args
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
 
                 # usage constraints
-                demand_lst, demand_cons = get_nonneg_args(demand_lst, is_present)
+                demand_lst, demand_cons = get_nonneg_args(demand, is_present)
                 cons += self._cpo_expr(demand_cons)
 
                 total_usage = []
@@ -576,12 +585,21 @@ class CPM_cpo(SolverInterface):
                
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
-            elif cpm_con.name == "no_overlap" or cpm_con.name == "no_overlap_optional":
-                if cpm_con.name == "no_overlap_optional":
-                    start, dur, end, is_present = cpm_con.args
+            elif cpm_con.name == "no_overlap":
+                if len(cpm_con.args) == 2:
+                    start, dur = cpm_con.args
+                    end = None
                 else:
                     start, dur, end = cpm_con.args
-                    is_present = None
+                tasks, cons = self._make_tasks(start, dur, end, None)
+                return cons + [dom.no_overlap(tasks)]
+            
+            elif cpm_con.name == "no_overlap_optional":
+                if len(cpm_con.args) == 3:
+                    start, dur, is_present = cpm_con.args
+                    end = None
+                else:
+                    start, dur, end, is_present = cpm_con.args
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
                 return cons + [dom.no_overlap(tasks)]
@@ -785,10 +803,10 @@ try:
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
                     if isinstance(cpm_var, _BoolVarImpl):
-                        sol_var = self._varmap[cpm_var].children[0]
+                        sol_var = self._varmap[cpm_var.name].children[0]
                         cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
                     elif isinstance(cpm_var, _IntVarImpl):
-                        sol_var = self._varmap[cpm_var]
+                        sol_var = self._varmap[cpm_var.name]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
