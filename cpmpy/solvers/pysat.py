@@ -61,7 +61,7 @@ from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.linearize import only_positive_coefficients, decompose_linear
-from ..expressions.utils import flatlist
+from ..expressions.utils import flatlist, is_int
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables
@@ -313,32 +313,37 @@ class CPM_pysat(SolverInterface):
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created.
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
 
             Transforms cpm_var into CNF literal using ``self.pysat_vpool``
             (positive or negative integer).
 
             So vpool is the varmap (we don't use _varmap here).
         """
-
-        # special case, negative-bool-view
-        # work directly on var inside the view
         if isinstance(cpm_var, BoolVal):
             return cpm_var
-        elif isinstance(cpm_var, NegBoolView):
-            # just a view, get actual var identifier, return -id
-            return -self.pysat_vpool.id(cpm_var._bv.name)
-        elif isinstance(cpm_var, _BoolVarImpl):
-            return self.pysat_vpool.id(cpm_var.name)
-        elif isinstance(cpm_var, _IntVarImpl):  # intvar
-            if cpm_var.name not in self.ivarmap:
+
+        if isinstance(cpm_var, _NumVarImpl):
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: just a view, get actual var identifier, return -id
+                    return -self.pysat_vpool.id(cpm_var._bv.name)
+                return self.pysat_vpool.id(cpm_var.name)
+
+            # intvar
+            name = cpm_var.name
+            if name not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self.add(cons)
             else:
-                enc = self.ivarmap[cpm_var.name]
+                enc = self.ivarmap[name]
             return self.solver_vars(enc.vars())
-        else:
-            raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
+
+        raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
     def transform(self, cpm_expr):
         """
