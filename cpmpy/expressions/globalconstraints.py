@@ -890,10 +890,6 @@ class MDD(GlobalConstraint):
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
 
-        self.nodes = self.levels.keys()
-        self.node_map = {n: i for i, n in enumerate(self.nodes)}
-        self.node_map[self.sink_node] = -1
-
     def _reduce(self):
         """
             Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes (to be implemented)
