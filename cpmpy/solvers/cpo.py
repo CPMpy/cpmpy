@@ -51,7 +51,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
+from ..expressions.utils import is_num, is_int, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -342,31 +342,35 @@ class CPM_cpo(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        docp = self.get_docp()
-        if is_num(cpm_var): # shortcut, eases posting constraints
+
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            docp = self.get_docp()
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    revar = docp.modeler.logical_not(self.solver_var(cpm_var._bv))
+                else:
+                    # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
+                    # we should add == 1 to turn it into a boolean expression
+                    revar = docp.expression.binary_var(name) == 1
+            else:
+                revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=name)
+            self._varmap[name] = revar
+            self.cpo_model.add(revar >= cpm_var.lb)  # ensure the model also has the variable
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return (self.solver_var(cpm_var._bv) == 0)
-
-        # create if it does not exist
-        if cpm_var.name not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
-                # we should add == 1 to turn it into a boolean expression
-                revar = docp.expression.binary_var(str(cpm_var)) == 1
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var.name] = revar
-            self.cpo_model.add(revar >= cpm_var.lb) # ensure the model also has the variable
-
-        # return from cache
-        return self._varmap[cpm_var.name]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def objective(self, expr, minimize=True):
         """
