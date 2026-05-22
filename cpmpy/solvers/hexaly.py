@@ -149,7 +149,10 @@ class CPM_hexaly(SolverInterface):
                 time_limit:  maximum solve time in seconds (float, optional)
                 solution_callback:             Hexaly callback registered on ``TIME_TICKED``.
                                                Takes precedence over ``display`` when both are set.
-                display:                       generic solution callback; either expressions, a list thereof, or a callable (see ``HexSolutionPrinter``).
+                display:                       generic solution callback for use during optimization.
+                                               either a list of CPMpy expressions, OR a callback function which
+                                               gets called after the variable-value mapping of the intermediate solution.
+                                               default/None: nothing is displayed
                 kwargs:                        any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:

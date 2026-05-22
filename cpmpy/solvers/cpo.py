@@ -164,8 +164,10 @@ class CPM_cpo(SolverInterface):
                 time_limit (float, optional):   maximum solve time in seconds
                 solution_callback:              a ``docplex.cp.solver.solver_listener.CpoSolverListener`` object)
                                                 Takes precedence over ``display`` when both are set.
-                display:                        either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping.
-                                                default/None: nothing displayed
+                display:                        generic solution callback for use during optimization.
+                                                either a list of CPMpy expressions, OR a callback function which
+                                                gets called after the variable-value mapping of the intermediate solution.
+                                                default/None: nothing is displayed
                 kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
