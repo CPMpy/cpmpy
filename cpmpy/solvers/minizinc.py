@@ -531,20 +531,22 @@ class CPM_minizinc(SolverInterface):
             if revar is not None:
                 return revar
 
+            # Assumes it is never given a 'NegBoolView', handled in self.add
+            if isinstance(cpm_var, NegBoolView):
+                raise NotSupportedError("Negative literals are not handled here. Please report.")
+                
+
             # not yet created, make a new solver var
             mzn_var = name.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
 
             # test if the name is a valid minizinc identifier
             if not self.mzn_name_pattern.search(mzn_var):
                 raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores." 
-                                            "First character must be an alphabetic character")
+                                            f"First character must be an alphabetic character: {mzn_var}")
             if mzn_var in self.keywords:
                 raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
 
             if cpm_var.is_bool():
-                # Assumes it is never given a 'NegBoolView'
-                if isinstance(cpm_var, NegBoolView):
-                    raise NotSupportedError("Negative literals are not handled here. Please report.")
                 self.mzn_model.add_string(f"var bool: {mzn_var};\n")
             else:
                 if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
