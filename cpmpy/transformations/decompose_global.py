@@ -265,6 +265,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
                     if rec_changed:
                         changed = True
+                        # we reconstruct it as a cpm_array here
                         newargs.append(cpm_array(rec_newargs).reshape(arg.shape))
                         if len(rec_toplevel) > 0:
                             toplevel.extend(toplevel_exprs)
@@ -273,6 +274,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
                 if rec_changed:
                     changed = True
+                    # we reconstruct it as a np.array here
                     newargs.append(np.array(rec_newargs).reshape(arg.shape))
                     if len(rec_toplevel) > 0:
                         toplevel.extend(toplevel_exprs)
