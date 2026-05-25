@@ -208,7 +208,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 # the decomp may itself contain globals
                 rec_changed, rec_exprs, rec_toplevel = _decompose_in_tree_args(exprs, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
                 if rec_changed:
-                    exprs = rec_exprs
+                    exprs = cast(list[Expression], rec_exprs)
                     if len(rec_toplevel) > 0:
                         toplevel.extend(rec_toplevel)
 
