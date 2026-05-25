@@ -61,43 +61,44 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 
     todolist: list[Expression] = []  # these still need to be decomposed
     newlist: list[Expression] = []
+    changed = False
     for expr in lst_of_expr:
         if isinstance(expr, GlobalConstraint) and expr.name not in supported:
             # toplevel/positive global constraint, decompose
-            decomp = None
-            if (csemap is not None):
-                decomp = csemap.get_decomposition(expr)
-            if decomp is not None:
-                newlist.append(decomp)
-                continue
-            # else, global constraint, decompose
+            changed = True
             if decompose_custom is not None and expr.name in decompose_custom:
                 exprs, toplevel_exprs = cast(tuple[list[Expression], list[Expression]], decompose_custom[expr.name](expr))
             else:
                 exprs, toplevel_exprs = expr.decompose()
-            # both might contain globals too
+            # we merge the list toplevel rather than create an 'and', also means we can not store it in csemap
+            # we add them to todolist because both might contain globals
             todolist.extend(exprs)
             if len(toplevel_exprs) > 0:
                 todolist.extend(toplevel_exprs)
         elif isinstance(expr, (bool, np.bool_)):
-            # TODO: violates type!!!
+            # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
+            changed = True
             newlist.append(BoolVal(expr))
         elif expr.has_subexpr():
             # decompose its arguments
-            changed, newargs, rec_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-            if changed:
+            arg_changed, arg_newargs, arg_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+            if arg_changed:
+                changed = True
                 expr = copy.copy(expr)
-                expr.update_args(newargs)
-                if len(rec_toplevel) > 0:
-                    todolist.extend(rec_toplevel)
+                expr.update_args(arg_newargs)
+                if len(arg_toplevel) > 0:
+                    todolist.extend(arg_toplevel)
             newlist.append(expr)
         else:
             newlist.append(expr)
 
     # recurse on any newly generated toplevel expressions
-    if len(todolist) == 0:
+    if len(todolist) > 0:
+        return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    elif changed:
         return newlist
-    return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    else:  # not changed
+        return lst_of_expr
 
 
 def decompose_objective(expr: Expression,
@@ -160,9 +161,9 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
         - ``newargs`` is the decomposed sequence (same length as ``args``).
         - ``toplevel`` is the list of auxiliary constraints to post at top level.
     """
-    changed = False
     toplevel: list[Expression] = []
     newargs: list[Any] = []
+    changed = False
     for arg in args:
         if isinstance(arg, Expression):
             orig_for_csemap: Optional[Expression] = None  # if set, will store the new arg in the csemap
