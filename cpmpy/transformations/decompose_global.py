@@ -161,13 +161,17 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
         - ``newargs`` is the decomposed sequence (same length as ``args``).
         - ``toplevel`` is the list of auxiliary constraints to post at top level.
     """
+    _Expression = Expression
+    _GlobalConstraint = GlobalConstraint
+    _GlobalFunction = GlobalFunction
+
     toplevel: list[Expression] = []
     newargs: list[Any] = []
     changed = False
     for arg in args:
-        if isinstance(arg, Expression):
+        if isinstance(arg, _Expression):
             # a nested expression (its inside an args)
-            if isinstance(arg, GlobalConstraint) and arg.name not in supported_reified:
+            if isinstance(arg, _GlobalConstraint) and arg.name not in supported_reified:
                 changed = True
                 if csemap is not None:
                     decomp = csemap.get_decomposition(arg)
@@ -204,7 +208,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 newargs.append(arg)
                 continue
             
-            elif isinstance(arg, GlobalFunction) and arg.name not in supported:
+            elif isinstance(arg, _GlobalFunction) and arg.name not in supported:
                 changed = True
                 if csemap is not None:
                     decomp = csemap.get_decomposition(arg)
@@ -214,7 +218,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 arg_orig2 = arg
 
                 # a decomposition may consist of a new GlobFunc to decompose...
-                while isinstance(arg, GlobalFunction) and arg.name not in supported:
+                while isinstance(arg, _GlobalFunction) and arg.name not in supported:
                     if decompose_custom is not None and arg.name in decompose_custom:
                         newarg, toplevel_exprs = cast(tuple[Expression, list[Expression]], decompose_custom[arg.name](arg))
                     else:
@@ -268,7 +272,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                         # we reconstruct it as a cpm_array here
                         newargs.append(cpm_array(rec_newargs).reshape(arg.shape))
                         if len(rec_toplevel) > 0:
-                            toplevel.extend(toplevel_exprs)
+                            toplevel.extend(rec_toplevel)
                         continue
             else:  # regular np.array
                 rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
@@ -277,7 +281,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     # we reconstruct it as a np.array here
                     newargs.append(np.array(rec_newargs).reshape(arg.shape))
                     if len(rec_toplevel) > 0:
-                        toplevel.extend(toplevel_exprs)
+                        toplevel.extend(rec_toplevel)
                     continue
         
         elif isinstance(arg, (list, tuple)):
