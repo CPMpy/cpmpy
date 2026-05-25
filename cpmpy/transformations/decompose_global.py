@@ -59,18 +59,37 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     if supported_reified is None:
         supported_reified = frozenset[str]()
 
-    newlist: List[Expression] = []
     todolist: List[Expression] = []  # these still need to be decomposed
+    newlist: List[Expression] = []
+    changed = False
     for expr in lst_of_expr:
+        if isinstance(expr, (bool, np.bool_)):
+            # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
+            changed = True
+            newlist.append(BoolVal(expr))
+            continue
+
+        # decompose arguments first (if needed)
+        if expr.has_subexpr():
+            args_changed, args_new, args_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+            if args_changed:
+                changed = True
+                expr = copy.copy(expr)
+                expr.update_args(args_new)
+                if len(args_toplevel) > 0:
+                    todolist.extend(args_toplevel)
+
         if isinstance(expr, GlobalConstraint) and expr.name not in supported:
-            # toplevel/positive global constraint, decompose
-            decomp = None
+            changed = True
+
+            # decomposed before?
             if (csemap is not None):
                 decomp = csemap.get_decomposition(expr)
-            if decomp is not None:
-                newlist.append(decomp)
-                continue
-            # else, global constraint, decompose
+                if decomp is not None:
+                    newlist.append(decomp)
+                    continue
+
+            # toplevel/positive global constraint, decompose
             if decompose_custom is not None and expr.name in decompose_custom:
                 exprs, toplevel_exprs = cast(Tuple[List[Expression], List[Expression]], decompose_custom[expr.name](expr))
             else:
@@ -79,25 +98,16 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             todolist.extend(exprs)
             if len(toplevel_exprs) > 0:
                 todolist.extend(toplevel_exprs)
-        elif isinstance(expr, (bool, np.bool_)):
-            # TODO: violates type!!!
-            newlist.append(BoolVal(expr))
-        elif expr.has_subexpr():
-            # decompose its arguments
-            changed, newargs, rec_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-            if changed:
-                expr = copy.copy(expr)
-                expr.update_args(newargs)
-                if len(rec_toplevel) > 0:
-                    todolist.extend(rec_toplevel)
-            newlist.append(expr)
         else:
             newlist.append(expr)
 
     # recurse on any newly generated toplevel expressions
-    if len(todolist) == 0:
+    if len(todolist) > 0:
+        return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    elif changed:
         return newlist
-    return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    else:  # not changed
+        return lst_of_expr
 
 
 def decompose_objective(expr: Expression,
