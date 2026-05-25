@@ -166,40 +166,54 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
     changed = False
     for arg in args:
         if isinstance(arg, Expression):
-            orig_for_csemap: Optional[Expression] = None  # if set, will store the new arg in the csemap
-
             # a nested expression (its inside an args)
             if isinstance(arg, GlobalConstraint) and arg.name not in supported_reified:
                 changed = True
-                decomp = None
-                if (csemap is not None):
+                if csemap is not None:
                     decomp = csemap.get_decomposition(arg)
-                if decomp is not None:
-                    newargs.append(decomp)
-                    continue
-                # else, global constraint, decompose
+                    if decomp is not None:
+                        newargs.append(decomp)
+                        continue
+                arg_orig = arg
+
+                # new global constraint, decompose
                 if decompose_custom is not None and arg.name in decompose_custom:
                     exprs, toplevel_exprs = cast(tuple[list[Expression], list[Expression]], decompose_custom[arg.name](arg))
                 else:
                     exprs, toplevel_exprs = arg.decompose()
-
-                # replace arg by conjunction of decompose
-                orig_for_csemap = arg
-                arg = Operator("and", exprs)  # don't use cpm_all as for len=1 it shortcuts
                 if len(toplevel_exprs) > 0:
                     toplevel.extend(toplevel_exprs)
             
+                # a decomposition may contain globals, recurse into the exprs
+                # we have to do this here anyway, hence we do not recurse into the args upfront
+                # (the csemap catches duplicate effort anyway)
+                rec_changed, rec_newexprs, rec_toplevel = _decompose_in_tree_args(exprs, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                if rec_changed:
+                    exprs = cast(list[Expression], rec_newexprs)
+                    if len(rec_toplevel) > 0:
+                        toplevel.extend(rec_toplevel)
+
+                if len(exprs) == 1:
+                    arg = exprs[0]
+                else:
+                    # replace arg by conjunction of decompose
+                    arg = Operator("and", exprs)
+
+                if csemap is not None:
+                    csemap.save_decomposition(arg_orig, arg)
+                newargs.append(arg)
+                continue
+            
             elif isinstance(arg, GlobalFunction) and arg.name not in supported:
                 changed = True
-                decomp = None
-                if (csemap is not None):
+                if csemap is not None:
                     decomp = csemap.get_decomposition(arg)
-                if decomp is not None:
-                    newargs.append(decomp)
-                    continue
-                # else nested global function, decompose
-                orig_for_csemap = arg
-                # this is a bit awkward, but the decompose can return a new GlobFunc to decompose...
+                    if decomp is not None:
+                        newargs.append(decomp)
+                        continue
+                arg_orig2 = arg
+
+                # a decomposition may consist of a new GlobFunc to decompose...
                 while isinstance(arg, GlobalFunction) and arg.name not in supported:
                     if decompose_custom is not None and arg.name in decompose_custom:
                         newarg, toplevel_exprs = cast(tuple[Expression, list[Expression]], decompose_custom[arg.name](arg))
@@ -208,35 +222,61 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     arg = newarg
                     if len(toplevel_exprs) > 0:
                         toplevel.extend(toplevel_exprs)
-
-                    # TODO: violates type!!!
-                    # apparently in #630 we decided that decompose may return an int (e.g. for element)...
-                    # we should change that (Element constructor requires variable index; the []/__get__ override can still take anything)
-                    if isinstance(arg, int):
-                        # no need to recurse further, stop here
-                        newargs.append(arg)
-                        break
                             
+                # TODO: violates type!!!
+                # apparently in #630 we decided that decompose may return an int (e.g. for element)...
+                # we should change that (Element constructor requires variable index; the []/__get__ override can still take anything)
                 if isinstance(arg, int):
+                    # can't store ints in csemap
+                    newargs.append(arg)
                     continue
             
-            # if it has subexprs, decompose its arguments too
-            if arg.has_subexpr():
-                rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                # if the new decomposed arg has subexprs, decompose its arguments too
+                if arg.has_subexpr():
+                    rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                    if rec_changed:
+                        changed = True
+                        # XXX exception! here we know 'arg' is a new expression, so we don't need to copy
+                        arg.update_args(rec_newargs)
+                        if len(rec_toplevel) > 0:
+                            toplevel.extend(rec_toplevel)
+
+                if csemap is not None:
+                    csemap.save_decomposition(arg_orig2, arg)
+                newargs.append(arg)
+                continue
+
+            else:  # any other expression
+                # if it has subexprs, decompose its arguments
+                if arg.has_subexpr():
+                    rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                    if rec_changed:
+                        changed = True
+                        arg = copy.copy(arg)
+                        arg.update_args(rec_newargs)
+                        if len(rec_toplevel) > 0:
+                            toplevel.extend(rec_toplevel)
+                    newargs.append(arg)
+                    continue
+        
+        elif isinstance(arg, np.ndarray) and arg.dtype == object:
+            if isinstance(arg, NDVarArray):
+                if arg.has_subexpr():
+                    rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+                    if rec_changed:
+                        changed = True
+                        newargs.append(cpm_array(rec_newargs).reshape(arg.shape))
+                        if len(rec_toplevel) > 0:
+                            toplevel.extend(toplevel_exprs)
+                        continue
+            else:  # regular np.array
+                rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
                 if rec_changed:
                     changed = True
-                    arg = copy.copy(arg)
-                    arg.update_args(rec_newargs)
+                    newargs.append(np.array(rec_newargs).reshape(arg.shape))
                     if len(rec_toplevel) > 0:
-                        toplevel.extend(rec_toplevel)
-
-            # very special case: "and" with single argument (from simple glob.decomp)
-            if arg.name == "and" and len(arg.args) == 1:
-                arg = cast(Expression, arg.args[0])
-
-            if orig_for_csemap is not None and csemap is not None:
-                csemap.save_decomposition(orig_for_csemap, arg)
-            newargs.append(arg)
+                        toplevel.extend(toplevel_exprs)
+                    continue
         
         elif isinstance(arg, (list, tuple)):
             rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg, supported=supported,
@@ -246,31 +286,11 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
             if rec_changed:
                 changed = True
                 newargs.append(rec_newargs)
-            else:
-                newargs.append(arg)
-        elif (isinstance(arg, np.ndarray) and arg.dtype == object):
-            if isinstance(arg, NDVarArray):
-                if arg.has_subexpr():
-                    rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-                    if rec_changed:
-                        changed = True
-                        newargs.append(cpm_array(rec_newargs).reshape(arg.shape))
-                    else:
-                        newargs.append(arg)
-                else:
-                    newargs.append(arg)
-            else:  # regular np.array
-                if arg.dtype == object:
-                    rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(tuple(arg.flat), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-                    if rec_changed:
-                        changed = True
-                        newargs.append(np.array(rec_newargs).reshape(arg.shape))
-                    else:
-                        newargs.append(arg)
-                else:
-                    newargs.append(arg)
-        else:
-            # constants, variables, other expressions are left as is
-            newargs.append(arg)
+                if len(rec_toplevel) > 0:
+                    toplevel.extend(rec_toplevel)
+                continue
+        
+        # all the rest: not allowed to contain expressions so just append
+        newargs.append(arg)
 
     return (changed, newargs, toplevel)
