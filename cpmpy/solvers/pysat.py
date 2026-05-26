@@ -321,24 +321,24 @@ class CPM_pysat(SolverInterface):
 
             So vpool is the varmap (we don't use _varmap here).
         """
-        if isinstance(cpm_var, BoolVal):
-            return cpm_var
-
         if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
             if cpm_var.is_bool():
                 if isinstance(cpm_var, NegBoolView):
                     # special case, negative-bool-view: just a view, get actual var identifier, return -id
-                    return -self.pysat_vpool.id(cpm_var._bv.name)
-                return self.pysat_vpool.id(cpm_var.name)
+                    return -self.pysat_vpool.id(cpm_var._bv.name) # use name of inner variable, not ~bv as name
+                return self.pysat_vpool.id(name)
 
             # intvar
-            name = cpm_var.name
             if name not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self.add(cons)
             else:
                 enc = self.ivarmap[name]
             return self.solver_vars(enc.vars())
+
+        if isinstance(cpm_var, BoolVal):
+            return cpm_var
 
         if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
