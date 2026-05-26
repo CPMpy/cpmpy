@@ -362,7 +362,9 @@ class CPM_ortools(SolverInterface):
                                                csemap=self._csemap)
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 
-        self.add(safe_cons+decomp_cons+flat_cons)
+        obj_cons = safe_cons + decomp_cons + flat_cons
+        if obj_cons:
+            self.add(obj_cons)
 
         # make objective function or variable and post
         ort_obj = self._make_numexpr(obj)

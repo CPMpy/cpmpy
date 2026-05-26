@@ -310,7 +310,9 @@ class CPM_highs(SolverInterface):
         # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
         obj, obj_const = only_positive_bv_wsum_const(obj)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+        obj_cons = safe_cons + decomp_cons + flat_cons
+        if obj_cons:
+            self.add(obj_cons)
 
         indices, values, const = self._row_from_linexpr(obj)
         const += obj_const

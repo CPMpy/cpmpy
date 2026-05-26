@@ -313,7 +313,9 @@ class CPM_cplex(SolverInterface):
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+        obj_cons = safe_cons + decomp_cons + flat_cons
+        if obj_cons:
+            self.add(obj_cons)
 
         # make objective function or variable and post
         cplex_obj = self._make_numexpr(obj)
