@@ -69,8 +69,8 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             if csemap is not None:
                 decomp = csemap.get_decomposition(expr)
                 if decomp is not None:
-                    print("YYYYYYYYYYY")
-                    newlist.append(decomp)
+                    assert decomp.name == "and", "decompose_in_tree: expected a conjunction but got {decomp}"
+                    newlist.extend(decomp.args)
                     continue
 
             if decompose_custom is not None and expr.name in decompose_custom:
