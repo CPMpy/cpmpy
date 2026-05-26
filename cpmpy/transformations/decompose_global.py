@@ -79,11 +79,12 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 exprs, toplevel_exprs = expr.decompose()
             # we merge the list toplevel rather than create an 'and'
             # we add them to todolist because both might contain globals
-            todolist.extend(exprs)
             if len(toplevel_exprs) > 0:
                 todolist.extend(toplevel_exprs)
-            if csemap is not None:
-                csemap.save_decomposition(expr, Operator("and", exprs))
+            if len(exprs) > 0:
+                todolist.extend(exprs)
+                if csemap is not None:
+                    csemap.save_decomposition(expr, Operator("and", exprs))
         elif isinstance(expr, (bool, np.bool_)):
             # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
             changed = True
