@@ -64,6 +64,7 @@ from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.safening import no_partial_functions, safen_objective
+from ..transformations.linearize import linearize_reified_variables
 
 
 class CPM_ortools(SolverInterface):
@@ -430,6 +431,7 @@ class CPM_ortools(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # everything that can create
                                              # reified expr must go before this
