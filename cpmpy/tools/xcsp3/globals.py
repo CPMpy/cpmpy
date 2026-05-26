@@ -799,12 +799,14 @@ class NotInDomain(GlobalConstraint):
             expr = aux
 
         if not any(isinstance(a, Expression) for a in arr):
-            given = len(set(arr))
-            missing = ub + 1 - lb - given
+            forbidden = set(arr)
+            allowed = [v for v in range(lb, ub + 1) if v not in forbidden]
+            missing = len(allowed)
+            given = ub + 1 - lb - missing
             if missing < 2 * given:  # != leads to double the amount of constraints
                 # use == if there is less than twice as many gaps in the domain.
                 row_selected = boolvar(shape=missing)
-                return [any(row_selected)] + [rs.implies(expr == val) for val,rs in zip(range(lb, ub + 1), row_selected) if val not in arr], defining
+                return [any(row_selected)] + [rs.implies(expr == val) for rs, val in zip(row_selected, allowed)], defining
         return [all([(expr != a) for a in arr])], defining
 
 
