@@ -1070,7 +1070,25 @@ class OrtSubcircuitWithStart(DirectConstraint):
         ort_arcs = [(i,j,CPMpy_solver.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if not ((i == j) and (i == self.args[1]))] # The start index cannot self loop and thus must be part of the subcircuit.
 
         return Native_solver.AddCircuit(ort_arcs)
-        
+
+    def value(self):
+        from cpmpy.expressions.utils import argval
+        arguments, start_index = self.args
+        N = len(arguments)
+        succs = [argval(a) for a in arguments]
+        if any(s is None for s in succs):
+            return None
+        # follow cycle from start_index
+        visited = set()
+        node = start_index
+        while node not in visited:
+            visited.add(node)
+            node = succs[node]
+        # valid cycle: returned to start and all non-cycle nodes self-loop
+        if node != start_index:
+            return False
+        return all(succs[i] == i for i in range(N) if i not in visited)
+
 
 # ----------------------------------- Choco ---------------------------------- #
 
