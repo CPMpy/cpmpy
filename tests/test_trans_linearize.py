@@ -734,18 +734,41 @@ class TestLinearizeReifiedVariablesThreshold:
         assert str(order_out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
         assert str(direct_out) == str(cpm_cons)
     
-    # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
-    
     def test_linearize_reified_inequalities_variations(self):
         """Use order encoding on inequalities and replace other types of inequality expressions"""
         a = self.a
         self.csemap = CSEMap()
         out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a < 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
         assert str(out) == "[or(~BV[a >= 2], ~BV[a >= 3], ~BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
-        
-    @pytest.mark.xfail(reason="aspirational")
+
     def test_linearize_non_ocurring_int_var(self):
         """For an integer solver, we can omit the channelling constraint if the encoded integer variable does not occur in any constraint. Note: `a` and `b` are encoded (because at least 2 equality reifications occur), `c` is not encoded (no reifications). We see `b` occurs as an integer variable in a constraint, so channelling is required, but the int var `a` does not occur in any constraint, so no channelling is required. `c` is not encoded."""
         b, c = cp.intvar(1, 3, name="b"), cp.intvar(1, 3, name="c")
-        out = linearize_reified_variables(self.cpm_cons + self.linearize([(b == 1) | (b == 2), b + c == 3]), min_values=2, csemap=self.csemap)
-        assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([BV[b == 1], BV[b == 2], BV[b == 3]]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
+        out = linearize_reified_variables(
+            self.cpm_cons + self.linearize([(b == 1) | (b == 2), b + c == 3]),
+            min_values=2,
+            csemap=self.csemap,
+            ivarmap=self.ivarmap,
+            channeling="used",
+        )
+        assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1, sum(BV[b == 1], BV[b == 2], BV[b == 3]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
+
+    def test_exact_decodes_unchanneled_reified_int(self):
+        from cpmpy.solvers import CPM_exact
+        if not CPM_exact.supported():
+            pytest.skip("Exact not installed")
+
+        a = cp.intvar(1, 3, name="a")
+        assert cp.Model((a == 1) | (a == 2)).solve(solver="exact")
+        assert a.value() in (1, 2)
+
+    def test_exact_channels_encoded_int_used_in_objective(self):
+        from cpmpy.solvers import CPM_exact
+        if not CPM_exact.supported():
+            pytest.skip("Exact not installed")
+
+        a = cp.intvar(1, 3, name="a")
+        model = cp.Model((a == 1) | (a == 2), maximize=a)
+        assert model.solve(solver="exact")
+        assert a.value() == 2
+        assert model.objective_value() == 2
