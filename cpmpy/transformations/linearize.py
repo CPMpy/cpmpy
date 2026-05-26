@@ -628,7 +628,8 @@ def get_linear_decompositions():
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 
-def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None, channeling=None):
+def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None, channeling=None,
+                                channeling_domain_threshold=None, channeled=None):
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
     has at least min_values such reifications: remove those implications and add
@@ -648,6 +649,13 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     - ``None``: preserve historical behavior, ``"all"`` when ``ivarmap`` is
       ``None`` and ``"none"`` otherwise
 
+    If ``channeling_domain_threshold`` is set with ``channeling="used"``, then
+    variables with a smaller domain are still fully channeled.
+
+    If ``channeled`` is provided, it is treated as a set of integer variable
+    names that already have channeling constraints. Newly created channeling
+    constraints are recorded in that set.
+
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
     # this transformation can only be done if there is a csemap
@@ -666,6 +674,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     toplevel = []
     bv_map = {}  # bv -> (var, val)
     enc_map = {}  # var -> encoding
+    channeling_mode = {}
     for var, vals in var_vals.items():
         # check if we should linearize the reified variables
         lb, ub = var.lb, var.ub
@@ -676,16 +685,22 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         # encode the values
         enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
         enc_map[var] = enc
+        mode = channeling
+        if mode == "used" and channeling_domain_threshold is not None and var.ub + 1 - var.lb < channeling_domain_threshold:
+            mode = "all"
+        channeling_mode[var] = mode
         
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
-        if channeling == "all":
+        if mode == "all" and (channeled is None or var.name not in channeled):
             # also post the var=wsum mapping
             terms, k = enc.encode_term()
             # var == wsum + k :: var - wsum == k
             ws = [1] + [-w for (w, _) in terms]
             bs = [var] + [b for (_, b) in terms]
             toplevel.append(Operator("wsum", (ws, bs)) == k)  
+            if channeled is not None:
+                channeled.add(var.name)
         
         # store the bvs that no longer need to be reified
         for val, bv in vals:
@@ -709,11 +724,13 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     if channeling == "used":
         used_vars = get_variables(constraints)
         for var, enc in enc_map.items():
-            if var in used_vars:
+            if channeling_mode[var] == "used" and var in used_vars and (channeled is None or var.name not in channeled):
                 terms, k = enc.encode_term()
                 ws = [1] + [-w for (w, _) in terms]
                 bs = [var] + [b for (_, b) in terms]
                 toplevel.append(Operator("wsum", (ws, bs)) == k)
+                if channeled is not None:
+                    channeled.add(var.name)
 
     return constraints + toplevel
 
