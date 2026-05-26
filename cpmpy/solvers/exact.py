@@ -148,6 +148,7 @@ class CPM_exact(SolverInterface):
         self.encoding = None
         self.ivarmap = dict()
         self._channeled_ivars = set()
+        self.reified_channeling_threshold = 1000
 
         # for solving with assumption variables,
         self.assumption_dict = None
@@ -531,7 +532,11 @@ class CPM_exact(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap, channeling="none")
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
+                                               ivarmap=self.ivarmap,
+                                               channeling="used",
+                                               channeling_domain_threshold=self.reified_channeling_threshold,
+                                               channeled=self._channeled_ivars)
         cpm_cons = add_intvar_channeling_constraints(cpm_cons,
                                                      self.ivarmap,
                                                      channeled=self._channeled_ivars,
