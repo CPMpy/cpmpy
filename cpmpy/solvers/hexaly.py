@@ -251,9 +251,6 @@ class CPM_hexaly(SolverInterface):
             or returns a constant if the variable is a constant
         """
         if isinstance(cpm_var, _NumVarImpl):
-            # special case, negative-bool-view
-            # work directly on var inside the view
-            
             name = cpm_var.name
             revar = self._varmap.get(name)
             if revar is not None:
@@ -262,14 +259,15 @@ class CPM_hexaly(SolverInterface):
             # not yet created, make a new solver var
             if cpm_var.is_bool():
                 if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view, work directly on var inside the view
                     revar = ~self.solver_var(cpm_var._bv)
                 else:
                     revar = self.hex_model.bool()
+                    revar.set_name(name)
             else:
                 revar = self.hex_model.int(cpm_var.lb, cpm_var.ub)
+                revar.set_name(name)
             
-            # set name of variable
-            revar.set_name(str(cpm_var))
             self._varmap[name] = revar
             return revar
 
