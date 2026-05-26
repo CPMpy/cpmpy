@@ -481,9 +481,6 @@ class CPM_gcs(SolverInterface):
         # NB: GCS supports a small number of simple expressions as the reifying term
         # e.g. (x > 3) -> constraint could in principle be supported in the future.
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        str_rep = ""
-        for c in cpm_cons:
-            str_rep += str(c) + '\n'
         return cpm_cons
 
     def verify(self, name=None, location=".", time_limit=None, display_output=False, veripb_args=[]):
