@@ -67,6 +67,7 @@ import copy
 from typing import AbstractSet, Sequence, Optional
 
 import cpmpy as cp
+import numpy as np
 from cpmpy.transformations.get_variables import get_variables
 from .cse import CSEMap
 
@@ -770,15 +771,14 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         constraints = newcons
 
     if channeling == "used":
-        used_vars = get_variables(constraints)
-        for var, enc in enc_map.items():
-            if channeling_mode[var] == "used" and var in used_vars and (channeled is None or var.name not in channeled):
-                terms, k = enc.encode_term()
-                ws = [1] + [-w for (w, _) in terms]
-                bs = [var] + [b for (_, b) in terms]
-                toplevel.append(Operator("wsum", (ws, bs)) == k)
-                if channeled is not None:
-                    channeled.add(var.name)
+        used_encodings = {var.name: enc for var, enc in enc_map.items() if channeling_mode[var] == "used"}
+        for var in _used_encoded_intvars(constraints, used_encodings, channeled=channeled):
+            terms, k = used_encodings[var.name].encode_term()
+            ws = [1] + [-w for (w, _) in terms]
+            bs = [var] + [b for (_, b) in terms]
+            toplevel.append(Operator("wsum", (ws, bs)) == k)
+            if channeled is not None:
+                channeled.add(var.name)
 
     return constraints + toplevel
 
@@ -792,6 +792,49 @@ def _extract_var_from_lhs(lhs):
         if isinstance(arg, _NumVarImpl) and not arg.is_bool():
             return arg
     return None
+
+
+def _used_encoded_intvars(exprs, ivarmap, channeled=None):
+    """Return native integer variables in ``exprs`` that have unchanneled encodings.
+
+    Encoded Boolean variables do not count as use of the original integer
+    variable. The scan stops once every unchanneled candidate from ``ivarmap``
+    has been found.
+    """
+    if not ivarmap:
+        return []
+
+    candidates = set(ivarmap)
+    if channeled is not None:
+        candidates.difference_update(channeled)
+    if not candidates:
+        return []
+
+    found = {}
+
+    def extract(lst):
+        for e in lst:
+            if not candidates:
+                return
+
+            if isinstance(e, Expression):
+                if isinstance(e, _NumVarImpl):
+                    if not e.is_bool() and e.name in candidates:
+                        found[e.name] = e
+                        candidates.remove(e.name)
+                elif e.name == "wsum":
+                    extract(e.args[1])  # skip data in arg0
+                elif e.name == "table":
+                    extract(e.args[0])  # skip data in arg1
+                else:
+                    extract(e.args)
+            elif isinstance(e, np.ndarray) and e.dtype == object:
+                extract(e.flat)
+            elif isinstance(e, (list, tuple, np.flatiter)):
+                extract(e)
+
+    extract((exprs,))
+    return list(found.values())
 
 
 def add_intvar_channeling_constraints(constraints, ivarmap, channeled=None, extra_exprs=None):
@@ -812,12 +855,11 @@ def add_intvar_channeling_constraints(constraints, ivarmap, channeled=None, extr
     """
     constraints = list(constraints)
     exprs = constraints if extra_exprs is None else constraints + (extra_exprs if isinstance(extra_exprs, list) else [extra_exprs])
-    for var in get_variables(exprs):
-        if isinstance(var, _NumVarImpl) and not var.is_bool() and var.name in ivarmap and (channeled is None or var.name not in channeled):
-            terms, k = ivarmap[var.name].encode_term()
-            ws = [1] + [-w for (w, _) in terms]
-            bs = [var] + [b for (_, b) in terms]
-            constraints.append(Operator("wsum", (ws, bs)) == k)
-            if channeled is not None:
-                channeled.add(var.name)
+    for var in _used_encoded_intvars(exprs, ivarmap, channeled=channeled):
+        terms, k = ivarmap[var.name].encode_term()
+        ws = [1] + [-w for (w, _) in terms]
+        bs = [var] + [b for (_, b) in terms]
+        constraints.append(Operator("wsum", (ws, bs)) == k)
+        if channeled is not None:
+            channeled.add(var.name)
     return constraints
