@@ -161,17 +161,13 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
         - ``newargs`` is the decomposed sequence (same length as ``args``).
         - ``toplevel`` is the list of auxiliary constraints to post at top level.
     """
-    _Expression = Expression
-    _GlobalConstraint = GlobalConstraint
-    _GlobalFunction = GlobalFunction
-
     toplevel: list[Expression] = []
     newargs: list[Any] = []
     changed = False
     for arg in args:
-        if isinstance(arg, _Expression):
+        if isinstance(arg, Expression):
             # a nested expression (its inside an args)
-            if isinstance(arg, _GlobalConstraint) and arg.name not in supported_reified:
+            if isinstance(arg, GlobalConstraint) and arg.name not in supported_reified:
                 changed = True
                 if csemap is not None:
                     decomp = csemap.get_decomposition(arg)
@@ -208,7 +204,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 newargs.append(arg)
                 continue
             
-            elif isinstance(arg, _GlobalFunction) and arg.name not in supported:
+            elif isinstance(arg, GlobalFunction) and arg.name not in supported:
                 changed = True
                 if csemap is not None:
                     decomp = csemap.get_decomposition(arg)
@@ -218,7 +214,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 arg_orig2 = arg
 
                 # a decomposition may consist of a new GlobFunc to decompose...
-                while isinstance(arg, _GlobalFunction) and arg.name not in supported:
+                while isinstance(arg, GlobalFunction) and arg.name not in supported:
                     if decompose_custom is not None and arg.name in decompose_custom:
                         newarg, toplevel_exprs = cast(tuple[Expression, list[Expression]], decompose_custom[arg.name](arg))
                     else:
