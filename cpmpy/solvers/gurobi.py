@@ -263,7 +263,7 @@ class CPM_gurobi(SolverInterface):
             raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
 
         # create if it does not exit
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             from gurobipy import GRB
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
@@ -271,10 +271,10 @@ class CPM_gurobi(SolverInterface):
                 revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
         # return from cache
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     def objective(self, expr, minimize=True):

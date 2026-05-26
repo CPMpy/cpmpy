@@ -156,7 +156,7 @@ class CPM_scip(SolverInterface):
             best_sol = self.scip_model.getBestSol()
             assert best_sol is not None, f"Due to status {scip_status}, we expected a solution from SCIP, but there was none. This is a bug, please report on GitHub."
             for cpm_var in self.user_vars:
-                assert cpm_var in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub."
+                assert cpm_var.name in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub."
                 scip_var = self.solver_var(cpm_var)
                 solver_val = self.scip_model.getSolVal(best_sol, scip_var)
                 if cpm_var.is_bool():
@@ -198,17 +198,17 @@ class CPM_scip(SolverInterface):
             )
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.scip_model.addVar(vtype='B', name=cpm_var.name)
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.scip_model.addVar(lb=cpm_var.lb, ub=cpm_var.ub, vtype='I', name=cpm_var.name)
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
         # return from cache
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     def objective(self, expr, minimize=True):

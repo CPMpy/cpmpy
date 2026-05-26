@@ -324,16 +324,16 @@ class CPM_ortools(SolverInterface):
             return self.solver_var(cpm_var._bv).Not()
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.ort_model.NewBoolVar(str(cpm_var))
             elif isinstance(cpm_var, _IntVarImpl):
                 revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
             else:
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     def objective(self, expr, minimize):
@@ -609,7 +609,7 @@ class CPM_ortools(SolverInterface):
                 tasks, task_cons = self._get_ort_intervals(start, dur, end)
                 self.add(task_cons)
 
-                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_vars(cap))
+                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
             
             elif cpm_expr.name == "cumulative_optional":
                 if len(cpm_expr.args) == 5:
@@ -628,7 +628,7 @@ class CPM_ortools(SolverInterface):
                 tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
                 self.add(task_cons)
                 
-                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_vars(cap))
+                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
 
             elif cpm_expr.name == "no_overlap":
                 if len(cpm_expr.args) == 2:
@@ -962,9 +962,9 @@ try:
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
                     if isinstance(cpm_var, _BoolVarImpl):
-                        cpm_var._value = bool(self.Value(self._varmap[cpm_var]))
+                        cpm_var._value = bool(self.Value(self._varmap[cpm_var.name]))
                     elif isinstance(cpm_var, _IntVarImpl):
-                        cpm_var._value = int(self.Value(self._varmap[cpm_var]))
+                        cpm_var._value = int(self.Value(self._varmap[cpm_var.name]))
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 

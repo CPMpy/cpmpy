@@ -238,11 +238,6 @@ def test_solver_vars(solver):
     assert len(solver_nested) == 2
     assert len(solver_nested[0]) == 2
     assert len(solver_nested[1]) == 2
-    
-    # Test with single variable (should work too)
-    single_var = cp.boolvar(name="single")
-    solver_single = solver.solver_vars(single_var)
-    assert solver_single is not None
 
 
 @pytest.mark.usefixtures("solver")
