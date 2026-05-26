@@ -31,8 +31,8 @@ DATASET_CLASSES = {
 
 
 def _import_dataset_class(class_name):
-    """Lazily import a dataset class from cpmpy.tools.dataset."""
-    import cpmpy.tools.dataset as ds
+    """Lazily import a dataset class from cpmpy.tools.datasets."""
+    import cpmpy.tools.datasets as ds
     return getattr(ds, class_name)
 
 
