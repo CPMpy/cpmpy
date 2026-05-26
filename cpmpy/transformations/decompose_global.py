@@ -66,15 +66,24 @@ def decompose_in_tree(lst_of_expr: list[Expression],
         if isinstance(expr, GlobalConstraint) and expr.name not in supported:
             # toplevel/positive global constraint, decompose
             changed = True
+            if csemap is not None:
+                decomp = csemap.get_decomposition(expr)
+                if decomp is not None:
+                    print("YYYYYYYYYYY")
+                    newlist.append(decomp)
+                    continue
+
             if decompose_custom is not None and expr.name in decompose_custom:
                 exprs, toplevel_exprs = cast(tuple[list[Expression], list[Expression]], decompose_custom[expr.name](expr))
             else:
                 exprs, toplevel_exprs = expr.decompose()
-            # we merge the list toplevel rather than create an 'and', also means we can not store it in csemap
+            # we merge the list toplevel rather than create an 'and'
             # we add them to todolist because both might contain globals
             todolist.extend(exprs)
             if len(toplevel_exprs) > 0:
                 todolist.extend(toplevel_exprs)
+            if csemap is not None:
+                csemap.save_decomposition(expr, Operator("and", exprs))
         elif isinstance(expr, (bool, np.bool_)):
             # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
             changed = True
