@@ -647,8 +647,8 @@ class TestLinearizeReifiedVariablesThreshold:
         """Use order encoding on inequalities and replace other types of inequality expressions"""
         a = self.a
         self.csemap = CSEMap()
-        out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a > 1)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[or(~BV[a >= 2], ~BV[a >= 3], BV[a >= 2]), (BV[a >= 3]) -> (BV[a >= 2])]"
+        out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a < 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == "[or(~BV2, ~BV3, ~BV3), (a >= 2) == (BV2), (a >= 3) == (BV3)]"
 
     # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
     @pytest.mark.xfail(reason="aspirational")
