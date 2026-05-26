@@ -628,7 +628,7 @@ def get_linear_decompositions():
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 
-def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
+def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None, channeling=None):
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
     has at least min_values such reifications: remove those implications and add
@@ -636,8 +636,17 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
 
     If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
     If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
-    (the domain constraint) is posted; the solver can then choose to eliminate the
-    vars, or post the wsums itself anyway.
+    (the domain constraint) is posted by default; the solver can then choose to
+    eliminate the vars, decode the vars from the encoding, or post the wsums itself
+    anyway.
+
+    The ``channeling`` argument controls when to post the wsum channeling constraints:
+    - ``"all"``: post them for every encoded integer variable
+    - ``"none"``: post none of them
+    - ``"used"``: post them only if the integer variable still occurs after the
+      reified equalities have been removed
+    - ``None``: preserve historical behavior, ``"all"`` when ``ivarmap`` is
+      ``None`` and ``"none"`` otherwise
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
@@ -645,12 +654,18 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     if csemap is None:
         return constraints
 
+    if channeling is None:
+        channeling = "all" if ivarmap is None else "none"
+    if channeling not in {"all", "none", "used"}:
+        raise ValueError(f"Unsupported channeling mode {channeling!r}, expected 'all', 'none', or 'used'")
+
     var_vals = csemap.get_reified_varvals()
     
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
     toplevel = []
     bv_map = {}  # bv -> (var, val)
+    enc_map = {}  # var -> encoding
     for var, vals in var_vals.items():
         # check if we should linearize the reified variables
         lb, ub = var.lb, var.ub
@@ -660,10 +675,11 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
 
         # encode the values
         enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
+        enc_map[var] = enc
         
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
-        if ivarmap is None:
+        if channeling == "all":
             # also post the var=wsum mapping
             terms, k = enc.encode_term()
             # var == wsum + k :: var - wsum == k
@@ -690,6 +706,15 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             newcons.append(con)
         constraints = newcons
 
+    if channeling == "used":
+        used_vars = get_variables(constraints)
+        for var, enc in enc_map.items():
+            if var in used_vars:
+                terms, k = enc.encode_term()
+                ws = [1] + [-w for (w, _) in terms]
+                bs = [var] + [b for (_, b) in terms]
+                toplevel.append(Operator("wsum", (ws, bs)) == k)
+
     return constraints + toplevel
 
 
@@ -702,3 +727,32 @@ def _extract_var_from_lhs(lhs):
         if isinstance(arg, _NumVarImpl) and not arg.is_bool():
             return arg
     return None
+
+
+def add_intvar_channeling_constraints(constraints, ivarmap, channeled=None, extra_exprs=None):
+    """Add value-channeling constraints for encoded integer vars used in expressions.
+
+    This is useful for solvers that keep native integer variables but also use
+    direct encodings for repeated reified equalities. If an encoded integer
+    variable later appears in a native numeric expression, the native variable
+    must be linked to its Boolean encoding.
+
+    ``constraints`` is returned with the necessary channeling constraints
+    appended. ``extra_exprs`` can be used to inspect expressions that are not in
+    the returned constraint list, such as an objective.
+
+    If ``channeled`` is provided, it is treated as a set of integer variable
+    names that already have channeling constraints. Newly created channeling
+    constraints are recorded in that set.
+    """
+    constraints = list(constraints)
+    exprs = constraints if extra_exprs is None else constraints + (extra_exprs if isinstance(extra_exprs, list) else [extra_exprs])
+    for var in get_variables(exprs):
+        if isinstance(var, _NumVarImpl) and not var.is_bool() and var.name in ivarmap and (channeled is None or var.name not in channeled):
+            terms, k = ivarmap[var.name].encode_term()
+            ws = [1] + [-w for (w, _) in terms]
+            bs = [var] + [b for (_, b) in terms]
+            constraints.append(Operator("wsum", (ws, bs)) == k)
+            if channeled is not None:
+                channeled.add(var.name)
+    return constraints
