@@ -266,9 +266,7 @@ class CPM_template(SolverInterface):
             or returns a constant if the variable is a constant
         """
         if isinstance(cpm_var, _NumVarImpl):
-            # [GUIDELINE] some solver interfaces explicitely create variables on a solver object
-            #       then use self.TPL_solver.NewBoolVar(...) instead of TEMPLATEpy.NewBoolVar(...)
-
+            
             name = cpm_var.name
             revar = self._varmap.get(name)
             if revar is not None:
