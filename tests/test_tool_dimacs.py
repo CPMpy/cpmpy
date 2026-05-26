@@ -70,10 +70,10 @@ class TestCNFTool:
        
         assert cnf_clauses == gt_clauses
 
-
-    def test_missing_p_line(self):
-        with pytest.raises(AssertionError):
-            self.dimacs_to_model("1 -2 0\np cnf 2 2")
+    # p-line has become optional
+    # def test_missing_p_line(self):
+    #     with pytest.raises(AssertionError):
+    #         self.dimacs_to_model("1 -2 0\np cnf 2 2")
 
     def test_incorrect_p_line(self):
         with pytest.raises(AssertionError):
