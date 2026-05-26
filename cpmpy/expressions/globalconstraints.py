@@ -950,7 +950,8 @@ class MDD(GlobalConstraint):
                 if (id1, value) in invalid_edges:
                     invalid_edge_vars.append(edge_var)
 
-        cons = []
+        defining = []
+        constraining = []
 
         # Enforce flow constraints: flow in = flow out, at most one activated in/out edge
         for node, level in self.levels.items():
@@ -958,23 +959,23 @@ class MDD(GlobalConstraint):
             outgoing = flow_out[node]
 
             if level == 0:
-                cons.append(cp.sum(outgoing) == 1) # root
-                cons.append(cp.sum(outgoing) > 0)
+                constraining.append(cp.sum(outgoing) == 1) # root
             elif level == len(arr):
-                cons.append(cp.sum(incoming) == 1) # sink
+                defining.append(cp.sum(incoming) == 1) # sink
             else:
-                cons.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
-                cons.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
-                cons.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
+                defining.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
+                defining.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
+                defining.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
 
         # Enforce that when arr[i] == v, exactly one of the edges at level i with label v is true, otherwise none can be true
         for (level, value), vars_ in edge_vars.items():
-            cons.append(cp.sum(vars_) == (arr[level] == value))
+            defining.append(cp.sum(vars_) == (arr[level] == value))
+
+        constraining.append(cp.sum(invalid_edge_vars) == 0)
 
         # When the MDD is extended to a complete MDD by means of invalid edges, there is always a solution to the flow problem.
-        # As a consequence, all flow constraints and channeling constraints can be top level constraints.
-        # We only need to add as a conditioning constraint that no invalid edge has any flow.
-        return [cp.sum(invalid_edge_vars) == 0], cons
+        # The only constraining constraints are therefore that the root flow is equal to 1, and that no invalid edge has any flow.
+        return constraining, defining
 
 
     def value(self) -> Optional[bool]:
