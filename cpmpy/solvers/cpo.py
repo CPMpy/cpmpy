@@ -50,7 +50,7 @@ from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, boolvar, intvar
 from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -687,6 +687,75 @@ class CPM_cpo(SolverInterface):
             if is_optional: # enforce presence of task
                 extra_cons += [dom.presence_of(task) == self.solver_var(is_present)]
             return task, extra_cons
+
+    @classmethod
+    def mus_native(cls, soft, hard=[]):
+        """
+        Compute a MUS using CP Optimizer's native conflict refiner.
+
+        CP Optimizer refines conflicts over native constraints. CPMpy constraints
+        can transform to several native constraints, so each soft constraint is
+        represented by a single indicator constraint. The actual soft constraint
+        is posted as hard constraint guarded by that indicator.
+        """
+        soft_cons = toplevel_list(soft, merge_and=False)
+        s = cls()
+
+        def add_cpo_expr(cpo_expr):
+            """Add one native expression and return the top-level expressions added."""
+            before = len(s.cpo_model.get_all_expressions())
+            s.cpo_model.add(cpo_expr)
+            return [expr for expr, _ in s.cpo_model.get_all_expressions()[before:]]
+
+        def flat_cpo_exprs(cpo_expr):
+            """Flatten nested lists of native expressions produced by globals."""
+            if is_any_list(cpo_expr):
+                for subexpr in cpo_expr:
+                    yield from flat_cpo_exprs(subexpr)
+            else:
+                yield cpo_expr
+
+        # Add hard constraints. They may appear in the conflict, but they are
+        # required by definition and are therefore not returned as part of the MUS.
+        for cpm_con in s.transform(hard):
+            add_cpo_expr(s._cpo_expr(cpm_con))
+
+        dom = s.get_docp().modeler
+        native_to_soft_idx = {}
+        assumptions = boolvar(shape=len(soft_cons), name="cpo_mus")
+        for i, (assumption, soft_con) in enumerate(zip(assumptions, soft_cons)):
+            native_soft = []
+            for cpm_con in s.transform(soft_con):
+                native_soft.extend(flat_cpo_exprs(s._cpo_expr(cpm_con)))
+
+            if len(native_soft) == 1:
+                # Simple case: one CPMpy soft constraint is one native CPO
+                # constraint, so no indicator is needed.
+                for native_con in add_cpo_expr(native_soft[0]):
+                    native_to_soft_idx[native_con] = i
+            else:
+                # Expanded case: guard the native CPO constraints by an
+                # indicator, and expose only the indicator as the soft
+                # representative to the conflict refiner.
+                indicator = s.solver_var(assumption)
+                for native_con in native_soft:
+                    add_cpo_expr(dom.if_then(indicator, native_con))
+
+                for cpm_con in s.transform(assumption):
+                    for native_con in add_cpo_expr(s._cpo_expr(cpm_con)):
+                        native_to_soft_idx[native_con] = i
+
+        refine_res = s.cpo_model.refine_conflict(LogVerbosity='Quiet')
+        assert refine_res.is_conflict(), "MUS: model must be UNSAT"
+
+        mus_idxs = set()
+        conflict_cons = refine_res.get_member_constraints() + refine_res.get_possible_constraints()
+        for native_con in conflict_cons:
+            soft_idx = native_to_soft_idx.get(native_con)
+            if soft_idx is not None:
+                mus_idxs.add(soft_idx)
+
+        return [soft_cons[i] for i in mus_idxs]
 
 
 # solvers are optional, so this file should be interpretable
