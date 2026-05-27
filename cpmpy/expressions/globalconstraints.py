@@ -581,9 +581,9 @@ class Table(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
-    def _variable_ordering(self):
+    def _variable_ordering(self, ordering):
         """
-        Orders the variables by their domain size, in order to obtain a potentially smaller MDD during decomposition.
+        Heuristically order the variables to obtain a better MDD.
         The columns of the table are ordered accordingly.
 
         Returns:
@@ -593,21 +593,26 @@ class Table(GlobalConstraint):
         if len(arr) == 0:
             return arr, tab
 
-        dom_size = [v.ub - v.lb + 1 for v in arr]
-        ordering = sorted(range(len(arr)), key=lambda i: dom_size[i])
+        if ordering == "domain":
+            heuristic = [v.ub - v.lb + 1 for v in arr]
+        else:
+            heuristic = [0] * len(arr) # no heuristic, keep original order
+
+        ordering = sorted(range(len(arr)), key=heuristic.__getitem__)
         arr = [arr[i] for i in ordering]
         tab = tab[:, ordering]
         return arr, tab
 
-    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+    def decompose_linear(self, ordering:str="domain") -> tuple[list[Expression], list[Expression]]:
         """
         Linear-friendly decomposition of the Table global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
+        Based on: Bierlee, H., Piessens, W., Stuckey, P., & Guns, T. (2026). Table Constraints for Integer Programming. In Leibniz International Proceedings in Informatics. Schloss Dagstuhl -- Leibniz-Zentrum fuer Informatik.
 
          Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
          """
 
-        arr, tab = self._variable_ordering()
+        arr, tab = self._variable_ordering(ordering)
 
         transitions: set[tuple[int | str, int, int | str]] = set()
         mdd: dict[int, dict[int, int]] = {}
@@ -622,7 +627,7 @@ class Table(GlobalConstraint):
                 if i == len(row) - 1:
                     nxt = -1
                 else:
-                    if val not in mdd[current].keys():
+                    if val not in mdd[current]:
                         mdd[current][val] = count
                         count += 1
                     nxt = mdd[current][val]

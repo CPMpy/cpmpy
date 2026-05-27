@@ -185,6 +185,12 @@ class TestTransfDecomp:
         assert set(map(str, decompose_linear([cons]))) == \
                             {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3)
 
+        # supported="mdd", to avoid recursive decomposition
+        cons = cp.Table(x, [[1, 1], [2, 3]])
+        print(set(map(str, decompose_linear([cons]))))
+        assert set(map(str, decompose_linear([cons], supported={"mdd"}))) == \
+               {'mdd([a, b],[(1, 1, -1), (0, 2, 2), (2, 3, -1), (0, 1, 1)])'}
+
         # test count
         cons = cp.Count(x, 2) >= 1
         assert set(map(str, decompose_linear([cons]))) == \
