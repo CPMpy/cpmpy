@@ -80,7 +80,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, 
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
-from .int2bool import IntVarEncOrder, _encode_int_var
+from .int2bool import IntVarEncDirect, IntVarEncOrder, _encode_int_var
 
 
 
@@ -676,7 +676,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         return bv_map
 
     bv_maps = {
-        "==": encode_reified_comparisons(var_vals, "direct", lambda var, val: var.lb <= val <= var.ub),
+        "==": encode_reified_comparisons(var_vals, "direct", lambda var, val: var.lb <= val <= var.ub, IntVarEncDirect),
         ">=": encode_reified_comparisons(var_bounds, "order", lambda var, val: var.lb < val <= var.ub, IntVarEncOrder),
     }
 
