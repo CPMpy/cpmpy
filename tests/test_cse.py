@@ -43,21 +43,48 @@ class TestCSE:
         
 
         # should also work for Boolean variables (introduce reification)
-        nested_cons = (x + y + z <= 10) | (cp.AllDifferent(x,y,z))
+        nested_cons = (x + y + z >= 11) | (cp.AllDifferent(x,y,z))
         flat_cons = flatten_constraint(nested_cons, csemap=csemap)
         
         assert len(flat_cons) == 3
         
         assert str(flat_cons[0]) == "(BV0) or (BV1)"
-        assert str(flat_cons[1]) == "(sum(x, y, z) <= 10) == (BV0)"
+        assert str(flat_cons[1]) == "(sum(x, y, z) >= 11) == (BV0)"
         assert str(flat_cons[2]) == "(alldifferent(x,y,z)) == (BV1)"
         
         # next time we use x + y + z <= 10, it should replace it with BV0
-        nested_cons2 = ((x + y + z <= 10) ^ cp.boolvar(name="a"))
+        nested_cons2 = ((x + y + z >= 11) ^ cp.boolvar(name="a"))
         flat_cons = flatten_constraint(nested_cons2, csemap=csemap)
 
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "BV0 xor a"
+
+    def test_canonicalize_inequalities(self):
+        x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
+        csemap = CSEMap()
+
+        flat_cons = flatten_constraint((x > 5) | (y + z > 7), csemap=csemap)
+
+        assert len(flat_cons) == 3
+        assert str(flat_cons[0]) == "(BV0) or (BV1)"
+        assert str(flat_cons[1]) == "(x >= 6) == (BV0)"
+        assert str(flat_cons[2]) == "((y) + (z) >= 8) == (BV1)"
+        assert {str(expr): str(var) for expr, var in csemap.flat_map.items()} == {
+            "x >= 6": "BV0",
+            "(y) + (z) > 7": "BV1",
+            "(y) + (z) >= 8": "BV1",
+        }
+
+    def test_flat_reification_is_not_cse_canonicalized(self):
+        x = cp.intvar(0,10, name="x")
+        b = cp.boolvar(name="b")
+        csemap = CSEMap()
+
+        flat_cons = flatten_constraint((x > 5) == b, csemap=csemap)
+
+        assert len(flat_cons) == 1
+        assert str(flat_cons[0]) == "(x > 5) == (b)"
+        assert len(csemap) == 0
 
 
 
