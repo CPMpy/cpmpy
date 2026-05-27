@@ -724,14 +724,6 @@ class TestLinearizeReifiedVariablesThreshold:
         assert str(out) == "[(~BV[a >= 1]) or (~BV[a >= 3]) or (BV[a >= 3]), sum([1, -1] * (BV[a >= 2], BV[a >= 1])) <= 0, sum([1, -1] * (BV[a >= 3], BV[a >= 2])) <= 0]"
 
     @pytest.mark.xfail(reason="aspirational")
-    def test_linearize_reified_reversed_inequality(self):
-        """Use order encoding for reversed inequalities such as `1 >= a`."""
-        a = self.a
-        self.csemap = CSEMap()
-        out = linearize_reified_variables(self.linearize((1 >= a) | (a >= 3)), min_values=1, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[(~BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
-
-    @pytest.mark.xfail(reason="aspirational")
     def test_linearize_non_ocurring_int_var(self):
         """For an integer solver, we can omit the channelling constraint if the encoded integer variable does not occur in any constraint. Note: `a` and `b` are encoded (because at least 2 equality reifications occur), `c` is not encoded (no reifications). We see `b` occurs as an integer variable in a constraint, so channelling is required, but the int var `a` does not occur in any constraint, so no channelling is required. `c` is not encoded."""
         b, c = cp.intvar(1, 3, name="b"), cp.intvar(1, 3, name="c")
