@@ -766,9 +766,8 @@ try:
                 display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                             default/None: nothing displayed
                 solution_limit (default = None): stop after this many solutions 
-                events (set of str, default = {EVENT_SOLUTION}): the events to listen to, should be subset of the events listed by docplex.cp.solver.cpo_callback.ALL_CALLBACK_EVENTS
         """
-        def __init__(self, solver: CPM_cpo, display=None, solution_limit=None, verbose=False, events:set[str]={EVENT_SOLUTION}):
+        def __init__(self, solver: CPM_cpo, display=None, solution_limit=None, verbose=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
             # we only need the cpmpy->solver varmap from the solver
@@ -781,13 +780,12 @@ try:
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
                 self._cpm_vars = solver.user_vars
-            self.events = frozenset(events)
             self._cpm_solver = solver
 
         def invoke(self, solver:CpoSolver, event: str, sres:CpoSolveResult):
             """Invoke for each relevant event"""
-            if event not in self.events:
-                return # irrelevant events
+            if event != EVENT_SOLUTION:
+                return # irrelevant event
 
             if len(self._cpm_vars):
                 # populate values before printing
