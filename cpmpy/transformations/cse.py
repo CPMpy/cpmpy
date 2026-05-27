@@ -107,22 +107,23 @@ class CSEMap:
         if isinstance(expr, Comparison):
             lhs, rhs = expr.args
             if is_int(rhs):
-                if expr.name == "!=":
+                name = expr.name
+                if name == "!=":
                     # b <-> (expr != val) :: (~b) <-> (expr == val)
                     new_expr = Comparison("==", lhs, rhs)
                     new_expr._has_subexpr = expr._has_subexpr
                     return new_expr, True
-                elif expr.name == ">":
+                elif name == ">":
                     # b <-> (expr > val) :: b <-> (expr >= val + 1)
                     new_expr = Comparison(">=", lhs, rhs + 1)
                     new_expr._has_subexpr = expr._has_subexpr
                     return new_expr, False
-                elif expr.name == "<":
+                elif name == "<":
                     # b <-> (expr < val) :: (~b) <-> (expr >= val)
                     new_expr = Comparison(">=", lhs, rhs)
                     new_expr._has_subexpr = expr._has_subexpr
                     return new_expr, True
-                elif expr.name == "<=":
+                elif name == "<=":
                     # b <-> (expr <= val) :: (~b) <-> (expr > val) :: (~b) <-> (expr >= val + 1)
                     new_expr = Comparison(">=", lhs, rhs + 1)
                     new_expr._has_subexpr = expr._has_subexpr
