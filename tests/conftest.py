@@ -86,18 +86,24 @@ def _generate_inputs(generator, solvers):
     Generate inputs for a test based on a generator function and a list of solvers.
 
     Arguments:
-        generator (callable): A function that generates constraints for a given solver
+        generator (callable): A function that generates constraints for a given solver.
+            Can yield either raw expressions or (id, expression) tuples.
         solvers (list[str]): A list of solver names to generate constraints for
 
     Returns:
-        list[tuple[str, Any]]: A list of tuples, each containing a solver name and a constraint expression
+        list[pytest.param]: A list of pytest.param objects with solver, constraint, and unique IDs
     """
     result = []
     if solvers is None:
         installed_solvers = [name for name, solver in cp.SolverLookup.base_solvers() if solver.supported()]
         solvers = [installed_solvers[0]]
     for solver in solvers:
-        result += [(solver, expr) for expr in generator(solver)]
+        for item in generator(solver):
+            if isinstance(item, tuple) and len(item) == 2 and isinstance(item[0], str):
+                test_id, expr = item
+                result.append(pytest.param(solver, expr, id=f"{solver}-{test_id}-{expr}"))
+            else:
+                result.append(pytest.param(solver, item, id=f"{solver}-{item}"))
     return result
 
 
@@ -295,7 +301,7 @@ def pytest_generate_tests(metafunc):
     if constraint_generator_marker:
         # take generator callable from marker, generate input expressions, and parameterise test with result
         generator = constraint_generator_marker.args[0]
-        metafunc.parametrize(("solver","constraint"), list(_generate_inputs(generator, parsed_solvers)),  ids=str)
+        metafunc.parametrize(("solver","constraint"), _generate_inputs(generator, parsed_solvers))
         return   
     
     # Check parametrize markers (for tests parametrized via @pytest.mark.parametrize)
@@ -310,7 +316,7 @@ def pytest_generate_tests(metafunc):
                 #     return
                 if argnames == "generator":
                     generator = argvalues
-                    metafunc.parametrize(("solver","constraint"), list(_generate_inputs(generator)),  ids=str)
+                    metafunc.parametrize(("solver","constraint"), _generate_inputs(generator, None))
             elif isinstance(argnames, (tuple, list)):
                 if "solver" in argnames:
                     return
