@@ -101,7 +101,7 @@ class CSEMap:
     def _canonicalize_boolexpr(self, expr: Expression) -> tuple[Expression, bool]:
         """
         Canonicalize any comparison between an expression `expr` and a constant `const`, results in more hits in the flat_map.
-        
+        All comparisons are canonicalized to `==` or `>=`.
         """
 
         if isinstance(expr, Comparison):
@@ -117,15 +117,16 @@ class CSEMap:
                     new_expr = Comparison(">=", lhs, rhs + 1)
                     new_expr._has_subexpr = expr._has_subexpr
                     return new_expr, False
-                elif expr.name == "<=":
-                    # b <-> (expr <= val) :: (~b) <-> (expr >= val + 1)
-                    new_expr = Comparison(">=", lhs, rhs + 1)
-                    new_expr._has_subexpr = expr._has_subexpr
-                    return new_expr, True
                 elif expr.name == "<":
                     # b <-> (expr < val) :: (~b) <-> (expr >= val)
                     new_expr = Comparison(">=", lhs, rhs)
                     new_expr._has_subexpr = expr._has_subexpr
                     return new_expr, True
+                elif expr.name == "<=":
+                    # b <-> (expr <= val) :: (~b) <-> (expr > val) :: (~b) <-> (expr >= val + 1)
+                    new_expr = Comparison(">=", lhs, rhs + 1)
+                    new_expr._has_subexpr = expr._has_subexpr
+                    return new_expr, True
+                
 
         return expr, False
