@@ -2310,7 +2310,10 @@ class DirectConstraint(Expression):
         for i in range(len(solver_args)):
             if self.novar is None or i not in self.novar:
                 # it may contain variables, replace
-                solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
+                if is_any_list(solver_args[i]):
+                    solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
+                else:
+                    solver_args[i] = CPMpy_solver.solver_var(solver_args[i])
         # len(native_args) should match nr of arguments of `native_function`
         return solver_function(*solver_args)
 
