@@ -100,8 +100,17 @@ class CSEMap:
 
     def _canonicalize_boolexpr(self, expr: Expression) -> tuple[Expression, bool]:
         """
-        Canonicalize any comparison between an expression `expr` and a constant `const`, results in more hits in the flat_map.
-        
+        Return a CSE key for Boolean comparisons and whether that key must be negated.
+
+        Numeric disequalities against integer constants are stored as the negation
+        of the matching equality, e.g. ``x != v`` reuses ``x == v``.
+
+        Integer-variable threshold literals are stored in order-encoding form
+        ``x >= v`` where possible, e.g. ``x > v`` becomes ``x >= v+1`` and
+        ``x < v`` becomes the negation of ``x >= v``.
+
+        This is not a general Boolean simplifier; expressions that are already flat
+        may bypass CSE canonicalization.
         """
 
         if isinstance(expr, Comparison):
