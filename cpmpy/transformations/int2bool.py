@@ -236,13 +236,6 @@ class IntVarEnc(ABC):
                 k += weight
         return k
 
-    def encode_value_constraint(self):
-        """Return constraint linking the original integer variable to its Boolean encoding."""
-        terms, k = self.encode_term()
-        weights = [1] + [-w for (w, _) in terms]
-        variables = [self._x] + [b for (_, b) in terms]
-        return Operator("wsum", (weights, variables)) == k
-
     @abstractmethod
     def encode_domain_constraint(self):
         """

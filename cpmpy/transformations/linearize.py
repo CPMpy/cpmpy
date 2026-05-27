@@ -80,7 +80,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, 
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
-from .int2bool import IntVarEncDirect, IntVarEncOrder, _encode_int_var
+from .int2bool import IntVarEncDirect, IntVarEncOrder, _encode_int_var, _encode_lin_expr
 
 
 
@@ -666,10 +666,14 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             if len(vals) < min_values:
                 continue  # do not encode
 
-            enc, domain_constraint = _encode_int_var(my_ivarmap, var, encoding, csemap=csemap)
+            _, domain_constraint = _encode_int_var(my_ivarmap, var, encoding, csemap=csemap)
             toplevel.extend(domain_constraint)
             if ivarmap is None:
-                toplevel.append(enc.encode_value_constraint())
+                terms, extra_domain_constraints, k = _encode_lin_expr(my_ivarmap, [var], [1], encoding, csemap=csemap)
+                assert extra_domain_constraints == []
+                weights = [1] + [-w for (w, _) in terms]
+                variables = [var] + [b for (_, b) in terms]
+                toplevel.append(Operator("wsum", (weights, variables)) == k)
 
             for val, bv in vals:
                 bv_map[bv] = (var, val)
