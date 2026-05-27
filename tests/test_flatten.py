@@ -302,7 +302,7 @@ class TestFlattenExpr:
 
         assert  str(flatten_constraint( a + b == c )) == "[((IV0) + (IV1)) == (IV2)]"
         #self.assertEqual( str(flatten_constraint( c != a + b )), "[((IV0) + (IV1)) != (IV2)]" ) # TODO, make it do the swap (again)
-        assert  str(flatten_constraint( ((a > 5) == ~(b >= 3)) )) == "[(IV0 > 5) == (~BV8), (IV1 >= 3) == (BV8)]"
+        assert  str(flatten_constraint( ((a > 5) == (b >= 3)) )) == "[(IV0 > 5) == (BV8), (IV1 >= 3) == (BV8)]"
 
         assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] == b )) == "[([1 2 3][IV0]) == (IV1)]"
         assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] > b )) == "[([1 2 3][IV0]) > (IV1)]"

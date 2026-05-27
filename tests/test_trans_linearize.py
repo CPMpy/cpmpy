@@ -642,14 +642,6 @@ class TestLinearizeReifiedVariablesThreshold:
 
         assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1, (BV[a == 3]) or (BV[a == 2])]"
 
-    
-    def test_linearize_reified_inequalities_variations(self):
-        """Use order encoding on inequalities and replace other types of inequality expressions"""
-        a = self.a
-        self.csemap = CSEMap()
-        out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a < 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[or(~BV2, ~BV3, ~BV3), (a >= 2) == (BV2), (a >= 3) == (BV3)]"
-
     # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
     @pytest.mark.xfail(reason="aspirational")
     def test_linearize_reified_disequalities(self):
@@ -658,6 +650,13 @@ class TestLinearizeReifiedVariablesThreshold:
         out = linearize_reified_variables(self.linearize((a != 1) | (a != 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
         assert str(out) == "[(~BV[a == 1]) or (~BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1]"
 
+    def test_linearize_reified_inequalities_variations(self):
+        """Use order encoding on inequalities and replace other types of inequality expressions"""
+        a = self.a
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a < 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == "[or(~BV2, ~BV3, ~BV3), (a >= 2) == (BV2), (a >= 3) == (BV3)]"
+        
     @pytest.mark.xfail(reason="aspirational")
     def test_linearize_non_ocurring_int_var(self):
         """For an integer solver, we can omit the channelling constraint if the encoded integer variable does not occur in any constraint. Note: `a` and `b` are encoded (because at least 2 equality reifications occur), `c` is not encoded (no reifications). We see `b` occurs as an integer variable in a constraint, so channelling is required, but the int var `a` does not occur in any constraint, so no channelling is required. `c` is not encoded."""

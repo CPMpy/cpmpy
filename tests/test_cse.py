@@ -60,20 +60,71 @@ class TestCSE:
         assert str(flat_cons[0]) == "BV0 xor a"
 
     def test_canonicalize_inequalities(self):
-        x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
-        csemap = CSEMap()
+        cases = [
+            (
+                lambda x, y, z: (x > 5) | (y + z > 7),
+                [
+                    "(BV0) or (BV1)",
+                    "(x >= 6) == (BV0)",
+                    "((y) + (z) >= 8) == (BV1)",
+                ],
+                {
+                    "x >= 6": "BV0",
+                    "(y) + (z) >= 8": "BV1",
+                    "(y) + (z) > 7": "BV1",
+                },
+            ),
+            (
+                lambda x, y, z: (x >= 6) | (y + z >= 8),
+                [
+                    "(BV0) or (BV1)",
+                    "(x >= 6) == (BV0)",
+                    "((y) + (z) >= 8) == (BV1)",
+                ],
+                {
+                    "x >= 6": "BV0",
+                    "(y) + (z) >= 8": "BV1",
+                },
+            ),
+            (
+                lambda x, y, z: (x < 6) | (y + z < 8),
+                [
+                    "(~BV0) or (~BV1)",
+                    "(x >= 6) == (BV0)",
+                    "((y) + (z) >= 8) == (BV1)",
+                ],
+                {
+                    "x >= 6": "BV0",
+                    "(y) + (z) >= 8": "BV1",
+                    "(y) + (z) < 8": "~BV1",
+                },
+            ),
+            (
+                lambda x, y, z: (x <= 5) | (y + z <= 7),
+                [
+                    "(~BV0) or (~BV1)",
+                    "(x >= 6) == (BV0)",
+                    "((y) + (z) >= 8) == (BV1)",
+                ],
+                {
+                    "x >= 6": "BV0",
+                    "(y) + (z) >= 8": "BV1",
+                    "(y) + (z) <= 7": "~BV1",
+                },
+            ),
+        ]
 
-        flat_cons = flatten_constraint((x > 5) | (y + z > 7), csemap=csemap)
+        for expr, expected_cons, expected_csemap in cases:
+            _IntVarImpl.counter = 0
+            _BoolVarImpl.counter = 0
+            x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
+            csemap = CSEMap()
 
-        assert len(flat_cons) == 3
-        assert str(flat_cons[0]) == "(BV0) or (BV1)"
-        assert str(flat_cons[1]) == "(x >= 6) == (BV0)"
-        assert str(flat_cons[2]) == "((y) + (z) >= 8) == (BV1)"
-        assert {str(expr): str(var) for expr, var in csemap.flat_map.items()} == {
-            "x >= 6": "BV0",
-            "(y) + (z) > 7": "BV1",
-            "(y) + (z) >= 8": "BV1",
-        }
+            flat_cons = flatten_constraint(expr(x, y, z), csemap=csemap)
+
+            assert len(flat_cons) == 3
+            assert [str(con) for con in flat_cons] == expected_cons
+            assert {str(expr): str(var) for expr, var in csemap.flat_map.items()} == expected_csemap
 
     def test_flat_reification_is_not_cse_canonicalized(self):
         x = cp.intvar(0,10, name="x")
