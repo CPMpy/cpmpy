@@ -1230,6 +1230,30 @@ def test_scip_special_cardinality():
     assert bvs.value().sum() <= 3
 
 
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_cumulative_native():
+    if not hasattr(CPM_scip().scip_model, "addConsCumulative"):
+        pytest.skip("PySCIPOpt without addConsCumulative")
+
+    start = cp.intvar(0, 10, shape=3)
+    model = cp.Model(cp.Cumulative(start, [3, 2, 2], demand=[2, 3, 1], capacity=3))
+    s = cp.SolverLookup.get("scip", model)
+    assert any(c.getConshdlrName() == "cumulative" for c in s.scip_model.getConss())
+    assert s.solve()
+
+
+@pytest.mark.skipif(not CPM_scip.supported(), reason="Scip not installed")
+def test_scip_no_overlap_native():
+    if not hasattr(CPM_scip().scip_model, "addConsCumulative"):
+        pytest.skip("PySCIPOpt without addConsCumulative")
+
+    start = cp.intvar(0, 10, shape=3)
+    model = cp.Model(cp.NoOverlap(start, [2, 1, 1]))
+    s = cp.SolverLookup.get("scip", model)
+    assert any(c.getConshdlrName() == "cumulative" for c in s.scip_model.getConss())
+    assert s.solve()
+
+
 @pytest.mark.skipif(not CPM_highs.supported(), reason="HiGHS (highspy) not installed")
 def test_highs_basic_ilp():
     # simple ILP: 0 <= x <= 10, 0 <= y <= 10, x + 2y >= 10, minimize x + y

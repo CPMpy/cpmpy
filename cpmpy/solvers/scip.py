@@ -29,9 +29,9 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
+from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_num, is_true_cst, is_false_cst
+from ..expressions.utils import is_num, is_true_cst, is_false_cst, get_nonneg_args
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -60,10 +60,12 @@ class CPM_scip(SolverInterface):
     # Globals we keep and how they are translated in add():
     # - "xor": addConsXor();
     # - "abs": addCons(abs(x) <= k);
-    # - "mul": addCons(mul == rhs).
+    # - "mul": addCons(mul == rhs);
+    # - "cumulative": addConsCumulative() when dur/demand/cap are fixed integers;
+    # - "no_overlap": addConsCumulative() with demand=1, capacity=1.
     # No native "div": PySCIPOpt uses real division, which does not match CPMpy integer division
     # (round toward zero); same rationale as Gurobi — decompose via Division.decompose().
-    supported_global_constraints = frozenset({"xor", "abs", "mul"})
+    supported_global_constraints = frozenset({"xor", "abs", "mul", "cumulative", "no_overlap"})
     supported_reified_global_constraints = frozenset()
 
     @staticmethod
@@ -362,6 +364,48 @@ class CPM_scip(SolverInterface):
 
                 # post constraint (note: `addConsXor` is tested to work for empty lists)
                 self.scip_model.addConsXor(scip_args, rhsvar)
+
+            elif cpm_expr.name == "cumulative":
+                if len(cpm_expr.args) == 4:
+                    start, dur, demand, cap = cpm_expr.args
+                    end = None
+                else:
+                    start, dur, end, demand, cap = cpm_expr.args
+
+                if not hasattr(self.scip_model, "addConsCumulative"):
+                    for c in self.transform(cpm_expr.decompose()[0]):
+                        self._add_transformed_constraint(c)
+                    return
+
+                dur, dur_cons = get_nonneg_args(dur)
+                demand, demand_cons = get_nonneg_args(demand)
+                for c in self.transform(dur_cons + demand_cons):
+                    self._add_transformed_constraint(c)
+
+                if end is not None:
+                    for c in self.transform([s + d == e for s, d, e in zip(start, dur, end)]):
+                        self._add_transformed_constraint(c)
+
+                if not (all(is_num(d) for d in dur) and all(is_num(h) for h in demand) and is_num(cap)):
+                    for c in self.transform(cpm_expr.decompose()[0]):
+                        self._add_transformed_constraint(c)
+                    return
+
+                self.scip_model.addConsCumulative(
+                    self.solver_vars(start),
+                    [int(d) for d in dur],
+                    [int(h) for h in demand],
+                    int(cap),
+                )
+
+            elif cpm_expr.name == "no_overlap":
+                if len(cpm_expr.args) == 2:
+                    start, dur = cpm_expr.args
+                    self._add_transformed_constraint(Cumulative(start, dur, demand=1, capacity=1))
+                else:
+                    start, dur, end = cpm_expr.args
+                    self._add_transformed_constraint(Cumulative(start, dur, end, demand=1, capacity=1))
+
             else:
                 raise NotImplementedError(
                     f"SCIP does not translate global constraint '{cpm_expr.name}' natively; "
