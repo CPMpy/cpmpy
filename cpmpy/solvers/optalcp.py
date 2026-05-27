@@ -54,6 +54,71 @@ from ..transformations.decompose_global import decompose_in_tree, decompose_obje
 from ..transformations.safening import no_partial_functions
 
 
+def _same_expression(lhs, rhs):
+    """Return whether two CPMpy expressions refer to the same syntactic expression."""
+    return lhs is rhs or (type(lhs) is type(rhs) and repr(lhs) == repr(rhs))
+
+
+def _strip_presence_factor(expr, presence):
+    """
+    Strip `presence` from simple demand expressions like `presence * height`.
+
+    Returns the stripped expression when `expr` is a direct multiplication by
+    `presence`, otherwise returns `expr` unchanged.
+    """
+    if _same_expression(expr, presence):
+        return 1
+
+    if getattr(expr, "name", None) != "mul" or len(expr.args) != 2:
+        return expr
+
+    lhs, rhs = expr.args
+    if _same_expression(lhs, presence):
+        return rhs
+    if _same_expression(rhs, presence):
+        return lhs
+    return expr
+
+
+def _extract_guarded_demands(demand):
+    """
+    Detect simple `presence * height` cumulative demands.
+
+    Returns `(is_present, stripped_demand)`. If no guarded demand is found,
+    `is_present` is `None`.
+    """
+    is_present = []
+    stripped_demand = []
+    found_guard = False
+
+    for expr in demand:
+        if isinstance(expr, _BoolVarImpl):
+            is_present.append(expr)
+            stripped_demand.append(1)
+            found_guard = True
+            continue
+
+        if getattr(expr, "name", None) == "mul" and len(expr.args) == 2:
+            lhs, rhs = expr.args
+            if isinstance(lhs, _BoolVarImpl):
+                is_present.append(lhs)
+                stripped_demand.append(rhs)
+                found_guard = True
+                continue
+            if isinstance(rhs, _BoolVarImpl):
+                is_present.append(rhs)
+                stripped_demand.append(lhs)
+                found_guard = True
+                continue
+
+        is_present.append(BoolVal(True))
+        stripped_demand.append(expr)
+
+    if not found_guard:
+        return None, demand
+    return is_present, stripped_demand
+
+
 class CPM_optalcp(SolverInterface):
     """
     Interface to OptalCP's Python API.
@@ -516,12 +581,26 @@ class CPM_optalcp(SolverInterface):
             else:
                 start, dur, end, demand, capacity, is_present = cpm_con.args
 
-        # create interval variables and linking constraints for each task
-        tasks, cons = self._make_tasks(start, dur, end, is_present)
+        if is_present is None:
+            is_present, demand = _extract_guarded_demands(demand)
+            cons = []
+            if is_present is not None:
+                # `Cumulative` enforces task consistency unconditionally, even
+                # when a guarded demand lets us model the pulse as optional.
+                _, dur_cons = get_nonneg_args(dur)
+                cons += self._opt_expr(dur_cons)
+                if end is not None:
+                    cons += self._opt_expr([s + d == e for s, d, e in zip(start, dur, end)])
+        else:
+            demand = [_strip_presence_factor(h, p) for h, p in zip(demand, is_present)]
+            cons = []
 
-        # get_nonneg_args strips the presence multiplication from demand expressions
-        # (e.g. bv * [2,3,4] -> [2,3,4]) since the optional interval var already
-        # contributes 0 pulse when absent — no need to encode it in the demand
+        # create interval variables and linking constraints for each task
+        tasks, task_cons = self._make_tasks(start, dur, end, is_present)
+        cons += task_cons
+
+        # Presence multipliers that match the optional interval have been stripped
+        # above; the optional interval already contributes 0 pulse when absent.
         demand_lst, demand_cons = get_nonneg_args(demand, is_present)
         cons += self._opt_expr(demand_cons)
 
@@ -630,7 +709,7 @@ class CPM_optalcp(SolverInterface):
 
         if is_optional:
             # tie the interval's presence status to the CPMpy boolean variable
-            extra_cons.append(task.presence() == self.solver_var(is_present))
+            extra_cons.append(task.presence() == self._opt_expr(is_present))
             # when present, link start/length/end to the CPMpy expressions via implications
             # so that the solver correctly propagates values from interval to CPMpy variables
             extra_cons.append(self.opt_model.implies(task.presence(), task.start() == self._opt_expr(start)))
