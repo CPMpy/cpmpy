@@ -51,29 +51,17 @@ class CSEMap:
         """Get the decomposition of the given global constraint or global function."""
         return self.decomp_map.get(expr, default)
 
-    def get_reified_varvals(self) -> dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]:
-        """collect all bv <-> var == val expressions in flat_map"""
+    def get_reified_comparisons(self, cmp) -> dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]:
+        """collect all bv <-> var cmp val expressions in flat_map, where cmp can be `==` or `>=`"""
         
         var_vals = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var: [val, bv]
         for expr, bv in self.flat_map.items():
-            if expr.name == "==":
+            if expr.name == cmp:
                 var, val = expr.args
                 if isinstance(var, _IntVarImpl) and is_int(val):
                     var_vals.setdefault(var, []).append((val, bv))
 
         return var_vals
-
-    def get_reified_varbounds(self) -> dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]:
-        """collect all bv <-> var >= val expressions in flat_map"""
-
-        var_bounds = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var: [val, bv]
-        for expr, bv in self.flat_map.items():
-            if expr.name == ">=":
-                var, val = expr.args
-                if isinstance(var, _IntVarImpl) and is_int(val):
-                    var_bounds.setdefault(var, []).append((val, bv))
-
-        return var_bounds
 
     def get_or_make_var(self, expr: Expression) -> tuple[_IntVarImpl, Optional[Expression]]:
         """

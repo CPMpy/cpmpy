@@ -642,75 +642,54 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
+    assert min_values > 0
+    
     # this transformation can only be done if there is a csemap
     if csemap is None:
         return constraints
 
-    var_vals = csemap.get_reified_varvals()
-    var_bounds = csemap.get_reified_varbounds()
+    var_vals = csemap.get_reified_comparisons("==")
+    var_bounds = csemap.get_reified_comparisons(">=")
     
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
     toplevel = []
-    bv_map = {}  # bv -> (var, val)
-    for var, vals in var_vals.items():
-        # check if we should linearize the reified variables
-        lb, ub = var.lb, var.ub
-        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
-        if len(vals) < min_values:
-            continue  # do not encode
+    
+    def encode_reified_comparisons(var_comparisons, encoding, valid_value, existing_encoding=None):
+        bv_map = {}  # bv -> (var, val)
+        for var, vals in var_comparisons.items():
+            if (existing_encoding is not None and var.name in my_ivarmap
+                    and not isinstance(my_ivarmap[var.name], existing_encoding)):
+                continue  # another encoding already represents this variable
 
-        # encode the values
-        enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
-        
-        # domain and channeling constraints
-        toplevel.extend(domain_constraint) # with the overwritten Bools
-        if ivarmap is None:
-            # also post the var=wsum mapping
-            terms, k = enc.encode_term()
-            # var == wsum + k :: var - wsum == k
-            ws = [1] + [-w for (w, _) in terms]
-            bs = [var] + [b for (_, b) in terms]
-            toplevel.append(Operator("wsum", (ws, bs)) == k)  
-        
-        # store the bvs that no longer need to be reified
-        for val, bv in vals:
-            bv_map[bv] = (var, val)
+            vals = [(val, bv) for val, bv in vals if valid_value(var, val)]
+            if len(vals) < min_values:
+                continue  # do not encode
 
-    bound_bv_map = {}  # bv -> (var, val)
-    for var, vals in var_bounds.items():
-        if var.name in my_ivarmap and not isinstance(my_ivarmap[var.name], IntVarEncOrder):
-            continue  # another encoding already represents this variable
+            enc, domain_constraint = _encode_int_var(my_ivarmap, var, encoding, csemap=csemap)
+            toplevel.extend(domain_constraint)
+            if ivarmap is None:
+                toplevel.append(enc.encode_value_constraint())
 
-        if len(vals) < min_values:
-            continue  # do not encode
+            for val, bv in vals:
+                bv_map[bv] = (var, val)
+        return bv_map
 
-        lb, ub = var.lb, var.ub
-        # order encoding has one Boolean per non-trivial lower bound threshold
-        vals = [(val, bv) for val, bv in vals if lb < val <= ub]
-        if len(vals) == 0:
-            continue  # do not encode
+    bv_maps = {
+        "==": encode_reified_comparisons(var_vals, "direct", lambda var, val: var.lb <= val <= var.ub),
+        ">=": encode_reified_comparisons(var_bounds, "order", lambda var, val: var.lb < val <= var.ub, IntVarEncOrder),
+    }
 
-        _, domain_constraint = _encode_int_var(my_ivarmap, var, "order", csemap=csemap)
-        toplevel.extend(domain_constraint)
-
-        for val, bv in vals:
-            bound_bv_map[bv] = (var, val)
-
-    if len(bv_map) > 0 or len(bound_bv_map) > 0:
+    if any(len(bv_map) > 0 for bv_map in bv_maps.values()):
         # Now clean up and remove the '(var == val) == bv' and '(var >= val) == bv' constraints:
         newcons = []
         for con in constraints:
-            if con.name == '==' and con.args[0].name in {'==', '>='}:
+            if con.name == '==' and con.args[0].name in bv_maps:
                 # potential '(var == val) == bv' or '(var >= val) == bv'
-                lhs,bv = con.args
-                if lhs.name == '==' and bv in bv_map:
-                    (var, val) = bv_map[bv]
-                    (lhs_var, lhs_val) = lhs.args
-                    if lhs_val == val and lhs_var == var:
-                        continue  # do not keep
-                elif lhs.name == '>=' and bv in bound_bv_map:
-                    (var, val) = bound_bv_map[bv]
+                lhs, bv = con.args
+                bv_map = bv_maps[lhs.name]
+                if bv in bv_map:
+                    var, val = bv_map[bv]
                     (lhs_var, lhs_val) = lhs.args
                     if lhs_val == val and lhs_var == var:
                         continue  # do not keep
