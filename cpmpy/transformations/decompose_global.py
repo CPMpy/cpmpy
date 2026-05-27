@@ -19,7 +19,7 @@ This allows to post the decomposed expression tree to the solver if it supports 
 """
 
 import copy
-from typing import AbstractSet, Optional, Dict, Any, Callable, TypeAlias, cast
+from typing import AbstractSet, Optional, Dict, Any, Callable, Protocol, cast, overload
 import numpy as np
 
 from .cse import CSEMap
@@ -28,14 +28,18 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import NDVarArray, cpm_array
 
-CustomDecompose: TypeAlias = Callable[[GlobalConstraint|GlobalFunction], tuple[list[Expression], list[Expression]]]
+class CustomDecomp(Protocol):
+    @overload
+    def __call__(self, expr: GlobalConstraint, /) -> tuple[list[Expression], list[Expression]]: ...
+    @overload
+    def __call__(self, expr: GlobalFunction, /) -> tuple[Expression, list[Expression]]: ...
 
 def decompose_in_tree(lst_of_expr: list[Expression],
                       supported: Optional[AbstractSet[str]] = None,
                       supported_reified: Optional[AbstractSet[str]] = None,
                       _toplevel=None, nested=False,
                       csemap: Optional[CSEMap] = None,
-                      decompose_custom: Optional[Dict[str, CustomDecompose]] = None) -> list[Expression]:
+                      decompose_custom: Optional[Dict[str, CustomDecomp]] = None) -> list[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
 
@@ -116,7 +120,7 @@ def decompose_objective(expr: Expression,
                         supported: Optional[AbstractSet[str]] = None,
                         supported_reified: Optional[AbstractSet[str]] = None,
                         csemap: Optional[CSEMap] = None,
-                        decompose_custom: Optional[Dict[str, Callable]]=None) -> tuple[Expression, list[Expression]]:
+                        decompose_custom: Optional[Dict[str, CustomDecomp]]=None) -> tuple[Expression, list[Expression]]:
     """
     Decompose any global constraint or global function not supported by the solver
     in the objective function expression (numeric or global).
@@ -154,7 +158,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                             supported: AbstractSet[str],
                             supported_reified: AbstractSet[str],
                             csemap: Optional[CSEMap]=None,
-                            decompose_custom:Optional[Dict[str, Callable]]=None) -> tuple[bool, list[Any]|tuple[Any], list[Expression]]:
+                            decompose_custom:Optional[Dict[str, CustomDecomp]]=None) -> tuple[bool, list[Any]|tuple[Any], list[Expression]]:
     """
     Well-typed recursive helper function to decompose unsupported global constraints
     and global functions in the arguments of an Expression.  
