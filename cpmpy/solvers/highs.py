@@ -158,21 +158,6 @@ class CPM_highs(SolverInterface):
 
         return self._varmap[cpm_var.name]
 
-    def solver_vars_1d(self, cpm_vars):
-        """
-           Faster `solver_vars()` for 1 dimensional iterables of ExprLikes
-        """
-        res = []
-        for cpm_var in cpm_vars:
-            solver_var = self._varmap.get(cpm_var.name, None)
-            if solver_var is not None:
-                # fast path
-                res.append(solver_var)
-            else:
-                # slow path, will check the varmap again
-                res.append(self.solver_var(cpm_var))
-        return res
-
     def _row_from_linexpr(self, linexpr) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
         """
         Convert a flat linear numeric expression (var/sum/wsum)
@@ -194,12 +179,12 @@ class CPM_highs(SolverInterface):
         elif isinstance(linexpr, Operator):  # sum or wsum (vars only in operand lists)
             coeffs: npt.NDArray[np.float64]
             if linexpr.name == "sum":
-                solvars = self.solver_vars_1d(linexpr.args)
+                solvars = self.solver_vars(linexpr.args)
                 idx = np.array(solvars, dtype=np.int32)
                 coeffs = np.ones(idx.size, dtype=np.float64)
             elif linexpr.name == "wsum":
                 ws, vs = linexpr.args
-                solvars = self.solver_vars_1d(vs)
+                solvars = self.solver_vars(vs)
                 idx = np.array(solvars, dtype=np.int32)
                 coeffs = np.asarray(ws, dtype=np.float64)
             else:
@@ -357,7 +342,7 @@ class CPM_highs(SolverInterface):
         import highspy
 
         # ensure all vars are known to solver
-        self.solver_vars_1d(self.user_vars)
+        self.solver_vars(self.user_vars)
 
         # edge case, empty model, ensure the solver has something to solve
         if not len(self.user_vars):
