@@ -44,6 +44,8 @@
 
 from typing import Optional
 import warnings
+import time
+
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
@@ -162,7 +164,7 @@ class CPM_cpo(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds
-                solution_callback:              a ``docplex.cp.solver.solver_listener.CpoSolverListener`` object)
+                solution_callback:              a ``docplex.cp.solver.solver_listener.CpoSolverListener`` or ``docplex.cp.solver.cpo_callback.CpoCallback`` object, or a list thereof
                                                 Takes precedence over ``display`` when both are set.
                 display:                        generic solution callback for use during optimization.
                                                 either a list of CPMpy expressions, OR a callback function which
@@ -204,20 +206,30 @@ class CPM_cpo(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        callback = None
-        if solution_callback is not None:
-            callback = solution_callback
-        elif display is not None:
-            callback = CpoSolutionPrinter(self, display)
-
         # create solver object
         self.cpo_solver = docp.solver.solver.CpoSolver(
             self.cpo_model,
             TimeLimit=time_limit,
             **kwargs,
         )
+
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
+            if not isinstance(callback, list):
+                callback = [callback]
+        elif display is not None:
+            callback = [CpoSolutionPrinter(self, display)]
+
         if callback is not None:
-            self.cpo_solver.add_callback(callback)
+            for cb in callback:
+                if isinstance(cb, CpoSolverListener):
+                    self.cpo_solver.add_listener(cb)
+                    # By default `solve()` only notifies listeners once with the final/best result.
+                    # Enable search_next mode so listeners are warned about every intermediate solution.
+                    self.cpo_solver.set_solve_with_search_next(True)
+                if isinstance(cb, CpoCallback):
+                    self.cpo_solver.add_callback(cb)
 
         self.cpo_result = self.cpo_solver.solve()
 
@@ -704,10 +716,9 @@ class CPM_cpo(SolverInterface):
 # even if cpo is not installed...
 try:
     from docplex.cp.solver.cpo_callback import CpoCallback, EVENT_SOLUTION
+    from docplex.cp.solver.solver_listener import CpoSolverListener
     from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
-    from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
-    import time
-    class CpoSolutionCounter(CpoCallback):
+    class CpoSolutionCounter(CpoSolverListener):
         """
             verbose (bool, default: False): whether to print info on every solution found 
     """
@@ -719,17 +730,18 @@ try:
             if self.__verbose:
                 self.__start_time = time.time()
 
-        def invoke(self, solver: CpoSolver, event:str, sres:CpoSolveResult):
-            """Keep track of solution count"""
-            if event != EVENT_SOLUTION:
-                return# irrelevant event
+        def result_found(self, solver: CpoSolver, sres: CpoSolveResult):
+            """Keep track of solution count, invoked for each solution"""
+            if not sres.is_new_solution():
+                return # ignore non-new solutions
+
             if self.__verbose:
                 current_time = time.time()
                 obj = sres.get_objective_value()
                 print('Solution %i, time = %0.2f s, objective = %i' %
                       (self.__solution_count, current_time - self.__start_time, obj))
             self.__solution_count += 1
-
+        
         def solution_count(self):
             """Returns the number of solutions found."""
             return self.__solution_count
@@ -782,10 +794,10 @@ try:
                 self._cpm_vars = solver.user_vars
             self._cpm_solver = solver
 
-        def invoke(self, solver:CpoSolver, event: str, sres:CpoSolveResult):
-            """Invoke for each relevant event"""
-            if event != EVENT_SOLUTION:
-                return # irrelevant event
+        def result_found(self, solver:CpoSolver, sres:CpoSolveResult):
+            
+            if not sres.is_new_solution():
+                return # ignore non-new solutions
 
             if len(self._cpm_vars):
                 # populate values before printing
