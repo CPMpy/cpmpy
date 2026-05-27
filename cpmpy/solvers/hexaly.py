@@ -258,7 +258,7 @@ class CPM_hexaly(SolverInterface):
             return ~self.solver_var(cpm_var._bv)
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 revar = self.hex_model.bool()
             elif isinstance(cpm_var, _IntVarImpl):
@@ -267,10 +267,10 @@ class CPM_hexaly(SolverInterface):
                 raise NotImplementedError("Not a known var {}".format(cpm_var))
             # set name of variable
             revar.set_name(str(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
         # return from cache
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
 
     def objective(self, expr, minimize=True):
@@ -562,14 +562,7 @@ class HexSolutionPrinter:
                 if self._solver.has_objective():
                     self._solver.objective_value_ = int(hex_sol.get_objective_bound(0))
 
-                # display
-                if isinstance(self._display, Expression):
-                    print(self._display.value())
-                elif is_any_list(self._display):
-                    print(argvals(self._display))
-                else:
-                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {self._display} of type {type(self._display)}"
-                    self._display()  # callback
+                self._solver.print_display(self._display)
                 
             # update data
             self.__solution_count += 1

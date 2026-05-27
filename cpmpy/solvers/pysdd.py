@@ -44,14 +44,14 @@
     ==============
 """
 from functools import reduce
-from typing import Optional, List
+from typing import Iterable, Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, BoolVal
 from ..expressions.variables import _BoolVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import is_bool, argval, argvals, is_any_list
+from ..expressions.utils import is_bool, argvals, is_any_list
 from ..transformations.decompose_global import decompose_in_tree
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list, simplify_boolean
@@ -135,7 +135,7 @@ class CPM_pysdd(SolverInterface):
         """
         return self.pysdd_root
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None):
+    def solve(self, time_limit:Optional[float]=None):
         """
             See if an arbitrary model exists
 
@@ -249,14 +249,7 @@ class CPM_pysdd(SolverInterface):
                 # fill in variable values
                 for i, cpm_var in enumerate(self.user_vars):
                     cpm_var._value = sol[i]
-
-                if isinstance(display, Expression):
-                    print(display.value())
-                elif is_any_list(display):
-                    print(argvals(display))
-                else:
-                    assert callable(display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    display()  # callback
+                self.print_display(display)
         
         return len(projected_sols)
 
@@ -271,7 +264,7 @@ class CPM_pysdd(SolverInterface):
             return -self.solver_var(cpm_var._bv)
 
         # create if it does not exist
-        if cpm_var not in self._varmap:
+        if cpm_var.name not in self._varmap:
             if isinstance(cpm_var, _BoolVarImpl):
                 # make new var, add at end (what is best here??)
                 self.pysdd_manager.add_var_after_last()
@@ -279,9 +272,9 @@ class CPM_pysdd(SolverInterface):
                 revar = self.pysdd_manager.vars[n]
             else:
                 raise NotImplementedError(f"CPM_pysdd: non-Boolean variable {cpm_var} not supported")
-            self._varmap[cpm_var] = revar
+            self._varmap[cpm_var.name] = revar
 
-        return self._varmap[cpm_var]
+        return self._varmap[cpm_var.name]
 
     def transform(self, cpm_expr):
         """

@@ -81,7 +81,7 @@ class AllDifferentLists(GlobalConstraint):
         """
         constraints = []
         for lst1, lst2 in all_pairs(self.args):
-            constraints += [cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2))]
+            constraints.append(cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2)))
         return constraints, []
 
     def value(self):
@@ -112,7 +112,7 @@ class AllDifferentListsExceptN(GlobalConstraint):
         """
         constraints = []
         for lst1, lst2 in all_pairs(self.args[0]):
-            constraints += [cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(NonReifiedTable(lst1, self.args[1]))]
+            constraints.append(cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(NonReifiedTable(lst1, self.args[1])))
         return constraints, []
 
     def value(self):
@@ -163,23 +163,23 @@ class SubCircuit(GlobalConstraint):
 
         # Constraining
         constraining = []
-        constraining += [AllDifferent(succ)] # All stops should have a unique successor.
+        constraining.append(AllDifferent(succ)) # All stops should have a unique successor.
         constraining += list( is_part_of_circuit.implies(succ < len(succ)) ) # Successor values should remain within domain.
         for i in range(0, n):
             # If a stop is on the subcircuit and it is not the last one, than its successor should have +1 as index.
-            constraining += [(is_part_of_circuit[i] & (i != end_node)).implies(
+            constraining.append((is_part_of_circuit[i] & (i != end_node)).implies(
                 index_within_subcircuit[succ[i]] == (index_within_subcircuit[i] + 1)
-            )]
+            ))
         constraining += list( is_part_of_circuit == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
 
         # Defining
         defining = []
-        defining += [ empty == cpm_all(succ == np.arange(n)) ] # Definition of empty subcircuit (all nodes self-loop)
-        defining += [ empty.implies(cpm_all(index_within_subcircuit == cpm_array([0]*n))) ] # If the subcircuit is empty, default all index values to 0
-        defining += [ empty.implies(start_node == 0) ] # If the subcircuit is empty, any node could be a start of a 0-length circuit. Default to node 0 as symmetry breaking.
-        defining += [succ[end_node] == start_node] # Definition of the last node. As the successor we should cycle back to the start.
-        defining += [ index_within_subcircuit[start_node] == 0 ] # The ordering starts at the start_node.
-        defining += [ ( empty | (is_part_of_circuit[start_node] == True) ) ] # The start node can only NOT belong to the subcircuit when the subcircuit is empty.
+        defining.append(empty == cpm_all(succ == np.arange(n))) # Definition of empty subcircuit (all nodes self-loop)
+        defining.append(empty.implies(cpm_all(index_within_subcircuit == cpm_array([0]*n)))) # If the subcircuit is empty, default all index values to 0
+        defining.append(empty.implies(start_node == 0)) # If the subcircuit is empty, any node could be a start of a 0-length circuit. Default to node 0 as symmetry breaking.
+        defining.append(succ[end_node] == start_node) # Definition of the last node. As the successor we should cycle back to the start.
+        defining.append(index_within_subcircuit[start_node] == 0) # The ordering starts at the start_node.
+        defining.append((empty | (is_part_of_circuit[start_node] == True))) # The start node can only NOT belong to the subcircuit when the subcircuit is empty.
         # Nodes which are not part of the subcircuit get an index fixed to +1 the index of "end_node", which equals the length of the subcircuit.
         # Nodes part of the subcircuit must have an index <= index_within_subcircuit[end_node].
         # The case of an empty subcircuit is an exception, since "end_node" itself is not part of the subcircuit
@@ -187,11 +187,11 @@ class SubCircuit(GlobalConstraint):
         # In a subcircuit any of the visited nodes can be the "start node", resulting in symmetrical solutions -> Symmetry breaking
         # Part of the formulation from the following is used: https://sofdem.github.io/gccat/gccat/Ccycle.html#uid18336
         subcircuit_visits = intvar(0, n-1, shape=n) # The visited nodes in sequence of length n, with possible repeated stops. e.g. subcircuit [0, 2, 1] -> [0, 2, 1, 0, 2, 1]
-        defining += [subcircuit_visits[0] == start_node] # The start nodes is the first stop
+        defining.append(subcircuit_visits[0] == start_node) # The start nodes is the first stop
         defining += [subcircuit_visits[i+1] == succ[subcircuit_visits[i]] for i in range(n-1)] # We follow the successor values
         # The free "start_node" could be any of the values of aux_subcircuit_visits (the actually visited nodes), resulting in degenerate solutions.
         # By enforcing "start_node" to take the smallest value, symmetry breaking is ensured.
-        defining += [start_node == cpm_min(subcircuit_visits)]
+        defining.append(start_node == cpm_min(subcircuit_visits))
 
         return constraining, defining
 
@@ -283,8 +283,8 @@ class SubCircuitWithStart(GlobalConstraint):
         succ = cpm_array(self.args[:-1]) # Successor variables
 
         constraining = []
-        constraining += [SubCircuit(succ)] # The successor variables should form a subcircuit.
-        constraining += [succ[start_index] != start_index] # The start_index should be inside the subcircuit.
+        constraining.append(SubCircuit(succ)) # The successor variables should form a subcircuit.
+        constraining.append(succ[start_index] != start_index) # The start_index should be inside the subcircuit.
 
         defining = []
 
@@ -831,8 +831,8 @@ class NoOverlap2d(GlobalConstraint):
         cons += [s + d == e for s,d,e in zip(start_y, dur_y, end_y)]
 
         for i,j in all_pairs(list(range(n))):
-            cons += [cpm_any([end_x[i] <= start_x[j], end_x[j] <= start_x[i],
-                              end_y[i] <= start_y[j], end_y[j] <= start_y[i]])]
+            cons.append(cpm_any([end_x[i] <= start_x[j], end_x[j] <= start_x[i],
+                                 end_y[i] <= start_y[j], end_y[j] <= start_y[i]]))
         return cons,[]
     def value(self):
         start_x, dur_x, end_x,  start_y, dur_y, end_y = argvals(self.args)
@@ -942,7 +942,7 @@ class DynamicCumulative(GlobalConstraint):
         if version == "time":
             # set duration of tasks
             for t in range(len(start)):
-                cons += [start[t] + duration[t] == end[t]]
+                cons.append(start[t] + duration[t] == end[t])
 
             # demand doesn't exceed capacity
             for t in range(lb,ub+1):
@@ -953,16 +953,18 @@ class DynamicCumulative(GlobalConstraint):
                     else:
                         demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
 
-                cons += [demand_at_t <= capacity]
+                cons.append(demand_at_t <= capacity)
                 
         elif version == "task":
 
             # set duration of tasks
+            ends = [start[t] + duration[t] for t in range(num_tasks)]
             for t in range(num_tasks):
-                cons += [start[t] + duration[t] == end[t]]
+                cons.append(ends[t] == end[t])
 
             for j in range(num_tasks):
-                cons += [capacity >= demand[j] + cp.sum([(start[i] <= start[j]) & (start[j] < start[i] + duration[i]) for i in range(num_tasks) if i != j])]
+                sj = start[j]
+                cons.append(capacity >= demand[j] + cp.sum([(start[i] <= sj) & (sj < ends[i]) for i in range(num_tasks) if i != j]))
 
         return cons, []
 
