@@ -19,7 +19,7 @@ This allows to post the decomposed expression tree to the solver if it supports 
 """
 
 import copy
-from typing import AbstractSet, Optional, Dict, Any, Callable, cast
+from typing import AbstractSet, Optional, Dict, Any, Callable, TypeAlias, cast
 import numpy as np
 
 from .cse import CSEMap
@@ -28,13 +28,14 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import NDVarArray, cpm_array
 
+CustomDecompose: TypeAlias = Callable[[GlobalConstraint|GlobalFunction], tuple[list[Expression], list[Expression]]]
 
 def decompose_in_tree(lst_of_expr: list[Expression],
                       supported: Optional[AbstractSet[str]] = None,
                       supported_reified: Optional[AbstractSet[str]] = None,
                       _toplevel=None, nested=False,
                       csemap: Optional[CSEMap] = None,
-                      decompose_custom: Optional[Dict[str, Callable]] = None) -> list[Expression]:
+                      decompose_custom: Optional[Dict[str, CustomDecompose]] = None) -> list[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
 
@@ -74,7 +75,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                     continue
 
             if decompose_custom is not None and expr.name in decompose_custom:
-                exprs, toplevel_exprs = cast(tuple[list[Expression], list[Expression]], decompose_custom[expr.name](expr))
+                exprs, toplevel_exprs = decompose_custom[expr.name](expr)
             else:
                 exprs, toplevel_exprs = expr.decompose()
             # we merge the list toplevel rather than create an 'and'
@@ -188,7 +189,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
 
                 # new global constraint, decompose
                 if decompose_custom is not None and arg.name in decompose_custom:
-                    exprs, toplevel_exprs = cast(tuple[list[Expression], list[Expression]], decompose_custom[arg.name](arg))
+                    exprs, toplevel_exprs = decompose_custom[arg.name](arg)
                 else:
                     exprs, toplevel_exprs = arg.decompose()
                 if len(toplevel_exprs) > 0:
@@ -226,7 +227,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 # a decomposition may consist of a new GlobFunc to decompose...
                 while isinstance(arg, GlobalFunction) and arg.name not in supported:
                     if decompose_custom is not None and arg.name in decompose_custom:
-                        newarg, toplevel_exprs = cast(tuple[Expression, list[Expression]], decompose_custom[arg.name](arg))
+                        newarg, toplevel_exprs = decompose_custom[arg.name](arg)
                     else:
                         newarg, toplevel_exprs = arg.decompose()
                     arg = newarg
