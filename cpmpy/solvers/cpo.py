@@ -705,24 +705,10 @@ class CPM_cpo(SolverInterface):
 try:
     from docplex.cp.solver.cpo_callback import CpoCallback, EVENT_SOLUTION
     from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
+    from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
     import time
-
     class CpoSolutionCounter(CpoCallback):
         """
-        Native CP Optimizer callback for solution counting.
-
-        It is based on cpo's built-in `CpoSolverListener`.
-
-        use with CPM_cpo as follows:
-
-        .. code-block:: python
-            
-            cb = CpoSolutionCounter()
-            s.solve(solution_callback=cb)
-
-        then retrieve the solution count with ``cb.solution_count()``
-
-        Arguments:
             verbose (bool, default: False): whether to print info on every solution found 
     """
 
@@ -780,6 +766,7 @@ try:
                 display: either a list of CPMpy expressions, OR a callback function, called with the variables after value-mapping
                             default/None: nothing displayed
                 solution_limit (default = None): stop after this many solutions 
+                events (set of str, default = {EVENT_SOLUTION}): the events to listen to, should be subset of the events listed by docplex.cp.solver.cpo_callback.ALL_CALLBACK_EVENTS
         """
         def __init__(self, solver: CPM_cpo, display=None, solution_limit=None, verbose=False, events:set[str]={EVENT_SOLUTION}):
             super().__init__(verbose)
