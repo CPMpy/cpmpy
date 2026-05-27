@@ -100,17 +100,19 @@ class CSEMap:
 
     def _canonicalize_boolexpr(self, expr: Expression) -> tuple[Expression, bool]:
         """
-        Return a CSE key for Boolean comparisons and whether that key must be negated.
+        Internal helper function to canonicalize a Boolean expression, used before checking the flat_map.
+        
+        Rules implemented:
+            bv <-> (expr != val) :: (~bv) <-> (expr == val)
+            bv <-> (expr > val) :: bv <-> (expr >= val + 1)
+            bv <-> (expr < val) :: (~bv) <-> (expr >= val)
+            bv <-> (expr <= val) :: (~bv) <-> (expr > val) :: (~bv) <-> (expr >= val + 1)
+        
+        Arguments:
+            expr: Boolean expression to canonicalize
 
-        Numeric disequalities against integer constants are stored as the negation
-        of the matching equality, e.g. ``x != v`` reuses ``x == v``.
-
-        Integer-variable threshold literals are stored in order-encoding form
-        ``x >= v`` where possible, e.g. ``x > v`` becomes ``x >= v+1`` and
-        ``x < v`` becomes the negation of ``x >= v``.
-
-        This is not a general Boolean simplifier; expressions that are already flat
-        may bypass CSE canonicalization.
+        Returns:
+            tuple[Expression, bool]: (canonicalized expression, whether the result represents the negated `expr`)
         """
 
         if isinstance(expr, Comparison):
