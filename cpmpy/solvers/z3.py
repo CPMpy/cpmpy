@@ -45,7 +45,7 @@
     Module details
     ==============
 """
-from typing import Optional, List
+from typing import Optional, Iterable
 
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -142,13 +142,13 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
             Call the z3 solver
 
             Arguments:
                 time_limit (float, optional):       maximum solve time in seconds
-                assumptions:                        list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                assumptions:                        iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                                     For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                                     get_core() returns a small subset of assumption variables that are unsat together.
                 **kwargs:                           any keyword argument, sets parameters of solver object
@@ -187,11 +187,12 @@ class CPM_z3(SolverInterface):
             self.z3_solver.set(timeout=int(time_limit*1000))
 
 
-        if assumptions is None:
-            assumptions = []
-
-        z3_assum_vars = self.solver_vars(assumptions)
-        self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+        if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
+            z3_assum_vars = self.solver_vars(assumptions)
+            self.assumption_dict = {z3_var : cpm_var for (cpm_var, z3_var) in zip(assumptions, z3_assum_vars)}
+        else:
+            z3_assum_vars = []
 
 
         # call the solver, with parameters
@@ -270,33 +271,36 @@ class CPM_z3(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
         import z3
 
-        if is_num(cpm_var): # shortcut, eases posting constraints
-            return cpm_var
+        if isinstance(cpm_var, _NumVarImpl):
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return z3.Not(self.solver_var(cpm_var._bv))
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
 
-        # create if it does not exit
-        if cpm_var not in self._varmap:
-            # we assume al variables are user variables (because nested expressions)
-            self.user_vars.add(cpm_var)
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = z3.Bool(str(cpm_var))
-            elif isinstance(cpm_var, _IntVarImpl):
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    revar = z3.Not(self.solver_var(cpm_var._bv))
+                else:
+                    revar = z3.Bool(str(cpm_var))
+
+            else:
                 revar = z3.Int(str(cpm_var))
                 # set bounds
                 self.z3_solver.add(revar >= cpm_var.lb)
                 self.z3_solver.add(revar <= cpm_var.ub)
-            else:
-                raise NotImplementedError("Not a know var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[name] = revar
+            return revar
 
-        return self._varmap[cpm_var]
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
+
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def has_objective(self):

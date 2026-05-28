@@ -39,12 +39,12 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Optional, List, Any
+from typing import Iterable, Optional, List, Any
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
-from ..expressions.utils import eval_comparison
-from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
+from ..expressions.utils import eval_comparison, is_int
+from ..expressions.variables import NegBoolView, _BoolVarImpl, _NumVarImpl
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
 from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool
@@ -114,8 +114,6 @@ class CPM_pindakaas(SolverInterface):
         self.ivarmap = dict()  # for the integer to boolean encoders
         self.encoding = "auto"
         self.pdk_solver = pdk.solver.CaDiCaL()
-        # TODO workaround for upstream issue https://github.com/pindakaashq/pindakaas/issues/189
-        self.pdk_solver._set_option("factor", 0)
         self.unsatisfiable = False  # `pindakaas` might determine unsat before solving
         self.core = None  # latest UNSAT core
         super().__init__(name=name, cpm_model=cpm_model)
@@ -138,12 +136,12 @@ class CPM_pindakaas(SolverInterface):
                 user_vars.update(self.ivarmap[x.name].vars())
         return user_vars
 
-    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[List[_BoolVarImpl]] = None):
+    def solve(self, time_limit: Optional[float] = None, assumptions: Optional[Iterable[_BoolVarImpl]] = None):
         """
         Solve the encoded CPMpy model given optional time limit and assumptions, returning whether a solution was found.
 
         :param time_limit: optional, time limit in seconds
-        :param assumptions: optional, a list of assumptions (Boolean variables which should hold for this solve call)
+        :param assumptions: optional, an iterable (e.g. list, set, tuple) of assumptions (Boolean variables which should hold for this solve call)
         """
         if self.unsatisfiable:
             self.cpm_status.exitstatus = ExitStatus.UNSATISFIABLE
@@ -157,7 +155,11 @@ class CPM_pindakaas(SolverInterface):
         time_limit_delta: Optional[timedelta] = None
         if time_limit is not None:
             time_limit_delta = timedelta(seconds=time_limit)
-        solver_assumptions: Optional[List[Any]] = None if assumptions is None else self.solver_vars(assumptions)
+        if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
+            solver_assumptions = self.solver_vars(assumptions)
+        else:
+            solver_assumptions = None
 
         t = time.time()
         with self.pdk_solver.solve(time_limit=time_limit_delta, assumptions=solver_assumptions) as result:
@@ -213,23 +215,40 @@ class CPM_pindakaas(SolverInterface):
         return has_sol
 
     def solver_var(self, cpm_var):
-        if isinstance(cpm_var, NegBoolView):  # negative literal
-            # get inner variable and return its negated solver var
-            return ~self.solver_var(cpm_var._bv)
-        elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
-            # insert if new
-            if cpm_var.name not in self._varmap:
-                self._varmap[cpm_var.name] = self.pdk_solver.new_var()
-            return self._varmap[cpm_var.name]
-        elif isinstance(cpm_var, _IntVarImpl):  # intvar
-            if cpm_var.name not in self.ivarmap:
-                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                self += cons
+        """
+            Creates solver variable for cpmpy variable
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
+        """
+        if isinstance(cpm_var, _NumVarImpl):
+
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):  # negative literal
+                    # get inner variable and return its negated solver var
+                    revar = ~self.solver_var(cpm_var._bv)
+                else:
+                    revar = self.pdk_solver.new_var()
+            
             else:
-                enc = self.ivarmap[cpm_var.name]
-            return self.solver_vars(enc.vars())
-        else:
-            raise TypeError(f"Unexpected type: {cpm_var}")
+                if name not in self.ivarmap:
+                    enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
+                    self.add(cons)
+                else:
+                    enc = self.ivarmap[name]
+                revar = self.solver_vars(enc.vars())
+            
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
+
+        raise TypeError(f"Unexpected type: {cpm_var}")
 
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)

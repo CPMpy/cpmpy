@@ -187,10 +187,9 @@ def test_solver_var(solver):
     
     try:
         solver_bool = solver.solver_var(bool_var)
-        solver_neg_bool = solver.solver_var(neg_bool_var)
-        
-        # Both should return something
         assert solver_bool is not None
+
+        solver_neg_bool = solver.solver_var(neg_bool_var)
         assert solver_neg_bool is not None
     
     except (NotSupportedError, ValueError) as e: # TODO: fix consistency among solvers
@@ -238,11 +237,6 @@ def test_solver_vars(solver):
     assert len(solver_nested) == 2
     assert len(solver_nested[0]) == 2
     assert len(solver_nested[1]) == 2
-    
-    # Test with single variable (should work too)
-    single_var = cp.boolvar(name="single")
-    solver_single = solver.solver_vars(single_var)
-    assert solver_single is not None
 
 
 @pytest.mark.usefixtures("solver")

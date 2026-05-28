@@ -134,7 +134,9 @@
 
 """
 import copy
+import copy
 import warnings
+from collections import defaultdict
 from collections import defaultdict
 from typing import cast, Literal, Optional, Iterable, Any, TYPE_CHECKING
 import numpy as np
@@ -142,9 +144,9 @@ import numpy as np
 import cpmpy as cp
 
 from ..exceptions import TypeError
-from .core import Expression, BoolVal, ExprLike, ListLike
-from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, _IntVarImpl, NDVarArray
-from .utils import all_pairs, is_int, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, argval
+from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray
+from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, argval
 
 if TYPE_CHECKING:
     from cpmpy.solvers.solver_interface import SolverInterface
@@ -390,7 +392,7 @@ class AllEqualExceptN(GlobalConstraint):
         constraints = []
         for x, y in all_pairs(arr):
             # x and y are equal, or one of them is equal to an excluded value
-            constraints += [cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n)]
+            constraints.append(cp.any(x == a for a in n) | (x == y) | cp.any(y == a for a in n))
         return constraints, []
 
     def value(self) -> Optional[bool]:
@@ -867,64 +869,64 @@ class Regular(GlobalConstraint):
 
 class MDD(GlobalConstraint):
     """
-    MDD-constraint: an MDD (Multi-valued Decision Diagram) is an acyclic layered graph starting from a single node and
-    ending in one. Each path of the MDD corresponds to a solution.
-    The values of the variables in 'array' correspond to a path in the MDD formed by the transitions in 'transitions'.
-    The root node is the first node used as a start in the first transition (i.e. transitions[0][0])
-    spec:
-        - array: an array of CPMpy expressions (integer variable, global functions,...)
-        - transitions: an array of tuples (nodeID, int, nodeID) where nodeID is some unique identifier for the nodes
-        (int or str are fine)
-    Example:
-        The following transitions depict a 3 layer MDD, starting at 'r' and ending in 't'
-        ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
-        ("n4", 0, "t"), ("n5", 1, "t")
-        Its graphical representation is:
-                  r
-              0/ |1  \2     X
-            n1   n2   n3
-            2| /2    /O     Y
-             n4     n5
-              0\   /1       Z
-                 t
-        It has 3 paths, corresponding to 3 solution for (X,Y,Z): (0,2,0), (1,2,0) and (2,0,1)
+    An MDD is a Multi-valued Decision Diagram, represented as an acyclic layered graph, with a single root node, and a single accepting sink node.
+    The constraint takes as input an array of `n` integer variables and an MDD with `n+1` layers, represented through a table of "(from_node, value, to_node)" entries, one for every arc in the MDD.
+    The MDD constraint is satisfied when the values in the array correspond to a path in the MDD starting from the root node, and where the first variable
+    in the array takes the value of the first edge, the second from the second edge, etc., ending in the accepting sink node.
+
+    The transitions/edges are given by a `n x 3` matrix, or more precisely a list of `n` tuples `(node_id1, value, node_id2)`.
+    A node_id is an integer or string representing a state in the MDD, and value is an integer representing the value of the variable in the sequence.
+    If not given explicitly, the root node is the node_id1 of the first entry in the transition table (i.e., transitions[0][0]).
+    The root node is at level 0, the sink node is the only node on level n.
+
+    Example: the following MDD accepts the solutions [1,1,1], [2,2,1] and [2,3,2] for the three variables x,y,z. The root node is "A" and the sink node is "F".
+    cp.MDD(array = [x,y,z],
+           transitions = [("A", 1, "B"),
+                          ("A", 2, "C"),
+                          ("B", 1, "D"),
+                          ("C", 2, "D"),
+                          ("C", 3, "E"),
+                          ("D", 1, "F"),
+                          ("E", 2, "F")])
     """
 
-    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]]):
+    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
-            transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (source, value, destination)
+            transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
+            start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
             raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
 
         _node_type = type(transitions[0][0])
-        for s, v, e in transitions:
-            if not isinstance(s, _node_type) or not isinstance(e, _node_type) or not isinstance(v, int):
+        for id1, v, id2 in transitions:
+            if not isinstance(id1, _node_type) or not isinstance(v, int) or not isinstance(id2, _node_type):
                 raise TypeError(
-                    f"The second argument of an MDD constraint should be a collection of transitions ({_node_type}, int, {_node_type})")
+                    f"The second argument of an MDD constraint should be a list of transitions ({_node_type}, int, {_node_type})")
 
         super().__init__("mdd", (array, transitions))
-        self.root_node = transitions[0][0]
+        self.root_node = transitions[0][0] if start is None else start
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
-        for s, v, e in transitions:
-            self.mapping[s][v] = e
+        for id1, v, id2 in transitions:
+            self.mapping[id1][v] = id2
 
         self.levels = {self.root_node: 0}
         current_nodes = [self.root_node]
-        for i in range(len(array)):
+        for level in range(len(array)):
             new_nodes = []
-            for n in current_nodes:
-                for v in self.mapping[n]:
-                    new_nodes.append(self.mapping[n][v])
-                    self.levels[self.mapping[n][v]] = i + 1
+            for id1 in current_nodes:
+                for _,id2 in self.mapping[id1].items():
+                    new_nodes.append(id2)
+                    self.levels[id2] = level + 1
             current_nodes = new_nodes
 
-        self.sink_node = max(self.levels.keys(), key=lambda x: self.levels[x])
-
-
+        # Check that there is exactly one sink node on level n (with n the number of integer variables)
+        sink_nodes = [node for node, level in self.levels.items() if level == len(array)]
+        assert len(sink_nodes) == 1
+        self.sink_node = sink_nodes[0]
 
     def _reduce(self):
         """
@@ -963,6 +965,26 @@ class MDD(GlobalConstraint):
                 self.reduced_mapping[node][value] = dst
 
 
+    def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
+        """
+        Auxiliary function that extends the MDD with invalid edges, which are directed to the sink node.
+
+        Returns:
+            tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
+            A tuple containing the extended mapping of the MDD and a set of invalid edges (source node, transition value) that are added to the MDD.
+        """
+        arr = self.args[0]
+        invalid_edges = set()
+        extended_mapping = copy.deepcopy(self.mapping)
+        for id1 in self.mapping.keys():
+            level = self.levels[id1]
+            domain = range(arr[level].lb, arr[level].ub + 1)
+            for v in domain:
+                if v not in self.mapping[id1]:
+                    extended_mapping[id1][v] = self.sink_node
+                    invalid_edges.add((id1, v))
+
+        return extended_mapping, invalid_edges
 
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
@@ -976,27 +998,14 @@ class MDD(GlobalConstraint):
             tuple[list[Expression], list[Expression]]:
                 A tuple containing the constraints representing the constraint value and the defining constraints.
         """
-        arr, _ = self.args
+        arr = self.args[0]
 
-        # MDD is reduced by merging nodes with equivalent suffixes
+        # MDD is extended with invalid edges, which are directed to the sink node
+        extended_mapping, invalid_edges_set = self._get_complete_mdd()
+        invalid_edges = frozenset(invalid_edges_set)
 
-        self._reduce()
-
-        # MDD is extended with invalid edges, which are directed to the sink nodes
-        invalid_edges = []
-        extended_mapping = copy.deepcopy(self.reduced_mapping)
-
-        for s in extended_mapping.keys():
-            level = self.levels[s]
-            if level == len(arr):
-                continue
-            domain = range(self.args[0][level].lb, self.args[0][level].ub + 1)
-            for v in domain:
-                if v not in extended_mapping[s]:
-                    extended_mapping[s][v] = self.sink_node
-                    invalid_edges.append((s, v))
-
-        # Represents the ingoing and outgoing flow for a certain node: for every node, the edge variables are listed
+        # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
+        # The default is an empty list, representing no ingoing / outgoing flow.
         flow_in: dict[int | str, list[Expression]] = defaultdict(list)
         flow_out: dict[int | str, list[Expression]] = defaultdict(list)
 
@@ -1004,37 +1013,44 @@ class MDD(GlobalConstraint):
         edge_vars = defaultdict(list)
         invalid_edge_vars = []
 
-        # Flow in and flow out calculated for every node
-        for src, edges in extended_mapping.items():
-            for value, dst in edges.items():
-                level = self.levels[src]
+        # Determine flow in and flow out for each node, and make a boolvar for each edge
+        for id1, edges in extended_mapping.items():
+            for value, id2 in edges.items():
                 edge_var = cp.boolvar()
-                flow_out[src].append(edge_var)
-                flow_in[dst].append(edge_var)
+                level = self.levels[id1]
+                flow_out[id1].append(edge_var)
+                flow_in[id2].append(edge_var)
                 edge_vars[(level, value)].append(edge_var)
 
-                if (src, value) in invalid_edges:
+                if (id1, value) in invalid_edges:
                     invalid_edge_vars.append(edge_var)
 
-        cons = []
+        defining = []
+        constraining = []
 
-        # Nodes in the MDD are iterated over, and flow constraints are enforced
-        for node in set(extended_mapping.keys()) | {self.sink_node}:
+        # Enforce flow constraints: flow in = flow out, at most one activated in/out edge
+        for node, level in self.levels.items():
             incoming = flow_in[node]
             outgoing = flow_out[node]
 
-            if incoming and outgoing:
-                cons.append(cp.sum(incoming) == cp.sum(outgoing))
-            elif outgoing:
-                cons.append(cp.sum(outgoing) == 1)
+            if level == 0:
+                constraining.append(cp.sum(outgoing) == 1) # root
+            elif level == len(arr):
+                defining.append(cp.sum(incoming) == 1) # sink
             else:
-                cons.append(cp.sum(incoming) == 1)
+                defining.append(cp.sum(incoming) == cp.sum(outgoing)) #enforce flow for internal nodes
+                defining.append(cp.sum(incoming) <= 1) # redundant constraint: at most one incoming edge
+                defining.append(cp.sum(outgoing) <= 1) # redundant constraint: at most one outgoing edge
 
-        # Link direct encoding variables with edge variables
+        # Enforce that when arr[i] == v, exactly one of the edges at level i with label v is true, otherwise none can be true
         for (level, value), vars_ in edge_vars.items():
-            cons.append(cp.sum(vars_) == (arr[level] == value))
+            defining.append(cp.sum(vars_) == (arr[level] == value))
 
-        return [cp.sum(invalid_edge_vars) == 0], cons
+        constraining.append(cp.sum(invalid_edge_vars) == 0)
+
+        # When the MDD is extended to a complete MDD by means of invalid edges, there is always a solution to the flow problem.
+        # The only constraining constraints are therefore that the root flow is equal to 1, and that no invalid edge has any flow.
+        return constraining, defining
 
 
     def value(self) -> Optional[bool]:
@@ -1042,17 +1058,16 @@ class MDD(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr, transitions = self.args
-        arrvals = [argval(a) for a in arr]
+        arr = self.args[0]
+        argvals = [argval(a) for a in arr]
         curr_node = self.root_node
-        for v in arrvals:
-            if v is None:
-                return None
+        if any(v is None for v in argvals):
+            return None
 
-        for v in arrvals:
+        for curr_v in argvals:
             if curr_node in self.mapping:
-                if v in self.mapping[curr_node]:
-                    curr_node = self.mapping[curr_node][v]
+                if curr_v in self.mapping[curr_node]:
+                    curr_node = self.mapping[curr_node][curr_v]
                 else:
                     return False
             else:
@@ -1068,12 +1083,12 @@ class IfThenElse(GlobalConstraint):
     Enforces a conditional expression of the form: if condition then if_true else if_false.
     `condition`, `if_true` and `if_false` are be boolean expressions.
     """
-    def __init__(self, condition: ExprLike, if_true: ExprLike, if_false: ExprLike):
+    def __init__(self, condition: BoolExprLike, if_true: BoolExprLike, if_false: BoolExprLike):
         """
         Arguments:
-            condition (ExprLike): Boolean expression or constant
-            if_true (ExprLike): Boolean expression or constant
-            if_false (ExprLike): Boolean expression or constant
+            condition (BoolExprLike): Boolean expression or constant
+            if_true (BoolExprLike): Boolean expression or constant
+            if_false (BoolExprLike): Boolean expression or constant
         """
         if not is_boolexpr(condition) or not is_boolexpr(if_true) or not is_boolexpr(if_false):
             raise TypeError(f"only boolean expression allowed in IfThenElse: Instead got "
@@ -1150,8 +1165,8 @@ class InDomain(GlobalConstraint):
         """
         expr, arr = self.args
         lb, ub = expr.get_bounds()
-        
-        return [expr != val for val in range(lb, ub + 1) if val not in arr], []
+        arr_set = frozenset(arr)
+        return [expr != val for val in range(lb, ub + 1) if val not in arr_set], []
 
     def value(self) -> Optional[bool]:
         """
@@ -1173,7 +1188,8 @@ class InDomain(GlobalConstraint):
         lb, ub = expr.get_bounds()
 
         # complement of arr
-        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr])
+        arr_set = frozenset(arr)
+        return InDomain(expr, [v for v in range(lb,ub+1) if v not in arr_set])
 
 
 class Xor(GlobalConstraint):
@@ -1183,10 +1199,10 @@ class Xor(GlobalConstraint):
     Equivalent to `sum(args) % 2 == 1`
     """
 
-    def __init__(self, arg_list: ListLike[ExprLike]):
+    def __init__(self, arg_list: ListLike[BoolExprLike]):
         """
         Arguments:
-            arg_list (ListLike[ExprLike]): List of expressions or constants, to be xor'ed
+            arg_list (ListLike[BoolExprLike]): List of expressions or constants, to be xor'ed
         """
         if not all(is_boolexpr(arg) for arg in arg_list):
             raise TypeError("Only Boolean arguments allowed in Xor global constraint: {}".format(arg_list))
@@ -1200,16 +1216,42 @@ class Xor(GlobalConstraint):
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the Xor global constraint.
-        Recursively decomposes the constraint into a chain of binary xor-constraints, represented using a sum.
+        Recursively decomposes the constraint into a chain of sums.
+        E.g., xor(a,b,c) :: (((a + b) == 1) + c) == 1
         
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        # there are multiple decompositions possible, Recursively using sum allows it to be efficient for all solvers.
-        decomp = [sum(self.args[:2]) == 1]
-        if len(self.args) > 2:
-            decomp = Xor(decomp + list(self.args[2:])).decompose()[0]
-        return decomp, []
+        # lets first simplify the Xor by removing all constants:
+        # True Xor x :: ~x  and  False Xor x :: x
+        new_args: list[Expression] = []
+        parity = False  # base case
+        for a in self.args:
+            if isinstance(a, Expression) and not isinstance(a, BoolVal):
+                new_args.append(a)
+            else:  # a constant, don't store but update parity
+                if a:  # True Xor x :: ~x
+                    parity = not parity
+        if len(new_args) == 0:
+            return [BoolVal(parity)], []
+        if parity:  # negate first Boolean variable
+            changed = False
+            for i, a in enumerate(self.args):
+                if isinstance(a, _BoolVarImpl):
+                    new_args[i] = ~a
+                    changed = True
+                    break
+            if not changed:  # no variables, negate first argument
+                new_args[0] = ~new_args[0]  # Warning, creates a negated expression during decompose
+
+        # There are multiple decompositions possible,
+        # recursively using sum allows it to be efficient for all solvers.
+        # E.g., xor(a,b,c) :: (((a + b) == 1) + c) == 1
+        prev: Expression = new_args[0]
+        for a in new_args[1:]:
+            prev = (prev + a == 1)  # recursive pairwise Xor decomposition
+
+        return [prev], []
 
     def value(self) -> Optional[bool]:
         arrvals = argvals(self.args)
@@ -1235,7 +1277,7 @@ class Xor(GlobalConstraint):
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
             from cpmpy.transformations.negation import recurse_negation
-            new_args[0] = recurse_negation(self.args[0])
+            new_args[0] = recurse_negation(self.args[0])           
 
         return Xor(new_args)
 
@@ -1286,7 +1328,10 @@ class Cumulative(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super(Cumulative, self).__init__("cumulative", (list(start), list(duration), list(end) if end is not None else None, demand_list, capacity))
+        if end is None:
+            super(Cumulative, self).__init__("cumulative", (list(start), list(duration), demand_list, capacity))
+        else:
+            super(Cumulative, self).__init__("cumulative", (list(start), list(duration), list(end), demand_list, capacity))
 
     
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
@@ -1324,12 +1369,17 @@ class Cumulative(GlobalConstraint):
         - demand >= 0
         - start + duration == end
         """
-        start, duration, end, demand, capacity = self.args
-        cons = [d >= 0 for d in duration]  # enforce non-negative durations
-        cons += [h >= 0 for h in demand]  # enforce non-negative demand
 
-        if end is not None:
+
+        cons = []
+        if len(self.args) == 4:
+            start, duration, demand, capacity = self.args
+        else:
+            start, duration, end, demand, capacity = self.args
             cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
+        
+        cons += [d >= 0 for d in duration]  # enforce non-negative durations
+        cons += [h >= 0 for h in demand]  # enforce non-negative demand
 
         return cons
 
@@ -1342,22 +1392,25 @@ class Cumulative(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity = self.args
 
         cons = self._consistency_constraints()
-        if end is None:
+        if len(self.args) == 4:
+            start, duration, demand, capacity = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end, demand, capacity = self.args
 
         # demand doesn't exceed capacity
         # tasks are uninterruptible, so we only need to check each starting point of each task
         # I.e., for each task, we check if it can be started, given the tasks that are already running.
         for t in range(len(start)):
+            st = start[t]
             demand_at_start_of_t = []
             for j in range(len(start)):
                 if t != j:
-                    demand_at_start_of_t += [demand[j] * ((start[j] <= start[t]) & (end[j] > start[t]))]
+                    demand_at_start_of_t.append(demand[j] * ((start[j] <= st) & (end[j] > st)))
 
-            cons += [(demand[t] + sum(demand_at_start_of_t)) <= capacity]
+            cons.append((demand[t] + sum(demand_at_start_of_t)) <= capacity)
 
         return cons, []
 
@@ -1370,12 +1423,13 @@ class Cumulative(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity = self.args
-
         cons = self._consistency_constraints()
-        if end is None:
+        if len(self.args) == 4:
+            start, duration, demand, capacity = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
-            
+        else:
+            start, duration, end, demand, capacity = self.args
+
         # demand doesn't exceed capacity
         # for each time-step, we check if the running demand does not exceed the capacity
         lbs, ubs = get_bounds(start)
@@ -1390,21 +1444,20 @@ class Cumulative(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end, demand, capacity = self.args
-        
-        start, dur, demand, capacity = argvals([start, dur, demand, capacity])
-        if any(a is None for a in flatlist([start, dur, demand, capacity])):
-            return None
-        if end is None:
-            end = [s + d for s,d in zip(start, dur)]
+
+        if len(self.args) == 4:
+            start, duration,demand, capacity = argvals(self.args)
+            if any(a is None for a in start + duration + demand + [capacity]):
+                return None
+            end = [start[i] + duration[i] for i in range(len(start))]
         else:
-            end = argvals(end)
-            if any(a is None for a in end):
+            start, duration,end, demand, capacity = argvals(self.args)
+            if any(a is None for a in start + duration + end + demand + [capacity]):
                 return None
                 
-        if any(d < 0 for d in dur):
+        if any(d < 0 for d in duration):
             return False
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
+        if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
 
         if any(d < 0 for d in demand):
@@ -1412,9 +1465,9 @@ class Cumulative(GlobalConstraint):
 
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
-        start, end = np.array(start), np.array(end) # eases check below
+        np_start, np_end = np.asanyarray(start), np.asanyarray(end) # eases check below
         for t in range(lb, ub+1):
-            if capacity < sum(demand * ((start <= t) & (end > t))):
+            if capacity < sum(demand * ((np_start <= t) & (np_end > t))):
                 return False
 
         return True
@@ -1440,7 +1493,7 @@ class CumulativeOptional(GlobalConstraint):
                        end: Optional[ListLike[ExprLike]] = None, 
                        demand: Optional[ListLike[ExprLike]|ExprLike] = None, 
                        capacity: Optional[ExprLike] = None, 
-                       is_present: Optional[ListLike[ExprLike]] = None):
+                       is_present: Optional[ListLike[BoolExprLike]] = None):
         """
             Arguments:
                 start (ListLike[ExprLike]): Start times of the tasks
@@ -1448,7 +1501,7 @@ class CumulativeOptional(GlobalConstraint):
                 end (ListLike[ExprLike] | None): Optional end times of the tasks
                 demand (ListLike[ExprLike] | ExprLike): Per-task demands or a single constant demand, required
                 capacity (ExprLike): Capacity of the resource, required
-                is_present (ListLike[ExprLike]): Presence of the tasks
+                is_present (ListLike[BoolExprLike]): Presence of the tasks
             
             Technical note: demand/capacity marked as Optional because it comes after an Optional argument
         """
@@ -1480,8 +1533,10 @@ class CumulativeOptional(GlobalConstraint):
         else: # constant demand
             demand_list = [demand] * len(start)
 
-        super().__init__("cumulative_optional", (list(start), list(duration), list(end) if end is not None else None,
-                                                 demand_list, capacity, list(is_present)))
+        if end is None:
+            super().__init__("cumulative_optional", (list(start), list(duration), demand_list, capacity, list(is_present)))
+        else:
+            super().__init__("cumulative_optional", (list(start), list(duration), list(end), demand_list, capacity, list(is_present)))
 
     def decompose(self, how:str="auto") -> tuple[list[Expression], list[Expression]]:
         """
@@ -1519,13 +1574,15 @@ class CumulativeOptional(GlobalConstraint):
         - start + duration == end if the task is present
         """
 
-        start, duration, end, demand, capacity, is_present = self.args
-        cons = [implies(p,d >= 0) for d, p in zip(duration, is_present)]  # enforce non-negative durations when present
-        cons += [implies(p,h >= 0) for h, p in zip(demand, is_present)]  # enforce non-negative demand when present
-
-        # set duration of tasks, only if end is user-provided and the task is present
-        if end is not None:
+        cons = []
+        if len(self.args) == 5:
+            start, duration, demand, capacity, is_present = self.args
+        else:
+            start, duration, end, demand, capacity, is_present = self.args
             cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
+
+        cons += [implies(p,d >= 0) for d, p in zip(duration, is_present)]  # enforce non-negative durations when present
+        cons += [implies(p,h >= 0) for h, p in zip(demand, is_present)]  # enforce non-negative demand when present
 
         return cons
 
@@ -1539,22 +1596,25 @@ class CumulativeOptional(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity, is_present = self.args
         
         cons = self._consistency_constraints()
-        if end is None:
+        if len(self.args) == 5:
+            start, duration, demand, capacity, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end, demand, capacity, is_present = self.args
 
         # demand of tasks that are present doesn't exceed capacity
         # tasks are uninterruptible, so we only need to check each starting point of each task
         # I.e., for each task, we check if it can be started, given the tasks that are already running.
         for t in range(len(start)):
+            st = start[t]
             demand_at_start_of_t = []
             for j in range(len(start)):
                 if t != j:
-                    demand_at_start_of_t += [demand[j] * (is_present[j] & (start[j] <= start[t]) & (end[j] > start[t]))]
+                    demand_at_start_of_t.append(demand[j] * (is_present[j] & (start[j] <= st) & (end[j] > st)))
 
-            cons += [implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity)]
+            cons.append(implies(is_present[t], (demand[t] + sum(demand_at_start_of_t)) <= capacity))
 
         return cons, []
 
@@ -1567,11 +1627,13 @@ class CumulativeOptional(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, duration, end, demand, capacity, is_present = self.args
-
+        
         cons = self._consistency_constraints()
-        if end is None:
+        if len(self.args) == 5:
+            start, duration, demand, capacity, is_present = self.args
             end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end, demand, capacity, is_present = self.args
 
         # demand of tasks that are presentdoesn't exceed capacity
         # for each time-step, we check if the running demand does not exceed the capacity
@@ -1587,18 +1649,20 @@ class CumulativeOptional(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """        
-        start, dur, end, demand, capacity, is_present = argvals(self.args)
-        if end is None:
-            end = [s + d for s,d in zip(start, dur)]
-        else:
-            end = argvals(end)
 
-        if any(a is None for a in flatlist([start, dur, end, demand, capacity, is_present])):
-            return None
-                
-        if any(p and d < 0 for d,p in zip(dur, is_present)):
+        if len(self.args) == 5:
+            start, duration,demand, capacity, is_present = argvals(self.args)
+            if any(a is None for a in start + duration + demand + [capacity] + is_present):
+                return None
+            end = [s + d for s,d in zip(start, duration)]
+        else:
+            start, duration,end, demand, capacity, is_present = argvals(self.args)
+            if any(a is None for a in start + duration + end + demand + [capacity] + is_present):
+                return None
+
+        if any(p and d < 0 for d,p in zip(duration,is_present)):
             return False
-        if any(p and s + d != e for s,d,e,p in zip(start, dur, end, is_present)):
+        if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
 
         if any(p and d < 0 for d,p in zip(demand, is_present)):
@@ -1606,9 +1670,9 @@ class CumulativeOptional(GlobalConstraint):
 
         # ensure demand doesn't exceed capacity
         lb, ub = min(start), max(end)
-        start, end, present = np.array(start), np.array(end), np.array(is_present) # eases check below
+        np_start, np_end, np_present = np.asanyarray(start), np.asanyarray(end), np.asanyarray(is_present) # eases check below
         for t in range(lb, ub+1):
-            if capacity < sum(demand * (present & (start <= t) & (end > t))):
+            if capacity < sum(demand * (np_present & (np_start <= t) & (np_end > t))):
                 return False
 
         return True
@@ -1641,7 +1705,10 @@ class NoOverlap(GlobalConstraint):
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
         
-        super().__init__("no_overlap", (list(start), list(duration), list(end) if end is not None else None))
+        if end is None:
+            super().__init__("no_overlap", (list(start), list(duration)))
+        else:
+            super().__init__("no_overlap", (list(start), list(duration), list(end)))
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
@@ -1650,16 +1717,19 @@ class NoOverlap(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, dur, end = self.args
-        cons = [d >= 0 for d in dur]
+        cons = []
+
+        if len(self.args) == 2:
+            start, duration = self.args
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end = self.args
+            cons += [start[i] + duration[i] == end[i] for i in range(len(start))]
         
-        if end is None:
-            end = [s+d for s,d in zip(start, dur)]
-        else: # can use the expression directly below
-            cons += [s + d == e for s,d,e in zip(start, dur, end)]
+        cons += [d >= 0 for d in duration]
             
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
-            cons += [(e1 <= s2) | (e2 <= s1)]
+            cons.append((e1 <= s2) | (e2 <= s1))
         return cons, []
 
     def value(self) -> Optional[bool]:
@@ -1667,20 +1737,21 @@ class NoOverlap(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end = argvals(self.args)
-        if end is None:
-            if any(s is None for s in start) or any(d is None for d in dur):
+        if len(self.args) == 2:
+            start, duration = argvals(self.args)
+            if any(a is None for a in start+duration):
                 return None
-            end = [s + d for s,d in zip(start, dur)]
+            end = [s + d for s,d in zip(start, duration)]
         else:
-            if any(s is None for s in start) or any(d is None for d in dur) or any(e is None for e in end):
+            start, duration,end = argvals(self.args)
+            if any(a is None for a in [start, duration,end]):
                 return None
        
-        if any(d < 0 for d in dur):
+        if any(d < 0 for d in duration):
             return False
-        if any(s + d != e for s,d,e in zip(start, dur, end)):
+        if any(s + d != e for s,d,e in zip(start, duration,end)):
             return False
-        for (s1,d1), (s2,d2) in all_pairs(zip(start,dur)):
+        for (s1,d1), (s2,d2) in all_pairs(zip(start,duration)):
             if s1 + d1 > s2 and s2 + d2 > s1:
                 return False
         return True
@@ -1698,13 +1769,13 @@ class NoOverlapOptional(GlobalConstraint):
         if the task is not present, it does not enforce any of the above.
     """
     
-    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[ExprLike]] = None):
+    def __init__(self, start: ListLike[ExprLike], duration: ListLike[ExprLike], end: Optional[ListLike[ExprLike]] = None, is_present: Optional[ListLike[BoolExprLike]] = None):
         """
         Arguments:
-            start (ListLike[Expression]): List of Expression objects representing the start times of the tasks
-            duration (ListLike[Expression]): List of Expression objects representing the durations of the tasks
-            end (ListLike[Expression] | None): optional, list of Expression objects representing the end times of the tasks
-            is_present (ListLike[Expression]): List of Boolean Expression objects representing the presence of the tasks
+            start (ListLike[ExprLike]): List of Expression objects representing the start times of the tasks
+            duration (ListLike[ExprLike]): List of Expression objects representing the durations of the tasks
+            end (ListLike[ExpLike] | None): optional, list of Expression objects representing the end times of the tasks
+            is_present (ListLike[BoolExprLike]): List of Boolean Expression objects representing the presence of the tasks
         """
        
         if not is_any_list(start):
@@ -1722,9 +1793,12 @@ class NoOverlapOptional(GlobalConstraint):
             raise ValueError("Start and is_present should have equal length")
         if end is not None and len(start) != len(end):
             raise ValueError(f"Start and end should have equal length, but got {len(start)} and {len(end)}")
-        
-        super().__init__("no_overlap_optional", (start, duration, end, is_present))
 
+        if end is None:
+            super().__init__("no_overlap_optional", (list(start), list(duration), list(is_present)))
+        else:
+            super().__init__("no_overlap_optional", (list(start), list(duration), list(end), list(is_present)))
+        
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
         Decomposition of the NoOverlap constraint, using pairwise no-overlap constraints.
@@ -1732,14 +1806,16 @@ class NoOverlapOptional(GlobalConstraint):
         Returns:
             tuple[Sequence[Expression], Sequence[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
-        start, dur, end, is_present = self.args
-        cons = [implies(p, d >= 0) for d, p in zip(dur, is_present)]
+
+        cons = []
+
+        if len(self.args) == 3:
+            start, duration, is_present = self.args
+            end = [start[i] + duration[i] for i in range(len(start))]
+        else:
+            start, duration, end, is_present = self.args
+            cons += [implies(is_present[i], start[i] + duration[i] == end[i]) for i in range(len(start))]
         
-        if end is None:
-            end = [s+d for s,d in zip(start, dur)]
-        else: # can use the expression directly below
-            cons += [implies(p, s + d == e) for s,d,e,p in zip(start, dur, end, is_present)]
-            
         for (s1, e1, p1), (s2, e2, p2) in all_pairs(zip(start, end, is_present)):
             cons += [implies(p1 & p2, (e1 <= s2) | (e2 <= s1))]
         return cons, []
@@ -1749,20 +1825,22 @@ class NoOverlapOptional(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        start, dur, end, is_present = argvals(self.args)
-        if end is None:
-            if any(s is None for s in start) or any(d is None for d in dur):
+
+        if len(self.args) == 3:
+            start, duration,is_present = argvals(self.args)
+            if any(a is None for a in start + duration + is_present):
                 return None
-            end = [s + d for s,d in zip(start, dur)]
+            end = [s + d for s,d in zip(start, duration)]
         else:
-            if any(s is None for s in start) or any(d is None for d in dur) or any(e is None for e in end) or any(p is None for p in is_present):
+            start, duration,end, is_present = argvals(self.args)
+            if any(a is None for a in start + duration + end + is_present):
                 return None
-       
-        if any(p and d < 0 for d,p in zip(dur, is_present)):
+
+        if any(p and d < 0 for d,p in zip(duration,is_present)):
             return False
-        if any(p and s + d != e for s,d,e,p in zip(start, dur, end, is_present)):
+        if any(p and s + d != e for s,d,e,p in zip(start, duration,end, is_present)):
             return False
-        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,dur,is_present)):
+        for (s1,d1,p1), (s2,d2,p2) in all_pairs(zip(start,duration,is_present)):
             if p1 and p2 and (s1 + d1 > s2) and (s2 + d2 > s1):
                 return False
         return True
@@ -1811,7 +1889,7 @@ class Precedence(GlobalConstraint):
                 lhs = args[j] == t
                 if is_bool(lhs):  # args[j] and t could both be constants
                     lhs = BoolVal(lhs)
-                constraints += [lhs.implies(cp.any(args[:j] == s))]
+                constraints.append(lhs.implies(cp.any(args[:j] == s)))
         return constraints, []
 
     def value(self) -> Optional[bool]:
@@ -2254,7 +2332,10 @@ class DirectConstraint(Expression):
         for i in range(len(solver_args)):
             if self.novar is None or i not in self.novar:
                 # it may contain variables, replace
-                solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
+                if is_any_list(solver_args[i]):
+                    solver_args[i] = CPMpy_solver.solver_vars(solver_args[i])
+                else:
+                    solver_args[i] = CPMpy_solver.solver_var(solver_args[i])
         # len(native_args) should match nr of arguments of `native_function`
         return solver_function(*solver_args)
 

@@ -65,6 +65,11 @@ Supported solvers
      - SAT ISAT ALLSAT - OPT IOPT
      - pip + local + (aca.) licence
      -
+   * - :doc:`HiGHS <api/solvers/highs>`
+     - ILP
+     - SAT ISAT - OPT IOPT - PAR
+     - pip
+     - 
    * - :doc:`Gurobi <api/solvers/gurobi>`
      - ILP
      - SAT ISAT - OPT IOPT - PAR
@@ -74,7 +79,7 @@ Supported solvers
      - ILP
      - SAT - OPT IOPT - PAR
      - pip + local + (aca.) license
-     - No
+     - 
    * - :doc:`Exact <api/solvers/exact>`
      - Pseudo-Boolean
      - SAT ASAT ISAT ALLSAT - OPT IOPT - PROOF
