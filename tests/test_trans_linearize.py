@@ -660,8 +660,8 @@ class TestLinearizeReifiedVariablesThreshold:
         """Canonicalize expression where the const is on the lhs"""
         a = self.a
         self.csemap = CSEMap()
-        out = linearize_reified_variables(self.linearize((1 <= a) | (2 >= a)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[(BV2) or (~BV3), (a >= 1) == (BV2), (a >= 3) == (BV3)]"
+        out = linearize_reified_variables(self.linearize((2 <= a) | (1 >= a) | (3 <= a)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == "[or(BV[a >= 2], ~BV[a >= 2], BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
         
     def test_linearize_reified_inequalities_no_ivarmap(self):
         """Use order encoding on inequalities and post the channel when keeping the int var."""
