@@ -101,8 +101,13 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             arg_changed, arg_newargs, arg_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
             if arg_changed:
                 changed = True
-                expr = copy.copy(expr)
-                expr.update_args(arg_newargs)
+                if expr.name == "not": # cannot leave negation here, push down in the arguments of the decomposition
+                    assert len(arg_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {arg_newargs}"
+                    expr = recurse_negation(arg_newargs[0])
+                else:
+                    expr = copy.copy(expr)
+                    expr.update_args(arg_newargs)
+                
                 if len(arg_toplevel) > 0:
                     todolist.extend(arg_toplevel)
             newlist.append(expr)
@@ -268,10 +273,14 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 if arg.has_subexpr():
                     rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
                     if rec_changed:
-                    
                         changed = True
-                        arg = copy.copy(arg)
-                        arg.update_args(rec_newargs)
+                        if arg.name == "not": # cannot leave negation here, push down in the arguments of the decomposition
+                            assert len(rec_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
+                            arg = recurse_negation(rec_newargs[0])
+                        else:
+                            arg = copy.copy(arg)
+                            arg.update_args(rec_newargs)
+                            
                         if len(rec_toplevel) > 0:
                             toplevel.extend(rec_toplevel)
                     newargs.append(arg)
