@@ -701,9 +701,9 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
         newcons = []
         for con in constraints:
             if con.name == '==': # its a reification
+                lhs, bv = con.args
                 if con.args[0].name == '==' and (bv, "direct") in bv_map:
                     # potential '(var == val) == bv'
-                    lhs, bv = con.args
                     var, val = bv_map[(bv, "direct")]
                     (lhs_var, lhs_val) = lhs.args
                     if encoding == "direct" and lhs_val == val and lhs_var == var:
@@ -711,7 +711,6 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
                 
                 if con.args[0].name == '>=' and (bv, "order") in bv_map:
                     # potential '(var >= val) == bv'
-                    lhs, bv = con.args
                     var, val = bv_map[(bv, "order")]
                     (lhs_var, lhs_val) = lhs.args
                     if encoding == "order" and lhs_val == val and lhs_var == var:
