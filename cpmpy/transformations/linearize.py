@@ -33,6 +33,8 @@ To get a good linearisation, solver backends typically apply these transformatio
 - Put constraints in flat normal form (:func:`~cpmpy.transformations.flatten_model.flatten_constraint`).
 - Apply :func:`linearize_reified_variables` to replace reified equalities of the form
   ``bv == (x == val)`` by a single direct encoding of ``x`` (must be done before implication-only normalisation).
+- If an external ``ivarmap`` is used and encoded integer variables still occur as integer variables,
+  add the required ``x == encoded(x)`` links with :func:`add_intvar_channeling_constraints`.
 - Ensure implications are of the form ``bv -> <expr>`` (:func:`~cpmpy.transformations.reification.only_implies`).
 - Call :func:`linearize_constraint` to transform the inequalities, strict equalities and implications.
 - Optionally run post-passes such as :func:`only_positive_bv` (e.g. for ILP solvers that do not support NegBoolView)
@@ -51,6 +53,7 @@ Main transformations:
 Helper functions:
 - :func:`canonical_comparison`: Canonicalize comparison expressions (variables on left, constants on right).
 - :func:`get_linear_decompositions`: Returns the custom linear decomposition map for global constraints.
+- :func:`add_intvar_channeling_constraints`: Adds channeling constraints for encoded integer variables stored in an ``ivarmap``.
 
 Optional post-linearisation transformations:
 - :func:`only_positive_bv`: Transforms constraints so only :class:`~cpmpy.expressions.variables._BoolVarImpl` variables appear positively
