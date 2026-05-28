@@ -270,7 +270,7 @@ class CallbacksCPMPy(Callbacks):
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
-                self.cpm_model += xglobals.NonReifiedTable(cpm_vars, tuples)
+                self.cpm_model += cp.Table(cpm_vars, tuples)
             else:
                 self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
 
