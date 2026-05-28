@@ -188,8 +188,15 @@ class TestTransfDecomp:
         # supported="mdd", to avoid recursive decomposition
         cons = cp.Table(x, [[1, 1], [2, 3]])
         print(set(map(str, decompose_linear([cons]))))
-        assert set(map(str, decompose_linear([cons], supported={"mdd"}))) == \
-               {'mdd([a, b],[(0, 1, 1), (0, 2, 2), (1, 1, -1), (2, 3, -1)])'}
+        my_mdd = cp.MDD(x, [(0, 1, 1), (0, 2, 2), (1, 1, -1), (2, 3, -1)]) # ground truth MDD to which the table should be decomposed
+        decomp = decompose_linear([cons], supported={"mdd"})
+
+        assert len(decomp) == 1
+        assert isinstance(decomp[0], cp.MDD)
+        # need more thorough test, order of transistions is not fixed
+        arr, transitions = decomp[0].args
+        assert str(arr) == str(my_mdd.args[0])
+        assert set(transitions) == set(my_mdd.args[1])
 
         # test count
         cons = cp.Count(x, 2) >= 1
