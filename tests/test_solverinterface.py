@@ -187,10 +187,9 @@ def test_solver_var(solver):
     
     try:
         solver_bool = solver.solver_var(bool_var)
-        solver_neg_bool = solver.solver_var(neg_bool_var)
-        
-        # Both should return something
         assert solver_bool is not None
+
+        solver_neg_bool = solver.solver_var(neg_bool_var)
         assert solver_neg_bool is not None
     
     except (NotSupportedError, ValueError) as e: # TODO: fix consistency among solvers

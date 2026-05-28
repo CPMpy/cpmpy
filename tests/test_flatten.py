@@ -116,19 +116,19 @@ class TestFlattenExpr:
         assert str(v) == "BV6"
         assert {str(c) for c in cons} == {"((BV0) <= (BV1)) == (BV6)"}
 
-        v, cons = get_or_make_var((a > 10) == x)
+        v, cons = get_or_make_var((a >= 10) == x)
         assert str(v) == "BV8"
         assert {str(c) for c in cons} == {
             "((BV7) == (BV0)) == (BV8)",
-            "(IV0 > 10) == (BV7)",
+            "(IV0 >= 10) == (BV7)",
         }
 
-        v, cons = get_or_make_var((a > 10) == (d > 5))
+        v, cons = get_or_make_var((a >= 10) == (d >= 5))
         assert str(v) == "BV11"
         assert {str(c) for c in cons} == {
             "((BV10) == (BV9)) == (BV11)",
-            "(IV0 > 10) == (BV10)",
-            "(IV3 > 5) == (BV9)",
+            "(IV0 >= 10) == (BV10)",
+            "(IV3 >= 5) == (BV9)",
         }
 
         v, cons = get_or_make_var(a > c)
@@ -181,15 +181,15 @@ class TestFlattenExpr:
             "((~BV1) or (BV2)) == (BV24)",
         }
 
-        v, cons = get_or_make_var(a > 10)
+        v, cons = get_or_make_var(a >= 10)
         assert str(v) == "BV26"
-        assert {str(c) for c in cons} == {"(IV0 > 10) == (BV26)"}
+        assert {str(c) for c in cons} == {"(IV0 >= 10) == (BV26)"}
 
-        v, cons = get_or_make_var((a > 10) & x & y)
+        v, cons = get_or_make_var((a >= 10) & x & y)
         assert str(v) == "BV28"
         assert {str(c) for c in cons} == {
             "(and(BV27, BV0, BV1)) == (BV28)",
-            "(IV0 > 10) == (BV27)",
+            "(IV0 >= 10) == (BV27)",
         }
 
         v, cons = get_or_make_var(Operator('not', [x]) == y)
@@ -293,7 +293,7 @@ class TestFlattenExpr:
         assert  str(flatten_constraint( (a > 10) == 0 )) == "[IV0 <= 10]"
         assert  str(flatten_constraint( (a > 10) == x )) == "[(IV0 > 10) == (BV0)]"
         #self.assertEqual( str(flatten_constraint( x == (a > 10) )), "[(IV0 > 10) == (BV0)]" ) # TODO, make it do the swap (again)
-        assert  str(flatten_constraint( (a > 10) | (b + c > 2) )) == "[(BV5) or (BV6), (IV0 > 10) == (BV5), ((IV1) + (IV2) > 2) == (BV6)]"
+        assert  str(flatten_constraint( (a >= 10) | (b + c >= 2) )) == "[(BV5) or (BV6), (IV0 >= 10) == (BV5), ((IV1) + (IV2) >= 2) == (BV6)]"
         assert  str(flatten_constraint( a > 10 )) == "[IV0 > 10]"
         assert  str(flatten_constraint( 10 > a )) == "[IV0 < 10]"# surprising
         assert  str(flatten_constraint( a+b > c )) == "[((IV0) + (IV1)) > (IV2)]"
@@ -302,7 +302,7 @@ class TestFlattenExpr:
 
         assert  str(flatten_constraint( a + b == c )) == "[((IV0) + (IV1)) == (IV2)]"
         #self.assertEqual( str(flatten_constraint( c != a + b )), "[((IV0) + (IV1)) != (IV2)]" ) # TODO, make it do the swap (again)
-        assert  str(flatten_constraint( ((a > 5) == (b < 3)) )) == "[(IV0 > 5) == (BV8), (IV1 < 3) == (BV8)]"
+        assert  str(flatten_constraint( ((a > 5) == (b >= 3)) )) == "[(IV0 > 5) == (BV8), (IV1 >= 3) == (BV8)]"
 
         assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] == b )) == "[([1 2 3][IV0]) == (IV1)]"
         assert  str(flatten_constraint( cp.cpm_array([1,2,3])[a] > b )) == "[([1 2 3][IV0]) > (IV1)]"

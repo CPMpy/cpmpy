@@ -175,6 +175,7 @@ class SolverInterface(object):
         """
            Creates solver variable for cpmpy variable
            or returns from cache if previously created
+           or returns a constant if the variable is a constant
         """
         return None
 

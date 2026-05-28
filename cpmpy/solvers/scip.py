@@ -31,7 +31,7 @@ from ..expressions.core import BoolVal, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.utils import is_num, is_true_cst, is_false_cst
+from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -188,27 +188,34 @@ class CPM_scip(SolverInterface):
 
 
     def solver_var(self, cpm_var):
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        """
+            Creates solver variable for cpmpy variable
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
+        """
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # special case, negative-bool-view (not supported as first-class var; use 1-bv in constraints)
+                if isinstance(cpm_var, NegBoolView):
+                    raise NotSupportedError(
+                        "Negative literals should not be part of any equation. See /transformations/linearize for more details"
+                    )
+                revar = self.scip_model.addVar(vtype='B', name=name)
+            else:
+                revar = self.scip_model.addVar(lb=cpm_var.lb, ub=cpm_var.ub, vtype='I', name=name)
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view (not supported as first-class var; use 1-bv in constraints)
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError(
-                "Negative literals should not be part of any equation. See /transformations/linearize for more details"
-            )
-
-        # create if it does not exist
-        if cpm_var.name not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.scip_model.addVar(vtype='B', name=cpm_var.name)
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.scip_model.addVar(lb=cpm_var.lb, ub=cpm_var.ub, vtype='I', name=cpm_var.name)
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var.name] = revar
-
-        # return from cache
-        return self._varmap[cpm_var.name]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize=True):

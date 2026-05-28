@@ -48,7 +48,7 @@ import numpy.typing as npt
 from .solver_interface import Callback, SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Expression, Operator
-from ..expressions.utils import is_any_list, is_num
+from ..expressions.utils import is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -133,30 +133,34 @@ class CPM_highs(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # negative bool views should have been eliminated by transformations
+                if isinstance(cpm_var, NegBoolView):
+                    raise NotSupportedError(
+                        "Negative literals should not be part of any equation. "
+                        "They should have been removed by only_positive_bv()/only_positive_bv_wsum. "
+                        "See /transformations/linearize for more details."
+                    )
+                revar = self.highs.addBinary().index
+            else:
+                revar = self.highs.addIntegral(lb=cpm_var.lb, ub=cpm_var.ub).index
+
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # negative bool views should have been eliminated by transformations
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError(
-                "Negative literals should not be part of any equation. "
-                "They should have been removed by only_positive_bv()/only_positive_bv_wsum. "
-                "See /transformations/linearize for more details."
-            )
-
-        # create if it does not exist
-        if cpm_var.name not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                hvar = self.highs.addBinary()
-            elif isinstance(cpm_var, _IntVarImpl):
-                hvar = self.highs.addIntegral(lb=cpm_var.lb, ub=cpm_var.ub)
-            else:
-                raise NotSupportedError(f"Not a known HiGHS variable type: {cpm_var}")
-
-            self._varmap[cpm_var.name] = hvar.index
-
-        return self._varmap[cpm_var.name]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def _row_from_linexpr(self, linexpr) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
         """
