@@ -643,19 +643,20 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     has at least min_values such reifications: remove those implications and add
     the corresponding encoding of x.
 
-    If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
-    If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
-    (the domain constraint) is posted by default; the solver can then choose to
-    eliminate the vars, decode the vars from the encoding, or post the wsums itself
-    anyway.
+    The domain constraints for the encoding are always posted. Channeling
+    constraints link the native integer variable to its Boolean encoding; they
+    may be skipped only when a later solver transformation owns that link, e.g.
+    by replacing the integer variable with its encoding.
 
     The ``channeling`` argument controls when to post the wsum channeling constraints:
     - ``"all"``: post them for every encoded integer variable
-    - ``"none"``: post none of them
+    - ``"none"``: post none; the caller must add/replace/decode from ``ivarmap``
     - ``"used"``: post them only if the integer variable still occurs after the
       reified equalities have been removed
-    - ``None``: preserve historical behavior, ``"all"`` when ``ivarmap`` is
-      ``None`` and ``"none"`` otherwise
+    - ``None``: use the default for the selected ownership model: post all
+      channeling constraints when this function owns the encoding map
+      (``ivarmap is None``), and leave channeling to the caller when an
+      external ``ivarmap`` is provided
 
     If ``channeled`` is provided, it is treated as a set of integer variable
     names that already have channeling constraints. Newly created channeling
@@ -735,7 +736,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             # var == wsum + k :: var - wsum == k
             ws = [1] + [-w for (w, _) in terms]
             bs = [var] + [b for (_, b) in terms]
-            toplevel.append(Operator("wsum", (ws, bs)) == k)  
+            toplevel.append(Operator("wsum", (ws, bs)) == k)
             if channeled is not None:
                 channeled.add(var.name)
         
