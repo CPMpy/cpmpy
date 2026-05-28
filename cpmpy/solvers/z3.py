@@ -45,16 +45,16 @@
     Module details
     ==============
 """
-from typing import Optional, Iterable, Callable
+from typing import Optional, Iterable
 
 from cpmpy.transformations.get_variables import get_variables
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, NDVarArray
-from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison, argvals
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
+from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -142,7 +142,7 @@ class CPM_z3(SolverInterface):
         return self.z3_solver
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, display:Optional[Callback]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
             Call the z3 solver
 
@@ -151,10 +151,6 @@ class CPM_z3(SolverInterface):
                 assumptions:                        iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                                     For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                                     get_core() returns a small subset of assumption variables that are unsat together.
-                display:                            generic solution callback for use during optimization.
-                                                    either a list of CPMpy expressions, OR a callback function which
-                                                    gets called after the variable-value mapping of the intermediate solution.
-                                                    default/None: nothing is displayed
                 **kwargs:                           any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -189,10 +185,6 @@ class CPM_z3(SolverInterface):
                 raise ValueError("Time limit must be positive")
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
-
-        if display is not None and self.has_objective():
-            callback = self._get_callback(display)
-            self.z3_solver.set_on_model(callback)
 
         if assumptions is not None:
             assumptions = list(assumptions)  # iterable to ordered list
@@ -577,29 +569,6 @@ class CPM_z3(SolverInterface):
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
         return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
-
-
-    def _get_callback(self, display:Callback) -> Callable:
-
-        if isinstance(display, Expression) or is_any_list(display):
-            cpm_vars = get_variables(display) # only fill in relevant vars for callback
-        else:
-            cpm_vars = list(self.user_vars) # function can use any variables
-        z3_vars = self.solver_vars(cpm_vars)
-
-        from z3.z3 import ModelRef
-
-        def callback(sol: ModelRef) -> None:
-            # fill in values of current solution
-            for cpm_var, sol_var in zip(cpm_vars, z3_vars):
-                if isinstance(cpm_var, _BoolVarImpl):
-                    cpm_var._value = bool(sol[sol_var])
-                elif isinstance(cpm_var, _NumVarImpl):
-                    cpm_var._value = sol[sol_var].as_long()
-
-            self.print_display(display)
-
-        return callback
 
 
 
