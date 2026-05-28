@@ -599,7 +599,7 @@ class Table(GlobalConstraint):
             lbs, ubs = get_bounds(arr)
             scores = [ub - lb + 1 for lb, ub in zip(lbs, ubs)]
         else:
-            scores = [0] * len(arr) # no heuristic, keep original order
+            raise ValueError(f"Unsupported ordering heuristic: {heuristic}, chose from {['domain']}")
 
         ordering = sorted(range(len(arr)), key=scores.__getitem__)
         arr = [arr[i] for i in ordering]
@@ -609,7 +609,10 @@ class Table(GlobalConstraint):
     def decompose_linear(self, heuristic:str="domain") -> tuple[list[Expression], list[Expression]]:
         """
         Linear-friendly decomposition of the Table global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
-        Based on: Bierlee, H., Piessens, W., Stuckey, P., & Guns, T. (2026). Table Constraints for Integer Programming. In Leibniz International Proceedings in Informatics. Schloss Dagstuhl -- Leibniz-Zentrum fuer Informatik.
+        Based on: 
+            Bierlee, H., Piessens, W., Stuckey, P., & Guns, T. (CP 2026). 
+            Table Constraints for Integer Programming. 
+            In Leibniz International Proceedings in Informatics. Schloss Dagstuhl -- Leibniz-Zentrum fuer Informatik.
 
          Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
