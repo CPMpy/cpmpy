@@ -187,7 +187,6 @@ class TestTransfDecomp:
 
         # supported="mdd", to avoid recursive decomposition
         cons = cp.Table(x, [[1, 1], [2, 3]])
-        print(set(map(str, decompose_linear([cons]))))
         my_mdd = cp.MDD(x, [(0, 1, 1), (0, 2, 2), (1, 1, -1), (2, 3, -1)]) # ground truth MDD to which the table should be decomposed
         decomp = decompose_linear([cons], supported={"mdd"})
 
