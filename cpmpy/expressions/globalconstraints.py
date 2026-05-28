@@ -581,6 +581,76 @@ class Table(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
+    def _variable_ordering(self, heuristic:str="domain"):
+        """
+        Heuristically order the variables to obtain a better MDD. The columns of the table are ordered accordingly.
+        Arguments:
+            heuristic (str): Name of the heuristic to use for ordering the variables.
+            Currently supported heuristic:
+            - "domain" : order by domain size (small to large)
+        Returns:
+            tuple[ListLike[Expression], (ListLike[ListLike[int]] | np.ndarray)]: The ordered array and table arguments
+        """
+        arr, tab = self.args
+        if len(arr) == 0:
+            return arr, tab
+
+        if heuristic == "domain":
+            lbs, ubs = get_bounds(arr)
+            scores = [ub - lb + 1 for lb, ub in zip(lbs, ubs)]
+        else:
+            raise ValueError(f"Unsupported ordering heuristic: {heuristic}, chose from {['domain']}")
+
+        ordering = sorted(range(len(arr)), key=scores.__getitem__)
+        arr = [arr[i] for i in ordering]
+        tab = tab[:, ordering]
+        return arr, tab
+
+    def decompose_linear(self, heuristic:str="domain") -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear-friendly decomposition of the Table global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
+        Based on: 
+            Bierlee, H., Piessens, W., Stuckey, P., & Guns, T. (CP 2026). 
+            Table Constraints for Integer Programming. 
+            In Leibniz International Proceedings in Informatics. Schloss Dagstuhl -- Leibniz-Zentrum fuer Informatik.
+
+         Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+         """
+
+        if len(self.args[1]) == 0: # empty table, does not allow any assignments
+            return [cp.BoolVal(False)], []
+
+        arr, tab = self._variable_ordering(heuristic)
+
+        mdd: dict[int, dict[int, int]] = {}
+
+        ROOT = 0
+        SINK = -1
+        count = 1 # number of non-root & non-sink nodes
+
+        for row in tab.tolist(): # converts to Python ints
+            current = ROOT
+            for i, val in enumerate(row):
+                if current not in mdd.keys():
+                    mdd[current] = {}
+                nxt: int | None
+                if i == len(row) - 1:
+                    nxt = SINK
+                    mdd[current][val] = nxt
+                else:
+                    nxt = mdd[current].get(val)
+                    if nxt is None:
+                        nxt = count
+                        count += 1
+                        mdd[current][val] = nxt
+
+                current = nxt
+
+        transitions = [(id1, v, id2) for id1, pairs in mdd.items() for v, id2 in pairs.items()]
+
+        return [MDD(arr, transitions, start=ROOT)], []
+
     def value(self) -> Optional[bool]:
         """
         Returns:

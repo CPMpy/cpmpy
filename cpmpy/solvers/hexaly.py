@@ -47,7 +47,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import argval, argvals, is_num, is_int, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -248,29 +248,33 @@ class CPM_hexaly(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view, work directly on var inside the view
+                    revar = ~self.solver_var(cpm_var._bv)
+                else:
+                    revar = self.hex_model.bool()
+                    revar.set_name(name)
+            else:
+                revar = self.hex_model.int(cpm_var.lb, cpm_var.ub)
+                revar.set_name(name)
+            
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return ~self.solver_var(cpm_var._bv)
-
-        # create if it does not exist
-        if cpm_var.name not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.hex_model.bool()
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.hex_model.int(cpm_var.lb, cpm_var.ub)
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            # set name of variable
-            revar.set_name(str(cpm_var))
-            self._varmap[cpm_var.name] = revar
-
-        # return from cache
-        return self._varmap[cpm_var.name]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize=True):

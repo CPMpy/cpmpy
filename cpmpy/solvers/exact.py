@@ -65,7 +65,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num
+from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num, is_int
 from ..exceptions import NotSupportedError
 
 import numpy as np
@@ -393,33 +393,34 @@ class CPM_exact(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # special case, negative-bool-view. Should be eliminated in linearize
+                if isinstance(cpm_var, NegBoolView):
+                    raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+                self.xct_solver.addVariable(name)
+            else:
+                lb, ub = cpm_var.get_bounds()
+                if self.encoding is None:
+                    encoding = "order" if ub-lb < 8 else "log"  # heuristic bound
+                else:
+                    encoding = self.encoding  # can also force it
+                self.xct_solver.addVariable(name, lb, ub, encoding)
+            self._varmap[name] = name
+            return name
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view. Should be eliminated in linearize
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
-
-        # return it if it already exists
-        if cpm_var.name in self._varmap:
-            return self._varmap[cpm_var.name]
-
-        # create if it does not exist
-        revar = str(cpm_var)
-        if isinstance(cpm_var, _BoolVarImpl):
-            self.xct_solver.addVariable(revar)
-        elif isinstance(cpm_var, _IntVarImpl):
-            lb, ub = cpm_var.get_bounds()
-            if self.encoding is None:
-                encoding = "order" if ub-lb < 8 else "log" # heuristic bound
-            else:
-                encoding = self.encoding # can also force it
-            self.xct_solver.addVariable(revar, lb, ub, encoding)
-        else:
-            raise NotImplementedError("Not a known var {}".format(cpm_var))
-        self._varmap[cpm_var.name] = revar
-        return revar
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize):

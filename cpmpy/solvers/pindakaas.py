@@ -43,8 +43,8 @@ from typing import Iterable, Optional, List, Any
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
-from ..expressions.utils import eval_comparison
-from ..expressions.variables import NegBoolView, _BoolVarImpl, _IntVarImpl
+from ..expressions.utils import eval_comparison, is_int
+from ..expressions.variables import NegBoolView, _BoolVarImpl, _NumVarImpl
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.get_variables import get_variables
 from ..transformations.int2bool import _decide_encoding, _encode_int_var, int2bool
@@ -215,23 +215,40 @@ class CPM_pindakaas(SolverInterface):
         return has_sol
 
     def solver_var(self, cpm_var):
-        if isinstance(cpm_var, NegBoolView):  # negative literal
-            # get inner variable and return its negated solver var
-            return ~self.solver_var(cpm_var._bv)
-        elif isinstance(cpm_var, _BoolVarImpl):  # positive literal
-            # insert if new
-            if cpm_var.name not in self._varmap:
-                self._varmap[cpm_var.name] = self.pdk_solver.new_var()
-            return self._varmap[cpm_var.name]
-        elif isinstance(cpm_var, _IntVarImpl):  # intvar
-            if cpm_var.name not in self.ivarmap:
-                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                self.add(cons)
+        """
+            Creates solver variable for cpmpy variable
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
+        """
+        if isinstance(cpm_var, _NumVarImpl):
+
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):  # negative literal
+                    # get inner variable and return its negated solver var
+                    revar = ~self.solver_var(cpm_var._bv)
+                else:
+                    revar = self.pdk_solver.new_var()
+            
             else:
-                enc = self.ivarmap[cpm_var.name]
-            return self.solver_vars(enc.vars())
-        else:
-            raise TypeError(f"Unexpected type: {cpm_var}")
+                if name not in self.ivarmap:
+                    enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
+                    self.add(cons)
+                else:
+                    enc = self.ivarmap[name]
+                revar = self.solver_vars(enc.vars())
+            
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
+
+        raise TypeError(f"Unexpected type: {cpm_var}")
 
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)

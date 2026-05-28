@@ -1,7 +1,7 @@
 import copy
 from typing import Optional, Any, cast, overload, Literal
 from ..expressions.core import Expression, Comparison
-from ..expressions.utils import is_int
+from ..expressions.utils import is_int, is_bool
 from ..expressions.variables import NegBoolView, boolvar, intvar, _IntVarImpl, _BoolVarImpl
 
 
@@ -99,14 +99,46 @@ class CSEMap:
 
 
     def _canonicalize_boolexpr(self, expr: Expression) -> tuple[Expression, bool]:
-        """canonicalize a Boolean expression, results in more hits in the flat_map"""
+        """
+        Internal helper function to canonicalize a Boolean expression, used before checking the flat_map.
+        
+        Rules implemented:
+            bv <-> (expr != val) :: (~bv) <-> (expr == val)
+            bv <-> (expr > val) :: bv <-> (expr >= val + 1)
+            bv <-> (expr < val) :: (~bv) <-> (expr >= val)
+            bv <-> (expr <= val) :: (~bv) <-> (expr > val) :: (~bv) <-> (expr >= val + 1)
+        
+        Arguments:
+            expr: Boolean expression to canonicalize
+
+        Returns:
+            tuple[Expression, bool]: (canonicalized expression, whether the result represents the negated `expr`)
+        """
 
         if isinstance(expr, Comparison):
             lhs, rhs = expr.args
-            if expr.name == "!=" and is_int(rhs):
-                # b <-> (expr != val) :: (~b) <-> (expr == val)
-                new_expr = Comparison("==", lhs, rhs)
-                new_expr._has_subexpr = expr._has_subexpr
-                return new_expr, True
+            if is_int(rhs):
+                name = expr.name
+                if name == "!=":
+                    # b <-> (expr != val) :: (~b) <-> (expr == val)
+                    new_expr = Comparison("==", lhs, rhs)
+                    new_expr._has_subexpr = expr._has_subexpr
+                    return new_expr, True
+                elif name == ">":
+                    # b <-> (expr > val) :: b <-> (expr >= val + 1)
+                    new_expr = Comparison(">=", lhs, rhs + 1)
+                    new_expr._has_subexpr = expr._has_subexpr
+                    return new_expr, False
+                elif name == "<":
+                    # b <-> (expr < val) :: (~b) <-> (expr >= val)
+                    new_expr = Comparison(">=", lhs, rhs)
+                    new_expr._has_subexpr = expr._has_subexpr
+                    return new_expr, True
+                elif name == "<=":
+                    # b <-> (expr <= val) :: (~b) <-> (expr > val) :: (~b) <-> (expr >= val + 1)
+                    new_expr = Comparison(">=", lhs, rhs + 1)
+                    new_expr._has_subexpr = expr._has_subexpr
+                    return new_expr, True
+                
 
         return expr, False
