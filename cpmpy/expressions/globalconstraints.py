@@ -620,20 +620,20 @@ class Table(GlobalConstraint):
 
         arr, tab = self._variable_ordering(heuristic)
 
-        mdd: dict[int|str, dict[int, int|str]] = {}
+        mdd: dict[int, dict[int, int]] = {}
 
-        root = 0
-        sink = -1
+        ROOT = 0
+        SINK = -1
         count = 1 # number of non-root & non-sink nodes
 
         for row in tab:
-            current: int | str = root
+            current = ROOT
             for i, val in enumerate(row):
                 if current not in mdd.keys():
                     mdd[current] = {}
-                nxt: int | str | None
+                nxt: int | None
                 if i == len(row) - 1:
-                    nxt = sink
+                    nxt = SINK
                     mdd[current][val] = nxt
                 else:
                     nxt = mdd[current].get(val)
@@ -646,7 +646,7 @@ class Table(GlobalConstraint):
 
         transitions = [(id1, int(v), id2) for id1, pairs in mdd.items() for v, id2 in pairs.items()]
 
-        return [MDD(arr, transitions, start=root)], []
+        return [MDD(arr, transitions, start=ROOT)], []
 
     def value(self) -> Optional[bool]:
         """
