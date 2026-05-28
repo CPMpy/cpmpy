@@ -652,9 +652,8 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
       (``ivarmap is None``), and leave channeling to the caller when an
       external ``ivarmap`` is provided
 
-    If ``channeled`` is provided, it is treated as a set of integer variable
-    names that already have channeling constraints. Newly created channeling
-    constraints are recorded in that set.
+    ``channeled`` is an optional set of variable names that have already been encoded.
+
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
@@ -787,20 +786,15 @@ def _used_encoded_intvars(exprs, ivarmap, channeled=None):
 
 
 def add_intvar_channeling_constraints(constraints, ivarmap, channeled=None, extra_exprs=None):
-    """Add value-channeling constraints for encoded integer vars used in expressions.
-
-    This is useful for solvers that keep native integer variables but also use
-    direct encodings for repeated reified equalities. If an encoded integer
-    variable later appears in a native numeric expression, the native variable
-    must be linked to its Boolean encoding.
+    """
+    Add value-channeling constraints for encoded integer vars used in expressions.
+    Needed when a solver uses both an encoding of a intvar and an encoding thereof.
 
     ``constraints`` is returned with the necessary channeling constraints
     appended. ``extra_exprs`` can be used to inspect expressions that are not in
     the returned constraint list, such as an objective.
 
-    If ``channeled`` is provided, it is treated as a set of integer variable
-    names that already have channeling constraints. Newly created channeling
-    constraints are recorded in that set.
+    ``channeled`` is an optional set of variable names that have already been encoded.
     """
     constraints = list(constraints)
     exprs = constraints if extra_exprs is None else constraints + (extra_exprs if isinstance(extra_exprs, list) else [extra_exprs])
