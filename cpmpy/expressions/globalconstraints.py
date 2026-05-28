@@ -618,6 +618,9 @@ class Table(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
          """
 
+        if len(self.args[1]) == 0: # empty table, does not allow any assignments
+            return [cp.BoolVal(False)], []
+
         arr, tab = self._variable_ordering(heuristic)
 
         mdd: dict[int, dict[int, int]] = {}
@@ -626,7 +629,7 @@ class Table(GlobalConstraint):
         SINK = -1
         count = 1 # number of non-root & non-sink nodes
 
-        for row in tab:
+        for row in tab.tolist(): # converts to Python ints
             current = ROOT
             for i, val in enumerate(row):
                 if current not in mdd.keys():
@@ -644,7 +647,7 @@ class Table(GlobalConstraint):
 
                 current = nxt
 
-        transitions = [(id1, int(v), id2) for id1, pairs in mdd.items() for v, id2 in pairs.items()]
+        transitions = [(id1, v, id2) for id1, pairs in mdd.items() for v, id2 in pairs.items()]
 
         return [MDD(arr, transitions, start=ROOT)], []
 
