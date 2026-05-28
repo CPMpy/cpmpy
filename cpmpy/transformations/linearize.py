@@ -676,7 +676,6 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     toplevel = []
     bv_map = {}  # bv -> (var, val)
     enc_map = {}  # var -> encoding
-    channeling_mode = {}
     for var, vals in var_vals.items():
         # check if we should linearize the reified variables
         lb, ub = var.lb, var.ub
@@ -687,12 +686,10 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         # encode the values
         enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
         enc_map[var] = enc
-        mode = channeling
-        channeling_mode[var] = mode
         
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
-        if mode == "all" and (channeled is None or var.name not in channeled):
+        if channeling == "all" and (channeled is None or var.name not in channeled):
             # also post the var=wsum mapping
             terms, k = enc.encode_term()
             # var == wsum + k :: var - wsum == k
@@ -722,7 +719,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         constraints = newcons
 
     if channeling == "used":
-        used_encodings = {var.name: enc for var, enc in enc_map.items() if channeling_mode[var] == "used"}
+        used_encodings = {var.name: enc for var, enc in enc_map.items()}
         for var in _used_encoded_intvars(constraints, used_encodings, channeled=channeled):
             terms, k = used_encodings[var.name].encode_term()
             ws = [1] + [-w for (w, _) in terms]
