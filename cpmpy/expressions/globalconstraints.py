@@ -975,7 +975,7 @@ class MDD(GlobalConstraint):
 
         for i in range(len(arr)-1, -1, -1):
             level_nodes = [n for n in self.levels if self.levels[n] == i]
-            groups = defaultdict(list)
+            groups = defaultdict(list) # All nodes with the same transition function are grouped together, and can be merged
 
             for node in level_nodes:
                 transition_function = self.mapping[node]
@@ -983,17 +983,18 @@ class MDD(GlobalConstraint):
                 groups[signature].append(node)
 
             for equiv_nodes in groups.values():
+                # First node chosen as representative, others are merged with it
                 rep = equiv_nodes[0]
                 for node in equiv_nodes[1:]:
                     substitutions[node] = rep
                     self.mapping.pop(node, None)
 
+            # Mapping is redirected to representative nodes for the previous layer in the MDD
+            # This is needed to ensure that the groups for level i-1 are correctly identified in the next iteration
             for node in (n for n in self.levels if self.levels[n] == i-1):
                 for value in self.mapping[node]:
                     dst = self.mapping[node][value]
-                    if dst in substitutions:
-                        dst = substitutions[dst]
-                    self.mapping[node][value] = dst
+                    self.mapping[node][value] = substitutions.get(dst, dst) # If no substitution, keep original destination node
 
 
     def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
