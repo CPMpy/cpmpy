@@ -269,9 +269,9 @@ class TestArrayExpressions:
             res *= v.value()
         assert y.value() == res
         # with axis arg
-        x = intvar(0,5,shape=(10,10), name="x")
+        x = intvar(0,5,shape=(10,4), name="x")
         y = intvar(0, 1000, shape=10, name="y")
-        model = cp.Model(y == x.prod(axis=0))
+        model = cp.Model(y == x.prod(axis=1))  # y[i] = product(x[i,:])
         model.solve()
         for i,vv in enumerate(x):
             res = 1
