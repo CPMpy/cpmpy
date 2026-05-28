@@ -655,8 +655,7 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
 
-    var_vals = csemap.get_reified_varval_comparisons("==")
-    var_bounds = csemap.get_reified_varval_comparisons(">=")
+    var_vals, var_bounds = csemap.get_reified_varval_comparisons()
 
     # decide the encoding to use for each variable
     var_encodings = dict() # var -> (encoding, vals)
