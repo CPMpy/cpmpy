@@ -278,9 +278,9 @@ class CPM_template(SolverInterface):
                     # special case, negative-bool-view: work directly on var inside the view
                     revar = TEMPLATEpy.negate(self.solver_var(cpm_var._bv))
                 else:
-                    revar = TEMPLATEpy.NewBoolVar(str(cpm_var))
+                    revar = TEMPLATEpy.NewBoolVar(name)
             else:
-                revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
+                revar = TEMPLATEpy.NewIntVar(cpm_var.lb, cpm_var.ub, name)
             self._varmap[name] = revar
             return revar
 
