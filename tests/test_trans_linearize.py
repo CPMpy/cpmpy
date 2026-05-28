@@ -655,7 +655,14 @@ class TestLinearizeReifiedVariablesThreshold:
         self.csemap = CSEMap()
         out = linearize_reified_variables(self.linearize((a >= 2) | (a >= 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
         assert str(out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
-
+        
+    def test_linearize_reified_inequality_misordered(self):
+        """Canonicalize expression where the const is on the lhs"""
+        a = self.a
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(self.linearize((1 <= a) | (2 >= a)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == "[(BV2) or (~BV3), (a >= 1) == (BV2), (a >= 3) == (BV3)]"
+        
     def test_linearize_reified_inequalities_no_ivarmap(self):
         """Use order encoding on inequalities and post the channel when keeping the int var."""
         a = self.a
@@ -727,7 +734,7 @@ class TestLinearizeReifiedVariablesThreshold:
         a = self.a
         self.csemap = CSEMap()
         out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a < 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[or(~BV2, ~BV3, ~BV3), (a >= 2) == (BV2), (a >= 3) == (BV3)]"
+        assert str(out) == "[or(~BV[a >= 2], ~BV[a >= 3], ~BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
         
     @pytest.mark.xfail(reason="aspirational")
     def test_linearize_non_ocurring_int_var(self):
