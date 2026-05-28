@@ -19,13 +19,13 @@
         ExitStatus
 
 """
-from typing import Optional, List, Callable, TypeAlias
+from typing import Any, Optional, List, Callable, TypeAlias, Iterable, Any
 import warnings
 import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, ListLike
+from ..expressions.core import Expression, ListLike, ExprLike
 from ..expressions.variables import _NumVarImpl
 from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
@@ -77,7 +77,7 @@ class SolverInterface(object):
             - objective_value_: the value of the objective function after solving (or None)
             - user_vars: set(), variables in the original (non-transformed) model,
                            for reverse mapping the values after `solve()`
-            - _varmap: dict(), maps cpmpy variables to native solver variables
+            - _varmap: dict[str, Any], maps cpmpy variable names to native solver variables
         """
         assert(subsolver is None)
 
@@ -87,7 +87,7 @@ class SolverInterface(object):
 
         # initialise variable handling
         self.user_vars = set()  # variables in the original (non-transformed) model
-        self._varmap = dict()  # maps cpmpy variables to native solver variables
+        self._varmap: dict[str, Any] = {}  # maps cpmpy variable names to native solver variables
         self._csemap = CSEMap()  # maps cpmpy expressions to previously created expressions (typically auxiliary variables)
 
         # rest uses own API
@@ -175,16 +175,30 @@ class SolverInterface(object):
         """
            Creates solver variable for cpmpy variable
            or returns from cache if previously created
+           or returns a constant if the variable is a constant
         """
         return None
 
-    def solver_vars(self, cpm_vars):
+    def solver_vars(self, cpm_vars: Iterable[ExprLike]) -> list[Any]:
         """
            Like `solver_var()` but for arbitrary shaped lists/tensors
         """
-        if is_any_list(cpm_vars):
-            return [self.solver_vars(v) for v in cpm_vars]
-        return self.solver_var(cpm_vars)
+        res: list[Any] = []
+        for cpm_var in cpm_vars:
+            if isinstance(cpm_var, _NumVarImpl):
+                if cpm_var.name in self._varmap:  # fast path
+                    res.append(self._varmap[cpm_var.name])
+                else:  # slow path
+                    res.append(self.solver_var(cpm_var))
+            elif isinstance(cpm_var, int):
+                res.append(cpm_var)
+            elif is_any_list(cpm_var):
+                # recurse
+                res.append(self.solver_vars(cpm_var))
+            else:
+                # slow path, if any at all
+                res.append(self.solver_var(cpm_var))
+        return res
 
     def transform(self, cpm_expr):
         """
