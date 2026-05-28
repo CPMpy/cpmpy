@@ -644,7 +644,7 @@ class Table(GlobalConstraint):
 
                 current = nxt
 
-        transitions : list[tuple[int|str, int, int|str]] = [(id1, int(v), id2) for id1, pairs in mdd.items() for v, id2 in pairs.items()]
+        transitions = [(id1, int(v), id2) for id1, pairs in mdd.items() for v, id2 in pairs.items()]
 
         return [MDD(arr, transitions, start=root)], []
 
