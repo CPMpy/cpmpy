@@ -715,6 +715,43 @@ class ShortTable(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear-friendly decomposition of the ShortTable global constraint using multiple Tables.
+        These Tables are subsequently decomposed into MDDs, which are eventually decomposed into flow constraints.
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+
+        arr, tab = self.args
+
+        # Group tables by STAR pattern
+        groups: defaultdict[tuple[int, ...], list[list[int]]] = defaultdict(list)
+
+        for row in tab.tolist(): # converts to Python ints
+            # Determine STAR pattern
+            star_pattern = tuple(i for i, val in enumerate(row) if val == STAR)
+            # Only include columns without STAR in the table for this pattern
+            reduced_row: list[int] = [val for val in row if val != STAR]
+            groups[star_pattern].append(reduced_row)
+
+        tables: list[Expression] = []
+        channelling_cons: list[Expression] = []
+        lbs, ubs = get_bounds(arr)
+
+        for pattern, reduced_table in groups.items():
+            # columns we keep (without STAR)
+            cols = [i for i in range(len(arr)) if i not in pattern]
+            # auxiliary variables for the columns we keep, with the same bounds as the original variables
+            aux_arr: list[Expression] = [cp.intvar(lb=lbs[i], ub=ubs[i]) for i in cols]
+            tables.append(Table(aux_arr, reduced_table))
+            # constraints to channel the auxiliary array with the original array
+            channelling_cons.append(cp.all([arr[i] == aux_arr[j] for j, i in enumerate(cols)]))
+
+        # Since the tables use auxiliary variables not used anywhere else, they always admit a solution
+        # The ShortTable constraint is satisfied iff at least one channelling constraint is satisfied
+        return [cp.sum(channelling_cons) != 0], tables
+
     def value(self) -> Optional[bool]:
         """
         Returns:
