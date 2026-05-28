@@ -581,11 +581,13 @@ class Table(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
-    def _variable_ordering(self, ordering):
+    def _variable_ordering(self, heuristic:str="domain"):
         """
-        Heuristically order the variables to obtain a better MDD.
-        The columns of the table are ordered accordingly.
-
+        Heuristically order the variables to obtain a better MDD. The columns of the table are ordered accordingly.
+        Arguments:
+            heuristic (str): Name of the heuristic to use for ordering the variables.
+            Currently supported heuristic:
+            - "domain" : order by domain size (small to large)
         Returns:
             tuple[ListLike[Expression], (ListLike[ListLike[int]] | np.ndarray)]: The ordered array and table arguments
         """
@@ -593,17 +595,18 @@ class Table(GlobalConstraint):
         if len(arr) == 0:
             return arr, tab
 
-        if ordering == "domain":
-            heuristic = [v.ub - v.lb + 1 for v in arr]
+        if heuristic == "domain":
+            lbs, ubs = get_bounds(arr)
+            scores = [ub - lb + 1 for lb, ub in zip(lbs, ubs)]
         else:
-            heuristic = [0] * len(arr) # no heuristic, keep original order
+            scores = [0] * len(arr) # no heuristic, keep original order
 
-        ordering = sorted(range(len(arr)), key=heuristic.__getitem__)
+        ordering = sorted(range(len(arr)), key=scores.__getitem__)
         arr = [arr[i] for i in ordering]
         tab = tab[:, ordering]
         return arr, tab
 
-    def decompose_linear(self, ordering:str="domain") -> tuple[list[Expression], list[Expression]]:
+    def decompose_linear(self, heuristic:str="domain") -> tuple[list[Expression], list[Expression]]:
         """
         Linear-friendly decomposition of the Table global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
         Based on: Bierlee, H., Piessens, W., Stuckey, P., & Guns, T. (2026). Table Constraints for Integer Programming. In Leibniz International Proceedings in Informatics. Schloss Dagstuhl -- Leibniz-Zentrum fuer Informatik.
@@ -612,32 +615,35 @@ class Table(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
          """
 
-        arr, tab = self._variable_ordering(ordering)
+        arr, tab = self._variable_ordering(heuristic)
 
-        transitions: set[tuple[int | str, int, int | str]] = set()
-        mdd: dict[int, dict[int, int]] = {}
+        mdd: dict[int|str, dict[int, int|str]] = {}
 
-        count = 1
+        root = 0
+        sink = -1
+        count = 1 # number of non-root & non-sink nodes
 
         for row in tab:
-            current = 0
+            current: int | str = root
             for i, val in enumerate(row):
                 if current not in mdd.keys():
                     mdd[current] = {}
+                nxt: int | str | None
                 if i == len(row) - 1:
-                    nxt = -1
+                    nxt = sink
+                    mdd[current][val] = nxt
                 else:
-                    if val not in mdd[current]:
-                        mdd[current][val] = count
+                    nxt = mdd[current].get(val)
+                    if nxt is None:
+                        nxt = count
                         count += 1
-                    nxt = mdd[current][val]
+                        mdd[current][val] = nxt
 
-                transition = (current, int(val), nxt)
-                if transition not in transitions:
-                    transitions.add(transition)
                 current = nxt
 
-        return [MDD(arr, list(transitions), start=0)], []
+        transitions : list[tuple[int|str, int, int|str]] = [(id1, int(v), id2) for id1, pairs in mdd.items() for v, id2 in pairs.items()]
+
+        return [MDD(arr, transitions, start=root)], []
 
     def value(self) -> Optional[bool]:
         """
