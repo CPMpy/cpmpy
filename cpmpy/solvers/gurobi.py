@@ -744,8 +744,9 @@ class CPM_gurobi(SolverInterface):
         grb_vars = self.solver_vars(cpm_vars)
 
         import gurobipy as gp
+        from gurobipy import GRB
 
-        def callback(model:gp.Model, state:gp.CallbackClass, **kwargs) -> None:
+        def callback(model:gp.Model, state:GRB.Callback, **kwargs) -> None:
             # fill in vars
             if state not in self.events:
                 return # irrelevant event
