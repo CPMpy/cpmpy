@@ -661,14 +661,18 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
     var_encodings = dict() # var -> (encoding, vals)
     for var, vals in var_vals.items():
         lb, ub = var.lb, var.ub
+        if var.name in my_ivarmap:
+            continue
         vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
-        if len(vals) >= min_values and var.name not in my_ivarmap:
+        if len(vals) >= min_values:
             var_encodings[var] = ("direct", vals)
     
     for var, vals in var_bounds.items():
         lb, ub = var.lb, var.ub
+        if var.name in my_ivarmap:
+            continue
         vals = [(val, bv) for val, bv in vals if lb < val <= ub]  # only the valid values, exclude lb
-        if len(vals) >= min_values and var not in var_encodings and var.name not in my_ivarmap:
+        if len(vals) >= min_values and var not in var_encodings:
             var_encodings[var] = ("order", vals) # no encoding exists for this variable yet, use order encoding
     
     
