@@ -63,7 +63,6 @@ Optional post-linearisation transformations:
   in linear constraints.
 """
 
-from collections import defaultdict
 import copy
 from typing import AbstractSet, Sequence, Optional
 
@@ -81,7 +80,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, 
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
-from .int2bool import IntVarEncDirect, IntVarEncOrder, _encode_int_var, _encode_lin_expr
+from .int2bool import _encode_int_var
 
 
 
