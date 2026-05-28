@@ -970,20 +970,17 @@ class MDD(GlobalConstraint):
         Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
         Alters the mapping in-place.
         """
+        arr, _ = self.args
         substitutions = {}
 
-        for i in range(len(self.args[0])-1, -1, -1):
+        for i in range(len(arr)-1, -1, -1):
             level_nodes = [n for n in self.levels if self.levels[n] == i]
-            groups = {}
+            groups = defaultdict(list)
 
             for node in level_nodes:
-                tf = self.mapping[node]
-                signature = tuple(sorted(tf.items()))
-                if signature not in groups:
-                    groups[signature] = []
-
+                transition_function = self.mapping[node]
+                signature = tuple(sorted(transition_function.items()))
                 groups[signature].append(node)
-
 
             for equiv_nodes in groups.values():
                 rep = equiv_nodes[0]
@@ -991,15 +988,12 @@ class MDD(GlobalConstraint):
                     substitutions[node] = rep
                     self.mapping.pop(node, None)
 
-
-        for node in self.mapping:
-            for value in self.mapping[node]:
-                dst = self.mapping[node][value]
-
-                while dst in substitutions:
-                    dst = substitutions[dst]
-
-                self.mapping[node][value] = dst
+            for node in (n for n in self.levels if self.levels[n] == i-1):
+                for value in self.mapping[node]:
+                    dst = self.mapping[node][value]
+                    if dst in substitutions:
+                        dst = substitutions[dst]
+                    self.mapping[node][value] = dst
 
 
     def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
