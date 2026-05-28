@@ -670,6 +670,20 @@ class TestLinearizeReifiedVariablesThreshold:
         out = linearize_reified_variables(self.linearize((a >= 2) | (a >= 3)), min_values=2, csemap=self.csemap)
         assert str(out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2]), sum([1, -1, -1] * [a, BV[a >= 2], BV[a >= 3]]) == 1]"
 
+    def test_linearize_reified_prefers_more_frequent_encoding(self):
+        """Choose order encoding when more order reifications than direct ones occur."""
+        a = cp.intvar(1, 4, name="a")
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(
+            self.linearize((a == 1) | (a == 2) | (a >= 2) | (a >= 3) | (a >= 4)),
+            min_values=2,
+            csemap=self.csemap,
+            ivarmap=self.ivarmap,
+        )
+
+        assert isinstance(self.ivarmap["a"], IntVarEncOrder)
+        assert str(out) == "[or(BV2, BV3, BV[a >= 2], BV[a >= 3], BV[a >= 4]), (a == 1) == (BV2), (a == 2) == (BV3), (BV[a >= 3]) -> (BV[a >= 2]), (BV[a >= 4]) -> (BV[a >= 3])]"
+
     def test_linearize_reified_inequalities_ignores_low_out_of_domain_threshold(self):
         """Out-of-domain order thresholds should not count towards min_values."""
         a = self.a
@@ -735,4 +749,3 @@ class TestLinearizeReifiedVariablesThreshold:
         b, c = cp.intvar(1, 3, name="b"), cp.intvar(1, 3, name="c")
         out = linearize_reified_variables(self.cpm_cons + self.linearize([(b == 1) | (b == 2), b + c == 3]), min_values=2, csemap=self.csemap)
         assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([BV[b == 1], BV[b == 2], BV[b == 3]]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
-

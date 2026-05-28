@@ -640,8 +640,9 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
     If ivarmap is not None, the encoding is added to ivarmap and only (the domain constraint) is posted; 
     the solver can then choose to eliminate the variables, or post the channeling constraints itself anyway.
 
-    If both BV <-> (x == val) and BV <-> (x >= val) are present, we prefer the direct encoding;
-    reified (x >= val) constraints are left untouched in that case. 
+    If both BV <-> (x == val) and BV <-> (x >= val) are present, choose the
+    encoding type that occurs most often for that variable. Ties prefer the
+    direct encoding.
     (TODO re-use direct encoding vars to replace comparison?)
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
@@ -659,21 +660,22 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
 
     # decide the encoding to use for each variable
     var_encodings = dict() # var -> (encoding, vals)
-    for var, vals in var_vals.items():
+    candidate_vars = list(var_vals) + [var for var in var_bounds if var not in var_vals]
+    for var in candidate_vars:
         lb, ub = var.lb, var.ub
         if var.name in my_ivarmap:
             continue
-        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
+
+        direct_vals = [(val, bv) for val, bv in var_vals.get(var, []) if lb <= val <= ub]  # only the valid values, in bounds!
+        order_vals = [(val, bv) for val, bv in var_bounds.get(var, []) if lb < val <= ub]  # only the valid values, exclude lb
+
+        if len(direct_vals) >= len(order_vals):
+            encoding, vals = "direct", direct_vals
+        else:
+            encoding, vals = "order", order_vals
+
         if len(vals) >= min_values:
-            var_encodings[var] = ("direct", vals)
-    
-    for var, vals in var_bounds.items():
-        lb, ub = var.lb, var.ub
-        if var.name in my_ivarmap or var in var_encodings:
-            continue
-        vals = [(val, bv) for val, bv in vals if lb < val <= ub]  # only the valid values, exclude lb
-        if len(vals) >= min_values:
-            var_encodings[var] = ("order", vals) # no encoding exists for this variable yet, use order encoding
+            var_encodings[var] = (encoding, vals)
     
     
     toplevel = []
