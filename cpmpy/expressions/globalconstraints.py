@@ -890,12 +890,13 @@ class MDD(GlobalConstraint):
                           ("E", 2, "F")])
     """
 
-    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None):
+    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None, reduce: bool = True):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
+            reduce (bool, default=True): Whether to reduce the MDD by merging nodes with equivalent suffixes, reducing the size of the MDD
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
@@ -928,11 +929,15 @@ class MDD(GlobalConstraint):
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
 
+        # reduce the MDD if requested
+        if reduce:
+            self._reduce()
+
     def _reduce(self):
         """
         Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
+        Alters the mapping in-place.
         """
-        self.reduced_mapping = copy.deepcopy(self.mapping)
         substitutions = {}
 
         for i in range(len(self.args[0])-1, -1, -1):
@@ -940,7 +945,7 @@ class MDD(GlobalConstraint):
             groups = {}
 
             for node in level_nodes:
-                tf = self.reduced_mapping[node]
+                tf = self.mapping[node]
                 signature = tuple(sorted(tf.items()))
                 if signature not in groups:
                     groups[signature] = []
@@ -952,17 +957,17 @@ class MDD(GlobalConstraint):
                 rep = equiv_nodes[0]
                 for node in equiv_nodes[1:]:
                     substitutions[node] = rep
-                    self.reduced_mapping.pop(node, None)
+                    self.mapping.pop(node, None)
 
 
-        for node in self.reduced_mapping:
-            for value in self.reduced_mapping[node]:
-                dst = self.reduced_mapping[node][value]
+        for node in self.mapping:
+            for value in self.mapping[node]:
+                dst = self.mapping[node][value]
 
                 while dst in substitutions:
                     dst = substitutions[dst]
 
-                self.reduced_mapping[node][value] = dst
+                self.mapping[node][value] = dst
 
 
     def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
