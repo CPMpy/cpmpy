@@ -1299,18 +1299,6 @@ def test_highs_basic_ilp():
     assert y.value() == 5
     assert s.objective_value_ == 5
 
-def _get_tsp_model(n):
-
-    np.random.seed(0)
-    b = np.random.randint(n,2*n, size=(n,n))
-    distance_matrix= cp.cpm_array(((b + b.T)/2).astype(int))
-    
-    x = cp.intvar(0,n-1,shape=n)
-
-    travel_distance = sum(distance_matrix[i, x[i]] for i in range(n))
-    model = cp.Model(cp.Circuit(x), minimize=travel_distance)
-    return model, x
-
 def _get_golomb_model(size):
     """copied from examples/csplib/prob006_golomb.py"""
     marks = cp.intvar(0, size*size, shape=size, name="marks")
