@@ -970,7 +970,7 @@ class MDD(GlobalConstraint):
         Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
         Alters the mapping in-place.
         """
-        arr, _ = self.args
+        arr = self.args[0]
         substitutions = {}
 
         # Loop backwards over MDD levels, from sink to root node
