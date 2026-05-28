@@ -639,6 +639,28 @@ class TestGlobal:
         assert num_true + num_false == 2**7
         assert len(true_sols & false_sols) == 0# no solutions can be in both
 
+    def test_mdd(self):
+        x = cp.intvar(0, 3, shape=3)
+
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+
+        start = "src"
+
+        solutions = [(0,1,0), (1,1,0), (2,2,0)]
+        reduced_sols = set()
+        non_reduced_sols = set()
+
+        reduced_model = cp.Model(cp.MDD(x, transitions, start=start, reduce=True))
+        non_reduced_model = cp.Model(cp.MDD(x, transitions, start=start, reduce=False))
+
+        num_reduced = reduced_model.solveAll(display=lambda : reduced_sols.add(tuple(argvals(x))))
+        num_non_reduced = non_reduced_model.solveAll(display=lambda : non_reduced_sols.add(tuple(argvals(x))))
+
+        assert num_reduced == num_non_reduced
+        assert reduced_sols == set(solutions)
+        assert non_reduced_sols == set(solutions)
+
 
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)

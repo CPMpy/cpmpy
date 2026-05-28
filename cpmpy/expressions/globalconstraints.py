@@ -973,28 +973,31 @@ class MDD(GlobalConstraint):
         arr, _ = self.args
         substitutions = {}
 
-        for i in range(len(arr)-1, -1, -1):
+        # Loop backwards over MDD levels, from sink to root node
+        for i in reversed(range(len(arr))):
             level_nodes = [n for n in self.levels if self.levels[n] == i]
+
+            # Mapping is redirected to representative (potentially merged) nodes of the next layer in the MDD
+            for node in level_nodes:
+                for value in self.mapping[node]:
+                    dst = self.mapping[node][value]
+                    self.mapping[node][value] = substitutions.get(dst, dst)  # If no substitution, keep original destination node
+
             groups = defaultdict(list) # All nodes with the same transition function are grouped together, and can be merged
 
             for node in level_nodes:
                 transition_function = self.mapping[node]
+                # Ordered tuple of (value, destination node) pairs, serves as a unique signature for equivalent transition functions
                 signature = tuple(sorted(transition_function.items()))
                 groups[signature].append(node)
 
             for equiv_nodes in groups.values():
-                # First node chosen as representative, others are merged with it
+                # First node chosen as representative node, others are merged with it
                 rep = equiv_nodes[0]
                 for node in equiv_nodes[1:]:
                     substitutions[node] = rep
                     self.mapping.pop(node, None)
 
-            # Mapping is redirected to representative nodes for the previous layer in the MDD
-            # This is needed to ensure that the groups for level i-1 are correctly identified in the next iteration
-            for node in (n for n in self.levels if self.levels[n] == i-1):
-                for value in self.mapping[node]:
-                    dst = self.mapping[node][value]
-                    self.mapping[node][value] = substitutions.get(dst, dst) # If no substitution, keep original destination node
 
 
     def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
