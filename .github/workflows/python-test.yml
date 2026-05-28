@@ -3,7 +3,7 @@ on: [push] # Can also put pull_request here, but then we dont run it when direct
 jobs:
   test:
     strategy:
-      fail-fast: true # cancel all jobs as soon as one solver test suite fails
+      fail-fast: false # cancel all jobs as soon as one solver test suite fails
       matrix:
         include:
           - solver: ortools
