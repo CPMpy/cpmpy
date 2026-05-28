@@ -162,6 +162,8 @@ def global_constraints(solver):
         elif name == "Table":
             yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
             yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
+            # different domain sizes for variables (test ordering in linear decomposition)
+            yield cp.Table([cp.intvar(lb=1, ub=5), cp.intvar(lb=1, ub=2), cp.intvar(lb=1, ub=3)], [[1,1,3], [2,1,3], [3,2,3]])
         elif name == "Regular":
             yield cp.Regular(cp.intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
