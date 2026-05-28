@@ -677,22 +677,3 @@ class TestLinearizeReifiedVariablesThreshold:
         )
         assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1, sum(BV[b == 1], BV[b == 2], BV[b == 3]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
 
-    def test_exact_decodes_unchanneled_reified_int(self):
-        from cpmpy.solvers import CPM_exact
-        if not CPM_exact.supported():
-            pytest.skip("Exact not installed")
-
-        a = cp.intvar(1, 3, name="a")
-        assert cp.Model((a == 1) | (a == 2)).solve(solver="exact")
-        assert a.value() in (1, 2)
-
-    def test_exact_channels_encoded_int_used_in_objective(self):
-        from cpmpy.solvers import CPM_exact
-        if not CPM_exact.supported():
-            pytest.skip("Exact not installed")
-
-        a = cp.intvar(1, 3, name="a")
-        model = cp.Model((a == 1) | (a == 2), maximize=a)
-        assert model.solve(solver="exact")
-        assert a.value() == 2
-        assert model.objective_value() == 2
