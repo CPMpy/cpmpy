@@ -51,7 +51,7 @@ class CSEMap:
         """Get the decomposition of the given global constraint or global function."""
         return self.decomp_map.get(expr, default)
 
-    def get_reified_varval_comparisons(self) -> tuple[dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]],
+    def get_reified_varvalbounds(self) -> tuple[dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]],
                                                       dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]]:
         """Collect bv <-> var == val and bv <-> var >= val expressions in flat_map."""
 
