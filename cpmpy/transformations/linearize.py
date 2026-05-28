@@ -709,14 +709,14 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
                     # potential '(var == val) == bv'
                     var, val = bv_map[(bv, "direct")]
                     (lhs_var, lhs_val) = lhs.args
-                    if encoding == "direct" and lhs_val == val and lhs_var == var:
+                    if lhs_val == val and lhs_var == var:
                         continue  # do not keep
                 
                 if con.args[0].name == '>=' and (bv, "order") in bv_map:
                     # potential '(var >= val) == bv'
                     var, val = bv_map[(bv, "order")]
                     (lhs_var, lhs_val) = lhs.args
-                    if encoding == "order" and lhs_val == val and lhs_var == var:
+                    if lhs_val == val and lhs_var == var:
                         continue  # do not keep
             newcons.append(con)
         
