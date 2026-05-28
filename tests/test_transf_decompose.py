@@ -189,7 +189,7 @@ class TestTransfDecomp:
         cons = cp.Table(x, [[1, 1], [2, 3]])
         print(set(map(str, decompose_linear([cons]))))
         assert set(map(str, decompose_linear([cons], supported={"mdd"}))) == \
-               {'mdd([a, b],[(1, 1, -1), (0, 2, 2), (2, 3, -1), (0, 1, 1)])'}
+               {'mdd([a, b],[(0, 1, 1), (0, 2, 2), (1, 1, -1), (2, 3, -1)])'}
 
         # test count
         cons = cp.Count(x, 2) >= 1
