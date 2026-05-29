@@ -200,9 +200,10 @@ class TestTransfDecomp:
         assert len(decomp) == 1
         assert isinstance(decomp[0], cp.MDD)
         # need more thorough test, order of transistions is not fixed
-        arr, transitions = decomp[0].args
-        assert str(arr) == str(my_mdd.args[0])
-        assert set(transitions) == set(my_mdd.args[1])
+        arr = decomp[0].args
+        transitions = decomp[0].transitions
+        assert str(arr) == str(my_mdd.args)
+        assert set(transitions) == set(my_mdd.transitions)
 
         # test count
         cons = cp.Count(x, 2) >= 1

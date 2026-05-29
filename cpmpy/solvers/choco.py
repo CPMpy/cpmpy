@@ -633,8 +633,10 @@ class CPM_choco(SolverInterface):
                 from pychoco._handle_wrapper import _HandleWrapper
                 from pychoco._utils import make_int_2d_array, make_intvar_array
 
-                array, transitions = cpm_expr.args
-                node_map = {n: i for i, n in enumerate(cpm_expr.levels)}
+                array = cpm_expr.args
+                transitions = cpm_expr.transitions
+                nodes = cpm_expr.nodes
+                node_map = {n: i for i, n in enumerate(nodes)}
                 node_map[cpm_expr.sink_node] = -1
                 transitions_int = [[node_map[src], val, node_map[dst]] for src, val, dst in transitions]
                 # currently no user-friendly way to create MDD objects with transitions in Pychoco.
