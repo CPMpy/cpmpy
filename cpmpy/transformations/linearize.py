@@ -83,7 +83,7 @@ from ..expressions.core import Comparison, Expression, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, NoOverlap, Cumulative
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _IntVarImpl, _NumVarImpl
 from .int2bool import IntVarEnc, _encode_int_var
 
 
@@ -797,7 +797,7 @@ def _extract_var_from_lhs(lhs):
 
 def _used_encoded_intvars(exprs: Sequence[ExprLike],
                           ivarmap: Mapping[str, IntVarEnc],
-                          channeled: Optional[AbstractSet[str]] = None) -> list[_NumVarImpl]:
+                          channeled: Optional[AbstractSet[str]] = None) -> list[_IntVarImpl]:
     """Return native integer variables in ``exprs`` that have unchanneled encodings.
 
     Encoded Boolean variables do not count as use of the original integer
@@ -813,7 +813,7 @@ def _used_encoded_intvars(exprs: Sequence[ExprLike],
     if not candidates:
         return []
 
-    found: dict[str, _NumVarImpl] = {}
+    found: dict[str, _IntVarImpl] = {}
 
     def extract(lst: Any) -> None:
         for e in lst:
@@ -821,7 +821,7 @@ def _used_encoded_intvars(exprs: Sequence[ExprLike],
                 return
 
             if isinstance(e, Expression):
-                if isinstance(e, _NumVarImpl):
+                if isinstance(e, _IntVarImpl):
                     if not e.is_bool() and e.name in candidates:
                         found[e.name] = e
                         candidates.remove(e.name)
