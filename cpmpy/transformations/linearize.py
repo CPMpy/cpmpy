@@ -706,8 +706,14 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         if var.name in my_ivarmap:
             continue
 
-        direct_vals = [(val, bv) for val, bv in var_vals.get(var, []) if lb <= val <= ub]  # only the valid values, in bounds!
-        order_vals = [(val, bv) for val, bv in var_bounds.get(var, []) if lb < val <= ub]  # only the valid values, exclude lb
+        direct_vals = [
+            (val, bv) for val, bv in var_vals.get(var, [])
+            if lb <= val <= ub
+        ]  # only the valid values, in bounds!
+        order_vals = [
+            (val, bv) for val, bv in var_bounds.get(var, [])
+            if lb < val <= ub
+        ]  # only the valid values, exclude lb
 
         if len(direct_vals) >= len(order_vals):
             encoding, vals = "direct", direct_vals
