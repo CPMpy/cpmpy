@@ -67,7 +67,7 @@ Optional post-linearisation transformations:
 """
 
 import copy
-from typing import AbstractSet, Sequence, Optional
+from typing import AbstractSet, Any, Mapping, MutableSet, Sequence, Optional
 
 import cpmpy as cp
 import numpy as np
@@ -79,7 +79,7 @@ from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Expression, Operator, BoolVal
+from ..expressions.core import BoolExprLike, Comparison, Expression, ExprLike, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
@@ -782,7 +782,9 @@ def _extract_var_from_lhs(lhs):
     return None
 
 
-def _used_encoded_intvars(exprs, ivarmap, channeled=None):
+def _used_encoded_intvars(exprs: Sequence[ExprLike],
+                          ivarmap: Mapping[str, IntVarEnc],
+                          channeled: Optional[AbstractSet[str]] = None) -> list[_NumVarImpl]:
     """Return native integer variables in ``exprs`` that have unchanneled encodings.
 
     Encoded Boolean variables do not count as use of the original integer
@@ -798,9 +800,9 @@ def _used_encoded_intvars(exprs, ivarmap, channeled=None):
     if not candidates:
         return []
 
-    found = {}
+    found: dict[str, _NumVarImpl] = {}
 
-    def extract(lst):
+    def extract(lst: Any) -> None:
         for e in lst:
             if not candidates:
                 return
@@ -825,7 +827,10 @@ def _used_encoded_intvars(exprs, ivarmap, channeled=None):
     return list(found.values())
 
 
-def add_intvar_channeling_constraints(constraints, ivarmap, channeled=None, extra_exprs=None):
+def add_intvar_channeling_constraints(constraints: Sequence[BoolExprLike],
+                                      ivarmap: Mapping[str, IntVarEnc],
+                                      channeled: Optional[MutableSet[str]] = None,
+                                      extra_exprs: Optional[ExprLike | Sequence[ExprLike]] = None) -> list[BoolExprLike]:
     """
     Add value-channeling constraints for encoded integer vars used in expressions.
     Needed when a solver uses both an encoding of a intvar and an encoding thereof.
