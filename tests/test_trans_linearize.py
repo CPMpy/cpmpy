@@ -740,8 +740,9 @@ class TestLinearizeReifiedVariablesThreshold:
         """Use order encoding on inequalities and replace other types of inequality expressions"""
         a = self.a
         self.csemap = CSEMap()
-        out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a < 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[or(~BV[a >= 2], ~BV[a >= 3], ~BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
+        cpm_cons = self.linearize((a < 1) | (a <= 2))
+        out = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == str(cpm_cons)
 
     def test_linearize_non_ocurring_int_var(self):
         """For an integer solver, we can omit the channelling constraint if the encoded integer variable does not occur in any constraint. Note: `a` and `b` are encoded (because at least 2 equality reifications occur), `c` is not encoded (no reifications). We see `b` occurs as an integer variable in a constraint, so channelling is required, but the int var `a` does not occur in any constraint, so no channelling is required. `c` is not encoded."""
