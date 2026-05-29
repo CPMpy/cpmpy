@@ -64,7 +64,6 @@ from ..transformations.linearize import linearize_constraint, only_positive_bv, 
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..transformations.int2bool import decode_int_varmap, clear_int_varmap_values
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num, is_int
 from ..exceptions import NotSupportedError
@@ -172,7 +171,10 @@ class CPM_exact(SolverInterface):
             self.objective_value_ = None
             for cpm_var in self.user_vars:
                 cpm_var._value = None
-            clear_int_varmap_values(self.ivarmap)
+            for enc in self.ivarmap.values():
+                enc._x._value = None
+                for bv in enc.vars():
+                    bv._value = None
             return
 
         # fill in variable values
@@ -180,7 +182,11 @@ class CPM_exact(SolverInterface):
         exact_vals = self.xct_solver.getLastSolutionFor(self.solver_vars(lst_vars))
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
-        decode_int_varmap(self.ivarmap, lambda bv: self.xct_solver.getLastSolutionFor([self.solver_var(bv)])[0])
+        for enc in self.ivarmap.values():
+            for bv in enc.vars():
+                val = self.xct_solver.getLastSolutionFor([self.solver_var(bv)])[0]
+                bv._value = None if val is None else bool(val)
+            enc._x._value = enc.decode()
 
     def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
