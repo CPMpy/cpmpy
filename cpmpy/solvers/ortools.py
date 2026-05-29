@@ -356,21 +356,11 @@ class CPM_ortools(SolverInterface):
                 are premanently posted to the solver
         """
 
-        # special case: a FloatSum objective
         if isinstance(expr, FloatSum):
-            # save user varables
-            get_variables(expr.terms, self.user_vars)
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
+            ort_obj = ort.LinearExpr.weighted_sum(self.solver_vars(vs), ws)
 
-            # transform objective
-            vars_ = []
-            flat_cons = []
-            for term in expr.terms:
-                var, cons = get_or_make_var(term, csemap=self._csemap)
-                vars_.append(var)
-                flat_cons.extend(cons)
-            self.add(flat_cons)
-            ort_obj = ort.LinearExpr.weighted_sum(self.solver_vars(vars_), expr.coeffs)
-        
         else:  # normal case, a CPMpy Expression
             # save user varables
             get_variables(expr, self.user_vars)

@@ -1124,7 +1124,7 @@ class FloatSum:
         vals = argvals_intexpr(self.terms)
         if vals is None:
             return None
-        return int(np.dot(self.coeffs, vals))
+        return float(np.dot(self.coeffs, vals))
 
     def _raise_objective_only(self) -> NoReturn:
         raise TypeError("FloatSum is objective-only. Use it directly in Model.minimize()/maximize().")

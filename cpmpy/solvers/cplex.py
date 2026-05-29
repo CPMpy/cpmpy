@@ -54,15 +54,15 @@ import warnings
 from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import FloatSum
-from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num, is_int
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.utils import eval_comparison, flatlist, is_bool, is_num, is_int
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, \
+from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, \
     only_positive_bv_wsum_const, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
@@ -307,16 +307,10 @@ class CPM_cplex(SolverInterface):
         """
         if isinstance(expr, FloatSum):
             # save user variables
-            get_variables(expr.terms, self.user_vars)
-            vars_ = []
-            flat_cons = []
-            for term in expr.terms:
-                var, cons = get_or_make_var(term, csemap=self._csemap)
-                vars_.append(var)
-                flat_cons.extend(cons)
-            self.add(flat_cons)
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
             self._obj_offset = 0
-            cplex_obj = self.cplex_model.scal_prod(self.solver_vars(vars_), [float(w) for w in expr.coeffs])
+            cplex_obj = self.cplex_model.scal_prod(self.solver_vars(vs), ws)
         else:
             # save user vars
             get_variables(expr, self.user_vars)

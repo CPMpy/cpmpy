@@ -56,7 +56,6 @@ from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..transformations.flatten_model import get_or_make_var
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 
@@ -330,22 +329,15 @@ class CPM_z3(SolverInterface):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
         if isinstance(expr, FloatSum):
-            # save user variables
-            get_variables(expr.terms, self.user_vars)
-            vars_ = []
-            flat_cons = []
-            for term in expr.terms:
-                var, cons = get_or_make_var(term, csemap=self._csemap)
-                vars_.append(var)
-                flat_cons.extend(cons)
-            self.add(flat_cons)
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
 
             weighted_terms = []
-            for coeff, var in zip(expr.coeffs, vars_):
+            for coeff, var in zip(ws, vs):
                 z3_term = self._z3_expr(var)
                 if isinstance(z3_term, z3.BoolRef):
                     z3_term = z3.If(z3_term, 1, 0)
-                weighted_terms.append(float(coeff) * z3_term)
+                weighted_terms.append(coeff * z3_term)
             z3_obj = z3.Sum(weighted_terms)
         else:
             # save user variables

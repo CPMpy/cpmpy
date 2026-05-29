@@ -575,18 +575,10 @@ class CPM_minizinc(SolverInterface):
         """
 
         if isinstance(expr, FloatSum):
-            get_variables(expr.terms, self.user_vars)
-            mzn_parts = []
-            for c, t in zip(expr.coeffs, expr.terms):
-                obj_t, decomp_cons = decompose_objective(
-                    t,
-                    supported=self.supported_global_constraints,
-                    supported_reified=self.supported_reified_global_constraints,
-                    csemap=self._csemap,
-                )
-                self.add(decomp_cons)
-                mzn_sub = self._convert_expression(obj_t)
-                mzn_parts.append("({0:g}) * ({1})".format(float(c), mzn_sub))
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
+            mzn_parts = ["({0:g}) * ({1})".format(float(c), self._convert_expression(t))
+                         for c, t in zip(ws, vs)]
             mzn_obj = " + ".join(mzn_parts)
         else:
             get_variables(expr, collect=self.user_vars)  # add objvars to vars

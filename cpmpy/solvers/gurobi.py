@@ -54,7 +54,7 @@ from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
@@ -293,16 +293,9 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
 
         if isinstance(expr, FloatSum):
-            # save user variables
-            get_variables(expr.terms, self.user_vars)
-            vars_ = []
-            flat_cons = []
-            for term in expr.terms:
-                var, cons = get_or_make_var(term, csemap=self._csemap)
-                vars_.append(var)
-                flat_cons.extend(cons)
-            self.add(flat_cons)
-            grb_obj = gp.quicksum(float(w) * self.solver_var(var) for w, var in zip(expr.coeffs, vars_))
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
+            grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs)))
         else:
             # save user variables
             get_variables(expr, self.user_vars)
