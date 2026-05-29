@@ -1357,6 +1357,9 @@ class Cumulative(GlobalConstraint):
             return self._task_decomposition()
         raise Exception # should not be reached
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        return self.decompose(how="time")
+
     def _consistency_constraints(self) -> list[Expression]:
         """
         Helper function to enforce consistency constraints, used in the decomposition.
@@ -1730,7 +1733,7 @@ class NoOverlap(GlobalConstraint):
         return cons, []
 
     def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
-        return cp.Cumulative(self.args[0], self.args[1], self.args[2], 1, 1).decompose()
+        return cp.Cumulative(self.args[0], self.args[1], self.args[2], 1, 1).decompose_linear()
 
     def value(self) -> Optional[bool]:
         """
