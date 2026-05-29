@@ -902,15 +902,16 @@ class NDElement(GlobalFunction):
         arr, *indices = self.args
 
         defining = []
-        flat_index = 0
+        flat_index: list[Expression] = []
         for dim, idx in enumerate(indices):
             lb, ub = idx.get_bounds()
             if lb < 0 or ub >= arr.shape[dim]:
                 warnings.warn(f"NDElement constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
                 defining += [idx >= 0, idx < arr.shape[dim]]
 
-            flat_index += idx * math.prod(arr.shape[dim+1:])  # stride on dim: flat offset per +1 (product of later axis sizes)
-        return Element(arr.reshape(-1), flat_index), defining
+            flat_index.append(idx * math.prod(arr.shape[dim+1:]))  # stride on dim: flat offset per +1 (product of later axis sizes)
+        
+        return Element(arr.reshape(-1), cp.sum(flat_index)), defining
 
     def get_bounds(self) -> tuple[int, int]:
         """
