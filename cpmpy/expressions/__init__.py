@@ -50,6 +50,7 @@ from .globalconstraints import (
     NoOverlap,
     NoOverlapOptional,
     NegativeTable,
+    MDD,
     Regular,
 )
 from .globalfunctions import (
@@ -118,6 +119,7 @@ __all__ = [
     "LexChainLessEq",
     "LexLess",
     "LexLessEq",
+    "MDD",
     "NegativeTable",
     "NoOverlap",
     "NoOverlapOptional",
