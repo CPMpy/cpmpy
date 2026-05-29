@@ -734,7 +734,7 @@ class TestLinearizeReifiedVariablesThreshold:
         assert str(order_out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
         assert str(direct_out) == str(cpm_cons)
     
-    def test_linearize_reified_inequalities_variations(self):
+    def test_linearize_reified_inequalities_not_enough(self):
         """Do not order-encode when only one non-tautological threshold remains."""
         a = self.a
         self.csemap = CSEMap()
