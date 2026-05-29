@@ -479,23 +479,3 @@ def replace_int_user_vars(user_vars, ivarmap):
     return bool_user_vars
 
 
-def decode_int_varmap(ivarmap, value_of):
-    """Decode all integer variables in ``ivarmap`` from their encoding variables.
-
-    ``value_of`` is a callable that maps a CPMpy Boolean variable to its solver
-    value. The helper first fills the encoding Boolean values, then uses the
-    encoding's decode method to set the integer variable value.
-    """
-    for enc in ivarmap.values():
-        for bv in enc.vars():
-            val = value_of(bv)
-            bv._value = None if val is None else bool(val)
-        enc._x._value = enc.decode()
-
-
-def clear_int_varmap_values(ivarmap):
-    """Clear values of all integer variables and encoding Booleans in ``ivarmap``."""
-    for enc in ivarmap.values():
-        enc._x._value = None
-        for bv in enc.vars():
-            bv._value = None
