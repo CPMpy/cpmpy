@@ -80,7 +80,7 @@ from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, 
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
-from .int2bool import _encode_int_var
+from .int2bool import IntVarEnc, _encode_int_var
 
 
 
@@ -629,7 +629,10 @@ def get_linear_decompositions():
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 
-def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMap]=None, ivarmap=None):
+def linearize_reified_variables(constraints:list[Expression], 
+                                min_values:int=3, 
+                                csemap:Optional[CSEMap]=None, 
+                                ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding and
     reified (BV <-> (x >= val)) implications with order encoding when a variable
@@ -678,9 +681,8 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
             var_encodings[var] = (encoding, vals)
     
     
-    toplevel = []
-
     bv_map = {}  # (bv, encoding) -> (var, val)
+    toplevel = []
 
     for var, (encoding, vals) in var_encodings.items():
         
@@ -723,8 +725,9 @@ def linearize_reified_variables(constraints, min_values=3, csemap:Optional[CSEMa
             newcons.append(con)
         
         return newcons + toplevel
-
-    return constraints + toplevel
+    
+    assert len(toplevel) == 0, "cannot have toplevel constraints if len(bv_map) == 0"
+    return constraints
 
 
 def _extract_var_from_lhs(lhs):
