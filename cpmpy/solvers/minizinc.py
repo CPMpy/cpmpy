@@ -73,7 +73,7 @@ from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
 from ..expressions.globalfunctions import Multiplication, FloatSum
-from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -519,48 +519,50 @@ class CPM_minizinc(SolverInterface):
     def solver_var(self, cpm_var) -> str:
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created.
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
 
             Returns:
                 minizinc-friendly 'string' name of var.
-
-            .. warning::
-                WARNING, this assumes it is never given a 'NegBoolView'
-                might not be true... e.g. in revar after solve?
         """
-        if is_num(cpm_var):
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # Assumes it is never given a 'NegBoolView', handled in self.add
+            if isinstance(cpm_var, NegBoolView):
+                raise NotSupportedError("Negative literals are not handled here. Please report.")
+                
+
+            # not yet created, make a new solver var
+            mzn_var = name.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
+
+            # test if the name is a valid minizinc identifier
+            if not self.mzn_name_pattern.search(mzn_var):
+                raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores." 
+                                            f"First character must be an alphabetic character: {mzn_var}")
+            if mzn_var in self.keywords:
+                raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
+
+            if cpm_var.is_bool():
+                self.mzn_model.add_string(f"var bool: {mzn_var};\n")
+            else:
+                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
+                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
+                                                  "of range (-2147483646..2147483646)")
+                self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
+            self._varmap[name] = mzn_var
+            return mzn_var
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             if cpm_var < -2147483646 or cpm_var > 2147483646:
                 raise MinizincBoundsException(
                     "minizinc does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
             return str(cpm_var)
 
-        # Assumes it is never given a 'NegBoolView'
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals are not handled here. Please report.")
-
-        if cpm_var not in self._varmap:
-            # clean the varname
-            varname = cpm_var.name
-            mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
-
-            # test if the name is a valid minizinc identifier
-            if not self.mzn_name_pattern.search(mzn_var):
-                raise MinizincNameException("Minizinc only accept names with alphabetic characters, "
-                                            "digits and underscores. "
-                                "First character must be an alphabetic character")
-            if mzn_var in self.keywords:
-                raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
-
-            if isinstance(cpm_var, _BoolVarImpl):
-                self.mzn_model.add_string(f"var bool: {mzn_var};\n")
-            elif isinstance(cpm_var, _IntVarImpl):
-                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
-                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
-                                                  "of range (-2147483646..2147483646)")
-                self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
-            self._varmap[cpm_var] = mzn_var
-
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def objective(self, expr, minimize):
         """
