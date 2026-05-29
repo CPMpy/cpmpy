@@ -162,7 +162,7 @@ class CPM_exact(SolverInterface):
         return self.xct_solver
 
     def _fillVars(self):
-        if not self.xct_solver.hasSolution():
+        if not self._solve_return(self.cpm_status):
             self.objective_value_ = None
             for cpm_var in self.user_vars:
                 cpm_var._value = None
