@@ -133,9 +133,8 @@ def test_solve_infeasible_ivs(solver):
 
     a = cp.intvar(1, 3, shape=1, name='a')
 
-    solver.solve()
-    
     solver += ((a == 1) | (a == 3))
+    solver.solve()
     
     assert solver.solve()
     assert solver.status().exitstatus == ExitStatus.FEASIBLE
