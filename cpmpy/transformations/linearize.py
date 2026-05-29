@@ -639,14 +639,14 @@ def linearize_reified_variables(constraints:list[Expression],
     has at least min_values such reifications: remove those implications and add
     the corresponding encoding of x.
 
-    If ivarmap is None, both sum(bvs)==1 and channeling constraints are posted.
+    If ivarmap is None, both consistency constraints and channeling constraints are posted.
     If ivarmap is not None, the encoding is added to ivarmap and only (the domain constraint) is posted; 
     the solver can then choose to eliminate the variables, or post the channeling constraints itself anyway.
 
     If both BV <-> (x == val) and BV <-> (x >= val) are present, choose the
     encoding type that occurs most often for that variable. Ties prefer the
     direct encoding.
-    (TODO re-use direct encoding vars to replace comparison?)
+    (TODO: add both encodings and channel between them?)
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
