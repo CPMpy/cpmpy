@@ -941,14 +941,12 @@ class MDD(GlobalConstraint):
                     f"The second argument of an MDD constraint should be a list of transitions ({_node_type}, int, {_node_type})")
 
         super().__init__("mdd", (array,))
-        self.transitions = transitions
         self.root_node = transitions[0][0] if start is None else start
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
         for id1, v, id2 in transitions:
             self.mapping[id1][v] = id2
 
         self.levels = {self.root_node: 0}
-        self.nodes = [self.root_node]
         current_nodes = [self.root_node]
         for level in range(len(array)):
             new_nodes = []
@@ -957,7 +955,6 @@ class MDD(GlobalConstraint):
                     new_nodes.append(id2)
                     self.levels[id2] = level + 1
             current_nodes = new_nodes
-            self.nodes.extend(new_nodes)
 
         # Check that there is exactly one sink node on level n (with n the number of integer variables)
         sink_nodes = [node for node, level in self.levels.items() if level == len(array)]
@@ -978,7 +975,7 @@ class MDD(GlobalConstraint):
 
         # Loop backwards over MDD levels, from sink to root node
         for i in reversed(range(len(arr))):
-            level_nodes = [n for n in self.levels if self.levels[n] == i]
+            level_nodes = [n for (n,lvl) in self.levels.items() if lvl == i]
 
             # Mapping is redirected to representative (potentially merged) nodes of the next layer in the MDD
             for node in level_nodes:
