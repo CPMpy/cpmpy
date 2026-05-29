@@ -940,7 +940,7 @@ class MDD(GlobalConstraint):
                 raise TypeError(
                     f"The second argument of an MDD constraint should be a list of transitions ({_node_type}, int, {_node_type})")
 
-        super().__init__("mdd", array)
+        super().__init__("mdd", (array,))
         self.transitions = transitions
         self.root_node = transitions[0][0] if start is None else start
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
@@ -973,7 +973,7 @@ class MDD(GlobalConstraint):
         Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
         Alters the mapping in-place.
         """
-        arr = self.args
+        arr = self.args[0]
         substitutions = {}
 
         # Loop backwards over MDD levels, from sink to root node
@@ -1012,7 +1012,7 @@ class MDD(GlobalConstraint):
             tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
             A tuple containing the extended mapping of the MDD and a set of invalid edges (source node, transition value) that are added to the MDD.
         """
-        arr = self.args
+        arr = self.args[0]
         invalid_edges = set()
         extended_mapping = copy.deepcopy(self.mapping)
         for id1 in self.mapping.keys():
@@ -1037,7 +1037,7 @@ class MDD(GlobalConstraint):
             tuple[list[Expression], list[Expression]]:
                 A tuple containing the constraints representing the constraint value and the defining constraints.
         """
-        arr = self.args
+        arr = self.args[0]
 
         # MDD is extended with invalid edges, which are directed to the sink node
         extended_mapping, invalid_edges_set = self._get_complete_mdd()
@@ -1097,7 +1097,7 @@ class MDD(GlobalConstraint):
         Returns:
             Optional[bool]: True if the global constraint is satisfied, False otherwise, or None if any argument is not assigned
         """
-        arr = self.args
+        arr = self.args[0]
         argvals = [argval(a) for a in arr]
         curr_node = self.root_node
         if any(v is None for v in argvals):
