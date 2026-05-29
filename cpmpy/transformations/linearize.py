@@ -684,24 +684,6 @@ def linearize_reified_variables(constraints:list[Expression],
     my_ivarmap = ivarmap if ivarmap is not None else {}
     var_vals, var_bounds = csemap.get_reified_varvalbounds()
 
-    current_bvs = set()
-
-    def collect_bvs(exprs):
-        for expr in exprs:
-            if isinstance(expr, _BoolVarImpl):
-                current_bvs.add(expr)
-                current_bvs.add(~expr)
-            elif isinstance(expr, _NumVarImpl):
-                continue
-            elif isinstance(expr, Expression):
-                collect_bvs(expr.args)
-            elif isinstance(expr, np.ndarray) and expr.dtype == object:
-                collect_bvs(expr.flat)
-            elif isinstance(expr, (list, tuple, np.flatiter)):
-                collect_bvs(expr)
-
-    collect_bvs(constraints)
-
     # decide the encoding to use for each variable
     var_encodings = dict() # var -> (encoding, vals)
     candidate_vars = list(var_vals) + [var for var in var_bounds if var not in var_vals]
@@ -712,11 +694,11 @@ def linearize_reified_variables(constraints:list[Expression],
 
         direct_vals = [
             (val, bv) for val, bv in var_vals.get(var, [])
-            if lb <= val <= ub and bv in current_bvs
+            if lb <= val <= ub
         ]  # only the valid values, in bounds!
         order_vals = [
             (val, bv) for val, bv in var_bounds.get(var, [])
-            if lb < val <= ub and bv in current_bvs
+            if lb < val <= ub
         ]  # only the valid values, exclude lb
 
         if len(direct_vals) >= len(order_vals):
