@@ -728,20 +728,17 @@ class Element(GlobalFunction):
     Element only supports 1D arrays; use NDElement for multi-dimensional indexing.
     """
 
-    def __init__(self, arr: ListLike[ExprLike], idx: ExprLike):
+    def __init__(self, arr: ListLike[ExprLike], idx: Expression):
         """
         Arguments:
             arr (ListLike[ExprLike]): List of expressions or constants to index into
-            idx (ExprLike): Integer expression or constant for the index (not a boolean expression)
+            idx (Expression): Integer expression for the index (not a Boolean expression)
         """
         if is_boolexpr(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
         if is_any_list(idx):
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
         if isinstance(arr, np.ndarray):
-            if arr.ndim != 1:
-                raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
-        elif isinstance(arr, np.ndarray):
             if arr.ndim != 1:
                 raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
         elif is_any_list(arr) and any(is_any_list(el) for el in arr):
@@ -843,11 +840,11 @@ class NDElement(GlobalFunction):
     with multiple decision variables.
     """
 
-    def __init__(self, arr: ListLike[ExprLike], indices: ListLike[ExprLike]):
+    def __init__(self, arr: ListLike[ExprLike], indices: ListLike[Expression]):
         """
         Arguments:
             arr (ListLike[ExprLike]): Multi-dimensional array of expressions or constants to index into
-            indices (ListLike[ExprLike]): Integer expressions or constants for each dimension index
+            indices (ListLike[Expresssion]): Integer expressions for each dimension index (no Boolean expressions)
         """
         if not is_any_list(indices):
             raise TypeError(f"NDElement(arr, indices) takes a list of index expressions, not: {indices}")
@@ -903,10 +900,17 @@ class NDElement(GlobalFunction):
             tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
         """
         arr, *indices = self.args
-        flat_index = indices[-1]
-        for dim, idx in enumerate(indices[:-1]):
-            flat_index += idx * math.prod(arr.shape[dim + 1 :])  # stride on dim: flat offset per +1 (product of later axis sizes)
-        return Element(arr.reshape(-1), flat_index), []
+
+        defining = []
+        flat_index = 0
+        for dim, idx in enumerate(indices):
+            lb, ub = idx.get_bounds()
+            if lb < 0 or ub >= arr.shape[dim]:
+                warnings.warn(f"NDElement constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
+                defining += [idx >= 0, idx < arr.shape[dim]]
+
+            flat_index += idx * math.prod(arr.shape[dim+1:])  # stride on dim: flat offset per +1 (product of later axis sizes)
+        return Element(arr.reshape(-1), flat_index), defining
 
     def get_bounds(self) -> tuple[int, int]:
         """
