@@ -737,6 +737,7 @@ class TestLinearizeReifiedVariablesThreshold:
     def test_linearize_reified_inequalities_variations(self):
         """Do not order-encode when only one non-tautological threshold remains."""
         a = self.a
+        self.csemap = CSEMap()
         cpm_cons = self.linearize((a < 1) | (a <= 2))
         out = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
         assert str(out) == str(cpm_cons)
