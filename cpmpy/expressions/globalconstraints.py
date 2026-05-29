@@ -1729,6 +1729,9 @@ class NoOverlap(GlobalConstraint):
             cons.append((e1 <= s2) | (e2 <= s1))
         return cons, []
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        return cp.Cumulative(self.args[0], self.args[1], self.args[2], 1, 1).decompose()
+
     def value(self) -> Optional[bool]:
         """
         Returns:
