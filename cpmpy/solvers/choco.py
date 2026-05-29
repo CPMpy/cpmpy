@@ -633,7 +633,7 @@ class CPM_choco(SolverInterface):
                 from pychoco._handle_wrapper import _HandleWrapper
                 from pychoco._utils import make_int_2d_array, make_intvar_array
 
-                array = cpm_expr.args
+                array = cpm_expr.args[0]
                 transitions = cpm_expr.transitions
                 nodes = cpm_expr.nodes
                 node_map = {n: i for i, n in enumerate(nodes)}
