@@ -55,10 +55,12 @@ class CSEMap:
                                                       dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]]:
         """Collect bv <-> var == val and bv <-> var >= val expressions in flat_map."""
 
+        comps = frozenset({"==", ">="})
+
         var_vals = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var == val: var -> [(val, bv)]
         var_bounds = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var >= val: var -> [(val, bv)]
         for expr, bv in self.flat_map.items():
-            if expr.name in {"==", ">="}:
+            if expr.name in comps:
                 var, val = expr.args
                 if isinstance(var, _IntVarImpl) and is_int(val):
                     target = var_vals if expr.name == "==" else var_bounds
