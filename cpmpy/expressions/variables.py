@@ -522,21 +522,16 @@ class NDVarArray(np.ndarray):
             if len(index) != self.ndim:
                 raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
 
-            # find dimension of expression in index
-            expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
-            arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
-            index = list(index[expr_dim[0]:])
-
             # eliminate constant indices to reduce dimensionality
             selector = []
-            new_indices = []
+            new_indices: list[Expression] = []
             for idx in index:
                 if isinstance(idx, Expression):
                     selector.append(slice(None))  # keep this axis (equivalent to `:` when used as index), to pass to element constraint
                     new_indices.append(idx)
                 else:
                     selector.append(idx)  # constant index
-            arr = arr[tuple(selector)]
+            arr = self[tuple(selector)]
 
             if len(new_indices) == 1:
                 return cp.Element(arr, new_indices[0])
