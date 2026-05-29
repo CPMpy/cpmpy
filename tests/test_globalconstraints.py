@@ -642,24 +642,24 @@ class TestGlobal:
     def test_mdd(self):
         x = cp.intvar(0, 3, shape=3)
 
+        start = "src"
         transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
                        ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
-
-        start = "src"
-
         solutions = [(0,1,0), (1,1,0), (2,2,0)]
-        reduced_sols = set()
-        non_reduced_sols = set()
 
-        reduced_model = cp.Model(cp.MDD(x, transitions, start=start, reduce=True))
-        non_reduced_model = cp.Model(cp.MDD(x, transitions, start=start, reduce=False))
+        mdd_orig = cp.MDD(x, transitions, start=start, reduce=False)
+        mdd_redu = cp.MDD(x, transitions, start=start, reduce=True)
+        assert mdd_orig.levels.keys() - mdd_redu.levels.keys() == {"b1", "b2", "c2"}
 
-        num_reduced = reduced_model.solveAll(display=lambda : reduced_sols.add(tuple(argvals(x))))
-        num_non_reduced = non_reduced_model.solveAll(display=lambda : non_reduced_sols.add(tuple(argvals(x))))
+        sols_orig = set()
+        num_orig = cp.Model(mdd_orig).solveAll(display=lambda : sols_orig.add(tuple(argvals(x))))
+        assert sols_orig == set(solutions)
 
-        assert num_reduced == num_non_reduced
-        assert reduced_sols == set(solutions)
-        assert non_reduced_sols == set(solutions)
+        sols_redu = set()
+        num_redu = cp.Model(mdd_redu).solveAll(display=lambda : sols_redu.add(tuple(argvals(x))))
+        assert sols_redu == set(solutions)
+
+        assert num_orig == num_redu
 
 
     def test_minimum(self):

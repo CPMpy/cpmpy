@@ -1110,6 +1110,11 @@ class MDD(GlobalConstraint):
                 return False
         return True # can only have reached end node
 
+    def __repr__(self) -> str:
+        "Print the MDD and the internally stored table"
+        table = [[id1, v, id2] for id1, edges in self.mapping.items() for v, id2 in edges.items()]
+        return f"MDD({self.args[0]}, {table}, {self.root_node})"
+
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
 # same semantic as CPLEX IfThenElse constraint
