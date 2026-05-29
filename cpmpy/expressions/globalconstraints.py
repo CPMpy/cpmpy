@@ -996,7 +996,9 @@ class MDD(GlobalConstraint):
         arr = self.args[0]
 
         # MDD is extended with invalid edges, which are directed to the sink node
-        extended_mapping, invalid_edges_set = self._get_complete_mdd()
+        # extended_mapping, invalid_edges_set = self._get_complete_mdd()
+        extended_mapping = self.mapping
+        invalid_edges_set = set()
         invalid_edges = frozenset(invalid_edges_set)
 
         # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
