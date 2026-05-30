@@ -327,9 +327,9 @@ class CPM_z3(SolverInterface):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
         if isinstance(expr, FloatSum):
-            vs, ws = expr.terms, expr.coeffs
+            ws, vs, const = expr.components()
             self.user_vars.update(vs)  # update user variables
-            z3_obj = z3.Sum([w*v for w,v in zip(ws,self.solver_vars(vs))])
+            z3_obj = z3.Sum([z3.Sum([w*v for w,v in zip(ws,self.solver_vars(vs))]), const])
         else:
             # save user variables
             get_variables(expr, self.user_vars)

@@ -293,9 +293,11 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
 
         if isinstance(expr, FloatSum):
-            vs, ws = expr.terms, expr.coeffs
+            ws, vs, const = expr.components()
             self.user_vars.update(vs)  # save user variables
-            grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs)))
+
+            import gurobipy as gp
+            grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
         else:
             # save user variables
             get_variables(expr, self.user_vars)

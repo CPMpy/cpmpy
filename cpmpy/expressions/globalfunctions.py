@@ -51,6 +51,13 @@
             def decompose(self):
                 return (self.args[0] + self.args[1]), []  # the decomposition
 
+    Objective-only :class:`FloatSum`
+    -------------------------------
+
+    :class:`FloatSum` is **not** an Expression nor a GlobalFunction.
+    It is only supported by some solvers (esp MIP solvers and ortools), and need to be passed direclty to
+    :meth:`~cpmpy.model.Model.minimize` / :meth:`~cpmpy.model.Model.maximize`.
+
     ===============
     List of classes
     ===============
@@ -74,13 +81,13 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Optional, Iterable, NoReturn, Final
+from typing import Optional, Iterable, NoReturn, Final, cast
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import intvar, cpm_array, NDVarArray, _NumVarImpl
+from .variables import intvar, cpm_array, NDVarArray, _NumVarImpl, NegBoolView
 from .utils import argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
@@ -1089,42 +1096,71 @@ class NValueExcept(GlobalFunction):
 
 class FloatSum:
     """
-    Objective-only weighted sum with float coefficients over integer expressions.
+    Objective-only weighted sum with float coefficients over decision variables.
 
     Does not inherit from Expression because it is objective only and has float .value()
     Basically it is breaking all design rules of CPMpy...
 
-    Accepts only (numpy) floats as coefficients, and Expressions as terms.
+    It can only appear as the argument to :meth:`~cpmpy.model.Model.minimize` / :meth:`~cpmpy.model.Model.maximize`.
+
+    Accepts only (numpy) floats as coefficients, decision variables (including NegBoolView) as terms,
+    and an optional float constant term (default ``0.0``).
     """
     name: Final = "floatsum"
     coeffs: np.ndarray
-    terms: NDVarArray
+    vars: NDVarArray
+    const: float
 
-    def __init__(self, coeffs: ListLike[float|np.floating], terms: ListLike[_NumVarImpl]):
+    def __init__(self, coeffs: ListLike[float|np.floating], vars: ListLike[_NumVarImpl], const: float|np.floating = 0.0):
         self.coeffs = np.asarray(coeffs, dtype=float).reshape(-1)
-        if isinstance(terms, NDVarArray):
-            self.terms = terms
+        self.const = float(const)
+        if isinstance(vars, NDVarArray):
+            self.vars = vars
         else:
-            self.terms = cpm_array(terms)
-            if self.terms.ndim > 1:  # must reshape to 1D
-                # typing is wrong: numpy preserves our ndarray subclass
-                flat = self.terms.reshape(-1)
-                assert isinstance(flat, NDVarArray)  # true: numpy preserves our ndarray subclass
-                self.terms = flat
+            self.vars = cpm_array(vars)
+        if self.vars.ndim > 1:  # must reshape to 1D
+            flat = self.vars.reshape(-1)
+            # typing is wrong: numpy preserves our ndarray subclass
+            self.vars = cast(NDVarArray, flat)
 
-        if self.coeffs.size != self.terms.size:
-            raise TypeError(f"FloatSum(coeffs, terms) expects equal lengths, got {self.coeffs.size} coefficients and {self.terms.size} terms")
+        if self.coeffs.size != self.vars.size:
+            raise TypeError(f"FloatSum(coeffs, terms) expects equal lengths, got {self.coeffs.size} coefficients and {self.vars.size} terms")
         if self.coeffs.size == 0:
             raise TypeError("FloatSum(coeffs, terms) expects at least one term")
 
     def __repr__(self) -> str:
-        return f"FloatSum({list(self.coeffs)}, {list(self.terms)})"
+        if self.const:
+            return f"FloatSum({list(self.coeffs)}, {list(self.vars)}, constant={self.const})"
+        return f"FloatSum({list(self.coeffs)}, {list(self.vars)})"
 
     def value(self) -> Optional[float]:
-        vals = argvals_intexpr(self.terms)
+        vals = argvals_intexpr(self.vars)
         if vals is None:
             return None
-        return float(np.dot(self.coeffs, vals))
+        return float(np.dot(self.coeffs, vals) + self.const)
+
+    def components(self, negbool=False) -> tuple[NDVarArray, np.ndarray, float]:
+        """
+        Return ``(coeffs, vars, const)``
+        
+        if `negbool` is False (default), we will eliminate all :class:`~cpmpy.expressions.variables.NegBoolView`
+        ``w * ~bv`` becomes ``w - w * bv`` (coeff ``-w`` on ``bv._bv``, constant ``+w``).
+        """
+        if negbool or not any(isinstance(v, NegBoolView) for v in self.vars):
+            return self.coeffs, self.vars, self.const
+        else:
+            ws: list[float] = []
+            vs: list[_NumVarImpl] = []
+            const = self.const
+            for w, v in zip(self.coeffs, self.vars):
+                if isinstance(v, NegBoolView):
+                    ws.append(-w)
+                    vs.append(v._bv)
+                    const += w
+                else:
+                    ws.append(w)
+                    vs.append(v)
+            return np.asarray(ws, dtype=float), cpm_array(vs), const
 
     def _raise_objective_only(self) -> NoReturn:
         raise TypeError("FloatSum is objective-only. Use it directly in Model.minimize()/maximize().")

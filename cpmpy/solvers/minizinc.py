@@ -575,10 +575,12 @@ class CPM_minizinc(SolverInterface):
         """
 
         if isinstance(expr, FloatSum):
-            vs, ws = expr.terms, expr.coeffs
+            ws, vs, const = expr.components()
             self.user_vars.update(vs)  # save user variables
             mzn_parts = [f"({float(w)}) * ({vv})" for w, vv in zip(ws, self.solver_vars(vs))]
             mzn_obj = " + ".join(mzn_parts)
+            if const:
+                mzn_obj = mzn_obj + " + " + const
         else:
             get_variables(expr, collect=self.user_vars)  # add objvars to vars
             obj, decomp_cons = decompose_objective(

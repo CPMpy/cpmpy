@@ -220,11 +220,11 @@ class CPM_scip(SolverInterface):
 
     def objective(self, expr, minimize=True):
         if isinstance(expr, FloatSum):
-            vs, ws = expr.terms, expr.coeffs
-            self.user_vars.update(vs)  # save user varables
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
 
             import pyscipopt as scip
-            scip_obj = scip.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs)))
+            scip_obj = scip.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
         else:
             get_variables(expr, collect=self.user_vars)
             # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)

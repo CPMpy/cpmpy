@@ -290,9 +290,9 @@ class CPM_hexaly(SolverInterface):
         from hexaly.optimizer import HxObjectiveDirection
 
         if isinstance(expr, FloatSum):
-            vs, ws = expr.terms, expr.coeffs
+            ws, vs, const = expr.components()
             self.user_vars.update(vs)  # save user variables
-            hex_obj = self.hex_model.sum(float(c) * self._hex_expr(t) for c, t in zip(ws, vs))
+            hex_obj = self.hex_model.sum(float(c) * self._hex_expr(t) for c, t in zip(ws, vs)) + const
         else:
             get_variables(expr, collect=self.user_vars)
             obj, decomp_cons = decompose_objective(

@@ -805,7 +805,7 @@ class TestSolvers:
 
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
-    _floatsum_supported_solvers = frozenset({"ortools", "gurobi", "cplex", "scip", "z3", "hexaly", "minizinc"})
+    _floatsum_supported_solvers = frozenset({"ortools", "gurobi", "cplex", "scip", "z3", "hexaly", "minizinc", "highs"})
 
     def test_installed_solvers(self, solver):
         # basic model
@@ -884,11 +884,27 @@ class TestSupportedSolvers:
     def test_floatsum_objective(self, solver):
         if solver not in self._floatsum_supported_solvers:
             pytest.skip(f"{solver} does not support FloatSum objective")
+        if solver == "z3":
+            solver = "z3:opt"
+        s = cp.SolverLookup.get(solver)
 
         x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        m = cp.Model(maximize=cp.FloatSum([0.3, 0.5, 0.6], [x, y, z]))
-        assert m.solve(solver=solver)
-        assert m.objective_value() == 1.4
+        s.maximize(cp.FloatSum([0.3, 0.5, 0.6], [x, y, z], const=1))
+        assert s.solve()
+        assert s.objective_value() == pytest.approx(2.4, abs=1e-05)
+
+    def test_floatsum_negboolview(self, solver):
+        if solver not in self._floatsum_supported_solvers:
+            pytest.skip(f"{solver} does not support FloatSum objective")
+        if solver == "z3":
+            solver = "z3:opt"
+        s = cp.SolverLookup.get(solver)
+
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        s.maximize(cp.FloatSum([0.3, 0.5, 0.6], [~x, y, ~z], const=1))
+        assert s.solve()
+        assert (x.value(), y.value(), z.value()) == (False, True, False)
+        assert s.objective_value() == pytest.approx(2.4, abs=1e-05)
 
     def test_value_cleared(self, solver):
         x, y, z = cp.boolvar(shape=3)

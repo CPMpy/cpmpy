@@ -93,6 +93,7 @@ __all__ = [
     "Among",
     "NValue",
     "NValueExcept",
+# Objective-only (not an Expression)
     "FloatSum",
 # Global constraints
     "AllDifferent",
