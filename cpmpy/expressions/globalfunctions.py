@@ -1139,7 +1139,7 @@ class FloatSum:
             return None
         return float(np.dot(self.coeffs, vals) + self.const)
 
-    def components(self, negbool=False) -> tuple[NDVarArray, np.ndarray, float]:
+    def components(self, negbool=False) -> tuple[np.ndarray, NDVarArray, float]:
         """
         Return ``(coeffs, vars, const)``
         
