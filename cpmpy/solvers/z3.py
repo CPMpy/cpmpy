@@ -259,8 +259,6 @@ class CPM_z3(SolverInterface):
                 obj_val = sol.evaluate(obj)
                 if z3.is_int_value(obj_val):
                     self.objective_value_ = obj_val.as_long()
-                elif z3.is_rational_value(obj_val):
-                    self.objective_value_ = obj_val.numerator_as_long() / obj_val.denominator_as_long()
                 else:
                     self.objective_value_ = float(obj_val.as_decimal(20).rstrip("?"))
                 if not self._minimize:
