@@ -199,10 +199,12 @@ class TestTransfDecomp:
 
         assert len(decomp) == 1
         assert isinstance(decomp[0], cp.MDD)
-        # need more thorough test, order of transistions is not fixed
-        arr, transitions = decomp[0].args
+        # need more thorough test, order of transitions is not fixed
+        arr = decomp[0].args[0]
+        decomp_transitions = [(id1, v, id2) for id1, tf in decomp[0].mapping.items() for v, id2 in tf.items()]
+        my_transitions = [(id1, v, id2) for id1, tf in my_mdd.mapping.items() for v, id2 in tf.items()]
         assert str(arr) == str(my_mdd.args[0])
-        assert set(transitions) == set(my_mdd.args[1])
+        assert set(decomp_transitions) == set(my_transitions)
 
         # test count
         cons = cp.Count(x, 2) >= 1

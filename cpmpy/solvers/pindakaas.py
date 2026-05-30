@@ -207,6 +207,8 @@ class CPM_pindakaas(SolverInterface):
             else:  # clear values of variables
                 for cpm_var in self.user_vars:
                     cpm_var._value = None
+                for enc in self.ivarmap.values():
+                    enc._x._value = None
                 # we have to save the unsat core here, as the result object does not live beyond this solve call
                 if assumptions is not None:
                     assert solver_assumptions is not None and len(assumptions) == len(solver_assumptions), "Number of assumptions and solver assumptions must match"

@@ -161,8 +161,11 @@ class CPM_exact(SolverInterface):
         """
         return self.xct_solver
 
-    def _fillVars(self):
-        if not self.xct_solver.hasSolution():
+    def _fillVars(self, has_solution=None):
+        if has_solution is None:
+            has_solution = self.xct_solver.hasSolution()
+
+        if not has_solution:
             self.objective_value_ = None
             for cpm_var in self.user_vars:
                 cpm_var._value = None
@@ -258,15 +261,16 @@ class CPM_exact(SolverInterface):
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
         
-        self._fillVars()
+        # True/False depending on self.cpm_status
+        ret = self._solve_return(self.cpm_status)
+        self._fillVars(has_solution=ret)
         if self.has_objective():
             if self.objective_is_min_:
                 self.objective_value_ = obj_val
             else: # maximize, so actually negative value
                 self.objective_value_ = -obj_val
         
-        # True/False depending on self.cpm_status
-        return self._solve_return(self.cpm_status)
+        return ret
 
     def _update_time(self, timelim, start, end):
         """
@@ -312,7 +316,7 @@ class CPM_exact(SolverInterface):
             (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
             if my_status == "UNSAT": # found unsatisfiability
                 total_end = time.time()
-                self._fillVars() # erases the solution
+                self._fillVars(has_solution=False) # erases the solution
                 # update exit status
                 self.cpm_status = SolverStatus(self.name)
                 self.cpm_status.runtime = total_end - total_start
@@ -346,14 +350,14 @@ class CPM_exact(SolverInterface):
 
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
             if my_status == "UNSAT": # found unsatisfiability (no more solutions to be found)
-                self._fillVars() # erases the solution
+                self._fillVars(has_solution=False) # erases the solution
                 break
             elif my_status == "SAT": # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
-                    self._fillVars()
+                    self._fillVars(has_solution=True)
                     self.print_display(display)
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
