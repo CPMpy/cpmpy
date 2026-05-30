@@ -294,7 +294,7 @@ class CPM_gurobi(SolverInterface):
 
         if isinstance(expr, FloatSum):
             vs, ws = expr.terms, expr.coeffs
-            self.user_vars.update(vs)
+            self.user_vars.update(vs)  # save user variables
             grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs)))
         else:
             # save user variables

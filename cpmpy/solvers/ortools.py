@@ -358,7 +358,7 @@ class CPM_ortools(SolverInterface):
 
         if isinstance(expr, FloatSum):
             vs, ws = expr.terms, expr.coeffs
-            self.user_vars.update(vs)
+            self.user_vars.update(vs)  # save user varables
             ort_obj = ort.LinearExpr.weighted_sum(self.solver_vars(vs), ws)
 
         else:  # normal case, a CPMpy Expression

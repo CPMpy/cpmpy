@@ -328,15 +328,8 @@ class CPM_z3(SolverInterface):
 
         if isinstance(expr, FloatSum):
             vs, ws = expr.terms, expr.coeffs
-            self.user_vars.update(vs)
-
-            weighted_terms = []
-            for coeff, var in zip(ws, vs):
-                z3_term = self._z3_expr(var)
-                if isinstance(z3_term, z3.BoolRef):
-                    z3_term = z3.If(z3_term, 1, 0)
-                weighted_terms.append(coeff * z3_term)
-            z3_obj = z3.Sum(weighted_terms)
+            self.user_vars.update(vs)  # update user variables
+            z3_obj = z3.Sum([w*v for w,v in zip(ws,self.solver_vars(vs))])
         else:
             # save user variables
             get_variables(expr, self.user_vars)
@@ -349,10 +342,10 @@ class CPM_z3(SolverInterface):
                                                    csemap=self._csemap)
 
             self.add(safe_cons + decomp_cons)
-
             z3_obj = self._z3_expr(obj)
-            if isinstance(z3_obj, z3.BoolRef):
-                z3_obj = z3.If(z3_obj, 1, 0) # must be integer
+
+        if isinstance(z3_obj, z3.BoolRef):
+            z3_obj = z3.If(z3_obj, 1, 0) # must be integer
 
         if minimize:
             self.obj_handle = self.z3_solver.minimize(z3_obj)

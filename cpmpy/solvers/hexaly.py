@@ -291,7 +291,7 @@ class CPM_hexaly(SolverInterface):
 
         if isinstance(expr, FloatSum):
             vs, ws = expr.terms, expr.coeffs
-            self.user_vars.update(vs)
+            self.user_vars.update(vs)  # save user variables
             hex_obj = self.hex_model.sum(float(c) * self._hex_expr(t) for c, t in zip(ws, vs))
         else:
             get_variables(expr, collect=self.user_vars)

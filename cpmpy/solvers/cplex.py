@@ -306,9 +306,8 @@ class CPM_cplex(SolverInterface):
                 are premanently posted to the solver
         """
         if isinstance(expr, FloatSum):
-            # save user variables
             vs, ws = expr.terms, expr.coeffs
-            self.user_vars.update(vs)
+            self.user_vars.update(vs) # save user variables
             self._obj_offset = 0
             cplex_obj = self.cplex_model.scal_prod(self.solver_vars(vs), ws)
         else:

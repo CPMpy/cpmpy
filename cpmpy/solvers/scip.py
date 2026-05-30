@@ -221,7 +221,7 @@ class CPM_scip(SolverInterface):
     def objective(self, expr, minimize=True):
         if isinstance(expr, FloatSum):
             vs, ws = expr.terms, expr.coeffs
-            self.user_vars.update(vs)
+            self.user_vars.update(vs)  # save user varables
 
             import pyscipopt as scip
             scip_obj = scip.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs)))
