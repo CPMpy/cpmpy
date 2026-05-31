@@ -1089,7 +1089,7 @@ class NValueExcept(GlobalFunction):
 
 class FloatSum:
     """
-    Objective-only weighted sum with float coefficients over integer expressions.
+    Objective-only weighted sum with float coefficients over integer variables.
 
     Does not inherit from Expression because it is objective only and has float .value()
     Basically it is breaking all design rules of CPMpy...
@@ -1106,11 +1106,13 @@ class FloatSum:
             self.terms = terms
         else:
             self.terms = cpm_array(terms)
-            if self.terms.ndim > 1:  # must reshape to 1D
-                # typing is wrong: numpy preserves our ndarray subclass
-                flat = self.terms.reshape(-1)
-                assert isinstance(flat, NDVarArray)  # true: numpy preserves our ndarray subclass
-                self.terms = flat
+        
+        # ensure terms is a 1D array
+        if self.terms.ndim > 1:
+            # typing is wrong: numpy preserves our ndarray subclass
+            flat = self.terms.reshape(-1)
+            assert isinstance(flat, NDVarArray)  # true: numpy preserves our ndarray subclass
+            self.terms = flat
 
         if self.coeffs.size != self.terms.size:
             raise TypeError(f"FloatSum(coeffs, terms) expects equal lengths, got {self.coeffs.size} coefficients and {self.terms.size} terms")
