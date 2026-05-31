@@ -51,6 +51,7 @@ from ..expressions.core import BoolVal, Comparison, Operator
 from ..expressions.utils import is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalfunctions import FloatSum
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -285,24 +286,42 @@ class CPM_highs(SolverInterface):
         """
         import highspy
 
-        get_variables(expr, collect=self.user_vars)
+        if isinstance(expr, FloatSum):
+            # HiGHS' column costs are float-native, so post coeffs directly
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
 
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(
-            obj,
-            supported=self.supported_global_constraints,
-            supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap,
-        )
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        # only_positive_bv_wsum_const keeps the constant separate so it never ends up
-        # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
-        obj, obj_const = only_positive_bv_wsum_const(obj)
+            solvars = self.solver_vars(list(vs))
+            indices = np.asarray(solvars, dtype=np.int32)
+            values = np.asarray(ws, dtype=np.float64)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            # merge duplicate columns (same var used multiple times in the FloatSum)
+            if np.unique(indices).size != indices.size:
+                new_idx, group = np.unique(indices, return_inverse=True)
+                new_coeffs = np.bincount(group, weights=values).astype(np.float64)
+                sel = new_coeffs != 0  # drop columns whose aggregated coeff cancels to 0
+                indices, values = new_idx[sel], new_coeffs[sel]
 
-        indices, values, const = self._row_from_linexpr(obj)
-        const += obj_const
+            const = 0.0
+        else:
+            get_variables(expr, collect=self.user_vars)
+
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(
+                obj,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            # only_positive_bv_wsum_const keeps the constant separate so it never ends up
+            # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
+            obj, obj_const = only_positive_bv_wsum_const(obj)
+
+            self.add(safe_cons + decomp_cons + flat_cons)
+
+            indices, values, const = self._row_from_linexpr(obj)
+            const += obj_const
 
         # reset only columns that carried cost in the previous objective, then set new ones
         if self._obj_cols is not None and len(self._obj_cols):
