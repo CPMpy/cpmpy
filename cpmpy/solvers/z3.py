@@ -24,7 +24,7 @@
     Requires that the 'z3-solver' python package is installed:
 
     .. code-block:: console
-    
+
         $ pip install z3-solver
 
     See detailed installation instructions at:
@@ -53,7 +53,7 @@ from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.normalize import toplevel_list
@@ -65,7 +65,7 @@ class CPM_z3(SolverInterface):
     Interface to Z3's Python API.
 
     Creates the following attributes (see parent constructor for more):
-        
+
     - ``z3_solver``: object, z3's Solver() object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function in the `z3` namespace and ``z3_solver.add()``'s the result.
@@ -90,7 +90,7 @@ class CPM_z3(SolverInterface):
             return False
         except Exception as e:
             raise e
-        
+
     @classmethod
     def version(cls) -> Optional[str]:
         """
@@ -101,7 +101,7 @@ class CPM_z3(SolverInterface):
             return version('z3-solver')
         except PackageNotFoundError:
             return None
-        
+
     def __init__(self, cpm_model=None, subsolver="sat"):
         """
         Constructor of the native solver object
@@ -158,7 +158,7 @@ class CPM_z3(SolverInterface):
             - ... (no common examples yet)
 
             The full list doesn't seem to be documented online, you have to run its help() function:
-            
+
             .. code-block:: python
 
                 import z3
@@ -168,7 +168,7 @@ class CPM_z3(SolverInterface):
                 Warning! Some parameternames in z3 have a '.' in their name,
                 such as (arbitrarily chosen): ``sat.lookahead_simplify``
                 You have to construct a dictionary of keyword arguments upfront:
-                
+
                 .. code-block:: python
 
                     params = {"sat.lookahead_simplify": True}
@@ -185,7 +185,6 @@ class CPM_z3(SolverInterface):
                 raise ValueError("Time limit must be positive")
             # z3 expects milliseconds in int
             self.z3_solver.set(timeout=int(time_limit*1000))
-
 
         if assumptions is not None:
             assumptions = list(assumptions)  # iterable to ordered list
@@ -256,7 +255,7 @@ class CPM_z3(SolverInterface):
             # translate objective, for optimisation problems only
             if self.has_objective():
                 obj = self.z3_solver.objectives()[0]
-                self.objective_value_ = sol.evaluate(obj).as_long() 
+                self.objective_value_ = sol.evaluate(obj).as_long()
                 if not self._minimize:
                     self.objective_value_ = -1*self.objective_value_ # Z3 negates the objective function to turn a maximisation problem into a minimisation one, undoing negation here
 
@@ -502,7 +501,7 @@ class CPM_z3(SolverInterface):
                 # minimic modulo with integer division (round towards o)
                 x,y = self._z3_expr(cpm_con.args)
                 return z3.If(z3.And(x >= 0), x % y, -(-x % y))
-            
+
             elif cpm_con.name == "mul":
                 x, y = self._z3_expr(cpm_con.args)
                 if isinstance(x, z3.BoolRef):
@@ -573,6 +572,7 @@ class CPM_z3(SolverInterface):
         assert (len(self.assumption_dict) > 0), "Assumptions must be set using s.solve(assumptions=[...])"
 
         return [self.assumption_dict[z3_var] for z3_var in self.z3_solver.unsat_core()]
+
 
 
 

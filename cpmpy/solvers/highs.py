@@ -45,10 +45,10 @@ import warnings
 import numpy as np
 import numpy.typing as npt
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import Callback, SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison, Operator
-from ..expressions.utils import is_num, is_int
+from ..expressions.core import BoolVal, Comparison, Expression, Operator
+from ..expressions.utils import is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -320,12 +320,16 @@ class CPM_highs(SolverInterface):
     def has_objective(self):
         return self._obj_cols is not None
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the HiGHS solver.
 
             Arguments:
             - time_limit: maximum solve time in seconds (float, optional)
+            - display:    callback function to call after each solution is found
+                          either a list of CPMpy expressions, OR a callback function which
+                          gets called after the variable-value mapping of the intermediate solution.
+                          default/None: nothing is displayed
             - kwargs:     any keyword argument, mapped to HiGHS options via ``setOptionValue``.
                           Unknown/invalid options are ignored with a warning.
 
@@ -356,6 +360,12 @@ class CPM_highs(SolverInterface):
         else:
             # (re)set to no limit (for HiGHS: infinity)
             self.highs.setOptionValue("time_limit", highspy.kHighsInf)
+
+        if display is not None:
+            callback_type = hscb.HighsCallbackType.kCallbackMipSolution
+            callback = HighsSolutionPrinter(self, display, callback_type)
+            self.highs.setCallback(callback.callback, None)
+            self.highs.startCallback(callback_type)
 
         # map additional kwargs to HiGHS options
         for key, val in kwargs.items():
@@ -427,3 +437,39 @@ class CPM_highs(SolverInterface):
 
         return has_sol
 
+
+if CPM_highs.supported():
+    from highspy import cb as hscb
+    
+    class HighsSolutionPrinter:
+        """
+        CPMpy callback for HiGHs
+        """
+
+        def __init__(self, cpm_solver: CPM_highs, display:Callback, mip_solution_callback_type = hscb.HighsCallbackType.kCallbackMipSolution):
+            self.mip_solution_callback_type = mip_solution_callback_type
+            self._cpm_solver = cpm_solver
+            self._display = display
+            if isinstance(display, Expression) or is_any_list(display):
+                self._cpm_vars = get_variables(display)
+            elif callable(display):
+                # might use any, so populate all (user) variables with their values
+                self._cpm_vars = cpm_solver.user_vars
+
+        def callback(self, callback_type, message, data_out, data_in, user_data):
+            if callback_type != self.mip_solution_callback_type:
+                return
+
+            col_values = data_out.mip_solution
+
+            # map variables
+            for cpm_var in self._cpm_vars:
+    
+                col_idx = self._cpm_solver._varmap[cpm_var.name]
+                val = col_values[col_idx]
+                if cpm_var.is_bool():
+                    cpm_var._value = val >= 0.5
+                else:
+                    cpm_var._value = int(round(val))
+
+            self._cpm_solver.print_display(self._display)

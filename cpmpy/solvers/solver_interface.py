@@ -33,7 +33,7 @@ from ..expressions.utils import is_any_list, argvals
 from ..expressions.python_builtins import any
 from ..transformations.normalize import toplevel_list
 
-Callback: TypeAlias = Expression | ListLike[Expression] | Callable # type alias to use in solveAll
+Callback: TypeAlias = Expression | ListLike[Expression] | Callable[[], None] # type alias to as display argument in solve and solveAll
 
 class SolverInterface(object):
     """

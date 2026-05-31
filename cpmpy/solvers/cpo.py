@@ -44,13 +44,15 @@
 
 from typing import Optional
 import warnings
+import time
+
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, NDVarArray
 from ..expressions.utils import is_num, is_int, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
@@ -156,14 +158,18 @@ class CPM_cpo(SolverInterface):
         """
         return self.cpo_model
     
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the CP Optimizer solver
 
             Arguments:
-                time_limit (float, optional):   maximum solve time in seconds 
-                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `CpoSolutionCounter`. If you want to count all solutions, 
-                                                                                                        don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
+                time_limit (float, optional):   maximum solve time in seconds
+                solution_callback:              a ``docplex.cp.solver.solver_listener.CpoSolverListener`` or ``docplex.cp.solver.cpo_callback.CpoCallback`` object, or a list thereof
+                                                Takes precedence over ``display`` when both are set.
+                display:                        generic solution callback for use during optimization.
+                                                either a list of CPMpy expressions, OR a callback function which
+                                                gets called after the variable-value mapping of the intermediate solution.
+                                                default/None: nothing is displayed
                 kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -199,14 +205,31 @@ class CPM_cpo(SolverInterface):
         # set time limit
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
-        
+
         # create solver object
         self.cpo_solver = docp.solver.solver.CpoSolver(
             self.cpo_model,
-            TimeLimit=time_limit, 
-            **kwargs, 
-            listeners=[solution_callback] if solution_callback is not None else None
+            TimeLimit=time_limit,
+            **kwargs,
         )
+
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
+            if not isinstance(callback, list):
+                callback = [callback]
+        elif display is not None:
+            callback = [CpoSolutionPrinter(self, display)]
+
+        if callback is not None:
+            for cb in callback:
+                if isinstance(cb, CpoSolverListener):
+                    self.cpo_solver.add_listener(cb)
+                    # By default `solve()` only notifies listeners once with the final/best result.
+                    # Enable search_next mode so listeners are warned about every intermediate solution.
+                    self.cpo_solver.set_solve_with_search_next(True)
+                if isinstance(cb, CpoCallback):
+                    self.cpo_solver.add_callback(cb)
 
         self.cpo_result = self.cpo_solver.solve()
 
@@ -698,25 +721,11 @@ class CPM_cpo(SolverInterface):
 # solvers are optional, so this file should be interpretable
 # even if cpo is not installed...
 try:
+    from docplex.cp.solver.cpo_callback import CpoCallback, EVENT_SOLUTION
     from docplex.cp.solver.solver_listener import CpoSolverListener
-    import time
-
+    from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
     class CpoSolutionCounter(CpoSolverListener):
         """
-        Native CP Optimizer callback for solution counting.
-
-        It is based on cpo's built-in `CpoSolverListener`.
-
-        use with CPM_cpo as follows:
-
-        .. code-block:: python
-            
-            cb = CpoSolutionCounter()
-            s.solve(solution_callback=cb)
-
-        then retrieve the solution count with ``cb.solution_count()``
-
-        Arguments:
             verbose (bool, default: False): whether to print info on every solution found 
     """
 
@@ -727,15 +736,18 @@ try:
             if self.__verbose:
                 self.__start_time = time.time()
 
-        def result_found(self, solver, sres):
-            """Called on each new solution."""
+        def result_found(self, solver: CpoSolver, sres: CpoSolveResult):
+            """Keep track of solution count, invoked for each solution"""
+            if not sres.is_new_solution():
+                return # ignore non-new solutions
+
             if self.__verbose:
                 current_time = time.time()
                 obj = sres.get_objective_value()
                 print('Solution %i, time = %0.2f s, objective = %i' %
                       (self.__solution_count, current_time - self.__start_time, obj))
             self.__solution_count += 1
-
+        
         def solution_count(self):
             """Returns the number of solutions found."""
             return self.__solution_count
@@ -773,7 +785,7 @@ try:
                             default/None: nothing displayed
                 solution_limit (default = None): stop after this many solutions 
         """
-        def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+        def __init__(self, solver: CPM_cpo, display=None, solution_limit=None, verbose=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
             # we only need the cpmpy->solver varmap from the solver
@@ -786,9 +798,13 @@ try:
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
                 self._cpm_vars = solver.user_vars
+            self._cpm_solver = solver
 
-        def result_found(self, solver, sres):
-            """Called on each new solution."""
+        def result_found(self, solver:CpoSolver, sres:CpoSolveResult):
+            
+            if not sres.is_new_solution():
+                return # ignore non-new solutions
+
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
@@ -800,13 +816,7 @@ try:
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                if isinstance(self._display, Expression):
-                    print(argval(self._display))
-                elif is_any_list(self._display):
-                    # explicit list of expressions to display
-                    print(argvals(self._display))
-                else: # callable
-                    self._display()
+                self._cpm_solver.print_display(self._display)
 
             # check for count limit
             if self.solution_count() == self._solution_limit:

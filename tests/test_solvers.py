@@ -2,6 +2,7 @@ import inspect
 import importlib
 import inspect
 
+import re
 import tempfile
 import pytest
 import numpy as np
@@ -1037,6 +1038,58 @@ class TestSupportedSolvers:
         #test unique sols, should be same number
         assert len(sols) == 8
 
+    def test_solution_callback(self, solver, capsys):
+        import random
+        random.seed(0)
+
+        
+        n = 10
+        kwargs = dict(time_limit=3)
+        solver_obj = cp.SolverLookup.get(solver)
+        if "display" not in inspect.signature(solver_obj.solve).parameters:
+            pytest.skip(f"{solver} does not support solution callbacking")
+        if solver == "z3":
+            kwargs['time_limit'] = 10 # z3 is too slow otherwise, cannot find more than one solution in time limit
+
+
+        model, (vars,) = _get_golomb_model(n)
+
+        # model, vars = _get_tsp_model(n)
+        obj = model.objective_
+
+        # collect solutions using callback
+        collector = list()
+        res = model.solve(solver=solver, display=lambda :  collector.append(argvals(vars)), **kwargs)
+        if model.status().exitstatus != ExitStatus.UNKNOWN:
+            assert res is True
+            assert len(collector) > 1
+        
+        # print solutions using default display
+        solution_line_pattern = r"\[\d+(?:,? \d+)*\]"
+
+        res = model.solve(solver=solver, display=vars, **kwargs)
+        if model.status().exitstatus != ExitStatus.UNKNOWN:
+            assert res is True
+            captured = capsys.readouterr().out
+            assert len(captured) > 0
+            assert re.match(solution_line_pattern, captured.splitlines()[-1])
+
+
+        # print some more information using callback
+        from time import time
+        t0 = time()
+        def display():
+            print("Time elapsed:", time() - t0, "Obj:", obj.value(),  "Sol:", argvals(vars))
+
+        display_line_pattern = r"Time elapsed: \d+\.\d+ Obj: \d+ Sol: \[\d+(?:,? \d+)*\]"
+
+        res = model.solve(solver=solver, display=display, **kwargs)
+        if model.status().exitstatus != ExitStatus.UNKNOWN:
+            assert res is True
+            captured = capsys.readouterr().out
+            assert len(captured) > 0
+            assert re.match(display_line_pattern, captured.splitlines()[-1])
+
 
     # minizinc: ignore inconsistency warning when deliberately testing unsatisfiable model
     @pytest.mark.filterwarnings("ignore:model inconsistency detected")
@@ -1253,3 +1306,18 @@ def test_highs_basic_ilp():
     assert x.value() == 0
     assert y.value() == 5
     assert s.objective_value_ == 5
+
+def _get_golomb_model(size):
+    """copied from examples/csplib/prob006_golomb.py"""
+    marks = cp.intvar(0, size*size, shape=size, name="marks")
+
+    model = cp.Model()
+    model += (marks[0] == 0)
+    model += marks[:-1] < marks[1:]
+    diffs = [marks[j] - marks[i] for i in range(0, size-1)
+                                 for j in range(i+1, size)]
+    model += cp.AllDifferent(diffs)
+
+    model.minimize(marks[-1])
+
+    return model, (marks,)
