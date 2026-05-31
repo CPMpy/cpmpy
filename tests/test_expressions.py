@@ -267,11 +267,11 @@ class TestArrayExpressions:
         # with axis arg
         x = intvar(0,5,shape=(10,4), name="x")
         y = intvar(0, 200, shape=10, name="y")
-        model = cp.Model(y == x.prod(axis=1))
+        model = cp.Model(y == x.prod(axis=1))  # y[i] = product(x[i,:])
         model.solve()
-        for i in range(y.shape[0]):
+        for i,vv in enumerate(x):
             res = 1
-            for v in x[i, :]:
+            for v in vv:
                 res *= v.value()
             assert y[i].value() == res
 

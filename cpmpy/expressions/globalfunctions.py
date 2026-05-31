@@ -80,8 +80,8 @@ import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import intvar, cpm_array, NDVarArray, _NumVarImpl, BoolVal
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
+from .variables import intvar, cpm_array, NDVarArray, _NumVarImpl
+from .utils import argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
 class GlobalFunction(Expression):
@@ -1100,7 +1100,7 @@ class FloatSum:
     coeffs: np.ndarray
     terms: NDVarArray
 
-    def __init__(self, coeffs: ListLike[float|np.floating], terms: ListLike[Expression]):
+    def __init__(self, coeffs: ListLike[float|np.floating], terms: ListLike[_NumVarImpl]):
         self.coeffs = np.asarray(coeffs, dtype=float).reshape(-1)
         if isinstance(terms, NDVarArray):
             self.terms = terms
@@ -1121,10 +1121,10 @@ class FloatSum:
         return f"FloatSum({list(self.coeffs)}, {list(self.terms)})"
 
     def value(self) -> Optional[float]:
-        vals = argvals(self.terms)
-        if any(v is None for v in vals):
+        vals = argvals_intexpr(self.terms)
+        if vals is None:
             return None
-        return sum(c * v for c, v in zip(self.coeffs, vals))
+        return float(np.dot(self.coeffs, vals))
 
     def _raise_objective_only(self) -> NoReturn:
         raise TypeError("FloatSum is objective-only. Use it directly in Model.minimize()/maximize().")

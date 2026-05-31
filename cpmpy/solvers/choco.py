@@ -87,7 +87,7 @@ class CPM_choco(SolverInterface):
                                     "table", 'negative_table', "short_table", "regular", "InDomain",
                                     "cumulative", "no_overlap", "circuit", "gcc", "inverse", "precedence",
                                     "increasing", "decreasing", "strictly_increasing", "strictly_decreasing",
-                                    "lex_lesseq", "lex_less",
+                                    "lex_lesseq", "lex_less", "mdd",
                                     "min", "max", "div", "mod", "pow", "abs", "mul", "count", "element", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints  # choco supports everything reified
 
@@ -313,34 +313,31 @@ class CPM_choco(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
-            if not is_int(cpm_var):
-                raise ValueError(f"Choco only accepts integer constants, got {cpm_var} of type {type(cpm_var)}")
-            if cpm_var < -2147483646 or cpm_var > 2147483646:
-                raise ChocoBoundsException(
-                    "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    revar = self.chc_model.bool_not_view(self.solver_var(cpm_var._bv))
+                else:
+                    revar = self.chc_model.boolvar(name=name)
+            else:
+                revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=name)
+           
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return int(cpm_var)
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return self.chc_model.bool_not_view(self.solver_var(cpm_var._bv))
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.chc_model.boolvar(name=str(cpm_var.name))
-            elif isinstance(cpm_var, _IntVarImpl):
-                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
-                    raise ChocoBoundsException(
-                        "Choco does not accept variables with bounds outside of range (-2147483646..2147483646)")
-                revar = self.chc_model.intvar(cpm_var.lb, cpm_var.ub, name=str(cpm_var.name))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def objective(self, expr, minimize):
         """
@@ -380,21 +377,12 @@ class CPM_choco(SolverInterface):
 
 
     def _to_var(self, val):
-        from pychoco.variables.intvar import IntVar
-        if is_int(val):
-            # Choco accepts only int32, not int64
-            if val < -2147483646 or val > 2147483646:
-                raise ChocoBoundsException(
-                    "Choco does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
-            return self.chc_model.intvar(int(val), int(val))  # convert to "variable"
-        elif isinstance(val, _NumVarImpl):
+        if isinstance(val, _NumVarImpl):
             return self.solver_var(val)  # use variable
+        elif is_int(val):
+            return self.chc_model.intvar(int(val), int(val))  # convert to "variable"
         else:
             raise ValueError(f"Cannot convert {val} of type {type(val)} to Choco variable, expected int or NumVarImpl")
-
-        # elif isinstance(val, IntVar):
-        #     return val
-        # return None
 
     def _to_vars(self, vals):
         if is_any_list(vals):
@@ -639,7 +627,24 @@ class CPM_choco(SolverInterface):
                 automaton.set_initial_state(cpm_expr.node_map[start])
                 automaton.set_final(*[cpm_expr.node_map[a] for a in accepting])
                 return self.chc_model.regular(self._to_vars(array), automaton)
-            
+            elif cpm_expr.name == "mdd":
+                from pychoco.objects.graphs.multivalued_decision_diagram import MultivaluedDecisionDiagram
+                from pychoco.backend import create_mdd_transitions
+                from pychoco._handle_wrapper import _HandleWrapper
+                from pychoco._utils import make_int_2d_array, make_intvar_array
+
+                array, transitions = cpm_expr.args
+                node_map = {n: i for i, n in enumerate(cpm_expr.levels)}
+                node_map[cpm_expr.sink_node] = -1
+                transitions_int = [[node_map[src], val, node_map[dst]] for src, val, dst in transitions]
+                # currently no user-friendly way to create MDD objects with transitions in Pychoco.
+                # Manually create the required objects using the backend API.
+                # Issue opened on github: https://github.com/chocoteam/pychoco/issues/43
+                chc_handle = create_mdd_transitions(make_intvar_array(self._to_vars(array)), make_int_2d_array(transitions_int))
+                chc_mdd = MultivaluedDecisionDiagram.__new__(MultivaluedDecisionDiagram)
+                _HandleWrapper.__init__(chc_mdd, chc_handle)
+                return self.chc_model.mddc(self._to_vars(array), chc_mdd)
+
             elif cpm_expr.name == 'InDomain':
                 assert len(cpm_expr.args) == 2  # args = [array, list of vals]
                 expr, table = self.solver_vars(cpm_expr.args)

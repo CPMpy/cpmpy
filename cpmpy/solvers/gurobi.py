@@ -50,11 +50,11 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callbac
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import FloatSum
-from ..expressions.utils import argvals, argval, is_any_list, is_num
+from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
@@ -255,27 +255,29 @@ class CPM_gurobi(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            from gurobipy import GRB
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+                revar = self.grb_model.addVar(vtype=GRB.BINARY, name=name)
+            else:
+                revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view. Should be eliminated in linearize
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
-
-        # create if it does not exit
-        if cpm_var not in self._varmap:
-            from gurobipy import GRB
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.grb_model.addVar(vtype=GRB.BINARY, name=cpm_var.name)
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.grb_model.addVar(cpm_var.lb, cpm_var.ub, vtype=GRB.INTEGER, name=str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize=True):
@@ -291,16 +293,9 @@ class CPM_gurobi(SolverInterface):
         from gurobipy import GRB
 
         if isinstance(expr, FloatSum):
-            # save user variables
-            get_variables(expr.terms, self.user_vars)
-            vars_ = []
-            flat_cons = []
-            for term in expr.terms:
-                var, cons = get_or_make_var(term, csemap=self._csemap)
-                vars_.append(var)
-                flat_cons.extend(cons)
-            self.add(flat_cons)
-            grb_obj = gp.quicksum(float(w) * self.solver_var(var) for w, var in zip(expr.coeffs, vars_))
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
+            grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs)))
         else:
             # save user variables
             get_variables(expr, self.user_vars)

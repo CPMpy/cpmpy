@@ -31,9 +31,9 @@ from ..expressions.core import BoolVal, Comparison, Operator
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
-from ..expressions.utils import is_num, is_true_cst, is_false_cst
+from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
 from ..transformations.comparison import only_numexpr_equality
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum
 from ..transformations.normalize import toplevel_list
@@ -156,7 +156,7 @@ class CPM_scip(SolverInterface):
             best_sol = self.scip_model.getBestSol()
             assert best_sol is not None, f"Due to status {scip_status}, we expected a solution from SCIP, but there was none. This is a bug, please report on GitHub."
             for cpm_var in self.user_vars:
-                assert cpm_var in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub."
+                assert cpm_var.name in self._varmap, f"SCIP: The user variable {cpm_var} was never added to the variable map. This is a bug, please report on GitHub."
                 scip_var = self.solver_var(cpm_var)
                 solver_val = self.scip_model.getSolVal(best_sol, scip_var)
                 if cpm_var.is_bool():
@@ -188,48 +188,43 @@ class CPM_scip(SolverInterface):
 
 
     def solver_var(self, cpm_var):
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        """
+            Creates solver variable for cpmpy variable
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
+        """
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # special case, negative-bool-view (not supported as first-class var; use 1-bv in constraints)
+                if isinstance(cpm_var, NegBoolView):
+                    raise NotSupportedError(
+                        "Negative literals should not be part of any equation. See /transformations/linearize for more details"
+                    )
+                revar = self.scip_model.addVar(vtype='B', name=name)
+            else:
+                revar = self.scip_model.addVar(lb=cpm_var.lb, ub=cpm_var.ub, vtype='I', name=name)
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view (not supported as first-class var; use 1-bv in constraints)
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError(
-                "Negative literals should not be part of any equation. See /transformations/linearize for more details"
-            )
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.scip_model.addVar(vtype='B', name=cpm_var.name)
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.scip_model.addVar(lb=cpm_var.lb, ub=cpm_var.ub, vtype='I', name=cpm_var.name)
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize=True):
         if isinstance(expr, FloatSum):
-            get_variables(expr.terms, collect=self.user_vars)
-            # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
-            self.solver_vars(list(self.user_vars))
-
-            vars_ = []
-            flat_cons = []
-            for term in expr.terms:
-                var, cons = get_or_make_var(term, csemap=self._csemap)
-                vars_.append(var)
-                flat_cons.extend(cons)
-
-            # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
-            for cpm_expr in self.transform(flat_cons):
-                self._add_transformed_constraint(cpm_expr)
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
 
             import pyscipopt as scip
-            scip_obj = scip.quicksum(float(w) * self.solver_var(var) for w, var in zip(expr.coeffs, vars_))
+            scip_obj = scip.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs)))
         else:
             get_variables(expr, collect=self.user_vars)
             # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)

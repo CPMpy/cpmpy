@@ -56,7 +56,6 @@ from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..transformations.flatten_model import get_or_make_var
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 
@@ -278,33 +277,36 @@ class CPM_z3(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
         import z3
 
-        if is_num(cpm_var): # shortcut, eases posting constraints
-            return cpm_var
+        if isinstance(cpm_var, _NumVarImpl):
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return z3.Not(self.solver_var(cpm_var._bv))
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
 
-        # create if it does not exit
-        if cpm_var not in self._varmap:
-            # we assume al variables are user variables (because nested expressions)
-            self.user_vars.add(cpm_var)
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = z3.Bool(str(cpm_var))
-            elif isinstance(cpm_var, _IntVarImpl):
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    revar = z3.Not(self.solver_var(cpm_var._bv))
+                else:
+                    revar = z3.Bool(str(cpm_var))
+
+            else:
                 revar = z3.Int(str(cpm_var))
                 # set bounds
                 self.z3_solver.add(revar >= cpm_var.lb)
                 self.z3_solver.add(revar <= cpm_var.ub)
-            else:
-                raise NotImplementedError("Not a know var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
+            self._varmap[name] = revar
+            return revar
 
-        return self._varmap[cpm_var]
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
+
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def has_objective(self):
@@ -327,22 +329,15 @@ class CPM_z3(SolverInterface):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
         if isinstance(expr, FloatSum):
-            # save user variables
-            get_variables(expr.terms, self.user_vars)
-            vars_ = []
-            flat_cons = []
-            for term in expr.terms:
-                var, cons = get_or_make_var(term, csemap=self._csemap)
-                vars_.append(var)
-                flat_cons.extend(cons)
-            self.add(flat_cons)
+            vs, ws = expr.terms, expr.coeffs
+            self.user_vars.update(vs)
 
             weighted_terms = []
-            for coeff, var in zip(expr.coeffs, vars_):
+            for coeff, var in zip(ws, vs):
                 z3_term = self._z3_expr(var)
                 if isinstance(z3_term, z3.BoolRef):
                     z3_term = z3.If(z3_term, 1, 0)
-                weighted_terms.append(float(coeff) * z3_term)
+                weighted_terms.append(coeff * z3_term)
             z3_obj = z3.Sum(weighted_terms)
         else:
             # save user variables
