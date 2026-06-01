@@ -190,12 +190,21 @@ class TestTransfDecomp:
         # test element
         cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3) 
+                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3)
 
-        # test table
-        cons = cp.Table(x, [[1,1], [2,3]])
-        assert set(map(str, decompose_linear([cons]))) == \
-                            {'((a == 1) and (b == 1)) or ((a == 2) and (b == 3))'}
+        # supported="mdd", to avoid recursive decomposition
+        cons = cp.Table(x, [[1, 1], [2, 3]])
+        my_mdd = cp.MDD(x, [(0, 1, 1), (0, 2, 2), (1, 1, -1), (2, 3, -1)]) # ground truth MDD to which the table should be decomposed
+        decomp = decompose_linear([cons], supported={"mdd"})
+
+        assert len(decomp) == 1
+        assert isinstance(decomp[0], cp.MDD)
+        # need more thorough test, order of transitions is not fixed
+        arr = decomp[0].args[0]
+        decomp_transitions = [(id1, v, id2) for id1, tf in decomp[0].mapping.items() for v, id2 in tf.items()]
+        my_transitions = [(id1, v, id2) for id1, tf in my_mdd.mapping.items() for v, id2 in tf.items()]
+        assert str(arr) == str(my_mdd.args[0])
+        assert set(decomp_transitions) == set(my_transitions)
 
         # test count
         cons = cp.Count(x, 2) >= 1

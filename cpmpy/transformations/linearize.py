@@ -68,6 +68,7 @@ from typing import AbstractSet, Sequence, Optional
 
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
+from .cse import CSEMap
 
 from .flatten_model import flatten_constraint, get_or_make_var
 from .decompose_global import decompose_in_tree, decompose_objective
@@ -75,11 +76,11 @@ from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
-from .int2bool import _encode_int_var
+from .int2bool import IntVarEnc, _encode_int_var
 
 
 
@@ -311,7 +312,7 @@ def only_positive_bv(lst_of_expr, csemap=None):
                         if nbv:
                             aux = cp.boolvar()
                             new_args.append(aux)
-                            new_cons += [aux + lhs.args[i]._bv == 1]  # aux == 1 - arg._bv
+                            new_cons.append(aux + lhs.args[i]._bv == 1)  # aux == 1 - arg._bv
                         else:
                             new_args.append(lhs.args[i])
 
@@ -576,7 +577,7 @@ def only_positive_coefficients(lst_of_expr):
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Optional[AbstractSet[str]] = None,
                      supported_reified: Optional[AbstractSet[str]] = None,
-                     csemap: Optional[dict[Expression, Expression]] = None):
+                     csemap: Optional[CSEMap] = None):
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
 
@@ -601,7 +602,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,
                                supported_reified: Optional[AbstractSet[str]] = None,
-                               csemap: Optional[dict[Expression, Expression]] = None):
+                               csemap: Optional[CSEMap] = None):
     """Decompose objective using linear-friendly (var == val) decompositions."""
     if supported is None:
         supported = frozenset[str]()
@@ -623,48 +624,70 @@ def get_linear_decompositions():
     return dict(
         alldifferent=AllDifferent.decompose_linear,
         element=Element.decompose_linear,
+        table=Table.decompose_linear
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 
-def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None):
+def linearize_reified_variables(constraints:list[Expression], 
+                                min_values:int=3, 
+                                csemap:Optional[CSEMap]=None, 
+                                ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
     """
-    Replace reified (BV <-> (x == val)) implications with direct encoding when a variable
+    Replace reified (BV <-> (x == val)) implications with direct encoding and
+    reified (BV <-> (x >= val)) implications with order encoding when a variable
     has at least min_values such reifications: remove those implications and add
-    the 'direct' encoding of x.
+    the corresponding encoding of x.
 
-    If ivarmap is None, both sum(bvs)==1 and wsum(values, bvs)==var are posted.
-    If ivarmap is not None, the encoding is added to ivarmap and only sum(bvs)==1
-    (the domain constraint) is posted; the solver can then choose to eliminate the
-    vars, or post the wsums itself anyway.
+    If ivarmap is None, both consistency constraints and channeling constraints are posted.
+    If ivarmap is not None, the encoding is added to ivarmap and only (the domain constraint) is posted; 
+    the solver can then choose to eliminate the variables, or post the channeling constraints itself anyway.
+
+    If both BV <-> (x == val) and BV <-> (x >= val) are present, choose the
+    encoding type that occurs most often for that variable. Ties prefer the
+    direct encoding.
+    (TODO: add both encodings and channel between them?)
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
     """
+    assert min_values > 0
+    
     # this transformation can only be done if there is a csemap
     if csemap is None:
         return constraints
 
-    # Collect bv -> (var == val)'s in csemap
-    var_vals = {}  # var: [val, bv]
-    for expr, bv in csemap.items():
-        if expr.name == '==':
-            var,val = expr.args
-            if isinstance(var, _NumVarImpl) and is_int(val):
-                var_vals.setdefault(var, []).append((val, bv))
-    
     # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
-    toplevel = []
-    bv_map = {}  # bv -> (var, val)
-    for var, vals in var_vals.items():
-        # check if we should linearize the reified variables
-        lb, ub = var.lb, var.ub
-        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
-        if len(vals) < min_values:
-            continue  # do not encode
 
+    var_vals, var_bounds = csemap.get_reified_varvalbounds()
+
+    # decide the encoding to use for each variable
+    var_encodings = dict() # var -> (encoding, vals)
+    candidate_vars = list(var_vals) + [var for var in var_bounds if var not in var_vals]
+    for var in candidate_vars:
+        lb, ub = var.lb, var.ub
+        if var.name in my_ivarmap:
+            continue
+
+        direct_vals = [(val, bv) for val, bv in var_vals.get(var, []) if lb <= val <= ub]  # only the valid values, in bounds!
+        order_vals = [(val, bv) for val, bv in var_bounds.get(var, []) if lb < val <= ub]  # only the valid values, exclude lb
+
+        if len(direct_vals) >= len(order_vals):
+            encoding, vals = "direct", direct_vals
+        else:
+            encoding, vals = "order", order_vals
+
+        if len(vals) >= min_values:
+            var_encodings[var] = (encoding, vals)
+    
+    
+    bv_map = {}  # (bv, encoding) -> (var, val)
+    toplevel = []
+
+    for var, (encoding, vals) in var_encodings.items():
+        
         # encode the values
-        enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
+        enc, domain_constraint = _encode_int_var(my_ivarmap, var, encoding, csemap=csemap)
         
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
@@ -678,24 +701,33 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
         
         # store the bvs that no longer need to be reified
         for val, bv in vals:
-            bv_map[bv] = (var, val)
+            bv_map[(bv, encoding)] = (var, val)
 
     if len(bv_map) > 0:
         # Now clean up and remove the '(var == val) == bv' constraints:
         newcons = []
         for con in constraints:
-            if con.name == '==' and con.args[0].name == '==':
-                # potential '(var == val) == bv'
-                lhs,bv = con.args
-                if bv in bv_map:
-                    (var, val) = bv_map[bv]
+            if con.name == '==': # its a reification
+                lhs, bv = con.args
+                if con.args[0].name == '==' and (bv, "direct") in bv_map:
+                    # potential '(var == val) == bv'
+                    var, val = bv_map[(bv, "direct")]
+                    (lhs_var, lhs_val) = lhs.args
+                    if lhs_val == val and lhs_var == var:
+                        continue  # do not keep
+                
+                if con.args[0].name == '>=' and (bv, "order") in bv_map:
+                    # potential '(var >= val) == bv'
+                    var, val = bv_map[(bv, "order")]
                     (lhs_var, lhs_val) = lhs.args
                     if lhs_val == val and lhs_var == var:
                         continue  # do not keep
             newcons.append(con)
-        constraints = newcons
-
-    return constraints + toplevel
+        
+        return newcons + toplevel
+    
+    assert len(toplevel) == 0, "cannot have toplevel constraints if len(bv_map) == 0"
+    return constraints
 
 
 def _extract_var_from_lhs(lhs):

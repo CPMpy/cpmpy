@@ -3,9 +3,11 @@ import pytest
 import cpmpy as cp
 from cpmpy.expressions import boolvar, intvar
 from cpmpy.expressions.core import Operator
+from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.linearize import linearize_constraint, linearize_reified_variables, decompose_linear, canonical_comparison, only_positive_bv, only_positive_coefficients, only_positive_bv_wsum_const, only_positive_bv_wsum
 from cpmpy.transformations.decompose_global import decompose_in_tree
+from cpmpy.transformations.int2bool import IntVarEncDirect, IntVarEncOrder
 from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.reification import only_bv_reifies, only_implies
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl
@@ -593,7 +595,7 @@ class TestLinearizeReifiedVariablesThreshold:
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
-        self.csemap = {}
+        self.csemap = CSEMap()
         self.ivarmap = {}
         a = cp.intvar(1, 3, name="a")
         self.a = a
@@ -638,32 +640,109 @@ class TestLinearizeReifiedVariablesThreshold:
 
         assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1, (BV[a == 3]) or (BV[a == 2])]"
 
-    # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
-    @pytest.mark.xfail(reason="aspirational")
     def test_linearize_reified_disequalities(self):
         """Use direct encoding on disequalities and replace `a != 1` expressions"""
         a = self.a
         out = linearize_reified_variables(self.linearize((a != 1) | (a != 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[(~BV[a == 1]) or (~BV[a == 2]), sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1"
+        assert str(out) == "[(~BV[a == 1]) or (~BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1]"
 
-    @pytest.mark.xfail(reason="aspirational")
     def test_linearize_reified_inequalities(self):
-        """Use order encoding on inequalities and replace `a>=1` expressions"""
+        """Use order encoding on inequalities and replace `a>=k` expressions"""
         a = self.a
-        out = linearize_reified_variables(self.linearize((a >= 1) | (a >= 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[(BV[a >= 1]) or (BV[a >= 2]), sum([1, -1] * (BV[a >= 2], BV[a >= 1])) <= 0, sum([1, -1] * (BV[a >= 3], BV[a >= 2])) <= 0]"
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(self.linearize((a >= 2) | (a >= 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
+        
+    def test_linearize_reified_inequality_misordered(self):
+        """Canonicalize expression where the const is on the lhs"""
+        a = self.a
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(self.linearize((2 <= a) | (1 >= a) | (3 <= a)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == "[or(BV[a >= 2], ~BV[a >= 2], BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
+        
+    def test_linearize_reified_inequalities_no_ivarmap(self):
+        """Use order encoding on inequalities and post the channel when keeping the int var."""
+        a = self.a
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(self.linearize((a >= 2) | (a >= 3)), min_values=2, csemap=self.csemap)
+        assert str(out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2]), sum([1, -1, -1] * [a, BV[a >= 2], BV[a >= 3]]) == 1]"
 
-    @pytest.mark.xfail(reason="aspirational")
+    def test_linearize_reified_prefers_more_frequent_encoding(self):
+        """Choose order encoding when more order reifications than direct ones occur."""
+        a = cp.intvar(1, 4, name="a")
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(
+            self.linearize((a == 1) | (a == 2) | (a >= 2) | (a >= 3) | (a >= 4)),
+            min_values=2,
+            csemap=self.csemap,
+            ivarmap=self.ivarmap,
+        )
+
+        assert isinstance(self.ivarmap["a"], IntVarEncOrder)
+        assert str(out) == "[or(BV2, BV3, BV[a >= 2], BV[a >= 3], BV[a >= 4]), (a == 1) == (BV2), (a == 2) == (BV3), (BV[a >= 3]) -> (BV[a >= 2]), (BV[a >= 4]) -> (BV[a >= 3])]"
+
+    def test_linearize_reified_inequalities_ignores_low_out_of_domain_threshold(self):
+        """Out-of-domain order thresholds should not count towards min_values."""
+        a = self.a
+        self.csemap = CSEMap()
+        cpm_cons = self.linearize((a >= 0) | (a >= 2))
+        out = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == str(cpm_cons)
+
+    def test_linearize_reified_inequalities_ignores_high_out_of_domain_threshold(self):
+        """Out-of-domain order thresholds should not count towards min_values."""
+        a = self.a
+        self.csemap = CSEMap()
+        cpm_cons = self.linearize((a >= 10) | (a >= 2))
+        out = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == str(cpm_cons)
+
+    def test_linearize_reified_upper_bounds_out_of_domain(self):
+        """Out-of-domain upper-bound reifications are left untouched by this pass."""
+        a = self.a
+        self.csemap = CSEMap()
+        cpm_cons = self.linearize((a <= 10) | (a <= -2))
+        out = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == str(cpm_cons)
+
+    def test_linearize_reified_same_var_direct_then_order(self):
+        """An existing direct encoding keeps later order reifications explicit."""
+        a = self.a
+        self.csemap = CSEMap()
+
+        direct_out = linearize_reified_variables(self.linearize((a == 1) | (a == 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        cpm_cons = self.linearize((a >= 2) | (a >= 3))
+        order_out = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+
+        assert isinstance(self.ivarmap["a"], IntVarEncDirect)
+        assert str(direct_out) == "[(BV[a == 1]) or (BV[a == 2]), sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1]"
+        assert str(order_out) == str(cpm_cons)
+
+    def test_linearize_reified_same_var_order_then_direct(self):
+        """An existing order encoding keeps later direct reifications explicit."""
+        a = self.a
+        self.csemap = CSEMap()
+
+        order_out = linearize_reified_variables(self.linearize((a >= 2) | (a >= 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        cpm_cons = self.linearize((a == 1) | (a == 2))
+        direct_out = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+
+        assert isinstance(self.ivarmap["a"], IntVarEncOrder)
+        assert str(order_out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
+        assert str(direct_out) == str(cpm_cons)
+    
+    # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
+    
     def test_linearize_reified_inequalities_variations(self):
         """Use order encoding on inequalities and replace other types of inequality expressions"""
         a = self.a
-        out = linearize_reified_variables(self.linearize((a < 1) | (a <= 2) | (a > 2)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[(~BV[a >= 1]) or (~BV[a >= 3]) or (BV[a >= 3]), sum([1, -1] * (BV[a >= 2], BV[a >= 1])) <= 0, sum([1, -1] * (BV[a >= 3], BV[a >= 2])) <= 0]"
-
+        self.csemap = CSEMap()
+        out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a < 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == "[or(~BV[a >= 2], ~BV[a >= 3], ~BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
+        
     @pytest.mark.xfail(reason="aspirational")
     def test_linearize_non_ocurring_int_var(self):
         """For an integer solver, we can omit the channelling constraint if the encoded integer variable does not occur in any constraint. Note: `a` and `b` are encoded (because at least 2 equality reifications occur), `c` is not encoded (no reifications). We see `b` occurs as an integer variable in a constraint, so channelling is required, but the int var `a` does not occur in any constraint, so no channelling is required. `c` is not encoded."""
         b, c = cp.intvar(1, 3, name="b"), cp.intvar(1, 3, name="c")
         out = linearize_reified_variables(self.cpm_cons + self.linearize([(b == 1) | (b == 2), b + c == 3]), min_values=2, csemap=self.csemap)
         assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([BV[b == 1], BV[b == 2], BV[b == 3]]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
-

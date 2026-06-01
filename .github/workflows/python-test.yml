@@ -19,6 +19,8 @@ jobs:
               sudo snap install minizinc --classic
           - solver: pindakaas
           - solver: pumpkin
+          - solver: scip
+          - solver: highs
     uses: ./.github/workflows/test-solver.yml
     with:
       solver: ${{ matrix.solver }}
