@@ -228,13 +228,13 @@ class TestTransfDecomp:
         cons = MyCustomGlobal([a,b,c])
 
         assert set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) >= 1", "a == 1"} # decomposed at toplevel
-        assert set(map(str, decompose_in_tree([~cons]))) == {"not(sum(a, b, c) == 1", "a == 1"} # pushed down negation into standard decomp -- TODO: update after #916 is merged
-        assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == {"(bv) -> (sum(a, b, c)) >= 1", "a == 1"} # decompose positive
-        assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) -> (sum(a, b, c) == 1)", "a == 1"} # decompose standard
+        assert set(map(str, decompose_in_tree([~cons]))) == {"not(sum(a, b, c) == 1)", "a == 1"} # pushed down negation into standard decomp -- TODO: update after #916 is merged
+        assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == {"(bv) -> (sum(a, b, c) >= 1)", "a == 1"} # decompose positive
+        assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard
 
         # custom decompose has precedence over positive decompose
-        decompose_custom = {"mycustomglobal": lambda x : (cp.sum(x.args) == 5, [])}
-        assert set(map(str, decompose_in_tree([cons], decompose_custom=decompose_custom))) == {"(sum(a,b,c)) == 5"} # custom decompose
+        decompose_custom = {"mycustomglobal": lambda x : ([cp.sum(x.args) == 5], [])}
+        assert set(map(str, decompose_in_tree([cons], decompose_custom=decompose_custom))) == {"sum(a, b, c) == 5"} # custom decompose
 
 
     def test_issue_546(self):
