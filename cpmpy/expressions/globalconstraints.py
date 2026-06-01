@@ -1779,7 +1779,10 @@ class NoOverlap(GlobalConstraint):
         return cons, []
 
     def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
-        return cp.Cumulative(self.args[0], self.args[1], self.args[2], 1, 1).decompose_linear()
+        if len(self.args) == 2:
+            return cp.Cumulative(self.args[0], self.args[1], demand=1, capacity=1).decompose_linear()
+        else:
+            return cp.Cumulative(self.args[0], self.args[1], self.args[2], 1, 1).decompose_linear()
 
     def value(self) -> Optional[bool]:
         """

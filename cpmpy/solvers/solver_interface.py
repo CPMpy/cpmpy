@@ -133,7 +133,8 @@ class SolverInterface(object):
             Post the given expression to the solver as objective to minimize/maximize
 
             Arguments:
-                expr: Expression, the CPMpy expression that represents the objective function
+                expr: a CPMpy :class:`~cpmpy.expressions.core.Expression`, or a
+                    :class:`~cpmpy.expressions.globalfunctions.FloatSum` if supported
                 minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             ``objective()`` can be called multiple times, only the last one is stored
