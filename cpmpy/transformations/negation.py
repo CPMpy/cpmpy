@@ -25,9 +25,11 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
             list of Expressions
     """
     newlist: list[Expression] = []
+    changed = False
     for expr in lst_of_expr:
-        changed, newexpr = _push_down_negation_expr(expr)
-        if changed:
+        changed_expr, newexpr = _push_down_negation_expr(expr)
+        if changed_expr:
+            changed = True
             if toplevel and newexpr.name == "and":
                 for b in newexpr.args:
                     if isinstance(b, Expression):
@@ -39,6 +41,9 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
                 newlist.append(newexpr)
         else:
             newlist.append(expr)
+    
+    if not changed:
+        return lst_of_expr
     return newlist
 
 

@@ -64,13 +64,18 @@ def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[E
     """
 
     newlist: list[Expression] = []
+    changed = False
     for expr in lst_of_expr:
-        changed, newexpr = _simplify_boolean_expr(expr, num_context=num_context)
-        if changed:
+        changed_expr, newexpr = _simplify_boolean_expr(expr, num_context=num_context)
+        if changed_expr:
+            changed = True
             assert not isinstance(newexpr, int)
             newlist.append(newexpr)
         else:
             newlist.append(expr)
+    
+    if not changed:
+        return lst_of_expr
     return newlist
 
 
