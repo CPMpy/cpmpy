@@ -380,8 +380,7 @@ class CPM_pysat(SolverInterface):
             cpm_cons,
             min_values=2,
             csemap=self._csemap,
-            ivarmap=self.ivarmap,
-            encoding=self.encoding,
+            ivarmap=self.ivarmap
         )
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)

@@ -274,7 +274,6 @@ class CPM_pindakaas(SolverInterface):
             min_values=2,
             csemap=self._csemap,
             ivarmap=self.ivarmap,
-            encoding=self.encoding,
         )
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
