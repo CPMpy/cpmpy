@@ -108,13 +108,19 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 
             # decompose its arguments
             arg_changed, arg_newargs, arg_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-            if decomposed_positive or arg_changed:
-                # TODO: we can avoid a copy here
+            if arg_changed and len(arg_toplevel) > 0: # first check is probably redundant, but its not in the contract
+                todolist.extend(arg_toplevel)
+            
+            if decomposed_positive and arg_changed:
+                changed = True
+                expr.update_args(arg_newargs) # no copy needed, we know expr is a fresh expression
+            elif arg_changed: # arg changed, but no decompose positive
                 changed = True
                 expr = copy.copy(expr)
                 expr.update_args(arg_newargs)
-                if len(arg_toplevel) > 0:
-                    todolist.extend(arg_toplevel)
+            elif decomposed_positive: # decomposed positive, but no arg changed
+                changed = True
+
             newlist.append(expr)
         else:
             newlist.append(expr)
