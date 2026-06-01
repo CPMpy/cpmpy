@@ -211,6 +211,32 @@ class TestTransfDecomp:
         assert set(map(str, decompose_linear([cons]))) == \
                             {'(a == 2) + (b == 2) >= 1'}
 
+    def test_decompose_positive(self):
+
+        # make a custom global constraint to test specialized decompose
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+            
+            def decompose(self):
+                return [cp.sum(self.args) == 1], [self.args[0] == 1] # some random defining constraint
+            def decompose_positive(self):
+                return [cp.sum(self.args) >= 1], [self.args[0] == 1] # some random defining constraint
+
+        a,b,c = cp.intvar(0,10,shape=3, name=("a","b","c"))
+        bv = cp.boolvar(name="bv")
+        cons = MyCustomGlobal([a,b,c])
+
+        assert set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) >= 1", "a == 1"} # decomposed at toplevel
+        assert set(map(str, decompose_in_tree([~cons]))) == {"sum(a, b, c) != 1", "a == 1"} # pushed down negation into standard decomp
+        assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == {"(bv) -> (sum(a, b, c)) >= 1", "a == 1"} # decompose positive
+        assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) -> (sum(a, b, c) == 1)", "a == 1"} # decompose standard
+
+        # custom decompose has precedence over positive decompose
+        decompose_custom = {"mycustomglobal": lambda x : (cp.sum(x.args) == 5, [])}
+        assert set(map(str, decompose_in_tree([cons], decompose_custom=decompose_custom))) == {"(sum(a,b,c)) == 5"} # custom decompose
+
+
     def test_issue_546(self):
         # https://github.com/CPMpy/cpmpy/issues/546
         x = cp.intvar(1,3,shape=2, name=tuple("ab"))
