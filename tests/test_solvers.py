@@ -1255,7 +1255,7 @@ def test_highs_basic_ilp():
     assert s.objective_value_ == 5
 
 
-@pytest.mark.requires_solver("gurobi")
+@pytest.mark.skipif(not CPM_gurobi.supported(), reason="Gurobi (gurobipy) not installed")
 class TestGurobi:
     def test_gurobi_read_integers_issue_858(self):
         x = cp.intvar(1, 3, name="x")
@@ -1268,7 +1268,7 @@ class TestGurobi:
 
         def check():
             print(x, x.value())
-            assert (x[1].value() >= 1), f"{x[1]}={x.value()}"
+            assert (x.value() >= 1), f"{x}={x.value()}"
 
         m.solveAll(solver="gurobi", solution_limit=1000, display=check)
 
