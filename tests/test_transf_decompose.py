@@ -1,4 +1,3 @@
-import unittest
 import cpmpy as cp
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.globalfunctions import GlobalFunction
@@ -19,7 +18,7 @@ class TestTransfDecomp:
         bv = cp.boolvar(name="bv")
 
         cons = [cp.AllDifferent(ivs)]
-        assert str(decompose_in_tree(cons)) == "[and((x) != (y), (x) != (z), (y) != (z))]"
+        assert str(decompose_in_tree(cons)) == "[(x) != (y), (x) != (z), (y) != (z)]"
         assert str(decompose_in_tree(cons, supported={"alldifferent"})) == str(cons)
 
         # reified
@@ -137,13 +136,16 @@ class TestTransfDecomp:
 
         cons = MyGlobal1([x])
         assert set(map(str,decompose_in_tree([cons], supported={"myglobalfunc","max"}))) == \
-                            {'((myglobalfunc(x[0],x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
+                            {'(myglobalfunc(x[0],x[1])) + 5 <= 0',
+                             'max(x[0],x[1]) == 1',
                              '(x[0]) + (x[1]) >= 3'}
 
         # decompose all
         assert set(map(str, decompose_in_tree([cons], supported={"max"}))) == \
-                            {'(((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1)',
-                             '(x[0]) + (x[1]) >= 3','x[0] != 0'}
+                            {'((x[0]) + (x[1])) + 5 <= 0',
+                             'max(x[0],x[1]) == 1',
+                             '(x[0]) + (x[1]) >= 3',
+                             'x[0] != 0'}
 
         # nested case
         bv = cp.boolvar(name="bv")
@@ -155,7 +157,8 @@ class TestTransfDecomp:
 
         assert set(map(str, decompose_in_tree([cons], supported={"max"}))) == \
                             {'(bv) == ((((x[0]) + (x[1])) + 5 <= 0) and (max(x[0],x[1]) == 1))',
-                             '(x[0]) + (x[1]) >= 3', 'x[0] != 0'}
+                             '(x[0]) + (x[1]) >= 3',
+                             'x[0] != 0'}
 
 
     def test_decompose_linear(self):
@@ -165,10 +168,14 @@ class TestTransfDecomp:
 
         cons = cp.AllDifferent(x)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"and((a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1)"}
+                            {'(a == 1) + (b == 1) <= 1',
+                             '(a == 2) + (b == 2) <= 1',
+                             '(a == 3) + (b == 3) <= 1'}
         # second call gives same result (no ivarmap state)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"and((a == 1) + (b == 1) <= 1, (a == 2) + (b == 2) <= 1, (a == 3) + (b == 3) <= 1)"}
+                            {'(a == 1) + (b == 1) <= 1',
+                             '(a == 2) + (b == 2) <= 1',
+                             '(a == 3) + (b == 3) <= 1'}
 
         # nested
         cons = bv == cp.AllDifferent(x)
@@ -183,12 +190,21 @@ class TestTransfDecomp:
         # test element
         cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3) 
+                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3)
 
-        # test table
-        cons = cp.Table(x, [[1,1], [2,3]])
-        assert set(map(str, decompose_linear([cons]))) == \
-                            {'((a == 1) and (b == 1)) or ((a == 2) and (b == 3))'}
+        # supported="mdd", to avoid recursive decomposition
+        cons = cp.Table(x, [[1, 1], [2, 3]])
+        my_mdd = cp.MDD(x, [(0, 1, 1), (0, 2, 2), (1, 1, -1), (2, 3, -1)]) # ground truth MDD to which the table should be decomposed
+        decomp = decompose_linear([cons], supported={"mdd"})
+
+        assert len(decomp) == 1
+        assert isinstance(decomp[0], cp.MDD)
+        # need more thorough test, order of transitions is not fixed
+        arr = decomp[0].args[0]
+        decomp_transitions = [(id1, v, id2) for id1, tf in decomp[0].mapping.items() for v, id2 in tf.items()]
+        my_transitions = [(id1, v, id2) for id1, tf in my_mdd.mapping.items() for v, id2 in tf.items()]
+        assert str(arr) == str(my_mdd.args[0])
+        assert set(decomp_transitions) == set(my_transitions)
 
         # test count
         cons = cp.Count(x, 2) >= 1
@@ -202,9 +218,9 @@ class TestTransfDecomp:
 
         cons = cp.AllDifferent(arr)
         assert set(map(str, decompose_linear([cons]))) == \
-                            {'and(sum(a == 1, b == 1, False) <= 1, '
-                             'sum(a == 2, b == 2, True) <= 1, '
-                             'sum(a == 3, b == 3, False) <= 1)'}
+                            {'sum(a == 1, b == 1, False) <= 1',
+                             'sum(a == 2, b == 2, True) <= 1',
+                             'sum(a == 3, b == 3, False) <= 1'}
 
         # also test full transformation stack
         if "gurobi" in cp.SolverLookup.solvernames():  # otherwise, not supported
