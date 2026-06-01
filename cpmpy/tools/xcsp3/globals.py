@@ -434,6 +434,16 @@ class NonReifiedTable(GlobalConstraint):
             cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
         return cons,[]
 
+    def decompose_linear(self):
+        """
+            Linear-friendly decomposition. The implication-only :meth:`decompose` is already linear-friendly,
+            so we reuse it. Required because this constraint shares the name "table" with
+            :class:`globalconstraints.Table <cpmpy.expressions.globalconstraints.Table>`, whose
+            ``decompose_linear`` (registered in :func:`get_linear_decompositions`) is dispatched by name and
+            is not applicable to a `NonReifiedTable`.
+        """
+        return self.decompose()
+
     def value(self):
         arr, tab = self.args
         arrval = np.asarray(argvals(arr))
