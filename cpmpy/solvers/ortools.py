@@ -371,10 +371,12 @@ class CPM_ortools(SolverInterface):
                                                 supported_reified=self.supported_reified_global_constraints,
                                                 csemap=self._csemap)
             obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-
+    
             obj_cons = safe_cons + decomp_cons + flat_cons
-        if obj_cons:
-            self.add(obj_cons)
+        
+            if obj_cons:
+                self.add(obj_cons)
+
             ort_obj = self._make_numexpr(obj)
 
         if minimize:

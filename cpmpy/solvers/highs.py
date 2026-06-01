@@ -312,11 +312,13 @@ class CPM_highs(SolverInterface):
             obj, obj_const = only_positive_bv_wsum_const(obj)
 
             obj_cons = safe_cons + decomp_cons + flat_cons
-        if obj_cons:
-            self.add(obj_cons)
 
             indices, values, const = self._row_from_linexpr(obj)
             const += obj_const
+        
+            if obj_cons:
+                self.add(obj_cons)
+
 
         # reset only columns that carried cost in the previous objective, then set new ones
         if self._obj_cols is not None and len(self._obj_cols):

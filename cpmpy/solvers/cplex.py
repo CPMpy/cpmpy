@@ -324,11 +324,13 @@ class CPM_cplex(SolverInterface):
             obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
 
             obj_cons = safe_cons + decomp_cons + flat_cons
-        if obj_cons:
-            self.add(obj_cons)
 
-            # make objective function or variable and post
+             # make objective function or variable and post
             cplex_obj = self._make_numexpr(obj)
+        
+            if obj_cons:
+                self.add(obj_cons)
+
         if minimize:
             self.cplex_model.set_objective('min', cplex_obj)
         else:

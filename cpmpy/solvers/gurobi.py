@@ -312,11 +312,12 @@ class CPM_gurobi(SolverInterface):
             obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
             obj_cons = safe_cons + decomp_cons + flat_cons
-        if obj_cons:
-            self.add(obj_cons)
 
             # make objective function or variable and post
             grb_obj = self._make_numexpr(obj)
+        
+            if obj_cons:
+                self.add(obj_cons)
 
         if minimize:
             self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
