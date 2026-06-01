@@ -639,6 +639,28 @@ class TestGlobal:
         assert num_true + num_false == 2**7
         assert len(true_sols & false_sols) == 0# no solutions can be in both
 
+    def test_mdd(self):
+        x = cp.intvar(0, 3, shape=3)
+
+        start = "src"
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+        solutions = [(0,1,0), (1,1,0), (2,2,0)]
+
+        mdd_orig = cp.MDD(x, transitions, start=start, reduce=False)
+        mdd_redu = cp.MDD(x, transitions, start=start, reduce=True)
+        assert mdd_orig.levels.keys() - mdd_redu.levels.keys() == {"b1", "b2", "c2"}
+
+        sols_orig = set()
+        num_orig = cp.Model(mdd_orig).solveAll(display=lambda : sols_orig.add(tuple(argvals(x))))
+        assert sols_orig == set(solutions)
+
+        sols_redu = set()
+        num_redu = cp.Model(mdd_redu).solveAll(display=lambda : sols_redu.add(tuple(argvals(x))))
+        assert sols_redu == set(solutions)
+
+        assert num_orig == num_redu
+
 
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
@@ -794,10 +816,9 @@ class TestGlobal:
 
         expected = {
             # safening constraints
-            "(BV0) == ((x >= 0) and (x <= 2))",
-            "(BV0) -> ((IV0) == (x))",
-            "(~BV0) -> (IV0 == 0)",
-            "BV0",
+            "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
+            "(not((x >= 0) and (x <= 2))) -> (IV0 == 0)",
+            "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
             '(IV0 == 1) -> (IV1 == 1)',
@@ -860,12 +881,12 @@ class TestGlobal:
         assert all_sols == decomp_sols# same on decision vars
         assert count == decomp_count# same on all vars
 
-    def test_xor(self):
+    def test_xor(self, solver):
         bv = cp.boolvar(5)
-        assert cp.Model(cp.Xor(bv)).solve()
+        assert cp.Model(cp.Xor(bv)).solve(solver=solver)
         assert cp.Xor(bv).value()
 
-    def test_xor_with_constants(self):
+    def test_xor_with_constants(self, solver):
 
         bvs = cp.boolvar(shape=3)
 
@@ -880,17 +901,18 @@ class TestGlobal:
             expr = cp.Xor(args)
             model = cp.Model(expr)
 
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
             # also check with decomposition
             model = cp.Model(expr.decompose())
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
         # edge case with False constants
-        assert not cp.Model(cp.Xor([False, False])).solve()
-        assert not cp.Model(cp.Xor([False, False, False])).solve()
+        assert not cp.Model(cp.Xor([False, False])).solve(solver=solver)
+        assert not cp.Model(cp.Xor([False, False, False])).solve(solver=solver)
+        assert cp.Model(cp.Xor([False, True, False])).solve(solver=solver)
 
     def test_ite_with_constants(self):
         x,y,z = cp.boolvar(shape=3)
@@ -963,6 +985,11 @@ class TestGlobal:
         capacity = 1
         m += cp.Cumulative(start, duration, end, demand, capacity)
         assert m.solve()
+
+    def test_cumulative_subexpr(self):
+        start = cp.intvar(0,10, shape=3)
+        cons = cp.Cumulative(start+start, [1,2,3], None, [1,2,3], 3)
+        assert cp.Model(cons).solve() is True
 
     def test_cumulative_decomposition_capacity(self):
         import numpy as np
