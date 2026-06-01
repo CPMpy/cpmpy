@@ -225,7 +225,7 @@ class CPM_hexaly(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = bool(self.hex_sol.get_value(sol_var))
                 else:
-                    cpm_var._value = int(self.hex_sol.get_value(sol_var))
+                    cpm_var._value = round(self.hex_sol.get_value(sol_var))
 
             # translate objective, for optimisation problems only
             if not self.is_satisfaction:
@@ -563,12 +563,12 @@ class HexSolutionPrinter:
                         cpm_var._value = bool(hex_sol.get_value(hex_var))
                     elif isinstance(cpm_var, _IntVarImpl):
                         hex_var = self._solver.solver_var(cpm_var)
-                        cpm_var._value = int(hex_sol.get_value(hex_var))
+                        cpm_var._value = round(hex_sol.get_value(hex_var))
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
                 # populate objective value
                 if self._solver.has_objective():
-                    self._solver.objective_value_ = int(hex_sol.get_objective_bound(0))
+                    self._solver.objective_value_ = round(hex_sol.get_objective_bound(0))
 
                 self._solver.print_display(self._display)
                 

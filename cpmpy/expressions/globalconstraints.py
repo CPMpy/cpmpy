@@ -187,6 +187,13 @@ class GlobalConstraint(Expression):
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the global constraint, only valid when the constraint is posted toplevel or occurs in a positive nested context.
+        Defaults to the standard decomposition, but subclasses can implement a better version.
+        """
+        return self.decompose()
+
     def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of a Boolean global constraint.
@@ -1022,8 +1029,11 @@ class MDD(GlobalConstraint):
 
         return extended_mapping, invalid_edges
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        return self.decompose(complete=False)
 
-    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+
+    def decompose(self, complete=True) -> tuple[list[Expression], list[Expression]]:
         """
         Flow decomposition of the MDD global constraint.
         Enforces that the condition is satisfied, by ensuring that the flow in equals the flow out for every node.
@@ -1036,11 +1046,13 @@ class MDD(GlobalConstraint):
         """
         arr = self.args[0]
 
+        if complete:
         # MDD is extended with invalid edges, which are directed to the sink node
-        extended_mapping, invalid_edges_set = self._get_complete_mdd()
-        # extended_mapping = self.mapping
-        # invalid_edges_set: set[tuple[int | str, int]] = set()
-        invalid_edges = frozenset(invalid_edges_set)
+            mapping, invalid_edges_set = self._get_complete_mdd()
+            invalid_edges = frozenset(invalid_edges_set)
+        else:
+            mapping = self.mapping
+            invalid_edges = frozenset()
 
         # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
         # The default is an empty list, representing no ingoing / outgoing flow.
@@ -1052,7 +1064,7 @@ class MDD(GlobalConstraint):
         invalid_edge_vars = []
 
         # Determine flow in and flow out for each node, and make a boolvar for each edge
-        for id1, edges in extended_mapping.items():
+        for id1, edges in mapping.items():
             for value, id2 in edges.items():
                 edge_var = cp.boolvar()
                 level = self.levels[id1]

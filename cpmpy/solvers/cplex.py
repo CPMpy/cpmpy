@@ -253,7 +253,7 @@ class CPM_cplex(SolverInterface):
             if self.has_objective():
                 obj_val = self.cplex_model.get_objective_expr().solution_value
                 if round(obj_val) == obj_val: # it is an integer?:
-                    self.objective_value_ = int(obj_val)
+                    self.objective_value_ = round(obj_val)
                 else: #  can happen with DirectVar or when using floats as coefficients
                     self.objective_value_ = float(obj_val)
 
@@ -623,7 +623,7 @@ class CPM_cplex(SolverInterface):
                     if cpm_var.is_bool():
                         cpm_var._value = solver_val >= 0.5
                     else:
-                        cpm_var._value = int(solver_val)
+                        cpm_var._value = round(solver_val)
 
                 # Translate objective
                 if self.has_objective():
