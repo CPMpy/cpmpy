@@ -230,6 +230,7 @@ class TestTransfDecomp:
         assert set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) >= 1", "a == 1"} # decomposed at toplevel
         assert set(map(str, decompose_in_tree([~cons]))) == {"not(sum(a, b, c) == 1)", "a == 1"} # pushed down negation into standard decomp -- TODO: update after #916 is merged
         assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == {"(bv) -> (sum(a, b, c) >= 1)", "a == 1"} # decompose positive
+        assert set(map(str, decompose_in_tree([cons.implies(bv)]))) == {"(sum(a, b, c) == 1) -> (bv)","a == 1"}  # decompose standard
         assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard
 
         # custom decompose has precedence over positive decompose
