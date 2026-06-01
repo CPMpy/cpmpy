@@ -80,10 +80,10 @@ class TestTransfDecomp:
         ivs = [cp.intvar(1,9,name=n) for n in "xyz"]
 
         cons = [cp.AllDifferent(ivs) == 0]
-        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [0 == cp.AllDifferent(ivs)]
-        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [cp.AllDifferent(ivs) == cp.AllEqual(ivs[:-1])]
         assert set(map(str,decompose_in_tree(cons))) == {"(and((x) != (y), (x) != (z), (y) != (z))) == ((x) == (y))"}
@@ -210,6 +210,26 @@ class TestTransfDecomp:
         cons = cp.Count(x, 2) >= 1
         assert set(map(str, decompose_linear([cons]))) == \
                             {'(a == 2) + (b == 2) >= 1'}
+
+    def test_decompose_in_negation(self):
+
+        x,y,z = cp.intvar(0,10,shape=3, name=tuple("xyz"))
+        bv = cp.boolvar(name="bv")
+
+        cons = cp.AllDifferent([x,y,z])
+        assert set(map(str, decompose_in_tree([cons]))) == \
+                            {"(x) != (y)", "(x) != (z)", "(y) != (z)"}
+        assert set(map(str, decompose_in_tree([~cons]))) == \
+                            {"or((x) == (y), (x) == (z), (y) == (z))"}
+        assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == \
+                            {"(bv) -> (and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str, decompose_in_tree([bv == (cons)]))) == \
+                            {"(bv) == (and((x) != (y), (x) != (z), (y) != (z)))"}
+        
+        # also when negation is nested
+        cons = bv == ~cp.AllDifferent([x,y,z])
+        assert set(map(str, decompose_in_tree([cons]))) == \
+                            {"(bv) == (or((x) == (y), (x) == (z), (y) == (z)))"}
 
     def test_issue_546(self):
         # https://github.com/CPMpy/cpmpy/issues/546
