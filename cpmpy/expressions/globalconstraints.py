@@ -609,9 +609,9 @@ class Table(GlobalConstraint):
     def decompose_linear(self, heuristic:str="domain") -> tuple[list[Expression], list[Expression]]:
         """
         Linear-friendly decomposition of the Table global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
-        Based on: 
-            Bierlee, H., Piessens, W., Stuckey, P., & Guns, T. (CP 2026). 
-            Table Constraints for Integer Programming. 
+        Based on:
+            Bierlee, H., Piessens, W., Stuckey, P., & Guns, T. (CP 2026).
+            Table Constraints for Integer Programming.
             In Leibniz International Proceedings in Informatics. Schloss Dagstuhl -- Leibniz-Zentrum fuer Informatik.
 
          Returns:
@@ -922,12 +922,13 @@ class MDD(GlobalConstraint):
                           ("E", 2, "F")])
     """
 
-    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None):
+    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None, reduce: bool = True):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
+            reduce (bool, default=True): Whether to reduce the MDD by merging nodes with equivalent suffixes, reducing the size of the MDD
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
@@ -939,7 +940,7 @@ class MDD(GlobalConstraint):
                 raise TypeError(
                     f"The second argument of an MDD constraint should be a list of transitions ({_node_type}, int, {_node_type})")
 
-        super().__init__("mdd", (array, transitions))
+        super().__init__("mdd", (array,))
         self.root_node = transitions[0][0] if start is None else start
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
         for id1, v, id2 in transitions:
@@ -959,6 +960,46 @@ class MDD(GlobalConstraint):
         sink_nodes = [node for node, level in self.levels.items() if level == len(array)]
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
+
+        # reduce the MDD if requested
+        if reduce:
+            self._reduce()
+
+    def _reduce(self):
+        """
+        Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
+        Alters the mapping in-place.
+        """
+        arr = self.args[0]
+        substitutions = {}
+
+        # Loop backwards over MDD levels, from sink to root node
+        for i in reversed(range(len(arr))):
+            level_nodes = [n for (n,lvl) in self.levels.items() if lvl == i]
+
+            # Mapping is redirected to representative (potentially merged) nodes of the next layer in the MDD
+            for node in level_nodes:
+                for value in self.mapping[node]:
+                    dst = self.mapping[node][value]
+                    self.mapping[node][value] = substitutions.get(dst, dst)  # If no substitution, keep original destination node
+
+            groups = defaultdict(list) # All nodes with the same transition function are grouped together, and can be merged
+
+            for node in level_nodes:
+                transition_function = self.mapping[node]
+                # Ordered tuple of (value, destination node) pairs, serves as a unique signature for equivalent transition functions
+                signature = tuple(sorted(transition_function.items()))
+                groups[signature].append(node)
+
+            for equiv_nodes in groups.values():
+                # First node chosen as representative node, others are merged with it
+                rep = equiv_nodes[0]
+                for node in equiv_nodes[1:]:
+                    substitutions[node] = rep
+                    self.mapping.pop(node, None)
+                    self.levels.pop(node, None)
+
+
 
     def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
         """
@@ -1070,6 +1111,11 @@ class MDD(GlobalConstraint):
             else:
                 return False
         return True # can only have reached end node
+
+    def __repr__(self) -> str:
+        "Print the MDD and the internally stored table"
+        table = [[id1, v, id2] for id1, edges in self.mapping.items() for v, id2 in edges.items()]
+        return f"MDD({self.args[0]}, {table}, {self.root_node})"
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)
