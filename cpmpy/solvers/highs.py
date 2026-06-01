@@ -39,7 +39,6 @@
 
 from typing import Optional
 
-import time
 import warnings
 
 import numpy as np
@@ -49,7 +48,8 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Operator
 from ..expressions.utils import is_num, is_int
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -285,26 +285,38 @@ class CPM_highs(SolverInterface):
         """
         import highspy
 
-        get_variables(expr, collect=self.user_vars)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)
+            indices = np.array([self.solver_var(v) for v in vs.flat], dtype=np.int32)
+            values = np.asarray(ws, dtype=np.float64)
+            if np.unique(indices).size != indices.size:
+                # group duplicates
+                new_indices, group = np.unique(indices, return_inverse=True)
+                new_values = np.bincount(group, weights=values).astype(np.float64)
+                sel = (new_values != 0)
+                indices, values = new_indices[sel], new_values[sel]
+        else:
+            get_variables(expr, collect=self.user_vars)
 
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(
-            obj,
-            supported=self.supported_global_constraints,
-            supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap,
-        )
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        # only_positive_bv_wsum_const keeps the constant separate so it never ends up
-        # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
-        obj, obj_const = only_positive_bv_wsum_const(obj)
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(
+                obj,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            # only_positive_bv_wsum_const keeps the constant separate so it never ends up
+            # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
+            obj, obj_const = only_positive_bv_wsum_const(obj)
 
-        obj_cons = safe_cons + decomp_cons + flat_cons
+            obj_cons = safe_cons + decomp_cons + flat_cons
         if obj_cons:
             self.add(obj_cons)
 
-        indices, values, const = self._row_from_linexpr(obj)
-        const += obj_const
+            indices, values, const = self._row_from_linexpr(obj)
+            const += obj_const
 
         # reset only columns that carried cost in the previous objective, then set new ones
         if self._obj_cols is not None and len(self._obj_cols):
