@@ -13,19 +13,23 @@ class TestTransSimplify:
 
     def test_bool_ops(self):
         expr = Operator("or", self.bvs.tolist() + [False])
-        assert str(self.transform(expr)) == "[or([bv[0], bv[1], bv[2]])]"
+        assert str(self.transform(expr)) == "[or(bv[0], bv[1], bv[2])]"
         expr = Operator("or", self.bvs.tolist() + [True])
         assert str(self.transform(expr)) == "[boolval(True)]"
 
         expr = Operator("and", self.bvs.tolist() + [False]) + self.ivs[0] >= 10
         assert str(self.transform(expr)) == "[0 + (iv[0]) >= 10]"
         expr = Operator("and", self.bvs.tolist() + [True]) + self.ivs[0] >= 10
-        assert str(self.transform(expr)) == "[(and([bv[0], bv[1], bv[2]])) + (iv[0]) >= 10]"
+        assert str(self.transform(expr)) == "[(and(bv[0], bv[1], bv[2])) + (iv[0]) >= 10]"
 
 
         expr = Operator("->", [self.bvs[0], True])
         assert str(self.transform(expr)) == "[boolval(True)]"
+        expr = Operator("->", [self.bvs[0], BoolVal(True)])
+        assert str(self.transform(expr)) == "[boolval(True)]"
         expr = Operator("->", [self.bvs[0], False])
+        assert str(self.transform(expr)) == "[~bv[0]]"
+        expr = Operator("->", [self.bvs[0], BoolVal(False)])
         assert str(self.transform(expr)) == "[~bv[0]]"
         expr = Operator("->", [True, self.bvs[0]])
         assert str(self.transform(expr)) == "[bv[0]]"
@@ -39,7 +43,7 @@ class TestTransSimplify:
         assert str(self.transform(expr)) == '[iv[0] >= 1]'
 
         expr = (cp.sum(self.ivs) + True) >= 10
-        assert str(self.transform(expr)) == '[sum([iv[0], iv[1], iv[2], 1]) >= 10]'
+        assert str(self.transform(expr)) == '[sum(iv[0], iv[1], iv[2], 1) >= 10]'
 
         expr = True + self.ivs[0] >= False
         assert str(self.transform(expr)) == '[1 + (iv[0]) >= 0]'
@@ -68,14 +72,14 @@ class TestTransSimplify:
     def test_simplify_expressions(self):
         # global constraints
         expr = cp.AllDifferent(self.ivs) == 0
-        assert str(self.transform(expr)) == '[not([alldifferent(iv[0],iv[1],iv[2])])]'
+        assert str(self.transform(expr)) == '[not(alldifferent(iv[0],iv[1],iv[2]))]'
         expr = 0 == cp.AllDifferent(self.ivs)
-        assert str(self.transform(expr)) == '[not([alldifferent(iv[0],iv[1],iv[2])])]'
+        assert str(self.transform(expr)) == '[not(alldifferent(iv[0],iv[1],iv[2]))]'
         # with constant, does not change (surprisingly? but we cannot check what the res type is...)
         expr = cp.AllDifferent(self.ivs.tolist() + [False]) == 0
-        assert str(self.transform(expr)) == '[not([alldifferent(iv[0],iv[1],iv[2],boolval(False))])]'
+        assert str(self.transform(expr)) == '[not(alldifferent(iv[0],iv[1],iv[2],boolval(False)))]'
         expr = 0 == cp.AllDifferent(self.ivs.tolist() + [True])
-        assert str(self.transform(expr)) == '[not([alldifferent(iv[0],iv[1],iv[2],boolval(True))])]'
+        assert str(self.transform(expr)) == '[not(alldifferent(iv[0],iv[1],iv[2],boolval(True)))]'
 
         # global functions
         expr = cp.max(self.ivs) == 0
@@ -89,14 +93,14 @@ class TestTransSimplify:
         assert str(self.transform(expr)) == '[max(iv[0],iv[1],iv[2],boolval(True)) == 0]'
 
         expr = (self.ivs[0] <= self.ivs[1]) == 0
-        assert str(self.transform(expr)) == '[not([(iv[0]) <= (iv[1])])]'
+        assert str(self.transform(expr)) == '[not((iv[0]) <= (iv[1]))]'
 
         expr = (self.ivs[0] == self.ivs[1]) == 1
         assert str(self.transform(expr)) == '[(iv[0]) == (iv[1])]'
 
         # very nested one
         expr = Operator("and", self.bvs[:1].tolist() + [BoolVal(False)]) == Operator("or", self.bvs)
-        assert str(self.transform(expr)) == '[and([~bv[0], ~bv[1], ~bv[2]])]'
+        assert str(self.transform(expr)) == '[and(~bv[0], ~bv[1], ~bv[2])]'
 
     # issue #322
     def test_with_floats(self):
@@ -105,7 +109,7 @@ class TestTransSimplify:
         expr = cp.AllDifferent(self.ivs) == 4.2
         assert str(self.transform(expr)) == '[boolval(False)]'
         expr = 0.0 == cp.AllDifferent(self.ivs)
-        assert str(self.transform(expr)) == '[not([alldifferent(iv[0],iv[1],iv[2])])]'
+        assert str(self.transform(expr)) == '[not(alldifferent(iv[0],iv[1],iv[2]))]'
 
         expr = (self.ivs[0] <= self.ivs[1]) < 0.8
         assert str(self.transform(expr)) == '[(iv[0]) > (iv[1])]'

@@ -2,7 +2,7 @@
     Maximal propagation of CPMpy constraints using repeated solving.
 """
 
-from cpmpy import *
+import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
 
 
@@ -43,7 +43,7 @@ def maximal_propagate_union(constraints, vars, solver="ortools"):
     """
     visisted_domain = {var: set() for var in vars}
 
-    solver = SolverLookup.get(solver)
+    solver = cp.SolverLookup.get(solver)
     solver += constraints
 
     while solver.solve():
@@ -64,7 +64,7 @@ def maximal_propagate_intersect(constraints, vars, solver="ortools"):
     """
     domain_to_visit = {var : set(range(var.lb, var.ub+1)) for var in vars}
 
-    solver = SolverLookup.get(solver)
+    solver = cp.SolverLookup.get(solver)
     solver += constraints
 
     while solver.solve():

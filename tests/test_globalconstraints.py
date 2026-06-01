@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.exceptions import TypeError, NotSupportedError, IncompleteFunctionError
@@ -638,6 +639,28 @@ class TestGlobal:
         assert num_true + num_false == 2**7
         assert len(true_sols & false_sols) == 0# no solutions can be in both
 
+    def test_mdd(self):
+        x = cp.intvar(0, 3, shape=3)
+
+        start = "src"
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+        solutions = [(0,1,0), (1,1,0), (2,2,0)]
+
+        mdd_orig = cp.MDD(x, transitions, start=start, reduce=False)
+        mdd_redu = cp.MDD(x, transitions, start=start, reduce=True)
+        assert mdd_orig.levels.keys() - mdd_redu.levels.keys() == {"b1", "b2", "c2"}
+
+        sols_orig = set()
+        num_orig = cp.Model(mdd_orig).solveAll(display=lambda : sols_orig.add(tuple(argvals(x))))
+        assert sols_orig == set(solutions)
+
+        sols_redu = set()
+        num_redu = cp.Model(mdd_redu).solveAll(display=lambda : sols_redu.add(tuple(argvals(x))))
+        assert sols_redu == set(solutions)
+
+        assert num_orig == num_redu
+
 
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
@@ -793,10 +816,9 @@ class TestGlobal:
 
         expected = {
             # safening constraints
-            "(BV0) == ((x >= 0) and (x <= 2))",
-            "(BV0) -> ((IV0) == (x))",
-            "(~BV0) -> (IV0 == 0)",
-            "BV0",
+            "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
+            "(not((x >= 0) and (x <= 2))) -> (IV0 == 0)",
+            "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
             '(IV0 == 1) -> (IV1 == 1)',
@@ -859,12 +881,12 @@ class TestGlobal:
         assert all_sols == decomp_sols# same on decision vars
         assert count == decomp_count# same on all vars
 
-    def test_xor(self):
+    def test_xor(self, solver):
         bv = cp.boolvar(5)
-        assert cp.Model(cp.Xor(bv)).solve()
+        assert cp.Model(cp.Xor(bv)).solve(solver=solver)
         assert cp.Xor(bv).value()
 
-    def test_xor_with_constants(self):
+    def test_xor_with_constants(self, solver):
 
         bvs = cp.boolvar(shape=3)
 
@@ -879,17 +901,18 @@ class TestGlobal:
             expr = cp.Xor(args)
             model = cp.Model(expr)
 
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
             # also check with decomposition
             model = cp.Model(expr.decompose())
-            assert model.solve()
+            assert model.solve(solver=solver)
             assert expr.value()
 
         # edge case with False constants
-        assert not cp.Model(cp.Xor([False, False])).solve()
-        assert not cp.Model(cp.Xor([False, False, False])).solve()
+        assert not cp.Model(cp.Xor([False, False])).solve(solver=solver)
+        assert not cp.Model(cp.Xor([False, False, False])).solve(solver=solver)
+        assert cp.Model(cp.Xor([False, True, False])).solve(solver=solver)
 
     def test_ite_with_constants(self):
         x,y,z = cp.boolvar(shape=3)
@@ -962,6 +985,11 @@ class TestGlobal:
         capacity = 1
         m += cp.Cumulative(start, duration, end, demand, capacity)
         assert m.solve()
+
+    def test_cumulative_subexpr(self):
+        start = cp.intvar(0,10, shape=3)
+        cons = cp.Cumulative(start+start, [1,2,3], None, [1,2,3], 3)
+        assert cp.Model(cons).solve() is True
 
     def test_cumulative_decomposition_capacity(self):
         import numpy as np
@@ -1185,17 +1213,17 @@ class TestGlobal:
         val = [0,1,2]
         occ = cp.intvar(0, len(iv), shape=3)
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ), cp.AllDifferent(val)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         val = [1, 4, 5]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i].value() for i in range(len(val)))
         occ = [2, 3, 0]
         assert cp.Model([~cp.GlobalCardinalityCount(iv, val, occ)]).solve()
-        assert ~cp.GlobalCardinalityCount(iv, val, occ).value()
+        assert not cp.GlobalCardinalityCount(iv, val, occ).value()
         assert not all(cp.Count(iv, val[i]).value() == occ[i] for i in range(len(val)))
-        assert ~cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
+        assert not cp.GlobalCardinalityCount([iv[0],iv[2],iv[1],iv[4],iv[3]], val, occ).value()
 
     def test_gcc_onearg(self):
         iv = cp.intvar(0, 10)
@@ -1769,13 +1797,13 @@ class TestTypeChecks:
     def test_table(self):
         iv = cp.intvar(-8,8,3)
 
-        constraints = [cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])] # not flatlist, should work
-        model = cp.Model(constraints)
-        assert model.solve()
+        #assert cp.Model(cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])).solve() # not flatlist, should work
+        # used to work, not allowed anymore
+        pytest.raises(AttributeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
 
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
-        pytest.raises(TypeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
+        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
 
     def test_issue627(self):
         for s, cls in cp.SolverLookup.base_solvers():
@@ -1821,3 +1849,43 @@ def test_issue801_expr_in_cumulative(solver):
         assert cp.Model(cp.Cumulative(bv * start,bv * dur, end, 1, 3)).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, bv * [2, 3, 4], 3 * bv[0])).solve(solver=solver)
         assert cp.Model(cp.Cumulative(bv * start, dur, end, 1, 3 * bv[0])).solve(solver=solver)
+
+
+
+# Test that all global constraint classes are imported and exported in cpmpy.expressions.__init__
+import importlib
+
+def global_constraint_classes():
+    """Helper to get all global constraint classes in cpmpy.expressions.globalconstraints"""
+    gc_mod = importlib.import_module("cpmpy.expressions.globalconstraints")
+    classes = []
+    for name, obj in gc_mod.__dict__.items():
+        if isinstance(obj, type):
+            # Heuristic: likely a global constraint class if it subclasses Constraint or has 'decompose' or '__call__'
+            if hasattr(obj, "__module__") and obj.__module__.endswith("globalconstraints"):
+                # skip internal base classes or helpers
+                if not name.startswith("_"):
+                    classes.append((name, obj))
+    return classes
+
+import inspect
+def test_globals_in_expressions_init():
+    """Check all global constraint classes are imported and exported in cpmpy.expressions.__init__"""
+    expressions_module = importlib.import_module("cpmpy.expressions")
+    expressions_all = set(getattr(expressions_module, "__all__", []))
+    
+    # check all global constraints are imported and exported in cpmpy.expressions.__init__
+    classes = inspect.getmembers(cp.expressions.globalconstraints, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalConstraint) and name != "GlobalConstraint"]
+
+    for name, cls in classes:
+        assert hasattr(expressions_module, name), f"Global constraint {name} is not imported in cpmpy.expressions.__init__"
+        assert name in expressions_all, f"Global constraint {name} is not exported in cpmpy.expressions.__init__.__all__"
+
+    # check all global constraints are imported and exported in cpmpy.expressions.__init__
+    classes = inspect.getmembers(cp.expressions.globalfunctions, inspect.isclass)
+    classes = [(name, cls) for name, cls in classes if issubclass(cls, GlobalFunction) and name != "GlobalFunction"]
+
+    for name, cls in classes:
+        assert hasattr(expressions_module, name), f"Global function {name} is not imported in cpmpy.expressions.__init__"
+        assert name in expressions_all, f"Global function {name} is not exported in cpmpy.expressions.__init__.__all__"

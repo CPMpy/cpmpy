@@ -54,9 +54,8 @@ import warnings
 from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..exceptions import NotSupportedError
-from ..expressions.core import *
-from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_bool
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -95,13 +94,11 @@ class CPM_cplex(SolverInterface):
         try:
             import docplex.mp as domp
         except ModuleNotFoundError as e:
-            warnings.warn(f"CPM_cplex: Could not import docplex: {e}")
             return False
         try:
             import cplex
             return True
         except ModuleNotFoundError as e:
-            warnings.warn(f"CPM_cplex: Could not import cplex: {e}")
             return False
 
     @staticmethod
@@ -270,28 +267,31 @@ class CPM_cplex(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # special case, negative-bool-view (not supported as first-class var; use 1-bv in constraints)
+                if isinstance(cpm_var, NegBoolView):
+                    raise ValueError("Negative literals should not be part of any equation. "
+                                    "Should have been removed by the only_positive_bv() transformation. "
+                                    "See /transformations/linearize for more details")
+                revar = self.cplex_model.binary_var(name)
+            else:
+                revar = self.cplex_model.integer_var(cpm_var.lb, cpm_var.ub, name=name)
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        if isinstance(cpm_var, NegBoolView):
-            raise ValueError("Negative literals should not be part of any equation. "
-                            "Should have been removed by the only_positive_bv() transformation. "
-                            "See /transformations/linearize for more details")
-
-        # create if it does not exit
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.cplex_model.binary_var(cpm_var.name)
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.cplex_model.integer_var(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize=True):
@@ -618,13 +618,7 @@ class CPM_cplex(SolverInterface):
                 if self.has_objective():
                     self.objective_value_ = sol_obj_val + self._obj_offset
 
-                if display is not None:
-                    if isinstance(display, Expression):
-                        print(argval(display))
-                    elif isinstance(display, list):
-                        print(argvals(display))
-                    else:
-                        display()  # callback
+                self.print_display(display)
 
         # Reset pool search mode to default
         self.cplex_model.context.cplex_parameters.mip.limits.populate = 1

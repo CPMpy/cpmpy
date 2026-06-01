@@ -1,45 +1,46 @@
 #!/usr/bin/env python
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 ##
 ## __init__.py
 ##
 """
-    Set of utilities for working with XCSP3-formatted CP models.
+Set of utilities for working with XCSP3-formatted CP models.
 
 
-    =================
-    List of functions
-    =================
+=================
+List of functions
+=================
 
-    .. autosummary::
-        :nosignatures:
+.. autosummary::
+    :nosignatures:
 
-        read_xcsp3
+    read_xcsp3
 
-    ========================
-    List of helper functions
-    ========================
+========================
+List of helper functions
+========================
 
-    .. autosummary::
-        :nosignatures:
+.. autosummary::
+    :nosignatures:
 
-        _parse_xcsp3
-        _load_xcsp3
+    _parse_xcsp3
+    _load_xcsp3
 
-    ==================
-    List of submodules
-    ==================
+==================
+List of submodules
+==================
 
-    .. autosummary::
-        :nosignatures:
+.. autosummary::
+    :nosignatures:
 
-        parser_callbacks
-        analyze
-        benchmark
-        xcsp3_cpmpy
-        dataset
-        globals
+    parser_callbacks
+    analyze
+    benchmark
+    xcsp3_cpmpy
+    dataset
+    globals
 """
+
 from io import StringIO
 import lzma
 import os
@@ -49,28 +50,32 @@ import cpmpy as cp
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
+    from pycsp3.parser.xparser import ParserXCSP3
 
-from .dataset import XCSP3Dataset # for easier importing
+from .dataset import XCSP3Dataset  # for easier importing
+
 
 def _parse_xcsp3(path: os.PathLike) -> "ParserXCSP3":
     """
     Parses an XCSP3 instance file (.xml) and returns a `ParserXCSP3` instance.
-    
+
     Arguments:
         path: location of the XCSP3 instance to read (expects a .xml file).
-    
+
     Returns:
         A parser object.
     """
     try:
         from pycsp3.parser.xparser import ParserXCSP3
     except ImportError as e:
-        raise ImportError("The 'pycsp3' package is required to parse XCSP3 files. "
-                          "Please install it with `pip install pycsp3`.") from e
-    
+        raise ImportError(
+            "The 'pycsp3' package is required to parse XCSP3 files. "
+            "Please install it with `pip install pycsp3`."
+        ) from e
+
     parser = ParserXCSP3(path)
     return parser
+
 
 def _load_xcsp3(parser: "ParserXCSP3") -> cp.Model:
     """
@@ -84,12 +89,13 @@ def _load_xcsp3(parser: "ParserXCSP3") -> cp.Model:
     """
     from .parser_callbacks import CallbacksCPMPy
     from pycsp3.parser.xparser import CallbackerXCSP3
+
     callbacks = CallbacksCPMPy()
     callbacks.force_exit = True
     callbacker = CallbackerXCSP3(parser, callbacks)
     callbacker.load_instance()
     model = callbacks.cpm_model
-   
+
     return model
 
 
@@ -112,6 +118,7 @@ def read_xcsp3(path: os.PathLike) -> cp.Model:
     model = _load_xcsp3(parser)
     return model
 
+
 def decompress_lzma(path: os.PathLike) -> StringIO:
     """
     Decompresses a .lzma file.
@@ -123,8 +130,12 @@ def decompress_lzma(path: os.PathLike) -> StringIO:
         Memory-mapped decompressed file
     """
     # Decompress the XZ file
-    with lzma.open(path, 'rt', encoding='utf-8') as f:
-        return StringIO(f.read()) # read to memory-mapped file
-        
+    with lzma.open(path, "rt", encoding="utf-8") as f:
+        return StringIO(f.read())  # read to memory-mapped file
 
-    
+
+__all__ = [
+    "XCSP3Dataset",
+    "decompress_lzma",
+    "read_xcsp3",
+]

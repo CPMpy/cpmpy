@@ -58,13 +58,13 @@ First we need to import all the tools that we will need to create our CP model, 
 .. code-block:: python
 
     import numpy as np
-    from cpmpy import *
+    import cpmpy as cp
 
 Secondly, as in every constraint programming model we need to define the decision variables:
 
 .. code-block:: python
 
-    s, e, n, d, m, o, r, y = intvar(0, 9, shape=8)
+    s, e, n, d, m, o, r, y = cp.intvar(0, 9, shape=8)
 
 This line indicates that we are creating 8 integer decision variables, s,e,n,d,m,o,r,y, and each will take a value between 0 and 9 (inclusive) in the solution. The `shape` argument informs the shape of the tensor (in this case, a vector of size 8, unpacked over the individual letters).
 
@@ -75,11 +75,11 @@ Constraints are included in the model as a list. First, we create a list to add 
 
 .. code-block:: python
 
-    model = Model(
-        AllDifferent(s, e, n, d, m, o, r, y),
-        (    sum(    [s, e, n, d] * np.array([       1000, 100, 10, 1]) ) \
-           + sum(    [m, o, r, e] * np.array([       1000, 100, 10, 1]) ) \
-          == sum( [m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1]) ) ),
+    model = cp.Model(
+        cp.AllDifferent(s, e, n, d, m, o, r, y),
+        (    cp.sum(    [s, e, n, d] * np.array([       1000, 100, 10, 1]) ) \
+           + cp.sum(    [m, o, r, e] * np.array([       1000, 100, 10, 1]) ) \
+          == cp.sum( [m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1]) ) ),
         s > 0,
         m > 0,
     )
@@ -126,15 +126,15 @@ We first model the constraints as before:
 .. code-block:: python
 
     import numpy as np
-    from cpmpy import *
+    import cpmpy as cp
 
-    s, e, n, d, m, o, t, y = intvar(0, 9, shape=8)
+    s, e, n, d, m, o, t, y = cp.intvar(0, 9, shape=8)
 
-    model = Model(
-        AllDifferent(s, e, n, d, m, o, t, y),
-        (    sum(    [s, e, n, d] * np.array([       1000, 100, 10, 1]) ) \
-           + sum(    [m, o, s, t] * np.array([       1000, 100, 10, 1]) ) \
-          == sum( [m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1]) ) ),
+    model = cp.Model(
+        cp.AllDifferent(s, e, n, d, m, o, t, y),
+        (    cp.sum(    [s, e, n, d] * np.array([       1000, 100, 10, 1]) ) \
+           + cp.sum(    [m, o, s, t] * np.array([       1000, 100, 10, 1]) ) \
+          == cp.sum( [m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1]) ) ),
         s > 0,
         m > 0,
     )
@@ -143,7 +143,7 @@ And now the objective function. Note that this just *states* that it is a maximi
 
 .. code-block:: python
 
-   model.maximize(sum([m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1])))
+   model.maximize(cp.sum([m, o, n, e, y] * np.array([10000, 1000, 100, 10, 1])))
 
 And then we solve and print! Now how `solve()` does not return True/False as for a satisfaction problem, but returns the objective's value.
 
@@ -158,7 +158,7 @@ If you want to maximize the value of the word 'MOST', this is only requires chan
 
 .. code-block:: python
 
-    model.maximize(sum( [m, o, s, t] * np.array([1000, 100, 10, 1]) ) )
+    model.maximize(cp.sum( [m, o, s, t] * np.array([1000, 100, 10, 1]) ) )
     model.solve()
     print("  S,E,N,D =   ", [x.value() for x in [s, e, n, d]])
     print("  M,O,S,T =   ", [x.value() for x in [m, o, s, t]])

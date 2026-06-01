@@ -1,9 +1,6 @@
 import pytest
 import cpmpy as cp 
-from cpmpy.expressions import *
-from cpmpy.expressions.core import Operator
 from cpmpy.solvers.pysat import CPM_pysat
-from cpmpy.transformations.linearize import only_positive_coefficients
 
 from utils import skip_on_missing_pblib
 
@@ -14,8 +11,8 @@ SOLVER = "pysat"
 class TestCardinality:
         
     def setup_method(self):
-        self.bv_before = boolvar(shape=7)
-        self.bvs = cpm_array(boolvar(shape=2).tolist() + [~boolvar()])
+        self.bv_before = cp.boolvar(shape=7)
+        self.bvs = cp.cpm_array(cp.boolvar(shape=2).tolist() + [~cp.boolvar()])
 
     def test_pysat_atmost(self):
 

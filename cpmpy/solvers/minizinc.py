@@ -60,17 +60,20 @@ import sys
 import os
 import json
 from datetime import timedelta  # for mzn's timeout
+from packaging.version import Version
 
 import numpy as np
+
+from cpmpy.expressions import NoOverlap
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
-from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount
+from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -306,7 +309,14 @@ class CPM_minizinc(SolverInterface):
         import minizinc
 
         if time_limit is not None:
-            kwargs['timeout'] = timedelta(seconds=time_limit)
+            # timeout is deprecated from version 0.10.0 onwards, but cpmpy also supports older versions
+            mzn_vers = self.version()
+            # minizinc should always be installed in this part of the code, assert for mypy
+            assert mzn_vers is not None
+            if Version(mzn_vers.split("/")[0]) >= Version("0.10.0"):
+                kwargs['time_limit'] = timedelta(seconds=time_limit)
+            else:
+                kwargs['timeout'] = timedelta(seconds=time_limit)
 
         # hack, we need to add the objective in a way that it can be changed
         # later, so make copy of the mzn_model
@@ -478,13 +488,7 @@ class CPM_minizinc(SolverInterface):
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
             # display if needed
-            if display is not None:
-                if isinstance(display, Expression):
-                    print(argval(display))
-                elif isinstance(display, list):
-                    print(argvals(display))
-                else:
-                    display()  # callback
+            self.print_display(display)
 
             # count and stop
             solution_count += 1
@@ -492,7 +496,7 @@ class CPM_minizinc(SolverInterface):
                 break
 
             # add nogood on the user variables
-            self += cpm_any([v != v.value() for v in self.user_vars])
+            self.add(cpm_any([v != v.value() for v in self.user_vars]))
 
         if solution_count == 0:
             # clear user vars if no solution found
@@ -515,48 +519,50 @@ class CPM_minizinc(SolverInterface):
     def solver_var(self, cpm_var) -> str:
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created.
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
 
             Returns:
                 minizinc-friendly 'string' name of var.
-
-            .. warning::
-                WARNING, this assumes it is never given a 'NegBoolView'
-                might not be true... e.g. in revar after solve?
         """
-        if is_num(cpm_var):
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # Assumes it is never given a 'NegBoolView', handled in self.add
+            if isinstance(cpm_var, NegBoolView):
+                raise NotSupportedError("Negative literals are not handled here. Please report.")
+                
+
+            # not yet created, make a new solver var
+            mzn_var = name.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
+
+            # test if the name is a valid minizinc identifier
+            if not self.mzn_name_pattern.search(mzn_var):
+                raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores." 
+                                            f"First character must be an alphabetic character: {mzn_var}")
+            if mzn_var in self.keywords:
+                raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
+
+            if cpm_var.is_bool():
+                self.mzn_model.add_string(f"var bool: {mzn_var};\n")
+            else:
+                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
+                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
+                                                  "of range (-2147483646..2147483646)")
+                self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
+            self._varmap[name] = mzn_var
+            return mzn_var
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             if cpm_var < -2147483646 or cpm_var > 2147483646:
                 raise MinizincBoundsException(
                     "minizinc does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
             return str(cpm_var)
 
-        # Assumes it is never given a 'NegBoolView'
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals are not handled here. Please report.")
-
-        if cpm_var not in self._varmap:
-            # clean the varname
-            varname = cpm_var.name
-            mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
-
-            # test if the name is a valid minizinc identifier
-            if not self.mzn_name_pattern.search(mzn_var):
-                raise MinizincNameException("Minizinc only accept names with alphabetic characters, "
-                                            "digits and underscores. "
-                                "First character must be an alphabetic character")
-            if mzn_var in self.keywords:
-                raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
-
-            if isinstance(cpm_var, _BoolVarImpl):
-                self.mzn_model.add_string(f"var bool: {mzn_var};\n")
-            elif isinstance(cpm_var, _IntVarImpl):
-                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
-                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
-                                                  "of range (-2147483646..2147483646)")
-                self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
-            self._varmap[cpm_var] = mzn_var
-
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def objective(self, expr, minimize):
         """
@@ -701,25 +707,28 @@ class CPM_minizinc(SolverInterface):
             return f"{expr.name}({{}}, {{}})".format(X, Y)
 
         if expr.name in ["lex_chain_less", "lex_chain_lesseq"]:
-            X = cpm_array([[self._convert_expression(e) for e in row] for row in expr.args])
+            arr = np.array([[self._convert_expression(e) for e in row] for row in expr.args])  # use np.array because its plain strings
             str_X = "[|\n"  # opening
-            for row in X.T:  # Minizinc enforces lexicographic order on columns
+            for row in arr.T:  # Minizinc enforces lexicographic order on columns
                 str_X += ",".join(map(str, row)) + " |"  # rows
             str_X += "\n|]"  # closing
             return f"{expr.name}({{}})".format(str_X)
 
         elif expr.name == "cumulative":
-            start, dur, end, demand, capacity = expr.args
+            extra_cons = []
+            if len(expr.args) == 4:
+                start, dur, demand, capacity = expr.args
+            else:
+                start, dur, end, demand, capacity = expr.args
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
             global_str = "cumulative({},{},{},{})"
             # ensure duration is non-negative
-            dur, extra_cons = get_nonneg_args(dur)
+            dur, dur_cons = get_nonneg_args(dur)
+            extra_cons += dur_cons
             # ensure demand is non-negative
             demand, demand_cons = get_nonneg_args(demand)
             extra_cons += demand_cons
-
-            if end is not None:
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
@@ -729,12 +738,17 @@ class CPM_minizinc(SolverInterface):
                                      self._convert_expression(capacity))
 
         elif expr.name == "no_overlap":
-            start, dur, end = expr.args
+            extra_cons = []
+            if len(expr.args) == 2:
+                start, dur = expr.args
+            else:
+                start, dur, end = expr.args
+                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+            
             global_str = "disjunctive({},{})"
             # ensure duration is non-negative
-            dur, extra_cons = get_nonneg_args(dur)
-            if end is not None:
-                extra_cons += [s + d == e for s, d, e in zip(start, dur, end)]
+            dur, dur_cons = get_nonneg_args(dur)
+            extra_cons += dur_cons
 
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
