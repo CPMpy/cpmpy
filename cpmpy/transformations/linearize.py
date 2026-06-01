@@ -628,8 +628,6 @@ def get_linear_decompositions():
         # (e.g. globalconstraints.Table and xcsp3.globals.NonReifiedTable), each
         # with their own decompose_linear, so call the instance's own method.
         table=lambda expr: expr.decompose_linear(),
-        cumulative=Cumulative.decompose_linear,
-        no_overlap=NoOverlap.decompose_linear
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 

@@ -1404,7 +1404,7 @@ class Cumulative(GlobalConstraint):
         raise Exception # should not be reached
 
     def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
-        return self.decompose(how="time")
+        return self.decompose(how="time") # always use time-based decomposition -- TODO: to check if this is worth it
 
     def _consistency_constraints(self) -> list[Expression]:
         """
@@ -1777,12 +1777,6 @@ class NoOverlap(GlobalConstraint):
         for (s1, e1), (s2, e2) in all_pairs(zip(start, end)):
             cons.append((e1 <= s2) | (e2 <= s1))
         return cons, []
-
-    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
-        if len(self.args) == 2:
-            return cp.Cumulative(self.args[0], self.args[1], demand=1, capacity=1).decompose_linear()
-        else:
-            return cp.Cumulative(self.args[0], self.args[1], self.args[2], 1, 1).decompose_linear()
 
     def value(self) -> Optional[bool]:
         """
