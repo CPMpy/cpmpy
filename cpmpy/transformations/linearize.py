@@ -67,7 +67,7 @@ Optional post-linearisation transformations:
 """
 
 import copy
-from typing import AbstractSet, Any, Mapping, MutableSet, Sequence, Optional
+from typing import AbstractSet, Any, Literal, Mapping, MutableSet, Sequence, Optional
 
 import cpmpy as cp
 import numpy as np
@@ -79,7 +79,7 @@ from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Expression, Operator, BoolVal
+from ..expressions.core import Comparison, Expression, Operator, BoolVal, ExprLike
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, NoOverlap, Cumulative
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
@@ -638,8 +638,13 @@ def get_linear_decompositions():
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 
-def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=None, channeling=None,
-                                channeled=None):
+def linearize_reified_variables(constraints: list[Expression],
+                                min_values: int = 3,
+                                csemap: Optional[CSEMap] = None,
+                                ivarmap: Optional[dict[str, IntVarEnc]] = None,
+                                encoding: Optional[str] = None,
+                                channeling: Optional[Literal["all", "none", "used"]] = None,
+                                channeled: Optional[MutableSet[str]] = None) -> list[Expression]:
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding and
     reified (BV <-> (x >= val)) implications with order encoding when a variable
@@ -676,30 +681,19 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
     # this transformation can only be done if there is a csemap
     if csemap is None:
         return constraints
+    if encoding in {"order", "binary"}:
+        return constraints
 
     if channeling is None:
         channeling = "all" if ivarmap is None else "none"
     if channeling not in {"all", "none", "used"}:
         raise ValueError(f"Unsupported channeling mode {channeling!r}, expected 'all', 'none', or 'used'")
 
-    var_vals = csemap.get_reified_varvals()
-    
-    # Make the integer encodings in integer linear friendly way
     my_ivarmap = ivarmap if ivarmap is not None else {}
-    toplevel = []
-    bv_map = {}  # bv -> (var, val)
-    enc_map = {}  # var -> encoding
-    for var, vals in var_vals.items():
-        # check if we should linearize the reified variables
-        lb, ub = var.lb, var.ub
-        vals = [(val, bv) for val, bv in vals if lb <= val <= ub]  # only the valid values, in bounds!
-        if len(vals) < min_values:
-            continue  # do not encode
-
     var_vals, var_bounds = csemap.get_reified_varvalbounds()
 
     # decide the encoding to use for each variable
-    var_encodings = dict() # var -> (encoding, vals)
+    var_encodings: dict[_IntVarImpl, tuple[Literal["direct", "order"], list[tuple[int, _BoolVarImpl]]]] = {}
     candidate_vars = list(var_vals) + [var for var in var_bounds if var not in var_vals]
     for var in candidate_vars:
         lb, ub = var.lb, var.ub
@@ -715,22 +709,24 @@ def linearize_reified_variables(constraints, min_values=3, csemap=None, ivarmap=
             if lb < val <= ub
         ]  # only the valid values, exclude lb
 
+        selected_encoding: Literal["direct", "order"]
         if len(direct_vals) >= len(order_vals):
-            encoding, vals = "direct", direct_vals
+            selected_encoding, vals = "direct", direct_vals
         else:
-            encoding, vals = "order", order_vals
+            selected_encoding, vals = "order", order_vals
 
         if len(vals) >= min_values:
-            var_encodings[var] = (encoding, vals)
+            var_encodings[var] = (selected_encoding, vals)
     
     
-    bv_map = {}  # (bv, encoding) -> (var, val)
-    toplevel = []
+    bv_map: dict[tuple[_BoolVarImpl, Literal["direct", "order"]], tuple[_IntVarImpl, int]] = {}
+    enc_map: dict[_IntVarImpl, IntVarEnc] = {}
+    toplevel: list[Expression] = []
 
     for var, (encoding, vals) in var_encodings.items():
         
         # encode the values
-        enc, domain_constraint = _encode_int_var(my_ivarmap, var, "direct", csemap=csemap)
+        enc, domain_constraint = _encode_int_var(my_ivarmap, var, encoding, csemap=csemap)
         enc_map[var] = enc
         
         # domain and channeling constraints
@@ -840,10 +836,10 @@ def _used_encoded_intvars(exprs: Sequence[ExprLike],
     return list(found.values())
 
 
-def add_intvar_channeling_constraints(constraints: Sequence[BoolExprLike],
+def add_intvar_channeling_constraints(constraints: Sequence[Expression],
                                       ivarmap: Mapping[str, IntVarEnc],
                                       channeled: Optional[MutableSet[str]] = None,
-                                      extra_exprs: Optional[ExprLike | Sequence[ExprLike]] = None) -> list[BoolExprLike]:
+                                      extra_exprs: Optional[ExprLike | Sequence[ExprLike]] = None) -> list[Expression]:
     """
     Add value-channeling constraints for encoded integer vars used in expressions.
     Needed when a solver uses both an encoding of a intvar and an encoding thereof.
@@ -855,7 +851,8 @@ def add_intvar_channeling_constraints(constraints: Sequence[BoolExprLike],
     ``channeled`` is an optional set of variable names that have already been encoded.
     """
     constraints = list(constraints)
-    exprs = constraints if extra_exprs is None else constraints + (extra_exprs if isinstance(extra_exprs, list) else [extra_exprs])
+    extra = [] if extra_exprs is None else (list(extra_exprs) if isinstance(extra_exprs, Sequence) else [extra_exprs])
+    exprs: list[ExprLike] = constraints + extra
     for var in _used_encoded_intvars(exprs, ivarmap, channeled=channeled):
         terms, k = ivarmap[var.name].encode_term()
         ws = [1] + [-w for (w, _) in terms]
