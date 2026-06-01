@@ -22,6 +22,8 @@ import copy
 from typing import AbstractSet, Optional, Dict, Any, Callable, Protocol, cast, overload
 import numpy as np
 
+from cpmpy.transformations.negation import recurse_negation
+
 from .cse import CSEMap
 from ..expressions.core import Expression, BoolVal, Operator
 from ..expressions.globalconstraints import GlobalConstraint
@@ -99,8 +101,12 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             arg_changed, arg_newargs, arg_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
             if arg_changed:
                 changed = True
-                expr = copy.copy(expr)
-                expr.update_args(arg_newargs)
+                if expr.name == "not": # cannot leave negation here, recurse into new expression
+                    assert len(arg_newargs) == 1, "decompose_in_tree: expected a single expression as argument of negation but got {arg_newargs}"
+                    expr = recurse_negation(arg_newargs[0]) # negate the argument
+                else:
+                    expr = copy.copy(expr)
+                    expr.update_args(arg_newargs)
                 if len(arg_toplevel) > 0:
                     todolist.extend(arg_toplevel)
             newlist.append(expr)
@@ -267,8 +273,12 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                     rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
                     if rec_changed:
                         changed = True
-                        arg = copy.copy(arg)
-                        arg.update_args(rec_newargs)
+                        if arg.name == "not": # cannot leave negation here, recurse into new expression
+                            assert len(rec_newargs) == 1, "decompose_in_tree: expected a single expression as argument of negation but got {rec_newargs}"
+                            arg = recurse_negation(rec_newargs[0]) # negate the argument
+                        else:
+                            arg = copy.copy(arg)
+                            arg.update_args(rec_newargs)
                         if len(rec_toplevel) > 0:
                             toplevel.extend(rec_toplevel)
                     newargs.append(arg)
