@@ -925,6 +925,53 @@ class Regular(GlobalConstraint):
         # constraint is satisfied iff last state is accepting
         return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the Regular global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
+        The MDD is obtained by means of constructing a layered directed multigraph for the given automaton, based on Algorithm 1 of:
+        "A Regular Language Membership Constraint for Finite Sequences of Variables", Gilles Pesant, 2004
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, transitions, start, accepting = self.args
+
+        # Keeps track of the supported nodes Q[(i,j)] for variable i taking value j
+        Q = defaultdict(set)
+        # Keeps track of the nodes N[i] that can be reached at layer i of the layered graph
+        N = defaultdict(set)
+        N[0].add(start)
+
+        # Forward phase
+        for i in range(len(arr)):
+            for j in range(arr[i].lb, arr[i].ub + 1):
+                for node in N[i]:
+                    if (node, j) in self.trans_dict.keys():
+                        Q[(i, j)].add(node)
+                        N[i + 1].add(self.trans_dict[(node, j)])
+
+        # Backward phase, remove non-accepting nodes
+        N[len(arr)] = N[len(arr)].intersection(accepting)
+
+        mdd_transitions: list[tuple[int | str, int, int | str]] = []
+
+        # Unique ID for every node in the layered graph
+        id_map = {(i, node): idx for idx, (i, node) in
+                  enumerate((i, node) for i in range(len(arr)) for node in self.nodes)}
+
+        # All accepting nodes in the final layer are merged into one
+        for node in accepting:
+            id_map[(len(arr), node)] = len(arr) * len(self.nodes)
+
+        # Backward phase, add valid MDD transitions
+        for i in reversed(range(len(arr))):
+            for j in range(arr[i].lb, arr[i].ub + 1):
+                for node in Q[(i, j)]:
+                    if (node, j) in self.trans_dict.keys() and self.trans_dict[(node, j)] in N[i + 1]:
+                        next_node = self.trans_dict[(node, j)]
+                        mdd_transitions.append((id_map[(i, node)], j, id_map[(i + 1, next_node)]))
+
+        return [MDD(arr, mdd_transitions, start=id_map[(0, start)])], []
+
     def value(self) -> Optional[bool]:
         """
         Returns:
