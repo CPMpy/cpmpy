@@ -580,7 +580,7 @@ class CPM_minizinc(SolverInterface):
             mzn_parts = [f"({float(w)}) * ({vv})" for w, vv in zip(ws, self.solver_vars(vs))]
             mzn_obj = " + ".join(mzn_parts)
             if const:
-                mzn_obj = mzn_obj + " + " + const
+                mzn_obj = f"{mzn_obj} + {const}"
         else:
             get_variables(expr, collect=self.user_vars)  # add objvars to vars
             obj, decomp_cons = decompose_objective(
@@ -786,7 +786,7 @@ class CPM_minizinc(SolverInterface):
             # TODO: pretty printing of () as in Operator?
 
             # special case: unary -
-            if self.name == '-':
+            if expr.name == '-':
                 return "-{}".format(args_str[0])
 
             # very special case: weighted sum (before 2-ary)
