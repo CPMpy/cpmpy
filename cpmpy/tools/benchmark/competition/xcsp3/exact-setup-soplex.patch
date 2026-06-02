@@ -1,0 +1,26 @@
+diff --git a/setup.py b/setup.py
+index 6827d7b..0695f82 100644
+--- a/setup.py
++++ b/setup.py
+@@ -74,14 +74,14 @@ ext_modules = [
+         ],
+ 
+         # FOR LINUX / OSX
+-        include_dirs=["./src"],
+-        define_macros=[("UNIXLIKE",1), ("ANKERLMAPS",1)],
+-        libraries=[],
++        # include_dirs=["./src"],
++        # define_macros=[("UNIXLIKE",1), ("ANKERLMAPS",1)],
++        # libraries=[],
+         # REPLACE LINES ABOVE WITH BELOW TO INCLUDE SOPLEX (pre-built in soplex_build)
+-        # include_dirs=["./src","./soplex/src","./soplex_build"],
+-        # library_dirs=["./soplex_build/lib"],
+-        # libraries=["soplex"], # or soplexshared for the shared .so library instead of the static .a
+-        # define_macros=[("UNIXLIKE",1), ("ANKERLMAPS",1), ("WITHSOPLEX",1)],
++        include_dirs=["./src","./soplex/src","./soplex_build"],
++        library_dirs=["./soplex_build/lib"],
++        libraries=["soplex"], # or soplexshared for the shared .so library instead of the static .a
++        define_macros=[("UNIXLIKE",1), ("ANKERLMAPS",1), ("WITHSOPLEX",1)],
+         # REPLACE LINES ABOVE WITH BELOW TO INCLUDE COINUTILS (installed as library)
+         # include_dirs=["./src"],
+         # define_macros=[("UNIXLIKE",1), ("ANKERLMAPS",1), ("WITHCOINUTILS",1)],
