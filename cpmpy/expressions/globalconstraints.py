@@ -588,9 +588,9 @@ class Table(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
-    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Linear-friendly decomposition of the Table global constraint.
+        Positive decomposition of the Table global constraint.
 
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
