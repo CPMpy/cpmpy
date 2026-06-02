@@ -740,6 +740,25 @@ class ShortTable(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the ShortTable global constraint.
+
+        Similar to `element` from Gleb's paper: "Improved Linearization of Constraint
+        Programming Models"
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, tab = self.args
+
+        row_selected = boolvar(shape=(len(tab),))
+        cons = [cp.any(row_selected)]
+        for i, row in enumerate(tab):
+            subexpr = cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR])
+            cons.append(row_selected[i].implies(subexpr))  # implication-only decomposition
+        return cons,[]
+
     def value(self) -> Optional[bool]:
         """
         Returns:

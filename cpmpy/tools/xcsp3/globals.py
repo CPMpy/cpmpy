@@ -385,65 +385,6 @@ class Channel(GlobalConstraint):
         arr, v = self.args
         return sum(argvals(x) for x in arr) == 1 and 0 <= argval(v) < len(arr) and arr[argval(v)] == 1
 
-class RowSelectingShortTable(GlobalConstraint):
-    """
-        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
-        no restrictions for the corresponding variable in that tuple.
-        Bit less validation then for :class:`globalconstraints.ShortTable <cpmpy.expressions.globalconstraints.ShortTable>`;
-        decomposition differs (row-selecting formulation).
-    """
-
-    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
-        if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()  # fast shortcut
-            if array.ndim != 1:  # reshape to 1D
-                array = array.reshape(-1)
-        else:
-            has_subexpr = False
-            for x in array:  # C-style python
-                if x.has_subexpr():
-                    has_subexpr = True
-                    break
-
-        if not isinstance(table, np.ndarray):
-            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
-        assert table.ndim == 2, "ShortTable's table must be a 2D array"
-
-        # args: tuple[ListLike[Expression], np.ndarray]
-        super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
-
-    @property
-    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
-        """ READ-ONLY, the well-tuped arguments of this global constraint
-        """
-        return self._args
-
-    def decompose(self):
-        """
-        Alternative decomposition, similar to `element` from Gleb's paper: "Improved Linearization of Constraint
-        Programming Models"
-        """
-        arr, tab = self.args
-
-        row_selected = boolvar(shape=(len(tab),))
-        cons = [Operator("or", row_selected)]
-        for i, row in enumerate(tab):
-            subexpr = Operator("and", [ai == ri for ai, ri in zip(arr, row) if ri != STAR])
-            cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
-        return cons,[]
-
-    def value(self):
-        arr, tab = self.args
-        arrval = np.asarray(argvals(arr))
-        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
-            return None
-
-        for row in tab:
-            mask = (row != STAR)
-            if (row[mask].astype(int, copy=False) == arrval[mask]).all():
-                return True
-        return False
-
 class NegativeShortTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
