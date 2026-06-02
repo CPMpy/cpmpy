@@ -455,6 +455,8 @@ class CPM_highs(SolverInterface):
                 else:
                     cpm_var._value = round(val)
             for enc in self.ivarmap.values():
+                if str(enc._x.name) in {str(v) for v in self._channeled_ivars}:
+                    continue
                 for bv in enc.vars():
                     bv._value = col_values[self.solver_var(bv)] >= 0.5
                 enc._x._value = enc.decode()

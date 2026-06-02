@@ -99,6 +99,7 @@ class CPM_scip(SolverInterface):
         self.ivarmap = {}
         self._channeled_ivars = set()
         self.objective_ = None
+        self._force_intvar_channeling = False
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
@@ -167,6 +168,8 @@ class CPM_scip(SolverInterface):
                 else:
                     cpm_var._value = round(solver_val)
             for enc in self.ivarmap.values():
+                if str(enc._x.name) in {str(v) for v in self._channeled_ivars}:
+                    continue
                 for bv in enc.vars():
                     bv._value = self.scip_model.getSolVal(best_sol, self.solver_var(bv)) >= 0.5
                 enc._x._value = enc.decode()
@@ -194,6 +197,7 @@ class CPM_scip(SolverInterface):
         # and the user can now change the model as they will. The downside is that potentially 
         # useful information for speeding up the next optimisation call is thrown out.
         self.scip_model.freeTransform()
+        self._force_intvar_channeling = True
 
         return has_sol
 
@@ -308,6 +312,8 @@ class CPM_scip(SolverInterface):
 
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)
+        force_intvar_channeling = getattr(self, "_force_intvar_channeling", False)
+        channeling_extra_exprs = get_variables(cpm_cons) if force_intvar_channeling else []
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
@@ -315,12 +321,12 @@ class CPM_scip(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling="used",
+                                               channeling="all" if force_intvar_channeling else "used",
                                                channeled=self._channeled_ivars)
         cpm_cons = add_intvar_channeling_constraints(cpm_cons,
                                                      self.ivarmap,
                                                      channeled=self._channeled_ivars,
-                                                     extra_exprs=self.objective_ if self.objective_ is not None else [])
+                                                     extra_exprs=channeling_extra_exprs + ([self.objective_] if self.objective_ is not None else []))
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
