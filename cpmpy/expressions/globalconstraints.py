@@ -1347,6 +1347,17 @@ class InDomain(GlobalConstraint):
         arr_set = frozenset(arr)
         return [expr != val for val in range(lb, ub + 1) if val not in arr_set], []
 
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the InDomain global constraint.
+        Avoids != constraints and instead decomposes into a large disjunction.
+        If `expr` is a variable (the most common case), `cpmpy.transformations.linearize.linearize_reified_varvals` will then encode this variable with a direct encoding
+        """
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+        arr_set = frozenset(arr)
+        return [cp.any([expr == val for val in arr_set])], []
+
     def value(self) -> Optional[bool]:
         """
         Returns:
