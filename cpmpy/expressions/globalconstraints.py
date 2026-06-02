@@ -1995,9 +1995,14 @@ class GlobalCardinalityCount(GlobalConstraint):
         Uses a conjunction of Count global function constraints.
         """
         vars, vals, occ = self.args
-        constraints = [cp.Count(vars, i) == v for i, v in zip(vals, occ)]
+        counts = [cp.Count(vars, v)  for v in vals]
+        constraints = [cnt == o for cnt, o in zip(counts, occ)]
         if self.closed:
-            constraints += [InDomain(v, vals) for v in vars]
+            constraints.append(InDomain(v, vals) for v in vars)
+            constraints.append(cp.sum(counts) == len(vars))
+        else:
+            constraints.append(cp.sum(counts) <= len(vars))
+            
         return constraints, []
 
     def value(self) -> Optional[bool]:
