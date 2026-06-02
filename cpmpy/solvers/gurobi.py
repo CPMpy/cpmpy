@@ -146,6 +146,7 @@ class CPM_gurobi(SolverInterface):
         self.ivarmap = {}
         self._channeled_ivars = set()
         self.objective_ = None
+        self._intvar_channeling = "used"
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -260,6 +261,7 @@ class CPM_gurobi(SolverInterface):
                 for bv in enc.vars():
                     bv._value = None
 
+        self._intvar_channeling = "all"
         return has_sol
 
 
@@ -405,7 +407,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling="used",
+                                               channeling=self._intvar_channeling,
                                                channeled=self._channeled_ivars)
         cpm_cons = add_intvar_channeling_constraints(cpm_cons,
                                                      self.ivarmap,

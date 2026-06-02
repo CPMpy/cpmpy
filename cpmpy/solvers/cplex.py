@@ -153,6 +153,7 @@ class CPM_cplex(SolverInterface):
         self.ivarmap = {}
         self._channeled_ivars = set()
         self.objective_ = None
+        self._intvar_channeling = "used"
 
         super().__init__(name="cplex", cpm_model=cpm_model)
 
@@ -273,6 +274,7 @@ class CPM_cplex(SolverInterface):
                 for bv in enc.vars():
                     bv._value = None
 
+        self._intvar_channeling = "all"
         return has_sol
 
 
@@ -421,7 +423,7 @@ class CPM_cplex(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub", "mul"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling="used",
+                                               channeling=self._intvar_channeling,
                                                channeled=self._channeled_ivars)
         cpm_cons = add_intvar_channeling_constraints(cpm_cons,
                                                      self.ivarmap,

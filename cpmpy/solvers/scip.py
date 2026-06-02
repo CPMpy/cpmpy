@@ -99,6 +99,7 @@ class CPM_scip(SolverInterface):
         self.ivarmap = {}
         self._channeled_ivars = set()
         self.objective_ = None
+        self._intvar_channeling = "used"
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
@@ -195,6 +196,7 @@ class CPM_scip(SolverInterface):
         # and the user can now change the model as they will. The downside is that potentially 
         # useful information for speeding up the next optimisation call is thrown out.
         self.scip_model.freeTransform()
+        self._intvar_channeling = "all"
 
         return has_sol
 
@@ -316,7 +318,7 @@ class CPM_scip(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling="used",
+                                               channeling=self._intvar_channeling,
                                                channeled=self._channeled_ivars)
         cpm_cons = add_intvar_channeling_constraints(cpm_cons,
                                                      self.ivarmap,
