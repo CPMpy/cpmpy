@@ -35,7 +35,7 @@ from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum
+from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, add_intvar_channeling_constraints
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -96,6 +96,9 @@ class CPM_scip(SolverInterface):
         self.scip_model = scip.Model()
         self.scip_model.setParam("display/verblevel", 0)  # remove solver logs from output
         self.objective_value_ = None
+        self.ivarmap = {}
+        self._channeled_ivars = set()
+        self.objective_ = None
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
@@ -163,12 +166,20 @@ class CPM_scip(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = round(solver_val)
+            for enc in self.ivarmap.values():
+                for bv in enc.vars():
+                    bv._value = self.scip_model.getSolVal(best_sol, self.solver_var(bv)) >= 0.5
+                enc._x._value = enc.decode()
 
             if self.has_objective():
                 self.objective_value_ = self.scip_model.getObjVal()
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+            for enc in self.ivarmap.values():
+                enc._x._value = None
+                for bv in enc.vars():
+                    bv._value = None
 
             self.objective_value_ = None
 
@@ -219,12 +230,19 @@ class CPM_scip(SolverInterface):
 
 
     def objective(self, expr, minimize=True):
+        self.objective_ = expr
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
             self.user_vars.update(vs)  # save user variables
 
             import pyscipopt as scip
             scip_obj = scip.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
+            obj_cons = add_intvar_channeling_constraints([],
+                                                         self.ivarmap,
+                                                         channeled=self._channeled_ivars,
+                                                         extra_exprs=expr)
+            for cpm_expr in self.transform(obj_cons):
+                self._add_transformed_constraint(cpm_expr)
         else:
             get_variables(expr, collect=self.user_vars)
             # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
@@ -240,8 +258,13 @@ class CPM_scip(SolverInterface):
             obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
             obj = only_positive_bv_wsum(obj)
 
+            obj_cons = add_intvar_channeling_constraints(safe_cons + decomp_cons + flat_cons,
+                                                         self.ivarmap,
+                                                         channeled=self._channeled_ivars,
+                                                         extra_exprs=obj)
+
             # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
-            for cpm_expr in self.transform(safe_cons + decomp_cons + flat_cons):
+            for cpm_expr in self.transform(obj_cons):
                 self._add_transformed_constraint(cpm_expr)
 
             scip_obj = self._make_numexpr(obj)
@@ -290,7 +313,14 @@ class CPM_scip(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
+                                               ivarmap=self.ivarmap,
+                                               channeling="used",
+                                               channeled=self._channeled_ivars)
+        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                     self.ivarmap,
+                                                     channeled=self._channeled_ivars,
+                                                     extra_exprs=self.objective_ if self.objective_ is not None else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)

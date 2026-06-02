@@ -63,7 +63,7 @@ from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, \
-    only_positive_bv_wsum_const, decompose_linear, decompose_linear_objective
+    only_positive_bv_wsum_const, decompose_linear, decompose_linear_objective, add_intvar_channeling_constraints
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -150,6 +150,9 @@ class CPM_cplex(SolverInterface):
         from docplex.mp.model import Model
         self.cplex_model = Model()
         self._obj_offset = 0
+        self.ivarmap = {}
+        self._channeled_ivars = set()
+        self.objective_ = None
 
         super().__init__(name="cplex", cpm_model=cpm_model)
 
@@ -249,6 +252,10 @@ class CPM_cplex(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = round(solver_val)
+            for enc in self.ivarmap.values():
+                for bv in enc.vars():
+                    bv._value = self.solver_var(bv).solution_value >= 0.5
+                enc._x._value = enc.decode()
             # set _objective_value
             if self.has_objective():
                 obj_val = self.cplex_model.get_objective_expr().solution_value
@@ -260,6 +267,10 @@ class CPM_cplex(SolverInterface):
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+            for enc in self.ivarmap.values():
+                enc._x._value = None
+                for bv in enc.vars():
+                    bv._value = None
 
         return has_sol
 
@@ -305,11 +316,18 @@ class CPM_cplex(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
+        self.objective_ = expr
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
             self.user_vars.update(vs)  # save user variables
             self._obj_offset = const
             cplex_obj = self.cplex_model.scal_prod(self.solver_vars(vs), ws)
+            obj_cons = add_intvar_channeling_constraints([],
+                                                         self.ivarmap,
+                                                         channeled=self._channeled_ivars,
+                                                         extra_exprs=expr)
+            if obj_cons:
+                self.add(obj_cons)
         else:
             # save user vars
             get_variables(expr, self.user_vars)
@@ -323,7 +341,10 @@ class CPM_cplex(SolverInterface):
             obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
             obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
 
-            obj_cons = safe_cons + decomp_cons + flat_cons
+            obj_cons = add_intvar_channeling_constraints(safe_cons + decomp_cons + flat_cons,
+                                                         self.ivarmap,
+                                                         channeled=self._channeled_ivars,
+                                                         extra_exprs=obj)
 
              # make objective function or variable and post
             cplex_obj = self._make_numexpr(obj)
@@ -397,7 +418,14 @@ class CPM_cplex(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub", "mul"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
+                                               ivarmap=self.ivarmap,
+                                               channeling="used",
+                                               channeled=self._channeled_ivars)
+        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                     self.ivarmap,
+                                                     channeled=self._channeled_ivars,
+                                                     extra_exprs=self.objective_ if self.objective_ is not None else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub"} | self.supported_global_constraints), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
