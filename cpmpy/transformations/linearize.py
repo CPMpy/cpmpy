@@ -33,6 +33,8 @@ To get a good linearisation, solver backends typically apply these transformatio
 - Put constraints in flat normal form (:func:`~cpmpy.transformations.flatten_model.flatten_constraint`).
 - Apply :func:`linearize_reified_variables` to replace reified equalities of the form
   ``bv == (x == val)`` by a single direct encoding of ``x`` (must be done before implication-only normalisation).
+- If an external ``ivarmap`` is used and encoded integer variables still occur as integer variables,
+  add the required ``x == encoded(x)`` links with :func:`add_intvar_channeling_constraints`.
 - Ensure implications are of the form ``bv -> <expr>`` (:func:`~cpmpy.transformations.reification.only_implies`).
 - Call :func:`linearize_constraint` to transform the inequalities, strict equalities and implications.
 - Optionally run post-passes such as :func:`only_positive_bv` (e.g. for ILP solvers that do not support NegBoolView)
@@ -51,6 +53,7 @@ Main transformations:
 Helper functions:
 - :func:`canonical_comparison`: Canonicalize comparison expressions (variables on left, constants on right).
 - :func:`get_linear_decompositions`: Returns the custom linear decomposition map for global constraints.
+- :func:`add_intvar_channeling_constraints`: Adds channeling constraints for encoded integer variables stored in an ``ivarmap``.
 
 Optional post-linearisation transformations:
 - :func:`only_positive_bv`: Transforms constraints so only :class:`~cpmpy.expressions.variables._BoolVarImpl` variables appear positively
@@ -64,9 +67,10 @@ Optional post-linearisation transformations:
 """
 
 import copy
-from typing import AbstractSet, Sequence, Optional
+from typing import AbstractSet, Any, Literal, Mapping, MutableSet, Sequence, Optional
 
 import cpmpy as cp
+import numpy as np
 from cpmpy.transformations.get_variables import get_variables
 from .cse import CSEMap
 
@@ -75,11 +79,11 @@ from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Expression, Operator, BoolVal
+from ..expressions.core import Comparison, Expression, Operator, BoolVal, ExprLike
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, NoOverlap, Cumulative
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
-from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
+from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _IntVarImpl, _NumVarImpl
 from .int2bool import IntVarEnc, _encode_int_var
 
 
@@ -632,24 +636,36 @@ def get_linear_decompositions():
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
 
-def linearize_reified_variables(constraints:list[Expression], 
-                                min_values:int=3, 
-                                csemap:Optional[CSEMap]=None, 
-                                ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
+def linearize_reified_variables(constraints: list[Expression],
+                                min_values: int = 3,
+                                csemap: Optional[CSEMap] = None,
+                                ivarmap: Optional[dict[str, IntVarEnc]] = None,
+                                encoding: Optional[str] = None,
+                                channeling: Optional[Literal["all", "none", "used"]] = None,
+                                channeled: Optional[MutableSet[str]] = None) -> list[Expression]:
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding and
     reified (BV <-> (x >= val)) implications with order encoding when a variable
     has at least min_values such reifications: remove those implications and add
     the corresponding encoding of x.
 
-    If ivarmap is None, both consistency constraints and channeling constraints are posted.
-    If ivarmap is not None, the encoding is added to ivarmap and only (the domain constraint) is posted; 
-    the solver can then choose to eliminate the variables, or post the channeling constraints itself anyway.
+    The domain constraints for the encoding are always posted. Channeling
+    constraints link the native integer variable to its Boolean encoding; they
+    may be skipped only when a later solver transformation owns that link, e.g.
+    by replacing the integer variable with its encoding.
 
-    If both BV <-> (x == val) and BV <-> (x >= val) are present, choose the
-    encoding type that occurs most often for that variable. Ties prefer the
-    direct encoding.
-    (TODO: add both encodings and channel between them?)
+    The ``channeling`` argument controls when to post the wsum channeling constraints:
+    - ``"all"``: post them for every encoded integer variable
+    - ``"none"``: post none; the caller must add/replace/decode from ``ivarmap``
+    - ``"used"``: post them only if the integer variable still occurs after the
+      reified equalities have been removed
+    - ``None``: use the default for the selected ownership model: post all
+      channeling constraints when this function owns the encoding map
+      (``ivarmap is None``), and leave channeling to the caller when an
+      external ``ivarmap`` is provided
+
+    ``channeled`` is an optional set of variable names that have already been encoded.
+
 
     Apply AFTER flatten_constraint and BEFORE only_implies and linearize_constraint.
 
@@ -663,49 +679,65 @@ def linearize_reified_variables(constraints:list[Expression],
     # this transformation can only be done if there is a csemap
     if csemap is None:
         return constraints
+    if encoding in {"order", "binary"}:
+        return constraints
 
-    # Make the integer encodings in integer linear friendly way
+    if channeling is None:
+        channeling = "all" if ivarmap is None else "none"
+    if channeling not in {"all", "none", "used"}:
+        raise ValueError(f"Unsupported channeling mode {channeling!r}, expected 'all', 'none', or 'used'")
+
     my_ivarmap = ivarmap if ivarmap is not None else {}
-
     var_vals, var_bounds = csemap.get_reified_varvalbounds()
 
     # decide the encoding to use for each variable
-    var_encodings = dict() # var -> (encoding, vals)
+    var_encodings: dict[_IntVarImpl, tuple[Literal["direct", "order"], list[tuple[int, _BoolVarImpl]]]] = {}
     candidate_vars = list(var_vals) + [var for var in var_bounds if var not in var_vals]
     for var in candidate_vars:
         lb, ub = var.lb, var.ub
         if var.name in my_ivarmap:
             continue
 
-        direct_vals = [(val, bv) for val, bv in var_vals.get(var, []) if lb <= val <= ub]  # only the valid values, in bounds!
-        order_vals = [(val, bv) for val, bv in var_bounds.get(var, []) if lb < val <= ub]  # only the valid values, exclude lb
+        direct_vals = [
+            (val, bv) for val, bv in var_vals.get(var, [])
+            if lb <= val <= ub
+        ]  # only the valid values, in bounds!
+        order_vals = [
+            (val, bv) for val, bv in var_bounds.get(var, [])
+            if lb < val <= ub
+        ]  # only the valid values, exclude lb
 
+        selected_encoding: Literal["direct", "order"]
         if len(direct_vals) >= len(order_vals):
-            encoding, vals = "direct", direct_vals
+            selected_encoding, vals = "direct", direct_vals
         else:
-            encoding, vals = "order", order_vals
+            selected_encoding, vals = "order", order_vals
 
         if len(vals) >= min_values:
-            var_encodings[var] = (encoding, vals)
+            var_encodings[var] = (selected_encoding, vals)
     
     
-    bv_map = {}  # (bv, encoding) -> (var, val)
-    toplevel = []
+    bv_map: dict[tuple[_BoolVarImpl, Literal["direct", "order"]], tuple[_IntVarImpl, int]] = {}
+    enc_map: dict[_IntVarImpl, IntVarEnc] = {}
+    toplevel: list[Expression] = []
 
     for var, (encoding, vals) in var_encodings.items():
         
         # encode the values
         enc, domain_constraint = _encode_int_var(my_ivarmap, var, encoding, csemap=csemap)
+        enc_map[var] = enc
         
         # domain and channeling constraints
         toplevel.extend(domain_constraint) # with the overwritten Bools
-        if ivarmap is None:
+        if channeling == "all" and (channeled is None or var.name not in channeled):
             # also post the var=wsum mapping
             terms, k = enc.encode_term()
             # var == wsum + k :: var - wsum == k
             ws = [1] + [-w for (w, _) in terms]
             bs = [var] + [b for (_, b) in terms]
-            toplevel.append(Operator("wsum", (ws, bs)) == k)  
+            toplevel.append(Operator("wsum", (ws, bs)) == k)
+            if channeled is not None:
+                channeled.add(var.name)
         
         # store the bvs that no longer need to be reified
         for val, bv in vals:
@@ -731,11 +763,19 @@ def linearize_reified_variables(constraints:list[Expression],
                     if lhs_val == val and lhs_var == var:
                         continue  # do not keep
             newcons.append(con)
-        
-        return newcons + toplevel
-    
-    assert len(toplevel) == 0, "cannot have toplevel constraints if len(bv_map) == 0"
-    return constraints
+        constraints = newcons
+
+    if channeling == "used":
+        used_encodings = {var.name: enc for var, enc in enc_map.items()}
+        for var in _used_encoded_intvars(constraints, used_encodings, channeled=channeled):
+            terms, k = used_encodings[var.name].encode_term()
+            ws = [1] + [-w for (w, _) in terms]
+            bs = [var] + [b for (_, b) in terms]
+            toplevel.append(Operator("wsum", (ws, bs)) == k)
+            if channeled is not None:
+                channeled.add(var.name)
+
+    return constraints + toplevel
 
 
 def _extract_var_from_lhs(lhs):
@@ -747,3 +787,75 @@ def _extract_var_from_lhs(lhs):
         if isinstance(arg, _NumVarImpl) and not arg.is_bool():
             return arg
     return None
+
+
+def _used_encoded_intvars(exprs: Sequence[ExprLike],
+                          ivarmap: Mapping[str, IntVarEnc],
+                          channeled: Optional[AbstractSet[str]] = None) -> list[_IntVarImpl]:
+    """Return native integer variables in ``exprs`` that have unchanneled encodings.
+
+    Encoded Boolean variables do not count as use of the original integer
+    variable. The scan stops once every unchanneled candidate from ``ivarmap``
+    has been found.
+    """
+    if not ivarmap:
+        return []
+
+    candidates = set(ivarmap)
+    if channeled is not None:
+        candidates.difference_update(channeled)
+    if not candidates:
+        return []
+
+    found: dict[str, _IntVarImpl] = {}
+
+    def extract(lst: Any) -> None:
+        for e in lst:
+            if not candidates:
+                return
+
+            if isinstance(e, Expression):
+                if isinstance(e, _IntVarImpl):
+                    if not e.is_bool() and e.name in candidates:
+                        found[e.name] = e
+                        candidates.remove(e.name)
+                elif e.name == "wsum":
+                    extract(e.args[1])  # skip data in arg0
+                elif e.name == "table":
+                    extract(e.args[0])  # skip data in arg1
+                else:
+                    extract(e.args)
+            elif isinstance(e, np.ndarray) and e.dtype == object:
+                extract(e.flat)
+            elif isinstance(e, (list, tuple, np.flatiter)):
+                extract(e)
+
+    extract((exprs,))
+    return list(found.values())
+
+
+def add_intvar_channeling_constraints(constraints: Sequence[Expression],
+                                      ivarmap: Mapping[str, IntVarEnc],
+                                      channeled: Optional[MutableSet[str]] = None,
+                                      extra_exprs: Optional[ExprLike | Sequence[ExprLike]] = None) -> list[Expression]:
+    """
+    Add value-channeling constraints for encoded integer vars used in expressions.
+    Needed when a solver uses both an encoding of a intvar and an encoding thereof.
+
+    ``constraints`` is returned with the necessary channeling constraints
+    appended. ``extra_exprs`` can be used to inspect expressions that are not in
+    the returned constraint list, such as an objective.
+
+    ``channeled`` is an optional set of variable names that have already been encoded.
+    """
+    constraints = list(constraints)
+    extra = [] if extra_exprs is None else (list(extra_exprs) if isinstance(extra_exprs, Sequence) else [extra_exprs])
+    exprs: list[ExprLike] = constraints + extra
+    for var in _used_encoded_intvars(exprs, ivarmap, channeled=channeled):
+        terms, k = ivarmap[var.name].encode_term()
+        ws = [1] + [-w for (w, _) in terms]
+        bs = [var] + [b for (_, b) in terms]
+        constraints.append(Operator("wsum", (ws, bs)) == k)
+        if channeled is not None:
+            channeled.add(var.name)
+    return constraints

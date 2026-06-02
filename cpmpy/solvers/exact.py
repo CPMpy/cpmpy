@@ -60,7 +60,7 @@ from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, 
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables
+from ..transformations.linearize import linearize_constraint, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, add_intvar_channeling_constraints
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -145,6 +145,8 @@ class CPM_exact(SolverInterface):
 
         # can override encoding of variables
         self.encoding = None
+        self.ivarmap = dict()
+        self._channeled_ivars = set()
 
         # for solving with assumption variables,
         self.assumption_dict = None
@@ -169,6 +171,10 @@ class CPM_exact(SolverInterface):
             self.objective_value_ = None
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+            for enc in self.ivarmap.values():
+                enc._x._value = None
+                for bv in enc.vars():
+                    bv._value = None
             return
 
         # fill in variable values
@@ -176,6 +182,11 @@ class CPM_exact(SolverInterface):
         exact_vals = self.xct_solver.getLastSolutionFor(self.solver_vars(lst_vars))
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
+        for enc in self.ivarmap.values():
+            for bv in enc.vars():
+                val = self.xct_solver.getLastSolutionFor([self.solver_var(bv)])[0]
+                bv._value = None if val is None else bool(val)
+            enc._x._value = enc.decode()
 
     def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
@@ -451,7 +462,11 @@ class CPM_exact(SolverInterface):
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+        cons = add_intvar_channeling_constraints(safe_cons + decomp_cons + flat_cons,
+                                                 self.ivarmap,
+                                                 channeled=self._channeled_ivars,
+                                                 extra_exprs=obj)
+        self.add(cons)
 
         # make objective function or variable and post
         xct_cfvars,xct_rhs = self._make_numexpr(obj,0)
@@ -522,7 +537,14 @@ class CPM_exact(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
+                                               ivarmap=self.ivarmap,
+                                               channeling="used",
+                                               channeled=self._channeled_ivars)
+        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                     self.ivarmap,
+                                                     channeled=self._channeled_ivars,
+                                                     extra_exprs=self.objective_ if self.has_objective() else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","->","mul"}), csemap=self._csemap)  # the core of the MIP-linearization
