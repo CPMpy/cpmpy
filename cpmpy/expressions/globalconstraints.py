@@ -753,7 +753,7 @@ class ShortTable(GlobalConstraint):
         arr, tab = self.args
 
         row_selected = boolvar(shape=(len(tab),))
-        cons = [cp.any(row_selected)]
+        cons = [cp.sum(row_selected) == 1]
         for i, row in enumerate(tab):
             subexpr = cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR])
             cons.append(row_selected[i].implies(subexpr))  # implication-only decomposition
