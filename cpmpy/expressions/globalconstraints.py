@@ -935,7 +935,10 @@ class Regular(GlobalConstraint):
         "A Regular Language Membership Constraint for Finite Sequences of Variables", Gilles Pesant, 2004
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+
+        Warning: for now this does not always work outside of a positive context (still to be investigated why)!
         """
+
         arr, transitions, start, accepting = self.args
 
         # Keeps track of the supported nodes Q[(i,j)] for variable i taking value j
@@ -976,7 +979,7 @@ class Regular(GlobalConstraint):
                         next_node = self.trans_dict[(node, j)]
                         mdd_transitions.append((id_map[(i, node)], j, id_map[(i + 1, next_node)]))
                         mark[node] = True
-            N[i] = [node for node in N[i] if mark[node]] # Filter out nodes with no valid path
+            N[i] = {node for node in N[i] if mark[node]} # Filter out nodes with no valid path
 
         return [MDD(arr, mdd_transitions, start=id_map[(0, start)])], []
 
