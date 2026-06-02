@@ -1998,7 +1998,7 @@ class GlobalCardinalityCount(GlobalConstraint):
         counts = [cp.Count(vars, v)  for v in vals]
         constraints = [cnt == o for cnt, o in zip(counts, occ)]
         if self.closed:
-            constraints.append(InDomain(v, vals) for v in vars)
+            constraints.extend([InDomain(v, vals) for v in vars])
             constraints.append(cp.sum(counts) == len(vars))
         else:
             constraints.append(cp.sum(counts) <= len(vars))
