@@ -894,39 +894,6 @@ class Regular(GlobalConstraint):
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Decomposition of the Regular global constraint. 
-        Encodes the automaton by encoding the transition table into `class:cpmpy.expressions.globalconstraints.Table` constraints.
-        Then enforces that the last state is accepting.
-        
-        Returns:
-            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
-        """
-        # Decompose to transition table using Table constraints
-        
-        arr, transitions, start, accepting = self.args
-        lbs, ubs = get_bounds(arr)
-        lb, ub = min(lbs), max(ubs)
-        
-        transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
-
-        # add a sink node for transitions that are not defined
-        sink = len(self.nodes)
-        transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
-        transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
-
-        # keep track of current state when traversing the array
-        state_vars = intvar(0, sink, shape=len(arr))
-        id_start = self.node_map[start]
-        # optimization: we know the entry node of the automaton, results in smaller table
-        defining: list[Expression] = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]
-        # define the rest of the automaton using transition table
-        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
-        
-        # constraint is satisfied iff last state is accepting
-        return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
-
-    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
-        """
         Linear decomposition of the Regular global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
         The MDD is obtained by means of constructing a layered directed multigraph for the given automaton, based on Algorithm 1 of:
         "A Regular Language Membership Constraint for Finite Sequences of Variables", Gilles Pesant, 2004
