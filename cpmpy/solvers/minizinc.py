@@ -786,7 +786,7 @@ class CPM_minizinc(SolverInterface):
             # TODO: pretty printing of () as in Operator?
 
             # special case: unary -
-            if self.name == '-':
+            if expr.name == '-':
                 return "-{}".format(args_str[0])
 
             # very special case: weighted sum (before 2-ary)
