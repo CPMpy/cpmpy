@@ -146,7 +146,6 @@ class CPM_gurobi(SolverInterface):
         self.ivarmap = {}
         self._channeled_ivars = set()
         self.objective_ = None
-        self._force_intvar_channeling = False
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -241,11 +240,10 @@ class CPM_gurobi(SolverInterface):
                 else:
                     cpm_var._value = round(solver_val)
             for enc in self.ivarmap.values():
-                if str(enc._x.name) in {str(v) for v in self._channeled_ivars}:
-                    continue
-                for bv in enc.vars():
-                    bv._value = self.solver_var(bv).X >= 0.5
-                enc._x._value = enc.decode()
+                if enc._x.name not in self._channeled_ivars:
+                    for bv in enc.vars():
+                        bv._value = self.solver_var(bv).X >= 0.5
+                    enc._x._value = enc.decode()
             # set _objective_value
             if self.has_objective():
                 grb_obj_val = grb_objective.getValue()
@@ -262,7 +260,6 @@ class CPM_gurobi(SolverInterface):
                 for bv in enc.vars():
                     bv._value = None
 
-        self._force_intvar_channeling = True
         return has_sol
 
 
@@ -398,8 +395,6 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        force_intvar_channeling = getattr(self, "_force_intvar_channeling", False)
-        channeling_extra_exprs = get_variables(cpm_cons) if force_intvar_channeling else []
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
@@ -410,12 +405,12 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling="all" if force_intvar_channeling else "used",
+                                               channeling="used",
                                                channeled=self._channeled_ivars)
         cpm_cons = add_intvar_channeling_constraints(cpm_cons,
                                                      self.ivarmap,
                                                      channeled=self._channeled_ivars,
-                                                     extra_exprs=channeling_extra_exprs + ([self.objective_] if self.objective_ is not None else []))
+                                                     extra_exprs=self.objective_ if self.objective_ is not None else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
