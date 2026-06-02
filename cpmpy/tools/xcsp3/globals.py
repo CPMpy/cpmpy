@@ -21,7 +21,6 @@ List of classes
     SafeOnlyInverse
     InverseOne
     Channel
-    RowSelectingShortTable
     NegativeShortTable
     MDD
     Regular
