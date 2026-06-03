@@ -877,6 +877,8 @@ class Count(GlobalFunction):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
+        if isinstance(arr, np.ndarray) and arr.ndim != 1:
+            arr = arr.reshape(-1)
         super().__init__("count", (arr, val))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -938,6 +940,8 @@ class Among(GlobalFunction):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
+        if isinstance(arr, np.ndarray) and arr.ndim != 1:
+            arr = arr.reshape(-1)
         super().__init__("among", (arr, vals))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -991,6 +995,8 @@ class NValue(GlobalFunction):
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
+        if isinstance(arr, np.ndarray) and arr.ndim != 1:
+            arr = arr.reshape(-1)
         super().__init__("nvalue", tuple(arr))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -1056,6 +1062,8 @@ class NValueExcept(GlobalFunction):
             raise ValueError("NValueExcept takes an array as input")
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
+        if isinstance(arr, np.ndarray) and arr.ndim != 1:
+            arr = arr.reshape(-1)
         super().__init__("nvalue_except", (arr, n))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
