@@ -75,7 +75,7 @@ from .decompose_global import decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Expression, Operator, BoolVal
+from ..expressions.core import Comparison, Expression, Operator, BoolVal, _wsum_make
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
@@ -482,7 +482,18 @@ def canonical_comparison(lst_of_expr):
                 
                 # 2) add collected variables to lhs
                 if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")):
-                    lhs = lhs + lhs2
+                    if lhs2:
+                        if isinstance(lhs, Operator) and lhs.name == "sum":
+                            lhs = Operator("sum", list(lhs.args) + lhs2)
+                        elif isinstance(lhs, Operator) and lhs.name == "wsum":
+                            w, e = list(lhs.args[0]), list(lhs.args[1])
+                            for term in lhs2:
+                                tw, te = _wsum_make(term)
+                                w.extend(tw)
+                                e.extend(te)
+                            lhs = Operator("wsum", [w, e])
+                        elif isinstance(lhs, _NumVarImpl):
+                            lhs = Operator("sum", [lhs] + lhs2)
                 else:
                     raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
 
@@ -554,7 +565,7 @@ def only_positive_coefficients(lst_of_expr):
 
                 # Simplify wsum to sum if all weights are 1
                 if all(w == 1 for w in nw):
-                    lhs = Operator("sum", [list(na)])
+                    lhs = Operator("sum", list(na))
                 else:
                     lhs = Operator("wsum", [list(nw), list(na)])
 

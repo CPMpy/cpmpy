@@ -98,7 +98,7 @@ from frozendict import frozendict
 import numpy as np
 import cpmpy as cp
 
-from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
+from .utils import is_num, is_any_list, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import TypeError
 
 # Common typing helpers
@@ -690,7 +690,8 @@ class Operator(Expression):
                 if not is_boolexpr(arg):
                     raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
         if arity == 0:
-            arg_list = flatlist(arg_list)
+            if isinstance(arg_list, np.ndarray) and arg_list.ndim != 1:
+                arg_list = arg_list.reshape(-1).tolist()
             assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)

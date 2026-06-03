@@ -45,7 +45,7 @@ CONSTRAINTS = [
         Comparison(cmp, c, 2),
         Comparison(cmp, x, 2),
         Comparison(cmp, x, 5),
-        Comparison(cmp, Operator("sum", [[x, y, z]]), 4),
+        Comparison(cmp, Operator("sum", [x, y, z]), 4),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 12),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), -10),
         Comparison(cmp, Operator("wsum", [[2, 3, 5], [x, y, z]]), 100),  # where ub(lhs)<rhs
