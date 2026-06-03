@@ -701,26 +701,20 @@ class Operator(Expression):
         #    and one of the args is a wsum,
         #                    or a product of a constant and an expression,
         # then create a wsum of weights,expressions over all
-        if name == 'sum' and \
-                all(not is_num(a) for a in arg_list) and \
-                any(_wsum_should(a) for a in arg_list):
-            we = [_wsum_make(a) for a in arg_list]
-            w: list[ExprLike] = [wi for w, _ in we for wi in w]
-            e: list[ExprLike] = [ei for _, e in we for ei in e]
-            name = 'wsum'
-            arg_list = (w, e)
-
-        # we have the requirement that weighted sums are [weights, expressions]
-        if name == 'wsum':
-            assert isinstance(arg_list[0], (list, tuple, np.ndarray)), "wsum: arg0 has to be a list-like"
-            assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
-            weights: list[ExprLike] = []
-            for a in arg_list[0]:
-                if isinstance(a, (bool, int, np.integer, np.bool_, BoolVal)):
-                    weights.append(int(a)) # bool or int, simplifies things later on
-                else:
-                    weights.append(a) # can be float
-            arg_list = (weights, arg_list[1])
+        if name == 'sum':
+            saw_wsum, all_expr = False, True
+            for a in arg_list:
+                if _wsum_should(a):
+                    saw_wsum = True
+                if is_int(a):
+                    all_expr = False
+                    break
+            if saw_wsum and all_expr:
+                wvs = [_wsum_make(a) for a in arg_list]
+                ws: list[ExprLike] = [w for ws, _ in wvs for w in ws]
+                vs: list[ExprLike] = [v for _, vs in wvs for v in vs]
+                super().__init__("wsum", (ws, vs))
+                return
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating
@@ -844,8 +838,11 @@ def _wsum_should(arg) -> bool:
     (negation '-' does not mean it SHOULD be a wsum, because then
      all subtractions are transformed into less readable wsums)
     """
-    name = getattr(arg, 'name', None)
-    return name == 'wsum' or (name == 'mul' and arg.is_lhs_num)
+    if isinstance(arg, Operator):
+        return arg.name == 'wsum'
+    if getattr(arg, 'name', None) == 'mul':
+        return arg.is_lhs_num
+    return False
 
 def _wsum_make(arg) -> tuple[list[int], list[ExprLike]]:
     """ Internal helper: prep the arg for wsum
