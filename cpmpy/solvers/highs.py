@@ -429,7 +429,7 @@ class CPM_highs(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = val >= 0.5
                 else:
-                    cpm_var._value = int(round(val))
+                    cpm_var._value = round(val)
 
             if self.has_objective():
                 self.objective_value_ = info.objective_function_value
