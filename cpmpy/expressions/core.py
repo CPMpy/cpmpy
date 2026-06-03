@@ -838,11 +838,8 @@ def _wsum_should(arg) -> bool:
     (negation '-' does not mean it SHOULD be a wsum, because then
      all subtractions are transformed into less readable wsums)
     """
-    if isinstance(arg, Operator):
-        return arg.name == 'wsum'
-    if getattr(arg, 'name', None) == 'mul':
-        return arg.is_lhs_num
-    return False
+    name = getattr(arg, 'name', None)
+    return name == 'wsum' or (name == 'mul' and arg.is_lhs_num)
 
 def _wsum_make(arg) -> tuple[list[int], list[ExprLike]]:
     """ Internal helper: prep the arg for wsum
