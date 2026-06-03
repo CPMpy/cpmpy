@@ -666,6 +666,20 @@ class Operator(Expression):
             arg_list (Sequence[ExprLike | ListLike[ExprLike]]): List of expressions/constants, 
                         or list of size 2 with list of weights and list of expressions for wsum.
         """
+        if name == "wsum":  # args = [ListLike[int|np.integer], ListLike[ExprLike]]
+            assert len(arg_list) == 2, f"Operator: wsum expects [weights, expressions] as arguments, got {arg_list}"
+            ws, vs = arg_list
+            if isinstance(ws, np.ndarray):
+                ws = ws.astype(int).reshape(-1).tolist()
+            else:
+                assert is_any_list(ws), f"Operator: wsum weights must be a sequence, got {type(ws)}: {ws}"
+                if not all(type(w) is int for w in ws):
+                    ws = [int(w) for w in ws]
+            if isinstance(vs, np.ndarray) and vs.ndim != 1:
+                vs = vs.reshape(-1)
+            super().__init__(name, (ws, vs))
+            return
+
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         assert is_any_list(arg_list), f"Operator: arg_list must be a list of expressions or constants, got {arg_list}"
