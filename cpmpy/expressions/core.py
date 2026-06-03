@@ -711,9 +711,9 @@ class Operator(Expression):
                     break
             if saw_wsum and all_expr:
                 wvs = [_wsum_make(a) for a in arg_list]
-                ws: list[ExprLike] = [w for ws, _ in wvs for w in ws]
-                vs: list[ExprLike] = [v for _, vs in wvs for v in vs]
-                super().__init__("wsum", (ws, vs))
+                ws2: list[ExprLike] = [w for w_list, _ in wvs for w in w_list]
+                vs2: list[ExprLike] = [v for _, v_list in wvs for v in v_list]
+                super().__init__("wsum", (ws2, vs2))
                 return
 
         # small cleanup: nested n-ary operators are merged into the toplevel

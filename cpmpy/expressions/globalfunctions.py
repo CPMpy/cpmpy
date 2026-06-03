@@ -367,12 +367,14 @@ class Multiplication(GlobalFunction):
             if not is_int(x):
                 warnings.warn("Mul: float constants are deprecated and converted to int. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             if type(x) is not int:
+                assert not isinstance(x, Expression)
                 x = int(x)
             is_lhs_num = True
         elif is_num(y):
             if not is_int(y):
                 warnings.warn("Mul: float constants are deprecated and converted to int. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             if type(y) is not int:
+                assert not isinstance(y, Expression)
                 y = int(y)
             (x, y) = (y, x)
             is_lhs_num = True
