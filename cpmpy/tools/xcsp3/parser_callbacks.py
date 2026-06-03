@@ -275,7 +275,7 @@ class CallbacksCPMPy(Callbacks):
                 self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
-        self.cpm_model += cp.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
+        self.cpm_model += xglobals.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
         self.cpm_model += cp.MDD(self.get_cpm_vars(scope), transitions)
