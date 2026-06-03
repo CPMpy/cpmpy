@@ -949,7 +949,7 @@ class Regular(GlobalConstraint):
             transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
 
         # keep track of current state when traversing the array
-        state_vars = intvar(0, len(self.nodes), shape=len(arr))
+        state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
         defining: list[Expression] = [
