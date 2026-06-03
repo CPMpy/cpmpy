@@ -80,7 +80,7 @@ from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal, ExprLike
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, NoOverlap, Cumulative
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, NoOverlap, Cumulative, Table, ShortTable, InDomain
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -628,10 +628,9 @@ def get_linear_decompositions():
     return dict(
         alldifferent=AllDifferent.decompose_linear,
         element=Element.decompose_linear,
-        # dispatched polymorphically: several classes share the name "table"
-        # (e.g. globalconstraints.Table and xcsp3.globals.NonReifiedTable), each
-        # with their own decompose_linear, so call the instance's own method.
-        table=lambda expr: expr.decompose_linear(),
+        table=Table.decompose_linear,
+        short_table=ShortTable.decompose,
+        InDomain=InDomain.decompose_linear,
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 

@@ -463,6 +463,35 @@ class Circuit(GlobalConstraint):
                 ]
         return value + nbc, toplevel
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the Circuit global constraint, inspired by Miller-Tucker-Zemlin formulation for TSPs
+
+        For now implemented as default positive decompositions, since all solvers submitted to XCSP3 either use linear decompositions (this one),
+        or implement Circuit natively.
+        """
+        succ = self.args
+        n = len(succ)
+        order = cp.intvar(0, n - 1, shape=n)
+
+        constraints = [x >= 0 for x in succ] + [x < n for x in succ]  # bounds on successors
+        constraints += [cp.sum(succ[j] == i for j in range(n)) == 1 for i in
+                        range(n)]  # each node i has exactly one predecessor
+        constraints += [cp.AllDifferent(order)]  # redundant constraint
+        constraints += [order[0] == 0]
+
+        defining: list[Expression] = []
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    # forbid self-loops
+                    constraints += [succ[i] != j]
+                if j != 0:
+                    # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
+                    defining += [(succ[i] == j) == (order[i] + 1 == order[j])]
+
+        return constraints, defining
+
     def value(self) -> Optional[bool]:
         """
         Returns:
@@ -587,6 +616,24 @@ class Table(GlobalConstraint):
         """
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
+
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the Table global constraint.
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, tab = self.args
+        if len(tab) == 1:
+            return [cp.all(t == a for (t, a) in zip(tab[0], arr))], []
+        
+        row_selected = boolvar(shape=len(tab))
+        cons = [cp.any(row_selected)]
+        for i, row in enumerate(tab):
+            subexpr = cp.all([x == v for x,v in zip(arr, row)])
+            cons.append(row_selected[i].implies(subexpr))  # implication-only decomposition
+        return cons,[]
 
     def _variable_ordering(self, heuristic:str="domain"):
         """
@@ -721,6 +768,25 @@ class ShortTable(GlobalConstraint):
         """
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
+
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the ShortTable global constraint.
+
+        Similar to `element` from Gleb's paper: "Improved Linearization of Constraint
+        Programming Models"
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+        """
+        arr, tab = self.args
+
+        row_selected = boolvar(shape=(len(tab),))
+        cons = [cp.sum(row_selected) == 1]
+        for i, row in enumerate(tab):
+            subexpr = cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR])
+            cons.append(row_selected[i].implies(subexpr))  # implication-only decomposition
+        return cons,[]
 
     def value(self) -> Optional[bool]:
         """
@@ -857,36 +923,94 @@ class Regular(GlobalConstraint):
 
     def decompose(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Decomposition of the Regular global constraint. 
+        Decomposition of the Regular global constraint.
         Encodes the automaton by encoding the transition table into `class:cpmpy.expressions.globalconstraints.Table` constraints.
         Then enforces that the last state is accepting.
-        
+
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         # Decompose to transition table using Table constraints
-        
+
         arr, transitions, start, accepting = self.args
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
-        
+
         transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
 
         # add a sink node for transitions that are not defined
         sink = len(self.nodes)
-        transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
+        transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if
+                        (n, v) not in self.trans_dict]
         transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
 
         # keep track of current state when traversing the array
         state_vars = intvar(0, sink, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        defining: list[Expression] = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]
+        defining: list[Expression] = [
+            Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
         # define the rest of the automaton using transition table
         defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
-        
+
         # constraint is satisfied iff last state is accepting
         return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+
+
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the Regular global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
+        The MDD is obtained by means of constructing a layered directed multigraph for the given automaton, based on Algorithm 1 of:
+        "A Regular Language Membership Constraint for Finite Sequences of Variables", Gilles Pesant, 2004
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+
+        Warning: for now this does not always work outside of a positive context (still to be investigated why)!
+        """
+
+        arr, transitions, start, accepting = self.args
+
+        # Keeps track of the supported nodes Q[(i,j)] for variable i taking value j
+        Q = defaultdict(set)
+        # Keeps track of the nodes N[i] that can be reached at layer i of the layered graph
+        N = defaultdict(set)
+        N[0].add(start)
+
+        # Forward phase
+        for i in range(len(arr)):
+            for j in range(arr[i].lb, arr[i].ub + 1):
+                for node in N[i]:
+                    if (node, j) in self.trans_dict.keys():
+                        Q[(i, j)].add(node)
+                        N[i + 1].add(self.trans_dict[(node, j)])
+
+        # Backward phase, remove non-accepting nodes
+        N[len(arr)] = N[len(arr)].intersection(accepting)
+
+        mdd_transitions: list[tuple[int | str, int, int | str]] = []
+
+        # Unique ID for every node in the layered graph
+        id_map = {(i, node): idx for idx, (i, node) in
+                  enumerate((i, node) for i in range(len(arr)) for node in self.nodes)}
+
+        # All accepting nodes in the final layer are merged into one
+        for node in accepting:
+            id_map[(len(arr), node)] = len(arr) * len(self.nodes)
+
+        mark = {}
+        # Backward phase, add valid MDD transitions
+        for i in reversed(range(len(arr))):
+            for node in N[i]:
+                mark[node] = False
+            for j in range(arr[i].lb, arr[i].ub + 1):
+                for node in Q[(i, j)]:
+                    if (node, j) in self.trans_dict.keys() and self.trans_dict[(node, j)] in N[i + 1]:
+                        next_node = self.trans_dict[(node, j)]
+                        mdd_transitions.append((id_map[(i, node)], j, id_map[(i + 1, next_node)]))
+                        mark[node] = True
+            N[i] = {node for node in N[i] if mark[node]} # Filter out nodes with no valid path
+
+        return [MDD(arr, mdd_transitions, start=id_map[(0, start)])], []
 
     def value(self) -> Optional[bool]:
         """
@@ -1222,6 +1346,17 @@ class InDomain(GlobalConstraint):
         lb, ub = expr.get_bounds()
         arr_set = frozenset(arr)
         return [expr != val for val in range(lb, ub + 1) if val not in arr_set], []
+
+    def decompose_linear(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear decomposition of the InDomain global constraint.
+        Avoids != constraints and instead decomposes into a large disjunction.
+        If `expr` is a variable (the most common case), `cpmpy.transformations.linearize.linearize_reified_varvals` will then encode this variable with a direct encoding
+        """
+        expr, arr = self.args
+        lb, ub = expr.get_bounds()
+        arr_set = frozenset(arr)
+        return [cp.any([expr == val for val in arr_set])], []
 
     def value(self) -> Optional[bool]:
         """
