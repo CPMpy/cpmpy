@@ -98,8 +98,8 @@ class CPM_scip(SolverInterface):
         self.objective_value_ = None
         self.ivarmap = {}
         self._channeled_ivars = set()
+        self._native_ivars = {}
         self.objective_ = None
-        self._intvar_channeling = "used"
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
@@ -196,7 +196,6 @@ class CPM_scip(SolverInterface):
         # and the user can now change the model as they will. The downside is that potentially 
         # useful information for speeding up the next optimisation call is thrown out.
         self.scip_model.freeTransform()
-        self._intvar_channeling = "all"
 
         return has_sol
 
@@ -318,12 +317,8 @@ class CPM_scip(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling=self._intvar_channeling,
+                                               channeling="used",
                                                channeled=self._channeled_ivars)
-        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
-                                                     self.ivarmap,
-                                                     channeled=self._channeled_ivars,
-                                                     extra_exprs=self.objective_ if self.objective_ is not None else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "abs", "->"}) | self.supported_global_constraints, csemap=self._csemap)
@@ -335,7 +330,19 @@ class CPM_scip(SolverInterface):
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
         self.solver_vars(list(self.user_vars))
 
-        for con in self.transform(cpm_expr):
+        cpm_cons = self.transform(cpm_expr)
+        extra_exprs = list(self._native_ivars.values())
+        if self.objective_ is not None:
+            extra_exprs.append(self.objective_)
+        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                     self.ivarmap,
+                                                     channeled=self._channeled_ivars,
+                                                     extra_exprs=extra_exprs)
+        for var in get_variables(cpm_cons):
+            if not var.is_bool():
+                self._native_ivars[var.name] = var
+
+        for con in cpm_cons:
             self._add_transformed_constraint(con)
 
         return self

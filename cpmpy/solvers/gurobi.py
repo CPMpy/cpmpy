@@ -145,8 +145,8 @@ class CPM_gurobi(SolverInterface):
         self.grb_model = gp.Model(env=GRB_ENV)
         self.ivarmap = {}
         self._channeled_ivars = set()
+        self._native_ivars = {}
         self.objective_ = None
-        self._intvar_channeling = "used"
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -261,7 +261,6 @@ class CPM_gurobi(SolverInterface):
                 for bv in enc.vars():
                     bv._value = None
 
-        self._intvar_channeling = "all"
         return has_sol
 
 
@@ -407,12 +406,8 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling=self._intvar_channeling,
+                                               channeling="used",
                                                channeled=self._channeled_ivars)
-        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
-                                                     self.ivarmap,
-                                                     channeled=self._channeled_ivars,
-                                                     extra_exprs=self.objective_ if self.objective_ is not None else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
@@ -444,7 +439,19 @@ class CPM_gurobi(SolverInterface):
       get_variables(cpm_expr_orig, collect=self.user_vars)
 
       # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
+      cpm_cons = self.transform(cpm_expr_orig)
+      extra_exprs = list(self._native_ivars.values())
+      if self.objective_ is not None:
+          extra_exprs.append(self.objective_)
+      cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                   self.ivarmap,
+                                                   channeled=self._channeled_ivars,
+                                                   extra_exprs=extra_exprs)
+      for var in get_variables(cpm_cons):
+          if not var.is_bool():
+              self._native_ivars[var.name] = var
+
+      for cpm_expr in cpm_cons:
           self._add_transformed(cpm_expr)
 
       return self

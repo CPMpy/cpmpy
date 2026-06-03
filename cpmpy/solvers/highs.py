@@ -120,8 +120,8 @@ class CPM_highs(SolverInterface):
         self._obj_cols = None
         self.ivarmap = {}
         self._channeled_ivars = set()
+        self._native_ivars = {}
         self.objective_ = None
-        self._intvar_channeling = "used"
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
@@ -224,12 +224,8 @@ class CPM_highs(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling=self._intvar_channeling,
+                                               channeling="used",
                                                channeled=self._channeled_ivars)
-        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
-                                                     self.ivarmap,
-                                                     channeled=self._channeled_ivars,
-                                                     extra_exprs=self.objective_ if self.objective_ is not None else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum"}), csemap=self._csemap)  # the core of the MIP-linearization; rewrites sub to wsum
@@ -246,7 +242,19 @@ class CPM_highs(SolverInterface):
         # track user vars and ensure newly seen ones have solver columns
         get_variables(cpm_expr, collect=self.user_vars)
 
-        for con in self.transform(cpm_expr):
+        cpm_cons = self.transform(cpm_expr)
+        extra_exprs = list(self._native_ivars.values())
+        if self.objective_ is not None:
+            extra_exprs.append(self.objective_)
+        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                     self.ivarmap,
+                                                     channeled=self._channeled_ivars,
+                                                     extra_exprs=extra_exprs)
+        for var in get_variables(cpm_cons):
+            if not var.is_bool():
+                self._native_ivars[var.name] = var
+
+        for con in cpm_cons:
             if isinstance(con, Comparison):
                 lhs, rhs = con.args
                 if not is_num(rhs):
@@ -471,6 +479,5 @@ class CPM_highs(SolverInterface):
                 for bv in enc.vars():
                     bv._value = None
 
-        self._intvar_channeling = "all"
         return has_sol
 

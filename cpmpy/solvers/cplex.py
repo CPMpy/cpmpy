@@ -152,8 +152,8 @@ class CPM_cplex(SolverInterface):
         self._obj_offset = 0
         self.ivarmap = {}
         self._channeled_ivars = set()
+        self._native_ivars = {}
         self.objective_ = None
-        self._intvar_channeling = "used"
 
         super().__init__(name="cplex", cpm_model=cpm_model)
 
@@ -274,7 +274,6 @@ class CPM_cplex(SolverInterface):
                 for bv in enc.vars():
                     bv._value = None
 
-        self._intvar_channeling = "all"
         return has_sol
 
 
@@ -423,12 +422,8 @@ class CPM_cplex(SolverInterface):
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub", "mul"]), csemap=self._csemap)  # supports >, <, !=
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
                                                ivarmap=self.ivarmap,
-                                               channeling=self._intvar_channeling,
+                                               channeling="used",
                                                channeled=self._channeled_ivars)
-        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
-                                                     self.ivarmap,
-                                                     channeled=self._channeled_ivars,
-                                                     extra_exprs=self.objective_ if self.objective_ is not None else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub"} | self.supported_global_constraints), csemap=self._csemap)  # CPLEX supports quadratic constraints and division by constants
@@ -457,7 +452,19 @@ class CPM_cplex(SolverInterface):
       get_variables(cpm_expr_orig, collect=self.user_vars)
 
       # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
+      cpm_cons = self.transform(cpm_expr_orig)
+      extra_exprs = list(self._native_ivars.values())
+      if self.objective_ is not None:
+          extra_exprs.append(self.objective_)
+      cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                   self.ivarmap,
+                                                   channeled=self._channeled_ivars,
+                                                   extra_exprs=extra_exprs)
+      for var in get_variables(cpm_cons):
+          if not var.is_bool():
+              self._native_ivars[var.name] = var
+
+      for cpm_expr in cpm_cons:
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
