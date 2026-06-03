@@ -365,11 +365,11 @@ class Multiplication(GlobalFunction):
         is_lhs_num = False
         if is_num(x):
             if not is_int(x):
-                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+                warnings.warn("Mul: float constants are deprecated and converted to int. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             is_lhs_num = True
         elif is_num(y):
             if not is_int(y):
-                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+                warnings.warn("Mul: float constants are deprecated and converted to int. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             (x, y) = (y, x)
             is_lhs_num = True
 
