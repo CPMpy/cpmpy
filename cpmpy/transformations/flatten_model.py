@@ -260,6 +260,8 @@ def flatten_constraint(expr, csemap=None):
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
                 if rvar.is_bool():
+                    if csemap is not None:
+                        csemap.flat_map[lexpr] = rvar # save this reification in the csemap
                     # this is a reification
                     (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap)
                 else:
