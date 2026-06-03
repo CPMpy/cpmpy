@@ -261,8 +261,11 @@ def flatten_constraint(expr, csemap=None):
             if exprname == '==' and lexpr.is_bool():
                 if rvar.is_bool():
                     if csemap is not None:
-                        lexpr_norm, _ = csemap._canonicalize_boolexpr(lexpr) # canonicalize the lexpr
-                        csemap.flat_map[lexpr_norm] = rvar # save this reificsation in the csemap
+                        lexpr_norm, negate = csemap._canonicalize_boolexpr(lexpr) # canonicalize the lexpr
+                        if negate:
+                            csemap.flat_map[lexpr_norm] = ~rvar # save this reificsation in the csemap
+                        else:
+                            csemap.flat_map[lexpr_norm] = rvar # save this reificsation in the csemap
                     # this is a reification
                     (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap)
                 else:

@@ -154,6 +154,19 @@ class TestCSE:
             "x == 5": "b",
         }
 
+    def test_flat_reification_negation_in_csemap(self):
+
+        x = cp.intvar(0,10,name="x")
+        b = cp.boolvar(name="b")
+
+        flat_cons = flatten_constraint((x != 5) == b, csemap=self.csemap)
+
+        assert len(flat_cons) == 1
+        assert str(flat_cons[0]) == "(x != 5) == (b)"
+        assert len(self.csemap) == 1
+        assert {str(expr): str(var) for expr, var in self.csemap.flat_map.items()} == {
+            "x == 5": "~b",
+        }
     def test_reification_of_exprs_in_csemap(self):
 
         x = cp.intvar(0,10,name="x")
