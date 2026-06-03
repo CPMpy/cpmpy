@@ -273,7 +273,7 @@ class CallbacksCPMPy(Callbacks):
             if positive:
                 self.cpm_model += cp.Table(cpm_vars, tuples)
             else:
-                self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
+                self.cpm_model += ~cp.Table(cpm_vars, tuples)
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
         self.cpm_model += cp.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
