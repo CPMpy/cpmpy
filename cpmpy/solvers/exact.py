@@ -147,7 +147,6 @@ class CPM_exact(SolverInterface):
         self.encoding = None
         self.ivarmap = dict()
         self._channeled_ivars = set()
-        self._native_ivars = {}
 
         # for solving with assumption variables,
         self.assumption_dict = None
@@ -542,6 +541,10 @@ class CPM_exact(SolverInterface):
                                                ivarmap=self.ivarmap,
                                                channeling="used",
                                                channeled=self._channeled_ivars)
+        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                     self.ivarmap,
+                                                     channeled=self._channeled_ivars,
+                                                     extra_exprs=self.objective_ if self.has_objective() else [])
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum","->","mul"}), csemap=self._csemap)  # the core of the MIP-linearization
@@ -587,19 +590,7 @@ class CPM_exact(SolverInterface):
         get_variables(cpm_expr_orig, collect=self.user_vars)
 
         # transform and post the constraints
-        cpm_cons = self.transform(cpm_expr_orig)
-        extra_exprs = list(self._native_ivars.values())
-        if self.has_objective():
-            extra_exprs.append(self.objective_)
-        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
-                                                     self.ivarmap,
-                                                     channeled=self._channeled_ivars,
-                                                     extra_exprs=extra_exprs)
-        for var in get_variables(cpm_cons):
-            if not var.is_bool():
-                self._native_ivars[var.name] = var
-
-        for cpm_expr in cpm_cons:
+        for cpm_expr in self.transform(cpm_expr_orig):
             # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
             # numexpr `comp` bvar|const
             if isinstance(cpm_expr, Comparison):
