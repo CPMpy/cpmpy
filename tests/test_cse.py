@@ -135,12 +135,54 @@ class TestCSE:
         b = cp.boolvar(name="b")
 
         flat_cons = flatten_constraint((x > 5) == b, csemap=self.csemap)
+        print(flat_cons)
 
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "(x > 5) == (b)"
-        assert len(self.csemap) == 0
 
+    def test_flat_reification_in_csemap(self):
 
+        x = cp.intvar(0,10,name="x")
+        b = cp.boolvar(name="b")
+
+        flat_cons = flatten_constraint((x == 5) == b, csemap=self.csemap)
+
+        assert len(flat_cons) == 1
+        assert str(flat_cons[0]) == "(x == 5) == (b)"
+        assert len(self.csemap) == 1
+        assert {str(expr): str(var) for expr, var in self.csemap.flat_map.items()} == {
+            "x == 5": "b",
+        }
+
+    def test_flat_reification_negation_in_csemap(self):
+
+        x = cp.intvar(0,10,name="x")
+        b = cp.boolvar(name="b")
+
+        flat_cons = flatten_constraint((x != 5) == b, csemap=self.csemap)
+
+        assert len(flat_cons) == 1
+        assert str(flat_cons[0]) == "(x != 5) == (b)"
+        assert len(self.csemap) == 1
+        assert {str(expr): str(var) for expr, var in self.csemap.flat_map.items()} == {
+            "x == 5": "~b",
+        }
+    def test_reification_of_exprs_in_csemap(self):
+
+        x = cp.intvar(0,10,name="x")
+        y = cp.intvar(0,10,name="y")
+        b = cp.boolvar(name="b")
+
+        flat_cons = flatten_constraint((x == 5) == (y == 10), csemap=self.csemap)
+
+        assert len(flat_cons) == 2
+        assert str(flat_cons[0]) == "(x == 5) == (BV0)"
+        assert str(flat_cons[1]) == "(y == 10) == (BV0)"
+        assert len(self.csemap) == 2
+        assert {str(expr): str(var) for expr, var in self.csemap.flat_map.items()} == {
+            "x == 5": "BV0",
+            "y == 10": "BV0",
+        }
 
     def test_decompose(self):
         x,y,z = cp.intvar(0,10, shape=3, name=tuple("xyz"))
