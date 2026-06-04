@@ -628,7 +628,7 @@ def get_linear_decompositions():
     return dict(
         alldifferent=AllDifferent.decompose_linear,
         element=Element.decompose_linear,
-        table=Table.decompose_linear,
+        table=lambda expr: expr.decompose_linear(),
         short_table=ShortTable.decompose,
         InDomain=InDomain.decompose_linear,
     )

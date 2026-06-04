@@ -433,6 +433,9 @@ class NonReifiedTable(GlobalConstraint):
             cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
         return cons,[]
 
+    def decompose_linear(self):
+        return self.decompose()
+
     def value(self):
         arr, tab = self.args
         arrval = np.asarray(argvals(arr))
