@@ -37,6 +37,18 @@ class CSEMap:
             
         return self.flat_map.get(expr, default)
 
+    def put(self, expr: Expression, var: _IntVarImpl) -> None:
+        """
+        Put the given expression and variable into the flat_map.
+        """
+        if expr.is_bool():
+            normal_expr, negate = self._canonicalize_boolexpr(expr)
+            if negate:
+                var = ~var
+            self.flat_map[normal_expr] = var
+        else:
+            self.flat_map[expr] = var
+
     def save_decomposition(self, expr: Expression, newexpr: Expression):
         """Save the decomposition of the given global constraint or global function."""
         self.decomp_map[expr] = newexpr
