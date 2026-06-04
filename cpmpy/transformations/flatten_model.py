@@ -259,15 +259,17 @@ def flatten_constraint(expr, csemap=None):
             # Reification (double implication): Boolexpr == Var
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
+                lhs = None
                 if rvar.is_bool():
                     if csemap is not None:
-                        lexpr_norm, negate = csemap._canonicalize_boolexpr(lexpr) # canonicalize the lexpr
-                        if negate:
-                            csemap.flat_map[lexpr_norm] = ~rvar # save this reificsation in the csemap
+                        other_expr = csemap.get(lexpr)
+                        if other_expr is not None:
+                            lhs = other_expr # already have a constraint lexpr == bvar, use bvar instead
+                            lcons = []
                         else:
-                            csemap.flat_map[lexpr_norm] = rvar # save this reificsation in the csemap
-                    # this is a reification
-                    (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap)
+                            csemap.put(lexpr, rvar)
+                    if lhs is None:
+                        (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap)
                 else:
                     # integer comparison
                     (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
