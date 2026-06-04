@@ -629,7 +629,7 @@ def get_linear_decompositions():
         alldifferent=AllDifferent.decompose_linear,
         element=Element.decompose_linear,
         table=lambda expr: expr.decompose_linear(),
-        short_table=ShortTable.decompose,
+        short_table=ShortTable.decompose_positive,
         InDomain=InDomain.decompose_linear,
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
