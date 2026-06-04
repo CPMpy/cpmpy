@@ -135,7 +135,6 @@ class TestCSE:
         b = cp.boolvar(name="b")
 
         flat_cons = flatten_constraint((x > 5) == b, csemap=self.csemap)
-        print(flat_cons)
 
         assert len(flat_cons) == 1
         assert str(flat_cons[0]) == "(x > 5) == (b)"

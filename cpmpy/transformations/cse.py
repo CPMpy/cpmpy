@@ -39,13 +39,13 @@ class CSEMap:
 
     def put(self, expr: Expression, var: _IntVarImpl) -> None:
         """
-        Normalize the expression and put the given expression and variable into the flat_map.
+        Put the given expression and variable into the flat_map.
         """
         if expr.is_bool():
-            expr, negate = self._canonicalize_boolexpr(expr)
+            normal_expr, negate = self._canonicalize_boolexpr(expr)
             if negate:
                 var = ~var
-            self.flat_map[expr] = var
+            self.flat_map[normal_expr] = var
         else:
             self.flat_map[expr] = var
 
