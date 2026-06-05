@@ -28,7 +28,7 @@ from cpmpy import ShortTable
 # from xglobals import RowSelectingShortTable as ShortTable
 # 2) Table for extension
 # from cp import Table as Table_extension
-from xglobals import NonReifiedTable as Table_extension
+from cpmpy.tools.xcsp3.globals import NonReifiedTable as Table_extension
 # 3) Table for instantiation
 from cpmpy import Table as Table_instantiation
 # from xglobals import NonReifiedTable as Table_instantiation
@@ -37,7 +37,7 @@ from cpmpy import Regular
 #from xglobals import Regular
 # 5) NegativeShortTable
 # from cp import ShortTable as NegativeShortTable
-from xglobals import NegativeShortTable
+from cpmpy.tools.xcsp3.globals import NegativeShortTable
 # 6) NegativeTable
 from cpmpy import NegativeTable
 
