@@ -20,6 +20,27 @@ from cpmpy.tools.xcsp3 import globals as xglobals
 from cpmpy import cpm_array
 from cpmpy.expressions.utils import flatlist, get_bounds, is_boolexpr
 
+# Imports to easily switch between table implementations.
+# Also need to look at XCSP3's globals.py, where NonReifiedTable is used in 3 places in the decomposition.
+
+# 1) ShortTable
+from cp import ShortTable
+# from xglobals import RowSelectingShortTable as ShortTable
+# 2) Table for extension
+# from cp import Table as Table_extension
+from xglobals import NonReifiedTable as Table_extension
+# 3) Table for instantiation
+from cp import Table as Table_instantiation
+# from xglobals import NonReifiedTable as Table_instantiation
+# 4) Regular
+# from cp import Regular
+from xglobals import Regular
+# 5) NegativeShortTable
+# from cp import ShortTable as NegativeShortTable
+from xglobals import NegativeShortTable
+# 6) NegativeTable
+from cp import NegativeTable
+
 
 class CallbacksCPMPy(Callbacks):  
     """
@@ -266,18 +287,18 @@ class CallbacksCPMPy(Callbacks):
             cpm_vars = self.vars_from_node(scope)
             exttuples = [tuple([strwildcard(x) for x in tup]) for tup in tuples]
             if positive:
-                self.cpm_model += cp.ShortTable(cpm_vars, exttuples)
+                self.cpm_model += ShortTable(cpm_vars, exttuples)
             else:
-                self.cpm_model += xglobals.NegativeShortTable(cpm_vars, exttuples)
+                self.cpm_model += NegativeShortTable(cpm_vars, exttuples)
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
-                self.cpm_model += xglobals.NonReifiedTable(cpm_vars, tuples)
+                self.cpm_model += Table_extension(cpm_vars, tuples)
             else:
-                self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
+                self.cpm_model += NegativeTable(cpm_vars, tuples)
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
-        self.cpm_model += xglobals.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
+        self.cpm_model += Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
         self.cpm_model += cp.MDD(self.get_cpm_vars(scope), transitions)
@@ -715,7 +736,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, balance, arcs, capacities, weights, condition)
 
     def ctr_instantiation(self, lst: list[Variable], values: list[int]):
-        self.cpm_model += cp.Table(self.get_cpm_vars(lst), [values])
+        self.cpm_model += Table_instantiation(self.get_cpm_vars(lst), [values])
 
     def ctr_clause(self, pos: list[Variable], neg: list[Variable]):  # not in XCSP3-core
         self._unimplemented(pos, neg)
