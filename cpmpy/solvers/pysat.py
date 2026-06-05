@@ -374,8 +374,8 @@ class CPM_pysat(SolverInterface):
             cpm_cons,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
-            decompose_custom = dict(
-                table = Table.decompose_positive # DO NOT COMMIT TO MASTER!!
+            decompose_custom_positive = dict(
+                table = Table.decompose_positive # force bypass decompose trough MDD, use row-selecting instead
             ),
             csemap=self._csemap
         )

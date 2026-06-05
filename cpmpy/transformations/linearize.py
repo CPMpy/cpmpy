@@ -582,6 +582,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Optional[AbstractSet[str]] = None,
                      supported_reified: Optional[AbstractSet[str]] = None,
                      decompose_custom : Optional[dict[str, CustomDecomp]] = None,
+                     decompose_custom_positive : Optional[dict[str, CustomDecomp]] = None,
                      csemap: Optional[CSEMap] = None):
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
@@ -591,6 +592,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
             supported: set of supported global constraints and global functions
             supported_reified: set of supported reified global constraints
             decompose_custom: dictionary of custom decompositions for global constraints
+            decompose_custom_positive: dictionary of custom positive decompositions for global constraints
             csemap: map of expressions to an auxiliary variable
 
         returns:
@@ -602,15 +604,19 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         supported_reified = frozenset[str]()
 
     linear_decompositions = get_linear_decompositions()
-    if decompose_custom is None:
-        decompose_custom = linear_decompositions
-    else:
+    positive_decompositions = copy.copy(linear_decompositions) # linear decompositions are also valid positive ones
+
+    if decompose_custom is not None:
         linear_decompositions.update(decompose_custom) # overwrite linear decompositions with custom ones provided
+    
+    if decompose_custom_positive is not None:
+        positive_decompositions.update(decompose_custom_positive) # overwrite linear decompositions with custom ones provided
 
     return decompose_in_tree(list(lst_of_expr), 
                              supported=supported,
                              supported_reified=supported_reified, 
                              csemap=csemap, 
+                             decompose_custom_positive=positive_decompositions,
                              decompose_custom=linear_decompositions)
 
 def decompose_linear_objective(obj: Expression,
