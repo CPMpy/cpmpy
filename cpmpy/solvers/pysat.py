@@ -55,6 +55,8 @@ from threading import Timer
 from typing import Optional, List, Iterable
 import warnings
 
+from cpmpy.expressions import Table
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
@@ -372,6 +374,9 @@ class CPM_pysat(SolverInterface):
             cpm_cons,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
+            decompose_custom = dict(
+                table = Table.decompose_positive # DO NOT COMMIT TO MASTER!!
+            ),
             csemap=self._csemap
         )
         cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?

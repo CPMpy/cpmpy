@@ -617,6 +617,21 @@ class Table(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the Table global constraint.
+        """
+        arr, tab = self.args
+
+        row_selected = boolvar(shape=(len(tab),))
+        cons = [cp.sum(row_selected) == 1]
+        for i, row in enumerate(tab):
+            subexpr = cp.all([ai == ri for ai, ri in zip(arr, row)])
+            cons.append(row_selected[i].implies(subexpr))  # implication-only decomposition
+        return cons,[]
+        
+    
+    
     def _variable_ordering(self, heuristic:str="domain"):
         """
         Heuristically order the variables to obtain a better MDD. The columns of the table are ordered accordingly.

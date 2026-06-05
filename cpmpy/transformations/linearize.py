@@ -75,7 +75,7 @@ from cpmpy.transformations.get_variables import get_variables
 from .cse import CSEMap
 
 from .flatten_model import flatten_constraint, get_or_make_var
-from .decompose_global import decompose_in_tree, decompose_objective
+from .decompose_global import CustomDecomp, decompose_in_tree, decompose_objective
 from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
@@ -581,6 +581,7 @@ def only_positive_coefficients(lst_of_expr):
 def decompose_linear(lst_of_expr: Sequence[Expression],
                      supported: Optional[AbstractSet[str]] = None,
                      supported_reified: Optional[AbstractSet[str]] = None,
+                     decompose_custom : Optional[dict[str, CustomDecomp]] = None,
                      csemap: Optional[CSEMap] = None):
     """
         Decompose unsupported global constraints in a linear-friendly way using (var == val) in sums.
@@ -589,6 +590,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
             lst_of_expr: list of expressions to decompose
             supported: set of supported global constraints and global functions
             supported_reified: set of supported reified global constraints
+            decompose_custom: dictionary of custom decompositions for global constraints
             csemap: map of expressions to an auxiliary variable
 
         returns:
@@ -599,9 +601,17 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
     if supported_reified is None:
         supported_reified = frozenset[str]()
 
-    decompose_custom = get_linear_decompositions()
+    linear_decompositions = get_linear_decompositions()
+    if decompose_custom is None:
+        decompose_custom = linear_decompositions
+    else:
+        linear_decompositions.update(decompose_custom) # overwrite linear decompositions with custom ones provided
 
-    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_in_tree(list(lst_of_expr), 
+                             supported=supported,
+                             supported_reified=supported_reified, 
+                             csemap=csemap, 
+                             decompose_custom=linear_decompositions)
 
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,

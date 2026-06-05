@@ -41,6 +41,8 @@ import time
 from datetime import timedelta
 from typing import Iterable, Optional, List, Any
 
+from cpmpy.expressions import Table
+
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
 from ..expressions.utils import eval_comparison, is_int
@@ -266,6 +268,9 @@ class CPM_pindakaas(SolverInterface):
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
             csemap=self._csemap,
+            decompose_custom = dict(
+                table = Table.decompose_positive # DO NOT COMMIT TO MASTER!!
+            )
         )
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
