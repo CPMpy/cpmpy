@@ -965,8 +965,8 @@ class Regular(GlobalConstraint):
         J = len(D)
 
         # collect possible transitions
-        Tin = [list() for _ in range(Q)]
-        Tout = [list() for _ in range(Q)]
+        Tin = [list() for _ in range(Q)] # type: ignore
+        Tout = [list() for _ in range(Q)] # type: ignore
         for trans in transitions:
             Tin[nodes.index(trans[2])].append( (D.index(trans[1]), nodes.index(trans[0])) )
             Tout[nodes.index(trans[0])].append( (D.index(trans[1]), nodes.index(trans[2])) )
