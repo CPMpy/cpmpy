@@ -56,7 +56,7 @@ from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective
+from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, decompose_linear, decompose_linear_objective, add_intvar_channeling_constraints
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -143,6 +143,10 @@ class CPM_gurobi(SolverInterface):
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
+        self.ivarmap = {}
+        self._channeled_ivars = set()
+        self._native_ivars = {}
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -236,6 +240,11 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = round(solver_val)
+            for enc in self.ivarmap.values():
+                if enc._x.name not in self._channeled_ivars:
+                    for bv in enc.vars():
+                        bv._value = self.solver_var(bv).X >= 0.5
+                    enc._x._value = enc.decode()
             # set _objective_value
             if self.has_objective():
                 grb_obj_val = grb_objective.getValue()
@@ -247,6 +256,10 @@ class CPM_gurobi(SolverInterface):
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+            for enc in self.ivarmap.values():
+                enc._x._value = None
+                for bv in enc.vars():
+                    bv._value = None
 
         return has_sol
 
@@ -291,6 +304,7 @@ class CPM_gurobi(SolverInterface):
                 are premanently posted to the solver
         """
         from gurobipy import GRB
+        self.objective_ = expr
 
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
@@ -298,6 +312,12 @@ class CPM_gurobi(SolverInterface):
 
             import gurobipy as gp
             grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
+            obj_cons = add_intvar_channeling_constraints([],
+                                                         self.ivarmap,
+                                                         channeled=self._channeled_ivars,
+                                                         extra_exprs=expr)
+            if obj_cons:
+                self.add(obj_cons)
         else:
             # save user variables
             get_variables(expr, self.user_vars)
@@ -311,7 +331,10 @@ class CPM_gurobi(SolverInterface):
             obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
             obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
-            obj_cons = safe_cons + decomp_cons + flat_cons
+            obj_cons = add_intvar_channeling_constraints(safe_cons + decomp_cons + flat_cons,
+                                                         self.ivarmap,
+                                                         channeled=self._channeled_ivars,
+                                                         extra_exprs=obj)
 
             # make objective function or variable and post
             grb_obj = self._make_numexpr(obj)
@@ -381,7 +404,10 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
+                                               ivarmap=self.ivarmap,
+                                               channeling="used",
+                                               channeled=self._channeled_ivars)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
@@ -413,7 +439,19 @@ class CPM_gurobi(SolverInterface):
       get_variables(cpm_expr_orig, collect=self.user_vars)
 
       # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
+      cpm_cons = self.transform(cpm_expr_orig)
+      extra_exprs = list(self._native_ivars.values())
+      if self.objective_ is not None:
+          extra_exprs.append(self.objective_)
+      cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                   self.ivarmap,
+                                                   channeled=self._channeled_ivars,
+                                                   extra_exprs=extra_exprs)
+      for var in get_variables(cpm_cons):
+          if not var.is_bool():
+              self._native_ivars[var.name] = var
+
+      for cpm_expr in cpm_cons:
           self._add_transformed(cpm_expr)
 
       return self
