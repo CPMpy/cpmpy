@@ -24,22 +24,22 @@ from cpmpy.expressions.utils import flatlist, get_bounds, is_boolexpr
 # Also need to look at XCSP3's globals.py, where NonReifiedTable is used in 3 places in the decomposition.
 
 # 1) ShortTable
-from cp import ShortTable
+from cpmpy import ShortTable
 # from xglobals import RowSelectingShortTable as ShortTable
 # 2) Table for extension
 # from cp import Table as Table_extension
 from xglobals import NonReifiedTable as Table_extension
 # 3) Table for instantiation
-from cp import Table as Table_instantiation
+from cpmpy import Table as Table_instantiation
 # from xglobals import NonReifiedTable as Table_instantiation
 # 4) Regular
-# from cp import Regular
-from xglobals import Regular
+from cpmpy import Regular
+#from xglobals import Regular
 # 5) NegativeShortTable
 # from cp import ShortTable as NegativeShortTable
 from xglobals import NegativeShortTable
 # 6) NegativeTable
-from cp import NegativeTable
+from cpmpy import NegativeTable
 
 
 class CallbacksCPMPy(Callbacks):  
