@@ -648,6 +648,7 @@ def get_linear_decompositions():
         table=lambda expr: expr.decompose_linear(),
         # short_table=ShortTable.decompose_positive, # TODO: hack to use the bv -> version, DO NOT COMMIT TO MASTER!!
         InDomain=InDomain.decompose_linear,
+        regular=Regular.decompose_linear,
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
