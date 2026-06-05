@@ -127,7 +127,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
 
     # recurse on any newly generated toplevel expressions
     if len(todolist) > 0:
-        return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+        return newlist + decompose_in_tree(todolist, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive)
     elif changed:
         return newlist
     else:  # not changed

@@ -610,6 +610,7 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         linear_decompositions.update(decompose_custom) # overwrite linear decompositions with custom ones provided
     
     if decompose_custom_positive is not None:
+        positive_decompositions.update(dict(        regular=Regular.decompose_linear)) # works only for positive
         positive_decompositions.update(decompose_custom_positive) # overwrite linear decompositions with custom ones provided
 
     return decompose_in_tree(list(lst_of_expr), 
@@ -647,7 +648,6 @@ def get_linear_decompositions():
         table=lambda expr: expr.decompose_linear(),
         # short_table=ShortTable.decompose_positive, # TODO: hack to use the bv -> version, DO NOT COMMIT TO MASTER!!
         InDomain=InDomain.decompose_linear,
-        regular=Regular.decompose_linear,
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
