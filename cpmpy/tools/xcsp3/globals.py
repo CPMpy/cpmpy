@@ -24,7 +24,6 @@ List of classes
     NonReifiedTable
     RowSelectingShortTable
     NegativeShortTable
-    MDD
     Regular
     NotInDomain
     NoOverlap2d
@@ -434,6 +433,9 @@ class NonReifiedTable(GlobalConstraint):
             cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
         return cons,[]
 
+    def decompose_linear(self):
+        return self.decompose()
+
     def value(self):
         arr, tab = self.args
         arrval = np.asarray(argvals(arr))
@@ -545,148 +547,6 @@ class NegativeShortTable(GlobalConstraint):
                 return True
         return False
 
-
-class MDD(GlobalConstraint):
-    """
-    MDD-constraint: an MDD (Multi-valued Decision Diagram) is an acyclic layerd graph starting from a single node and
-    ending in one. Each edge layer corresponds to a variables and each path corresponds to a solution
-    The values of the variables in 'array' correspond to a path in the mdd formed by the transitions in 'transitions'.
-    Root node is the first node used as a start in the first transition (i.e. transitions[0][0])
-
-    Arguments:
-        array: an array of CPMpy expressions (integer variable, global functions,...)
-        transitions: an array of tuples (nodeID, int, nodeID) where nodeID is some unique identifiers for the nodes
-            (int or str are fine)
-    
-    Example:
-        The following transitions depict a 3 layer MDD, starting at 'r' and ending in 't'
-        ("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
-        ("n4", 0, "t"), ("n5", 1, "t")
-        Its graphical representation is:
-
-        .. code-block:: text
-            
-                  r
-              0/ |1  \\2     X
-            n1   n2   n3
-            2| /2    /O     Y
-             n4     n5
-              0\   /1       Z
-                 t
-        
-        It has 3 paths, corresponding to 3 solution for (X,Y,Z): (0,2,0), (1,2,0) and (2,0,1)
-    """
-
-    def __init__(self, array, transitions):
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
-        if not all(is_transition(transition) for transition in transitions):
-            raise TypeError("The second argument of an MDD constraint should be collection of transitions")
-        super().__init__("mdd", (array, transitions))
-        self.root_node = transitions[0][0]
-        self.mapping = {}
-        for s, v, e in transitions:
-            self.mapping[(s, v)] = e
-
-    def _transition_to_layer_representation(self):
-        """ auxiliary function to compute which nodes belongs to which node-layer and which transition belongs to which
-        edge-layer of the MDD, needed to compute decomposition
-        """
-        arr, transitions = self.args
-        nodes_by_level = [[self.root_node]]
-        transitions_by_level = []
-        tran = transitions
-        for i in range(len(arr)): # go through each layer
-            nodes_by_level.append([])
-            transitions_by_level.append([])
-            remaining_tran = []
-            for t in tran: # test each transition
-                ns, _, ne = t
-                if ns in nodes_by_level[i]: # add to the current layer if start node belongs to the node-layer
-                    if ne not in nodes_by_level[i + 1]:
-                        nodes_by_level[i + 1].append(ne)
-                    transitions_by_level[i].append(t)
-                else:
-                    remaining_tran.append(t)
-            tran = remaining_tran
-        return nodes_by_level, transitions_by_level
-
-    # auxillary method to transform into layered representation (gather all the node by node-layers)
-    def _normalize_layer_representation(self, nodes_by_level, transitions_by_level):
-        """ auxiliary function to normalize the names of the nodes in layer by layer representation. Node ID in
-        normalized representation goes from 0 to n-1 for each layer. Used by the decomposition of the constraint.
-        """
-        nb_nodes_by_level = [len(x) for x in nodes_by_level]
-        num_mapping = {}
-        for lvl in nodes_by_level:
-            for i in range(len(lvl)):
-                num_mapping[lvl[i]] = i
-        transitions_by_level_normalized = [[[num_mapping[n_in], v, num_mapping[n_out]]
-                                            for n_in, v, n_out in lvl]
-                                           for lvl in transitions_by_level]
-        return nb_nodes_by_level, num_mapping, transitions_by_level_normalized
-
-
-    def decompose(self):
-        # Table decomposition (not by decomposition of the mdd into one big table, but by having transitions tables for
-        # each layer and auxiliary variables for the nodes. Similar to decomposition of regular into table,
-        # but with one table for each layer
-        arr, _ = self.args
-        lb = [x.lb for x in arr]
-        ub = [x.ub for x in arr]
-        # transform to layer representation
-        nbl, tbl = self._transition_to_layer_representation()
-        # normalize the naming of the nodes so it can be use as value for aux variables
-        nb_nodes_by_level, num_mapping, transitions_by_level_normalized = self._normalize_layer_representation(nbl, tbl)
-        # choose the best decomposition depending on number of levels
-        if len(transitions_by_level_normalized) > 2:
-            # decomposition with multiple transitions table and aux variables for the nodes
-            aux = [intvar(0, nb_nodes) for nb_nodes in nb_nodes_by_level[1:]]
-            # complete the MDD with additional dummy transitions to get the false end node also represented,
-            # needed so the negation works.
-            # I.E., now any assignment have a path in the MDD, some, the solutions, ending in an accepting state
-            # (end node of the initial MDD), other, the non-solutions, ending in a rejecting state (dummy end node)
-            for i in range(len(arr)):
-                # add for each state the missing transition to a dummy node on the next level
-                transition_dummy = [[num_mapping[n], v, nb_nodes_by_level[i+1]] for n in nbl[i] for v in range(lb[i], ub[i] + 1) if
-                            (n, v) not in self.mapping]
-                if i != 0:
-                    # add transition from one dummy node to the other (not needed for initial layer as no dummy there)
-                    transition_dummy += [[nb_nodes_by_level[i], v, nb_nodes_by_level[i+1]] for v in range(lb[i], ub[i] + 1)]
-                # add the new transitions
-                transitions_by_level_normalized[i] = transitions_by_level_normalized[i] + transition_dummy
-            # optimization for first level (only one node, allows to deal with smaller table on first layer)
-            tab_first = [x[1:] for x in transitions_by_level_normalized[0]]
-            # defining constraints: aux and arr variables define a path in the augmented-with-negative-path-MDD
-            defining = [NonReifiedTable([arr[0], aux[0]], tab_first)] \
-                   + [NonReifiedTable([aux[i - 1], arr[i], aux[i]], transitions_by_level_normalized[i]) for i in
-                      range(1, len(arr))]
-            # constraining constraint: end of the path in accepting node
-            constraining = [aux[-1] == 0]
-            return constraining, defining
-        elif len(transitions_by_level_normalized) == 2:
-            # decomposition by unfolding into a table (i.e., extract all paths and list them as table entries),
-            # avoid auxiliary variables
-            tab = [[t_a[1], t_b[1]] for t_a in transitions_by_level_normalized[0] for t_b in
-                   transitions_by_level_normalized[1] if t_a[2] == t_b[0]]
-            return [NonReifiedTable(arr, tab)], []
-
-        elif len(transitions_by_level_normalized) == 1:
-            # decomposition to inDomain, avoid auxiliary variables and tables
-            return [InDomain(arr[0], [t[1] for t in transitions_by_level_normalized[0]])], []
-
-    def value(self):
-        arr, transitions = self.args
-        arrval = [argval(a) for a in arr]
-        curr_node = self.root_node
-        for v in arrval:
-            if (curr_node, v) in self.mapping:
-                curr_node = self.mapping[curr_node, v]
-            else:
-                return False
-        return True # can only have reached end node
-
 class Regular(GlobalConstraint):
     """
     Regular-constraint (or Automaton-constraint)
@@ -737,30 +597,66 @@ class Regular(GlobalConstraint):
         self.node_map = {n: i for i, n in enumerate(self.nodes)}
 
     def decompose(self):
-        # Decompose to transition table using Table constraints
-        
-        arr, transitions, start, accepting = self.args
-        lbs, ubs = get_bounds(arr)
-        lb, ub = min(lbs), max(ubs)
-        
-        transitions = [[self.node_map[n_in], v, self.node_map[n_out]] for n_in, v, n_out in transitions]
+        """
+        Deterministic Finite Automata (DFA) MIP decomposition based on Côté et al. (2007): 
+            "Modeling the Regular Constraint with Integer Programming"
+        """
+        arr, transitions, start, ends = self.args
 
-        # add a sink node for transitions that are not defined
-        # --> not necessary for comp, because positive context
-        # sink = len(self.nodes)
-        # transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict]
-        # transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
+        # get number of possible states
+        nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))  # get all nodes used
+        Q = len(nodes)
+        # get number of layers
+        I = len(arr)
+        # get possible transition values
+        D = list(set([t[1] for t in transitions]))
+        J = len(D)
 
-        # keep track of current state when traversing the array
-        state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
-        id_start = self.node_map[start]
-        # optimization: we know the entry node of the automaton, results in smaller table
-        defining = [NonReifiedTable([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
-        # define the rest of the automaton using transition table
-        defining += [NonReifiedTable([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
-        
-        # constraint is satisfied iff last state is accepting
-        return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+        # collect possible transitions
+        Tin = [list() for _ in range(Q)]
+        Tout = [list() for _ in range(Q)]
+        for trans in transitions:
+            Tin[nodes.index(trans[2])].append( (D.index(trans[1]), nodes.index(trans[0])) )
+            Tout[nodes.index(trans[0])].append( (D.index(trans[1]), nodes.index(trans[2])) )
+
+        # get special start / end states
+        E = [nodes.index(e) for e in ends]
+        S = nodes.index(start)
+
+        defining = []
+        constraining = []
+
+        # auxiliary decision variables
+        s = cp.boolvar(shape=(I, J, Q))     # flow variable
+        sf = cp.boolvar(shape=(len(ends),)) # flow leaving states of last layer
+
+        # 1 unit of flow entering the graph
+        for q in range(Q):
+            if q == S:
+                defining.append( cp.sum(s[0, j, S] for j,_ in Tout[S]) == 1 )
+            else:
+                defining.append( cp.sum(s[0, j, q] for j in range(J)) == 0 )
+        # incoming = outgoing
+        for i in range(1, I):
+            for q in range(Q):
+                defining.append( cp.sum([s[i-1, j, q_] for j,q_ in Tin[q]]) == cp.sum([s[i, j, q] for j,_ in Tout[q]]) )
+        # collect total flow exiting graph
+        for q in range(Q):
+            if q in E:
+                defining.append( cp.sum([s[-1, j, q_] for j,q_ in Tin[q]]) == sf[E.index(q)] )
+            else:
+                defining.append( cp.sum([s[-1, j, q_] for j,q_ in Tin[q]]) == 0)
+        # 1 unit of flow exiting the graph
+        defining.append( cp.sum(sf) == 1 )
+
+        # channeling with 'arr'
+        # defining.extend([MapDomain(a) for a in arr]) <- now automatic?
+        for i in range(I):
+            for j in range(J):
+                constraining.append( (arr[i] == D[j]) == ( cp.sum(s[i,j,:]) ) )
+
+        return constraining + defining, []
+
 
     def value(self):
         arr, transitions, start, accepting = self.args
@@ -799,12 +695,14 @@ class NotInDomain(GlobalConstraint):
             expr = aux
 
         if not any(isinstance(a, Expression) for a in arr):
-            given = len(set(arr))
-            missing = ub + 1 - lb - given
+            forbidden = set(arr)
+            allowed = [v for v in range(lb, ub + 1) if v not in forbidden]
+            missing = len(allowed)
+            given = ub + 1 - lb - missing
             if missing < 2 * given:  # != leads to double the amount of constraints
                 # use == if there is less than twice as many gaps in the domain.
                 row_selected = boolvar(shape=missing)
-                return [any(row_selected)] + [rs.implies(expr == val) for val,rs in zip(range(lb, ub + 1), row_selected) if val not in arr], defining
+                return [any(row_selected)] + [rs.implies(expr == val) for rs, val in zip(row_selected, allowed)], defining
         return [all([(expr != a) for a in arr])], defining
 
 
@@ -1068,7 +966,25 @@ class OrtSubcircuitWithStart(DirectConstraint):
         ort_arcs = [(i,j,CPMpy_solver.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if not ((i == j) and (i == self.args[1]))] # The start index cannot self loop and thus must be part of the subcircuit.
 
         return Native_solver.AddCircuit(ort_arcs)
-        
+
+    def value(self):
+        from cpmpy.expressions.utils import argval
+        arguments, start_index = self.args
+        N = len(arguments)
+        succs = [argval(a) for a in arguments]
+        if any(s is None for s in succs):
+            return None
+        # follow cycle from start_index
+        visited = set()
+        node = start_index
+        while node not in visited:
+            visited.add(node)
+            node = succs[node]
+        # valid cycle: returned to start and all non-cycle nodes self-loop
+        if node != start_index:
+            return False
+        return all(succs[i] == i for i in range(N) if i not in visited)
+
 
 # ----------------------------------- Choco ---------------------------------- #
 

@@ -34,6 +34,13 @@ Since the dataset is PyTorch compatible, it can be used with a DataLoader:
         # Your code here
 """
 
+import warnings as _warnings
+_warnings.warn(
+    "cpmpy.tools.xcsp3.dataset is deprecated; use cpmpy.tools.datasets.xcsp3.XCSP3Dataset instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
 import pathlib
 from typing import Tuple, Any
 import xml.etree.ElementTree as ET

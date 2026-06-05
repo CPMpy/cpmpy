@@ -34,9 +34,25 @@ solver_dependencies = {
     "pumpkin": ["pumpkin-solver>=0.3.0"], # CPMpy requires features only available from Pumpkin version >=0.3.0
     "pindakaas": ["pindakaas>=0.5.0"],
     "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
-    "scip": ["pyscipopt>=6.1"]
+    "scip": ["pyscipopt>=6.1"],
+    "rc2": ["python-sat>=1.8.dev4", "pypblib"]
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
+
+format_dependencies = {
+    "io.mps": ["pyscipopt"],
+    "io.lp": ["pyscipopt"],
+    "io.cip": ["pyscipopt"],
+    "io.fzn": ["pyscipopt"],
+    "io.gms": ["pyscipopt"],
+    "io.pip": ["pyscipopt"],
+    "io.scip": ["pyscipopt"],
+    "io.dimacs": solver_dependencies["pindakaas"],  # Required for write_dimacs (uses to_cnf transformation)
+    "io.opb": [],  # No external dependencies
+    "io.wcnf": solver_dependencies["pindakaas"],  # Required for write(..., format="wcnf") via DIMACS writer path
+    "io.xcsp3": ["pycsp3"],
+}
+format_dependencies["io.all"] = list({pkg for group in format_dependencies.values() for pkg in group})
 
 setup(
     name='cpmpy',
@@ -61,6 +77,7 @@ setup(
     extras_require={
         # Solvers
         **solver_dependencies,
+        **format_dependencies,
         # Tools
         "xcsp3": ["pycsp3", "requests", "tqdm", "matplotlib", "psutil", "filelock", "gnureadline; platform_system != 'Windows'", "pyreadline3; platform_system == 'Windows'"], # didn't add CLI-specific req since some are not cross-platform
         # Other

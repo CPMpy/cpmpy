@@ -55,6 +55,8 @@ from threading import Timer
 from typing import Optional, List, Iterable
 import warnings
 
+from cpmpy.expressions import Table
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Comparison, Operator, BoolVal
@@ -372,11 +374,19 @@ class CPM_pysat(SolverInterface):
             cpm_cons,
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
+            decompose_custom_positive = dict(
+                table = Table.decompose_positive # force bypass decompose trough MDD, use row-selecting instead
+            ),
             csemap=self._csemap
         )
         cpm_cons = simplify_boolean(cpm_cons) # why is this needed here? Also in flatten_constraint?
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
+        cpm_cons = linearize_reified_variables(
+            cpm_cons,
+            min_values=2,
+            csemap=self._csemap,
+            ivarmap=self.ivarmap
+        )
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum","wsum", "->", "and", "or"}), csemap=self._csemap)  # the core of the MIP-linearization

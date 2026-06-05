@@ -41,6 +41,8 @@ import time
 from datetime import timedelta
 from typing import Iterable, Optional, List, Any
 
+from cpmpy.expressions import Table
+
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
 from ..expressions.utils import eval_comparison, is_int
@@ -122,19 +124,23 @@ class CPM_pindakaas(SolverInterface):
     def native_model(self):
         return self.pdk_solver
 
-    def _int2bool_user_vars(self):
+    def _encoded_vars(self):
         # ensure all vars are known to solver
         self.solver_vars(list(self.user_vars))
 
-        # the user vars are only the Booleans (e.g. to ensure solveAll behaves consistently)
-        user_vars = set()
+        # Boolean literals used by the SAT backend (including int2bool encodings)
+        encoded_vars = set()
         for x in self.user_vars:
             if isinstance(x, _BoolVarImpl):
-                user_vars.add(x)
+                encoded_vars.add(x)
             else:
                 # extends set with encoding variables of `x`
-                user_vars.update(self.ivarmap[x.name].vars())
-        return user_vars
+                encoded_vars.update(self.ivarmap[x.name].vars())
+        return encoded_vars
+
+    def _int2bool_user_vars(self):
+        """Deprecated alias for :meth:`_encoded_vars`."""
+        return self._encoded_vars()
 
     def solve(self, time_limit: Optional[float] = None, assumptions: Optional[Iterable[_BoolVarImpl]] = None):
         """
@@ -150,7 +156,7 @@ class CPM_pindakaas(SolverInterface):
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
 
-        self.user_vars = self._int2bool_user_vars()
+        self.encoded_vars = self._encoded_vars()
 
         time_limit_delta: Optional[timedelta] = None
         if time_limit is not None:
@@ -180,10 +186,10 @@ class CPM_pindakaas(SolverInterface):
             # True/False depending on self.cpm_status
             has_sol = self._solve_return(self.cpm_status)
 
-            # translate solution values (of user specified variables only)
+            # translate solution values (of encoded Boolean variables only)
             if has_sol:
                 # fill in variable values
-                for cpm_var in self.user_vars:
+                for cpm_var in self.encoded_vars:
                     # essentially `.solver_var`, but failing if new vars are added
                     if isinstance(cpm_var, NegBoolView):
                         lit = ~self._varmap[cpm_var._bv.name]
@@ -205,6 +211,8 @@ class CPM_pindakaas(SolverInterface):
                     enc._x._value = enc.decode()
 
             else:  # clear values of variables
+                for cpm_var in self.encoded_vars:
+                    cpm_var._value = None
                 for cpm_var in self.user_vars:
                     cpm_var._value = None
                 for enc in self.ivarmap.values():
@@ -260,10 +268,18 @@ class CPM_pindakaas(SolverInterface):
             supported=self.supported_global_constraints,
             supported_reified=self.supported_reified_global_constraints,
             csemap=self._csemap,
+            decompose_custom_positive = dict(
+                table = Table.decompose_positive # force bypass decompose trough MDD, use row-selecting instead
+            )
         )
         cpm_cons = simplify_boolean(cpm_cons)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
+        cpm_cons = linearize_reified_variables(
+            cpm_cons,
+            min_values=2,
+            csemap=self._csemap,
+            ivarmap=self.ivarmap
+        )
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)

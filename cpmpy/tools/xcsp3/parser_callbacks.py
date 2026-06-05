@@ -20,6 +20,27 @@ from cpmpy.tools.xcsp3 import globals as xglobals
 from cpmpy import cpm_array
 from cpmpy.expressions.utils import flatlist, get_bounds, is_boolexpr
 
+# Imports to easily switch between table implementations.
+# Also need to look at XCSP3's globals.py, where NonReifiedTable is used in 3 places in the decomposition.
+
+# 1) ShortTable
+from cpmpy import ShortTable
+# from xglobals import RowSelectingShortTable as ShortTable
+# 2) Table for extension
+# from cp import Table as Table_extension
+from cpmpy.tools.xcsp3.globals import NonReifiedTable as Table_extension
+# 3) Table for instantiation
+from cpmpy import Table as Table_instantiation
+# from xglobals import NonReifiedTable as Table_instantiation
+# 4) Regular
+from cpmpy import Regular
+#from xglobals import Regular
+# 5) NegativeShortTable
+# from cp import ShortTable as NegativeShortTable
+from cpmpy.tools.xcsp3.globals import NegativeShortTable
+# 6) NegativeTable
+from cpmpy import NegativeTable
+
 
 class CallbacksCPMPy(Callbacks):  
     """
@@ -87,7 +108,9 @@ class CallbacksCPMPy(Callbacks):
         "le": (2, lambda x, y: x <= y),
         "ge": (2, lambda x, y: x >= y),
         "gt": (2, lambda x, y: x > y),
-        "ne": (2, lambda x, y: x != y),
+        # ne is n-ary in XCSP3 (like eq): ne(x0,...,xn) is the logical negation of eq, i.e. "not all equal"
+        # (not pairwise AllDifferent). Binary case stays a plain disequality.
+        "ne": (0, lambda x: x[0] != x[1] if len(x) == 2 else cp.any([a != b for a, b in zip(x[:-1], x[1:])])),
         "eq": (0, lambda x: x[0] == x[1] if len(x) == 2 else cp.AllEqual(x)),
         # Set
         'in': (2, lambda x, y: cp.InDomain(x, y)),  # could be mixed context here!
@@ -131,8 +154,7 @@ class CallbacksCPMPy(Callbacks):
             if arity != 0:
                 return cpm_op(*cpm_args)
             return cpm_op(cpm_args)
-        else:
-            return node
+        return node
 
     def ctr_primitive1a(self, x: Variable, op: TypeConditionOperator, k: int):
         assert op.is_rel()
@@ -265,21 +287,21 @@ class CallbacksCPMPy(Callbacks):
             cpm_vars = self.vars_from_node(scope)
             exttuples = [tuple([strwildcard(x) for x in tup]) for tup in tuples]
             if positive:
-                self.cpm_model += xglobals.RowSelectingShortTable(cpm_vars, exttuples)
+                self.cpm_model += ShortTable(cpm_vars, exttuples)
             else:
-                self.cpm_model += xglobals.NegativeShortTable(cpm_vars, exttuples)
+                self.cpm_model += NegativeShortTable(cpm_vars, exttuples)
         else:
             cpm_vars = self.vars_from_node(scope)
             if positive:
-                self.cpm_model += xglobals.NonReifiedTable(cpm_vars, tuples)
+                self.cpm_model += Table_extension(cpm_vars, tuples)
             else:
-                self.cpm_model += cp.NegativeTable(cpm_vars, tuples)
+                self.cpm_model += NegativeTable(cpm_vars, tuples)
 
     def ctr_regular(self, scope: list[Variable], transitions: list, start_state: str, final_states: list[str]):
-        self.cpm_model += xglobals.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
+        self.cpm_model += Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
-        self.cpm_model += xglobals.MDD(self.get_cpm_vars(scope), transitions)
+        self.cpm_model += cp.MDD(self.get_cpm_vars(scope), transitions)
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         cpm_exprs = self.get_cpm_exprs(scope)
@@ -470,7 +492,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += (cp.Count(cpm_vars, value) == self.get_cpm_var(k))
 
     def ctr_among(self, lst: list[Variable], values: list[int], k: int | Variable):
-        self.cpm_model += cp.Among(self.get_cpm_vars(lst), values) == self.get_cpm_var(k)
+        self.cpm_model += cp.Among(self.get_cpm_vars(lst), self.unroll(values)) == self.get_cpm_var(k)
 
     def ctr_nvalues(self, lst: list[Variable] | list[Node], excepting: None | list[int], condition: Condition):
         if excepting is None:
@@ -499,8 +521,8 @@ class CallbacksCPMPy(Callbacks):
     def ctr_cardinality(self, lst: list[Variable], values: list[int] | list[Variable],
                         occurs: list[int] | list[Variable] | list[range], closed: bool):
         self.cpm_model += cp.GlobalCardinalityCount(self.get_cpm_exprs(lst),
-                                                    self.get_cpm_exprs(values),
-                                                    self.get_cpm_exprs(occurs),
+                                                    self.unroll(values),
+                                                    self.get_cpm_occurs_exprs(occurs),
                                                     closed=closed)
 
     def ctr_minimum(self, lst: list[Variable] | list[Node], condition: Condition):
@@ -617,16 +639,18 @@ class CallbacksCPMPy(Callbacks):
             expr = s + d
             cpm_ends.append(cp.intvar(*get_bounds(expr)))
 
-        if condition.operator == TypeConditionOperator.LE:
-            self.cpm_model += xglobals.DynamicCumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
-                                            self.get_cpm_var(condition.right_operand()))
-        else:
-            # post decomposition directly
-            # be smart and chose task or time decomposition #TODO you did task decomp in both cases
-            if max(get_bounds(cpm_ends)[1]) >= 100:
-                self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
-            else:
-                self._cumulative_time_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
+        self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, condition.right_operand())
+
+        # if condition.operator == TypeConditionOperator.LE:
+        #     self.cpm_model += xglobals.DynamicCumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
+        #                                     self.get_cpm_var(condition.right_operand()))
+        # else:
+        #     # post decomposition directly
+        #     # be smart and chose task or time decomposition #TODO you did task decomp in both cases
+        #     if max(get_bounds(cpm_ends)[1]) >= 100:
+        #         self._cumulative_task_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
+        #     else:
+        #         self._cumulative_time_decomp(cpm_start, cpm_durations, cpm_ends, heights, condition)
 
     def _cumulative_task_decomp(self, cpm_start, cpm_duration, cpm_ends, cpm_demands, condition: Condition):
         cpm_demands = cp.cpm_array(cpm_demands)
@@ -712,7 +736,7 @@ class CallbacksCPMPy(Callbacks):
         self._unimplemented(lst, balance, arcs, capacities, weights, condition)
 
     def ctr_instantiation(self, lst: list[Variable], values: list[int]):
-        self.cpm_model += xglobals.NonReifiedTable(self.get_cpm_vars(lst), [values])
+        self.cpm_model += Table_instantiation(self.get_cpm_vars(lst), [values])
 
     def ctr_clause(self, pos: list[Variable], neg: list[Variable]):  # not in XCSP3-core
         self._unimplemented(pos, neg)
@@ -821,20 +845,30 @@ class CallbacksCPMPy(Callbacks):
         else:
             return self.vars_from_node(lst)
 
+    def get_cpm_occurs_exprs(self, occurs):
+        """Cardinality occurs list: constants and/or intvars for interval bounds."""
+        cpm_occurs = []
+        for occur in occurs:
+            if isinstance(occur, range):
+                cpm_occurs.append(cp.intvar(occur.start, occur.stop - 1))
+            elif isinstance(occur, XVar):
+                cpm_occurs.append(self.get_cpm_var(occur))
+            else:
+                cpm_occurs.append(self.intentionfromtree(occur))
+        return cpm_occurs
+
     def get_cpm_exprs(self, lst):
+        if not lst:
+            return []
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
         if isinstance(lst[0], range):
-            # assert len(lst) == 1, f"Expected range here, but got list with multiple elements, what's the semantics???{lst}"
-
             if len(lst) == 1:
-                return list(lst[0])  # this should work without converting to str first
-            else:
-                return [cp.intvar(l.start, l.stop - 1) for l in lst]
-
-            # return list(eval(str(lst[0])))
-        else:
-            return self.exprs_from_node(lst)
+                return list(lst[0])
+            return self.get_cpm_occurs_exprs(lst)
+        if any(isinstance(x, range) for x in lst):
+            return self.get_cpm_occurs_exprs(lst)
+        return self.exprs_from_node(lst)
 
     def end_instance(self):
         pass

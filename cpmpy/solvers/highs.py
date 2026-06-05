@@ -39,7 +39,6 @@
 
 from typing import Optional
 
-import time
 import warnings
 
 import numpy as np
@@ -49,12 +48,13 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Operator
 from ..expressions.utils import is_num, is_int
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum_const
+from ..transformations.linearize import decompose_linear, decompose_linear_objective, linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum_const, add_intvar_channeling_constraints
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
@@ -118,6 +118,10 @@ class CPM_highs(SolverInterface):
 
         self._inf = highspy.kHighsInf
         self._obj_cols = None
+        self.ivarmap = {}
+        self._channeled_ivars = set()
+        self._native_ivars = {}
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
@@ -218,7 +222,10 @@ class CPM_highs(SolverInterface):
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)  # constraints that support reification
         cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)  # supports >, <, !=
-        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap,
+                                               ivarmap=self.ivarmap,
+                                               channeling="used",
+                                               channeled=self._channeled_ivars)
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
         cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
         cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum"}), csemap=self._csemap)  # the core of the MIP-linearization; rewrites sub to wsum
@@ -235,7 +242,19 @@ class CPM_highs(SolverInterface):
         # track user vars and ensure newly seen ones have solver columns
         get_variables(cpm_expr, collect=self.user_vars)
 
-        for con in self.transform(cpm_expr):
+        cpm_cons = self.transform(cpm_expr)
+        extra_exprs = list(self._native_ivars.values())
+        if self.objective_ is not None:
+            extra_exprs.append(self.objective_)
+        cpm_cons = add_intvar_channeling_constraints(cpm_cons,
+                                                     self.ivarmap,
+                                                     channeled=self._channeled_ivars,
+                                                     extra_exprs=extra_exprs)
+        for var in get_variables(cpm_cons):
+            if not var.is_bool():
+                self._native_ivars[var.name] = var
+
+        for con in cpm_cons:
             if isinstance(con, Comparison):
                 lhs, rhs = con.args
                 if not is_num(rhs):
@@ -284,25 +303,51 @@ class CPM_highs(SolverInterface):
             Any constraints created during conversion are permanently posted.
         """
         import highspy
+        self.objective_ = expr
 
-        get_variables(expr, collect=self.user_vars)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)
+            indices = np.array([self.solver_var(v) for v in vs.flat], dtype=np.int32)
+            values = np.asarray(ws, dtype=np.float64)
+            if np.unique(indices).size != indices.size:
+                # group duplicates
+                new_indices, group = np.unique(indices, return_inverse=True)
+                new_values = np.bincount(group, weights=values).astype(np.float64)
+                sel = (new_values != 0)
+                indices, values = new_indices[sel], new_values[sel]
+            obj_cons = add_intvar_channeling_constraints([],
+                                                         self.ivarmap,
+                                                         channeled=self._channeled_ivars,
+                                                         extra_exprs=expr)
+            if obj_cons:
+                self.add(obj_cons)
+        else:
+            get_variables(expr, collect=self.user_vars)
 
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(
-            obj,
-            supported=self.supported_global_constraints,
-            supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap,
-        )
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        # only_positive_bv_wsum_const keeps the constant separate so it never ends up
-        # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
-        obj, obj_const = only_positive_bv_wsum_const(obj)
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(
+                obj,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            # only_positive_bv_wsum_const keeps the constant separate so it never ends up
+            # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
+            obj, obj_const = only_positive_bv_wsum_const(obj)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            obj_cons = add_intvar_channeling_constraints(safe_cons + decomp_cons + flat_cons,
+                                                         self.ivarmap,
+                                                         channeled=self._channeled_ivars,
+                                                         extra_exprs=obj)
 
-        indices, values, const = self._row_from_linexpr(obj)
-        const += obj_const
+            indices, values, const = self._row_from_linexpr(obj)
+            const += obj_const
+        
+            if obj_cons:
+                self.add(obj_cons)
+
 
         # reset only columns that carried cost in the previous objective, then set new ones
         if self._obj_cols is not None and len(self._obj_cols):
@@ -418,12 +463,21 @@ class CPM_highs(SolverInterface):
                     cpm_var._value = val >= 0.5
                 else:
                     cpm_var._value = round(val)
+            for enc in self.ivarmap.values():
+                if enc._x.name not in self._channeled_ivars:
+                    for bv in enc.vars():
+                        bv._value = col_values[self.solver_var(bv)] >= 0.5
+                    enc._x._value = enc.decode()
 
             if self.has_objective():
                 self.objective_value_ = info.objective_function_value
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None
+            for enc in self.ivarmap.values():
+                enc._x._value = None
+                for bv in enc.vars():
+                    bv._value = None
 
         return has_sol
 
