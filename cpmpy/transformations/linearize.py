@@ -80,7 +80,7 @@ from .normalize import toplevel_list, simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, Operator, BoolVal, ExprLike
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, NoOverlap, Cumulative, Table, ShortTable, InDomain
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, NoOverlap, Cumulative, Table, ShortTable, InDomain, Regular
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -629,8 +629,9 @@ def get_linear_decompositions():
         alldifferent=AllDifferent.decompose_linear,
         element=Element.decompose_linear,
         table=lambda expr: expr.decompose_linear(),
-        short_table=ShortTable.decompose_positive,
+        short_table=ShortTable.decompose_positive, # TODO: hack to use the bv -> version, DO NOT COMMIT TO MASTER!!
         InDomain=InDomain.decompose_linear,
+        regular=Regular.decompose_linear,
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
