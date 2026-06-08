@@ -1206,13 +1206,22 @@ class TestSupportedSolvers:
 def test_objective_numexprs(solver, constraint):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
+    lb, ub = constraint.get_bounds()
     try:
         model.minimize(constraint)
         assert model.solve(solver=solver, time_limit=3)
-        assert constraint.value() < constraint.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
+        if model.status().exitstatus == ExitStatus.OPTIMAL:
+            assert constraint.value() == lb
+        if model.status().exitstatus == ExitStatus.FEASIBLE:
+            assert constraint.value() < ub # should be smaller than ub, unless very unlucky
+        
+        # same test, but with maximization
         model.maximize(constraint)
-        assert model.solve(solver=solver)
-        assert constraint.value() > constraint.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
+        assert model.solve(solver=solver, time_limit=3)
+        if model.status().exitstatus == ExitStatus.OPTIMAL:
+            assert constraint.value() == ub
+        if model.status().exitstatus == ExitStatus.FEASIBLE:
+            assert constraint.value() > lb # should be larger than lb, unless very unlucky
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
 
