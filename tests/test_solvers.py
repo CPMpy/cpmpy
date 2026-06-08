@@ -1206,7 +1206,7 @@ class TestSupportedSolvers:
 def test_objective_numexprs(solver, constraint):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
-    if "Modulo" in str(constraint): # skip, bounds are not guaranteed to be tight
+    if "mod" in str(constraint): # skip, bounds are not guaranteed to be tight
         pytest.skip(reason="Modulo bounds are not guaranteed to be tight")
         return
     lb, ub = constraint.get_bounds()
