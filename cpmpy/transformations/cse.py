@@ -40,13 +40,21 @@ class CSEMap:
     def put(self, expr: Expression, var: _IntVarImpl) -> None:
         """
         Put the given expression and variable into the flat_map.
+        Only use this method if you want to save expr == var to the flat_map.
+        Use get_or_make_var instead to make a new variable for an expression.
+        Raises a ValueError if the expression is already in the flat_map.
         """
         if expr.is_bool():
+            assert var.is_bool(), f"{expr} is of type Boolean, but {var} is of type {type(var)}. Please report on github."
             normal_expr, negate = self._canonicalize_boolexpr(expr)
             if negate:
                 var = ~var
+            if normal_expr in self.flat_map:
+                raise ValueError(f"Expression {normal_expr} is already in the flat_map. Please report on github.")
             self.flat_map[normal_expr] = var
         else:
+            if expr in self.flat_map:
+                raise ValueError(f"Expression {expr} is already in the flat_map. Please report on github.")
             self.flat_map[expr] = var
 
     def save_decomposition(self, expr: Expression, newexpr: Expression):
