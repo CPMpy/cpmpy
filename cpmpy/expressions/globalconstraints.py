@@ -192,6 +192,13 @@ class GlobalConstraint(Expression):
         """
         raise NotImplementedError("Decomposition for", self, "not available")
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the global constraint, only valid when the constraint is posted toplevel or occurs in a positive nested context.
+        Defaults to the standard decomposition, but subclasses can implement a better version.
+        """
+        return self.decompose()
+
     def get_bounds(self) -> tuple[int, int]:
         """
         Returns the bounds of a Boolean global constraint.
@@ -586,6 +593,76 @@ class Table(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row)]) for row in tab])], []
 
+    def _variable_ordering(self, heuristic:str="domain"):
+        """
+        Heuristically order the variables to obtain a better MDD. The columns of the table are ordered accordingly.
+        Arguments:
+            heuristic (str): Name of the heuristic to use for ordering the variables.
+            Currently supported heuristic:
+            - "domain" : order by domain size (small to large)
+        Returns:
+            tuple[ListLike[Expression], (ListLike[ListLike[int]] | np.ndarray)]: The ordered array and table arguments
+        """
+        arr, tab = self.args
+        if len(arr) == 0:
+            return arr, tab
+
+        if heuristic == "domain":
+            lbs, ubs = get_bounds(arr)
+            scores = [ub - lb + 1 for lb, ub in zip(lbs, ubs)]
+        else:
+            raise ValueError(f"Unsupported ordering heuristic: {heuristic}, chose from {['domain']}")
+
+        ordering = sorted(range(len(arr)), key=scores.__getitem__)
+        arr = [arr[i] for i in ordering]
+        tab = tab[:, ordering]
+        return arr, tab
+
+    def decompose_linear(self, heuristic:str="domain") -> tuple[list[Expression], list[Expression]]:
+        """
+        Linear-friendly decomposition of the Table global constraint using an MDD, which is subsequently decomposed into linear flow constraints.
+        Based on:
+            Bierlee, H., Piessens, W., Stuckey, P., & Guns, T. (CP 2026).
+            Table Constraints for Integer Programming.
+            In Leibniz International Proceedings in Informatics. Schloss Dagstuhl -- Leibniz-Zentrum fuer Informatik.
+
+         Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+         """
+
+        if len(self.args[1]) == 0: # empty table, does not allow any assignments
+            return [cp.BoolVal(False)], []
+
+        arr, tab = self._variable_ordering(heuristic)
+
+        mdd: dict[int, dict[int, int]] = {}
+
+        ROOT = 0
+        SINK = -1
+        count = 1 # number of non-root & non-sink nodes
+
+        for row in tab.tolist(): # converts to Python ints
+            current = ROOT
+            for i, val in enumerate(row):
+                if current not in mdd.keys():
+                    mdd[current] = {}
+                nxt: int | None
+                if i == len(row) - 1:
+                    nxt = SINK
+                    mdd[current][val] = nxt
+                else:
+                    nxt = mdd[current].get(val)
+                    if nxt is None:
+                        nxt = count
+                        count += 1
+                        mdd[current][val] = nxt
+
+                current = nxt
+
+        transitions = [(id1, v, id2) for id1, pairs in mdd.items() for v, id2 in pairs.items()]
+
+        return [MDD(arr, transitions, start=ROOT)], []
+
     def value(self) -> Optional[bool]:
         """
         Returns:
@@ -857,12 +934,13 @@ class MDD(GlobalConstraint):
                           ("E", 2, "F")])
     """
 
-    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None):
+    def __init__(self, array: ListLike[Expression], transitions: ListLike[tuple[int|str, int, int|str]], start: Optional[int|str] = None, reduce: bool = True):
         """
         Arguments:
             array (ListLike[Expression]): List of expressions representing the input sequence
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
+            reduce (bool, default=True): Whether to reduce the MDD by merging nodes with equivalent suffixes, reducing the size of the MDD
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
@@ -874,7 +952,7 @@ class MDD(GlobalConstraint):
                 raise TypeError(
                     f"The second argument of an MDD constraint should be a list of transitions ({_node_type}, int, {_node_type})")
 
-        super().__init__("mdd", (array, transitions))
+        super().__init__("mdd", (array,))
         self.root_node = transitions[0][0] if start is None else start
         self.mapping: dict[int | str, dict[int, int | str]] = defaultdict(dict)  # mapping from source node and transition value to destination node
         for id1, v, id2 in transitions:
@@ -894,6 +972,46 @@ class MDD(GlobalConstraint):
         sink_nodes = [node for node, level in self.levels.items() if level == len(array)]
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
+
+        # reduce the MDD if requested
+        if reduce:
+            self._reduce()
+
+    def _reduce(self):
+        """
+        Auxiliary function that reduces the original MDD by merging nodes with equivalent suffixes
+        Alters the mapping in-place.
+        """
+        arr = self.args[0]
+        substitutions = {}
+
+        # Loop backwards over MDD levels, from sink to root node
+        for i in reversed(range(len(arr))):
+            level_nodes = [n for (n,lvl) in self.levels.items() if lvl == i]
+
+            # Mapping is redirected to representative (potentially merged) nodes of the next layer in the MDD
+            for node in level_nodes:
+                for value in self.mapping[node]:
+                    dst = self.mapping[node][value]
+                    self.mapping[node][value] = substitutions.get(dst, dst)  # If no substitution, keep original destination node
+
+            groups = defaultdict(list) # All nodes with the same transition function are grouped together, and can be merged
+
+            for node in level_nodes:
+                transition_function = self.mapping[node]
+                # Ordered tuple of (value, destination node) pairs, serves as a unique signature for equivalent transition functions
+                signature = tuple(sorted(transition_function.items()))
+                groups[signature].append(node)
+
+            for equiv_nodes in groups.values():
+                # First node chosen as representative node, others are merged with it
+                rep = equiv_nodes[0]
+                for node in equiv_nodes[1:]:
+                    substitutions[node] = rep
+                    self.mapping.pop(node, None)
+                    self.levels.pop(node, None)
+
+
 
     def _get_complete_mdd(self) -> tuple[dict[int | str, dict[int, int | str]], set[tuple[int | str, int]]]:
         """
@@ -916,8 +1034,11 @@ class MDD(GlobalConstraint):
 
         return extended_mapping, invalid_edges
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        return self.decompose(complete=False)
 
-    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+
+    def decompose(self, complete=True) -> tuple[list[Expression], list[Expression]]:
         """
         Flow decomposition of the MDD global constraint.
         Enforces that the condition is satisfied, by ensuring that the flow in equals the flow out for every node.
@@ -930,9 +1051,13 @@ class MDD(GlobalConstraint):
         """
         arr = self.args[0]
 
+        if complete:
         # MDD is extended with invalid edges, which are directed to the sink node
-        extended_mapping, invalid_edges_set = self._get_complete_mdd()
-        invalid_edges = frozenset(invalid_edges_set)
+            mapping, invalid_edges_set = self._get_complete_mdd()
+            invalid_edges = frozenset(invalid_edges_set)
+        else:
+            mapping = self.mapping
+            invalid_edges = frozenset()
 
         # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
         # The default is an empty list, representing no ingoing / outgoing flow.
@@ -944,7 +1069,7 @@ class MDD(GlobalConstraint):
         invalid_edge_vars = []
 
         # Determine flow in and flow out for each node, and make a boolvar for each edge
-        for id1, edges in extended_mapping.items():
+        for id1, edges in mapping.items():
             for value, id2 in edges.items():
                 edge_var = cp.boolvar()
                 level = self.levels[id1]
@@ -1003,6 +1128,11 @@ class MDD(GlobalConstraint):
             else:
                 return False
         return True # can only have reached end node
+
+    def __repr__(self) -> str:
+        "Print the MDD and the internally stored table"
+        table = [[id1, v, id2] for id1, edges in self.mapping.items() for v, id2 in edges.items()]
+        return f"MDD({self.args[0]}, {table}, {self.root_node})"
 
 
 # syntax of the form 'if b then x == 9 else x == 0' is not supported (no override possible)

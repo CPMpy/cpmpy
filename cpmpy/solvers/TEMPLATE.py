@@ -246,6 +246,7 @@ class CPM_template(SolverInterface):
             # fill in variable values
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
+                # [GUIDELINE] for ILP-solvers, ensure the value is integer and use `round()`
                 cpm_var._value = self.TPL_solver.value(sol_var)
                 raise NotImplementedError("TEMPLATE: back-translating the solution values")
 
