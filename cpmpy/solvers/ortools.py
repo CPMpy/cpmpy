@@ -980,7 +980,7 @@ try:
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(self.Value(self._varmap[cpm_var.name]))
                     elif isinstance(cpm_var, _IntVarImpl):
-                        cpm_var._value = int(self.Value(self._varmap[cpm_var.name]))
+                        cpm_var._value = self.Value(self._varmap[cpm_var.name])
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 

@@ -237,12 +237,12 @@ class CPM_gurobi(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = solver_val >= 0.5
                 else:
-                    cpm_var._value = int(solver_val)
+                    cpm_var._value = round(solver_val)
             # set _objective_value
             if self.has_objective():
                 grb_obj_val = grb_objective.getValue()
                 if round(grb_obj_val) == grb_obj_val:  # its integer
-                    self.objective_value_ = int(grb_obj_val)
+                    self.objective_value_ = round(grb_obj_val)
                 else:  # FloatSum objective, must be read through FloatSum.value()
                     self.objective_value_ = None
 
@@ -711,7 +711,7 @@ class CPM_gurobi(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = solver_val >= 0.5
                 else:
-                    cpm_var._value = int(solver_val)
+                    cpm_var._value = round(solver_val)
 
             # Translate objective
             if self.has_objective():

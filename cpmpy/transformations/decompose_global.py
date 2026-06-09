@@ -22,11 +22,13 @@ import copy
 from typing import AbstractSet, Optional, Dict, Any, Callable, Protocol, cast, overload
 import numpy as np
 
+
 from .cse import CSEMap
 from ..expressions.core import Expression, BoolVal, Operator
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import NDVarArray, cpm_array
+from ..expressions.python_builtins import all as cpm_all
 
 class CustomDecomp(Protocol):
     @overload
@@ -77,11 +79,11 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                     assert decomp.name == "and", "decompose_in_tree: expected a conjunction but got {decomp}"
                     newlist.extend(decomp.args)
                     continue
-
-            if decompose_custom is not None and expr.name in decompose_custom:
+            
+            if decompose_custom is not None and expr.name in decompose_custom: # do we also need a "decompose_custom_positive"?
                 exprs, toplevel_exprs = decompose_custom[expr.name](expr)
             else:
-                exprs, toplevel_exprs = expr.decompose()
+                exprs, toplevel_exprs = expr.decompose_positive()
             # we merge the list toplevel rather than create an 'and'
             # we add them to todolist because both might contain globals
             if len(toplevel_exprs) > 0:
@@ -95,14 +97,27 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             changed = True
             newlist.append(BoolVal(expr))
         elif expr.has_subexpr():
+            # special case for positive reified
+            decomposed_positive = False
+            if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
+                changed = True
+                exprs, toplevel_exprs = expr.args[1].decompose_positive()
+                if len(toplevel_exprs) > 0:
+                    todolist.extend(toplevel_exprs)
+                expr = Operator("->", [expr.args[0], cpm_all(exprs)])   
+                decomposed_positive = True
+
             # decompose its arguments
             arg_changed, arg_newargs, arg_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
             if arg_changed:
                 changed = True
-                expr = copy.copy(expr)
-                expr.update_args(arg_newargs)
                 if len(arg_toplevel) > 0:
                     todolist.extend(arg_toplevel)
+                # if decompose_positive: we know 'expr' is a fresh expression
+                if not decomposed_positive:
+                    expr = copy.copy(expr)
+                expr.update_args(arg_newargs)
+
             newlist.append(expr)
         else:
             newlist.append(expr)
