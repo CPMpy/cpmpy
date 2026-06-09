@@ -28,6 +28,7 @@
     You will also need to install CPLEX Optimization Studio from IBM's website.
     There is a free community version available.
     https://www.ibm.com/products/ilog-cplex-optimization-studio
+
     See detailed installation instructions at:
     https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
     
@@ -49,12 +50,14 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import warnings
 from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.utils import eval_comparison, flatlist, is_bool, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, intvar
@@ -252,10 +255,10 @@ class CPM_cplex(SolverInterface):
             # set _objective_value
             if self.has_objective():
                 obj_val = self.cplex_model.get_objective_expr().solution_value
-                if round(obj_val) == obj_val: # it is an integer?:
+                if round(obj_val) == obj_val:  # its integer
                     self.objective_value_ = int(obj_val)
-                else: #  can happen with DirectVar or when using floats as coefficients
-                    self.objective_value_ = float(obj_val)
+                else:  # FloatSum objective, must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -295,7 +298,13 @@ class CPM_cplex(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 

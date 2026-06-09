@@ -52,6 +52,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import re
 from typing import Optional
@@ -403,7 +405,12 @@ class CPM_minizinc(SolverInterface):
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
             # translate objective, for optimisation problems only (otherwise None)
-            self.objective_value_ = self.mzn_result.objective
+            if self.mzn_result.objective is None:
+                self.objective_value_ = None
+            elif round(self.mzn_result.objective) == self.mzn_result.objective:  # its integer
+                self.objective_value_ = int(self.mzn_result.objective)
+            else:  # FloatSum objective, must be read through FloatSum.value()
+                self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -564,11 +571,17 @@ class CPM_minizinc(SolverInterface):
 
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
-    def objective(self, expr, minimize):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
+            - expr: Expression or FloatSum, the objective function
             - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored

@@ -889,9 +889,10 @@ class TestSupportedSolvers:
         s = cp.SolverLookup.get(solver)
 
         x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        s.maximize(cp.FloatSum([0.3, 0.5, 0.6], [x, y, z], const=1))
+        fs = cp.FloatSum([0.3, 0.5, 0.6], [x, y, z], const=1)
+        s.maximize(fs)
         assert s.solve()
-        assert s.objective_value() == pytest.approx(2.4, abs=1e-05)
+        assert fs.value() == pytest.approx(2.4, abs=1e-05)
 
     def test_floatsum_negboolview(self, solver):
         if solver not in self._floatsum_supported_solvers:
@@ -901,10 +902,11 @@ class TestSupportedSolvers:
         s = cp.SolverLookup.get(solver)
 
         x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        s.maximize(cp.FloatSum([0.3, 0.5, 0.6], [~x, y, ~z], const=1))
+        fs = cp.FloatSum([0.3, 0.5, 0.6], [~x, y, ~z], const=1)
+        s.maximize(fs)
         assert s.solve()
         assert (x.value(), y.value(), z.value()) == (False, True, False)
-        assert s.objective_value() == pytest.approx(2.4, abs=1e-05)
+        assert fs.value() == pytest.approx(2.4, abs=1e-05)
 
     def test_value_cleared(self, solver):
         x, y, z = cp.boolvar(shape=3)

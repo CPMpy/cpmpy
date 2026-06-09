@@ -44,6 +44,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 from typing import Optional, Iterable
 
@@ -258,11 +260,15 @@ class CPM_z3(SolverInterface):
                 obj = self.z3_solver.objectives()[0]
                 obj_val = sol.evaluate(obj)
                 if z3.is_int_value(obj_val):
-                    self.objective_value_ = obj_val.as_long()
+                    val = obj_val.as_long()
                 else:
-                    self.objective_value_ = float(obj_val.as_decimal(20).rstrip("?"))
+                    val = float(obj_val.as_decimal(20).rstrip("?"))
                 if not self._minimize:
-                    self.objective_value_ = -1*self.objective_value_ # Z3 negates the objective function to turn a maximisation problem into a minimisation one, undoing negation here
+                    val = -1 * val  # Z3 negates the objective function to turn a maximisation problem into a minimisation one, undoing negation here
+                if round(val) == val:  # its integer
+                    self.objective_value_ = int(val)
+                else:  # FloatSum objective, must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else:  # clear values of variables
             for cpm_var in self.user_vars:
@@ -311,7 +317,13 @@ class CPM_z3(SolverInterface):
         import z3
         return isinstance(self.z3_solver, z3.Optimize) and len(self.z3_solver.objectives()) != 0
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 

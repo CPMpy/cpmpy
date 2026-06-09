@@ -42,6 +42,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import sys
 from typing import Optional, List, Iterable
@@ -279,10 +281,10 @@ class CPM_ortools(SolverInterface):
             # translate objective
             if self.has_objective():
                 ort_obj_val = self.ort_solver.objective_value
-                if round(ort_obj_val) == ort_obj_val: # it is an integer?
-                    self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
-                else: # can happen when using floats as coeff in objective
-                    self.objective_value_ = float(ort_obj_val)
+                if round(ort_obj_val) == ort_obj_val:  # its integer
+                    self.objective_value_ = int(ort_obj_val)
+                else:  # FloatSum objective, must be read through FloatSum.value()
+                    self.objective_value_ = None
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
@@ -342,11 +344,17 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
+            - expr: Expression or FloatSum, the objective function
             - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored

@@ -21,14 +21,16 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import warnings
 from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison, Operator
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.core import Expression, BoolVal, Comparison, Operator
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
@@ -165,7 +167,11 @@ class CPM_scip(SolverInterface):
                     cpm_var._value = round(solver_val)
 
             if self.has_objective():
-                self.objective_value_ = self.scip_model.getObjVal()
+                obj_val = self.scip_model.getObjVal()
+                if round(obj_val) == obj_val:  # its integer
+                    self.objective_value_ = int(obj_val)
+                else:  # FloatSum objective, must be read through FloatSum.value()
+                    self.objective_value_ = None
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None
@@ -218,7 +224,13 @@ class CPM_scip(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
             self.user_vars.update(vs)  # save user variables

@@ -55,8 +55,11 @@
     -------------------------------
 
     :class:`FloatSum` is **not** an Expression nor a GlobalFunction.
-    It is only supported by some solvers (esp MIP solvers and ortools), and need to be passed direclty to
-    :meth:`~cpmpy.model.Model.minimize` / :meth:`~cpmpy.model.Model.maximize`.
+    It is only supported by some solvers (ortools, gurobi, cplex, scip, z3, minizinc, highs, hexaly),
+    and must be passed directly to that solver's :meth:`~cpmpy.solvers.solver_interface.SolverInterface.minimize`
+    / :meth:`~cpmpy.solvers.solver_interface.SolverInterface.maximize`
+    After solve, read the value with :meth:`~cpmpy.expressions.globalfunctions.FloatSum.value`.
+    :meth:`~cpmpy.solvers.solver_interface.SolverInterface.objective_value` stays ``None`` for non-integral objectives.
 
     ===============
     List of classes
@@ -1098,10 +1101,14 @@ class FloatSum:
     """
     Objective-only weighted sum with float coefficients over decision variables.
 
-    Does not inherit from Expression because it is objective only and has float .value()
-    Basically it is breaking all design rules of CPMpy...
+    Does not inherit from Expression because it is objective only and has float :meth:`value`.
 
-    It can only appear as the argument to :meth:`~cpmpy.model.Model.minimize` / :meth:`~cpmpy.model.Model.maximize`.
+    Pass to **solver** :meth:`~cpmpy.solvers.solver_interface.SolverInterface.minimize` /
+    :meth:`~cpmpy.solvers.solver_interface.SolverInterface.maximize` only.
+    Supported solvers declare ``Expression | FloatSum`` on those methods (e.g. ortools, minizinc, z3, hexaly and the MIP solvers).
+
+    After solve, use :meth:`value` for the objective value. :meth:`~cpmpy.solvers.solver_interface.SolverInterface.objective_value`
+    is ``None`` when the native result is not integral.
 
     Accepts only (numpy) floats as coefficients, decision variables (including NegBoolView) as terms,
     and an optional float constant term (default ``0.0``).
@@ -1163,7 +1170,7 @@ class FloatSum:
             return np.asarray(ws, dtype=float), cpm_array(vs), const
 
     def _raise_objective_only(self) -> NoReturn:
-        raise TypeError("FloatSum is objective-only. Use it directly in Model.minimize()/maximize().")
+        raise TypeError("FloatSum is objective-only. Use it directly in solver minimize()/maximize().")
 
     def __eq__(self, other: object) -> NoReturn: self._raise_objective_only()
     def __ne__(self, other: object) -> NoReturn: self._raise_objective_only()

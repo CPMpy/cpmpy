@@ -35,6 +35,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional
@@ -46,7 +48,7 @@ import numpy.typing as npt
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison, Operator
+from ..expressions.core import Expression, BoolVal, Comparison, Operator
 from ..expressions.utils import is_num, is_int
 from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalfunctions import FloatSum
@@ -278,7 +280,13 @@ class CPM_highs(SolverInterface):
 
     __add__ = add
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize.
             Any constraints created during conversion are permanently posted.
@@ -432,7 +440,11 @@ class CPM_highs(SolverInterface):
                     cpm_var._value = int(round(val))
 
             if self.has_objective():
-                self.objective_value_ = info.objective_function_value
+                obj_val = info.objective_function_value
+                if round(obj_val) == obj_val:  # its integer
+                    self.objective_value_ = int(obj_val)
+                else:  # FloatSum objective, must be read through FloatSum.value()
+                    self.objective_value_ = None
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None

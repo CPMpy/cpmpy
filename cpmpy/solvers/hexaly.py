@@ -36,6 +36,12 @@
         :nosignatures:
 
         CPM_hexaly
+
+    ==============
+    Module details
+    ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional, List
@@ -229,7 +235,11 @@ class CPM_hexaly(SolverInterface):
 
             # translate objective, for optimisation problems only
             if not self.is_satisfaction:
-                self.objective_value_ = self.hex_sol.get_objective_bound(0)
+                obj_val = self.hex_sol.get_objective_bound(0)
+                if round(obj_val) == obj_val:  # its integer
+                    self.objective_value_ = int(obj_val)
+                else:  # FloatSum objective, must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -277,7 +287,13 @@ class CPM_hexaly(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 

@@ -40,6 +40,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional, List
@@ -239,10 +241,10 @@ class CPM_gurobi(SolverInterface):
             # set _objective_value
             if self.has_objective():
                 grb_obj_val = grb_objective.getValue()
-                if round(grb_obj_val) == grb_obj_val: # it is an integer?:
+                if round(grb_obj_val) == grb_obj_val:  # its integer
                     self.objective_value_ = int(grb_obj_val)
-                else: #  can happen with DirectVar or when using floats as coefficients
-                    self.objective_value_ =  float(grb_obj_val)
+                else:  # FloatSum objective, must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -280,7 +282,13 @@ class CPM_gurobi(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
