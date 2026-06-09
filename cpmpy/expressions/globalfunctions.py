@@ -637,14 +637,22 @@ class Modulo(GlobalFunction):
         if lb2 == ub2 == 0:
             raise ZeroDivisionError("Domain of {} only contains 0".format(self.args[1]))
 
-        # the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
-        lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
-        ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
-        if lb1 >= 0:  # result will be positive if first argument is positive
-            return 0, max(-lb, ub, 0)  # lb = 0
-        elif ub1 <= 0:  # result will be negative if first argument is negative
-            return min(-ub, lb, 0), 0  # ub = 0
-        return min(-ub, lb, 0), max(-lb, ub, 0)  # 0 should always be in the domain
+        # For small domains, compute exact bounds by enumeration.
+        if (ub1 - lb1 + 1) * (ub2 - lb2 + 1) <= 10 ** 6:
+            xs = np.arange(lb1, ub1 + 1)
+            ys = np.arange(lb2, ub2 + 1)
+            ys = ys[ys != 0]  # divisor is never 0 (partial function)
+            
+            rem = np.fmod(xs[:, None], ys[None, :]) # np.fmod implements truncated-division remainder
+            return int(rem.min()), int(rem.max())
+
+        # Otherwise fall back to an analytical over-approximation.
+        # The remainder has the same sign as the dividend and satisfies both
+        #   |remainder| <= |divisor| - 1   and   |remainder| <= |dividend|
+        max_rem = max(abs(lb2), abs(ub2)) - 1  # largest possible |remainder|
+        ub = min(ub1, max_rem) if ub1 > 0 else 0  # positive remainders need a positive dividend
+        lb = max(lb1, -max_rem) if lb1 < 0 else 0  # negative remainders need a negative dividend
+        return lb, ub
 
 
 class Power(GlobalFunction):
