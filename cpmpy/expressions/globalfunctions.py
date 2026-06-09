@@ -703,9 +703,13 @@ class Power(GlobalFunction):
             tuple[int, int]: A tuple of (lower bound, upper bound) for the power
         """
         base, exp = self.args
+        # exp is guaranteed to be a constant greater than 0
         lb_base, ub_base = get_bounds(base)
-
+    
         bounds = [lb_base ** exp, ub_base ** exp]
+        if lb_base < 0 < ub_base:
+            bounds.append(0)
+
         return min(bounds), max(bounds)
 
 
