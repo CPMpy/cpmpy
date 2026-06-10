@@ -6,6 +6,7 @@ import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
+from cpmpy.exceptions import MinizincNameException, NotSupportedError
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.utils import argvals
 
@@ -22,7 +23,6 @@ from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy.solvers.scip import CPM_scip
 from cpmpy.solvers.highs import CPM_highs
 from cpmpy import SolverLookup
-from cpmpy.exceptions import MinizincNameException, NotSupportedError, TypeError as CPMpyTypeError
 
 from test_constraints import numexprs
 from utils import skip_on_missing_pblib
@@ -279,19 +279,6 @@ class TestSolvers:
         model += bv2 | bv3
 
         assert model.solve(solver="ortools")# this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
-
-    def test_ortools_rejects_float_coefficients(self):
-        m = cp.Model()
-        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-        with pytest.warns(DeprecationWarning):
-            m += 0.7 * x + 0.8 * y >= 1
-        pytest.raises(TypeError, m.solve)
-
-    def test_floatsum_objective_only(self):
-        x = cp.boolvar(name="x")
-        fs = cp.FloatSum([0.5], [x])
-        with pytest.raises(CPMpyTypeError, match="objective-only"):
-            _ = fs >= 1
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -893,6 +880,7 @@ class TestSupportedSolvers:
         s.maximize(fs)
         assert s.solve()
         assert fs.value() == pytest.approx(2.4, abs=1e-05)
+        assert len(s.user_vars) == 3
 
     def test_floatsum_negboolview(self, solver):
         if solver not in self._floatsum_supported_solvers:
@@ -907,6 +895,7 @@ class TestSupportedSolvers:
         assert s.solve()
         assert (x.value(), y.value(), z.value()) == (False, True, False)
         assert fs.value() == pytest.approx(2.4, abs=1e-05)
+        assert len(s.user_vars) == 3
 
     def test_value_cleared(self, solver):
         x, y, z = cp.boolvar(shape=3)

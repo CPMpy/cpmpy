@@ -9,6 +9,8 @@ from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
 
+from cpmpy.exceptions import MinizincNameException, NotSupportedError, TypeError as CPMpyTypeError
+
 from utils import inclusive_range
 
 
@@ -164,6 +166,19 @@ class TestWeightedSum:
         expr3 = sum(x for x in self.ivs)
         assert(str(expr1) == str(expr2))
         assert(str(expr1) == str(expr3))
+
+    def test_reject_float_coefficients(self):
+        m = cp.Model()
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        with pytest.warns(DeprecationWarning):
+            m += 0.7 * x + 0.8 * y >= 1
+        pytest.raises(TypeError, m.solve)
+
+    def test_floatsum_objective_only(self):
+        x = cp.boolvar(name="x")
+        fs = cp.FloatSum([0.5], [x])
+        with pytest.raises(CPMpyTypeError, match="objective-only"):
+            _ = fs >= 1
 
 class TestMul:
 
