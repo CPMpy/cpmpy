@@ -6,6 +6,7 @@ import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
+from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.utils import argvals
 
 from cpmpy.solvers.pysat import CPM_pysat
@@ -181,7 +182,7 @@ class TestSolvers:
             def on_solution_callback(self):
                 # populate values before printing
                 for cpm_var in self.x:
-                    cpm_var._value = self.Value(self.varmap[cpm_var])
+                    cpm_var._value = self.Value(self.varmap[cpm_var.name])
         
                 self.solcount += 1
                 print("x:",self.x.value())
@@ -1107,11 +1108,18 @@ class TestSupportedSolvers:
         """
         if solver == 'pysdd':
             pytest.skip(reason=f"{solver} does not support integer decision variables")
+
+        class DummyConstraint(GlobalConstraint):
+            def __init__(self, args):
+                super().__init__("dummy_constraint", tuple(args))
+
+            def decompose(self):
+                return [], []
         
         x = cp.intvar(1, 4, shape=1)
         # Dubious constraint which enforces nothing, gets decomposed to empty list
         # -> resulting CP model is empty
-        m = cp.Model([cp.AllDifferentExceptN([x], 1)])
+        m = cp.Model(DummyConstraint([x]))
         s = cp.SolverLookup().get(solver, m)
         assert len(s.user_vars) == 1 # check if var captured as a user_var
 
@@ -1245,3 +1253,22 @@ def test_highs_basic_ilp():
     assert x.value() == 0
     assert y.value() == 5
     assert s.objective_value_ == 5
+
+
+@pytest.mark.requires_solver("gurobi", "cplex", "scip", "highs", "hexaly")
+class TestRound:
+    def test_gurobi_read_integers_issue_858(self, solver):
+        x = cp.intvar(1, 3, name="x")
+        p = cp.intvar(0, 1, shape=3, name="p")
+        q = cp.intvar(0, 1, shape=3, name="q")
+        m = cp.Model()
+        m += cp.sum([p[0], p[1], p[2]]) == 1
+        m += cp.sum([3, 3, 1, -1] * cp.cpm_array([q[0], q[1], q[2], x])) == 0
+        m += cp.sum([q[0], q[1], q[2]]) == 1
+
+        def check():
+            print(x, x.value())
+            assert (x.value() >= 1), f"{x}={x.value()}"
+
+        m.solveAll(solver=solver, solution_limit=1000, display=check)
+

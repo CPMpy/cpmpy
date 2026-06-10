@@ -48,7 +48,7 @@ import numpy.typing as npt
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison, Operator
-from ..expressions.utils import is_num
+from ..expressions.utils import is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -133,45 +133,34 @@ class CPM_highs(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # negative bool views should have been eliminated by transformations
+                if isinstance(cpm_var, NegBoolView):
+                    raise NotSupportedError(
+                        "Negative literals should not be part of any equation. "
+                        "They should have been removed by only_positive_bv()/only_positive_bv_wsum. "
+                        "See /transformations/linearize for more details."
+                    )
+                revar = self.highs.addBinary().index
+            else:
+                revar = self.highs.addIntegral(lb=cpm_var.lb, ub=cpm_var.ub).index
+
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # negative bool views should have been eliminated by transformations
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError(
-                "Negative literals should not be part of any equation. "
-                "They should have been removed by only_positive_bv()/only_positive_bv_wsum. "
-                "See /transformations/linearize for more details."
-            )
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                hvar = self.highs.addBinary()
-            elif isinstance(cpm_var, _IntVarImpl):
-                hvar = self.highs.addIntegral(lb=cpm_var.lb, ub=cpm_var.ub)
-            else:
-                raise NotSupportedError(f"Not a known HiGHS variable type: {cpm_var}")
-
-            self._varmap[cpm_var] = hvar.index
-
-        return self._varmap[cpm_var]
-
-    def solver_vars_1d(self, cpm_vars):
-        """
-           Faster `solver_vars()` for 1 dimensional iterables of ExprLikes
-        """
-        res = []
-        for cpm_var in cpm_vars:
-            solver_var = self._varmap.get(cpm_var, None)
-            if solver_var is not None:
-                # fast path
-                res.append(solver_var)
-            else:
-                # slow path, will check the varmap again
-                res.append(self.solver_var(cpm_var))
-        return res
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def _row_from_linexpr(self, linexpr) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.float64], int|float]:
         """
@@ -194,12 +183,12 @@ class CPM_highs(SolverInterface):
         elif isinstance(linexpr, Operator):  # sum or wsum (vars only in operand lists)
             coeffs: npt.NDArray[np.float64]
             if linexpr.name == "sum":
-                solvars = self.solver_vars_1d(linexpr.args)
+                solvars = self.solver_vars(linexpr.args)
                 idx = np.array(solvars, dtype=np.int32)
                 coeffs = np.ones(idx.size, dtype=np.float64)
             elif linexpr.name == "wsum":
                 ws, vs = linexpr.args
-                solvars = self.solver_vars_1d(vs)
+                solvars = self.solver_vars(vs)
                 idx = np.array(solvars, dtype=np.int32)
                 coeffs = np.asarray(ws, dtype=np.float64)
             else:
@@ -353,7 +342,7 @@ class CPM_highs(SolverInterface):
         import highspy
 
         # ensure all vars are known to solver
-        self.solver_vars_1d(self.user_vars)
+        self.solver_vars(self.user_vars)
 
         # edge case, empty model, ensure the solver has something to solve
         if not len(self.user_vars):
@@ -421,14 +410,14 @@ class CPM_highs(SolverInterface):
             solution = self.highs.getSolution()
             col_values = solution.col_value
             for cpm_var in self.user_vars:
-                if cpm_var not in self._varmap:
+                if cpm_var.name not in self._varmap:
                     continue
-                col_idx = self._varmap[cpm_var]
+                col_idx = self._varmap[cpm_var.name]
                 val = col_values[col_idx]
                 if cpm_var.is_bool():
                     cpm_var._value = val >= 0.5
                 else:
-                    cpm_var._value = int(round(val))
+                    cpm_var._value = round(val)
 
             if self.has_objective():
                 self.objective_value_ = info.objective_function_value
