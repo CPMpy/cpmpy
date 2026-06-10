@@ -1993,14 +1993,19 @@ class GlobalCardinalityCount(GlobalConstraint):
         """
         Decomposition of the GlobalCardinalityCount constraint.
         Uses a conjunction of Count global function constraints.
+        
+        Same as the one MiniZinc uses:
+        https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_global_cardinality.mzn
         """
         vars, vals, occ = self.args
-        counts = [cp.Count(vars, v)  for v in vals]
+        counts = [cp.Count(vars, v) for v in vals]
         constraints = [cnt == o for cnt, o in zip(counts, occ)]
         if self.closed:
             constraints.extend([InDomain(v, vals) for v in vars])
+            # redundant constraint
             constraints.append(cp.sum(counts) == len(vars))
         else:
+            # redundant constraint
             constraints.append(cp.sum(counts) <= len(vars))
             
         return constraints, []
