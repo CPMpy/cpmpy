@@ -170,6 +170,7 @@ def global_constraints(solver):
             yield cp.NegativeTable(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":
             yield cp.ShortTable(NUM_ARGS, [[0,"*",2], ["*","*",1]])
+            yield cp.ShortTable(cp.intvar(lb=0, ub=3, shape=4),[[0, 1, 2, "*"], ["*", 1, "*", 0], [2, 3, 1, "*"], [1, "*", "*", 2]])
         elif name == "MDD":
             yield cp.MDD(cp.intvar(lb=0, ub=1, shape=3, name="x"), [("r", 0, "n1"), ("n1", 0, "n2"), ("n2", 0, "t")])
             yield cp.MDD(NUM_ARGS, [("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
