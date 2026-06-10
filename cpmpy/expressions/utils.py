@@ -66,6 +66,16 @@ def is_num(arg):
     """
     return isinstance(arg, (bool, np.bool_, cp.BoolVal, int, np.integer, float, np.floating))
 
+def is_np_int(arg):
+    """ is it an numpy int?
+    """
+    return isinstance(arg, np.integer)
+
+def is_np_bool(arg):
+    """ is it a numpy bool?
+    """
+    return isinstance(arg, np.bool_)
+
 
 def is_false_cst(arg):
     """ is the argument the constant False (can be of type bool, np.bool and BoolVal)
