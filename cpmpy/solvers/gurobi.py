@@ -622,7 +622,7 @@ class CPM_gurobi(SolverInterface):
             elif isinstance(grb_con, gp.QConstr):
                 return grb_con.IISQConstr == 1
             elif isinstance(grb_con, gp.SOS):
-                return grb_con.IISSOSForce == 1
+                return grb_con.IISSOS == 1
             else:
                 raise TypeError(f"Unexpected Gurobi constraint {grb_con} of type {type(grb_con)}")
 
