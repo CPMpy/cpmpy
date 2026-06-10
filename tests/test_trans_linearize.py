@@ -731,18 +731,38 @@ class TestLinearizeReifiedVariablesThreshold:
         assert str(order_out) == "[(BV[a >= 2]) or (BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
         assert str(direct_out) == str(cpm_cons)
     
-    # The following tests are marked with `xfail` because they are expected to fail, because they are not yet implemented; to see the current output compared with the desired output in the test, run with `pytest --runxfail`
-    
-    def test_linearize_reified_inequalities_variations(self):
-        """Use order encoding on inequalities and replace other types of inequality expressions"""
+    def test_linearize_reified_inequalities_not_enough(self):
+        """Do not order-encode when only one non-tautological threshold remains."""
         a = self.a
         self.csemap = CSEMap()
-        out = linearize_reified_variables(self.linearize((a < 2) | (a <= 2) | (a < 3)), min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
-        assert str(out) == "[or(~BV[a >= 2], ~BV[a >= 3], ~BV[a >= 3]), (BV[a >= 3]) -> (BV[a >= 2])]"
-        
-    @pytest.mark.xfail(reason="aspirational")
-    def test_linearize_non_ocurring_int_var(self):
+        cpm_cons = self.linearize((a < 1) | (a <= 2))
+        out = linearize_reified_variables(cpm_cons, min_values=2, csemap=self.csemap, ivarmap=self.ivarmap)
+        assert str(out) == str(cpm_cons)
+
+    def test_linearize_non_ocurring_int_var_direct(self):
         """For an integer solver, we can omit the channelling constraint if the encoded integer variable does not occur in any constraint. Note: `a` and `b` are encoded (because at least 2 equality reifications occur), `c` is not encoded (no reifications). We see `b` occurs as an integer variable in a constraint, so channelling is required, but the int var `a` does not occur in any constraint, so no channelling is required. `c` is not encoded."""
         b, c = cp.intvar(1, 3, name="b"), cp.intvar(1, 3, name="c")
-        out = linearize_reified_variables(self.cpm_cons + self.linearize([(b == 1) | (b == 2), b + c == 3]), min_values=2, csemap=self.csemap)
-        assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum([BV[a == 1], BV[a == 2], BV[a == 3]]) == 1, sum([BV[b == 1], BV[b == 2], BV[b == 3]]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
+        out = linearize_reified_variables(
+            self.cpm_cons + self.linearize([(b == 1) | (b == 2), b + c == 3]),
+            min_values=2,
+            csemap=self.csemap,
+            ivarmap=self.ivarmap,
+            channeling="used",
+        )
+        assert str(out) == "[(BV[a == 1]) or (BV[a == 2]), (BV[b == 1]) or (BV[b == 2]), (b) + (c) == 3, sum(BV[a == 1], BV[a == 2], BV[a == 3]) == 1, sum(BV[b == 1], BV[b == 2], BV[b == 3]) == 1, sum([1, 0, -1, -2] * [b, BV[b == 1], BV[b == 2], BV[b == 3]]) == 1]", "The `a` var does occur"
+
+    def test_linearize_non_ocurring_int_var_order(self):
+        """For an integer solver, we can omit the channelling constraint if the encoded integer variable does not occur in any constraint. Note: `a` and `b` are encoded (because at least 2 equality reifications occur), `c` is not encoded (no reifications). We see `b` occurs as an integer variable in a constraint, so channelling is required, but the int var `a` does not occur in any constraint, so no channelling is required. `c` is not encoded."""
+        a = self.a
+        self.csemap = CSEMap()
+        cpm_cons = self.linearize((a < 1) | (a <= 2))
+        
+        b, c = cp.intvar(1, 3, name="b"), cp.intvar(1, 3, name="c")
+        out = linearize_reified_variables(
+            self.cpm_cons + self.linearize([(b > 2) | (b <= 1), b + c == 3]),
+            min_values=2,
+            csemap=self.csemap,
+            ivarmap=self.ivarmap,
+            channeling="used",
+        )
+        assert str(out) == "[(BV0) or (BV1), (a == 1) == (BV0), (a == 2) == (BV1), (BV[b >= 3]) or (~BV[b >= 2]), (b) + (c) == 3, (BV[b >= 3]) -> (BV[b >= 2]), sum([1, -1, -1] * [b, BV[b >= 2], BV[b >= 3]]) == 1]", "The `a` var does occur"

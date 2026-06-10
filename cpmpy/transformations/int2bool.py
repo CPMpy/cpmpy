@@ -477,3 +477,5 @@ def replace_int_user_vars(user_vars, ivarmap):
             # extends set with encoding variables of `x`
             bool_user_vars.update(ivarmap[x.name].vars())
     return bool_user_vars
+
+

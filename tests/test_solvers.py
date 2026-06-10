@@ -546,6 +546,22 @@ class TestSolvers:
         s = cp.SolverLookup.get("exact", m)
         assert s.solveAll(display=_trixor_callback) ==7
 
+    @pytest.mark.skipif(not CPM_exact.supported(),
+                        reason="Exact not installed")
+    def test_exact_decodes_unchanneled_reified_int(self):
+        a = cp.intvar(1, 3, name="a")
+        assert cp.Model((a == 1) | (a == 2)).solve(solver="exact")
+        assert a.value() in (1, 2)
+
+    @pytest.mark.skipif(not CPM_exact.supported(),
+                        reason="Exact not installed")
+    def test_exact_channels_encoded_int_used_in_objective(self):
+        a = cp.intvar(1, 3, name="a")
+        model = cp.Model((a == 1) | (a == 2), maximize=a)
+        assert model.solve(solver="exact")
+        assert a.value() == 2
+        assert model.objective_value() == 2
+
     @pytest.mark.skipif(not CPM_exact.supported(), 
                         reason="Exact not installed")
     def test_parameters_to_exact(self):
