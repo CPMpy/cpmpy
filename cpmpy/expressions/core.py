@@ -98,7 +98,7 @@ from frozendict import frozendict
 import numpy as np
 import cpmpy as cp
 
-from .utils import is_num, is_any_list, flatlist, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
+from .utils import is_num, is_int, is_any_list, get_bounds, is_boolexpr, is_true_cst, is_false_cst, argvals, is_bool
 from ..exceptions import TypeError
 
 # Common typing helpers
@@ -666,6 +666,20 @@ class Operator(Expression):
             arg_list (Sequence[ExprLike | ListLike[ExprLike]]): List of expressions/constants, 
                         or list of size 2 with list of weights and list of expressions for wsum.
         """
+        if name == "wsum":  # args = [ListLike[int|np.integer], ListLike[ExprLike]]
+            assert len(arg_list) == 2, f"Operator: wsum expects [weights, expressions] as arguments, got {arg_list}"
+            ws, vs = arg_list
+            if isinstance(ws, np.ndarray):
+                ws = ws.astype(int).reshape(-1).tolist()
+            else:
+                assert is_any_list(ws), f"Operator: wsum weights must be a sequence, got {type(ws)}: {ws}"
+                if not all(type(w) is int for w in ws):
+                    ws = [int(w) for w in ws]
+            if isinstance(vs, np.ndarray) and vs.ndim != 1:
+                vs = vs.reshape(-1)
+            super().__init__(name, (ws, vs))
+            return
+
         # sanity checks
         assert (name in Operator.allowed), "Operator {} not allowed".format(name)
         assert is_any_list(arg_list), f"Operator: arg_list must be a list of expressions or constants, got {arg_list}"
@@ -676,7 +690,8 @@ class Operator(Expression):
                 if not is_boolexpr(arg):
                     raise TypeError("{}-operator only accepts boolean arguments, not {}".format(name,arg))
         if arity == 0:
-            arg_list = flatlist(arg_list)
+            if isinstance(arg_list, np.ndarray) and arg_list.ndim != 1:
+                arg_list = arg_list.reshape(-1).tolist()
             assert (len(arg_list) >= 1), "Operator: n-ary operators require at least one argument"
         else:
             assert (len(arg_list) == arity), "Operator: {}, number of arguments must be {}".format(name, arity)
@@ -686,26 +701,20 @@ class Operator(Expression):
         #    and one of the args is a wsum,
         #                    or a product of a constant and an expression,
         # then create a wsum of weights,expressions over all
-        if name == 'sum' and \
-                all(not is_num(a) for a in arg_list) and \
-                any(_wsum_should(a) for a in arg_list):
-            we = [_wsum_make(a) for a in arg_list]
-            w: list[ExprLike] = [wi for w, _ in we for wi in w]
-            e: list[ExprLike] = [ei for _, e in we for ei in e]
-            name = 'wsum'
-            arg_list = (w, e)
-
-        # we have the requirement that weighted sums are [weights, expressions]
-        if name == 'wsum':
-            assert isinstance(arg_list[0], (list, tuple, np.ndarray)), "wsum: arg0 has to be a list-like"
-            assert all(is_num(a) for a in arg_list[0]), "wsum: arg0 has to be all constants but is: "+str(arg_list[0])
-            weights: list[ExprLike] = []
-            for a in arg_list[0]:
-                if isinstance(a, (bool, int, np.integer, np.bool_, BoolVal)):
-                    weights.append(int(a)) # bool or int, simplifies things later on
-                else:
-                    weights.append(a) # can be float
-            arg_list = (weights, arg_list[1])
+        if name == 'sum':
+            saw_wsum, all_expr = False, True
+            for a in arg_list:
+                if _wsum_should(a):
+                    saw_wsum = True
+                if is_int(a):
+                    all_expr = False
+                    break
+            if saw_wsum and all_expr:
+                wvs = [_wsum_make(a) for a in arg_list]
+                ws2: list[ExprLike] = [w for w_list, _ in wvs for w in w_list]
+                vs2: list[ExprLike] = [v for _, v_list in wvs for v in v_list]
+                super().__init__("wsum", (ws2, vs2))
+                return
 
         # small cleanup: nested n-ary operators are merged into the toplevel
         # (this is actually against our design principle of creating

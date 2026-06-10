@@ -49,6 +49,7 @@ import cpmpy as cp
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
@@ -291,22 +292,30 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
-        # save user variables
-        get_variables(expr, self.user_vars)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(obj,
-                                                      supported=self.supported_global_constraints,
-                                                      supported_reified=self.supported_reified_global_constraints,
-                                                      csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+            import gurobipy as gp
+            grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
+        else:
+            # save user variables
+            get_variables(expr, self.user_vars)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(obj,
+                                                          supported=self.supported_global_constraints,
+                                                          supported_reified=self.supported_reified_global_constraints,
+                                                          csemap=self._csemap)
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
-        # make objective function or variable and post
-        grb_obj = self._make_numexpr(obj)
+            self.add(safe_cons + decomp_cons + flat_cons)
+
+            # make objective function or variable and post
+            grb_obj = self._make_numexpr(obj)
+
         if minimize:
             self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
         else:

@@ -51,6 +51,13 @@
             def decompose(self):
                 return (self.args[0] + self.args[1]), []  # the decomposition
 
+    Objective-only :class:`FloatSum`
+    -------------------------------
+
+    :class:`FloatSum` is **not** an Expression nor a GlobalFunction.
+    It is only supported by some solvers (esp MIP solvers and ortools), and need to be passed direclty to
+    :meth:`~cpmpy.model.Model.minimize` / :meth:`~cpmpy.model.Model.maximize`.
+
     ===============
     List of classes
     ===============
@@ -70,17 +77,18 @@
         Among
         NValue
         NValueExcept
+        FloatSum
 
 """
 import warnings  # for deprecation warning
-from typing import Optional, Iterable
+from typing import Optional, Iterable, NoReturn, Final, cast
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
-from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
+from .variables import intvar, cpm_array, NDVarArray, _NumVarImpl, NegBoolView
+from .utils import argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
 class GlobalFunction(Expression):
@@ -356,8 +364,18 @@ class Multiplication(GlobalFunction):
         """
         is_lhs_num = False
         if is_num(x):
+            if not is_int(x):
+                warnings.warn("Mul: float constants are deprecated and converted to int. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+            if type(x) is not int:
+                assert not isinstance(x, Expression)
+                x = int(x)
             is_lhs_num = True
         elif is_num(y):
+            if not is_int(y):
+                warnings.warn("Mul: float constants are deprecated and converted to int. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+            if type(y) is not int:
+                assert not isinstance(y, Expression)
+                y = int(y)
             (x, y) = (y, x)
             is_lhs_num = True
 
@@ -371,8 +389,16 @@ class Multiplication(GlobalFunction):
         x, y = args
         is_lhs_num = False
         if is_num(x):
+            if not is_int(x):
+                warnings.warn("Mul: float constants are deprecated and converted to int. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+            if type(x) is not int:
+                x = int(x)
             is_lhs_num = True
         elif is_num(y):
+            if not is_int(y):
+                warnings.warn("Mul: float constants are deprecated and converted to int. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+            if type(y) is not int:
+                y = int(y)
             (x, y) = (y, x)
             is_lhs_num = True
 
@@ -868,6 +894,8 @@ class Count(GlobalFunction):
             raise TypeError(f"Count(arr, val) takes an array of expressions as first argument, not: {arr}")
         if is_any_list(val):
             raise TypeError(f"Count(arr, val) takes a numeric expression as second argument, not a list: {val}")
+        if isinstance(arr, np.ndarray) and arr.ndim != 1:
+            arr = arr.reshape(-1)
         super().__init__("count", (arr, val))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -929,6 +957,8 @@ class Among(GlobalFunction):
             raise TypeError(f"Among takes as input two arrays, not: {arr} and {vals}")
         if any(isinstance(val, Expression) for val in vals):
             raise TypeError(f"Among takes a set of integer values as input, not {vals}")
+        if isinstance(arr, np.ndarray) and arr.ndim != 1:
+            arr = arr.reshape(-1)
         super().__init__("among", (arr, vals))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -982,6 +1012,8 @@ class NValue(GlobalFunction):
         """
         if not is_any_list(arr):
             raise ValueError(f"NValue(arr) takes an array as input, not: {arr}")
+        if isinstance(arr, np.ndarray) and arr.ndim != 1:
+            arr = arr.reshape(-1)
         super().__init__("nvalue", tuple(arr))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -1047,6 +1079,8 @@ class NValueExcept(GlobalFunction):
             raise ValueError("NValueExcept takes an array as input")
         if not is_num(n):
             raise ValueError(f"NValueExcept takes an integer as second argument, but got {n} of type {type(n)}")
+        if isinstance(arr, np.ndarray) and arr.ndim != 1:
+            arr = arr.reshape(-1)
         super().__init__("nvalue_except", (arr, n))
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
@@ -1091,3 +1125,90 @@ class NValueExcept(GlobalFunction):
         """
         arr, n = self.args
         return 0, len(arr)
+
+
+class FloatSum:
+    """
+    Objective-only weighted sum with float coefficients over decision variables.
+
+    Does not inherit from Expression because it is objective only and has float .value()
+    Basically it is breaking all design rules of CPMpy...
+
+    It can only appear as the argument to :meth:`~cpmpy.model.Model.minimize` / :meth:`~cpmpy.model.Model.maximize`.
+
+    Accepts only (numpy) floats as coefficients, decision variables (including NegBoolView) as terms,
+    and an optional float constant term (default ``0.0``).
+    """
+    name: Final = "floatsum"
+    coeffs: np.ndarray
+    vars: NDVarArray
+    const: float
+
+    def __init__(self, coeffs: ListLike[float|np.floating], vars: ListLike[_NumVarImpl], const: float|np.floating = 0.0):
+        self.coeffs = np.asarray(coeffs, dtype=float).reshape(-1)
+        self.const = float(const)
+        if isinstance(vars, NDVarArray):
+            self.vars = vars
+        else:
+            self.vars = cpm_array(vars)
+        if self.vars.ndim > 1:  # must reshape to 1D
+            flat = self.vars.reshape(-1)
+            # typing is wrong: numpy preserves our ndarray subclass
+            self.vars = cast(NDVarArray, flat)
+
+        if self.coeffs.size != self.vars.size:
+            raise TypeError(f"FloatSum(coeffs, terms) expects equal lengths, got {self.coeffs.size} coefficients and {self.vars.size} terms")
+        if self.coeffs.size == 0:
+            raise TypeError("FloatSum(coeffs, terms) expects at least one term")
+
+    def __repr__(self) -> str:
+        if self.const:
+            return f"FloatSum({list(self.coeffs)}, {list(self.vars)}, constant={self.const})"
+        return f"FloatSum({list(self.coeffs)}, {list(self.vars)})"
+
+    def value(self) -> Optional[float]:
+        vals = argvals_intexpr(self.vars)
+        if vals is None:
+            return None
+        return float(np.dot(self.coeffs, vals) + self.const)
+
+    def components(self, negbool=False) -> tuple[np.ndarray, NDVarArray, float]:
+        """
+        Return ``(coeffs, vars, const)``
+        
+        if `negbool` is False (default), we will eliminate all :class:`~cpmpy.expressions.variables.NegBoolView`
+        ``w * ~bv`` becomes ``w - w * bv`` (coeff ``-w`` on ``bv._bv``, constant ``+w``).
+        """
+        if negbool or not any(isinstance(v, NegBoolView) for v in self.vars):
+            return self.coeffs, self.vars, self.const
+        else:
+            ws: list[float] = []
+            vs: list[_NumVarImpl] = []
+            const = self.const
+            for w, v in zip(self.coeffs, self.vars):
+                if isinstance(v, NegBoolView):
+                    ws.append(-w)
+                    vs.append(v._bv)
+                    const += w
+                else:
+                    ws.append(w)
+                    vs.append(v)
+            return np.asarray(ws, dtype=float), cpm_array(vs), const
+
+    def _raise_objective_only(self) -> NoReturn:
+        raise TypeError("FloatSum is objective-only. Use it directly in Model.minimize()/maximize().")
+
+    def __eq__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __ne__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __lt__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __le__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __gt__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __ge__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __add__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __radd__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __sub__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rsub__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __mul__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rmul__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __neg__(self) -> NoReturn: self._raise_objective_only()
+    def __abs__(self) -> NoReturn: self._raise_objective_only()
