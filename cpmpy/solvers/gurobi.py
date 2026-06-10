@@ -550,10 +550,6 @@ class CPM_gurobi(SolverInterface):
         # constraint that is hard for the CPMpy-level MUS mapping and force it.
         grb_hard_cons = []
 
-        # transform and add all hard constraints
-        for cpm_con in s.transform(hard):
-            # note: we use `s.transform`, then `_add_transformed`, to add some of the constraints to the solver, because need to introspect the transformation and require access to the Gurobi constraints. This bypasses normal creation of `user_vars`. This is safe to do since `user_vars` are not used in this algorithm, and the solver object does not leave this function.
-            grb_hard_cons.append(s._add_transformed(cpm_con))
 
         # The Gurobi IIS algorithm minimizes constraints directly, unlike assumption-based solvers. However, a user-level constraint may be transformed to a group of multiple Gurobi constraints. In this case, we have to represent this group by a *single* soft constraint, otherwise the Gurobi IIS may not map to the user-level constraint MUS. We collect `grb_soft_cons` so that `grb_soft_cons[i]` is a single soft constraint representing `soft[i]`. After calling `computeIIS`, we can read the relevant IIS attribute to see which are in the IIS/MUS.
         grb_soft_cons = []
@@ -586,6 +582,10 @@ class CPM_gurobi(SolverInterface):
             else:
                 grb_soft_cons.append(s._add_transformed(soft_con_rep))
 
+        # transform and add all hard constraints
+        for cpm_con in s.transform(hard):
+            # use ._add_transformed instead of .add because we need the Gurobi constraint object later
+            grb_hard_cons.append(s._add_transformed(cpm_con))
 
         # update required to avoid `gurobipy._exception.GurobiError: GenConstr has not yet been added to the model` when accessing constraint attribute.
         # model updates can be expensive, so we do this only once!
