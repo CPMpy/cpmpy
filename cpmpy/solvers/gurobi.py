@@ -546,8 +546,7 @@ class CPM_gurobi(SolverInterface):
         # instantiate Gurobi solver
         s = cls()
 
-        # Gurobi minimizes the IIS over native constraints, so collect every
-        # constraint that is hard for the CPMpy-level MUS mapping and force it.
+        # we collect the Gurobi constraint objects, so we can enable their `IISConstrForce` attribute later
         grb_hard_cons = []
 
 
