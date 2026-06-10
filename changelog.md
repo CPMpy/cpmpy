@@ -1,5 +1,15 @@
 # Change log
 
+## 0.10.1
+
+### Fixed
+
+This is a hotfix release due to a bug discovered in bounds computation.
+
+* Bounds for pow and mod (cherry picked for this hotfix) [#1012](https://github.com/CPMpy/cpmpy/pull/1012)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.10.0...v0.10.1
+
 ## 0.10.0
 
 ### Added
