@@ -62,7 +62,7 @@ from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
-from ..transformations.safening import no_partial_functions
+from ..transformations.safening import no_partial_functions, safen_objective
 from ..transformations.reification import reify_rewrite
 from ..exceptions import ChocoBoundsException, NotSupportedError
 
@@ -359,6 +359,7 @@ class CPM_choco(SolverInterface):
         get_variables(expr, self.user_vars)
 
         # transform objective
+        obj, safe_cons = safen_objective(expr)
         obj, decomp_cons = decompose_objective(expr,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
@@ -367,7 +368,7 @@ class CPM_choco(SolverInterface):
         # make objective function non-nested
         obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
 
-        self.add(decomp_cons + obj_cons)
+        self.add(safe_cons + decomp_cons + obj_cons)
 
         self.obj = obj_var
         self.minimize_obj = minimize  # Choco has as default to maximize
