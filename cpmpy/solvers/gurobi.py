@@ -550,7 +550,6 @@ class CPM_gurobi(SolverInterface):
         grb_hard_cons = []
 
 
-        # The Gurobi IIS algorithm minimizes constraints directly, unlike assumption-based solvers. However, a user-level constraint may be transformed to a group of multiple Gurobi constraints. In this case, we have to represent this group by a *single* soft constraint, otherwise the Gurobi IIS may not map to the user-level constraint MUS. We collect `grb_soft_cons` so that `grb_soft_cons[i]` is a single soft constraint representing `soft[i]`. After calling `computeIIS`, we can read the `IISConstr` (or variations) attribute to see which are in the IIS/MUS.
         grb_soft_cons = []
 
         for soft_con in soft_cons:
