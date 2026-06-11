@@ -546,21 +546,20 @@ class CPM_gurobi(SolverInterface):
         # instantiate Gurobi solver
         s = cls()
 
-        # we collect the Gurobi constraint objects, so we can enable their `IISConstrForce` (or variations) attribute later
+        # collect the Gurobi constraint objects
         grb_hard_cons = []
-
-
         grb_soft_cons = []
 
         for soft_con in soft_cons:
-            # manually transform the constraint so we can see whether `soft_con` is represented by more than one constraint
+            # transform each constraint seperately, can map to multiple Gurobi-level constraints
             soft_con_tf = s.transform(soft_con)
 
             if len(soft_con_tf) == 0:
-                # this uncommon case ensures `grb_soft_cons` maps to `soft_cons`
-                soft_con_rep = cp.BoolVal(True)
-                grb_soft_cons.append(s._add_transformed(soft_con_rep))
-            elif len(soft_con_tf) == 1:
+                raise ValueError
+                # uncommon case, just ensure `grb_soft_con` and `soft` are same length
+                soft_con_tf = [cp.BoolVal(True)]
+            
+            if len(soft_con_tf) == 1:
                 # if `con` represented by a single transformed constraint, it can be added as-is
                 soft_con_rep = soft_con_tf[0]
                 grb_soft_cons.append(s._add_transformed(soft_con_rep))
@@ -583,7 +582,7 @@ class CPM_gurobi(SolverInterface):
             # use ._add_transformed instead of .add because we need the Gurobi constraint object later
             grb_hard_cons.append(s._add_transformed(cpm_con))
 
-        # update required to avoid `gurobipy._exception.GurobiError: GenConstr has not yet been added to the model` when accessing constraint attribute.
+        # update model so we can access consrtaint attribtutes
         # model updates can be expensive, so we do this only once!
         s.native_model.update()
         for grb_con in grb_hard_cons:
@@ -605,7 +604,7 @@ class CPM_gurobi(SolverInterface):
         except gp.GurobiError as e:
             if e.errno == gp.GRB.Error.IIS_NOT_INFEASIBLE:
                 raise AssertionError("MUS: model must be UNSAT")
-            raise
+            raise e # something else happened
 
         def in_iis(grb_con):
             """Check if `grb_con` is in the IIS. The exact attribute name depends on the type of Gurobi constraint."""
