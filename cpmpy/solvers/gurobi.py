@@ -563,23 +563,20 @@ class CPM_gurobi(SolverInterface):
             elif len(soft_con_tf) == 1:
                 # if `con` represented by a single transformed constraint, it can be added as-is
                 soft_con_rep = soft_con_tf[0]
+                grb_soft_cons.append(s._add_transformed(soft_con_rep))
             else:
                 # We introduce an assumption variable `a` and add *hard* constraints `a -> /\ tf_cons`.
                 # The lower bound fixing `a == 1` is the soft part Gurobi can select in the IIS.
                 assumption = cp.boolvar()
 
-                # adding `a -> /\ C` may require re-transform due to the added implication
-                additional_hard_constraint = assumption.implies(cp.all(soft_con_tf))
-                for tf_con in s.transform(additional_hard_constraint):
-                    grb_hard_cons.append(s._add_transformed(tf_con))
+                # add `a -> /\ C` as a hard constraint
+                hard.append(assumption.implies(cp.all(soft_con_tf)))
 
                 soft_con_rep = s.solver_var(assumption)
                 soft_con_rep.setAttr("LB", 1)
-
-            if isinstance(soft_con_rep, gp.Var):
                 grb_soft_cons.append(soft_con_rep)
-            else:
-                grb_soft_cons.append(s._add_transformed(soft_con_rep))
+
+                
 
         # transform and add all hard constraints
         for cpm_con in s.transform(hard):
