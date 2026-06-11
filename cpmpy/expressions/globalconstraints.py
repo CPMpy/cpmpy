@@ -463,13 +463,12 @@ class Circuit(GlobalConstraint):
                 ]
         return value + nbc, toplevel
 
-    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
         """
-        Linear decomposition of the Circuit global constraint, inspired by Miller-Tucker-Zemlin formulation for TSPs
+        Linear decomposition of the Circuit global constraint, inspired by Miller-Tucker-Zemlin formulation for TSPs.
+        This linear decomposition is only valid in positive context.
+        """
 
-        For now implemented as default positive decompositions, since all solvers submitted to XCSP3 either use linear decompositions (this one),
-        or implement Circuit natively.
-        """
         succ = self.args
         n = len(succ)
         order = cp.intvar(0, n - 1, shape=n)
@@ -959,6 +958,83 @@ class Regular(GlobalConstraint):
 
         # constraint is satisfied iff last state is accepting
         return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
+
+    def decompose_linear_positive(self) -> tuple[list[Expression], list[Expression]]:
+        return self.decompose_linear(complete=False)
+
+    def decompose_linear(self, complete=True) -> tuple[list[Expression], list[Expression]]:
+        """
+            Deterministic Finite Automata (DFA) MIP decomposition based on Côté et al. (2007):
+            "Modeling the Regular Constraint with Integer Programming"
+        """
+        arr, transitions, start, ends = self.args
+        nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))  # get all nodes used
+        Q = len(nodes)
+        # get number of layers
+        I = len(arr)
+        # get possible transition values
+        D = list(set([t[1] for t in transitions]))
+        J = len(D)
+
+        # collect possible transitions
+        flow_in = defaultdict(list)
+        flow_out = defaultdict(list)
+        for trans in transitions:
+            flow_in[nodes.index(trans[2])].append((D.index(trans[1]), nodes.index(trans[0])))
+            flow_out[nodes.index(trans[0])].append((D.index(trans[1]), nodes.index(trans[2])))
+
+
+        # get special start / end states
+        E = [nodes.index(e) for e in ends]
+        S = nodes.index(start)
+
+        invalid_edges = []
+        if complete:
+            for q in nodes:
+                for d in D:
+                    if d not in [v for (v, _) in flow_out[q]]:
+                        flow_out[q].append((d, E[0]))  # add edge to end state for missing transitions
+                        invalid_edges.append((q, d))
+
+
+        defining = []
+        constraining = []
+
+        # auxiliary decision variables
+        s = cp.boolvar(shape=(I, J, Q))  # flow variable
+        sf = cp.boolvar(shape=(len(ends),))  # flow leaving states of last layer
+
+        # 1 unit of flow entering the graph
+        for q in range(Q):
+            if q == S:
+                constraining.append(cp.sum(s[0, j, S] for j, _ in flow_out[S]) == 1)
+            else:
+                defining.append(cp.sum(s[0, j, q] for j in range(J)) == 0)
+        # incoming = outgoing
+        for i in range(1, I):
+            for q in range(Q):
+                defining.append(
+                    cp.sum([s[i - 1, j, q_] for j, q_ in flow_in[q]]) == cp.sum([s[i, j, q] for j, _ in flow_out[q]]))
+        # collect total flow exiting graph
+        for q in range(Q):
+            if q in E:
+                defining.append(cp.sum([s[-1, j, q_] for j, q_ in flow_in[q]]) == sf[E.index(q)])
+            else:
+                defining.append(cp.sum([s[-1, j, q_] for j, q_ in flow_in[q]]) == 0)
+        # 1 unit of flow exiting the graph
+        defining.append(cp.sum(sf) == 1)
+
+        # channeling with 'arr'
+        #defining.extend([MapDomain(a) for a in arr])
+        for i in range(I):
+            for j in range(J):
+                defining.append((arr[i] == D[j]) == (cp.sum(s[i, j, :])))
+
+        if complete:
+            constraining.append(cp.sum([s[-1, j, E[0]]for (j, E[0]) in flow_out[q] if (q,j) in invalid_edges]) == 0)
+
+        return constraining, defining
+
 
 
     def value(self) -> Optional[bool]:

@@ -41,7 +41,9 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                       supported_reified: Optional[AbstractSet[str]] = None,
                       _toplevel=None, nested=False,
                       csemap: Optional[CSEMap] = None,
-                      decompose_custom: Optional[Dict[str, CustomDecomp]] = None) -> list[Expression]:
+                      decompose_custom: Optional[Dict[str, CustomDecomp]] = None,
+                      decompose_custom_positive: Optional[Dict[str, CustomDecomp]] = None,
+                      ) -> list[Expression]:
     """
     Decomposes global constraint or global function not supported by the solver.
 
@@ -80,8 +82,8 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                     newlist.extend(decomp.args)
                     continue
             
-            if decompose_custom is not None and expr.name in decompose_custom: # do we also need a "decompose_custom_positive"?
-                exprs, toplevel_exprs = decompose_custom[expr.name](expr)
+            if decompose_custom_positive is not None and expr.name in decompose_custom_positive: # do we also need a "decompose_custom_positive"?
+                exprs, toplevel_exprs = decompose_custom_positive[expr.name](expr)
             else:
                 exprs, toplevel_exprs = expr.decompose_positive()
             # we merge the list toplevel rather than create an 'and'
