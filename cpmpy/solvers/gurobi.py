@@ -555,7 +555,6 @@ class CPM_gurobi(SolverInterface):
             soft_con_tf = s.transform(soft_con)
 
             if len(soft_con_tf) == 0:
-                raise ValueError
                 # uncommon case, just ensure `grb_soft_con` and `soft` are same length
                 soft_con_tf = [cp.BoolVal(True)]
             
