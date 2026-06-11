@@ -559,6 +559,7 @@ class CPM_gurobi(SolverInterface):
             if len(soft_con_tf) == 0:
                 # this uncommon case ensures `grb_soft_cons` maps to `soft_cons`
                 soft_con_rep = cp.BoolVal(True)
+                grb_soft_cons.append(s._add_transformed(soft_con_rep))
             elif len(soft_con_tf) == 1:
                 # if `con` represented by a single transformed constraint, it can be added as-is
                 soft_con_rep = soft_con_tf[0]
