@@ -964,77 +964,80 @@ class Regular(GlobalConstraint):
 
     def decompose_linear(self, complete=True) -> tuple[list[Expression], list[Expression]]:
         """
-            Deterministic Finite Automata (DFA) MIP decomposition based on Côté et al. (2007):
-            "Modeling the Regular Constraint with Integer Programming"
+        Deterministic Finite Automata (DFA) MIP decomposition based on
+        Côté et al. (2007): "Modeling the Regular Constraint with Integer Programming"
         """
-        arr, transitions, start, ends = self.args
-        nodes = list(set([t[0] for t in transitions] + [t[-1] for t in transitions]))  # get all nodes used
-        Q = len(nodes)
-        # get number of layers
-        I = len(arr)
-        # get possible transition values
-        D = list(set([t[1] for t in transitions]))
-        J = len(D)
 
-        # collect possible transitions
+        arr, transitions, start, ends = self.args
+        nodes = sorted(set([t[0] for t in transitions] + [t[2] for t in transitions]))
+        node_index = {n: i for i, n in enumerate(nodes)}
+        Q = len(nodes)
+        D = sorted(set([t[1] for t in transitions]))
+        d_index = {d: i for i, d in enumerate(D)}
+        J = len(D)
+        I = len(arr)
+
         flow_in = defaultdict(list)
         flow_out = defaultdict(list)
-        for trans in transitions:
-            flow_in[nodes.index(trans[2])].append((D.index(trans[1]), nodes.index(trans[0])))
-            flow_out[nodes.index(trans[0])].append((D.index(trans[1]), nodes.index(trans[2])))
 
+        for (u, d, v) in transitions:
+            ui = node_index[u]
+            vi = node_index[v]
+            di = d_index[d]
 
-        # get special start / end states
-        E = [nodes.index(e) for e in ends]
-        S = nodes.index(start)
+            flow_out[ui].append((di, vi))
+            flow_in[vi].append((di, ui))
+
+        S = node_index[start]
+        E = [node_index[e] for e in ends]
 
         invalid_edges = []
+
         if complete:
             for q in nodes:
-                for d in D:
-                    if d not in [v for (v, _) in flow_out[q]]:
-                        flow_out[q].append((d, E[0]))  # add edge to end state for missing transitions
-                        invalid_edges.append((q, d))
+                qi = node_index[q]
+                existing = {di for (di, _) in flow_out[qi]}
 
+                for d in D:
+                    di = d_index[d]
+                    if di not in existing:
+                        flow_out[qi].append((di, E[0]))
+                        flow_in[E[0]].append((di, qi))
+                        invalid_edges.append((qi, di))
 
         defining = []
         constraining = []
 
-        # auxiliary decision variables
-        s = cp.boolvar(shape=(I, J, Q))  # flow variable
-        sf = cp.boolvar(shape=(len(ends),))  # flow leaving states of last layer
+        s = cp.boolvar(shape=(I, J, Q))
+        sf = cp.boolvar(shape=(len(E),))
 
-        # 1 unit of flow entering the graph
         for q in range(Q):
             if q == S:
                 constraining.append(cp.sum(s[0, j, S] for j, _ in flow_out[S]) == 1)
             else:
                 defining.append(cp.sum(s[0, j, q] for j in range(J)) == 0)
-        # incoming = outgoing
+
         for i in range(1, I):
             for q in range(Q):
-                defining.append(
-                    cp.sum([s[i - 1, j, q_] for j, q_ in flow_in[q]]) == cp.sum([s[i, j, q] for j, _ in flow_out[q]]))
-        # collect total flow exiting graph
+                defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
+
         for q in range(Q):
             if q in E:
-                defining.append(cp.sum([s[-1, j, q_] for j, q_ in flow_in[q]]) == sf[E.index(q)])
+                defining.append(cp.sum(s[I - 1, j, q_] for (j, q_) in flow_in[q]) == sf[E.index(q)])
             else:
-                defining.append(cp.sum([s[-1, j, q_] for j, q_ in flow_in[q]]) == 0)
-        # 1 unit of flow exiting the graph
+                defining.append(cp.sum(s[I - 1, j, q_] for (j, q_) in flow_in[q]) == 0)
+
         defining.append(cp.sum(sf) == 1)
 
-        # channeling with 'arr'
-        #defining.extend([MapDomain(a) for a in arr])
         for i in range(I):
             for j in range(J):
-                defining.append((arr[i] == D[j]) == (cp.sum(s[i, j, :])))
+                defining.append(cp.sum(s[i, j, q] for q in range(Q)) == (arr[i] == D[j]))
 
         if complete:
-            constraining.append(cp.sum([s[-1, j, E[0]]for (j, E[0]) in flow_out[q] if (q,j) in invalid_edges]) == 0)
+            constraining.append(cp.sum(s[i, di, qi] for i in range(I) for (qi, di) in invalid_edges) == 0)
+
 
         return constraining, defining
-
 
 
     def value(self) -> Optional[bool]:
