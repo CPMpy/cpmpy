@@ -10,7 +10,7 @@ class TestMus:
         self.mus_func = mus
         self.naive_func = mus_naive
 
-    def test_circular(self):
+    def test_circular(self, solver):
         x = cp.intvar(0, 3, shape=4, name="x")
         # circular "bigger then", UNSAT
         cons = [
@@ -25,7 +25,7 @@ class TestMus:
         assert set(self.mus_func(cons)) == set(cons[:3])
         assert set(self.naive_func(cons)) == set(cons[:3])
 
-    def test_bug_191(self):
+    def test_bug_191(self, solver):
         """
         Original Bug request: https://github.com/CPMpy/cpmpy/issues/191
         When assum is a single boolvar and candidates is a list (of length 1), it fails.
@@ -39,7 +39,7 @@ class TestMus:
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
         assert set(mus_naive_cons) == set(soft)
 
-    def test_bug_191_many_soft(self):
+    def test_bug_191_many_soft(self, solver):
         """
         Checking whether bugfix 191  doesn't break anything in the MUS tool chain,
         when the number of soft constraints > 1.
@@ -57,7 +57,7 @@ class TestMus:
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
         assert set(mus_naive_cons) == set(soft)
 
-    def test_wglobal(self):
+    def test_wglobal(self, solver):
         x = cp.intvar(-9, 9, name="x")
         y = cp.intvar(-9, 9, name="y")
 
@@ -83,13 +83,14 @@ class TestMus:
         assert len(ms) < len(cons)
         assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
-@pytest.mark.requires_solver("exact")       
+
+@pytest.mark.requires_solver("exact")
 class TestNativeMusExact(TestMus):
     def setup_method(self):
         self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver="exact")
         self.naive_func = mus_naive
 
-    def test_decomposed_global(self):
+    def test_decomposed_global(self, solver):
         x = cp.intvar(1, 5, shape=3, name="x")
         soft = [x[0] == x[1], x[1] == x[2]]
         hard = [cp.AllDifferent(x)]
