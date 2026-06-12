@@ -1,8 +1,11 @@
-# Flexible job-shop: a set of jobs must be run, each can be run on any of the machines,
+#!/usr/bin/env python
+
+# Parallel machine scheduling: a set of jobs must be run, each can be run on any of the machines,
 # with different duration and energy consumption. Minimize makespan and total energy consumption
 import cpmpy as cp
 import pandas as pd
 import random; random.seed(1)
+SHOW_VISUALISATION = False
 
 # --- Data definition ---
 num_jobs = 15
@@ -11,43 +14,41 @@ num_machines = 3
 data = [[jobid, machid, random.randint(2, 8), random.randint(5, 15)]
         for jobid in range(num_jobs) for machid in range(num_machines)]
 df_data = pd.DataFrame(data, columns=['job_id', 'machine_id', 'duration', 'energy'])
+num_compatible = len(df_data)
 
-# Compute maximal horizon (crude upper bound) and number of alternatives
-horizon = df_data.groupby('job_id')['duration'].max().sum()
-num_alternatives = len(df_data.index)
-assert list(df_data.index) == list(range(num_alternatives)), "Index must be default integer (0,1,..)"
+# Compute maximal horizon (sum of slowest duration per job)
+horizon = df_data.groupby("job_id")["duration"].max().sum()
 
+# Decision `start[j]`: integer start time for each job `j`
+start = cp.intvar(0, horizon, shape=num_jobs, name="start")
+# Decision `end[j]`: integer end time for each job `j`
+end = cp.intvar(0, horizon, shape=num_jobs, name="end")
+# Decision `active[(j,m)]`: Per compatible combination, Boolean indicating if it is used
+active = cp.boolvar(shape=num_compatible, name="active")
 
-# --- Decision variables ---
-start = cp.intvar(0, horizon, name="start", shape=num_alternatives)
-end   = cp.intvar(0, horizon, name="end", shape=num_alternatives)
-active = cp.boolvar(name="active", shape=num_alternatives)
-
-# --- Constraints ---
 model = cp.Model()
 
-# Each job must have one active alternative
-for job_id, group in df_data.groupby('job_id'):
-    model += (cp.sum(active[group.index]) == 1)
+# Mandatory jobs: each job must be assigned to exactly one compatible machine
+for _, job_rows in df_data.groupby("job_id"):
+    model += cp.sum(active[job_rows.index]) == 1
 
-# For all jobs ensure start + dur = end (also for inactives, thats OK)
-model += (start + df_data['duration'] == end)
+# Machine capacity: each machine can only process one job at a time
+# also enforces Matching duration: the end time of a job is the start time + the duration on its assigned machine
+for _, mach_rows in df_data.groupby("machine_id", sort=True):
+    model += cp.NoOverlapOptional(
+        start = start[mach_rows["job_id"]],
+        end = end[mach_rows["job_id"]],
+        duration = mach_rows["duration"].values,
+        is_present = active[mach_rows.index],
+    )
 
-# No two active alternatives on the same machine may overlap; (ab)use cumulative with 'active' as demand.
-for mach_id, group in df_data.groupby('machine_id'):
-    sel = group.index
-    model += cp.Cumulative(start[sel], group['duration'].values, end[sel], active[sel], capacity=1)
+# Metric Makespan: end time of the latest job
+makespan = cp.max(end)
 
-# --- Objectives ---
-# Makespan: max over all active alternatives
-makespan = cp.intvar(0, horizon, name="makespan")
-for i in range(num_alternatives):
-    model += active[i].implies(makespan >= end[i])  # end times of actives determines makespan
+# Metric Total energy: total energy consumed by the machines
+total_energy = cp.sum(active * df_data["energy"])
 
-# Total energy consumption
-total_energy = cp.sum(df_data['energy'] * active)
-
-# Minimize makespan first, then total energy
+# Objective: minimize makespan, and to a lesser extend also total energy consumption
 model.minimize(100 * makespan + total_energy)
 
 
@@ -57,11 +58,13 @@ if model.solve():
     print("Total makespan:", makespan.value(), "energy:", total_energy.value())
 
     # Visualize with Plotly's excellent Gantt chart support
-    import plotly.express as px
-    df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
-    df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
-    df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
-    px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
+    if SHOW_VISUALISATION:
+        import plotly.express as px
+        df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
+        df_solution["start"] = pd.to_datetime(start.value(), unit="m") # start vars are ordered by job_id
+        df_solution["end"] = pd.to_datetime(end.value(), unit="m") # end vars are ordered by job_id
+        import plotly.io as pio; pio.renderers.default = "browser"
+        px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
 else:
     print("No solution found.")
 
