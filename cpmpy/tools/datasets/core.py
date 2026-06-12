@@ -94,18 +94,6 @@ except ImportError:
 import cpmpy as cp
 
 
-def _format_bytes(bytes_num):
-    """
-    Format bytes into human-readable string (e.g., KB, MB, GB).
-
-    Used to display download progress.
-    """
-    for unit in ['bytes', 'KB', 'MB', 'GB', 'TB']:
-        if bytes_num < 1024.0:
-            return f"{bytes_num:.1f} {unit}"
-        bytes_num /= 1024.0
-
-
 class classproperty:
     """
     Descriptor that makes a method work as a class-level property (no () needed).
@@ -723,22 +711,12 @@ class FileDataset(Dataset):
                                 pbar.update(len(chunk))
             else:
                 # Fallback to simple download if tqdm is not available
-                downloaded = 0
                 with open(filepath, 'wb') as f:
                     while True:
                         chunk = response.read(chunk_size)
                         if not chunk:
                             break
                         f.write(chunk)
-                        downloaded += len(chunk)
-                        if total_size > 0:
-                            percent = (downloaded / total_size) * 100
-                            sys.stdout.write(f"\r\033[KDownloading {desc}: {_format_bytes(downloaded)}/{_format_bytes(total_size)} ({percent:.1f}%)")
-                        else:
-                            sys.stdout.write(f"\r\033[KDownloading {desc}: {_format_bytes(downloaded)}...")
-                        sys.stdout.flush()
-                sys.stdout.write("\n")
-                sys.stdout.flush()
 
 
 def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset:
