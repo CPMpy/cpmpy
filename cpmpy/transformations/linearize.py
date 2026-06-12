@@ -72,13 +72,13 @@ from .cse import CSEMap
 
 from .flatten_model import flatten_constraint, get_or_make_var
 from .decompose_global import decompose_in_tree, decompose_objective
-from .normalize import toplevel_list, simplify_boolean
+from .normalize import simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
-from ..expressions.core import Comparison, Expression, Operator, BoolVal
+from ..expressions.core import Comparison, Expression, ListLike, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table
 from ..expressions.globalfunctions import GlobalFunction, Element
-from ..expressions.utils import is_bool, is_num, is_int, eval_comparison, get_bounds, is_true_cst, is_false_cst
+from ..expressions.utils import is_boolexpr, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
 from .int2bool import IntVarEnc, _encode_int_var
 
@@ -206,7 +206,12 @@ def linearize_constraint(lst_of_expr, supported={"sum","wsum","->"}, reified=Fal
                 raise ValueError(f"Linearization of `lhs` ({lhs}) not supported, run "
                                  "`cpmpy.transformations.decompose_global.decompose_in_tree() first")
 
-            [cpm_expr] = canonical_comparison([cpm_expr])  # just transforms the constraint, not introducing new ones
+            (cpm_expr,) = canonical_comparison((cpm_expr,))  # just transforms the constraint, not introducing new ones
+            if isinstance(cpm_expr, BoolVal):
+                # it was a trivial comparison
+                newlist.append(cpm_expr)
+                continue
+
             lhs, rhs = cpm_expr.args
 
             if lhs.name == "sum" and len(lhs.args) == 1 and isinstance(lhs.args[0], _BoolVarImpl) and "or" in supported:
@@ -428,7 +433,7 @@ def only_positive_bv_wsum_const(cpm_expr):
         raise ValueError(f"unexpected expression, should be sum, wsum or var but got {cpm_expr}")
 
 
-def canonical_comparison(lst_of_expr):
+def canonical_comparison(lst_of_expr: ListLike[Expression]) -> list[Expression]:
     """
         Canonicalize a comparison expression.
         Transforms linear expressions, or a reification thereof into canonical form by:
@@ -438,27 +443,25 @@ def canonical_comparison(lst_of_expr):
         Expects the input constraints to be flat. Only apply after applying :func:`flatten_constraint`
     """
 
-    lst_of_expr = toplevel_list(lst_of_expr) # ensure it is a list
-
     newlist = []
     for cpm_expr in lst_of_expr:
 
         if isinstance(cpm_expr, Operator) and cpm_expr.name == '->':    # half reification of comparison
             lhs, rhs = cpm_expr.args
             if isinstance(rhs, Comparison):
-                rhs = canonical_comparison(rhs)[0]
+                (rhs,) = canonical_comparison((rhs,))
                 newlist.append(lhs.implies(rhs))
             elif isinstance(lhs, Comparison):
-                lhs = canonical_comparison(lhs)[0]
+                (lhs,) = canonical_comparison((lhs,))
                 newlist.append(lhs.implies(rhs))
             else:
                 newlist.append(cpm_expr)
 
         elif isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
-            if isinstance(lhs, Comparison) and (is_bool(rhs) or isinstance(rhs, Expression) and rhs.is_bool()):
+            if isinstance(lhs, Comparison) and is_boolexpr(rhs):
                 assert cpm_expr.name == "==", "Expected a reification of a comparison here, but got {}".format(cpm_expr.name)
-                lhs = canonical_comparison(lhs)[0]
+                (lhs,) = canonical_comparison((lhs,))
             elif is_num(lhs) or isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum", "sub"}):
                 if lhs.name == "sub":
                     lhs = Operator("wsum", [[1,-1],lhs.args])
@@ -497,7 +500,11 @@ def canonical_comparison(lst_of_expr):
                                 rhs -= arg
                             else:
                                 new_args.append(arg)
-                        lhs = Operator("sum", new_args)
+                        if len(new_args) == 0: # edge case where all args are constants...
+                            newlist.append(cp.BoolVal(eval_comparison(cpm_expr.name, 0, rhs)))
+                            continue
+                        else:
+                            lhs = Operator("sum", new_args)
 
                     elif lhs.name == "wsum":
                         new_weights, new_args = [], []
@@ -507,7 +514,11 @@ def canonical_comparison(lst_of_expr):
                             else:
                                 new_weights.append(w)
                                 new_args.append(arg)
-                        lhs = Operator("wsum", [new_weights, new_args])
+                        if len(new_args) == 0: # edge case where all args are constants...
+                            newlist.append(cp.BoolVal(eval_comparison(cpm_expr.name, 0, rhs)))
+                            continue
+                        else:
+                            lhs = Operator("wsum", [new_weights, new_args])
                     else:
                         raise ValueError(f"lhs should be sum or wsum, but got {lhs}")
                 else:
