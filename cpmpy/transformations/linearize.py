@@ -76,7 +76,7 @@ from .normalize import simplify_boolean
 from ..exceptions import TransformationNotImplementedError
 
 from ..expressions.core import Comparison, Expression, ListLike, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint, AllDifferent, Table, InDomain, Regular, Circuit, ShortTable
 from ..expressions.globalfunctions import GlobalFunction, Element
 from ..expressions.utils import is_boolexpr, is_num, eval_comparison, get_bounds, is_true_cst, is_false_cst
 from ..expressions.variables import _BoolVarImpl, boolvar, NegBoolView, _NumVarImpl
@@ -607,8 +607,9 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
         supported_reified = frozenset[str]()
 
     decompose_custom = get_linear_decompositions()
+    decompose_custom_positive = get_linear_positive_decompositions()
 
-    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+    return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive)
 
 def decompose_linear_objective(obj: Expression,
                                supported: Optional[AbstractSet[str]] = None,
@@ -627,7 +628,6 @@ def decompose_linear_objective(obj: Expression,
 def get_linear_decompositions():
     """
         Implementation of custom linear decompositions for some global constraints.
-        Uses (var == val) in sums; no integer encoding.
 
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
@@ -635,14 +635,31 @@ def get_linear_decompositions():
     return dict(
         alldifferent=AllDifferent.decompose_linear,
         element=Element.decompose_linear,
-        table=Table.decompose_linear
+        table=Table.decompose_linear,
+        short_table=ShortTable.decompose,
+        InDomain=InDomain.decompose_linear,
+        regular=Regular.decompose_linear,
     )
     # Should we add Gleb's table decomposition? or is it not non-reifiable?
 
+def get_linear_positive_decompositions():
+    """
+        Implementation of custom linear decompositions for some global constraints, that are only valid in positive context.
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    return dict(
+        regular=Regular.decompose_linear_positive,
+        circuit=Circuit.decompose_linear_positive,
+    )
+
+
+
 
 def linearize_reified_variables(constraints:list[Expression], 
-                                min_values:int=3, 
-                                csemap:Optional[CSEMap]=None, 
+                                min_values:int=3,
+                                csemap:Optional[CSEMap]=None,
                                 ivarmap:Optional[dict[str, IntVarEnc]] = None) -> list[Expression]:
     """
     Replace reified (BV <-> (x == val)) implications with direct encoding and

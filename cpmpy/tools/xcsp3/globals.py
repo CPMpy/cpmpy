@@ -21,8 +21,6 @@ List of classes
     SafeOnlyInverse
     InverseOne
     Channel
-    NonReifiedTable
-    RowSelectingShortTable
     NegativeShortTable
     MDD
     Regular
@@ -52,7 +50,7 @@ import cpmpy as cp
 
 from cpmpy.exceptions import CPMpyException
 from cpmpy.expressions.core import Expression, Operator, ListLike, ExprLike
-from cpmpy.expressions.globalconstraints import GlobalConstraint, AllDifferent, InDomain, DirectConstraint
+from cpmpy.expressions.globalconstraints import GlobalConstraint, AllDifferent, InDomain, DirectConstraint, Table
 from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
     get_bounds, eval_comparison
@@ -112,7 +110,7 @@ class AllDifferentListsExceptN(GlobalConstraint):
         """
         constraints = []
         for lst1, lst2 in all_pairs(self.args[0]):
-            constraints.append(cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(NonReifiedTable(lst1, self.args[1])))
+            constraints.append(cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(Table(lst1, self.args[1])))
         return constraints, []
 
     def value(self):
@@ -386,120 +384,6 @@ class Channel(GlobalConstraint):
         arr, v = self.args
         return sum(argvals(x) for x in arr) == 1 and 0 <= argval(v) < len(arr) and arr[argval(v)] == 1
 
-
-class NonReifiedTable(GlobalConstraint):
-    """
-    The values of the variables in 'array' correspond to a row in 'table'.
-    This global represents the non-reified version, meaning that it does not support occuring reified when decomposing.
-    Look at :class:`globalconstraints.Table <cpmpy.expressions.globalconstraints.Table` for a formulation that does support reification.
-    """
-
-    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
-        if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()  # fast shortcut
-            if array.ndim != 1:  # reshape to 1D
-                array = array.reshape(-1)
-        else:
-            has_subexpr = False
-            for x in array:  # C-style python
-                if x.has_subexpr():
-                    has_subexpr = True
-                    break
-
-        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
-            table = np.array(table, dtype=int)
-        assert table.ndim == 2, "NonReifiedTable's table must be a 2D array"
-
-        # args: tuple[ListLike[Expression], np.ndarray]
-        super().__init__("table", (array, table), has_subexpr=has_subexpr)
-
-    @property
-    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
-        """ READ-ONLY, the well-tuped arguments of this global constraint
-        """
-        return self._args
-
-    def decompose(self):
-        """
-            This explicit implication-only decomposition is only valid in a non-reified setting.
-        """
-        arr, tab = self.args
-        if len(tab) == 1:
-            return [cpm_all(t == a for (t, a) in zip(tab[0], arr))], []
-        
-        row_selected = boolvar(shape=len(tab))
-        cons = [Operator("or", row_selected)]
-        for i, row in enumerate(tab):
-            subexpr = Operator("and", [x == v for x,v in zip(arr, row)])
-            cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
-        return cons,[]
-
-    def value(self):
-        arr, tab = self.args
-        arrval = np.asarray(argvals(arr))
-        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
-            return None
-        return bool(np.any(np.all(tab == arrval, axis=1)))
-
-class RowSelectingShortTable(GlobalConstraint):
-    """
-        Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
-        no restrictions for the corresponding variable in that tuple.
-        Bit less validation then for :class:`globalconstraints.ShortTable <cpmpy.expressions.globalconstraints.ShortTable>`;
-        decomposition differs (row-selecting formulation).
-    """
-
-    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
-        if isinstance(array, NDVarArray):
-            has_subexpr = array.has_subexpr()  # fast shortcut
-            if array.ndim != 1:  # reshape to 1D
-                array = array.reshape(-1)
-        else:
-            has_subexpr = False
-            for x in array:  # C-style python
-                if x.has_subexpr():
-                    has_subexpr = True
-                    break
-
-        if not isinstance(table, np.ndarray):
-            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
-        assert table.ndim == 2, "ShortTable's table must be a 2D array"
-
-        # args: tuple[ListLike[Expression], np.ndarray]
-        super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
-
-    @property
-    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
-        """ READ-ONLY, the well-tuped arguments of this global constraint
-        """
-        return self._args
-
-    def decompose(self):
-        """
-        Alternative decomposition, similar to `element` from Gleb's paper: "Improved Linearization of Constraint
-        Programming Models"
-        """
-        arr, tab = self.args
-
-        row_selected = boolvar(shape=(len(tab),))
-        cons = [Operator("or", row_selected)]
-        for i, row in enumerate(tab):
-            subexpr = Operator("and", [ai == ri for ai, ri in zip(arr, row) if ri != STAR])
-            cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
-        return cons,[]
-
-    def value(self):
-        arr, tab = self.args
-        arrval = np.asarray(argvals(arr))
-        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
-            return None
-
-        for row in tab:
-            mask = (row != STAR)
-            if (row[mask].astype(int, copy=False) == arrval[mask]).all():
-                return True
-        return False
-
 class NegativeShortTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
@@ -755,9 +639,9 @@ class Regular(GlobalConstraint):
         state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        defining = [NonReifiedTable([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
+        defining = [Table([arr[0], state_vars[0]], [[v,e] for s,v,e in transitions if s == id_start])]        
         # define the rest of the automaton using transition table
-        defining += [NonReifiedTable([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
+        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
         
         # constraint is satisfied iff last state is accepting
         return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
