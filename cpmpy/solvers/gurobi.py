@@ -581,7 +581,7 @@ class CPM_gurobi(SolverInterface):
             # use ._add_transformed instead of .add because we need the Gurobi constraint object later
             grb_hard_cons.append(s._add_transformed(cpm_con))
 
-        # update model so we can access constraint attribtutes
+        # update model so we can access consrtaint attribtutes
         # model updates can be expensive, so we do this only once!
         s.native_model.update()
         for grb_con in grb_hard_cons:
