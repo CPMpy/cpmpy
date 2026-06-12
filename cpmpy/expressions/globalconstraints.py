@@ -768,7 +768,7 @@ class ShortTable(GlobalConstraint):
         arr, tab = self.args
         return [cp.any([cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR]) for row in tab])], []
 
-    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+    '''def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
         """
         Positive decomposition of the ShortTable global constraint.
 
@@ -785,7 +785,7 @@ class ShortTable(GlobalConstraint):
         for i, row in enumerate(tab):
             subexpr = cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR])
             cons.append(row_selected[i].implies(subexpr))  # implication-only decomposition
-        return cons,[]
+        return cons,[]'''
 
     def value(self) -> Optional[bool]:
         """

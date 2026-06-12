@@ -631,7 +631,6 @@ def get_linear_decompositions(complete=True):
         "alldifferent": AllDifferent.decompose_linear,
         "element": Element.decompose_linear,
         "table": Table.decompose_linear,
-        "short_table": ShortTable.decompose,
         "InDomain": InDomain.decompose_linear,
         "regular": (
             Regular.decompose_linear_positive
