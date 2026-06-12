@@ -6,7 +6,8 @@ from functools import partial
 from pathlib import Path
 from typing import Optional
 
-from cpmpy.tools.benchmark.test.runner import Runner 
+from ..observer.utils import load_observers
+from ..runner.runner import Runner
 
 
 def create_output_file(output_file: Optional[str], base_dir: Optional[str] = None, *args) -> str:
@@ -27,17 +28,19 @@ def create_output_file(output_file: Optional[str], base_dir: Optional[str] = Non
     if output_file is None:
         output_file = f"{'_'.join(args)}.txt"
     
-    # If output_file is already absolute, use it as-is
-    if os.path.isabs(output_file):
+    # If output_file is already absolute, or already includes a directory (full path from caller),
+    # use it as-is to avoid creating nested dirs like results/results/
+    if os.path.isabs(output_file) or os.path.dirname(output_file):
         full_path = output_file
     else:
-        # Otherwise, join with base_dir
+        # Otherwise, join with base_dir (output_file is just a filename)
         full_path = os.path.join(base_dir, output_file)
     
     Path(full_path).parent.mkdir(parents=True, exist_ok=True)
     
     return full_path
-class InstanceRunner:
+class InstanceAdapter:
+    valid_exit_codes = (0,)
     
     def __init__(self):
         self.additional_observers = []
@@ -46,7 +49,15 @@ class InstanceRunner:
         self.this_file_path = os.path.abspath(inspect.getfile(type(self)))
         self.this_python = sys.executable
 
-    def get_runner(self, instance: str, solver: str = "ortools", output_file: str = None, overwrite: bool = True, **kwargs):
+    def get_runner(
+            self,
+            instance: str,
+            solver: str = "ortools",
+            output_file: str = None,
+            overwrite: bool = True,
+            extra_observers: Optional[list] = None,
+            **kwargs,
+        ):
 
         runner = Runner(reader=self.reader)
         # Store reference to instance_runner so observers can access it for formatting
@@ -61,11 +72,14 @@ class InstanceRunner:
                 runner.register_observer(observer(output_file=output_file, overwrite=overwrite))
             else:
                 runner.register_observer(observer())
-        
-        # Register any additional observers that were added programmatically
+
+        # Register additional observers (programmatic + CLI-provided)
         # Track file paths to avoid duplicate WriteToFileObserver registrations
         registered_file_paths = set()
-        for observer in self.get_additional_observers():
+        all_extra_observers = list(self.get_additional_observers())
+        if extra_observers:
+            all_extra_observers.extend(extra_observers)
+        for observer in all_extra_observers:
             # If observer is a partial function, call it to get the instance
             if isinstance(observer, partial):
                 obs_instance = observer()
@@ -123,7 +137,7 @@ class InstanceRunner:
         parser.add_argument("--seed", type=int, default=None)
         parser.add_argument("--intermediate", action="store_true", default=False)
         parser.add_argument("--cores", type=int, default=None)
-        parser.add_argument("--observers", type=list[str], default=None)
+        parser.add_argument("--observers", type=str, nargs="+", default=None)
         return parser
 
     def print_comment(self, comment: str):
@@ -139,10 +153,20 @@ class InstanceRunner:
         """Get the list of additional observers that should be registered."""
         return self.additional_observers
 
-    def run(self, instance: str, solver: str = "ortools", output_file: str = None, **kwargs):
+    def exit_code(self) -> int:
+        """Return the process exit code for the latest run."""
+        return 0
 
-        
+    def run(
+            self,
+            instance: str,
+            solver: str = "ortools",
+            output_file: str = None,
+            observers: Optional[list[str]] = None,
+            **kwargs,
+        ):
+        extra_observers = load_observers(observers)
 
-        
-        self.runner = self.get_runner(instance, solver, output_file, **kwargs)
+        self.runner = self.get_runner(instance, solver, output_file, extra_observers=extra_observers, **kwargs)
         self.runner.run(instance=instance, solver=solver, output_file=output_file, **kwargs)
+        return self.exit_code()

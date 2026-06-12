@@ -1,5 +1,16 @@
 from cpmpy.transformations.int2bool import IntVarEncDirect, IntVarEncOrder, IntVarEncLog
 
+
+def _safe_name(v):
+    """Best-effort variable label for unexpected objects (e.g. lists)."""
+    return getattr(v, "name", str(v))
+
+
+def _veripb_safe_name(name):
+    """VeriPB does not support commas in variable names."""
+    s = str(name)
+    return s.replace(", ", "][").replace(",", "][")
+
 def _build_reverse_map(ivarmap):
     """
     Build a reverse lookup from BoolVar object ID to decode info.
@@ -41,7 +52,7 @@ def annotate_cpmpy(vars, ivarmap):
     for v in vars:
         info = reverse.get(id(v))
         if info is None:
-            name = v.name
+            name = _safe_name(v)
         elif info["encoding"] == "order":
             name = f"{info['source_name']}>={info['threshold']}"
         elif info["encoding"] == "binary":
@@ -49,7 +60,7 @@ def annotate_cpmpy(vars, ivarmap):
         elif info["encoding"] == "direct":
             name = f"{info['source_name']}={info['value']}"
         else:
-            name = v.name
+            name = _safe_name(v)
         lines.append(name)
     return lines
 
@@ -97,7 +108,8 @@ def annotate_sugar(vars, ivarmap):
         info = reverse.get(id(v))
 
         if info is None:
-            name = v.name
+            lines.append(_safe_name(v))
+            continue
 
         src = info["source_name"]
 
@@ -114,7 +126,7 @@ def annotate_sugar(vars, ivarmap):
             name = f"p{src}#{info['bit']}"
 
         else:
-            name = v.name
+            name = _safe_name(v)
 
         lines.append(name)
 
@@ -126,16 +138,19 @@ def annotate_veripb(vars, ivarmap):
     for v in vars:
         info = reverse.get(id(v))
         if info is None:
-            if v.name[:2] == "BV": # aux vars introduced by CPMpy
-                names.append("_" + v.name)
+            vname = _safe_name(v)
+            if str(vname).startswith("BV"): # aux vars introduced by CPMpy
+                names.append("_" + _veripb_safe_name(vname))
+            else:
+                names.append(_veripb_safe_name(vname))
         elif info["encoding"] == "order":
-            names.append(f"{info['source_name']}_ge_{info['threshold']}")
+            names.append(f"{_veripb_safe_name(info['source_name'])}_ge_{info['threshold']}")
         elif info["encoding"] == "binary":
-            names.append(f"{info['source_name']}_bit{info['bit']}")
+            names.append(f"{_veripb_safe_name(info['source_name'])}_bit{info['bit']}")
         elif info["encoding"] == "direct":
-            names.append(f"{info['source_name']}_eq_{info['value']}")
+            names.append(f"{_veripb_safe_name(info['source_name'])}_eq_{info['value']}")
         else:
-            names.append(v.name)
+            names.append(_veripb_safe_name(_safe_name(v)))
     return names
 
 

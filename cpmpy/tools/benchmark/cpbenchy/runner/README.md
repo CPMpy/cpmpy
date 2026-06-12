@@ -1,5 +1,33 @@
 # Benchmark Testing Tooling
 
+run a single instance: 
+python ./libraries/cpmpy/cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py ./data/opb/2024/DEC-LIN/selected/submitted-PB05/aloul/FPGA_SAT05/normalized-fpga14_14_sat_pb.cnf.cr.opb.xz --runner opb --verbose
+
+run an entire dataset:
+python ./libraries/cpmpy/cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py --dataset cpmpy.tools.datasets.opb.OPBDataset --dataset-year 2025 --dataset-track DEC-LIN --dataset-download --runner opb --output ./test_outp
+
+different resource manager:
+python ./libraries/cpmpy/cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py --dataset cpmpy.tools.datasets.opb.OPBDataset --dataset-year 2025 --dataset-track DEC-LIN --dataset-download --runner opb --output ./test_outp --resource-manager python
+
+
+
+
+
+
+
+
+python ./libraries/cpmpy/cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py ./data/opb/2024/DEC-LIN/selected/submitted-PB05/aloul/FPGA_SAT05/normalized-fpga14_14_sat_pb.cnf.cr.opb.xz --runner opb --verbose
+
+
+
+
+
+
+
+
+
+
+
 python cpmpy/tools/benchmark/test/xcsp3_instance_runner.py data/2024/CSP/AverageAvoiding-20_c24.xml.lzma
 
 
@@ -38,7 +66,7 @@ The tooling provides a flexible framework for:
 
 - **`main.py`**: Example of running parallel benchmarks on XCSP3 datasets with resource management
 - **`bench_xcsp3.py`**: Alternative benchmarking script (deprecated, see `run_xcsp3.py`)
-- **`run_xcsp3.py`**: Deprecated script (use `XCSP3InstanceRunner` instead)
+- **`run_xcsp3.py`**: Deprecated script (use `XCSP3InstanceAdapter` instead)
 
 ## Usage
 
@@ -47,7 +75,7 @@ The tooling provides a flexible framework for:
 The simplest way to run a single XCSP3 instance:
 
 ```bash
-python -m cpmpy.tools.benchmark.test.xcsp3_instance_runner <instance_path> [options]
+python -m cpmpy.tools.benchmark.runner.xcsp3_instance_runner <instance_path> [options]
 ```
 
 **Options:**
@@ -62,7 +90,7 @@ python -m cpmpy.tools.benchmark.test.xcsp3_instance_runner <instance_path> [opti
 
 **Example:**
 ```bash
-python -m cpmpy.tools.benchmark.test.xcsp3_instance_runner instance.xml --solver ortools --time_limit 300 --seed 42
+python -m cpmpy.tools.benchmark.runner.xcsp3_instance_runner instance.xml --solver ortools --time_limit 300 --seed 42
 ```
 
 ### Running Multiple Instances in Parallel
@@ -70,8 +98,8 @@ python -m cpmpy.tools.benchmark.test.xcsp3_instance_runner instance.xml --solver
 Use `main.py` as a template for running benchmarks on multiple instances:
 
 ```python
-from cpmpy.tools.benchmark.test.xcsp3_instance_runner import XCSP3InstanceRunner
-from cpmpy.tools.benchmark.test.manager import RunExecResourceManager, run_instance
+from cpmpy.tools.benchmark.runner.xcsp3_instance_runner import XCSP3InstanceAdapter
+from cpmpy.tools.benchmark.runner.manager import RunExecResourceManager, run_instance
 from cpmpy.tools.dataset.model.xcsp3 import XCSP3Dataset
 from concurrent.futures import ProcessPoolExecutor
 from queue import Queue
@@ -87,7 +115,7 @@ memory_limit = 8000  # MB per worker
 
 # Initialize managers
 resource_manager = RunExecResourceManager()
-instance_runner = XCSP3InstanceRunner()
+instance_runner = XCSP3InstanceAdapter()
 
 # Create job queue
 job_queue = Queue()
@@ -106,10 +134,10 @@ with ProcessPoolExecutor(max_workers=workers) as executor:
 Uses benchexec's RunExecutor for strict resource control. Requires `benchexec` to be installed.
 
 ```python
-from cpmpy.tools.benchmark.test.manager import RunExecResourceManager, XCSP3InstanceRunner
+from cpmpy.tools.benchmark.runner.manager import RunExecResourceManager, XCSP3InstanceAdapter
 
 resource_manager = RunExecResourceManager()
-runner = XCSP3InstanceRunner()
+runner = XCSP3InstanceAdapter()
 
 resource_manager.run(
     instance="instance.xml",
@@ -125,10 +153,10 @@ resource_manager.run(
 Python-based resource management using observers. Less strict but doesn't require external dependencies.
 
 ```python
-from cpmpy.tools.benchmark.test.manager import PythonResourceManager, XCSP3InstanceRunner
+from cpmpy.tools.benchmark.runner.manager import PythonResourceManager, XCSP3InstanceAdapter
 
 resource_manager = PythonResourceManager()
-runner = XCSP3InstanceRunner()
+runner = XCSP3InstanceAdapter()
 
 resource_manager.run(
     instance="instance.xml",
@@ -144,7 +172,7 @@ resource_manager.run(
 The `manager.py` script provides a command-line interface:
 
 ```bash
-python -m cpmpy.tools.benchmark.test.manager \
+python -m cpmpy.tools.benchmark.runner.manager \
     --instance instance.xml \
     --time_limit 300 \
     --memory_limit 4000 \
@@ -172,12 +200,12 @@ The runner system uses observers to collect information and format output:
 - **`SolutionCheckerObserver`**: Validates solutions
 - **`ResourceLimitObserver`**: Monitors and enforces resource limits
 
-Observers are automatically registered by `XCSP3InstanceRunner`. To add custom observers:
+Observers are automatically registered by `XCSP3InstanceAdapter`. To add custom observers:
 
 ```python
-from cpmpy.tools.benchmark.test.runner import YourCustomObserver
+from cpmpy.tools.benchmark.runner.runner import YourCustomObserver
 
-runner = XCSP3InstanceRunner()
+runner = XCSP3InstanceAdapter()
 runner.register_observer(YourCustomObserver())
 runner.run(instance="instance.xml")
 ```

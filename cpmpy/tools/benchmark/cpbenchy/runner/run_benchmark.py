@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generic CLI for running benchmarks with any InstanceRunner.
+Generic CLI for running benchmarks with any InstanceAdapter.
 
 This script provides a flexible command-line interface for running benchmarks
 with configurable runners, observers, and run settings.
@@ -13,7 +13,7 @@ Usage Examples:
     python run_benchmark.py instance.xml --runner xcsp3 --solver ortools --output /path/to/output.txt
 
     # Run with custom observers
-    python run_benchmark.py instance.xml --runner xcsp3 --observers CompetitionPrintingObserver RuntimeObserver
+    python run_benchmark.py instance.xml --runner xcsp3 --observers RuntimeObserver
 
     # Run with observer constructor arguments
     python run_benchmark.py instance.xml --runner xcsp3 --observers "WriteToFileObserver(output_file=\"/path/to/file.txt\", overwrite=False)"
@@ -28,278 +28,111 @@ Usage Examples:
     python run_benchmark.py --dataset cpmpy.tools.dataset.model.xcsp3.XCSP3Dataset --dataset-year 2024 --dataset-track CSP --dataset-root ./data --runner xcsp3 --workers 4 --output ./results
 
     # Load a custom runner
-    python run_benchmark.py instance.xml --runner cpmpy.tools.benchmark.test.xcsp3_instance_runner.XCSP3InstanceRunner
+    python run_benchmark.py instance.xml --runner cpmpy.tools.benchmark.runner.xcsp3_instance_runner.XCSP3InstanceAdapter
 """
 
+# python -m cpmpy.tools.benchmark.cpbenchy.runner.run_benchmark --dataset cpmpy.tools.dataset.xcsp3.XCSP3Dataset --dataset-year 2024 --dataset-track CSP --dataset-download --runner xcsp3 --workers 1 --cores_per_worker 8 --memory-per-worker 2048 --time_limit 60 --output ./results/
+
 import argparse
-import importlib
 import sys
-import ast
-from typing import List, Optional, Dict, Any
+import threading
+import time
+from typing import List, Optional
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Manager
 
-from cpmpy.tools.benchmark.test.instance_runner import InstanceRunner
-from cpmpy.tools.benchmark.test.manager import load_instance_runner, run_instance, RunExecResourceManager
-from cpmpy.tools.benchmark.test.observer import (
-    Observer,
-    CompetitionPrintingObserver,
-    HandlerObserver,
-    LoggerObserver,
-    ResourceLimitObserver,
-    SolverArgsObserver,
-    RuntimeObserver,
-    SolutionCheckerObserver,
-    WriteToFileObserver,
+from tqdm import tqdm
+
+from cpmpy.tools.benchmark.cpbenchy.adapter._base import InstanceAdapter
+from cpmpy.tools.benchmark.cpbenchy.runner.manager import (
+    load_instance_runner,
+    run_instance,
+    PythonResourceManager,
+    RunExecResourceManager,
 )
+from cpmpy.tools.benchmark.cpbenchy.observer import Observer, WriteToFileObserver, WriteToStdoutObserver
+from cpmpy.tools.benchmark.cpbenchy.observer.utils import OBSERVER_CLASSES, load_observers
 
 
-# Map of observer names to classes
-# Note: WriteToFileObserver is not included here as it requires a file_path argument
-# Use format "WriteToFileObserver:/path/to/file.txt" if needed, or omit it
-# (output files are automatically created in results/ directory via output_file parameter)
-OBSERVER_CLASSES = {
-    "CompetitionPrintingObserver": CompetitionPrintingObserver,
-    "HandlerObserver": HandlerObserver,
-    "LoggerObserver": LoggerObserver,
-    "ResourceLimitObserver": ResourceLimitObserver,
-    "SolverArgsObserver": SolverArgsObserver,
-    "RuntimeObserver": RuntimeObserver,
-    "SolutionCheckerObserver": SolutionCheckerObserver,
-}
-
-# Aliases for shorter names
-OBSERVER_ALIASES = {
-    "WriteToFile": "WriteToFileObserver",
-    "Competition": "CompetitionPrintingObserver",
-    "Handler": "HandlerObserver",
-    "Logger": "LoggerObserver",
-    "ResourceLimit": "ResourceLimitObserver",
-    "SolverArgs": "SolverArgsObserver",
-    "Runtime": "RuntimeObserver",
-    "SolutionChecker": "SolutionCheckerObserver",
-}
+DEFAULT_SOLUTION_CHECKER_OBSERVER = "SolutionCheckerObserver"
 
 
-def parse_observer_with_args(observer_spec: str) -> tuple[str, Dict[str, Any]]:
+def parse_cores(value, /) -> Optional[tuple[List[int], bool]]:
     """
-    Parse an observer specification that may include constructor arguments.
-    
-    Supports formats:
-    - "ObserverClass" -> ("ObserverClass", {})
-    - "module.path.ObserverClass" -> ("module.path.ObserverClass", {})
-    - "ObserverClass(arg1=val1,arg2=val2)" -> ("ObserverClass", {"arg1": val1, "arg2": val2})
-    - "module.path.ObserverClass(arg1=val1,arg2=val2)" -> ("module.path.ObserverClass", {"arg1": val1, "arg2": val2})
-    
-    Arguments:
-        observer_spec: Observer specification string
-    
-    Returns:
-        Tuple of (observer_path, kwargs_dict)
+    Parse cores as either a count or explicit core IDs.
+
+    - int or "4" → ([0, 1, 2, 3], False)  count: no pinning, pass N to solver
+    - "id:4" → ([4], True)                 explicit: pin to core 4
+    - "id:0,2,4,6" → ([0, 2, 4, 6], True) explicit: pin to these cores
+
+    Returns (core_list, pin_cores). pin_cores=True means RunExec should pin;
+    pin_cores=False means only pass core count to the solver.
+    Returns None if value is None or empty.
     """
-    # Check if there are constructor arguments
-    # Match pattern: classname(...) where ... can contain nested parentheses
-    # We need to find the last opening parenthesis that matches a closing one
-    paren_pos = observer_spec.rfind('(')
-    if paren_pos != -1 and observer_spec.endswith(')'):
-        observer_path = observer_spec[:paren_pos]
-        args_str = observer_spec[paren_pos + 1:-1]  # Remove the parentheses
-        
-        # Parse the arguments string into a dict
-        kwargs = {}
-        if args_str.strip():
-            # Use ast.literal_eval to safely parse the arguments
-            # Wrap in braces to make it a dict literal
-            try:
-                parsed = ast.literal_eval(f"{{{args_str}}}")
-                if isinstance(parsed, dict):
-                    kwargs = parsed
-                else:
-                    raise ValueError(f"Invalid argument format: {args_str}. Expected key=value pairs")
-            except (ValueError, SyntaxError):
-                # If that fails, try manual parsing for key=value pairs
-                # This handles cases where values might have commas or special characters
-                for pair in args_str.split(','):
-                    pair = pair.strip()
-                    if '=' in pair:
-                        # Find the first = sign (key=value)
-                        eq_pos = pair.find('=')
-                        key = pair[:eq_pos].strip()
-                        value = pair[eq_pos + 1:].strip()
-                        # Try to parse the value
-                        try:
-                            # Try as literal (bool, int, float, None, string)
-                            parsed_value = ast.literal_eval(value)
-                        except (ValueError, SyntaxError):
-                            # If that fails, treat as string (remove quotes if present)
-                            if (value.startswith('"') and value.endswith('"')) or \
-                               (value.startswith("'") and value.endswith("'")):
-                                parsed_value = value[1:-1]
-                            else:
-                                parsed_value = value
-                        kwargs[key] = parsed_value
-                    else:
-                        raise ValueError(f"Invalid argument format: {pair}. Expected 'key=value'")
-        
-        return observer_path, kwargs
-    else:
-        return observer_spec, {}
+    if value is None:
+        return None
+    s = str(value).strip().lower()
+    if not s:
+        return None
+    if s.startswith("id:"):
+        ids = [int(x.strip()) for x in s[3:].split(",") if x.strip()]
+        return (ids, True) if ids else None
+    if "," in s:
+        # Comma-separated = explicit core IDs (unambiguous)
+        ids = [int(x.strip()) for x in s.split(",") if x.strip()]
+        return (ids, True) if ids else None
+    n = int(s)
+    if n <= 0:
+        return None
+    return (list(range(n)), False)
 
 
-def load_observer(observer_name: str) -> Observer:
-    """
-    Load an observer by name or module path, optionally with constructor arguments.
-
-    Arguments:
-        observer_name: Either a simple name (e.g., "CompetitionPrintingObserver")
-                      or a full module path (e.g., "cpmpy.tools.benchmark.test.observer.CompetitionPrintingObserver")
-                      or a file path (e.g., "/path/to/file.py:ClassName" or "path/to/file.py::ClassName")
-                      or with arguments (e.g., "WriteToFileObserver(file_path='/path/to/file.txt')")
-                      For WriteToFileObserver, use format "WriteToFileObserver:file_path" or provide file_path separately
-
-    Returns:
-        Observer instance
-    """
-    import importlib.util
-    from pathlib import Path
-
-    # Parse observer name and arguments
-    observer_path, kwargs = parse_observer_with_args(observer_name)
-
-    # Resolve aliases at the top level (e.g., "WriteToFile" -> "WriteToFileObserver")
-    if observer_path in OBSERVER_ALIASES:
-        observer_path = OBSERVER_ALIASES[observer_path]
-
-    # Check for file path format: /path/to/file.py:ClassName or path/to/file.py::ClassName
-    # Also handle module.path.to.file.py::ClassName (convert to module path)
-    if "::" in observer_path or ("::" not in observer_path and ".py:" in observer_path):
-        # Split on :: or : (but not :/ for absolute paths on Windows)
-        if "::" in observer_path:
-            file_part, class_name = observer_path.rsplit("::", 1)
-        else:
-            file_part, class_name = observer_path.rsplit(":", 1)
-
-        # Resolve alias for class name (e.g., "WriteToFile" -> "WriteToFileObserver")
-        if class_name in OBSERVER_ALIASES:
-            class_name = OBSERVER_ALIASES[class_name]
-
-        # Convert to module path format if it looks like module.path.file.py
-        if ".py" in file_part and not file_part.startswith("/") and not file_part.startswith("."):
-            # Format: cpmpy.tools.benchmark.test.observer.py -> cpmpy.tools.benchmark.test.observer
-            module_path = file_part.replace(".py", "")
-            try:
-                module = importlib.import_module(module_path)
-                observer_class = getattr(module, class_name)
-                if not issubclass(observer_class, Observer):
-                    raise ValueError(f"{observer_class} is not a subclass of Observer")
-
-                # Handle WriteToFileObserver special case
-                if class_name == "WriteToFileObserver":
-                    if "file_path" in kwargs and "output_file" not in kwargs:
-                        kwargs["output_file"] = kwargs.pop("file_path")
-                    if "output_file" not in kwargs:
-                        # Default output file
-                        kwargs["output_file"] = "results/output.txt"
-
-                return observer_class(**kwargs)
-            except (ImportError, AttributeError) as e:
-                raise ValueError(f"Could not load observer '{observer_path}': {e}")
-
-        # Handle actual file paths
-        file_path = Path(file_part).resolve()
-        if file_path.exists():
-            # Add parent directory to sys.path if needed
-            parent_dir = str(file_path.parent)
-            if parent_dir not in sys.path:
-                sys.path.insert(0, parent_dir)
-
-            # Import the module
-            module_name = file_path.stem
-            spec = importlib.util.spec_from_file_location(module_name, file_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-
-            # Get the class
-            observer_class = getattr(module, class_name)
-            if not issubclass(observer_class, Observer):
-                raise ValueError(f"{observer_class} is not a subclass of Observer")
-
-            # Handle WriteToFileObserver special case
-            if class_name == "WriteToFileObserver":
-                if "file_path" in kwargs and "output_file" not in kwargs:
-                    kwargs["output_file"] = kwargs.pop("file_path")
-                if "output_file" not in kwargs:
-                    # Default output file
-                    kwargs["output_file"] = "results/output.txt"
-
-            return observer_class(**kwargs)
-
-    # Special handling for WriteToFileObserver
-    if observer_path.startswith("WriteToFileObserver") or observer_path.endswith("WriteToFileObserver"):
-        if ":" in observer_path and "::" not in observer_path:
-            # Format: WriteToFileObserver:/path/to/file.txt (legacy format)
-            _, file_path = observer_path.split(":", 1)
-            kwargs["output_file"] = file_path
-            return WriteToFileObserver(**kwargs)
-        # Support both output_file and file_path for backward compatibility
-        if "file_path" in kwargs and "output_file" not in kwargs:
-            kwargs["output_file"] = kwargs.pop("file_path")
-        if "output_file" not in kwargs:
-            # Default output file
-            kwargs["output_file"] = "results/output.txt"
-        return WriteToFileObserver(**kwargs)
-
-    # Check if it's a known observer name
-    if observer_path in OBSERVER_CLASSES:
-        observer_class = OBSERVER_CLASSES[observer_path]
-        return observer_class(**kwargs)
-
-    # Try to load from module path
-    if "." in observer_path:
-        module_path, class_name = observer_path.rsplit(".", 1)
-        try:
-            module = importlib.import_module(module_path)
-            observer_class = getattr(module, class_name)
-            if not issubclass(observer_class, Observer):
-                raise ValueError(f"{observer_class} is not a subclass of Observer")
-            # Check if it's WriteToFileObserver loaded via module path
-            if class_name == "WriteToFileObserver":
-                # Support both output_file and file_path for backward compatibility
-                if "file_path" in kwargs and "output_file" not in kwargs:
-                    kwargs["output_file"] = kwargs.pop("file_path")
-                if "output_file" not in kwargs:
-                    # Default output file
-                    kwargs["output_file"] = "results/output.txt"
-            return observer_class(**kwargs)
-        except (ImportError, AttributeError) as e:
-            raise ValueError(f"Could not load observer '{observer_path}': {e}")
-
-    raise ValueError(f"Unknown observer: {observer_path}. Available: {', '.join(OBSERVER_CLASSES.keys())}")
+def create_resource_manager(name: str, pin_cores: bool = True):
+    """Create the configured resource manager for worker processes."""
+    normalized = name.lower().replace("_", "-")
+    if normalized == "runexec":
+        return RunExecResourceManager(pin_cores=pin_cores)
+    if normalized == "python":
+        return PythonResourceManager()
+    raise ValueError(f"Unknown resource manager: {name}")
 
 
-def load_observers(observer_names: Optional[List[str]]) -> List[Observer]:
-    """
-    Load multiple observers from a list of names.
-    
-    Arguments:
-        observer_names: List of observer names or module paths
-    
-    Returns:
-        List of Observer instances
-    """
-    if not observer_names:
-        return []
-    
-    observers = []
-    for name in observer_names:
-        observers.append(load_observer(name))
-    
-    return observers
+def _observer_name(observer) -> str:
+    if isinstance(observer, str):
+        return observer
+    func = getattr(observer, "func", None)
+    if func is not None:
+        return _observer_name(func)
+    return getattr(observer, "__name__", observer.__class__.__name__)
+
+
+def _is_solution_checker_observer(observer) -> bool:
+    return "SolutionChecker" in _observer_name(observer)
+
+
+def _runner_has_solution_checker(runner: InstanceAdapter, observer_specs: Optional[List[str]] = None) -> bool:
+    default_observers = getattr(runner, "default_observers", [])
+    additional_observers = getattr(runner, "get_additional_observers", lambda: [])()
+    return any(
+        _is_solution_checker_observer(observer)
+        for observer in [*default_observers, *additional_observers, *(observer_specs or [])]
+    )
+
+
+def solution_checker_observer_specs(
+    runner: InstanceAdapter,
+    observer_specs: Optional[List[str]],
+    enabled: bool,
+) -> List[str]:
+    specs = list(observer_specs or [])
+    if enabled and not _runner_has_solution_checker(runner, specs):
+        specs.append(DEFAULT_SOLUTION_CHECKER_OBSERVER)
+    return specs
 
 
 def run_single_instance(
     instance: str,
-    runner: InstanceRunner,
+    runner: InstanceAdapter,
     solver: str = "ortools",
     time_limit: Optional[float] = None,
     mem_limit: Optional[int] = None,
@@ -316,7 +149,7 @@ def run_single_instance(
     # Automatically add WriteToFileObserver if output_file is provided
     if output_file is not None:
         # Ensure the output file path is absolute or properly constructed
-        from cpmpy.tools.benchmark.test.instance_runner import create_output_file
+        from cpmpy.tools.benchmark.cpbenchy.adapter._base import create_output_file
         from functools import partial
         output_file = create_output_file(output_file, None, solver, instance)
         runner.register_observer(partial(WriteToFileObserver, output_file=output_file, overwrite=True))
@@ -325,9 +158,18 @@ def run_single_instance(
     if additional_observers:
         for observer in additional_observers:
             runner.register_observer(observer)
+
+    # Verbose mode: ensure raw channel is emitted to stdout.
+    if verbose:
+        has_stdout_observer = any(
+            isinstance(obs, WriteToStdoutObserver)
+            for obs in getattr(runner, "additional_observers", [])
+        )
+        if not has_stdout_observer:
+            runner.register_observer(WriteToStdoutObserver())
     
     # Run the instance
-    runner.run(
+    return runner.run(
         instance=instance,
         solver=solver,
         time_limit=time_limit,
@@ -340,9 +182,27 @@ def run_single_instance(
     )
 
 
-def worker_function(worker_id, cores, job_queue, time_limit, memory_limit, runner_path, solver, seed, intermediate, verbose, output_dir):
+def worker_function(
+    worker_id,
+    cores,
+    job_queue,
+    time_limit,
+    memory_limit,
+    runner_path,
+    solver,
+    seed,
+    intermediate,
+    verbose,
+    output_dir,
+    observer_specs=None,
+    solution_checker=False,
+    resource_manager_name="runexec",
+    pin_cores=True,
+    completed_count=None,
+    count_lock=None,
+):
     """Worker function for parallel execution."""
-    resource_manager = RunExecResourceManager()
+    resource_manager = create_resource_manager(resource_manager_name, pin_cores=pin_cores)
     
     while True:
         try:
@@ -352,17 +212,25 @@ def worker_function(worker_id, cores, job_queue, time_limit, memory_limit, runne
         
         # Create a fresh instance_runner for each instance to avoid observer accumulation
         instance_runner = load_instance_runner(runner_path)
+        effective_observer_specs = solution_checker_observer_specs(
+            instance_runner,
+            observer_specs,
+            solution_checker,
+        )
+        instance_runner.subprocess_observers = effective_observer_specs
+        for observer in load_observers(effective_observer_specs):
+            instance_runner.register_observer(observer)
         
         # Construct output_file path for this instance
         output_file = None
         if output_dir is not None:
-            from cpmpy.tools.benchmark.test.instance_runner import create_output_file
+            from cpmpy.tools.benchmark.cpbenchy.adapter._base import create_output_file    
             # Extract instance name for filename
             import os
             instance_name = os.path.splitext(os.path.basename(instance))[0]
             output_file = create_output_file(None, output_dir, solver, instance_name)
             # Note: WriteToFileObserver will be automatically added by the resource manager
-        
+
         run_instance(
             instance,
             instance_runner,
@@ -376,6 +244,9 @@ def worker_function(worker_id, cores, job_queue, time_limit, memory_limit, runne
             verbose,
             output_file,
         )
+        if completed_count is not None and count_lock is not None:
+            with count_lock:
+                completed_count.value += 1
         job_queue.task_done()
 
 
@@ -424,16 +295,19 @@ def compute_workers_and_memory(
         # Only one value set - derive the other from total_memory
         if workers is not None:
             # Derive memory_per_worker from total_memory and workers
-            if total_memory % workers != 0:
-                raise ValueError(
-                    f"Measured total-memory ({total_memory} MiB) is not evenly divisible by "
-                    f"workers ({workers})"
-                )
             memory_per_worker = total_memory // workers
             if memory_per_worker < 1:
                 raise ValueError(
                     f"Derived memory-per-worker ({memory_per_worker} MiB) must be at least 1. "
                     f"Check your workers value relative to available memory ({total_memory} MiB)."
+                )
+            remainder = total_memory % workers
+            if remainder:
+                print(
+                    f"WARNING: Measured total-memory ({total_memory} MiB) is not evenly divisible by "
+                    f"workers ({workers}); using {memory_per_worker} MiB per worker and leaving "
+                    f"{remainder} MiB unallocated.",
+                    file=sys.stderr,
                 )
             return workers, memory_per_worker
         else:  # memory_per_worker is not None
@@ -491,13 +365,17 @@ def run_batch(
     mem_limit: Optional[int] = None,
     seed: Optional[int] = None,
     workers: Optional[int] = None,
-    cores_per_worker: int = 1,
+    cores_per_worker: str = "1",
     total_memory: Optional[int] = None,
     memory_per_worker: Optional[int] = None,
     ignore_memory_check: bool = False,
     intermediate: bool = False,
     verbose: bool = False,
     output_dir: Optional[str] = None,
+    observer_specs: Optional[List[str]] = None,
+    solution_checker: bool = False,
+    resource_manager: str = "runexec",
+    no_pin_cores: bool = False,
 ):
     """
     Run a batch of instances in parallel.
@@ -532,24 +410,42 @@ def run_batch(
     if mem_limit is None and memory_per_worker is not None:
         mem_limit = memory_per_worker
     
+    # Parse cores_per_worker: "3" → count per worker (no pin), "0,2,4,6" → explicit (pin)
+    parsed = parse_cores(cores_per_worker)
+    if parsed is None:
+        core_list, pin_cores = [0], False
+    else:
+        core_list, pin_cores = parsed
+        if not pin_cores:
+            # Count mode: N means N cores per worker. Build range(workers * N).
+            count_per_worker = len(core_list)
+            core_list = list(range(workers * count_per_worker))
+    if no_pin_cores:
+        pin_cores = False
     total_cores = psutil.cpu_count(logical=False)
-    
-    if workers * cores_per_worker > total_cores:
+
+    if workers > len(core_list):
         raise ValueError(
-            f"Not enough cores: {workers} workers × {cores_per_worker} cores = "
-            f"{workers * cores_per_worker} cores needed, but only {total_cores} available"
+            f"Not enough cores: {workers} workers need at least {workers} cores, "
+            f"but only {len(core_list)} cores specified"
         )
-    
-    # Assign cores to each worker
+
+    # Partition cores among workers
     worker_cores = []
+    n = len(core_list)
+    chunk_size = n // workers
+    remainder = n % workers
+    idx = 0
     for i in range(workers):
-        start_core = i * cores_per_worker
-        end_core = start_core + cores_per_worker
-        cores = list(range(start_core, end_core))
-        worker_cores.append(cores)
+        size = chunk_size + (1 if i < remainder else 0)
+        worker_cores.append(core_list[idx : idx + size])
+        idx += size
     
     if verbose:
-        print(f"Total cores: {total_cores}, Workers: {workers}, Cores per worker: {cores_per_worker}")
+        print(
+            f"Total cores: {total_cores}, Workers: {workers}, Cores: {core_list}, "
+            f"Resource manager: {resource_manager}, Solution checker: {solution_checker}"
+        )
         for i, cores in enumerate(worker_cores):
             print(f"Worker {i}: cores {cores}")
     
@@ -558,6 +454,26 @@ def run_batch(
         job_queue = manager.Queue()
         for instance in instances:
             job_queue.put((instance, {}))
+        
+        completed_count = manager.Value("i", 0) if not verbose else None
+        count_lock = manager.Lock() if not verbose else None
+
+        def _progress_updater():
+            """Update tqdm progress bar until all instances complete."""
+            n = len(instances)
+            with tqdm(total=n, unit="inst", desc="Benchmark") as pbar:
+                last = 0
+                while last < n:
+                    with count_lock:
+                        current = completed_count.value
+                    pbar.update(current - last)
+                    last = current
+                    time.sleep(0.1)
+                pbar.update(n - last)
+
+        if not verbose:
+            progress_thread = threading.Thread(target=_progress_updater, daemon=True)
+            progress_thread.start()
         
         # Submit workers to the executor
         with ProcessPoolExecutor(max_workers=workers) as executor:
@@ -575,12 +491,21 @@ def run_batch(
                     intermediate,
                     verbose,
                     output_dir,
+                    observer_specs,
+                    solution_checker,
+                    resource_manager,
+                    pin_cores,
+                    completed_count,
+                    count_lock,
                 )
                 for worker_id, cores in enumerate(worker_cores)
             ]
             # Wait for all workers to finish
             for future in futures:
                 future.result()
+        
+        if not verbose:
+            progress_thread.join(timeout=2)
 
 
 def parse_instance_list(file_path: str) -> List[str]:
@@ -638,7 +563,7 @@ def load_dataset(dataset_path: str, dataset_kwargs: dict):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generic CLI for running benchmarks with any InstanceRunner",
+        description="Generic CLI for running benchmarks with any InstanceAdapter",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
@@ -670,8 +595,8 @@ def main():
         "--runner",
         type=str,
         default="xcsp3",
-        help="InstanceRunner to use. Can be a simple name (e.g., 'xcsp3') or a full module path "
-             "(e.g., 'cpmpy.tools.benchmark.test.xcsp3_instance_runner.XCSP3InstanceRunner') "
+        help="InstanceAdapter to use. Can be a simple name (e.g., 'xcsp3') or a full module path "
+             "(e.g., 'cpmpy.tools.benchmark.runner.xcsp3_instance_runner.XCSP3InstanceAdapter') "
              "or a file path (e.g., '/path/to/runner.py:ClassName')"
     )
     
@@ -684,11 +609,19 @@ def main():
         metavar="OBSERVER",
         help="Additional observers to register. Can specify multiple. "
              "Available: " + ", ".join(OBSERVER_CLASSES.keys()) + ". "
-             "Or use full module path like 'cpmpy.tools.benchmark.test.observer.CompetitionPrintingObserver'. "
+             "Or use full module path like 'cpmpy.tools.benchmark.runner.observer.CompetitionPrintingObserver'. "
              "To pass constructor arguments, use format 'ObserverClass(arg1=val1,arg2=val2)'. "
              "Example: 'WriteToFileObserver(file_path=\"/path/to/file.txt\", overwrite=False)'. "
              "Note: WriteToFileObserver is automatically added to write outputs to results/ directory. "
              "To use a custom file path, use format 'WriteToFileObserver(file_path=\"/path/to/file.txt\")'"
+    )
+    parser.add_argument(
+        "--solution-checker",
+        action="store_true",
+        help=(
+            "Enable solution checking via SolutionCheckerObserver. The observer uses "
+            "cpmpy.tools.solution_checker.check_solution by default."
+        )
     )
     
     # Solver settings
@@ -720,9 +653,9 @@ def main():
     )
     parser.add_argument(
         "--cores",
-        type=int,
+        type=str,
         default=None,
-        help="Number of CPU cores to use (for single instance)"
+        help="CPU cores: number (e.g., 4 → cores 0–3) or comma-separated list (e.g., 0,2,4,6)"
     )
     parser.add_argument(
         "--intermediate",
@@ -752,9 +685,25 @@ def main():
     )
     parser.add_argument(
         "--cores_per_worker",
-        type=int,
-        default=1,
-        help="Number of cores per worker for batch processing (default: 1)"
+        type=str,
+        default="1",
+        help="Cores per worker: number (e.g., 3, no pinning) or explicit list (e.g., 0,1,2,3,4,5,6,7,8 for pinning)"
+    )
+    parser.add_argument(
+        "--resource-manager",
+        type=str,
+        default="runexec",
+        choices=("runexec", "python"),
+        help=(
+            "Resource manager for batch/dataset workers: runexec uses benchexec, "
+            "python uses in-process Python limits (default: runexec)"
+        )
+    )
+    parser.add_argument(
+        "--no-pin-cores",
+        action="store_true",
+        dest="no_pin_cores",
+        help="Disable RunExec CPU pinning; only pass core count to the solver"
     )
     parser.add_argument(
         "--total-memory",
@@ -838,19 +787,25 @@ def main():
     try:
         if args.runner == "xcsp3":
             # Special case for xcsp3
-            from cpmpy.tools.benchmark.test.run_xcsp3_instance import XCSP3InstanceRunner
-            runner = XCSP3InstanceRunner()
+            from cpmpy.tools.benchmark.cpbenchy.adapter.xcsp3 import XCSP3Adapter
+            runner = XCSP3Adapter()
         else:
             runner = load_instance_runner(args.runner)
     except Exception as e:
         print(f"Error loading runner '{args.runner}': {e}", file=sys.stderr)
         sys.exit(1)
     
+    observer_specs = solution_checker_observer_specs(
+        runner,
+        args.observers,
+        args.solution_checker,
+    )
+
     # Load observers
     additional_observers = None
-    if args.observers:
+    if observer_specs:
         try:
-            additional_observers = load_observers(args.observers)
+            additional_observers = load_observers(observer_specs)
         except Exception as e:
             print(f"Error loading observers: {e}", file=sys.stderr)
             sys.exit(1)
@@ -942,6 +897,10 @@ def main():
                 intermediate=args.intermediate,
                 verbose=args.verbose,
                 output_dir=args.output,
+                observer_specs=observer_specs,
+                solution_checker=args.solution_checker,
+                resource_manager=args.resource_manager,
+                no_pin_cores=args.no_pin_cores,
             )
         except Exception as e:
             print(f"Error running dataset: {e}", file=sys.stderr)
@@ -988,6 +947,10 @@ def main():
                 intermediate=args.intermediate,
                 verbose=args.verbose,
                 output_dir=args.output,
+                observer_specs=observer_specs,
+                solution_checker=args.solution_checker,
+                resource_manager=args.resource_manager,
+                no_pin_cores=args.no_pin_cores,
             )
         except Exception as e:
             print(f"Error running batch: {e}", file=sys.stderr)
@@ -1000,19 +963,22 @@ def main():
             parser.error("Either provide an instance path or use --batch")
         
         try:
-            run_single_instance(
+            parsed = parse_cores(args.cores)
+            cores_for_runner = len(parsed[0]) if parsed else None
+            exit_code = run_single_instance(
                 instance=args.instance,
                 runner=runner,
                 solver=args.solver,
                 time_limit=args.time_limit,
                 mem_limit=args.mem_limit,
                 seed=args.seed,
-                cores=args.cores,
+                cores=cores_for_runner,
                 intermediate=args.intermediate,
                 verbose=args.verbose,
                 output_file=args.output,
                 additional_observers=additional_observers,
             )
+            sys.exit(exit_code)
         except Exception as e:
             print(f"Error running instance: {e}", file=sys.stderr)
             import traceback

@@ -27,6 +27,7 @@ from cpmpy.transformations.safening import safen_objective
 from cpmpy.transformations.flatten_model import flatten_objective
 from cpmpy.transformations.linearize import decompose_linear_objective, only_positive_coefficients_
 from cpmpy.transformations.int2bool import _encode_lin_expr
+from cpmpy.transformations.cse import CSEMap
 
 from typing import Optional, Callable, Union
 import builtins
@@ -37,14 +38,14 @@ def _transform_objective(expr, encoding="auto", csemap=None, ivarmap=None):
     """
         Transform objective into weighted Boolean literals plus helper constraints.
 
-        :param csemap: optional shared CSE cache dict (populated in-place)
+        :param csemap: optional shared CSE cache (populated in-place)
         :param ivarmap: optional shared integer variable encoding dict (populated in-place)
 
         Returns:
             (weights, xs, const, extra_cons)
     """
     if csemap is None:
-        csemap = dict()
+        csemap = CSEMap()
     if ivarmap is None:
         ivarmap = dict()
     obj, safe_cons = safen_objective(expr)
@@ -116,9 +117,9 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
     else:
         hard_prefix = ""
 
-    # Shared dicts so both objective and constraint transformations populate
-    # the same ivarmap — enabling annotation of all integer variable encodings.
-    ivarmap, csemap = dict(), dict()
+    # Shared maps so both objective and constraint transformations populate
+    # the same ivarmap, enabling annotation of all integer variable encodings.
+    ivarmap, csemap = dict(), CSEMap()
 
     constraints = toplevel_list(model.constraints)
     objective_lits = []

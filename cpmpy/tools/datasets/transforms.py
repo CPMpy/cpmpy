@@ -41,10 +41,34 @@ Example usage::
 import json
 import os
 import re
+import inspect
 
 import cpmpy as cp
 
 _builtins_open = open  # capture before any parameter shadowing
+
+
+def _filter_call_kwargs(func, kwargs):
+    """
+    Keep only kwargs accepted by ``func``.
+
+    Avoids passing writer-only options (e.g. ``annotate``) to loaders.
+    """
+    try:
+        sig = inspect.signature(func)
+    except (TypeError, ValueError):
+        return dict(kwargs)
+
+    # If function accepts **kwargs, keep everything.
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        return dict(kwargs)
+
+    accepted = {
+        name
+        for name, p in sig.parameters.items()
+        if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    }
+    return {k: v for k, v in kwargs.items() if k in accepted}
 
 
 def extract_format_metadata(content, format_name):
@@ -411,7 +435,8 @@ class Translate:
             content = f.read()
         
         # Step 2: Loading - turn raw contents into CPMpy model
-        loader_kwargs = {k: v for k, v in self.kwargs.items() if k != 'open'}
+        base_kwargs = {k: v for k, v in self.kwargs.items() if k != 'open'}
+        loader_kwargs = _filter_call_kwargs(self.loader, base_kwargs)
         
         # Handle both regular functions and classmethods/staticmethods
         if hasattr(self.loader, '__self__') or isinstance(self.loader, classmethod):
@@ -422,7 +447,7 @@ class Translate:
         self._last_model = model
         
         # Step 3: Writing - serialize model to string
-        writer_kwargs = {k: v for k, v in self.kwargs.items() if k != 'open'}
+        writer_kwargs = _filter_call_kwargs(self.writer, base_kwargs) if callable(self.writer) else base_kwargs
         if callable(self.writer):
             # writer is a callable function
             return self.writer(model, fname=None, **writer_kwargs)
