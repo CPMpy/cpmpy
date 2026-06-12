@@ -81,9 +81,12 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                     assert decomp.name == "and", "decompose_in_tree: expected a conjunction but got {decomp}"
                     newlist.extend(decomp.args)
                     continue
-            
-            if decompose_custom_positive is not None and expr.name in decompose_custom_positive: # do we also need a "decompose_custom_positive"?
+
+            # First see if a custom decomposition is provided for positive context, then for any context, otherwise use the default
+            if decompose_custom_positive is not None and expr.name in decompose_custom_positive:
                 exprs, toplevel_exprs = decompose_custom_positive[expr.name](expr)
+            elif decompose_custom is not None and expr.name in decompose_custom:
+                exprs, toplevel_exprs = decompose_custom[expr.name](expr)
             else:
                 exprs, toplevel_exprs = expr.decompose_positive()
             # we merge the list toplevel rather than create an 'and'
