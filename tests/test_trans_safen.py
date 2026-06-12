@@ -84,7 +84,7 @@ class TestTransLinearize:
         arr = cp.intvar(1, 3, shape=3, name="x")
         idx = cp.intvar(-1, 4, name="i")
 
-        expr = (a / b + arr[idx]) == 2
+        expr = (a // b + arr[idx]) == 2
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         assert cp.Model(safe_expr).solve()
@@ -106,7 +106,7 @@ class TestTransLinearize:
         arr = cp.intvar(0,3, shape=3, name="x")
         idx = cp.intvar(-1, 4, name="i")
 
-        expr = (a / arr[idx]) == 2
+        expr = (a // arr[idx]) == 2
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         assert cp.Model(safe_expr).solve()

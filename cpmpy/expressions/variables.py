@@ -65,7 +65,7 @@ from typing import Any, Literal, Optional, overload
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
-from .core import Expression, ExprLike, ListLike, BoolVal
+from .core import Expression, ExprLike, BoolExprLike, ListLike, BoolVal
 from .utils import is_num, is_int, is_boolexpr, get_bounds
 
 _BV_PREFIX = "BV"
@@ -525,7 +525,7 @@ class NDVarArray(np.ndarray):
             if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
                 # TODO can we do the same for more than one Expression? Not sure...
                 index  = list(index)
-                index += [index.pop(expr_dim[0])]
+                index.append(index.pop(expr_dim[0]))
 
                 arr = np.moveaxis(self, expr_dim[0], -1)
                 return cp.Element(arr[(*index[:-1],)], index[-1])
@@ -773,8 +773,10 @@ class NDVarArray(np.ndarray):
     def __rxor__(self, other):
         return self._vectorized(other, '__rxor__')
 
-    def implies(self, other):
-        return self._vectorized(other, 'implies')
+    def implies(self, other: BoolExprLike|Iterable[BoolExprLike], simplify=False) -> NDVarArray:
+        if not isinstance(other, Iterable):
+            other = [other] * len(self)
+        return cpm_array([s.implies(o, simplify=simplify) for s, o in zip(self, other)])
 
     #in	  __contains__(self, value) 	Check membership
     # CANNOT meaningfully overwrite, python always returns True/False

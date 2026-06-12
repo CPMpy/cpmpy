@@ -25,6 +25,7 @@ from .mcs import mcs, mcs_grow, mcs_grow_naive, mcs_opt
 from .mss import mss, mss_grow, mss_grow_naive, mss_opt
 from .mus import (
     mus,
+    mus_native,
     mus_naive,
     ocus,
     ocus_naive,
@@ -34,10 +35,11 @@ from .mus import (
     quickxplain_naive,
     smus,
 )
-from .utils import OCUSException
+from .utils import OCUSException, make_assump_model
 
 __all__ = [
     "OCUSException",
+    "make_assump_model",
     "marco",
     "mcs",
     "mcs_grow",
@@ -48,6 +50,7 @@ __all__ = [
     "mss_grow_naive",
     "mss_opt",
     "mus",
+    "mus_native",
     "mus_naive",
     "ocus",
     "ocus_naive",

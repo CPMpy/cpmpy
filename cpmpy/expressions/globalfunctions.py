@@ -73,14 +73,14 @@
 
 """
 import warnings  # for deprecation warning
-from typing import Optional
+from typing import Optional, Iterable
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import boolvar, intvar, cpm_array
-from .utils import flatlist, argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies
+from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
+from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
 class GlobalFunction(Expression):
@@ -162,18 +162,32 @@ class Minimum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the minimum
         """
-        super().__init__("min", tuple(flatlist(arg_list)))
+        has_subexpr: Optional[bool] = None
+
+        arg_iter: Iterable[ExprLike] = arg_list
+        if isinstance(arg_list, np.ndarray):
+            if isinstance(arg_list, NDVarArray):
+                has_subexpr = arg_list.has_subexpr()
+            arg_iter = arg_list.flat
+
+        # convert numpy integers to Python integers
+        args: tuple[int|Expression, ...] = npint2int(arg_iter)
+        super().__init__("min", args, has_subexpr=has_subexpr)
+    
+    @property
+    def args(self) -> tuple[int|Expression, ...]:
+        """ READ-ONLY, well-typed argument of this global function, no numpy ints"""
+        return self._args
 
     def value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The minimum value of the arguments, or None if any argument is not assigned
         """
-        vargs = [argval(a) for a in self.args]
-        if any(val is None for val in vargs):
+        vals = argvals_intexpr(self.args)
+        if vals is None:
             return None
-
-        return min(vargs)
+        return min(vals)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -196,8 +210,8 @@ class Minimum(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the minimum value
         """
-        bnds = [get_bounds(x) for x in self.args]
-        return min(lb for lb, ub in bnds), min(ub for lb, ub in bnds)
+        lbs, ubs = get_bounds_intexpr(self.args)
+        return min(lbs), min(ubs)
 
 
 class Maximum(GlobalFunction):
@@ -210,18 +224,33 @@ class Maximum(GlobalFunction):
         Arguments:
             arg_list (ListLike[ExprLike]): List of expressions or constants of which to compute the maximum
         """
-        super().__init__("max", tuple(flatlist(arg_list)))
+        has_subexpr: Optional[bool] = None
+
+        arg_iter: Iterable[ExprLike] = arg_list
+        if isinstance(arg_list, np.ndarray):
+            if isinstance(arg_list, NDVarArray):
+                has_subexpr = arg_list.has_subexpr()
+            arg_iter = arg_list.flat
+
+        # convert numpy integers to Python integers
+        args: tuple[int|Expression, ...] = npint2int(arg_iter)
+        super().__init__("max", args, has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[int|Expression, ...]:
+        """ READ-ONLY, well-typed argument of this global function, no numpy ints"""
+        return self._args
 
     def value(self) -> Optional[int]:
         """
         Returns:
             Optional[int]: The maximum value of the arguments, or None if any argument is not assigned
         """
-        vargs = [argval(a) for a in self.args]
-        if any(val is None for val in vargs):
+        vals = argvals_intexpr(self.args)
+        if vals is None:
             return None
 
-        return max(vargs)
+        return max(vals)
 
     def decompose(self) -> tuple[Expression, list[Expression]]:
         """
@@ -244,8 +273,8 @@ class Maximum(GlobalFunction):
         Returns:
             tuple[int, int]: A tuple of (lower bound, upper bound) for the maximum value
         """
-        bnds = [get_bounds(x) for x in self.args]
-        return max(lb for lb, ub in bnds), max(ub for lb, ub in bnds)
+        lbs, ubs = get_bounds_intexpr(self.args)
+        return max(lbs), max(ubs)
 
 
 class Abs(GlobalFunction):
@@ -608,14 +637,22 @@ class Modulo(GlobalFunction):
         if lb2 == ub2 == 0:
             raise ZeroDivisionError("Domain of {} only contains 0".format(self.args[1]))
 
-        # the (abs of) the maximum value of the remainder is always one smaller than the absolute value of the divisor
-        lb = lb2 + (lb2 <= 0) - (lb2 >= 0)
-        ub = ub2 + (ub2 <= 0) - (ub2 >= 0)
-        if lb1 >= 0:  # result will be positive if first argument is positive
-            return 0, max(-lb, ub, 0)  # lb = 0
-        elif ub1 <= 0:  # result will be negative if first argument is negative
-            return min(-ub, lb, 0), 0  # ub = 0
-        return min(-ub, lb, 0), max(-lb, ub, 0)  # 0 should always be in the domain
+        # For small domains, compute exact bounds by enumeration.
+        if (ub1 - lb1 + 1) * (ub2 - lb2 + 1) <= 10 ** 6:
+            xs = np.arange(lb1, ub1 + 1)
+            ys = np.arange(lb2, ub2 + 1)
+            ys = ys[ys != 0]  # divisor is never 0 (partial function)
+            
+            rem = np.fmod(xs[:, None], ys[None, :]) # np.fmod implements truncated-division remainder
+            return int(rem.min()), int(rem.max())
+
+        # Otherwise fall back to an analytical over-approximation.
+        # The remainder has the same sign as the dividend and satisfies both
+        #   |remainder| <= |divisor| - 1   and   |remainder| <= |dividend|
+        max_rem = max(abs(lb2), abs(ub2)) - 1  # largest possible |remainder|
+        ub = min(ub1, max_rem) if ub1 > 0 else 0  # positive remainders need a positive dividend
+        lb = max(lb1, -max_rem) if lb1 < 0 else 0  # negative remainders need a negative dividend
+        return lb, ub
 
 
 class Power(GlobalFunction):
@@ -674,9 +711,16 @@ class Power(GlobalFunction):
             tuple[int, int]: A tuple of (lower bound, upper bound) for the power
         """
         base, exp = self.args
-        lb_base, ub_base = get_bounds(base)
+        if exp == 0:
+            return 1, 1
 
+        # exp is guaranteed to be a constant greater than 0
+        lb_base, ub_base = get_bounds(base)
+    
         bounds = [lb_base ** exp, ub_base ** exp]
+        if lb_base < 0 < ub_base:
+            bounds.append(0)
+
         return min(bounds), max(bounds)
 
 

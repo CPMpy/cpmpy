@@ -44,7 +44,7 @@
     ==============
 """
 import sys
-from typing import Optional, List
+from typing import Optional, List, Iterable
 import warnings  # for stdout checking
 import numpy as np
 
@@ -82,7 +82,7 @@ class CPM_ortools(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "xor", "table", "negative_table", "cumulative", "circuit",
-                                              "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional"
+                                              "inverse", "no_overlap", "regular", "cumulative_optional", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
@@ -149,13 +149,13 @@ class CPM_ortools(SolverInterface):
         return self.ort_model
 
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, solution_callback=None, **kwargs):
         """
             Call the CP-SAT solver
 
             Arguments:
                 time_limit (float, optional):  maximum solve time in seconds 
-                assumptions:    list of CPMpy Boolean variables (or their negation) that are assumed to be true.
+                assumptions:    iterable (e.g. list, set, tuple) of CPMpy Boolean variables (or their negation) that are assumed to be true.
                                 For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                                 get_core() returns a small subset of assumption variables that are unsat together.
                                 Note: the or-tools interface is stateless, so you can incrementally call solve() with assumptions, but or-tools will always start from scratch...
@@ -202,6 +202,7 @@ class CPM_ortools(SolverInterface):
             self.ort_solver.parameters.max_time_in_seconds = float(time_limit)
 
         if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
             ort_assum_vars = self.solver_vars(assumptions)
             # dict mapping ortools vars to CPMpy vars
             self.assumption_dict = {ort_var.Index(): cpm_var for (cpm_var, ort_var) in zip(assumptions, ort_assum_vars)}
@@ -278,7 +279,7 @@ class CPM_ortools(SolverInterface):
             if self.has_objective():
                 ort_obj_val = self.ort_solver.objective_value
                 if round(ort_obj_val) == ort_obj_val: # it is an integer?
-                    self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
+                    self.objective_value_ = round(ort_obj_val)  # ensure it is an integer
                 else: # can happen when using floats as coeff in objective
                     self.objective_value_ = float(ort_obj_val)
         else: # clear values of variables
@@ -313,26 +314,31 @@ class CPM_ortools(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    revar = self.solver_var(cpm_var._bv).Not()
+                else:
+                    revar = self.ort_model.NewBoolVar(name)
+            else:
+                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, name)
+            
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return self.solver_var(cpm_var._bv).Not()
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.ort_model.NewBoolVar(str(cpm_var))
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.ort_model.NewIntVar(cpm_var.lb, cpm_var.ub, str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize):
@@ -547,7 +553,7 @@ class CPM_ortools(SolverInterface):
                     x,y = lhs.args
                     if get_bounds(y)[0] <= 0: # not supported, but result of modulo is agnositic to sign of second arg
                         y, link = get_or_make_var(-lhs.args[1], csemap=self._csemap)
-                        self += link
+                        self.add(link)
                     return self.ort_model.AddModuloEquality(ortrhs, *self.solver_vars([x,y]))
                 elif lhs.name == 'pow':
                     # only `POW(b,2) == IV` supported, post as b*b == IV
@@ -561,7 +567,7 @@ class CPM_ortools(SolverInterface):
                         new_lhs = 1
                         for exp in range(n):
                             new_lhs, new_cons = get_or_make_var(b * new_lhs, csemap=self._csemap)
-                            self += new_cons
+                            self.add(new_cons)
                         return self.ort_model.Add(eval_comparison("==", self.solver_var(new_lhs), ortrhs))
 
 
@@ -590,65 +596,73 @@ class CPM_ortools(SolverInterface):
                 return self.ort_model.AddAutomaton(array, cpm_expr.node_map[start], [cpm_expr.node_map[n] for n in accepting], 
                                                    [(cpm_expr.node_map[src], label, cpm_expr.node_map[dst]) for src, label, dst in transitions])
             elif cpm_expr.name == "cumulative":
-                start, dur, end, demand, cap = cpm_expr.args
+                if len(cpm_expr.args) == 4:
+                    start, dur, demand, cap = cpm_expr.args
+                    end = None
+                else:
+                    start, dur, end, demand, cap = cpm_expr.args
+                
                 # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur)
                 self.add(dur_cons)
-
-                if end is None: # need to make the end-variables ourself
-                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-
                 # ensure demand is non-negative
                 demand, demand_cons = get_nonneg_args(demand)
                 self.add(demand_cons)
+                # make interval variables
+                tasks, task_cons = self._get_ort_intervals(start, dur, end)
+                self.add(task_cons)
 
-                start, dur, end, demand, cap = self.solver_vars([start, dur, end, demand, cap])
-                intervals = [self.ort_model.NewIntervalVar(s,d,e,f"interval_{s}-{d}-{e}") for s,d,e in zip(start,dur,end)]
-
-                return self.ort_model.AddCumulative(intervals, demand, cap)
+                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
+            
             elif cpm_expr.name == "cumulative_optional":
-                start, dur, end, demand, cap, is_present = cpm_expr.args
+                if len(cpm_expr.args) == 5:
+                    start, dur, demand, cap, is_present = cpm_expr.args
+                    end = None
+                else:
+                    start, dur, end, demand, cap, is_present = cpm_expr.args
+                
                 # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur, is_present)
                 self.add(dur_cons)
-
-                if end is None: # need to make the end-variables ourself
-                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-
                 # ensure demand is non-negative
                 demand, demand_cons = get_nonneg_args(demand, is_present)
                 self.add(demand_cons)
-
-                start, dur, end, demand, cap, is_present = self.solver_vars([start, dur, end, demand, cap, is_present])
-                is_present = [bool(p) if is_bool(p) else p for p in is_present] # convert BoolVals to booleans
-                intervals = [self.ort_model.NewOptionalIntervalVar(s,d,e,p,f"interval_{s}-{d}-{e}-{p}") for s,d,e,p in zip(start,dur,end,is_present)]
-                return self.ort_model.AddCumulative(intervals, demand, cap)
+                # make interval variables
+                tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
+                self.add(task_cons)
+                
+                return self.ort_model.AddCumulative(tasks, self.solver_vars(demand), self.solver_var(cap))
 
             elif cpm_expr.name == "no_overlap":
-                start, dur, end  = cpm_expr.args
+                if len(cpm_expr.args) == 2:
+                    start, dur = cpm_expr.args
+                    end = None
+                else:
+                    start, dur, end = cpm_expr.args
+
+                # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur)
                 self.add(dur_cons)
+                # make interval variables
+                tasks, task_cons = self._get_ort_intervals(start, dur, end)
+                self.add(task_cons)
+                return self.ort_model.AddNoOverlap(tasks)
 
-                if end is None: # need to make the end-variables ourself
-                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-
-                start, dur, end = self.solver_vars([start, dur, end])
-                intervals = [self.ort_model.NewIntervalVar(s, d, e, f"interval_{s}-{d}-{e}") for s, d, e in zip(start, dur, end)]
-
-                return self.ort_model.AddNoOverlap(intervals)
             elif cpm_expr.name == "no_overlap_optional":
-                start, dur, end, is_present = cpm_expr.args
+                if len(cpm_expr.args) == 3:
+                    start, dur, is_present = cpm_expr.args
+                    end = None
+                else:
+                    start, dur, end, is_present = cpm_expr.args
+
+                # ensure duration is non-negative
                 dur, dur_cons = get_nonneg_args(dur, is_present)
                 self.add(dur_cons)
+                # make interval variables   
+                tasks, task_cons = self._get_ort_intervals(start, dur, end, is_present)
+                self.add(task_cons)
+                return self.ort_model.AddNoOverlap(tasks)
 
-                if end is None: # need to make the end-variables ourself
-                    end = [intvar(*get_bounds(s+d)) for s,d in zip(start, dur)]
-
-                start, dur, end, is_present = self.solver_vars([start, dur, end, is_present])
-                is_present = [bool(p) if is_bool(p) else p for p in is_present] # convert BoolVals
-                intervals = [self.ort_model.NewOptionalIntervalVar(s, d, e, p, f"interval_{s}-{d}-{e}-{p}") for s, d, e, p in zip(start, dur, end, is_present)]
-
-                return self.ort_model.add_no_overlap(intervals)
             elif cpm_expr.name == "circuit":
                 # ortools has a constraint over the arcs, so we need to create these
                 # when using an objective over arcs, using these vars direclty is recommended
@@ -657,7 +671,7 @@ class CPM_ortools(SolverInterface):
                 N = len(x)
                 arcvars = boolvar(shape=(N,N))
                 # post channeling constraints from int to bool
-                self += [b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)]
+                self.add([b == (x[i] == j) for (i,j),b in np.ndenumerate(arcvars)])
                 # post the global constraint
                 # when posting arcs on diagonal (i==j), it would do subcircuit
                 ort_arcs = [(i,j,self.solver_var(b)) for (i,j),b in np.ndenumerate(arcvars) if i != j]
@@ -696,6 +710,44 @@ class CPM_ortools(SolverInterface):
 
         # else
         raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+
+    def _get_ort_intervals(self, start, duration, end=None, is_present=None):
+        """Helper function to create tasks variables for use in Cumulative and NoOverlap constraints."""
+        tasks = []
+        cons = []
+        for i, (cpm_s, cpm_d) in enumerate(zip(start, duration)):
+
+            ort_s, ort_d = self.solver_vars([cpm_s, cpm_d])
+            
+            # handle optional intervals
+            if is_present is not None:
+                if isinstance(is_present[i], BoolVal):
+                    ort_p = bool(is_present[i])
+                else:
+                    ort_p = self.solver_var(is_present[i])
+            else:
+                ort_p = None
+
+            if end is None:
+                if is_num(cpm_d): # duration is a constant, use special fixed size interval var
+                    if ort_p is None:
+                        tasks.append(self.ort_model.NewFixedSizeIntervalVar(ort_s, ort_d, f"interval_{cpm_s}-{cpm_d}"))
+                    else:
+                        tasks.append(self.ort_model.NewOptionalFixedSizeIntervalVar(ort_s, ort_d, ort_p, f"interval_{cpm_s}-{cpm_d}-{is_present[i]}"))
+                else: # variable sized interval, need to make the end variable ourself
+                    cpm_e, end_cons = get_or_make_var(cpm_s + cpm_d, csemap=self.csemap)
+                    cons.extend(end_cons)
+                    if ort_p is None:
+                        tasks.append(self.ort_model.NewIntervalVar(ort_s, ort_d, cpm_e, f"interval_{cpm_s}-{cpm_d}-{cpm_e}"))
+                    else:
+                        tasks.append(self.ort_model.NewOptionalIntervalVar(ort_s, ort_d, cpm_e, ort_p, f"interval_{cpm_s}-{cpm_d}-{cpm_e}-{is_present[i]}"))
+            
+            elif ort_p is None: # mandatory interval
+                tasks.append(self.ort_model.NewIntervalVar(ort_s, ort_d, self.solver_var(end[i]), f"interval_{cpm_s}-{cpm_d}-{end[i]}"))
+            else: # optional interval
+                tasks.append(self.ort_model.NewOptionalIntervalVar(ort_s, ort_d, self.solver_var(end[i]), ort_p, f"interval_{cpm_s}-{cpm_d}-{end[i]}-{is_present[i]}"))
+        
+        return tasks, cons
 
 
     def solution_hint(self, cpm_vars:List[_NumVarImpl], vals:List[int|bool]):
@@ -894,6 +946,7 @@ try:
         def __init__(self, solver, display=None, solution_limit=None, verbose=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
+            self._solver = solver
             # we only need the cpmpy->solver varmap from the solver
             self._varmap = solver._varmap
             # identify which variables to populate with their values
@@ -912,20 +965,13 @@ try:
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
                     if isinstance(cpm_var, _BoolVarImpl):
-                        cpm_var._value = bool(self.Value(self._varmap[cpm_var]))
+                        cpm_var._value = bool(self.Value(self._varmap[cpm_var.name]))
                     elif isinstance(cpm_var, _IntVarImpl):
-                        cpm_var._value = int(self.Value(self._varmap[cpm_var]))
+                        cpm_var._value = self.Value(self._varmap[cpm_var.name])
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                # print the desired display
-                if isinstance(self._display, Expression):
-                    print(self._display.value())
-                elif is_any_list(self._display):
-                    print(argvals(self._display))
-                else:
-                    assert callable(self._display), f"Expected display argument to be an Expression, list thereof or a function, but got {display} of type {type(display)}"
-                    self._display()  # callback
+                self._solver.print_display(self._display)
 
             # check for count limit
             if self.solution_count() == self._solution_limit:
