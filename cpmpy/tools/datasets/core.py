@@ -748,6 +748,6 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
             return {}
 
         def download(self) -> None:
-            raise NotImplementedError("from_files() datasets are already local; downloading is not supported.")
+            pass  # already in local files
 
     return FromFilesDataset(dataset_dir, extension)
