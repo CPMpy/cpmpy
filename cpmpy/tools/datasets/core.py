@@ -254,9 +254,6 @@ class FileDataset(Dataset):
       (for example table/dict structures for RCPSP-style scheduling data), then
       build a model separately or via a transform.
     """ 
-    # TODO documentation to add / improve
-    # For a more detailed authoring guide (design patterns, metadata conventions,
-    # and implementation checklist), see :ref:`datasets_advanced_authoring`.
 
     # Extension for metadata sidecar files
     METADATA_EXTENSION = ".meta.json"
@@ -495,7 +492,6 @@ class FileDataset(Dataset):
             data = self.parse(file_path)
 
         if self.transform:
-            # TODO maybe revisit this flow of execution once CPMpy model feature extraction has been added
             if isinstance(data, (str, os.PathLike)):
                 data = self.transform(data, open=self.open)
             else:
@@ -508,13 +504,6 @@ class FileDataset(Dataset):
             # Let transforms contribute to metadata (e.g. model verification info)
             if hasattr(self.transform, 'enrich_metadata'):
                 metadata = self.transform.enrich_metadata(data, metadata)
-            elif isinstance(data, cp.Model):
-                # Transform returned a CPMpy model; enrich metadata from model details.
-                # metadata = _enrich_from_model(data, metadata) TODO for future metadata PR
-                pass
-        elif isinstance(data, cp.Model):
-            # metadata = _enrich_from_model(data, metadata) TODO for future metadata PR
-            pass
 
         return data, metadata
 
