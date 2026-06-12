@@ -174,9 +174,11 @@ def xcsp3_objective_performance_profile(df):
 def xcsp3_stats(df):
 
     for phase in ['parse', 'model', 'post']:
-        slowest_idx = df[f'time_{phase}'].idxmax()
-        if slowest_idx is not None and not pd.isna(slowest_idx):
-            print(f"Slowest {phase}: {df.loc[slowest_idx, f'time_{phase}']}s ({df.loc[slowest_idx, 'instance']}, {df.loc[slowest_idx, 'solver']})")
+        try:
+            slowest_idx = df[f'time_{phase}'].idxmax()
+        except ValueError:
+            continue
+        print(f"Slowest {phase}: {df.loc[slowest_idx, f'time_{phase}']}s ({df.loc[slowest_idx, 'instance']}, {df.loc[slowest_idx, 'solver']})")
 
     for solver in df['solver'].unique():
         solver_total = df[df['solver'] == solver]['time_total'].sum()
