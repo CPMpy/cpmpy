@@ -514,6 +514,8 @@ class CPM_pumpkin(SolverInterface):
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == "or": 
                 return [constraints.Clause(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
+            if cpm_expr.name == "and":
+                return [clause for arg in cpm_expr.args for clause in self._get_constraint(arg, tag=tag)]
 
             raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
 
