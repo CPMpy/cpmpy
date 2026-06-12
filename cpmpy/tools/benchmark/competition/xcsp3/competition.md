@@ -239,13 +239,13 @@ The commands are as follows:
 
 | **Submission** | **Command** |
 | - | - |
-| **`cpmpy_<solver name>`** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --solver `<solver name>` |
-| **cpmpy_ortools** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver ortools |
-| **cpmpy_exact** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --solver exact |
-| **cpmpy_z3** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --solver z3 |
-| **cpmpy_gurobi** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --solver gurobi |
-| **cpmpy_cpo** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --solver cpo |
+| **`cpmpy_<solver name>`** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver `<solver name>` |
+| **cpmpy_ortools** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --intermediate --solver ortools |
+| **cpmpy_exact** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver exact |
+| **cpmpy_z3** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver z3 |
+| **cpmpy_gurobi** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver gurobi |
+| **cpmpy_cpo** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver cpo |
 | **cpmpy_highs** |python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver highs |
-| **cpmpy_scip** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --solver scip |
-| **cpmpy_pindakaas_cadical** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --solver pindakaas |
+| **cpmpy_scip** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver scip |
+| **cpmpy_pindakaas_cadical** | python ./cpmpy/tools/benchmark/cpbenchy/runner/run_benchmark.py BENCHNAME --runner xcsp3 --time_limit TIMELIMIT --mem_limit MEMLIMIT --verbose --cores NBCORES --seed RANDOMSEED --intermediate --solver pindakaas |
 
