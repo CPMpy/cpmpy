@@ -935,6 +935,9 @@ class Regular(GlobalConstraint):
         # Decompose to transition table using Table constraints
 
         arr, transitions, start, accepting = self.args
+        if len(accepting) == 0:
+            return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
+
         lbs, ubs = get_bounds(arr)
         lb, ub = min(lbs), max(ubs)
 
@@ -964,78 +967,88 @@ class Regular(GlobalConstraint):
 
     def decompose_linear(self, complete=True) -> tuple[list[Expression], list[Expression]]:
         """
-        Deterministic Finite Automata (DFA) MIP decomposition based on
+        Deterministic Finite Automata (DFA) MIP decomposition using flow constraints based on
         Côté et al. (2007): "Modeling the Regular Constraint with Integer Programming"
+
+        Returns:
+            tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
+
         """
 
-        arr, transitions, start, ends = self.args
-        nodes = sorted(set([t[0] for t in transitions] + [t[2] for t in transitions]))
-        node_index = {n: i for i, n in enumerate(nodes)}
-        Q = len(nodes)
-        D = sorted(set([t[1] for t in transitions]))
-        d_index = {d: i for i, d in enumerate(D)}
-        J = len(D)
-        I = len(arr)
+        arr, transitions, start, accepting = self.args
+
+        if len(accepting) == 0:
+            return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
+
+        # Collect all nodes and all transition values in the DFA
+        nodes = sorted({src for src, _, _ in transitions} |
+                       {dst for _, _, dst in transitions})
+        values = sorted({value for _, value, _ in transitions})
+
+        node_idx = {node: idx for idx, node in enumerate(nodes)}
+        value_idx = {value: idx for idx, value in enumerate(values)}
 
         flow_in = defaultdict(list)
         flow_out = defaultdict(list)
 
-        for (u, d, v) in transitions:
-            ui = node_index[u]
-            vi = node_index[v]
-            di = d_index[d]
-
-            flow_out[ui].append((di, vi))
-            flow_in[vi].append((di, ui))
-
-        S = node_index[start]
-        E = [node_index[e] for e in ends]
-
-        invalid_edges = []
+        # Determine the flow in and out of each node based on the transitions
+        for src, value, dst in transitions:
+            id1 = node_idx[src]
+            id2 = node_idx[dst]
+            v = value_idx[value]
+            flow_out[id1].append((v, id2))
+            flow_in[id2].append((v, id1))
 
         if complete:
-            for q in nodes:
-                qi = node_index[q]
-                existing = {di for (di, _) in flow_out[qi]}
+            # When no edge in a given node for a given value exists, add an edge to a new non-accepting sink node
+            snk = len(nodes)
+            for id1 in range(len(nodes)):
+                existing_values = {val for (val, _) in flow_out[id1]}
+                for v in range(len(values)):
+                    if v not in existing_values:
+                        flow_out[id1].append((v, snk))
+                        flow_in[snk].append((v, id1))
 
-                for d in D:
-                    di = d_index[d]
-                    if di not in existing:
-                        flow_out[qi].append((di, E[0]))
-                        flow_in[E[0]].append((di, qi))
-                        invalid_edges.append((qi, di))
+            # The non-accepting sink node loops back to itself for all values
+            for v in range(len(values)):
+                flow_out[snk].append((v, snk))
+                flow_in[snk].append((v, snk))
 
         defining = []
         constraining = []
 
-        s = cp.boolvar(shape=(I, J, Q))
+        S = node_idx[start]
+        E = [node_idx[a] for a in accepting]
+        s = cp.boolvar(shape=(len(arr), len(values), len(nodes)))
         sf = cp.boolvar(shape=(len(E),))
 
-        for q in range(Q):
+        # Start node has one unit of flow
+        for q in range(len(nodes)):
             if q == S:
                 constraining.append(cp.sum(s[0, j, S] for j, _ in flow_out[S]) == 1)
             else:
-                defining.append(cp.sum(s[0, j, q] for j in range(J)) == 0)
+                defining.append(cp.sum(s[0, j, q] for j in range(len(values))) == 0)
 
-        for i in range(1, I):
-            for q in range(Q):
+        # Enforce flow constraints: flow in = flow out
+        for i in range(1, len(arr)):
+            for q in range(len(nodes)):
                 defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) == cp.sum(s[i, j, q] for (j, _) in flow_out[q]))
+                defining.append(cp.sum(s[i - 1, j, q_] for (j, q_) in flow_in[q]) <= 1) # redundant constraint
+                defining.append(cp.sum(s[i, j, q] for (j, _) in flow_out[q]) <= 1) # redundant constraint
 
-        for q in range(Q):
+        # Accepting end nodes have one unit of flow in total
+        for q in range(len(nodes)):
             if q in E:
-                defining.append(cp.sum(s[I - 1, j, q_] for (j, q_) in flow_in[q]) == sf[E.index(q)])
+                defining.append(cp.sum(s[-1, j, q_] for (j, q_) in flow_in[q]) == sf[E.index(q)])
             else:
-                defining.append(cp.sum(s[I - 1, j, q_] for (j, q_) in flow_in[q]) == 0)
+                constraining.append(cp.sum(s[-1, j, q_] for (j, q_) in flow_in[q]) == 0)
 
-        defining.append(cp.sum(sf) == 1)
+        constraining.append(cp.sum(sf) == 1)
 
-        for i in range(I):
-            for j in range(J):
-                defining.append(cp.sum(s[i, j, q] for q in range(Q)) == (arr[i] == D[j]))
-
-        if complete:
-            constraining.append(cp.sum(s[i, di, qi] for i in range(I) for (qi, di) in invalid_edges) == 0)
-
+        # Channelling constraints between the flow variables and the direct encoding variables
+        for i in range(len(arr)):
+            for j in range(len(values)):
+                defining.append(cp.sum(s[i, j, q] for q in range(len(nodes))) == (arr[i] == values[j]))
 
         return constraining, defining
 

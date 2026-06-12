@@ -595,8 +595,8 @@ def decompose_linear(lst_of_expr: Sequence[Expression],
     if supported_reified is None:
         supported_reified = frozenset[str]()
 
-    decompose_custom = get_linear_decompositions()
-    decompose_custom_positive = get_linear_positive_decompositions()
+    decompose_custom = get_linear_decompositions(complete=True)
+    decompose_custom_positive = get_linear_decompositions(complete=False)
 
     return decompose_in_tree(list(lst_of_expr), supported=supported, supported_reified=supported_reified, csemap=csemap,
                              decompose_custom=decompose_custom, decompose_custom_positive=decompose_custom_positive)
@@ -615,35 +615,37 @@ def decompose_linear_objective(obj: Expression,
 
     return decompose_objective(obj, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
 
-def get_linear_decompositions():
+
+
+def get_linear_decompositions(complete=True):
     """
         Implementation of custom linear decompositions for some global constraints.
+        args:
+            complete: whether the decomposition returned should be complete (valid in all contexts),
+            or whether a decomposition only valid in a positive context can be returned.
 
         returns:
             dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
-    """
-    return dict(
-        alldifferent=AllDifferent.decompose_linear,
-        element=Element.decompose_linear,
-        table=Table.decompose_linear,
-        short_table=ShortTable.decompose,
-        InDomain=InDomain.decompose_linear,
-        regular=Regular.decompose_linear
-    )
-    # Should we add Gleb's table decomposition? or is it not non-reifiable?
+        """
+    decomps = {
+        "alldifferent": AllDifferent.decompose_linear,
+        "element": Element.decompose_linear,
+        "table": Table.decompose_linear,
+        "short_table": ShortTable.decompose,
+        "InDomain": InDomain.decompose_linear,
+        "regular": (
+            Regular.decompose_linear_positive
+            if not complete
+            else Regular.decompose_linear
+        ),
+    }
+
+    if not complete:
+        decomps["circuit"] = Circuit.decompose_linear_positive
+
+    return decomps
 
 
-def get_linear_positive_decompositions():
-    """
-        Implementation of custom linear positive decompositions for some global constraints.
-
-        returns:
-            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
-    """
-    return dict(
-        regular=Regular.decompose_linear_positive,
-        circuit=Circuit.decompose_linear_positive
-    )
 
 def linearize_reified_variables(constraints:list[Expression], 
                                 min_values:int=3, 
