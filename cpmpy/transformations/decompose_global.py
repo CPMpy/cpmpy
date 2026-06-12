@@ -110,22 +110,22 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 decomposed_positive = True
 
             # decompose its arguments
-            arg_changed, arg_newargs, arg_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-            if arg_changed:
+            args_changed, expr_newargs, expr_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+            if args_changed:
                 changed = True
-                if len(arg_toplevel) > 0:
-                    todolist.extend(arg_toplevel)
+                if len(expr_toplevel) > 0:
+                    todolist.extend(expr_toplevel)
                     
                 if expr.name == "not": # cannot leave negation here, push down in the arguments of the decomposition
-                    assert len(arg_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {arg_newargs}"
-                    expr = recurse_negation(arg_newargs[0])
+                    assert len(expr_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {expr_newargs}"
+                    expr = recurse_negation(expr_newargs[0])
                     newlist.append(expr)
                     continue
 
                 # if decompose_positive: we know 'expr' is a fresh expression
                 if not decomposed_positive:
                     expr = copy.copy(expr)
-                expr.update_args(arg_newargs)
+                expr.update_args(expr_newargs)
 
             newlist.append(expr)
         else:
