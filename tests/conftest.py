@@ -180,7 +180,7 @@ during test parametrisation and filtering.
 """
 
 MARKERS = {
-    "requires_solver": "mark test as requiring a specific solver",                      # to filter (not skip) tests when required solver is not installed
+    "requires_solver": "mark test as requiring specific solver(s)",                     # to filter (not skip) tests when required solver is not installed
     "requires_dependency": "mark test as requiring a specific dependency",              # to filter (not skip) tests when required dependency is not installed
     "generate_constraints": "mark test as generating constraints",                      # to make multiple copies of the same test, based on a generated set of constraints
     "depends_on_solver": "mark test as depending on solvers (directly or indirectly)",  # for marking tests that indirectly use a solver (without using the solver fixture)
@@ -315,19 +315,14 @@ def pytest_generate_tests(metafunc):
                 if "solver" in argnames:
                     return
     
-    # Check if test has requires_solver marker (solver-specific tests)
-    # For test classes, the marker might be on the class, not the method
-    requires_solver_marker = None
+    # requires_solver from the function itself, or from the concrete collected class.
+    class_marks = getattr(metafunc.cls, "__dict__", {}).get("pytestmark", []) if metafunc.cls else []
+    requires_solver_marker = next((m for m in metafunc.definition.own_markers + class_marks if m.name == "requires_solver"), None)
 
-    # Try iter_markers which traverses up the hierarchy (works for both function and class-based tests)
-    for marker in metafunc.definition.iter_markers("requires_solver"):
-        requires_solver_marker = marker
-        break
-        
-    # Parametrise test with solvers specified in requires_solver marker
-    if requires_solver_marker:
-        marker_solvers = list(requires_solver_marker.args)
-        metafunc.parametrize("solver", marker_solvers)
+    # Parametrise only when the mark lists at least one solver; a mark with no solvers is ignored
+    # (acts like no mark).
+    if requires_solver_marker and requires_solver_marker.args:
+        metafunc.parametrize("solver", list(requires_solver_marker.args))
         return
     
     # Only parametrize if multiple solvers are explicitly provided
@@ -378,7 +373,8 @@ def pytest_collection_modifyitems(config, items):
     
     for item in items:
         # Markers
-        required_solver_marker = item.get_closest_marker("requires_solver")
+        class_marks = getattr(getattr(item, "cls", None), "__dict__", {}).get("pytestmark", [])
+        required_solver_marker = next((m for m in item.own_markers + class_marks if m.name == "requires_solver"), None)
         required_dependency_marker = item.get_closest_marker("requires_dependency")
         depends_on_solver_marker = item.get_closest_marker("depends_on_solver")
 
@@ -396,8 +392,8 @@ def pytest_collection_modifyitems(config, items):
         if depends_on_solver_marker and (cmd_solvers is not None and len(cmd_solvers) == 0):
             continue # skip test
 
-        # A) Solver-specific test
-        if required_solver_marker:
+        # A) Solver-specific test (marker lists at least one required solver)
+        if required_solver_marker and required_solver_marker.args:
             
             """
             Solver parametrisation
@@ -454,12 +450,23 @@ def pytest_collection_modifyitems(config, items):
             # skip test if the required solver is not installed
             # Note: item is already in filtered list if it passed filtering above
             if parametrised_solver is not None:
+                # Case 1: test is parametrized on fixture `solver` (e.g. test_xxx[ortools]).
+                # Skip this concrete parametrized case when that solver is unavailable.
                 if not cp.SolverLookup.lookup(parametrised_solver).supported():
                     skip = pytest.mark.skip(reason=f"Solver {parametrised_solver} not installed")
                     item.add_marker(skip)
                     skipped_solver_specific += 1
                     # Item already added to filtered above, just mark it for skip
                     continue
+            elif not any(cp.SolverLookup.lookup(solver).supported() for solver in required_solver_marker.args):
+                # Case 2: test has @pytest.mark.requires_solver(...) but is NOT parametrized
+                # over fixture `solver` (single test function call). Skip when none of the
+                # required solvers are installed.
+                skip = pytest.mark.skip(reason=f"None of required solvers are installed: {list(required_solver_marker.args)}")
+                item.add_marker(skip)
+                skipped_solver_specific += 1
+                # Item already added to filtered above, just mark it for skip
+                continue
 
         # B) Non-solver-specific test
         else:
