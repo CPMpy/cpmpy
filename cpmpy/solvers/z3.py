@@ -44,6 +44,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 from typing import Optional, Iterable
 
@@ -52,7 +54,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
 from ..expressions.utils import is_num, is_any_list, is_bool, is_int, is_boolexpr, eval_comparison
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -130,6 +132,7 @@ class CPM_z3(SolverInterface):
 
         # handle of objective (as returned by solver)
         self.obj_handle = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
@@ -253,12 +256,13 @@ class CPM_z3(SolverInterface):
                 elif isinstance(cpm_var, _NumVarImpl):
                     cpm_var._value = sol[sol_var].as_long()
 
-            # translate objective, for optimisation problems only
             if self.has_objective():
-                obj = self.z3_solver.objectives()[0]
-                self.objective_value_ = sol.evaluate(obj).as_long() 
-                if not self._minimize:
-                    self.objective_value_ = -1*self.objective_value_ # Z3 negates the objective function to turn a maximisation problem into a minimisation one, undoing negation here
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else:  # clear values of variables
             for cpm_var in self.user_vars:
@@ -307,7 +311,13 @@ class CPM_z3(SolverInterface):
         import z3
         return isinstance(self.z3_solver, z3.Optimize) and len(self.z3_solver.objectives()) != 0
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
@@ -322,21 +332,29 @@ class CPM_z3(SolverInterface):
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
 
-        # save user variables
-        get_variables(expr, self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(obj,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # update user variables
+            z3_obj = z3.Sum([z3.Sum([w*v for w,v in zip(ws,self.solver_vars(vs))]), const])
+        else:
+            # save user variables
+            get_variables(expr, self.user_vars)
 
-        self.add(safe_cons + decomp_cons)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_objective(obj,
+                                                   supported=self.supported_global_constraints,
+                                                   supported_reified=self.supported_reified_global_constraints,
+                                                   csemap=self._csemap)
 
-        z3_obj = self._z3_expr(obj)
+            self.add(safe_cons + decomp_cons)
+            z3_obj = self._z3_expr(obj)
+
         if isinstance(z3_obj, z3.BoolRef):
             z3_obj = z3.If(z3_obj, 1, 0) # must be integer
+
         if minimize:
             self.obj_handle = self.z3_solver.minimize(z3_obj)
             self._minimize = True # record direction of optimisation

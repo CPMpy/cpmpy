@@ -42,6 +42,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import sys
 from typing import Optional, List, Iterable
@@ -52,6 +54,7 @@ from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callbac
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import DirectConstraint
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_comparison, flatlist, argval, argvals, \
@@ -137,6 +140,7 @@ class CPM_ortools(SolverInterface):
         # for solving with assumption variables,
         # need to store mapping from ORTools Index to CPMpy variable
         self.assumption_dict = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
@@ -275,13 +279,13 @@ class CPM_ortools(SolverInterface):
                     raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - "
                                      f"please report on github...")
 
-            # translate objective
             if self.has_objective():
-                ort_obj_val = self.ort_solver.objective_value
-                if round(ort_obj_val) == ort_obj_val: # it is an integer?
-                    self.objective_value_ = round(ort_obj_val)  # ensure it is an integer
-                else: # can happen when using floats as coeff in objective
-                    self.objective_value_ = float(ort_obj_val)
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
         else: # clear values of variables
             for cpm_var in self.user_vars:
                 cpm_var._value = None
@@ -341,11 +345,17 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
+            - expr: Expression or FloatSum, the objective function
             - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored
@@ -355,21 +365,27 @@ class CPM_ortools(SolverInterface):
                 are premanently posted to the solver
         """
 
-        # save user varables
-        get_variables(expr, self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(obj,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
+            ort_obj = ort.LinearExpr.weighted_sum(self.solver_vars(vs), ws) + const
+        else:
+            # save user varables
+            get_variables(expr, self.user_vars)
 
-        self.add(safe_cons+decomp_cons+flat_cons)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_objective(obj,
+                                                supported=self.supported_global_constraints,
+                                                supported_reified=self.supported_reified_global_constraints,
+                                                csemap=self._csemap)
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 
-        # make objective function or variable and post
-        ort_obj = self._make_numexpr(obj)
+            self.add(safe_cons+decomp_cons+flat_cons)
+            ort_obj = self._make_numexpr(obj)
+
         if minimize:
             self.ort_model.Minimize(ort_obj)
         else:

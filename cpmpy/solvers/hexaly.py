@@ -36,6 +36,12 @@
         :nosignatures:
 
         CPM_hexaly
+
+    ==============
+    Module details
+    ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional, List
@@ -45,9 +51,9 @@ import warnings
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
-from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import argval, argvals, is_num, is_int, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -133,6 +139,7 @@ class CPM_hexaly(SolverInterface):
         self.hex_solver.param.verbosity = 0
         self.hex_model = self.hex_solver.model
         self.is_satisfaction = True
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="hexaly", cpm_model=cpm_model)
@@ -227,9 +234,13 @@ class CPM_hexaly(SolverInterface):
                 else:
                     cpm_var._value = round(self.hex_sol.get_value(sol_var))
 
-            # translate objective, for optimisation problems only
-            if not self.is_satisfaction:
-                self.objective_value_ = self.hex_sol.get_objective_bound(0)
+            if self.has_objective():
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -277,7 +288,13 @@ class CPM_hexaly(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
@@ -289,21 +306,27 @@ class CPM_hexaly(SolverInterface):
         """
         from hexaly.optimizer import HxObjectiveDirection
 
-        # save user vars
-        get_variables(expr, collect=self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
-        self.add(decomp_cons)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
+            hex_obj = self.hex_model.sum(float(c) * self._hex_expr(t) for c, t in zip(ws, vs)) + const
+        else:
+            get_variables(expr, collect=self.user_vars)
+            obj, decomp_cons = decompose_objective(
+                expr,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            self.add(decomp_cons)
+            hex_obj = self._hex_expr(obj)
 
         # make objective function or variable and post
         while self.has_objective(): # remove prev objective(s)
             self.hex_model.remove_objective(0)
         self.is_satisfaction = False
-        hex_obj = self._hex_expr(obj)
         if minimize:
             self.hex_model.add_objective(hex_obj,HxObjectiveDirection.MINIMIZE)
         else:
@@ -562,9 +585,13 @@ class HexSolutionPrinter:
                         cpm_var._value = round(hex_sol.get_value(hex_var))
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
-                # populate objective value
                 if self._solver.has_objective():
-                    self._solver.objective_value_ = round(hex_sol.get_objective_bound(0))
+                    assert self._solver.objective_ is not None
+                    val = self._solver.objective_.value()
+                    if val is not None and round(val) == val:
+                        self._solver.objective_value_ = int(val)
+                    else:  # FloatSum, float value must be read through FloatSum.value()
+                        self._solver.objective_value_ = None
 
                 self._solver.print_display(self._display)
                 

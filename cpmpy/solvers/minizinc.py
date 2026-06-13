@@ -52,6 +52,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import re
 from typing import Optional
@@ -72,7 +74,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
-from ..expressions.globalfunctions import Multiplication
+from ..expressions.globalfunctions import Multiplication, FloatSum
 from ..expressions.utils import is_int, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
@@ -292,6 +294,7 @@ class CPM_minizinc(SolverInterface):
         # Prepare solve statement, so it can be overwritten on demand
         self.mzn_txt_solve = "solve satisfy;"
         self.mzn_result = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
@@ -402,8 +405,13 @@ class CPM_minizinc(SolverInterface):
                 else:
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
-            # translate objective, for optimisation problems only (otherwise None)
-            self.objective_value_ = self.mzn_result.objective
+            if self.has_objective():
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -564,28 +572,41 @@ class CPM_minizinc(SolverInterface):
 
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
-    def objective(self, expr, minimize):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
+            - expr: Expression or FloatSum, the objective function
             - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored
         """
+        self.objective_ = expr
 
-        # save user variables
-        get_variables(expr, collect=self.user_vars) # add objvars to vars
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
+            mzn_parts = [f"({float(w)}) * ({vv})" for w, vv in zip(ws, self.solver_vars(vs))]
+            mzn_obj = " + ".join(mzn_parts)
+            if const:
+                mzn_obj = f"{mzn_obj} + {const}"
+        else:
+            get_variables(expr, collect=self.user_vars)  # add objvars to vars
+            obj, decomp_cons = decompose_objective(
+                expr,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            self.add(decomp_cons)
+            mzn_obj = self._convert_expression(obj)
 
-        obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
-        self.add(decomp_cons)
-
-        # make objective function or variable and post
-
-        mzn_obj = self._convert_expression(obj)
         # do not add it to the mzn_model yet, supports only one 'solve' entry
         if minimize:
             self.mzn_txt_solve = "solve minimize {};\n".format(mzn_obj)
@@ -780,7 +801,7 @@ class CPM_minizinc(SolverInterface):
             # TODO: pretty printing of () as in Operator?
 
             # special case: unary -
-            if self.name == '-':
+            if expr.name == '-':
                 return "-{}".format(args_str[0])
 
             # very special case: weighted sum (before 2-ary)

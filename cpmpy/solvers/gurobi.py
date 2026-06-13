@@ -40,6 +40,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional, List
@@ -49,6 +51,7 @@ import cpmpy as cp
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
@@ -142,6 +145,7 @@ class CPM_gurobi(SolverInterface):
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -194,7 +198,6 @@ class CPM_gurobi(SolverInterface):
             self.grb_model.setParam(param, val)
 
         _ = self.grb_model.optimize(callback=solution_callback)
-        grb_objective = self.grb_model.getObjective()
 
         grb_status = self.grb_model.Status
 
@@ -235,13 +238,13 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = round(solver_val)
-            # set _objective_value
             if self.has_objective():
-                grb_obj_val = grb_objective.getValue()
-                if round(grb_obj_val) == grb_obj_val: # it is an integer?:
-                    self.objective_value_ = round(grb_obj_val)
-                else: #  can happen with DirectVar or when using floats as coefficients
-                    self.objective_value_ =  float(grb_obj_val)
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -279,7 +282,13 @@ class CPM_gurobi(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
@@ -291,22 +300,32 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
-        # save user variables
-        get_variables(expr, self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(obj,
-                                                      supported=self.supported_global_constraints,
-                                                      supported_reified=self.supported_reified_global_constraints,
-                                                      csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            import gurobipy as gp
+            grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
+        else:
+            # save user variables
+            get_variables(expr, self.user_vars)
 
-        # make objective function or variable and post
-        grb_obj = self._make_numexpr(obj)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(obj,
+                                                          supported=self.supported_global_constraints,
+                                                          supported_reified=self.supported_reified_global_constraints,
+                                                          csemap=self._csemap)
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            obj = only_positive_bv_wsum(obj)  # remove negboolviews
+
+            self.add(safe_cons + decomp_cons + flat_cons)
+
+            # make objective function or variable and post
+            grb_obj = self._make_numexpr(obj)
+
         if minimize:
             self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
         else:
@@ -695,9 +714,13 @@ class CPM_gurobi(SolverInterface):
                 else:
                     cpm_var._value = round(solver_val)
 
-            # Translate objective
             if self.has_objective():
-                self.objective_value_ = self.grb_model.PoolObjVal
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
             self.print_display(display)
 

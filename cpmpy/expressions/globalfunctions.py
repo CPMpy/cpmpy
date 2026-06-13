@@ -51,6 +51,16 @@
             def decompose(self):
                 return (self.args[0] + self.args[1]), []  # the decomposition
 
+    Objective-only :class:`FloatSum`
+    -------------------------------
+
+    :class:`FloatSum` is **not** an Expression nor a GlobalFunction.
+    It is only supported by some solvers (ortools, gurobi, cplex, scip, z3, minizinc, highs, hexaly),
+    and must be passed directly to that solver's :meth:`s.minimize() <cpmpy.solvers.solver_interface.SolverInterface.minimize>` /
+    :meth:`s.maximize() <cpmpy.solvers.solver_interface.SolverInterface.maximize>`.
+    After solve, read the value with :meth:`~cpmpy.expressions.globalfunctions.FloatSum.value`.
+    :meth:`s.objective_value() <cpmpy.solvers.solver_interface.SolverInterface.objective_value>` stays ``None`` for non-integral objectives.
+
     ===============
     List of classes
     ===============
@@ -70,17 +80,18 @@
         Among
         NValue
         NValueExcept
+        FloatSum
 
 """
 import warnings  # for deprecation warning
-from typing import Optional, Iterable
+from typing import Optional, Iterable, NoReturn, Final, cast
 import numpy as np
 import cpmpy as cp
 
 from ..exceptions import CPMpyException, IncompleteFunctionError, TypeError
 from .core import Expression, Operator, ExprLike, ListLike
-from .variables import intvar, NDVarArray, _NumVarImpl, BoolVal
-from .utils import argval, is_num, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
+from .variables import intvar, cpm_array, NDVarArray, _NumVarImpl, NegBoolView
+from .utils import argval, is_num, is_int, eval_comparison, is_any_list, is_boolexpr, get_bounds, argvals, implies, argvals_intexpr, get_bounds_intexpr, npint2int
 
 
 class GlobalFunction(Expression):
@@ -356,8 +367,12 @@ class Multiplication(GlobalFunction):
         """
         is_lhs_num = False
         if is_num(x):
+            if not is_int(x):
+                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             is_lhs_num = True
         elif is_num(y):
+            if not is_int(y):
+                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             (x, y) = (y, x)
             is_lhs_num = True
 
@@ -371,8 +386,12 @@ class Multiplication(GlobalFunction):
         x, y = args
         is_lhs_num = False
         if is_num(x):
+            if not is_int(x):
+                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             is_lhs_num = True
         elif is_num(y):
+            if not is_int(y):
+                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
             (x, y) = (y, x)
             is_lhs_num = True
 
@@ -1091,3 +1110,107 @@ class NValueExcept(GlobalFunction):
         """
         arr, n = self.args
         return 0, len(arr)
+
+
+class FloatSum:
+    """
+    Objective-only weighted sum with float coefficients over decision variables.
+
+    Does not inherit from Expression because it is objective only and has float :meth:`value`.
+
+    Pass to **solver** :meth:`s.minimize() <cpmpy.solvers.solver_interface.SolverInterface.minimize>` / :meth:`s.maximize() <cpmpy.solvers.solver_interface.SolverInterface.maximize>` only.
+    Supported solvers declare ``Expression | FloatSum`` on those methods (e.g. ortools, minizinc, z3, hexaly and the MIP solvers).
+
+    After solve, use :meth:`value` for the objective value. :meth:`s.objective_value() <cpmpy.solvers.solver_interface.SolverInterface.objective_value>`
+    is ``None`` when the native result is not integral.
+
+    Accepts only (numpy) floats as coefficients, decision variables (including NegBoolView) as terms,
+    and an optional float constant term (default ``0.0``).
+    """
+    name: Final = "floatsum"
+    coeffs: np.ndarray
+    vars: NDVarArray
+    const: float
+
+    def __init__(self, coeffs: ListLike[float|np.floating], vars: ListLike[_NumVarImpl], const: float|np.floating = 0.0):
+        """
+        Arguments:
+            coeffs (ListLike[float | np.floating]): Float coefficients for the weighted sum
+            vars (ListLike[_NumVarImpl]): Decision variables (including NegBoolView) as terms
+            const (float | np.floating, optional): Constant term added to the sum (default 0.0)
+        """
+        self.coeffs = np.asarray(coeffs, dtype=float).reshape(-1)
+        self.const = float(const)
+        if isinstance(vars, NDVarArray):
+            self.vars = vars
+        else:
+            self.vars = cpm_array(vars)
+        if self.vars.ndim > 1:  # must reshape to 1D
+            flat = self.vars.reshape(-1)
+            # typing is wrong: numpy preserves our ndarray subclass
+            self.vars = cast(NDVarArray, flat)
+
+        if self.coeffs.size != self.vars.size:
+            raise TypeError(f"FloatSum(coeffs, terms) expects equal lengths, got {self.coeffs.size} coefficients and {self.vars.size} terms")
+        if self.coeffs.size == 0:
+            raise TypeError("FloatSum(coeffs, terms) expects at least one term")
+
+    def __repr__(self) -> str:
+        if self.const != 0.0:
+            return f"FloatSum({list(self.coeffs)}, {list(self.vars)}, constant={self.const})"
+        return f"FloatSum({list(self.coeffs)}, {list(self.vars)})"
+
+    def value(self) -> Optional[float]:
+        vals = argvals_intexpr(self.vars)
+        if vals is None:
+            return None
+        return float(np.dot(self.coeffs, vals) + self.const)
+
+    def components(self, allow_negbool=False) -> tuple[np.ndarray, NDVarArray, float]:
+        """
+        Return ``(coeffs, vars, const)``
+        
+        if `allow_negbool` is False (default), we will eliminate all :class:`~cpmpy.expressions.variables.NegBoolView`
+        ``w * ~bv`` becomes ``w - w * bv`` (coeff ``-w`` on ``bv._bv``, constant ``+w``).
+        """
+        if allow_negbool or not any(isinstance(v, NegBoolView) for v in self.vars):
+            return self.coeffs, self.vars, self.const
+        else:
+            ws: list[float] = []
+            vs: list[_NumVarImpl] = []
+            const = self.const
+            for w, v in zip(self.coeffs, self.vars):
+                if isinstance(v, NegBoolView):
+                    ws.append(-w)
+                    vs.append(v._bv)
+                    const += w
+                else:
+                    ws.append(w)
+                    vs.append(v)
+            return np.asarray(ws, dtype=float), cpm_array(vs), const
+
+    def _raise_objective_only(self) -> NoReturn:
+        raise TypeError("FloatSum cannot be used as an expression, only as an objective. Pass it directly to solver minimize()/maximize().")
+
+    def __eq__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __ne__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __lt__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __le__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __gt__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __ge__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __add__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __radd__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __sub__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rsub__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __mul__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rmul__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __truediv__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rtruediv__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __floordiv__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rfloordiv__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __mod__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __rmod__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __pow__(self, other: object, modulo: object = None) -> NoReturn: self._raise_objective_only()
+    def __rpow__(self, other: object) -> NoReturn: self._raise_objective_only()
+    def __neg__(self) -> NoReturn: self._raise_objective_only()
+    def __abs__(self) -> NoReturn: self._raise_objective_only()
