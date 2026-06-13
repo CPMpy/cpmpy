@@ -1156,7 +1156,7 @@ class FloatSum:
             raise TypeError("FloatSum(coeffs, terms) expects at least one term")
 
     def __repr__(self) -> str:
-        if self.const:
+        if self.const != 0.0:
             return f"FloatSum({list(self.coeffs)}, {list(self.vars)}, constant={self.const})"
         return f"FloatSum({list(self.coeffs)}, {list(self.vars)})"
 
