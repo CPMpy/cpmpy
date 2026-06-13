@@ -177,7 +177,7 @@ class TestWeightedSum:
     def test_floatsum_objective_only(self):
         x = cp.boolvar(name="x")
         fs = cp.FloatSum([0.5], [x])
-        with pytest.raises(CPMpyTypeError, match="cannot be used as a subexpression"):
+        with pytest.raises(CPMpyTypeError, match="cannot be used as an expression"):
             _ = fs >= 1
 
 class TestMul:
