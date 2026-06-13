@@ -56,10 +56,10 @@
 
     :class:`FloatSum` is **not** an Expression nor a GlobalFunction.
     It is only supported by some solvers (ortools, gurobi, cplex, scip, z3, minizinc, highs, hexaly),
-    and must be passed directly to that solver's :meth:`~cpmpy.solvers.solver_interface.SolverInterface.minimize`
-    / :meth:`~cpmpy.solvers.solver_interface.SolverInterface.maximize`
+    and must be passed directly to that solver's :meth:`s.minimize() <cpmpy.solvers.solver_interface.SolverInterface.minimize>` /
+    :meth:`s.maximize() <cpmpy.solvers.solver_interface.SolverInterface.maximize>`.
     After solve, read the value with :meth:`~cpmpy.expressions.globalfunctions.FloatSum.value`.
-    :meth:`~cpmpy.solvers.solver_interface.SolverInterface.objective_value` stays ``None`` for non-integral objectives.
+    :meth:`s.objective_value() <cpmpy.solvers.solver_interface.SolverInterface.objective_value>` stays ``None`` for non-integral objectives.
 
     ===============
     List of classes
@@ -1118,11 +1118,10 @@ class FloatSum:
 
     Does not inherit from Expression because it is objective only and has float :meth:`value`.
 
-    Pass to **solver** :meth:`~cpmpy.solvers.solver_interface.SolverInterface.minimize` /
-    :meth:`~cpmpy.solvers.solver_interface.SolverInterface.maximize` only.
+    Pass to **solver** :meth:`s.minimize() <cpmpy.solvers.solver_interface.SolverInterface.minimize>` / :meth:`s.maximize() <cpmpy.solvers.solver_interface.SolverInterface.maximize>` only.
     Supported solvers declare ``Expression | FloatSum`` on those methods (e.g. ortools, minizinc, z3, hexaly and the MIP solvers).
 
-    After solve, use :meth:`value` for the objective value. :meth:`~cpmpy.solvers.solver_interface.SolverInterface.objective_value`
+    After solve, use :meth:`value` for the objective value. :meth:`s.objective_value() <cpmpy.solvers.solver_interface.SolverInterface.objective_value>`
     is ``None`` when the native result is not integral.
 
     Accepts only (numpy) floats as coefficients, decision variables (including NegBoolView) as terms,
