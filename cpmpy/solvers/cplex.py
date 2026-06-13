@@ -153,6 +153,7 @@ class CPM_cplex(SolverInterface):
         from docplex.mp.model import Model
         self.cplex_model = Model()
         self._obj_offset = 0
+        self.objective_ = None
 
         super().__init__(name="cplex", cpm_model=cpm_model)
 
@@ -252,12 +253,12 @@ class CPM_cplex(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = round(solver_val)
-            # set _objective_value
             if self.has_objective():
-                obj_val = self.cplex_model.get_objective_expr().solution_value
-                if round(obj_val) == obj_val:  # its integer
-                    self.objective_value_ = round(obj_val) + self._obj_offset
-                else:  # FloatSum objective, must be read through FloatSum.value()
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
                     self.objective_value_ = None
 
         else: # clear values of variables
@@ -314,6 +315,8 @@ class CPM_cplex(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
+        self.objective_ = expr
+
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
             self.user_vars.update(vs)  # save user variables
@@ -630,9 +633,13 @@ class CPM_cplex(SolverInterface):
                     else:
                         cpm_var._value = round(solver_val)
 
-                # Translate objective
                 if self.has_objective():
-                    self.objective_value_ = sol_obj_val + self._obj_offset
+                    assert self.objective_ is not None
+                    val = self.objective_.value()
+                    if val is not None and round(val) == val:
+                        self.objective_value_ = int(val)
+                    else:  # FloatSum, float value must be read through FloatSum.value()
+                        self.objective_value_ = None
 
                 self.print_display(display)
 

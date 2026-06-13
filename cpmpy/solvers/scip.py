@@ -97,7 +97,7 @@ class CPM_scip(SolverInterface):
 
         self.scip_model = scip.Model()
         self.scip_model.setParam("display/verblevel", 0)  # remove solver logs from output
-        self.objective_value_ = None
+        self.objective_ = None
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
@@ -167,10 +167,11 @@ class CPM_scip(SolverInterface):
                     cpm_var._value = round(solver_val)
 
             if self.has_objective():
-                obj_val = self.scip_model.getObjVal()
-                if round(obj_val) == obj_val:  # its integer
-                    self.objective_value_ = int(obj_val)
-                else:  # FloatSum objective, must be read through FloatSum.value()
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
                     self.objective_value_ = None
         else:
             for cpm_var in self.user_vars:
@@ -231,6 +232,8 @@ class CPM_scip(SolverInterface):
         self.objective(expr, minimize=False)
 
     def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
+        self.objective_ = expr
+
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
             self.user_vars.update(vs)  # save user variables

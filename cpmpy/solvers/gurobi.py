@@ -145,6 +145,7 @@ class CPM_gurobi(SolverInterface):
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -197,7 +198,6 @@ class CPM_gurobi(SolverInterface):
             self.grb_model.setParam(param, val)
 
         _ = self.grb_model.optimize(callback=solution_callback)
-        grb_objective = self.grb_model.getObjective()
 
         grb_status = self.grb_model.Status
 
@@ -238,12 +238,12 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = round(solver_val)
-            # set _objective_value
             if self.has_objective():
-                grb_obj_val = grb_objective.getValue()
-                if round(grb_obj_val) == grb_obj_val:  # its integer
-                    self.objective_value_ = round(grb_obj_val)
-                else:  # FloatSum objective, must be read through FloatSum.value()
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
                     self.objective_value_ = None
 
         else: # clear values of variables
@@ -299,6 +299,8 @@ class CPM_gurobi(SolverInterface):
                 are premanently posted to the solver
         """
         from gurobipy import GRB
+
+        self.objective_ = expr
 
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
@@ -713,9 +715,13 @@ class CPM_gurobi(SolverInterface):
                 else:
                     cpm_var._value = round(solver_val)
 
-            # Translate objective
             if self.has_objective():
-                self.objective_value_ = self.grb_model.PoolObjVal
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
             self.print_display(display)
 

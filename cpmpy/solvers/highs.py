@@ -120,6 +120,7 @@ class CPM_highs(SolverInterface):
 
         self._inf = highspy.kHighsInf
         self._obj_cols = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
@@ -293,6 +294,8 @@ class CPM_highs(SolverInterface):
         """
         import highspy
 
+        self.objective_ = expr
+
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
             self.user_vars.update(vs)
@@ -440,10 +443,11 @@ class CPM_highs(SolverInterface):
                     cpm_var._value = round(val)
 
             if self.has_objective():
-                obj_val = info.objective_function_value
-                if round(obj_val) == obj_val:  # its integer
-                    self.objective_value_ = int(obj_val)
-                else:  # FloatSum objective, must be read through FloatSum.value()
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
                     self.objective_value_ = None
         else:
             for cpm_var in self.user_vars:

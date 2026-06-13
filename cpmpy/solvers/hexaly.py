@@ -139,6 +139,7 @@ class CPM_hexaly(SolverInterface):
         self.hex_solver.param.verbosity = 0
         self.hex_model = self.hex_solver.model
         self.is_satisfaction = True
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="hexaly", cpm_model=cpm_model)
@@ -233,12 +234,12 @@ class CPM_hexaly(SolverInterface):
                 else:
                     cpm_var._value = round(self.hex_sol.get_value(sol_var))
 
-            # translate objective, for optimisation problems only
-            if not self.is_satisfaction:
-                obj_val = self.hex_sol.get_objective_bound(0)
-                if round(obj_val) == obj_val:  # its integer
-                    self.objective_value_ = int(obj_val)
-                else:  # FloatSum objective, must be read through FloatSum.value()
+            if self.has_objective():
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
                     self.objective_value_ = None
 
         else: # clear values of variables
@@ -304,6 +305,8 @@ class CPM_hexaly(SolverInterface):
             are permanently posted to the solver)
         """
         from hexaly.optimizer import HxObjectiveDirection
+
+        self.objective_ = expr
 
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
@@ -582,9 +585,13 @@ class HexSolutionPrinter:
                         cpm_var._value = round(hex_sol.get_value(hex_var))
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
-                # populate objective value
                 if self._solver.has_objective():
-                    self._solver.objective_value_ = round(hex_sol.get_objective_bound(0))
+                    assert self._solver.objective_ is not None
+                    val = self._solver.objective_.value()
+                    if val is not None and round(val) == val:
+                        self._solver.objective_value_ = int(val)
+                    else:  # FloatSum, float value must be read through FloatSum.value()
+                        self._solver.objective_value_ = None
 
                 self._solver.print_display(self._display)
                 

@@ -132,6 +132,7 @@ class CPM_z3(SolverInterface):
 
         # handle of objective (as returned by solver)
         self.obj_handle = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="z3", cpm_model=cpm_model)
@@ -255,19 +256,12 @@ class CPM_z3(SolverInterface):
                 elif isinstance(cpm_var, _NumVarImpl):
                     cpm_var._value = sol[sol_var].as_long()
 
-            # translate objective, for optimisation problems only
             if self.has_objective():
-                obj = self.z3_solver.objectives()[0]
-                obj_val = sol.evaluate(obj)
-                if z3.is_int_value(obj_val):
-                    val = obj_val.as_long()
-                else:
-                    val = float(obj_val.as_decimal(20).rstrip("?"))
-                if not self._minimize:
-                    val = -1 * val  # Z3 negates the objective function to turn a maximisation problem into a minimisation one, undoing negation here
-                if round(val) == val:  # its integer
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
                     self.objective_value_ = int(val)
-                else:  # FloatSum objective, must be read through FloatSum.value()
+                else:  # FloatSum, float value must be read through FloatSum.value()
                     self.objective_value_ = None
 
         else:  # clear values of variables
@@ -337,6 +331,8 @@ class CPM_z3(SolverInterface):
         # objective can be a nested expression for z3
         if not isinstance(self.z3_solver, z3.Optimize):
             raise NotSupportedError("Use the z3 optimizer for optimization problems")
+
+        self.objective_ = expr
 
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()

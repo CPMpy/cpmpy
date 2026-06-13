@@ -140,6 +140,7 @@ class CPM_ortools(SolverInterface):
         # for solving with assumption variables,
         # need to store mapping from ORTools Index to CPMpy variable
         self.assumption_dict = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="ortools", cpm_model=cpm_model)
@@ -278,12 +279,12 @@ class CPM_ortools(SolverInterface):
                     raise ValueError(f"Var {cpm_var} is unknown to the OR-Tools solver, this is unexpected - "
                                      f"please report on github...")
 
-            # translate objective
             if self.has_objective():
-                ort_obj_val = self.ort_solver.objective_value
-                if round(ort_obj_val) == ort_obj_val:  # its integer
-                    self.objective_value_ = int(ort_obj_val)
-                else:  # FloatSum objective, must be read through FloatSum.value()
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
                     self.objective_value_ = None
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -363,6 +364,8 @@ class CPM_ortools(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
+
+        self.objective_ = expr
 
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()

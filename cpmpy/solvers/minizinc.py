@@ -294,6 +294,7 @@ class CPM_minizinc(SolverInterface):
         # Prepare solve statement, so it can be overwritten on demand
         self.mzn_txt_solve = "solve satisfy;"
         self.mzn_result = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
@@ -404,13 +405,13 @@ class CPM_minizinc(SolverInterface):
                 else:
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
-            # translate objective, for optimisation problems only (otherwise None)
-            if self.mzn_result.objective is None:
-                self.objective_value_ = None
-            elif round(self.mzn_result.objective) == self.mzn_result.objective:  # its integer
-                self.objective_value_ = int(self.mzn_result.objective)
-            else:  # FloatSum objective, must be read through FloatSum.value()
-                self.objective_value_ = None
+            if self.has_objective():
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -586,6 +587,7 @@ class CPM_minizinc(SolverInterface):
 
             'objective()' can be called multiple times, only the last one is stored
         """
+        self.objective_ = expr
 
         if isinstance(expr, FloatSum):
             ws, vs, const = expr.components()
