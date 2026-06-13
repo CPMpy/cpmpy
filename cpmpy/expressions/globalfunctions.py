@@ -1166,14 +1166,14 @@ class FloatSum:
             return None
         return float(np.dot(self.coeffs, vals) + self.const)
 
-    def components(self, negbool=False) -> tuple[np.ndarray, NDVarArray, float]:
+    def components(self, allow_negbool=False) -> tuple[np.ndarray, NDVarArray, float]:
         """
         Return ``(coeffs, vars, const)``
         
-        if `negbool` is False (default), we will eliminate all :class:`~cpmpy.expressions.variables.NegBoolView`
+        if `allow_negbool` is False (default), we will eliminate all :class:`~cpmpy.expressions.variables.NegBoolView`
         ``w * ~bv`` becomes ``w - w * bv`` (coeff ``-w`` on ``bv._bv``, constant ``+w``).
         """
-        if negbool or not any(isinstance(v, NegBoolView) for v in self.vars):
+        if allow_negbool or not any(isinstance(v, NegBoolView) for v in self.vars):
             return self.coeffs, self.vars, self.const
         else:
             ws: list[float] = []
