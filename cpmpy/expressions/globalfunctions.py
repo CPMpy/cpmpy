@@ -1133,6 +1133,12 @@ class FloatSum:
     const: float
 
     def __init__(self, coeffs: ListLike[float|np.floating], vars: ListLike[_NumVarImpl], const: float|np.floating = 0.0):
+        """
+        Arguments:
+            coeffs (ListLike[float | np.floating]): Float coefficients for the weighted sum
+            vars (ListLike[_NumVarImpl]): Decision variables (including NegBoolView) as terms
+            const (float | np.floating, optional): Constant term added to the sum (default 0.0)
+        """
         self.coeffs = np.asarray(coeffs, dtype=float).reshape(-1)
         self.const = float(const)
         if isinstance(vars, NDVarArray):
