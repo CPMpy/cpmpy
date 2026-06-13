@@ -1190,7 +1190,7 @@ class FloatSum:
             return np.asarray(ws, dtype=float), cpm_array(vs), const
 
     def _raise_objective_only(self) -> NoReturn:
-        raise TypeError("FloatSum is objective-only. Use it directly in solver minimize()/maximize().")
+        raise TypeError("FloatSum cannot be used as an expression, only as an objective. Pass it directly to solver minimize()/maximize().")
 
     def __eq__(self, other: object) -> NoReturn: self._raise_objective_only()
     def __ne__(self, other: object) -> NoReturn: self._raise_objective_only()
