@@ -256,7 +256,7 @@ class CPM_cplex(SolverInterface):
             if self.has_objective():
                 obj_val = self.cplex_model.get_objective_expr().solution_value
                 if round(obj_val) == obj_val:  # its integer
-                    self.objective_value_ = round(obj_val)
+                    self.objective_value_ = round(obj_val) + self._obj_offset
                 else:  # FloatSum objective, must be read through FloatSum.value()
                     self.objective_value_ = None
 
