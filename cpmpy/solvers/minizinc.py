@@ -909,8 +909,8 @@ class CPM_minizinc(SolverInterface):
             values = sorted(set(v for _, v, _ in transitions))
             val_min, val_max = min(values), max(values)
 
-            # Build transition dict: (state, value) -> next_state
-            trans = {(node_map[s], v): node_map[e] for s, v, e in transitions}
+            # Transform transition dict to use 1-indexed state identifiers
+            trans = {(node_map[s], v): node_map[e] for (s, v), e in expr.trans_dict.items()}
 
             # Build 2D transition table d[1..Q, val_min..val_max] with <> for undefined
             d_entries = []
