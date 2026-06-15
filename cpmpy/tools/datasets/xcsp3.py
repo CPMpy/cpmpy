@@ -5,11 +5,14 @@ XCS3 Dataset
     Origin: https://xcsp.org/instances/
 """
 
+from __future__ import annotations
+
 import os
 import lzma
 import zipfile
 import pathlib
 import io
+from typing import Any, Optional, Dict, Callable
 
 from cpmpy.tools.datasets.core import FileDataset
 
@@ -34,9 +37,11 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
     citation = [
         "Audemard, G., Boussemart, F., Lecoutre, C., Piette, C., Tabary, S. XCSP3: An Integrated Format for Benchmarking Combinatorial Constrained Problems. arXiv:2009.00514, 2020.",
     ]
-    
 
-    def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP", transform=None, target_transform=None, download: bool = False, **kwargs):
+
+    def __init__(self, root: str = ".", year: int = 2024, track: str = "CSP",
+                 transform: Optional[Callable] = None, target_transform: Optional[Callable] = None,
+                 download: bool = False, **kwargs: Any):
         """
         Initialize the XCSP3 Dataset.
         """
@@ -59,18 +64,18 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
             **kwargs
         )
 
-    def categories(self) -> dict:
+    def categories(self) -> Dict[str, Any]:
         return {
             "year": self.year,
             "track": self.track
         }
 
-    def collect_instance_metadata(self, file) -> dict:
+    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
         """
         Extract instance type (CSP/COP) from XCSP3 XML root element.
         """
         import re
-        result = {}
+        result: Dict[str, Any] = {}
         try:
             with self.open(file) as f:
                 # Read only the first few lines to find the root element
@@ -138,8 +143,8 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
                 if file_info.filename.startswith(prefix):
                     # Extract file to track_dir, removing main_folder/track prefix
                     filename = pathlib.Path(file_info.filename).name
-                    with zip_ref.open(file_info) as source, open(self.dataset_dir / filename, 'wb') as target:
-                        target.write(source.read())
+                    with zip_ref.open(file_info) as source, open(self.dataset_dir / filename, 'wb') as out_file:
+                        out_file.write(source.read())
 
         # Clean up the zip file
         target_download_path.unlink()

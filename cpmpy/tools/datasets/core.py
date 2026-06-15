@@ -82,7 +82,7 @@ import pathlib
 import io
 import sys
 import tempfile
-from typing import Any, Optional, Tuple, List, Callable, ClassVar
+from typing import Any, Optional, Tuple, List, Dict, Iterator, Callable, ClassVar
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
 
@@ -156,7 +156,7 @@ class Dataset(ABC):
         pass
 
     @abstractmethod
-    def instance_metadata(self, instance) -> dict:
+    def instance_metadata(self, instance: Any) -> Dict[str, Any]:
         """
         Return the metadata for a given instance.
         """
@@ -168,7 +168,7 @@ class Dataset(ABC):
     # ---------------------------------------------------------------------------- #
 
     @classmethod
-    def dataset_metadata(cls) -> dict:
+    def dataset_metadata(cls) -> Dict[str, Any]:
         """
         Return dataset-level metadata as a dictionary.
 
@@ -193,14 +193,14 @@ class Dataset(ABC):
     #                                   Internals                                  #
     # ---------------------------------------------------------------------------- #
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Tuple[Any, Any]]:
         """
         Iterate over the dataset.
         """
         for i in range(len(self)):
             yield self[i]
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs: Any):
         """
         A collection of checks to ensure that the subclass is a valid Dataset subclass.
         """
@@ -248,7 +248,7 @@ class FileDataset(Dataset):
     """ 
 
     # Extension for metadata sidecar files
-    METADATA_EXTENSION = ".meta.json"
+    METADATA_EXTENSION: ClassVar[str] = ".meta.json"
 
     def __init__(
             self,
@@ -257,7 +257,7 @@ class FileDataset(Dataset):
             download: bool = False,
             parse: bool = False,
             extension: str = ".txt",
-            **kwargs
+            **kwargs: Any
         ):
         """
         Constructor for the FileDataset base class.
@@ -317,7 +317,7 @@ class FileDataset(Dataset):
 
 
     @abstractmethod
-    def categories(self) -> dict:
+    def categories(self) -> Dict[str, Any]:
         """
         Labels to distinguish instances into categories matching to those of the dataset.
         E.g.
@@ -327,7 +327,7 @@ class FileDataset(Dataset):
         pass
 
     @abstractmethod
-    def download(self, *args, **kwargs):
+    def download(self, *args: Any, **kwargs: Any):
         """
         Download the dataset.
         """
@@ -338,7 +338,7 @@ class FileDataset(Dataset):
     #                        Methods to optionally overwrite                       #
     # ---------------------------------------------------------------------------- #
 
-    def collect_instance_metadata(self, file: pathlib.Path) -> dict:
+    def collect_instance_metadata(self, file: pathlib.Path) -> Dict[str, Any]:
         """
         Provide domain-specific instance metadata.
         Called once after download for each instance.
@@ -379,7 +379,7 @@ class FileDataset(Dataset):
         with self.open(instance) as f:
             return f.read()
 
-    def parse(self, instance: os.PathLike):
+    def parse(self, instance: os.PathLike) -> Any:
         """
         Parse an instance file into intermediate data structures.
 
@@ -404,7 +404,7 @@ class FileDataset(Dataset):
     # ---------------------------------------------------------------------------- #
 
 
-    def instance_metadata(self, instance: os.PathLike) -> dict:
+    def instance_metadata(self, instance: os.PathLike) -> Dict[str, Any]:
         """
         Return the metadata for a given instance file.
 
@@ -443,7 +443,7 @@ class FileDataset(Dataset):
 
     # ------------------------------ Instance access ----------------------------- #
 
-    def _list_instances(self) -> list:
+    def _list_instances(self) -> List[pathlib.Path]:
         """
         List all instance files, excluding metadata sidecar files.
 
@@ -559,7 +559,7 @@ class FileDataset(Dataset):
             # Build structured, self-contained sidecar. Let exceptions from
             # collect_instance_metadata() propagate: a failure signals a corrupt
             # instance or a bug, which should surface rather than be buried.
-            sidecar = {
+            sidecar: Dict[str, Any] = {
                 "dataset": self.dataset_metadata(),
                 "instance_name": self._instance_name(file_path),
                 "source_file": str(file_path.relative_to(self.dataset_dir)),
@@ -576,7 +576,7 @@ class FileDataset(Dataset):
     @staticmethod
     def _download_file(url: str, target: str, destination: Optional[str] = None,
                         desc: Optional[str] = None,
-                        chunk_size: int = 1024 * 1024) -> os.PathLike:
+                        chunk_size: int = 1024 * 1024) -> pathlib.Path:
         """
         Download a file from a URL with progress bar and speed information.
 
@@ -592,7 +592,7 @@ class FileDataset(Dataset):
             chunk_size (int): Size of each chunk for download in bytes (default=1MB).
 
         Returns:
-            os.PathLike: The destination path where the downloaded file is saved.
+            pathlib.Path: The destination path where the downloaded file is saved.
         """
 
         if desc is None:
@@ -685,22 +685,17 @@ def from_files(dataset_dir: os.PathLike, extension: str = ".txt") -> FileDataset
             print(x, y)
     """
     class FromFilesDataset(FileDataset):
-        # Plain class attributes so that dataset_metadata() (a classmethod
-        # that reads cls.name / cls.description / ...) works correctly.
-        name = ""
+        name = pathlib.Path(dataset_dir).name
         description = ""
         homepage = ""
-        citation: List[str] = []
 
         def __init__(self, dataset_dir: os.PathLike, extension: str = ".txt"):
-            # Set name from the directory so metadata contains something useful.
-            self.name = pathlib.Path(dataset_dir).name
             super().__init__(dataset_dir=dataset_dir, extension=extension)
 
-        def categories(self) -> dict:
+        def categories(self) -> Dict[str, Any]:
             return {}
 
-        def download(self) -> None:
+        def download(self):
             pass  # already in local files
 
     return FromFilesDataset(dataset_dir, extension)
