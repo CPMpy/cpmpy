@@ -54,7 +54,7 @@
     ==============
 """
 import re
-from typing import cast, Optional
+from typing import Optional
 import warnings
 import sys
 import os
@@ -891,7 +891,7 @@ class CPM_minizinc(SolverInterface):
                 domain_str = self._convert_expression(domain)
             return "({} in {})".format(arg0_str, domain_str)
 
-        elif expr.name == "regular":
+        elif isinstance(expr, Regular):
             # MiniZinc: `regular(array[int] of var int: x, array[int,int] of opt int: d, int: q0, set of int: F)`
             # We map CPMpy's named states to 1-indexed integers.
             # Example:
@@ -899,12 +899,11 @@ class CPM_minizinc(SolverInterface):
             #   MiniZinc: `constraint regular([IV0,IV1,IV2], array2d(1..3, 0..1, [<>,2,2,3,2,3]), 1, {3})`
             #            note: `d` is a 2D array `[|<>,2|2,3|2,3|]` with rows=states, cols=values
 
-            reg = cast(Regular, expr)
-            array, transitions, start, accepting = reg.args
+            array, transitions, start, accepting = expr.args
 
             # Map states to 1..Q (MiniZinc states are 1-indexed)
-            node_map = {n: i + 1 for i, n in enumerate(reg.nodes)}
-            Q = len(reg.nodes)
+            node_map = {n: i + 1 for i, n in enumerate(expr.nodes)}
+            Q = len(expr.nodes)
 
             # Determine value range for the alphabet
             values = sorted(set(v for _, v, _ in transitions))
