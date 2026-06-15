@@ -71,7 +71,7 @@ from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
-from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
+from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount, MDD
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.utils import is_int, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -98,7 +98,7 @@ class CPM_minizinc(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "cumulative", "circuit", "gcc",
+                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "cumulative", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
@@ -889,6 +889,32 @@ class CPM_minizinc(SolverInterface):
             else:
                 domain_str = self._convert_expression(domain)
             return "({} in {})".format(arg0_str, domain_str)
+
+        elif expr.name == "mdd":
+            # mdd(array): transitions live in expr.mapping / expr.levels (not in args)
+            # MiniZinc mdd expects: mdd(x, N, level, E, from, label, to) with root=node 1 and sink as to=0
+            assert isinstance(expr, MDD)
+            array = expr.args[0]
+            array_str = self._convert_expression(array)
+            sink = expr.sink_node
+            # Renumber CPMpy node ids to integers 1..N (root must be node 1; sink encoded as 0 in to)
+            nodes = sorted((n for n in expr.levels if n != sink),
+                           key=lambda n: (expr.levels[n], str(n)))
+            node_map = {n: i + 1 for i, n in enumerate(nodes)}
+            level_str = "[" + ",".join(str(expr.levels[n] + 1) for n in nodes) + "]"
+            # Convert transitions to parallel arrays for MiniZinc
+            from_list, label_list, to_list = [], [], []
+            for id1 in sorted(expr.mapping.keys(), key=lambda n: (expr.levels[n], str(n))):
+                for val in sorted(expr.mapping[id1].keys()):
+                    id2 = expr.mapping[id1][val]
+                    from_list.append(str(node_map[id1]))
+                    label_list.append("{{{}}}".format(val))  # label is a set of int per edge
+                    to_list.append("0" if id2 == sink else str(node_map[id2]))
+            from_str = "[{}]".format(",".join(from_list))
+            label_str = "[{}]".format(",".join(label_list))
+            to_str = "[{}]".format(",".join(to_list))
+            return "mdd({}, {}, {}, {}, {}, {}, {})".format(
+                array_str, len(nodes), level_str, len(from_list), from_str, label_str, to_str)
 
         elif expr.name == "regular":
             # regular(array, transitions, start, accepting)
