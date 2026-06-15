@@ -1300,7 +1300,7 @@ class Xor(GlobalConstraint):
             changed = False
             for i, a in enumerate(new_args):  # index into new_args (constants already removed)
                 if isinstance(a, _BoolVarImpl):
-                    new_args[i] = ~a # a is var, ok to be negated
+                    new_args[i] = ~a  # a is var, ok to be negated
                     changed = True
                     break
             if not changed:  # no variables, negate first argument
@@ -1334,13 +1334,13 @@ class Xor(GlobalConstraint):
         changed = False
         for i, a in enumerate(self.args):
             if isinstance(a, _BoolVarImpl):
-                new_args[i] = ~a # a is var, ok to be negated
+                new_args[i] = ~a  # a is var, ok to be negated
                 changed = True
                 break
 
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            new_args[0] = recurse_negation(new_args[0]) # .negate() cannot introduce negation, so push down into arg
+            new_args[0] = recurse_negation(new_args[0])  # .negate() cannot introduce negation, so push down into arg
 
         return Xor(new_args)
 

@@ -437,7 +437,7 @@ def normalized_boolexpr(expr, csemap=None):
             return ((recurse_negation(lhs) | rhs), lcons+rcons)
         if expr.name == 'not':
             flatvar, flatcons = get_or_make_var(expr.args[0], csemap=csemap)
-            return (~flatvar, flatcons) # flatvar is var, so safe to just negate
+            return (~flatvar, flatcons)  # flatvar is var, so safe to just negate
         if not expr.has_subexpr():
             return (expr, [])
         else:
@@ -469,7 +469,7 @@ def normalized_boolexpr(expr, csemap=None):
                 (lhs, lcons) = get_or_make_var(lexpr, csemap=csemap)
                 if expr.name == '!=' and rvar.is_bool():
                     # != not needed, negate RHS variable
-                    rvar = ~rvar # rvar is var, so safe to just negate
+                    rvar = ~rvar  # rvar is var, so safe to just negate
                     exprname = '=='
             else:
                 # other cases: LHS is numexpr
