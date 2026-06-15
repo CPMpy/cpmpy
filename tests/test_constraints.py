@@ -23,7 +23,7 @@ NUM_GLOBAL = {
     "AllEqual", "AllDifferent", "AllDifferentExcept0",
     "AllDifferentExceptN", "AllEqualExceptN",
     "GlobalCardinalityCount", "InDomain", "Inverse","Circuit",
-    "Table", 'NegativeTable', "ShortTable", "Regular",
+    "Table", 'NegativeTable', "ShortTable", "Regular", "MDD",
     "Increasing", "IncreasingStrict", "Decreasing", "DecreasingStrict", 
     "Precedence", "Cumulative", "NoOverlap", "CumulativeOptional", "NoOverlapOptional",
     "LexLess", "LexLessEq", "LexChainLess", "LexChainLessEq",
