@@ -199,7 +199,9 @@ def reify_rewrite(constraints, supported=frozenset(), csemap=None):
                     (auxvar, cons) = get_or_make_var(lhs, csemap=csemap)
                     newcons += cons
                     reifexpr = copy.copy(cpm_expr)
-                    reifexpr.args[boolexpr_index] = Comparison(op, auxvar, rhs)  # Comp(OP,AUX,RHS)
+                    args = list(reifexpr.args)
+                    args[boolexpr_index] = Comparison(op, auxvar, rhs)  # Comp(OP,AUX,RHS)
+                    reifexpr.update_args(tuple(args))
                     newcons.append(reifexpr)
             else:
                 # don't think this will be reached

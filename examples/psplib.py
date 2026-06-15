@@ -59,9 +59,8 @@ class PSPLibDataset(object):  # torch.utils.data.Dataset compatible
                 print(f"Downloading PSPLib {variant} {family} instances...")
                 
                 zip_name = f"{family}.{self.family_codes[variant]}.zip"
-                url = f"https://www.om-db.wi.tum.de/psplib/files/"
-
-                url_path = url + zip_name
+                url = "https://www.om-db.wi.tum.de/psplib/download_dataset.php?set={family}&mode={variant}&format=zip"
+                url_path = url.format(family=family, variant=self.family_codes[variant])
                 zip_path = self.root / zip_name
                 
                 try:

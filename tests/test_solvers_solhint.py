@@ -1,5 +1,3 @@
-import unittest
-
 import cpmpy as cp
 from cpmpy.exceptions import NotSupportedError
 from cpmpy import SolverLookup
@@ -7,14 +5,12 @@ from cpmpy import SolverLookup
 import pytest
 
 
-@pytest.mark.parametrize(
-        "solver",
-        [name for name, solver in SolverLookup.base_solvers() if solver.supported()]
-)
+@pytest.mark.usefixtures("solver")
 class TestSolutionHinting:
 
-
     def test_hints(self, solver):
+        if solver == "rc2":
+            pytest.skip("does not support solution hints")
 
         a,b = cp.boolvar(shape=2)
         model = cp.Model(a | b)
@@ -32,9 +28,12 @@ class TestSolutionHinting:
         
         if solver == "ortools":
             args = {"cp_model_presolve": False} # hints are not taken into account in presolve
+        elif solver == "cplex":
+            args = {"clean_before_solve": True} # will continue from previous solution otherwise
         else:
             args = {}
 
+        slv.solution_hint([a,b], [True, False]) # check hints are used
         assert slv.solve(**args)
         assert a.value() == True
         assert b.value() == False
@@ -47,6 +46,7 @@ class TestSolutionHinting:
         slv.solution_hint([a,b], [False,False])
         assert slv.solve(**args) # should also work with an UNSAT hint
 
-        slv.solution_hint([a,[b]], [[[False]], True]) # check nested lists
-        assert slv.solve(**args)
+        # disabled, does not match type hints of `def solution_hint`
+        # slv.solution_hint([a,[b]], [[[False]], True]) # check nested lists
+        # assert slv.solve(**args)
 

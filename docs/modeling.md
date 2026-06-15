@@ -18,25 +18,29 @@ pip install cpmpy[gurobi, choco, exact] # installs 3 additional solving backends
 
 An overview of the available backends can be found [here](index.rst#supported-solvers).
 
-CPMpy requires python version  3.8 or higher.
+CPMpy requires python version  3.10 or higher.
 
 See [installation instructions](./installation_instructions.rst) for more details. 
 
+```{warning}
+CPMpy does not enforce hard version upper limits on its dependencies. For settings where robustness and reproducability are of great importance, have a look at the above detailed installation instructions.
+```
+
 ## Using the library
 
-To conveniently use CPMpy in your Python project, include it as follows:
-```python
-from cpmpy import *
-```
-This will overload the built-in `any()`, `all()`, `min()`, `max()`, `sum()` functions, such that they create CPMpy expressions when used on decision variables (see below). This convenience comes at the cost of some overhead for all uses of these functions in your code (even when no CPMpy decision variables are involved).
-
-You can also import it as a package, which does not overload the Python built-ins:
+We recommend that you import it as a package, to avoid overloading the Python built-ins and having side-effects in the rest of your code:
 ```python
 import cpmpy as cp
 ```
-The build-in operators can now be accessed through the package (for example `cp.any()`) without overloading Python's defaults.
 
-We will use the latter in this document.
+The Python built-ins we overload are `all()`, `any()`, `max()`, `min()`, `sum()`, `abs()`, such that they create CPMpy expressions when used on decision variables (see below). With the impove import, they can be accessed as `cp.any()`, `cp.sum()` etc.
+
+You can also import all CPMpy expressions and overloaded functions as follows:
+```python
+from cpmpy import *
+```
+This makes the code 'look' more like a native language (you can write `sum()` instead of `cp.sum()`), but it comes at the cost of some overhead for all uses of these Python built-ins when they don't involve expressions.
+
 
 ## Decision variables
 
@@ -100,10 +104,10 @@ m = cp.Model(
 )
 
 # Adding more constraints
-m += (y - z != x)
-m += (x + y + z <= 15)
+m.add(y - z != x)
+m.add(x + y + z <= 15)
 # you can also add a list of constraints, which is interpreted as a conjunction of constraints
-m += [v <= 9 for v in [x,y,z]]
+m.add([v <= 9 for v in [x,y,z]])
 
 print(f"The model contains {len(m.constraints)} constraints")
 print(m)  # pretty printing of the model, very useful for debugging
@@ -371,13 +375,13 @@ arr = np.arange(4)  # array([0, 1, 2, 3])
 idx = cp.intvar(0,len(arr))  # indexing is offset 0
 
 m = cp.Model()
-#m += (arr[idx] == 2)             # does not work, numpy does not know what to do
+#m.add(arr[idx] == 2)             # does not work, numpy does not know what to do
 # IndexError: only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices
 
 cparr = cp.cpm_array(arr)         # wrap in CPMpy array
-m += (cparr[idx] == 2)            # works
+m.add(cparr[idx] == 2)            # works
 
-m += (cp.Element(arr, idx) == 2)  # also works, identical to above
+m.add(cp.Element(arr, idx) == 2)  # also works, identical to above
 
 m.solve()
 print(f"arr: {arr.value()}, idx: {idx.value()}, val: {arr[idx].value()}")
@@ -402,9 +406,9 @@ b = cp.boolvar(name="b")
 x = cp.intvar(1,10, shape=3, name="x")
 
 # Constraints
-m += (x[0] == 1)
-m += cp.AllDifferent(x)
-m += b.implies(x[1] + x[2] > 5)
+m.add(x[0] == 1)
+m.add(cp.AllDifferent(x))
+m.add(b.implies(x[1] + x[2] > 5))
 
 # Objective function (optional)
 m.maximize(cp.sum(x) + 100*b)
@@ -501,7 +505,7 @@ print(m)
 s = cp.SolverLookup.get("ortools") # will be explained later
 # feed the constraints one-by-one 
 for c in m.constraints:
-    s += c  # add the constraints incrementally until you hit the error
+    s.add(c)  # add the constraints incrementally until you hit the error
 ```
 
 If that is not sufficient or you want to debug an unexpected (non)solution, have a look at our detailed [Debugging guide](./how_to_debug.md).
@@ -509,6 +513,7 @@ If that is not sufficient or you want to debug an unexpected (non)solution, have
 ## Selecting a solver
 
 The default solver is [OR-Tools CP-SAT](https://developers.google.com/optimization), an award winning constraint solver. But CPMpy supports multiple other solvers: a MIP solver (gurobi), SAT solvers (those in PySAT), the Z3 SMT solver, even a knowledge compiler (PySDD) and any CP solver supported by the text-based MiniZinc language.
+
 
 
 The list of supported solver interfaces can be found in [the API documentation](./api/solvers.rst) or by using the following:
@@ -520,15 +525,13 @@ cp.SolverLookup.base_solvers() # returns a list of tuples,
 # [('ortools', <class 'cpmpy.solvers.ortools.CPM_ortools'>), ('z3', <class 'cpmpy.solvers.z3.CPM_z3'>), ('minizinc', <class 'cpmpy.solvers.minizinc.CPM_minizinc'>), ('gcs', <class 'cpmpy.solvers.gcs.CPM_gcs'>), ('gurobi', <class 'cpmpy.solvers.gurobi.CPM_gurobi'>), ('pysat', <class 'cpmpy.solvers.pysat.CPM_pysat'>), ('pysdd', <class 'cpmpy.solvers.pysdd.CPM_pysdd'>), ('exact', <class 'cpmpy.solvers.exact.CPM_exact'>), ('choco', <class 'cpmpy.solvers.choco.CPM_choco'>), ('cpo', <class 'cpmpy.solvers.cpo.CPM_cpo'>)]
 ```
 
+To get some information on which solvers are currently available on your system, you can make use of our convenient CLI:
 
-Additionally, one can get the version (if available) of each of these solvers:
-```python
-import cpmpy as cp
-cp.SolverLookup.version() # returns list of per-solver version reports: {name: ..., installed: ..., version: ...}
-# [{'name': 'ortools', 'installed': True, 'version': '9.12.4544'}, {'name': 'pysat', 'installed': True, 'version': '1.8.dev16'}, ...]
-cp.SolverLookup.print_version() # prints 'solver version' table to stdout
+```bash
+cpmpy version
 ```
 ```console
+CPMpy version: 0.9.26
 Solver               Installed  Version        
 --------------------------------------------------
 ortools              Yes        9.12.4544
@@ -547,7 +550,19 @@ pysdd                No         -
 exact                Yes        2.1.0
 choco                No         -
 cpo                  No         -
+...                  ...        ...
 ```
+
+
+Additionally, we provide programatic access to that same information:
+
+```python
+import cpmpy as cp
+cp.SolverLookup.version() # returns list of per-solver version reports: {name: ..., installed: ..., version: ...}
+# [{'name': 'ortools', 'installed': True, 'version': '9.12.4544'}, {'name': 'pysat', 'installed': True, 'version': '1.8.dev16'}, ...]
+cp.SolverLookup.print_version() # prints 'solver version' table to stdout, same as the CLI
+```
+
 
 Some solvers (like minizinc and pysat) also provide a collection of subsolvers:
 ```python
@@ -585,9 +600,9 @@ for solvername in cp.SolverLookup.solvernames() # all solvers (+subsolvers) inst
 ```
 
 ```{Note}
-For solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
+For solvers other than "ortools", you will need to **install additional package(s)**. You can check if a solver, e.g. "gurobi", is supported by calling `cp.SolverLookup.get("gurobi")` and it will raise a helpful error if it is not yet installed on your system. Most solvers can easily be installed through `pip install cpmpy[<solver_name>]`. See [the API documentation](./api/solvers.rst) of the solver for detailed installation instructions.
 ```console
-    Exception: CPM_gurobi: Install the python package 'gurobipy' to use this solver interface.
+    ModuleNotFoundError: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
 ```
 
 
@@ -609,7 +624,7 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3) 
 s = cp.SolverLookup.get("ortools")
 # we are operating on the ortools interface here
-s += (cp.sum(x) <= 5)
+s.add(cp.sum(x) <= 5)
 s.solve()
 print(s.status())
 ```
@@ -649,7 +664,7 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3) 
 s = cp.SolverLookup.get("ortools")
 # we are operating on the ortools interface here
-s += (cp.sum(x) <= 5)
+s.add(cp.sum(x) <= 5)
 s.solve()
 print(s.ort_solver.NumBranches())
 ```
@@ -663,7 +678,7 @@ import cpmpy as cp
 x = cp.intvar(0,10, shape=3) 
 s = cp.SolverLookup.get("minizinc")
 # we are operating on the minizinc interface here
-s += (cp.sum(x) <= 5)
+s.add(cp.sum(x) <= 5)
 s.solve()
 print(s.mzn_result.statistics)
 print(s.mzn_result.statistics['nodes']) # if we are only interested in the nb of search nodes
@@ -678,12 +693,13 @@ This has two potential benefits for incremental solving, whereby you add more co
   2) if the solver itself is incremental then it can reuse any information from call to call, as the state of the native solver object is kept between solver calls and can therefore rely on information derived during a previous `.solve()` call.
 
 ```python
-s = SolverLookup.get("gurobi")
+import cpmpy as cp
+s = cp.SolverLookup.get("gurobi")
 
-s += sum(ivar) <= 5 
+s.add(cp.sum(ivar) <= 5)
 s.solve()
 
-s += sum(ivar) == 3
+s.add(cp.sum(ivar) == 3)
 # the underlying gurobi instance is reused, only the new constraint is added to it.
 # gurobi is an incremental solver and will look for solutions starting from the previous one.
 s.solve()
@@ -703,14 +719,14 @@ import cpmpy as cp
 x = cp.intvar(1,5, shape=5, name="x")
 
 c1 = cp.AllDifferent(x)
-c2 = x[0] == cp.min(x)
-c3 = x[-1] == 1 # this one makes it UNSAT
+c2 = (x[0] == cp.min(x))
+c3 = (x[-1] == 1) # this one makes it UNSAT
 
 cp.Model([c1,c2,c3]).solve() # Will be UNSAT
 
 s = cp.SolverLookup.get("exact") # OR-tools, PySAT and Exact support solving under assumptions
 assump = cp.boolvar(shape=3, name="assump")
-s += assump.implies([c1,c2,c3]) # assump[0] -> c1, assump[1] -> c2, assump[2] -> c3
+s.add(assump.implies([c1,c2,c3])) # assump[0] -> c1, assump[1] -> c2, assump[2] -> c3
 
 # Underlying solver state will be kept inbetween solve-calls
 s.solve(assumptions=assump[0,1]) # Will be SAT
@@ -729,7 +745,7 @@ We sometimes add solver-specific functions to the CPMpy interface, for convenien
 import cpmpy as cp
 x = cp.intvar(0,10, shape=3)
 s = cp.SolverLookup.get("ortools")
-s += cp.sum(x) <= 5
+s.add(cp.sum(x) <= 5)
 # we are operating on an ortools' interface here
 s.solution_hint(x, [1,2,3])
 s.solve()
@@ -754,8 +770,8 @@ import cpmpy as cp
 iv = cp.intvar(1,9, shape=3)
 
 s =  cp.SolverLookup.get("ortools")
-s += cp.AllDifferent(iv)
-s += cp.DirectConstraint("AddAllDifferent", iv)  # a DirectConstraint equivalent to the above for OR-Tools
+s.add(cp.AllDifferent(iv))
+s.add(cp.DirectConstraint("AddAllDifferent", iv))  # a DirectConstraint equivalent to the above for OR-Tools
 ```
 
 This requires knowledge of the API of the underlying solver, as any function name that you give to it will be called. The only special thing that the DirectConstraint does, is automatically translate any CPMpy variable in the arguments to the native solver variable.
@@ -775,8 +791,8 @@ trans_tabl = [ # corresponds to regex 0* 1+ 0+
     (1, 0, 2),
     (2, 0, 2)
 ]
-s += cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
-                         novar=[1, 2, 3])  # optional, what arguments not to scan for vars
+s.add(cp.DirectConstraint("AddAutomaton", (trans_vars, 0, [2], trans_tabl),
+                          novar=[1, 2, 3])  # optional, what arguments not to scan for vars
 ```
 
 A minimal example of the DirectConstraint for every supported solver is [in the test suite](https://github.com/CPMpy/cpmpy/tree/master/tests/test_direct.py).
@@ -797,7 +813,7 @@ iv = cp.intvar(1,9, shape=3)
 
 s = cp.SolverLookup.get("ortools")
 
-s += AllDifferent(iv)  # the traditional way, equivalent to:
+s.add(AllDifferent(iv))  # the traditional way, equivalent to:
 s.native_model.AddAllDifferent(s.solver_vars(iv))  # directly calling the API (OR-Tools' python library), has to be with native variables
 ```
 

@@ -1,5 +1,110 @@
 # Change log
 
+## 0.10.0
+
+### Added
+
+* **New solver**: Rc2 MaxSAT solver [#729](https://github.com/CPMpy/cpmpy/pull/729)
+* Expended `to_cnf` using `pumpkin` encoding backend [#782](https://github.com/CPMpy/cpmpy/pull/782)
+* Linearisation of multiplication between Boolean and Integer [#769](https://github.com/CPMpy/cpmpy/pull/769)
+* Solution callback for Hexaly [#787](https://github.com/CPMpy/cpmpy/pull/787), [#809](https://github.com/CPMpy/cpmpy/pull/809)
+* Start of solver parametrised testsuite [#817](https://github.com/CPMpy/cpmpy/pull/817)
+* Documentation overview of solver capabilities [#728](https://github.com/CPMpy/cpmpy/pull/728)
+* Typehints and documentation update for global constraints [#812](https://github.com/CPMpy/cpmpy/pull/812)
+* Typehints for Solve and SolveAll [#775](https://github.com/CPMpy/cpmpy/pull/775)
+* OCUS in tools, allowing meta-constraints on MUSes [#698](https://github.com/CPMpy/cpmpy/pull/698)
+* Fix supported solver version ranges [#816](https://github.com/CPMpy/cpmpy/pull/816)
+* Transversal / hitting set example (contributed by @nandorsieben) [#790](https://github.com/CPMpy/cpmpy/pull/790)
+* Nurserostering benchmark  [#789](https://github.com/CPMpy/cpmpy/pull/789)
+* Prediction+optimisation example of scheduling surgeries under uncertainty [5a87c5e](https://github.com/CPMpy/cpmpy/commit/5a87c5ec464394a952b166f93076788f70f4e2ce)
+* Decision-focused learning example [#621](https://github.com/CPMpy/cpmpy/pull/621)
+
+### Internal improvements
+
+* Globals define their own negation [#703](https://github.com/CPMpy/cpmpy/pull/703)
+* Change `cp.sum(*iterable, **kwargs)` to `cp.sum(iterable, **kwargs)` [#756](https://github.com/CPMpy/cpmpy/pull/756)
+* Division and Modulo as global functions [#807](https://github.com/CPMpy/cpmpy/pull/807)
+* Refactor decompose for global functions [#793](https://github.com/CPMpy/cpmpy/pull/793)
+* Refactor and update Cumulative and NoOverlap constraints [#694](https://github.com/CPMpy/cpmpy/pull/694)
+
+### Changed
+
+* Throw `ModuleNotFoundError` when module is not installed [#825](https://github.com/CPMpy/cpmpy/pull/825)
+
+### Fixed
+
+* Fix support for newest OR-Tools 9.15 release [#821](https://github.com/CPMpy/cpmpy/pull/821)
+* Check Hexaly license before using solver [#826](https://github.com/CPMpy/cpmpy/pull/826)
+* Fix `to_cnf` clause bypass issue [#824](https://github.com/CPMpy/cpmpy/pull/824)
+* Fix bug handle pdk unsat with conditions [#811](https://github.com/CPMpy/cpmpy/pull/811)
+* Missing packaging dependency in setup.py [#813](https://github.com/CPMpy/cpmpy/pull/813)
+* Abs constraint handle None  [#794](https://github.com/CPMpy/cpmpy/pull/794)
+* Timeout under assumptions for Exact [#805](https://github.com/CPMpy/cpmpy/pull/805)
+* Support for expressions in start, duration and end in CPO [#802](https://github.com/CPMpy/cpmpy/pull/802)
+* Consistent version checks [#792](https://github.com/CPMpy/cpmpy/pull/792)
+* Missing constraint tags for Pumpkin [#799](https://github.com/CPMpy/cpmpy/pull/799)
+* Z3 negate maximisation objective [#786](https://github.com/CPMpy/cpmpy/pull/786)
+* Scaled Booleans in Pumpkin interface [#776](https://github.com/CPMpy/cpmpy/pull/776)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.29...v0.10.0
+
+## 0.9.29
+
+### Fixed
+
+This is a hotfix release due to external breaking changes in the default solver backend.
+
+* Pin solver versions (not merged, cherry picked for this hotfix) [#816](https://github.com/CPMpy/cpmpy/pull/816)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.28...v0.9.29
+
+## 0.9.28
+
+This is a very small release with a hotfix for multi-dimensional indexing where the index is a decision variable.
+
+### Fixed
+
+* Hotfix for single expression in multi-dimensional indexing [#772](https://github.com/CPMpy/cpmpy/pull/772)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.27...v0.9.28
+
+## 0.9.27
+
+### Added
+
+* **New solver**: CPLEX ILP solver [#583](https://github.com/CPMpy/cpmpy/pull/583), [#762](https://github.com/CPMpy/cpmpy/pull/762), [#763](https://github.com/CPMpy/cpmpy/pull/763)
+* **New solver**: Hexaly local search solver [#718](https://github.com/CPMpy/cpmpy/pull/718)
+* **New tool**: CPMpy cli (get version information on all subsolvers) [#693](https://github.com/CPMpy/cpmpy/pull/693)
+* Use of CSE in `flatten_objective` [#730](https://github.com/CPMpy/cpmpy/pull/730)
+* Constraint tagging for `pumpkin` [#720](https://github.com/CPMpy/cpmpy/pull/720)
+* Solver capability overview in docs [d8d3a2d](https://github.com/CPMpy/cpmpy/commit/d8d3a2d0f78438aa0f0da6909d74b5a505b5f8a5)
+* PSP-lib dataset and loader [#701](https://github.com/CPMpy/cpmpy/pull/701)
+* Safen name collision between user and aux variables [#731](https://github.com/CPMpy/cpmpy/pull/731)
+
+### Changed
+
+* Update `pindakaas` to version 0.2.1 [#753](https://github.com/CPMpy/cpmpy/pull/753)
+* Exclude slow examples from testset [#746](https://github.com/CPMpy/cpmpy/pull/746)
+* Safe variable names [#731](https://github.com/CPMpy/cpmpy/pull/731)
+* SolverInterface consistency improvements and added tests [#726](https://github.com/CPMpy/cpmpy/pull/726)
+* Improve testing of examples [#651](https://github.com/CPMpy/cpmpy/pull/651)
+* Modernize shebangs of examples [#644](https://github.com/CPMpy/cpmpy/pull/644)
+* Linearize improvements [e721b0a](https://github.com/CPMpy/cpmpy/commit/e721b0ab960be632c525bfbbf493876031ca9d98)
+* Update waterfall (added automated int-to-bool) [710ec42](https://github.com/CPMpy/cpmpy/commit/710ec42fc34a014084e0f6bbe8d1e5eed72c3dcf)
+* Collection of improvements to GitHub README
+
+### Fixed
+
+* `Precedence` global decomposition [#742](https://github.com/CPMpy/cpmpy/pull/742)
+* Minor bugs in examples [#739](https://github.com/CPMpy/cpmpy/pull/739)
+* `gnureadline` typo in `setup.py` [#722](https://github.com/CPMpy/cpmpy/pull/722)
+* Non-contiguous array handling in `cpm_array` [#738](https://github.com/CPMpy/cpmpy/pull/738)
+* Remove simplification of nullifying arguments from constructors [#725](https://github.com/CPMpy/cpmpy/pull/725)
+* Skip psplib in testset due to random failure on GitHub actions [7a15d07](https://github.com/CPMpy/cpmpy/commit/7a15d07962610e3844d358a05c7c419e110f110c)
+* (Pin Pumpkin solver git commit [#719](https://github.com/CPMpy/cpmpy/pull/719)) outdated by [#720](https://github.com/CPMpy/cpmpy/pull/720)
+
+**Full Changelog**: https://github.com/CPMpy/cpmpy/compare/v0.9.26...v0.9.27
+
 ## 0.9.26
 
 ### Added

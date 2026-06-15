@@ -22,6 +22,7 @@ from .gurobi import CPM_gurobi
 from .ortools import CPM_ortools
 from .minizinc import CPM_minizinc
 from .pysat import CPM_pysat
+from .scip import CPM_scip
 from .z3 import CPM_z3
 from .gcs import CPM_gcs
 from .pysdd import CPM_pysdd
@@ -29,7 +30,11 @@ from .exact import CPM_exact
 from .choco import CPM_choco
 from .pumpkin import CPM_pumpkin
 from .cpo   import CPM_cpo
+from .cplex import CPM_cplex
 from .pindakaas import CPM_pindakaas
+from .highs import CPM_highs
+from .hexaly import CPM_hexaly
+from .rc2 import CPM_rc2
 
 def param_combinations(all_params, remaining_keys=None, cur_params=None):
     """
@@ -71,7 +76,8 @@ class SolverLookup():
 
             First one is default
         """
-        return [("ortools", CPM_ortools),
+        return [
+                ("ortools", CPM_ortools),
                 ("z3", CPM_z3),
                 ("minizinc", CPM_minizinc),
                 ("gcs", CPM_gcs),
@@ -82,7 +88,12 @@ class SolverLookup():
                 ("choco", CPM_choco),
                 ("pumpkin", CPM_pumpkin),
                 ("cpo", CPM_cpo),
+                ("cplex", CPM_cplex),
                 ("pindakaas", CPM_pindakaas),
+                ("highs", CPM_highs),
+                ("hexaly", CPM_hexaly),
+                ("rc2", CPM_rc2),
+                ("scip", CPM_scip),
                ]
 
     @classmethod

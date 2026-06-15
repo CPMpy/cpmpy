@@ -46,15 +46,18 @@ List of Solver-native classes
     MinizincSubcircuitWithStart
 """
 
+from typing import Literal
 import numpy as np
 import cpmpy as cp
-from cpmpy import cpm_array, intvar, boolvar
+
 from cpmpy.exceptions import CPMpyException
-from cpmpy.expressions.core import Expression, Operator
-from cpmpy.expressions.globalconstraints import GlobalConstraint, GlobalFunction, AllDifferent, InDomain, DirectConstraint
+from cpmpy.expressions.core import Expression, Operator, ListLike, ExprLike
+from cpmpy.expressions.globalconstraints import GlobalConstraint, AllDifferent, InDomain, DirectConstraint
+from cpmpy.expressions.globalfunctions import GlobalFunction
 from cpmpy.expressions.utils import STAR, is_any_list, is_num, all_pairs, argvals, flatlist, is_boolexpr, argval, is_int, \
     get_bounds, eval_comparison
-from cpmpy.expressions.variables import _IntVarImpl
+from cpmpy.expressions.variables import cpm_array, intvar, boolvar, _IntVarImpl, NDVarArray
+from cpmpy.expressions.python_builtins import all as cpm_all, any as cpm_any, min as cpm_min
 
 
 # ---------------------------------------------------------------------------- #
@@ -71,15 +74,14 @@ class AllDifferentLists(GlobalConstraint):
             raise TypeError(f"AllDifferentLists expects a list of lists, but got {lists}")
         if any(len(lst) != len(lists[0]) for lst in lists):
             raise ValueError("Lists should have equal length, but got these lengths:", list(map(len, lists)))
-        super().__init__("alldifferent_lists", [flatlist(lst) for lst in lists])
+        super().__init__("alldifferent_lists", tuple(flatlist(lst) for lst in lists))
 
     def decompose(self):
         """Returns the decomposition
         """
-        from cpmpy.expressions.python_builtins import any as cpm_any
         constraints = []
         for lst1, lst2 in all_pairs(self.args):
-            constraints += [cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2))]
+            constraints.append(cpm_any(var1 != var2 for var1, var2 in zip(lst1, lst2)))
         return constraints, []
 
     def value(self):
@@ -103,15 +105,14 @@ class AllDifferentListsExceptN(GlobalConstraint):
             raise TypeError(f"AllDifferentListsExceptN expects a list of lists, but got {lists}")
         if any(len(lst) != len(lists[0]) for lst in lists + n):
             raise ValueError("Lists should have equal length, but got these lengths:", list(map(len, lists)))
-        super().__init__("alldifferent_lists_except_n", [[flatlist(lst) for lst in lists], [flatlist(x) for x in n]])
+        super().__init__("alldifferent_lists_except_n", (tuple(flatlist(lst) for lst in lists), tuple(flatlist(x) for x in n)))
 
     def decompose(self):
         """Returns the decomposition
         """
-        from cpmpy.expressions.python_builtins import all as cpm_all
         constraints = []
         for lst1, lst2 in all_pairs(self.args[0]):
-            constraints += [cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(NonReifiedTable(lst1, self.args[1]))]
+            constraints.append(cpm_all(var1 == var2 for var1, var2 in zip(lst1, lst2)).implies(NonReifiedTable(lst1, self.args[1])))
         return constraints, []
 
     def value(self):
@@ -141,7 +142,7 @@ class SubCircuit(GlobalConstraint):
             raise CPMpyException("SubCircuitWithStart constraint must be given a minimum of 2 variables for field 'args' as stops to route between.")
 
         # Create the object
-        super().__init__("subcircuit", flatargs)
+        super().__init__("subcircuit", tuple(flatargs))
 
     def decompose(self):
         """
@@ -149,9 +150,6 @@ class SubCircuit(GlobalConstraint):
             A mix of the above Circuit decomposition, with elements from the Minizinc implementation for the support of optional visits:
             https://github.com/MiniZinc/minizinc-old/blob/master/lib/minizinc/std/subcircuit.mzn
         """
-        from cpmpy.expressions.python_builtins import min as cpm_min
-        from cpmpy.expressions.python_builtins import all as cpm_all
-
         # Input arguments
         succ = cpm_array(self.args) # Successor variables
         n = len(succ)
@@ -165,23 +163,23 @@ class SubCircuit(GlobalConstraint):
 
         # Constraining
         constraining = []
-        constraining += [AllDifferent(succ)] # All stops should have a unique successor.
+        constraining.append(AllDifferent(succ)) # All stops should have a unique successor.
         constraining += list( is_part_of_circuit.implies(succ < len(succ)) ) # Successor values should remain within domain.
         for i in range(0, n):
             # If a stop is on the subcircuit and it is not the last one, than its successor should have +1 as index.
-            constraining += [(is_part_of_circuit[i] & (i != end_node)).implies(
+            constraining.append((is_part_of_circuit[i] & (i != end_node)).implies(
                 index_within_subcircuit[succ[i]] == (index_within_subcircuit[i] + 1)
-            )]
+            ))
         constraining += list( is_part_of_circuit == (succ != np.arange(n)) ) # When a node is part of the subcircuit it should not self loop, if it is not part it should self loop.
 
         # Defining
         defining = []
-        defining += [ empty == cpm_all(succ == np.arange(n)) ] # Definition of empty subcircuit (all nodes self-loop)
-        defining += [ empty.implies(cpm_all(index_within_subcircuit == cpm_array([0]*n))) ] # If the subcircuit is empty, default all index values to 0
-        defining += [ empty.implies(start_node == 0) ] # If the subcircuit is empty, any node could be a start of a 0-length circuit. Default to node 0 as symmetry breaking.
-        defining += [succ[end_node] == start_node] # Definition of the last node. As the successor we should cycle back to the start.
-        defining += [ index_within_subcircuit[start_node] == 0 ] # The ordering starts at the start_node.
-        defining += [ ( empty | (is_part_of_circuit[start_node] == True) ) ] # The start node can only NOT belong to the subcircuit when the subcircuit is empty.
+        defining.append(empty == cpm_all(succ == np.arange(n))) # Definition of empty subcircuit (all nodes self-loop)
+        defining.append(empty.implies(cpm_all(index_within_subcircuit == cpm_array([0]*n)))) # If the subcircuit is empty, default all index values to 0
+        defining.append(empty.implies(start_node == 0)) # If the subcircuit is empty, any node could be a start of a 0-length circuit. Default to node 0 as symmetry breaking.
+        defining.append(succ[end_node] == start_node) # Definition of the last node. As the successor we should cycle back to the start.
+        defining.append(index_within_subcircuit[start_node] == 0) # The ordering starts at the start_node.
+        defining.append((empty | (is_part_of_circuit[start_node] == True))) # The start node can only NOT belong to the subcircuit when the subcircuit is empty.
         # Nodes which are not part of the subcircuit get an index fixed to +1 the index of "end_node", which equals the length of the subcircuit.
         # Nodes part of the subcircuit must have an index <= index_within_subcircuit[end_node].
         # The case of an empty subcircuit is an exception, since "end_node" itself is not part of the subcircuit
@@ -189,11 +187,11 @@ class SubCircuit(GlobalConstraint):
         # In a subcircuit any of the visited nodes can be the "start node", resulting in symmetrical solutions -> Symmetry breaking
         # Part of the formulation from the following is used: https://sofdem.github.io/gccat/gccat/Ccycle.html#uid18336
         subcircuit_visits = intvar(0, n-1, shape=n) # The visited nodes in sequence of length n, with possible repeated stops. e.g. subcircuit [0, 2, 1] -> [0, 2, 1, 0, 2, 1]
-        defining += [subcircuit_visits[0] == start_node] # The start nodes is the first stop
+        defining.append(subcircuit_visits[0] == start_node) # The start nodes is the first stop
         defining += [subcircuit_visits[i+1] == succ[subcircuit_visits[i]] for i in range(n-1)] # We follow the successor values
         # The free "start_node" could be any of the values of aux_subcircuit_visits (the actually visited nodes), resulting in degenerate solutions.
         # By enforcing "start_node" to take the smallest value, symmetry breaking is ensured.
-        defining += [start_node == cpm_min(subcircuit_visits)]
+        defining.append(start_node == cpm_min(subcircuit_visits))
 
         return constraining, defining
 
@@ -272,7 +270,7 @@ class SubCircuitWithStart(GlobalConstraint):
             raise CPMpyException("SubCircuitWithStart constraint must be given a minimum of 2 variables for field 'args' as stops to route between.")
 
         # Create the object
-        super().__init__("subcircuitwithstart", flatargs + [start_index])
+        super().__init__("subcircuitwithstart", tuple(flatargs + [start_index]))
 
     def decompose(self):
         """
@@ -285,8 +283,8 @@ class SubCircuitWithStart(GlobalConstraint):
         succ = cpm_array(self.args[:-1]) # Successor variables
 
         constraining = []
-        constraining += [SubCircuit(succ)] # The successor variables should form a subcircuit.
-        constraining += [succ[start_index] != start_index] # The start_index should be inside the subcircuit.
+        constraining.append(SubCircuit(succ)) # The successor variables should form a subcircuit.
+        constraining.append(succ[start_index] != start_index) # The start_index should be inside the subcircuit.
 
         defining = []
 
@@ -323,7 +321,7 @@ class SafeOnlyInverse(GlobalConstraint):
             name = "inverse"
         else:
             name = "inverseAsym"
-        super().__init__(name, [fwd, rev])
+        super().__init__(name, (fwd, rev))
 
     def decompose(self):
         fwd, rev = self.args
@@ -349,7 +347,7 @@ class InverseOne(GlobalConstraint):
         flatargs = flatlist([arr])
         if any(is_boolexpr(arg) for arg in flatargs):
             raise TypeError("Only integer arguments allowed for global constraint Inverse: {}".format(flatargs))
-        super().__init__("inverseOne", [arr])
+        super().__init__("inverseOne", (arr,))
 
     def decompose(self):
         from cpmpy.expressions.python_builtins import all
@@ -378,7 +376,7 @@ class Channel(GlobalConstraint):
             raise TypeError(
                 "the first argument of a Channel constraint should only contain 0-1 variables/expressions (i.e., " +
                 "intvars/intexprs with domain {0,1} or boolvars/boolexprs)")
-        super().__init__("channelValue", [arr, v])
+        super().__init__("channelValue", (arr, v))
 
     def decompose(self):
         arr, v = self.args
@@ -396,118 +394,156 @@ class NonReifiedTable(GlobalConstraint):
     Look at :class:`globalconstraints.Table <cpmpy.expressions.globalconstraints.Table` for a formulation that does support reification.
     """
 
-    def __init__(self, array, table):
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
-        super().__init__("table", [array, table])
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int]] | np.ndarray):
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):  # Ensure it is a numpy array
+            table = np.array(table, dtype=int)
+        assert table.ndim == 2, "NonReifiedTable's table must be a 2D array"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self):
         """
-            This decomposition is only valid in a non-reified setting.
+            This explicit implication-only decomposition is only valid in a non-reified setting.
         """
-        from cpmpy.expressions.python_builtins import any, all
         arr, tab = self.args
-        row_selected = boolvar(shape=len(tab))
         if len(tab) == 1:
-            return [all(t == a for (t, a) in zip(tab[0], arr))], []
+            return [cpm_all(t == a for (t, a) in zip(tab[0], arr))], []
         
-        cons = []
+        row_selected = boolvar(shape=len(tab))
+        cons = [Operator("or", row_selected)]
         for i, row in enumerate(tab):
             subexpr = Operator("and", [x == v for x,v in zip(arr, row)])
-            cons.append(Operator("->", [row_selected[i], subexpr]))
-
-        return [Operator("or", row_selected)]+cons,[]
+            cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
+        return cons,[]
 
     def value(self):
         arr, tab = self.args
-        arrval = argvals(arr)
-        return arrval in tab
-
-    @property
-    def vars(self):
-        return self._args[0]
-
-    # specialisation to avoid recursing over big tables
-    def has_subexpr(self):
-        if not hasattr(self, '_has_subexpr'):  # if _has_subexpr has not been computed before or has been reset
-            arr, tab = self.args  # the table 'tab' can only hold constants, never a nested expression
-            self._has_subexpr = any(a.has_subexpr() for a in arr)
-        return self._has_subexpr
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
+            return None
+        return bool(np.any(np.all(tab == arrval, axis=1)))
 
 class RowSelectingShortTable(GlobalConstraint):
     """
         Extension of the `Table` constraint where the `table` matrix may contain wildcards (STAR), meaning there are
         no restrictions for the corresponding variable in that tuple.
-        This global skips typechecks on the table and has a different decomposition than the standard 
-        :class:`globalconstraints.ShortTable <cpmpy.expressions.globalconstraints.ShortTable>`.
+        Bit less validation then for :class:`globalconstraints.ShortTable <cpmpy.expressions.globalconstraints.ShortTable>`;
+        decomposition differs (row-selecting formulation).
     """
-    def __init__(self, array, table):
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("The first argument of a Table constraint should only contain variables/expressions")
-        if isinstance(table, np.ndarray): # Ensure it is a list
-            table = table.tolist()
-        super().__init__("short_table", [array, table])
+
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):
+            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
+        assert table.ndim == 2, "ShortTable's table must be a 2D array"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("short_table", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self):
         """
         Alternative decomposition, similar to `element` from Gleb's paper: "Improved Linearization of Constraint
         Programming Models"
         """
-        from cpmpy.expressions.python_builtins import any, all
-
         arr, tab = self.args
-        row_selected = boolvar(shape=(len(tab),))
 
-        cons = []
+        row_selected = boolvar(shape=(len(tab),))
+        cons = [Operator("or", row_selected)]
         for i, row in enumerate(tab):
             subexpr = Operator("and", [ai == ri for ai, ri in zip(arr, row) if ri != STAR])
-            cons.append(row_selected[i].implies(subexpr))
-
-        return [any(row_selected)]+cons,[]
+            cons.append(Operator("->", [row_selected[i], subexpr]))  # implication-only decomposition
+        return cons,[]
 
     def value(self):
         arr, tab = self.args
-        tab = np.array(tab)
-        arrval = np.array(argvals(arr))
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
+            return None
+
         for row in tab:
-            num_row = row[row != STAR].astype(int)
-            num_vals = arrval[row != STAR].astype(int)
-            if (num_row == num_vals).all():
+            mask = (row != STAR)
+            if (row[mask].astype(int, copy=False) == arrval[mask]).all():
                 return True
         return False
 
 class NegativeShortTable(GlobalConstraint):
     """The values of the variables in 'array' do not correspond to any row in 'table'
     """
-    def __init__(self, array, table):
-        array = flatlist(array)
-        if not all(isinstance(x, Expression) for x in array):
-            raise TypeError("the first argument of a Table constraint should only contain variables/expressions")
-        super().__init__("negative_shorttable", [array, table])
+
+    def __init__(self, array: ListLike[Expression], table: ListLike[ListLike[int|Literal["*"]]] | np.ndarray):
+        if isinstance(array, NDVarArray):
+            has_subexpr = array.has_subexpr()  # fast shortcut
+            if array.ndim != 1:  # reshape to 1D
+                array = array.reshape(-1)
+        else:
+            has_subexpr = False
+            for x in array:  # C-style python
+                if x.has_subexpr():
+                    has_subexpr = True
+                    break
+
+        if not isinstance(table, np.ndarray):
+            table = np.array(table, dtype=object)  # object, otherwise np makes it all string
+        assert table.ndim == 2, "NegativeShortTable's table must be a 2D array"
+
+        # args: tuple[ListLike[Expression], np.ndarray]
+        super().__init__("negative_shorttable", (array, table), has_subexpr=has_subexpr)
+
+    @property
+    def args(self) -> tuple[ListLike[Expression], np.ndarray]:
+        """ READ-ONLY, the well-tuped arguments of this global constraint
+        """
+        return self._args
 
     def decompose(self):
-        from cpmpy.expressions.python_builtins import all as cpm_all
-        from cpmpy.expressions.python_builtins import any as cpm_any
         arr, tab = self.args
-        return [cpm_all(cpm_any(ai != ri for ai, ri in zip(arr, row) if ri != "*") for row in tab)], []
+        return [cpm_all(cpm_any([ai != ri for ai, ri in zip(arr, row) if ri != "*"]) for row in tab)], []
 
     def value(self):
         arr, tab = self.args
-        arrval = [argval(a) for a in arr]
+        arrval = np.asarray(argvals(arr))
+        if arrval.dtype == object and any(x is None for x in arrval.flat):  # if not object, there is no None
+            return None
+
         for tup in tab:
-            thistup = True
-            for aval, tval in zip(arrval, tup):
-                if tval != '*':
-                    if aval != tval:
-                        thistup = False
-                        break
-            if thistup:
-                # found tuple that matches
-                return False
-        # didn't find tuple that matches
-        return True
+            mask = (tup != STAR)
+            if (tup[mask].astype(int, copy=False) != arrval[mask]).all():
+                return True
+        return False
 
 
 class MDD(GlobalConstraint):
@@ -547,7 +583,7 @@ class MDD(GlobalConstraint):
             raise TypeError("The first argument of an MDD constraint should only contain variables/expressions")
         if not all(is_transition(transition) for transition in transitions):
             raise TypeError("The second argument of an MDD constraint should be collection of transitions")
-        super().__init__("mdd", [array, transitions])
+        super().__init__("mdd", (array, transitions))
         self.root_node = transitions[0][0]
         self.mapping = {}
         for s, v, e in transitions:
@@ -689,7 +725,7 @@ class Regular(GlobalConstraint):
         #     raise TypeError("The third argument of a regular constraint should be a node id")
         # if not (is_any_list(accepting) and all(isinstance(e, _node_type) for e in accepting)):
         #     raise TypeError("The fourth argument of a regular constraint should be a list of node ids")
-        super().__init__("regular", [array, transitions, start, list(accepting)])
+        super().__init__("regular", (array, transitions, start, tuple(accepting)))
 
         self.nodes = set()
         self.trans_dict = {}
@@ -745,7 +781,7 @@ class NotInDomain(GlobalConstraint):
     """
 
     def __init__(self, expr, arr):
-        super().__init__("NotInDomain", [expr, arr])
+        super().__init__("NotInDomain", (expr, arr))
 
     def decompose(self):
         """
@@ -786,19 +822,17 @@ class NoOverlap2d(GlobalConstraint):
     """
     def __init__(self, start_x, dur_x, end_x,  start_y, dur_y, end_y):
         assert len(start_x) == len(dur_x) == len(end_x) == len(start_y) == len(dur_y) == len(end_y)
-        super().__init__("no_overlap2d", [start_x, dur_x, end_x,  start_y, dur_y, end_y])
+        super().__init__("no_overlap2d", (start_x, dur_x, end_x, start_y, dur_y, end_y))
 
     def decompose(self):
-        from cpmpy.expressions.python_builtins import any as cpm_any
-
         start_x, dur_x, end_x,  start_y, dur_y, end_y = self.args
         n = len(start_x)
         cons =  [s + d == e for s,d,e in zip(start_x, dur_x, end_x)]
         cons += [s + d == e for s,d,e in zip(start_y, dur_y, end_y)]
 
         for i,j in all_pairs(list(range(n))):
-            cons += [cpm_any([end_x[i] <= start_x[j], end_x[j] <= start_x[i],
-                              end_y[i] <= start_y[j], end_y[j] <= start_y[i]])]
+            cons.append(cpm_any([end_x[i] <= start_x[j], end_x[j] <= start_x[i],
+                                 end_y[i] <= start_y[j], end_y[j] <= start_y[i]]))
         return cons,[]
     def value(self):
         start_x, dur_x, end_x,  start_y, dur_y, end_y = argvals(self.args)
@@ -819,7 +853,7 @@ class IfThenElseNum(GlobalFunction):
         Function returning x if b is True and otherwise y
     """
     def __init__(self, b, x,y):
-        super().__init__("IfThenElseNum",[b,x,y])
+        super().__init__("IfThenElseNum", (b, x, y))
 
     def decompose_comparison(self, cmp_op, cpm_rhs):
         b,x,y = self.args
@@ -871,7 +905,7 @@ class DynamicCumulative(GlobalConstraint):
         else: # constant demand
             demand = [demand] * n_jobs
 
-        super(DynamicCumulative, self).__init__("cumulative", [start, duration, end, demand, capacity])
+        super(DynamicCumulative, self).__init__("cumulative", (start, duration, end, demand, capacity))
 
     def decompose(self):
         """
@@ -908,7 +942,7 @@ class DynamicCumulative(GlobalConstraint):
         if version == "time":
             # set duration of tasks
             for t in range(len(start)):
-                cons += [start[t] + duration[t] == end[t]]
+                cons.append(start[t] + duration[t] == end[t])
 
             # demand doesn't exceed capacity
             for t in range(lb,ub+1):
@@ -919,16 +953,18 @@ class DynamicCumulative(GlobalConstraint):
                     else:
                         demand_at_t += demand[job] * ((start[job] <= t) & (t < end[job]))
 
-                cons += [demand_at_t <= capacity]
+                cons.append(demand_at_t <= capacity)
                 
         elif version == "task":
 
             # set duration of tasks
+            ends = [start[t] + duration[t] for t in range(num_tasks)]
             for t in range(num_tasks):
-                cons += [start[t] + duration[t] == end[t]]
+                cons.append(ends[t] == end[t])
 
             for j in range(num_tasks):
-                cons += [capacity >= demand[j] + cp.sum([(start[i] <= start[j]) & (start[j] < start[i] + duration[i]) for i in range(num_tasks) if i != j])]
+                sj = start[j]
+                cons.append(capacity >= demand[j] + cp.sum([(start[i] <= sj) & (sj < ends[i]) for i in range(num_tasks) if i != j]))
 
         return cons, []
 
@@ -983,7 +1019,7 @@ class OrtNoOverlap2D(DirectConstraint):
     The rectangles have their sides aligned with the perpendicular x- and y-axis.
     """
     def __init__(self, arguments):
-        super().__init__("ortnooverlap2d", arguments)
+        super().__init__("ortnooverlap2d", (arguments,))
 
     def callSolver(self, CPMpy_solver, Native_solver):
         start_x, dur_x, end_x, start_y, dur_y, end_y = CPMpy_solver.solver_vars(self.args[0])
@@ -999,7 +1035,7 @@ class OrtSubcircuit(DirectConstraint):
     When a node `i` is not part of the circuit, it should self-loop with an arc `i -> i`.
     """
     def __init__(self, arguments):
-        super().__init__("ortsubcircuit", arguments)
+        super().__init__("ortsubcircuit", (arguments,))
 
     def callSolver(self, CPMpy_solver, Native_solver):
         N = len(self.args[0])
@@ -1044,7 +1080,7 @@ class ChocoSubcircuit(DirectConstraint):
     When a node `i` is not part of the circuit, it should self-loop with an arc `i -> i`.
     """
     def __init__(self, arguments):
-        super().__init__("chocosubcircuit", arguments)
+        super().__init__("chocosubcircuit", (arguments,))
 
     def callSolver(self, CPMpy_solver, Native_solver):
         # Successor variables
@@ -1063,7 +1099,7 @@ class MinizincSubcircuit(DirectConstraint):
     When a node `i` is not part of the circuit, it should self-loop with an arc `i -> i`.
     """
     def __init__(self, arguments):
-        super().__init__("minizincsubcircuit", arguments)
+        super().__init__("minizincsubcircuit", (arguments,))
 
     def callSolver(self, CPMpy_solver, Native_solver):
         # minizinc is offset 1, which can be problematic here...
@@ -1078,7 +1114,7 @@ class MinizincSubcircuitWithStart(DirectConstraint):
     which is ensure to be part of the subcircuit.
     """
     def __init__(self, arguments):
-        super().__init__("minizincsubcircuitwithstart", arguments)
+        super().__init__("minizincsubcircuitwithstart", (arguments,))
 
     def callSolver(self, CPMpy_solver, Native_solver):
         # minizinc is offset 1, which can be problematic here...

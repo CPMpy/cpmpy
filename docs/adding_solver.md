@@ -15,7 +15,7 @@ Implementing the template consists of the following parts:
   * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver
   * `solveAll()` optionally, if the solver natively supports solution enumeration
 
-For your new solver to appear in CPMpy's [API documentation](./api/solvers.rst), add a `.rst` file in ``/docs/api/solvers`` (copy one of the other solvers' file and make the necessary changes) and add your solver to the *"List of submodules"* and the *"List of classes"* in the file ``/cpmpy/solvers/__init__.py``. And also to the overview table of solvers in ``docs/index.rst``.
+For your new solver to appear in CPMpy's [API documentation](./api/solvers.rst), add a `.rst` file in ``/docs/api/solvers`` (copy one of the other solvers' file and make the necessary changes) and add your solver to the *"List of submodules"* and the *"List of classes"* in the file ``/cpmpy/solvers/__init__.py``. And also to the overview table of solvers in ``docs/index.rst``. To test for incremental capabilities, use the ``examples/advanced/test_incremental_solving.py`` script.
 
 To ease the installation process of your solver, be sure to add it to CPMpy's `setup.py`. Simply add an entry to `solver_dependencies`, mapping the cpmpy-native name for your solver (the same one used when calling `model.solve(solver=<SOLVER_NAME>)`) to the name of your pip-installable Python package and all its required dependencies.
 
@@ -104,6 +104,13 @@ This is done by adding an import statement in `/solvers/__init__.py` and adding 
 To run the testsuite on your solver, go to `/tests/test_constraints.py` and set `SOLVERNAMES` to the name of your solver. By running the file, every constraint allowed by the Flat Normal Form will be generated and posted to your solver interface.
 As not every solver should support all possible constraints, you can exclude some using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` and `EXCLUDE_IMPL` dictionaries.
 After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
+
+Once your solver is passing the test suite, it is a good idea to check test coverage to see which lines of your solver code are never executed during the tests. Missing coverage may indicate missing tests, but it could also mean that code you intended to run was silently bypassed. For example, if you added native support for a constraint but a transformation is decomposing it before it reaches your solver, performance could suffer. You can generate an HTML coverage report in `htmlcov` using the [pytest-cov](https://pypi.org/project/pytest-cov/) plugin:
+
+```bash
+pip install pytest-cov
+pytest --cov=cpmpy --cov-report=html -n auto
+```
 
 ## Tunable hyperparameters
 CPMpy offers a tool for searching the best hyperparameter configuration for a given model on a solver (see [corresponding documentation](./solver_parameters.md)).

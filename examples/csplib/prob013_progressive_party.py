@@ -17,6 +17,7 @@
 import sys
 import requests
 import json
+from pathlib import Path
 
 from cpmpy import *
 from cpmpy.expressions.utils import all_pairs
@@ -35,8 +36,8 @@ def progressive_party(n_boats, n_periods, capacity, crew_size, **kwargs):
     # The total number of people aboard a boat, including the host crew and guest crews, must not exceed the capacity.
     for slot in range(n_periods):
         for boat in range(n_boats):
-            # Sum of crew sizes of visiting boats + crew size of host boat
-            model += sum((visits[slot] == boat) * crew_size) + crew_size[boat] * is_host[boat] <= capacity[boat]
+            # Sum of crew sizes of visiting boats + crew size of host boat (hosts are also included in visits, so no need to add separately)
+            model += sum((visits[slot] == boat) * crew_size) <= capacity[boat]
 
     # Guests cannot visit a boat twice
     for boat in range(n_boats):
@@ -75,10 +76,9 @@ if __name__ == "__main__":
     import requests
 
     # argument parsing
-    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob013_progressive_party.json"
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-instance', nargs='?', default="lan01", help="Name of the problem instance found in file 'filename'")
-    parser.add_argument('-filename', nargs='?', default=url, help="File containing problem instances, can be local file or url")
+    parser.add_argument('-filename', nargs='?', default=str(Path(__file__).with_name("prob013_progressive_party.json")), help="File containing problem instances, can be local file or url")
     parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
     args = parser.parse_args()

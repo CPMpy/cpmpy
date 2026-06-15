@@ -24,7 +24,7 @@ from prepare_galleries import prepare_galleries
 # -- Project information -----------------------------------------------------
 
 project = 'CPMpy'
-copyright = '2025, Tias Guns'
+copyright = '2026, Tias Guns'
 author = 'Tias Guns'
 
 # The full version, including alpha/beta/rc tags

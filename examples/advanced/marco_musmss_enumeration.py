@@ -117,7 +117,7 @@ class SubsetSolver:
         self.all_n = set(range(n))  # used for complement
 
         # intialise indicators
-        self.indicators = BoolVar(shape=n)
+        self.indicators = boolvar(shape=n)
         self.idcache = dict((v,i) for (i,v) in enumerate(self.indicators))
 
         # make reified model
@@ -180,7 +180,7 @@ class MapSolver:
         """
         self.all_n = set(range(n))  # used for complement
 
-        self.indicators = BoolVar(shape=n)
+        self.indicators = boolvar(shape=n)
         # default to true for first next_seed(), "high bias"
         for v in self.indicators:
             v._value = True

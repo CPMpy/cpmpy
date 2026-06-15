@@ -25,19 +25,19 @@
 
     Source installation instructions:
 
-    - Ensure you have C++20 compiler such as GCC 10.3  / clang 15
-    - (on Debian-based systems, see https://apt.llvm.org for easy installation)
-    - If necessary ``export CXX=<your up to date C++ compiler (e.g. clang++-15)>``
-    - Ensure you have Boost installed
+    - Ensure you have a C++23 compiler such as GCC 13 (Ubuntu 24.04) or later, or
+      clang 21 or later. GCC 15 and clang 21 are the primary development
+      compilers; on Debian-based systems see https://apt.llvm.org for easy
+      installation of recent clang.
+    - If necessary ``export CXX=<your up to date C++ compiler (e.g. clang++-21)>``.
+    - On Ubuntu, install the Python development headers matching your Python
+      version (e.g. ``sudo apt install python3.12-dev`` for Python 3.12).
     - ``git clone https://github.com/ciaranm/glasgow-constraint-solver.git``
     - ``cd glasgow-constraint-solver/python``
     - ``pip install .``
 
-    .. note::
-        If for any reason you need to retry the build, ensure you remove glasgow-constraints-solver/generator before rebuilding.
-
     For the verifier functionality, the 'veripb' tool is also required.
-    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb. 
+    See https://gitlab.com/MIAOresearch/software/VeriPB#installation for installation instructions of veripb.
 
     The rest of this documentation is for advanced users.
 
@@ -50,20 +50,22 @@
 
         CPM_gcs
 """
-from typing import Optional
-import pkg_resources
+import warnings
+from typing import Optional, Iterable, Any
+
+from packaging.version import Version
 
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
+from ..expressions.core import Comparison, Operator, BoolVal, ExprLike
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
-from ..expressions.utils import is_num, argval, argvals
-from ..transformations.decompose_global import decompose_in_tree
+from ..expressions.utils import is_int, is_any_list
+from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
+from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.safening import no_partial_functions
 
 from ..transformations.normalize import toplevel_list
@@ -91,11 +93,20 @@ class CPM_gcs(SolverInterface):
     https://github.com/ciaranm/glasgow-constraint-solver/blob/main/python/python_test.py
     """
 
+    supported_global_constraints = frozenset({"alldifferent", "table", "negative_table", "inverse", "circuit", "xor",
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue"})
+    supported_reified_global_constraints = frozenset()
+
     @staticmethod
     def supported():
         # try to import the package
         try:
             import gcspy
+            gcs_version = CPM_gcs.version()
+            if Version(gcs_version) < Version("0.1.8"):
+                warnings.warn(f"CPMpy requires GCS version >=0.1.8 but you have version "
+                              f"{gcs_version}, beware exact>=2.1.0 requires Python 3.10 or higher.")
+                return False
             return True
         except ModuleNotFoundError:
             return False
@@ -107,9 +118,10 @@ class CPM_gcs(SolverInterface):
         """
         Returns the installed version of the solver's Python API.
         """
+        from importlib.metadata import version, PackageNotFoundError
         try:
-            return pkg_resources.get_distribution('gcspy').version
-        except pkg_resources.DistributionNotFound:
+            return version('gcspy')
+        except PackageNotFoundError:
             return None
 
     def __init__(self, cpm_model=None, subsolver=None):
@@ -121,7 +133,7 @@ class CPM_gcs(SolverInterface):
             subsolver: None (not supported)
         """
         if not self.supported():
-            raise Exception("CPM_gcs: Install the python package 'gcspy' to use this solver interface.")
+            raise ModuleNotFoundError("CPM_gcs: Install the python package 'cpmpy[gcs]' to use this solver interface.")
 
         import gcspy
 
@@ -138,10 +150,17 @@ class CPM_gcs(SolverInterface):
         # initialise everything else and post the constraints/objective
         super().__init__(name="Glasgow Constraint Solver", cpm_model=cpm_model)
 
+    @property
+    def native_model(self):
+        """
+            Returns the solver's underlying native model (for direct solver access).
+        """
+        return self.gcs
+    
     def has_objective(self):
         return self.objective_var is not None
     
-    def solve(self, time_limit=None, prove=False, proof_name=None, proof_location=".", 
+    def solve(self, time_limit:Optional[float]=None, prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
               verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, get just one (optimal) solution.
@@ -167,8 +186,9 @@ class CPM_gcs(SolverInterface):
         prove |= verify
         # Set default proof name to name of file containing __main__
         if prove and proof_name is None:
-            if hasattr(sys.modules['__main__'], "__file__"):
-                self.proof_name = path.splitext(path.basename(sys.modules['__main__'].__file__))[0]
+            main_file = sys.modules['__main__'].__file__
+            if main_file is not None:
+                self.proof_name = path.splitext(path.basename(main_file))[0]
             else:
                 self.proof_name = "gcs_proof"
         else:
@@ -243,9 +263,9 @@ class CPM_gcs(SolverInterface):
             
         return has_sol
 
-    def solveAll(self, time_limit=None, display=None, solution_limit=None, call_from_model=False, 
-                 prove=False, proof_name=None, proof_location=".", verify=False, verify_time_limit=None, veripb_args = [], 
-                 display_verifier_output=True, **kwargs):
+    def solveAll(self, display:Optional[Callback]=None, time_limit:Optional[float]=None, solution_limit:Optional[int]=None, call_from_model=False,
+                 prove=False, proof_name:Optional[str]=None, proof_location:Optional[str]=".",
+                 verify=False, verify_time_limit=None, veripb_args = [], display_verifier_output=True, **kwargs):
         """
             Run the Glasgow Constraint Solver, and get a number of solutions, with optional solution callbacks. 
 
@@ -276,8 +296,9 @@ class CPM_gcs(SolverInterface):
         prove |= verify
         # Set default proof name to name of file containing __main__
         if prove and proof_name is None:
-            if hasattr(sys.modules['__main__'], "__file__"):
-                self.proof_name = path.splitext(path.basename(sys.modules['__main__'].__file__))[0]
+            main_file = sys.modules['__main__'].__file__
+            if main_file is not None:
+                self.proof_name = path.splitext(path.basename(main_file))[0]
             else:
                 self.proof_name = "gcs_proof"
         self.proof_location = proof_location
@@ -291,19 +312,11 @@ class CPM_gcs(SolverInterface):
                     cpm_var._value = bool(solution_map[sol_var])
                 else:
                     cpm_var._value = solution_map[sol_var]
+            self.print_display(display)
+            return
 
-            if isinstance(display, Expression):
-                print(argval(display))
-            elif isinstance(display, list):
-                # explicit list of expressions to display
-                print(argvals(display))
-            elif callable(display):
-                display()
-            else:
-                raise NotImplementedError("Glasgow Constraint Solver: Unknown display type.".format(cpm_var))
-            return 
         sol_callback = None
-        if display:
+        if display is not None:
             sol_callback=display_callback
 
         self.gcs_result = self.gcs.solve(
@@ -341,32 +354,72 @@ class CPM_gcs(SolverInterface):
 
         return num_sols
 
+    @staticmethod
+    def _gcs_safe_name(name):
+        """
+        gcs (and the VeriPB proof format underneath) only guarantees
+        support for variable names matching ``[a-zA-Z][a-zA-Z0-9[\\]{}_^-]+``;
+        commas in particular are not in the guaranteed set. CPMpy's auto-
+        generated names for multi-dimensional array elements use commas as
+        separators (e.g. ``arr[0,0]``), so rewrite each comma to ``][`` so
+        that ``arr[0,0]`` becomes ``arr[0][0]`` — a valid name that also
+        reads as the multi-dimensional index.
+        """
+        return name.replace(",", "][")
+
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    # gcs only works with integer variables, so not(x) = -x + 1
+                    revar = self.gcs.add_constant(self.gcs.negate(self.solver_var(cpm_var._bv)), 1)
+                else:
+                    # Bool vars are just int vars with [0, 1] domain
+                    revar = self.gcs.create_integer_variable(0, 1, self._gcs_safe_name(name))
+            else:
+                revar = self.gcs.create_integer_variable(cpm_var.lb, cpm_var.ub, self._gcs_safe_name(name))
+            self._varmap[name] = revar  # save actual name, not gcs_safe name
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return self.gcs.create_integer_constant(cpm_var)
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            # gcs only works with integer variables, so not(x) = -x + 1
-            return self.gcs.add_constant(self.gcs.negate(self.solver_var(cpm_var._bv)), 1)
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                # Bool vars are just int vars with [0, 1] domain
-                revar = self.gcs.create_integer_variable(0, 1, str(cpm_var))
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.gcs.create_integer_variable(cpm_var.lb, cpm_var.ub, str(cpm_var))
+    def solver_vars(self, cpm_vars: Iterable[ExprLike]) -> list[Any]:
+        """
+           Like `solver_var()` but for arbitrary shaped lists/tensors
+
+           Can not inherit from parent because 'int' needs special treatment
+        """
+        res: list[Any] = []
+        for cpm_var in cpm_vars:
+            if isinstance(cpm_var, _NumVarImpl):
+                if cpm_var.name in self._varmap:  # fast path
+                    res.append(self._varmap[cpm_var.name])
+                else:  # slow path
+                    res.append(self.solver_var(cpm_var))
+            elif isinstance(cpm_var, int):
+                res.append(self.gcs.create_integer_constant(cpm_var))  # GCS special treatment
+            elif is_any_list(cpm_var):
+                # recurse
+                res.append(self.solver_vars(cpm_var))
             else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        return self._varmap[cpm_var]
+                # slow path, if any at all
+                res.append(self.solver_var(cpm_var))
+        return res
 
     def objective(self, expr, minimize=True):
         """
@@ -378,20 +431,24 @@ class CPM_gcs(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are permanently posted to the solver
         """
-        # make objective function non-nested
-        (flat_obj, flat_cons) = flatten_objective(expr)
-        self += flat_cons # add potentially created constraints
-        self.user_vars.update(get_variables(flat_obj)) # add objvars to vars
 
-        (obj, obj_cons) = get_or_make_var(flat_obj, csemap=self._csemap)
-        self += obj_cons
+        # save variables
+        get_variables(expr, collect=self.user_vars)
 
-        self.objective_var = obj
+        # transform objective
+        obj, decomp_cons = decompose_objective(expr,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        obj_var, obj_cons = get_or_make_var(obj) # do not pass csemap here, we will still transform obj_var == obj...
+        self.add(decomp_cons + obj_cons)
+
+        self.objective_var = obj_var
 
         if minimize:
-            self.gcs.minimise(self.solver_var(obj))  
+            self.gcs.minimise(self.solver_var(obj_var))
         else:
-            self.gcs.maximise(self.solver_var(obj))
+            self.gcs.maximise(self.solver_var(obj_var))
 
     def transform(self, cpm_expr):
         """
@@ -408,21 +465,11 @@ class CPM_gcs(SolverInterface):
             :return: list of Expression
         """
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {
-            "min", 
-            "max", 
-            "abs", 
-            "alldifferent", 
-            "element", 
-            'table', 
-            'negative_table', 
-            'count', 
-            'nvalue',
-            'inverse', 
-            'circuit', 
-            'xor'}
         cpm_cons = no_partial_functions(cpm_cons)
-        cpm_cons = decompose_in_tree(cpm_cons, supported, csemap=self._csemap)
+        cpm_cons = decompose_in_tree(cpm_cons,
+                                     supported=self.supported_global_constraints,
+                                     supported_reified=self.supported_reified_global_constraints,
+                                     csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
 
         # NB: GCS supports full reification for linear equality and linear inequaltiy constraints
@@ -434,9 +481,6 @@ class CPM_gcs(SolverInterface):
         # NB: GCS supports a small number of simple expressions as the reifying term
         # e.g. (x > 3) -> constraint could in principle be supported in the future.
         cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
-        str_rep = ""
-        for c in cpm_cons:
-            str_rep += str(c) + '\n'
         return cpm_cons
 
     def verify(self, name=None, location=".", time_limit=None, display_output=False, veripb_args=[]):
@@ -567,10 +611,10 @@ class CPM_gcs(SolverInterface):
                             # lt == x < y
                             # gt == x > y
                             lt_bool, gt_bool = boolvar(shape=2)
-                            self += (lhs < rhs) == lt_bool
-                            self += (lhs > rhs) == gt_bool
+                            self.add((lhs < rhs) == lt_bool)
+                            self.add((lhs > rhs) == gt_bool)
                             if fully_reify:
-                                self += (~bool_lhs).implies(lhs == rhs)
+                                self.add((~bool_lhs).implies(lhs == rhs))
                             self.gcs.post_or_reif(self.solver_vars([lt_bool, gt_bool]), reif_var, False)
                         else:
                             raise NotImplementedError("Not currently supported by Glasgow Constraint Solver API '{}' {}".format)
@@ -654,7 +698,8 @@ class CPM_gcs(SolverInterface):
                     elif lhs.name == 'min':
                         self.gcs.post_min(self.solver_vars(lhs.args), self.solver_var(rhs))   
                     elif lhs.name == 'element':
-                        self.gcs.post_element(self.solver_var(rhs), self.solver_vars(lhs.args[1]), self.solver_vars(lhs.args[0])) 
+                        arr, idx = self.solver_vars(lhs.args)
+                        self.gcs.post_element(self.solver_var(rhs), idx, arr)
                     elif lhs.name == 'count':
                         self.gcs.post_count(self.solver_vars(lhs.args[0]), self.solver_var(lhs.args[1]), self.solver_var(rhs))
                     elif lhs.name == 'nvalue':
@@ -671,7 +716,8 @@ class CPM_gcs(SolverInterface):
             elif cpm_expr.name == 'circuit':
                 self.gcs.post_circuit(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'inverse':
-                self.gcs.post_inverse(self.solver_vars(cpm_expr.args[0]), self.solver_vars(cpm_expr.args[1]))
+                gcs_args = self.solver_vars(cpm_expr.args)
+                self.gcs.post_inverse(gcs_args[0], gcs_args[1])
             elif cpm_expr.name == 'alldifferent':
                 self.gcs.post_alldifferent(self.solver_vars(cpm_expr.args))
             elif cpm_expr.name == 'table':
@@ -681,7 +727,7 @@ class CPM_gcs(SolverInterface):
             elif isinstance(cpm_expr, GlobalConstraint):
                 # GCS also has SmartTable, Regular Language Membership, Knapsack constraints
                 # which could be added in future. 
-                self += cpm_expr.decompose()  # assumes a decomposition exists...
+                self.add(cpm_expr.decompose())  # assumes a decomposition exists...
             else:
                 # Hopefully we don't end up here.
                 raise NotImplementedError(cpm_expr)

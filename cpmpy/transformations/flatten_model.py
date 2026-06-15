@@ -88,31 +88,33 @@ commutative expressions (``and``, ``or``, ``sum``, ``wsum``, ...) but such optim
     TODO: update behind_the_scenes.rst doc with the new 'flat normal form'
     TODO: small optimisations, e.g. and/or chaining (potentially after negation), see test_flatten
 """
+import copy
 import math
 import builtins
 import cpmpy as cp
 
+from .cse import CSEMap
 from .normalize import toplevel_list, simplify_boolean
-from ..expressions.core import *
+from ..expressions.core import Expression, Comparison, Operator
 from ..expressions.core import _wsum_should, _wsum_make
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl
 from ..expressions.utils import is_num, is_any_list, is_int, is_star
 from .negation import push_down_negation
 
 
-def flatten_model(orig_model):
+def flatten_model(orig_model, csemap=None):
     """
         Receives model, returns new model where every constraint is in 'flat normal form'
     """
 
     # the top-level constraints
-    basecons = flatten_constraint(orig_model.constraints)
+    basecons = flatten_constraint(orig_model.constraints, csemap=csemap)
 
     # the objective
     if orig_model.objective_ is None:
         return cp.Model(*basecons)  # no objective, satisfaction problem
     else:
-        (newobj, newcons) = flatten_objective(orig_model.objective_)
+        (newobj, newcons) = flatten_objective(orig_model.objective_, csemap=csemap)
         basecons += newcons
         if orig_model.objective_is_min:
             return cp.Model(*basecons, minimize=newobj)
@@ -258,6 +260,8 @@ def flatten_constraint(expr, csemap=None):
             # normalize the lhs (does not have to be a var, hence we call normalize instead of get_or_make_var
             if exprname == '==' and lexpr.is_bool():
                 if rvar.is_bool():
+                    if csemap is not None and csemap.get(lexpr) is None:
+                        csemap.put(lexpr, rvar)
                     # this is a reification
                     (lhs, lcons) = normalized_boolexpr(lexpr, csemap=csemap)
                 else:
@@ -300,7 +304,7 @@ def flatten_objective(expr, supported=frozenset(["sum", "wsum"]), csemap=None):
         raise Exception(f"Objective expects a single variable/expression, not a list of expressions: {expr}")
 
     expr = simplify_boolean([expr])[0]
-    (flatexpr, flatcons) = normalized_numexpr(expr)  # might rewrite expr into a (w)sum
+    (flatexpr, flatcons) = normalized_numexpr(expr, csemap=csemap)  # might rewrite expr into a (w)sum
     if isinstance(flatexpr, Expression) and flatexpr.name in supported:
         return (flatexpr, flatcons)
     else:
@@ -334,42 +338,44 @@ def get_or_make_var(expr, csemap=None):
 
     if is_any_list(expr):
         raise Exception(f"Expected single variable, not a list for: {expr}")
+    
+    # check if the expression is already in the csemap
+    new_var = None
+    if (csemap is not None):
+        new_var = csemap.get(expr)
+    if new_var is not None:
+        return (new_var, [])
 
-    if csemap is not None and expr in csemap:
-        return csemap[expr], []
-
+    # expression is not in the csemap
+    # need to recursively flatten
     if expr.is_bool():
-        # normalize expr into a boolexpr LHS, reify LHS == bvar
-        (flatexpr, flatcons) = normalized_boolexpr(expr, csemap=csemap)
-
-        if isinstance(flatexpr,_BoolVarImpl):
+        flatexpr, flatcons = normalized_boolexpr(expr, csemap=csemap)
+        if isinstance(flatexpr, _BoolVarImpl):
             # avoids unnecessary bv == bv or bv == ~bv assignments
-            return flatexpr,flatcons
-        bvar = _BoolVarImpl()
-
-        # save expr in dict
-        if csemap is not None:
-            csemap[expr] = bvar
-        return bvar, [flatexpr == bvar] + flatcons
-
+            return flatexpr, flatcons
     else:
-        # normalize expr into a numexpr LHS,
-        # then compute bounds and return (newintvar, LHS == newintvar)
-        (flatexpr, flatcons) = normalized_numexpr(expr, csemap=csemap)
+        flatexpr, flatcons = normalized_numexpr(expr, csemap=csemap)
 
-        lb, ub = flatexpr.get_bounds()
-        if not is_int(lb) or not is_int(ub):
-            warnings.warn(f"CPMpy only uses integer variables, but found expression ({expr}) with domain {lb}({type(lb)}"
-                          f" - {ub}({type(ub)}. CPMpy will rewrite this constriants with integer bounds instead.")
-            lb, ub = math.floor(lb), math.ceil(ub)
-        ivar = _IntVarImpl(lb, ub)
+    if csemap is None:
+        # this will have some overhead, but it nicely stores all logic in the csemap object
+        new_var, expr_eq_var = CSEMap().get_or_make_var(flatexpr)
+    else:
+        # save both original expression and flattened expression to the csemap
+        # maybe the flattened expression is already in the map?
+        new_var = csemap.get(flatexpr)
+        expr_eq_var = None
+        if new_var is None: # it's not in the map
+            new_var, expr_eq_var = csemap.get_or_make_var(flatexpr)
+        if flatexpr is not expr: # avoid additional hash call if expr was flat already
+            csemap.flat_map[expr] = new_var
 
-        # save expr in dict
-        if csemap is not None:
-            csemap[expr] = ivar
-        return ivar, [flatexpr == ivar] + flatcons
 
-def get_or_make_var_or_list(expr, csemap=None):
+    if expr_eq_var is not None:
+        flatcons.append(expr_eq_var)
+
+    return new_var, flatcons
+
+def get_or_make_var_or_list(expr, csemap = None):
     """ Like get_or_make_var() but also accepts and recursively transforms lists
         Used to convert arguments of globals
     """
@@ -508,9 +514,14 @@ def normalized_numexpr(expr, csemap=None):
         # so reify and return the boolvar
         return get_or_make_var(expr, csemap=csemap)
 
+    # rewrite const*a into a weighted sum, so it can be used as objective
+    elif expr.name == "mul" and getattr(expr, "is_lhs_num", False):
+        w, e = expr.args
+        return normalized_numexpr(Operator("wsum", ([w], [e])), csemap=csemap)
+
     elif isinstance(expr, Operator):
-        # rewrite -a, const*a and a*const into a weighted sum, so it can be used as objective
-        if expr.name == '-' or (expr.name == 'mul' and _wsum_should(expr)):
+        # rewrite -a into a weighted sum, so it can be used as objective
+        if expr.name == '-':
             return normalized_numexpr(Operator("wsum", _wsum_make(expr)), csemap=csemap)
 
         if not expr.has_subexpr():

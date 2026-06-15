@@ -1,4 +1,3 @@
-import unittest
 import numpy as np
 
 import cpmpy as cp
@@ -6,8 +5,8 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.expressions.variables import _IntVarImpl, _BoolVarImpl # to reset counters
 
-class TestTransfComp(unittest.TestCase):
-    def setUp(self):
+class TestTransfComp:
+    def setup_method(self):
         _IntVarImpl.counter = 0
         _BoolVarImpl.counter = 0
 
@@ -16,17 +15,16 @@ class TestTransfComp(unittest.TestCase):
         
         cases = [(cp.min(ivs) == 3, ["min(ivs[0],ivs[1],ivs[2]) == 3"]),
                  (cp.min(ivs) > 3, ["(min(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 > 3"]),
-                 (cp.min(ivs) <= 3, ["(min(ivs[0],ivs[1],ivs[2])) == (IV2)", "IV2 <= 3"]),
-                 (3 != cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV4)", "IV4 != 3"]),
-                 (3 > cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV6)", "IV6 < 3"]),
-                 (3 <= cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV8)", "IV8 >= 3"]),
+                 (cp.min(ivs) <= 3, ["(min(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 <= 3"]),
+                 (3 != cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 != 3"]),
+                 (3 > cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 < 3"]),
+                 (3 <= cp.max(ivs), ["(max(ivs[0],ivs[1],ivs[2])) == (IV0)", "IV0 >= 3"]),
                 ]
 
         # test transformation
         transform = lambda expr: only_numexpr_equality(flatten_constraint(expr))
 
         for (expr, strexpr) in cases:
-            self.assertSetEqual( set([str(c) for c in transform(expr)]), set(strexpr) )
-            self.assertTrue(cp.Model(expr).solve())
-
-
+            self.setup_method()  # reset the IV counters
+            assert  set([str(c) for c in transform(expr)]) == set(strexpr)
+            assert cp.Model(expr).solve()
