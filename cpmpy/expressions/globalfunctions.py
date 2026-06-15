@@ -117,6 +117,9 @@ class GlobalFunction(Expression):
             The first one will replace the GlobalFunction expression in-place,
             the second one will be added to the list of top-level constraints.
 
+            The decomposition is not allowed to introduce explicit `not` operators.
+            Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
+
             The decomposition might create auxiliary variables
             and use other global constraints as long as
             it does not create a circular dependency.
@@ -435,6 +438,8 @@ class Multiplication(GlobalFunction):
         - If both int: take the factor with smallest domain, encode it with one bool per value, then
           decompose into b_i*other_int constraints and sum(i*z_i)
         """
+        from cpmpy.transformations.negation import recurse_negation
+
         a, b = self.args[0], self.args[1]
         if self.is_lhs_num:
             # const*expr -> wsum([const], [expr])
@@ -451,7 +456,8 @@ class Multiplication(GlobalFunction):
             lb_z = min(0, lb_y)  # make sure it can take 0
             ub_z = max(0, ub_y)  # make sure it can take 0
             z = intvar(lb_z, ub_z)
-            return z, [bv.implies(z == iv), (~bv).implies(z == 0)]
+            return z, [bv.implies(z == iv), 
+                       recurse_negation(bv).implies(z == 0)]
 
         # let a be the one with the smallest domain, leading to the fewest auxiliariy variables
         lb_a, ub_a = get_bounds(a)
