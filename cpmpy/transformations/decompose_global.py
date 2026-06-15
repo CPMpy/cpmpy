@@ -98,8 +98,29 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
             changed = True
             newlist.append(BoolVal(expr))
+
+        elif expr.name == "not":  # not(global) or negation left by a decomposition
+            args_changed, expr_newargs, expr_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+            if len(expr_toplevel) > 0:
+                todolist.extend(expr_toplevel)
+            if not args_changed:
+                expr_newargs = expr.args  # lets be sure its set
+
+            assert len(expr_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {expr_newargs}"
+            if isinstance(expr_newargs[0], GlobalConstraint):
+                if args_changed:
+                    changed = True
+                    # supported nested global whose args have changed
+                    expr = copy.copy(expr)
+                    expr.update_args(expr_newargs)
+            else:
+                changed = True
+                # decomposed global or boolean expr from decomposition; push negation down
+                expr = recurse_negation(expr_newargs[0])
+            newlist.append(expr)
+
         elif expr.has_subexpr():
-            # special case for positive reified
+            # first, special case for positive reified
             decomposed_positive = False
             if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
                 changed = True
@@ -115,12 +136,6 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 changed = True
                 if len(expr_toplevel) > 0:
                     todolist.extend(expr_toplevel)
-                    
-                if expr.name == "not": # cannot leave negation here, push down in the arguments of the decomposition
-                    assert len(expr_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {expr_newargs}"
-                    expr = recurse_negation(expr_newargs[0])
-                    newlist.append(expr)
-                    continue
 
                 # if decompose_positive: we know 'expr' is a fresh expression
                 if not decomposed_positive:
