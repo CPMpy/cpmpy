@@ -82,7 +82,7 @@ import pathlib
 import io
 import sys
 import tempfile
-from typing import Any, Optional, Tuple, List, Callable
+from typing import Any, Optional, Tuple, List, Callable, ClassVar
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
 
@@ -96,19 +96,6 @@ except ImportError:
 
 import cpmpy as cp
 
-
-class classproperty:
-    """
-    Descriptor that makes a method work as a class-level property (no () needed).
-    Similar to @property, but for class methods.
-    """
-
-    def __init__(self, func):
-        self.func = func
-        self.__isabstractmethod__ = getattr(func, '__isabstractmethod__', False)
-
-    def __get__(self, instance, owner):
-        return self.func(owner)
 
 class Dataset(ABC):
     """
@@ -129,21 +116,10 @@ class Dataset(ABC):
 
     # -------------- Dataset-level metadata (override in subclasses) ------------- #
 
-    @classproperty
-    @abstractmethod
-    def name(self) -> str: pass
-
-    @classproperty
-    @abstractmethod
-    def description(self) -> str: pass
-
-    @classproperty
-    @abstractmethod
-    def homepage(self) -> str: pass
-
-    @classproperty
-    def citation(self) -> List[str]:
-        return []
+    name: ClassVar[str]
+    description: ClassVar[str]
+    homepage: ClassVar[str]
+    citation: ClassVar[List[str]] = []
     
     # ---------------------------------------------------------------------------- #
 
@@ -223,6 +199,31 @@ class Dataset(ABC):
         """
         for i in range(len(self)):
             yield self[i]
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        A collection of checks to ensure that the subclass is a valid Dataset subclass.
+        """
+        super().__init_subclass__(**kwargs)
+
+        # Check that the subclass is not the Dataset class itself
+        if cls is Dataset:
+            raise TypeError("Dataset is an abstract base class and cannot be instantiated directly")
+
+        # Abstract intermediate classes (e.g. FileDataset) still have
+        # unimplemented abstractmethods; only concrete subclasses must define the
+        # dataset-level attributes -> test to skip the next check
+        is_abstract = any(
+            getattr(getattr(cls, name, None), "__isabstractmethod__", False)
+            for name in dir(cls)
+        )
+        if is_abstract:
+            return
+
+        # Check that the subclass defines the required class attributes
+        for attr in ("name", "description", "homepage"):
+            if attr not in cls.__dict__:
+                raise TypeError(f"{cls.__name__} must define class attribute {attr!r}")
 
 
 class FileDataset(Dataset):
