@@ -1298,7 +1298,7 @@ class Xor(GlobalConstraint):
             return [BoolVal(parity)], []
         if parity:  # negate first Boolean variable
             changed = False
-            for i, a in enumerate(self.args):
+            for i, a in enumerate(new_args):  # index into new_args (constants already removed)
                 if isinstance(a, _BoolVarImpl):
                     new_args[i] = ~a # a is var, ok to be negated
                     changed = True
