@@ -123,12 +123,14 @@ class CPM_pindakaas(SolverInterface):
         return self.pdk_solver
 
     def _int2bool_user_vars(self):
+
         # ensure all vars are known to solver
         for cpm_var in self.user_vars:
             if isinstance(cpm_var, _NumVarImpl) and not cpm_var.is_bool():
                 if cpm_var.name not in self.ivarmap:
                     _, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                    self.add(cons)
+                    for cpm_expr in self.transform(cons):
+                        self._post_constraint(cpm_expr)
                 for bv in self.ivarmap[cpm_var.name].vars().flatten():
                     self.solver_var(bv)
             else:
