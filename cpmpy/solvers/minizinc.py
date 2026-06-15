@@ -64,16 +64,14 @@ from packaging.version import Version
 
 import numpy as np
 
-from cpmpy.expressions import NoOverlap
-
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import MinizincNameException, MinizincBoundsException
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
-from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount, Regular
+from ..expressions.variables import _NumVarImpl, NegBoolView
+from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, Regular
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.utils import is_int, is_any_list, argvals, argval, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
