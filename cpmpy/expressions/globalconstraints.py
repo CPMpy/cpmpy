@@ -473,23 +473,24 @@ class Circuit(GlobalConstraint):
         n = len(succ)
         order = cp.intvar(0, n - 1, shape=n)
 
-        constraints = [x >= 0 for x in succ] + [x < n for x in succ]  # bounds on successors
-        constraints += [cp.sum(succ[j] == i for j in range(n)) == 1 for i in
-                        range(n)]  # each node i has exactly one predecessor
-        constraints += [cp.AllDifferent(order)]  # redundant constraint
-        constraints += [order[0] == 0]
+        constraining : list[Expression] = []
+        constraining.extend(x >= 0 for x in succ) # lower bound on successors
+        constraining.extend(x < n for x in succ)  # upper bound on successors
+        constraining.extend(cp.sum(succ[j] == i for j in range(n)) == 1 for i in range(n))  # each node i has exactly one predecessor
+        constraining.append(cp.AllDifferent(order))  # redundant constraint
+        constraining.append(order[0] == 0)
 
         defining: list[Expression] = []
         for i in range(n):
             for j in range(n):
                 if i == j:
                     # forbid self-loops
-                    constraints += [succ[i] != j]
+                    constraining.append(succ[i] != j)
                 if j != 0:
                     # ensure no subtours, i -> j means order must increase along the edge (can not loop back, except to j=0)
-                    defining += [(succ[i] == j) == (order[i] + 1 == order[j])]
+                    defining.append((succ[i] == j) == (order[i] + 1 == order[j]))
 
-        return constraints, defining
+        return constraining, defining
 
     def value(self) -> Optional[bool]:
         """
@@ -946,18 +947,16 @@ class Regular(GlobalConstraint):
         if complete:
             # add a sink node for transitions that are not defined. When the Regular constraint is in positive context, this is not needed
             sink = len(self.nodes)
-            transitions += [[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if
-                            (n, v) not in self.trans_dict]
-            transitions += [[sink, v, sink] for v in range(lb, ub + 1)]
+            transitions.append([self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict)
+            transitions.append([sink, v, sink] for v in range(lb, ub + 1))
 
         # keep track of current state when traversing the array
         state_vars = intvar(0, len(self.nodes) if complete else len(self.nodes)-1, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
-        defining: list[Expression] = [
-            Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
+        defining: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
         # define the rest of the automaton using transition table
-        defining += [Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr))]
+        defining.extend(Table([state_vars[i - 1], arr[i], state_vars[i]], transitions) for i in range(1, len(arr)))
 
         # constraint is satisfied iff last state is accepting
         return [InDomain(state_vars[-1], [self.node_map[e] for e in accepting])], defining
@@ -981,9 +980,16 @@ class Regular(GlobalConstraint):
             return [cp.BoolVal(False)], [] # no accepting states, cannot be satisfied
 
         # Collect all nodes and all transition values in the DFA
-        nodes = sorted({src for src, _, _ in transitions} |
-                       {dst for _, _, dst in transitions})
-        values = sorted({value for _, value, _ in transitions})
+        nodes_set = set()
+        values_set = set()
+
+        for src, value, dst in transitions:
+            nodes_set.add(src)
+            nodes_set.add(dst)
+            values_set.add(value)
+
+        nodes = sorted(nodes_set)
+        values = sorted(values_set)
 
         node_idx = {node: idx for idx, node in enumerate(nodes)}
         value_idx = {value: idx for idx, value in enumerate(values)}
