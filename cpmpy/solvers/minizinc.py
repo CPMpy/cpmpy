@@ -73,7 +73,7 @@ from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.utils import is_int, is_any_list, argvals, argval, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, argvals, argval, get_bounds, get_nonneg_args, implies, is_true_cst, is_false_cst
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -102,7 +102,7 @@ class CPM_minizinc(SolverInterface):
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
-                                              "precedence", "no_overlap",
+                                              "precedence", "no_overlap", "no_overlap_optional",
                                               "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
 
@@ -292,6 +292,7 @@ class CPM_minizinc(SolverInterface):
         # Prepare solve statement, so it can be overwritten on demand
         self.mzn_txt_solve = "solve satisfy;"
         self.mzn_result = None
+        self._opt_var_count = 0
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
@@ -640,6 +641,36 @@ class CPM_minizinc(SolverInterface):
         return self
     __add__ = add  # avoid redirect in superclass
 
+    def _new_opt_int_var(self, cpm_var) -> str:
+        """Helper to declare a new MiniZinc optional integer variable."""
+        name = "opt_start_{}".format(self._opt_var_count)
+        self._opt_var_count += 1
+        lb, ub = get_bounds(cpm_var)
+        if lb < -2147483646 or ub > 2147483646:
+            raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
+                                          "of range (-2147483646..2147483646)")
+        self.mzn_model.add_string("var opt {}..{}: {};\n".format(lb, ub, name))
+        return name
+
+    def _convert_optional_starts(self, start, is_present) -> str:
+        """Helper to convert optional task starts to a MiniZinc var opt int array."""
+        opt_starts = []
+        for s, p in zip(start, is_present):
+            self.solver_var(s)
+            opt_name = self._new_opt_int_var(s)
+            opt_starts.append(opt_name)
+            if is_true_cst(p):
+                self.mzn_model.add_string("constraint occurs({});\n".format(opt_name))
+                self.mzn_model.add_string("constraint deopt({}) = {};\n".format(opt_name, self._convert_expression(s)))
+            elif is_false_cst(p):
+                self.mzn_model.add_string("constraint absent({});\n".format(opt_name))
+            else:
+                self.solver_var(p)
+                self.mzn_model.add_string("constraint occurs({}) <-> {};\n".format(opt_name, self._convert_expression(p)))
+                self.mzn_model.add_string("constraint occurs({}) -> deopt({}) = {};\n".format(
+                    opt_name, opt_name, self._convert_expression(s)))
+        return "[{}]".format(",".join(opt_starts))
+
     def _convert_expression(self, expr) -> str:
         """
             Convert a CPMpy expression into a minizinc-compatible string
@@ -753,6 +784,23 @@ class CPM_minizinc(SolverInterface):
             format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
 
             return format_str.format(self._convert_expression(start), self._convert_expression(dur))
+
+        elif expr.name == "no_overlap_optional":
+            extra_cons = []
+            if len(expr.args) == 3:
+                start, dur, is_present = expr.args
+            else:
+                start, dur, end, is_present = expr.args
+                extra_cons += [implies(p, s + d == e) for s, d, e, p in zip(start, dur, end, is_present)]
+
+            global_str = "disjunctive({},{})"
+            # ensure duration is non-negative
+            dur, dur_cons = get_nonneg_args(dur, is_present)
+            extra_cons += dur_cons
+
+            format_str = "forall(" + self._convert_expression(extra_cons) + " ++ [" + global_str + "])"
+
+            return format_str.format(self._convert_optional_starts(start, is_present), self._convert_expression(dur))
 
         args_str = [self._convert_expression(e) for e in expr.args]
         # standard expressions: comparison, operator, element
