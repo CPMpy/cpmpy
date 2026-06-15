@@ -106,6 +106,15 @@ class TestTransfDecomp:
         assert str(decompose_in_tree(cons, supported={"min"})) == \
                          "[(min(x,y)) == (z)]"
 
+    def test_decompose_allequal_reified(self):
+        # nested AllEqual decomposition can leave not(...) (e.g. False == (a|b)); must be pushed down
+        a, b = cp.boolvar(2, name=("a", "b"))
+        bv = cp.boolvar(name="bv")
+
+        cons = [bv.implies(cp.AllEqual(a, b, False, a | b))]
+        assert str(decompose_in_tree(cons)) == \
+            "[(bv) -> (and((a) == (b), ~b, (~a) and (~b)))]"
+
 
     def test_globals_in_decomp(self):
 

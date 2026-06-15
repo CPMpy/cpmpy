@@ -304,17 +304,25 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 # if it has subexprs, decompose its arguments
                 if arg.has_subexpr():
                     rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-                    if rec_changed:
-                        changed = True
-                        if len(rec_toplevel) > 0:
-                            toplevel.extend(rec_toplevel)
+                    if len(rec_toplevel) > 0:
+                        toplevel.extend(rec_toplevel)
+                    if not rec_changed:
+                        rec_newargs = arg.args  # let's be sure its set
 
-                        if arg.name == "not": # cannot leave negation here, push down in the arguments of the decomposition
-                            assert len(rec_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
-                            arg = recurse_negation(rec_newargs[0])
+                    if arg.name == "not":  # not(global) or negation left by a decomposition
+                        assert len(rec_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
+                        if isinstance(rec_newargs[0], GlobalConstraint):
+                            if rec_changed:
+                                changed = True
+                                arg = copy.copy(arg)
+                                arg.update_args(rec_newargs)
                         else:
-                            arg = copy.copy(arg)
-                            arg.update_args(rec_newargs)
+                            changed = True
+                            arg = recurse_negation(rec_newargs[0])
+                    elif rec_changed:
+                        changed = True
+                        arg = copy.copy(arg)
+                        arg.update_args(rec_newargs)
                             
                     newargs.append(arg)
                     continue
