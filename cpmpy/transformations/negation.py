@@ -1,5 +1,11 @@
 """
     Transformations dealing with negations (used by other transformations).
+
+    After calling `push_down_negation()`, only two 'negative' expressions remain:
+    - NegBoolView(var), which represents ~var
+    - Operator("not", [GlobalConstraint]) in case GlobalConstraint did not overwrite the .negate() method.
+    
+    The latter can be further handled by `decompose_in_tree()`, e.g. it will negate the decomposition.
 """
 import copy
 import warnings  # for deprecation warning
@@ -250,11 +256,16 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
         
     # global constraints
     elif isinstance(expr, GlobalConstraint):
-        new_glob = copy.copy(expr)
+        # first recurse to see if the arguments contain negations
         rec_changed, rec_args = _push_down_negation_args(expr.args)
         if rec_changed:
+            new_glob = copy.copy(expr)
             new_glob.update_args(rec_args)
-        return new_glob.negate() # contract says this does not introduce any 'not' operators, no need to recurse into new expression
+            expr = new_glob
+
+        # by default, global.negate() will return ~global
+        # some global constraints may have a better way to negate them, and overwrite global.negate()
+        return expr.negate()
            
     else:
         raise ValueError(f"Unsupported expression to negate: {expr}")
