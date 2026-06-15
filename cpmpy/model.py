@@ -143,6 +143,7 @@ class Model(object):
 
             ``objective()`` can be called multiple times, only the last one is stored
         """
+        assert isinstance(expr, Expression), f"Model only accepts an Expression as objective, got {type(expr)} instead"
         self.objective_ = expr
         self.objective_is_min = minimize
 
