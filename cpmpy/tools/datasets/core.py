@@ -80,8 +80,6 @@ import tempfile
 from typing import Any, Optional, Tuple, List, Callable
 from urllib.error import URLError
 from urllib.request import HTTPError, Request, urlopen
-from concurrent.futures import ProcessPoolExecutor, as_completed
-import multiprocessing
 
 # tqdm as an optional dependency, provides prettier progress bars
 tqdm: Any = None
@@ -414,13 +412,13 @@ class FileDataset(Dataset):
             'id': str(instance),
             'dataset': self.name,
             'categories': self.categories(),
-            'name': pathlib.Path(instance).name.replace(self.extension, ''),
+            'name': self._instance_name(instance),
             'path': instance,
         }
 
         # Advanced mode: bypass sidecars and collect metadata on demand.
         if self._ignore_sidecar:
-            metadata.update(self.collect_instance_metadata(file=pathlib.Path(instance)))
+            metadata.update(self.collect_instance_metadata(pathlib.Path(instance)))
             return metadata
         else:
             # Load sidecar metadata if it exists
@@ -510,7 +508,15 @@ class FileDataset(Dataset):
         """
         return pathlib.Path(str(instance_path) + self.METADATA_EXTENSION)
 
-    def _collect_all_metadata(self, force: bool = False, workers: int = 1):
+    def _instance_name(self, instance: os.PathLike) -> str:
+        """
+        Logical instance name: the filename with the dataset extension stripped.
+        """
+        name = pathlib.Path(instance).name
+        ext = self.extension
+        return name[:-len(ext)] if ext and name.endswith(ext) else name
+
+    def _collect_all_metadata(self, force: bool = False):
         """
         Collect and store structured metadata sidecar files for all instances.
 
@@ -519,105 +525,46 @@ class FileDataset(Dataset):
         - `dataset`: dataset-level metadata (name, description, url, ...)
         - `instance_name`: logical instance name (filename stem)
         - `source_file`: path to the instance file
-        - `category`: dataset category labels (year, track, variant, family)
+        - `categories`: dataset category labels (year, track, variant, family)
         - `instance_metadata`: portable domain-specific metadata
-        - `format_metadata`: format-specific metadata from the source format
 
         Arguments:
             force (bool): If True, re-collect instance metadata even if sidecar
                 files already exist.
-            workers (int): Number of parallel workers for metadata collection.
-                Default is 1 (sequential). Use >1 for parallel processing.
         """
         files = self._list_instances()
 
         # Filter files that need processing
-        files_to_process = []
         if force:
             files_to_process = files
         else:
-            for file_path in files:
-                meta_path = self._metadata_path(file_path)
-                if not meta_path.exists():
-                    files_to_process.append(file_path)
+            files_to_process = [f for f in files if not self._metadata_path(f).exists()]
 
         if not files_to_process:
             return
 
-        # Process files sequentially or in parallel
-        if workers <= 1:
-            # Sequential processing
-            if tqdm is not None:
-                file_iter = tqdm(files_to_process, desc="Collecting metadata", unit="file")
-            else:
-                file_iter = files_to_process
-                print(f"Collecting metadata for {len(files_to_process)} instances...")
-
-            for file_path in file_iter:
-                self._collect_one_metadata(file_path)
+        if tqdm is not None:
+            file_iter = tqdm(files_to_process, desc="Collecting metadata", unit="file")
         else:
-            # Parallel processing with ProcessPoolExecutor for CPU-bound work
-            print(f"Collecting metadata for {len(files_to_process)} instances using {workers} workers...")
-            
-            # 'fork' is Linux-only; 'spawn' is the safe cross-platform default
-            start_method = 'fork' if sys.platform == 'linux' else 'spawn'
-            ctx = multiprocessing.get_context(start_method)
-            with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as executor:
-                futures = {executor.submit(self._collect_one_metadata, fp): fp for fp in files_to_process}
-                
-                if tqdm is not None:
-                    iterator = tqdm(as_completed(futures), total=len(futures), desc="Collecting metadata", unit="file")
-                else:
-                    iterator = as_completed(futures)
-                
-                for future in iterator:
-                    try:
-                        future.result()
-                    except Exception as e:
-                        fp = futures[future]
-                        print(f"Error collecting metadata for {fp.name}: {e}")
+            file_iter = files_to_process
+            print(f"Collecting metadata for {len(files_to_process)} instances...")
 
-    def _collect_one_metadata(self, file_path):
-        """
-        Collect metadata for a single instance file.
+        for file_path in file_iter:
+            # Build structured, self-contained sidecar. Let exceptions from
+            # collect_instance_metadata() propagate: a failure signals a corrupt
+            # instance or a bug, which should surface rather than be buried.
+            sidecar = {
+                "dataset": self.dataset_metadata(),
+                "instance_name": self._instance_name(file_path),
+                "source_file": str(file_path.relative_to(self.dataset_dir)),
+                "categories": self.categories(),
+                "instance_metadata": self.collect_instance_metadata(file_path),
+            }
 
-        Arguments:
-            file_path (os.PathLike): Path to the instance file.
-        """
-        meta_path = self._metadata_path(file_path)
-        metadata_error = None
-        try:
-            instance_meta = self.collect_instance_metadata(str(file_path))
-        except Exception as e:
-            instance_meta = {}
-            metadata_error = str(e)
+            with open(self._metadata_path(file_path), "w") as f:
+                json.dump(sidecar, f, indent=2)
 
-        # Derive logical instance name from dataset-specific extension (strict)
-        filename = file_path.name
-        suffix_len = len(self.extension)
-        if suffix_len and not filename.endswith(self.extension):
-            raise ValueError(
-                f"Instance file '{filename}' does not end with dataset extension '{self.extension}'."
-            )
-        stem = filename[:-suffix_len] if suffix_len else filename
 
-        # Build structured sidecar
-        sidecar = {
-            "dataset": self.dataset_metadata(),
-            "instance_name": stem,
-            "source_file": str(file_path.relative_to(self.dataset_dir)),
-            "categories": self.categories(),
-            "instance_metadata": instance_meta,
-        }
-
-        # Collect metadata collection error if any
-        if metadata_error is not None:
-            sidecar["_metadata_error"] = metadata_error
-
-        with open(meta_path, "w") as f:
-            json.dump(sidecar, f, indent=2)
-
-            
     # ----------------------------- Download methods ----------------------------- #
 
     @staticmethod

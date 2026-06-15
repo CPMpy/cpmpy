@@ -197,7 +197,7 @@ def sidecar_payload(downloaded_dataset):
 
     # Metadata collection expects a reader that returns a CPMpy model.
     sidecar_dataset.reader = lambda *_args, **_kwargs: cp.Model()
-    sidecar_dataset._collect_all_metadata(force=True, workers=1)
+    sidecar_dataset._collect_all_metadata(force=True)
 
     instances = sidecar_dataset._list_instances()
     assert len(instances) > 0
