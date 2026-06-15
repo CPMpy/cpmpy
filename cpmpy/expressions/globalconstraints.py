@@ -947,8 +947,8 @@ class Regular(GlobalConstraint):
         if complete:
             # add a sink node for transitions that are not defined. When the Regular constraint is in positive context, this is not needed
             sink = len(self.nodes)
-            transitions.append([self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict)
-            transitions.append([sink, v, sink] for v in range(lb, ub + 1))
+            transitions.extend([[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
+            transitions.extend([[sink, v, sink] for v in range(lb, ub + 1)])
 
         # keep track of current state when traversing the array
         state_vars = intvar(0, len(self.nodes) if complete else len(self.nodes)-1, shape=len(arr))
