@@ -1077,6 +1077,21 @@ class TestGlobal:
         model = cp.Model(constraints)
         assert not model.solve(solver="minizinc")
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_mdd_minizinc(self):
+        """Test native mdd global constraint with minizinc solver"""
+        x = cp.intvar(0, 3, shape=3)
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+        solutions = {(0, 1, 0), (1, 1, 0), (2, 2, 0)}
+
+        for reduce in (False, True):
+            mdd = cp.MDD(x, transitions, start="src", reduce=reduce)
+            sols = set()
+            num = cp.Model(mdd).solveAll(solver="minizinc", display=lambda: sols.add(tuple(argvals(x))))
+            assert sols == solutions
+            assert num == len(solutions)
 
 
     def test_cumulative_no_np(self):
