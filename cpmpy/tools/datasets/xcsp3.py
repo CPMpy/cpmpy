@@ -22,6 +22,11 @@ class XCSP3Dataset(FileDataset):  # torch.utils.data.Dataset compatible
     """
     XCSP3 Dataset in a PyTorch compatible format.
 
+    XCSP3 is an XML-based format designed to represent instances of combinatorial constrained problems from the angle of Constraint Programming (CP). 
+    
+    - Origin: https://xcsp.org/instances/
+    - Reference: Audemard, G., Boussemart, F., Lecoutre, C., Piette, C., Tabary, S. XCSP3: An Integrated Format for Benchmarking Combinatorial Constrained Problems. arXiv:2009.00514, 2020.
+
     Arguments:
         root (str): Root directory containing the XCSP3 instances (if 'download', instances will be downloaded to this location)
         year (int): Competition year (2022, 2023 or 2024)

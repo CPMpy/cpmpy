@@ -101,16 +101,33 @@ class Dataset(ABC):
     """
     Abstract base class for CO datasets.
 
+    The `Dataset` class is an abstract base class for all datasets. It provides a standardized interface for 
+    the PyTorch-compatible access pattern for CO benchmark datasets. It is not meant to be instantiated directly, 
+    but rather subclassed. Have a look at :class:`FileDataset` for a concrete implementation.
+
     Each instance in a dataset is characterised by a (x, y) pair of:
-        x: instance reference (e.g., file path, database key, generated seed, ...)
-        y: instance metadata  (solution, features, origin, etc.)
+
+        - x: instance reference (e.g., file path, database key, generated seed, ...)
+        - y: instance metadata  (solution, features, origin, etc.)
 
     Instances are indexed by a unique identifier can be accessed by that identifier. 
     For example its positional index within the dataset.
 
     Implementing this class requires implementing the following methods:
-    - ``__len__``: return the total number of instances
-    - ``__getitem__``: return the instance and metadata at the given index / identifier
+
+        - ``__len__``: return the total number of instances
+        - ``__getitem__``: return the instance and metadata at the given index / identifier
+
+    And providing the following class attributes:
+
+        - ``name``: the name of the dataset
+        - ``description``: a short description of the dataset
+        - ``homepage``: a URL to the homepage of the dataset
+        - ``citation``: optionally, a list of citations for the dataset
+
+    Optional methods to overwrite:
+    
+        - ``instance_metadata``: return the metadata for a given instance
     """
     
 
@@ -159,6 +176,12 @@ class Dataset(ABC):
     def instance_metadata(self, instance: Any) -> Dict[str, Any]:
         """
         Return the metadata for a given instance.
+
+        Arguments:
+            instance: the instance identifier for which to return the metadata
+
+        Returns:
+            dict: The metadata for the instance.
         """
         pass
 
