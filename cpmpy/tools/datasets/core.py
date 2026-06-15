@@ -27,13 +27,17 @@ Class hierarchy::
         └── XCSP3Dataset
         └── (your dataset here)
 
+Whilst the dataset class provides a PyTorch compatible access pattern, it has no actual dependency on PyTorch and can be used without 
+installing this library.
+    
 To implement a new dataset, one needs to subclass one of the abstract dataset classes,
 and provide implementation for the following methods:
 - ``category``: return a dictionary of category labels, describing to which subset the dataset has been restricted (year, track, ...)
 - ``download``: download the dataset (helper function :func:`_download_file` is provided)
 
 Some optional methods to overwrite are:
-- ``collect_instance_metadata``: collect metadata about individual instances (e.g. number of variables, constraints, ...), potentially domain specific 
+- ``collect_instance_metadata``: collect metadata about individual instances (e.g. number of variables, constraints, ...), 
+  potentially domain specific 
 - ``open``: how to open the instance file (e.g. for compressed files using .xz, .lzma, .gz, ...)
 
 Datasets must also implement the following dataset metadata attributes:
@@ -64,6 +68,7 @@ Example:
 The dataset also supports PyTorch-style transforms and target transforms.
 
 .. code-block:: python
+
     dataset = MyDataset(download=True, transform=my_model_loader)
     for model, info in dataset:
         ...
