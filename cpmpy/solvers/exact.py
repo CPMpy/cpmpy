@@ -49,7 +49,7 @@
 import sys  # for stdout checking
 import time
 import warnings
-from typing import Optional, List
+from typing import Optional, List, Iterable
 
 from packaging.version import Version
 
@@ -65,7 +65,7 @@ from ..transformations.reification import only_implies, reify_rewrite, only_bv_r
 from ..transformations.normalize import toplevel_list
 from ..transformations.safening import no_partial_functions, safen_objective
 from ..expressions.globalconstraints import DirectConstraint
-from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num
+from ..expressions.utils import flatlist, argvals, argval, is_any_list, is_num, is_int
 from ..exceptions import NotSupportedError
 
 import numpy as np
@@ -161,8 +161,11 @@ class CPM_exact(SolverInterface):
         """
         return self.xct_solver
 
-    def _fillVars(self):
-        if not self.xct_solver.hasSolution():
+    def _fillVars(self, has_solution=None):
+        if has_solution is None:
+            has_solution = self.xct_solver.hasSolution()
+
+        if not has_solution:
             self.objective_value_ = None
             for cpm_var in self.user_vars:
                 cpm_var._value = None
@@ -174,7 +177,7 @@ class CPM_exact(SolverInterface):
         for cpm_var, val in zip(lst_vars,exact_vals):
             cpm_var._value = bool(val) if isinstance(cpm_var, _BoolVarImpl) else val # xct value is always an int
 
-    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
             Call Exact
 
@@ -183,7 +186,7 @@ class CPM_exact(SolverInterface):
             :param assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
                            For repeated solving, and/or for use with :func:`s.get_core() <get_core()>`: if the model is UNSAT,
                            get_core() returns a small subset of assumption variables that are unsat together.
-            :type assumptions: list of CPMpy Boolean variables
+            :type assumptions: iterable (e.g. list, set, tuple) of CPMpy Boolean variables
 
             :param time_limit: optional, time limit in seconds
             :type time_limit: int or float
@@ -207,6 +210,7 @@ class CPM_exact(SolverInterface):
 
         # set assumptions
         if assumptions is not None:
+            assumptions = list(assumptions)  # iterable to ordered list
             assert all(v.is_bool() for v in assumptions), "Non-Boolean assumptions given to Exact: " + str([v for v in assumptions if not v.is_bool()])
             assump_vals = [int(not isinstance(v, NegBoolView)) for v in assumptions]
             assump_vars = [self.solver_var(v._bv if isinstance(v, NegBoolView) else v) for v in assumptions]
@@ -257,15 +261,16 @@ class CPM_exact(SolverInterface):
         else:
             raise NotImplementedError(my_status)  # a new status type was introduced, please report on github
         
-        self._fillVars()
+        # True/False depending on self.cpm_status
+        ret = self._solve_return(self.cpm_status)
+        self._fillVars(has_solution=ret)
         if self.has_objective():
             if self.objective_is_min_:
                 self.objective_value_ = obj_val
             else: # maximize, so actually negative value
                 self.objective_value_ = -obj_val
         
-        # True/False depending on self.cpm_status
-        return self._solve_return(self.cpm_status)
+        return ret
 
     def _update_time(self, timelim, start, end):
         """
@@ -311,7 +316,7 @@ class CPM_exact(SolverInterface):
             (my_status, objval) = self.xct_solver.toOptimum(timelim) # fix the solution to the optimal objective
             if my_status == "UNSAT": # found unsatisfiability
                 total_end = time.time()
-                self._fillVars() # erases the solution
+                self._fillVars(has_solution=False) # erases the solution
                 # update exit status
                 self.cpm_status = SolverStatus(self.name)
                 self.cpm_status.runtime = total_end - total_start
@@ -345,14 +350,14 @@ class CPM_exact(SolverInterface):
 
             assert my_status in ["UNSAT","SAT","INCONSISTENT","TIMEOUT"], "Unexpected status code for Exact: " + my_status
             if my_status == "UNSAT": # found unsatisfiability (no more solutions to be found)
-                self._fillVars() # erases the solution
+                self._fillVars(has_solution=False) # erases the solution
                 break
             elif my_status == "SAT": # found solution, but not optimality proven
                 assert self.xct_solver.hasSolution()
                 solsfound += 1
                 self.xct_solver.invalidateLastSol() # TODO: pass user vars to this function
                 if display is not None:
-                    self._fillVars()
+                    self._fillVars(has_solution=True)
                     self.print_display(display)
             elif my_status == "INCONSISTENT": # found inconsistency
                 raise ValueError("Error: inconsistency during solveAll should not happen, please warn the developers of this bug")
@@ -392,33 +397,34 @@ class CPM_exact(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # special case, negative-bool-view. Should be eliminated in linearize
+                if isinstance(cpm_var, NegBoolView):
+                    raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
+                self.xct_solver.addVariable(name)
+            else:
+                lb, ub = cpm_var.get_bounds()
+                if self.encoding is None:
+                    encoding = "order" if ub-lb < 8 else "log"  # heuristic bound
+                else:
+                    encoding = self.encoding  # can also force it
+                self.xct_solver.addVariable(name, lb, ub, encoding)
+            self._varmap[name] = name
+            return name
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view. Should be eliminated in linearize
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals should not be left as part of any equation. Please report.")
-
-        # return it if it already exists
-        if cpm_var in self._varmap:
-            return self._varmap[cpm_var]
-
-        # create if it does not exist
-        revar = str(cpm_var)
-        if isinstance(cpm_var, _BoolVarImpl):
-            self.xct_solver.addVariable(revar)
-        elif isinstance(cpm_var, _IntVarImpl):
-            lb, ub = cpm_var.get_bounds()
-            if self.encoding is None:
-                encoding = "order" if ub-lb < 8 else "log" # heuristic bound
-            else:
-                encoding = self.encoding # can also force it
-            self.xct_solver.addVariable(revar, lb, ub, encoding)
-        else:
-            raise NotImplementedError("Not a known var {}".format(cpm_var))
-        self._varmap[cpm_var] = revar
-        return revar
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize):

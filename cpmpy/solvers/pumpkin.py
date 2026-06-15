@@ -38,7 +38,7 @@
     ==============
 """
 import warnings
-from typing import Optional, List
+from typing import Optional, List, Iterable
 from os.path import join
 
 import numpy as np
@@ -47,9 +47,9 @@ from packaging.version import Version
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import Cumulative, GlobalConstraint
+from ..expressions.globalconstraints import Cumulative, GlobalConstraint, NoOverlap
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
-from ..expressions.utils import is_num, is_any_list, get_bounds
+from ..expressions.utils import is_num, is_int, is_any_list, get_bounds
 from ..transformations.get_variables import get_variables
 from ..transformations.linearize import canonical_comparison
 from ..transformations.normalize import toplevel_list
@@ -163,7 +163,7 @@ class CPM_pumpkin(SolverInterface):
         return self._solve_return(self.cpm_status)
 
 
-    def solve(self, time_limit:Optional[float]=None, prove=False, assumptions:Optional[List[_BoolVarImpl]]=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, prove=False, assumptions:Optional[Iterable[_BoolVarImpl]]=None, **kwargs):
         """
         Call the Pumpkin solver
 
@@ -172,7 +172,7 @@ class CPM_pumpkin(SolverInterface):
             prove: whether to produce a DRCP proof (.lits file and .drcp proof file).
             proof_name: name for the the proof files.
             proof_location: location for the proof files (default to current working directory).
-            assumptions: CPMpy Boolean variables (or their negation) that are assumed to be true.
+            assumptions: iterable (e.g. list, set, tuple) of Boolean variables (or their negation) that are assumed to be true.
                             For repeated solving, and/or for use with :func:`s.get_core() <cpmpy.solvers.pumpkin.CPM_pumpkin.get_core>`: if the model is UNSAT,
                             `get_core()` returns a small subset of assumption variables that are unsat together.
         """
@@ -208,6 +208,7 @@ class CPM_pumpkin(SolverInterface):
 
         elif assumptions is not None:
             assert self._proof is None, "Proof-logging under assumptions is not supported"
+            assumptions = list(assumptions)  # iterable to ordered list
             pum_assumptions = [self.to_predicate(a) for a in assumptions]
             self.assump_map = dict(zip(pum_assumptions, assumptions))
             solve_func = self.pum_solver.satisfy_under_assumptions
@@ -293,31 +294,30 @@ class CPM_pumpkin(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
 
-        if is_num(cpm_var):
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: work directly on var inside the view
+                    revar = self.solver_var(cpm_var._bv).negate()
+                else:
+                    revar = self.pum_solver.new_boolean_variable(name=name)
+            else:
+                revar = self.pum_solver.new_integer_variable(cpm_var.lb, cpm_var.ub, name=name)
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return self.solver_var(cpm_var._bv).negate()
-
-        # create if it does not exist
-        if isinstance(cpm_var, _NumVarImpl):
-            if cpm_var not in self._varmap:
-                if isinstance(cpm_var, _BoolVarImpl):
-                    revar = self.pum_solver.new_boolean_variable(name=str(cpm_var))
-                elif isinstance(cpm_var, _IntVarImpl):
-                    revar = self.pum_solver.new_integer_variable(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
-                else:
-                    raise NotImplementedError("Not a known var {}".format(cpm_var))
-                self._varmap[cpm_var] = revar
-
-            # return from cache
-            return self._varmap[cpm_var]
-        
-        raise ValueError(f"Not a known var {cpm_var}")
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
 
@@ -512,6 +512,8 @@ class CPM_pumpkin(SolverInterface):
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == "or": 
                 return [constraints.Clause(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
+            if cpm_expr.name == "and":
+                return [clause for arg in cpm_expr.args for clause in self._get_constraint(arg, tag=tag)]
 
             raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
 
@@ -565,19 +567,29 @@ class CPM_pumpkin(SolverInterface):
                 return [constraints.AllDifferent(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
             
             elif cpm_expr.name == "cumulative":
-                start, dur, end, demand, cap = cpm_expr.args
+                pum_cons = []
+                if len(cpm_expr.args) == 4:
+                    start, dur, demand, cap = cpm_expr.args
+                else:
+                    start, dur, end, demand, cap = cpm_expr.args
+                    end_cons = [s + d == e for s,d,e in zip(start, dur, end)]
+                    for cons in self.transform(end_cons):
+                        pum_cons.extend(self._get_constraint(cons, tag=tag))
+
                 assert all(is_num(d) for d in dur), "Pumpkin only accepts Cumulative with fixed durations"
-                assert all(is_num(d) for d in demand), "Pumpkin only accepts Cumulative with fixed demand"
+                assert all(is_num(h) for h in demand), "Pumpkin only accepts Cumulative with fixed demand"
                 assert is_num(cap), "Pumpkin only accepts Cumulative with fixed capacity"
 
-                pum_cons = [constraints.Cumulative(self.solver_vars(start),dur, demand, cap, constraint_tag=tag)]
-                if end is not None:
-                    pum_cons += [self._get_constraint(c, tag=tag)[0] for c in self.transform([s + d == e for s,d,e in zip(start, dur, end)])]
+                pum_cons += [constraints.Cumulative(self.solver_vars(start),dur, demand, cap, constraint_tag=tag)]
                 return pum_cons
 
             elif cpm_expr.name == "no_overlap":
-                start, dur, end = cpm_expr.args
-                return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1), tag=tag)
+                if len(cpm_expr.args) == 2:
+                    start, dur = cpm_expr.args
+                    return self._get_constraint(Cumulative(start, dur, demand=1, capacity=1), tag=tag)
+                else:
+                    start, dur, end = cpm_expr.args
+                    return self._get_constraint(Cumulative(start, dur, end, demand=1, capacity=1), tag=tag)
 
             elif cpm_expr.name == "table":
                 arr, table = cpm_expr.args
