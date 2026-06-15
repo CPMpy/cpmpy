@@ -901,12 +901,12 @@ class CPM_minizinc(SolverInterface):
             #   MiniZinc: `constraint regular([IV0,IV1,IV2], array2d(1..3, 0..1, [<>,2,2,3,2,3]), 1, {3})`
             #            note: `d` is a 2D array `[|<>,2|2,3|2,3|]` with rows=states, cols=values
 
-            expr = cast(expr, Regular)
-            array, transitions, start, accepting = expr.args
+            reg = cast(Regular, expr)
+            array, transitions, start, accepting = reg.args
 
             # Map states to 1..Q (MiniZinc states are 1-indexed)
-            node_map = {n: i + 1 for i, n in enumerate(expr.nodes)}
-            Q = len(expr.nodes)
+            node_map = {n: i + 1 for i, n in enumerate(reg.nodes)}
+            Q = len(reg.nodes)
 
             # Determine value range for the alphabet
             values = sorted(set(v for _, v, _ in transitions))
