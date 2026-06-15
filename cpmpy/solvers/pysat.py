@@ -214,6 +214,19 @@ class CPM_pysat(SolverInterface):
         """
         return self.pysat_solver
 
+    def _int2bool_user_vars(self):
+        # ensure all vars are known to solver
+        for cpm_var in self.user_vars:
+            if isinstance(cpm_var, _NumVarImpl) and not cpm_var.is_bool():
+                if cpm_var.name not in self.ivarmap:
+                    _, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
+                    self.add(cons)
+                for bv in self.ivarmap[cpm_var.name].vars().flatten():
+                    self.solver_var(bv)
+            else:
+                self.solver_var(cpm_var)
+        # the user vars should have all and only Booleans (e.g. to ensure solveAll behaves consistently)
+        return replace_int_user_vars(self.user_vars, self.ivarmap)
 
     def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None):
         """
@@ -230,10 +243,7 @@ class CPM_pysat(SolverInterface):
                             Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
-        # the user vars should have all and only Booleans (e.g. to ensure solveAll behaves consistently)
-        self.user_vars = replace_int_user_vars(self.user_vars, self.ivarmap)
+        self.user_vars = self._int2bool_user_vars()
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
@@ -322,20 +332,12 @@ class CPM_pysat(SolverInterface):
             So vpool is the varmap (we don't use _varmap here).
         """
         if isinstance(cpm_var, _NumVarImpl):
-            name = cpm_var.name
-            if cpm_var.is_bool():
-                if isinstance(cpm_var, NegBoolView):
-                    # special case, negative-bool-view: just a view, get actual var identifier, return -id
-                    return -self.pysat_vpool.id(cpm_var._bv.name) # use name of inner variable, not ~bv as name
-                return self.pysat_vpool.id(name)
-
-            # intvar
-            if name not in self.ivarmap:
-                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                self.add(cons)
-            else:
-                enc = self.ivarmap[name]
-            return self.solver_vars(enc.vars())
+            if not cpm_var.is_bool():
+                raise TypeError(f"CPM_pysat.solver_var only supports Boolean variables, not {cpm_var}")
+            if isinstance(cpm_var, NegBoolView):
+                # special case, negative-bool-view: just a view, get actual var identifier, return -id
+                return -self.pysat_vpool.id(cpm_var._bv.name) # use name of inner variable, not ~bv as name
+            return self.pysat_vpool.id(cpm_var.name)
 
         if isinstance(cpm_var, BoolVal):
             return cpm_var
