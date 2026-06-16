@@ -71,7 +71,7 @@ from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, Regular
 from ..expressions.globalfunctions import Multiplication
-from ..expressions.utils import is_int, is_any_list, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -899,15 +899,15 @@ class CPM_minizinc(SolverInterface):
             #   MiniZinc: `constraint regular([IV0,IV1,IV2], array2d(1..3, 0..1, [<>,2,2,3,2,3]), 1, {3})`
             #            note: `d` is a 2D array `[|<>,2|2,3|2,3|]` with rows=states, cols=values
 
-            array, transitions, start, accepting = expr.args
+            array, _, start, accepting = expr.args
 
             # Map states to 1..Q (MiniZinc states are 1-indexed)
-            node_map = {n: i + 1 for i, n in enumerate(expr.nodes)}
+            node_map = {n: i + 1 for n, i in expr.node_map.items()}
             Q = len(expr.nodes)
 
-            # Determine value range for the alphabet
-            values = sorted(set(v for _, v, _ in transitions))
-            val_min, val_max = min(values), max(values)
+            # Alphabet must cover the full variable domain (undefined transitions are <>)
+            lbs, ubs = get_bounds(array)
+            val_min, val_max = min(lbs), max(ubs)
 
             # Transform transition dict to use 1-indexed state identifiers
             trans = {(node_map[s], v): node_map[e] for (s, v), e in expr.trans_dict.items()}
