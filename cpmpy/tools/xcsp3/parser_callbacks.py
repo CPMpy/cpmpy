@@ -639,7 +639,13 @@ class CallbacksCPMPy(Callbacks):
             expr = s + d
             cpm_ends.append(cp.intvar(*get_bounds(expr)))
 
-        self.cpm_model += cp.Cumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands, condition.right_operand())
+        self.cpm_model += cp.Cumulative(
+            cpm_start,
+            cpm_durations,
+            cpm_ends,
+            cpm_demands,
+            self.get_cpm_var(condition.right_operand()),
+        )
 
         # if condition.operator == TypeConditionOperator.LE:
         #     self.cpm_model += xglobals.DynamicCumulative(cpm_start, cpm_durations, cpm_ends, cpm_demands,
@@ -830,7 +836,7 @@ class CallbacksCPMPy(Callbacks):
         return cpm_exprs
 
     def get_cpm_var(self, x):
-        if isinstance(x, XVar):
+        if isinstance(x, XVar) or x in self.cpm_variables:
             return self.cpm_variables[x]
         else:
             return x  # constants
