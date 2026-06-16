@@ -32,7 +32,10 @@ def solution_xcsp3(model, useless_style="*", boolean_style="int"):
         root = ET.Element("instantiation", type="solution")
     # COP
     else:
-        root = ET.Element("instantiation", type="optimum", cost=str(int(model.objective_value())))
+        objective_value = model.objective_value()
+        if objective_value is None:
+            raise ValueError("Cannot format XCSP3 solution: objective value is unavailable")
+        root = ET.Element("instantiation", type="optimum", cost=str(int(objective_value)))
 
     # How useless variables should be handled
     #    (variables which have value `None` in the solution)
