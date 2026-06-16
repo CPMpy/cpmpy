@@ -57,9 +57,9 @@ class XCSP3JarCheckerObserver(Observer):
                 jar=self.jar_path,
                 instance_path=runner.instance,
                 solution_file=tmp_path,
-                debug_callback=lambda line: runner.print_comment(
-                    f"xcsp3-checker input: {line}"
-                ),
+                # debug_callback=lambda line: runner.print_comment(
+                #     f"xcsp3-checker input: {line}"
+                # ),
             )
             runner.print_comment(f"xcsp3-checker result: {verdict}")
             runner.print_comment(f"xcsp3-checker time: {checker_time:.3f}s")
