@@ -811,6 +811,11 @@ def main():
         args.observers,
         args.solution_checker,
     )
+    if getattr(args, "xcsp3_checker_jar", None):
+        observer_specs.append(
+            "cpmpy.tools.benchmark.cpbenchy.observer.xcsp3_jar_checker."
+            f"XCSP3JarCheckerObserver(jar_path={args.xcsp3_checker_jar!r})"
+        )
 
     # Load observers
     additional_observers = None
@@ -821,12 +826,6 @@ def main():
             print(f"Error loading observers: {e}", file=sys.stderr)
             sys.exit(1)
 
-    # Wire XCSP3 JAR checker when requested
-    if getattr(args, "xcsp3_checker_jar", None):
-        from cpmpy.tools.benchmark.cpbenchy.observer.xcsp3_jar_checker import XCSP3JarCheckerObserver
-        jar_observer = XCSP3JarCheckerObserver(jar_path=args.xcsp3_checker_jar)
-        additional_observers = (additional_observers or []) + [jar_observer]
-    
     # Run single instance, batch, or dataset
     if args.dataset:
         # Dataset processing
@@ -1005,4 +1004,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

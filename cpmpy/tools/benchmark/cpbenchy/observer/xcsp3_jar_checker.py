@@ -26,6 +26,11 @@ class XCSP3JarCheckerObserver(Observer):
     def observe_end(self, runner: Runner):
         if not runner.is_sat:
             return  # No solution to check
+        # In RunExec parent-process replay mode, the child has already run the
+        # checker and only relayed raw output/metadata. The live solver object is
+        # not available there, so there is no solution object to format.
+        if getattr(runner, "s", None) is None:
+            return
 
         from cpmpy.tools.benchmark.cpbenchy.adapter.xcsp3 import solution_xcsp3
         try:
@@ -38,7 +43,7 @@ class XCSP3JarCheckerObserver(Observer):
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".txt", delete=False
         ) as tmp:
-            tmp.write("v " + solution_xml + "\n")
+            tmp.write(solution_xml + "\n")
             tmp_path = tmp.name
 
         try:
