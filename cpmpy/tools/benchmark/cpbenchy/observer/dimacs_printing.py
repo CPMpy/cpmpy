@@ -63,19 +63,22 @@ class DIMACSPrintingObserver(Observer):
             return model.has_objective()
         return s.has_objective()
 
+    def _solution_value(self, s, runner: Runner = None):
+        adapter = getattr(runner, "instance_runner", None) if runner else None
+        include_aux = getattr(adapter, "include_aux_vars", False) if adapter else False
+        return self.solution_printer(s, include_aux_vars=include_aux) if include_aux else self.solution_printer(s)
+
     def print_result(self, s, runner: Runner = None):
         if s is None:
             return
-        # Pass include_aux_vars from adapter when present (for solution checkers that need IV/BV)
-        adapter = getattr(runner, "instance_runner", None) if runner else None
-        include_aux = getattr(adapter, "include_aux_vars", False) if adapter else False
-        value = self.solution_printer(s, include_aux_vars=include_aux) if include_aux else self.solution_printer(s)
         if s.status().exitstatus == CPMStatus.OPTIMAL:
+            value = self._solution_value(s, runner)
             if self._has_objective(s, runner):
                 self.print_objective(self._final_objective(s, runner), runner)
             self.print_value(value, runner)
             self.print_status("OPTIMUM" + chr(32) + "FOUND", runner)
         elif s.status().exitstatus == CPMStatus.FEASIBLE:
+            value = self._solution_value(s, runner)
             if self._has_objective(s, runner):
                 self.print_objective(self._final_objective(s, runner), runner)
             self.print_value(value, runner)
