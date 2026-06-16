@@ -39,7 +39,8 @@ class DIMACSPrintingObserver(Observer):
         runner.print_raw("s" + chr(32) + status)
 
     def print_value(self, value: str, runner: Runner):
-        runner.print_raw("v" + chr(32) + value)
+        prefix = "v" + chr(32)
+        runner.print_raw(prefix + str(value).rstrip("\r\n").replace("\n", "\n" + prefix))
 
     def print_objective(self, objective: int, runner: Runner):
         runner.print_raw("o" + chr(32) + str(objective))
