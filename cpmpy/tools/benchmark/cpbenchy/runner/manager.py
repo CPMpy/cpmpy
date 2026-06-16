@@ -1051,6 +1051,10 @@ class RunExecResourceManager(StreamingResourceManager):
                     tail = _tail_text_file(tmp_filename)
                     if tail:
                         _runner.runner_metadata["output_tail"] = tail
+                        if verbose and termination_reason is not None:
+                            _runner.print_comment("RunExec child output tail:")
+                            for tail_line in tail.splitlines():
+                                _runner.print_comment(tail_line)
                     if intermediate_objectives:
                         _runner.intermediate_objectives = intermediate_objectives
                         _runner.runner_metadata["intermediate_objectives"] = intermediate_objectives
