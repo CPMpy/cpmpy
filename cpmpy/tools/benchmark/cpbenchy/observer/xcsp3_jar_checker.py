@@ -61,9 +61,30 @@ class XCSP3JarCheckerObserver(Observer):
                 #     f"xcsp3-checker input: {line}"
                 # ),
             )
+            checker_payload = {
+                "checker": "xcsp3-solutionChecker",
+                "jar_path": self.jar_path,
+                "verdict": verdict,
+                "time": checker_time,
+                "valid": verdict.startswith("OK"),
+            }
+            setattr(runner, "solution_checker", checker_payload)
+            if hasattr(runner, "runner_metadata") and isinstance(runner.runner_metadata, dict):
+                runner.runner_metadata["solution_checker"] = checker_payload
             runner.print_comment(f"xcsp3-checker result: {verdict}")
             runner.print_comment(f"xcsp3-checker time: {checker_time:.3f}s")
         except Exception as e:
+            checker_payload = {
+                "checker": "xcsp3-solutionChecker",
+                "jar_path": self.jar_path,
+                "verdict": None,
+                "time": None,
+                "valid": False,
+                "error": str(e),
+            }
+            setattr(runner, "solution_checker", checker_payload)
+            if hasattr(runner, "runner_metadata") and isinstance(runner.runner_metadata, dict):
+                runner.runner_metadata["solution_checker"] = checker_payload
             runner.print_comment(f"xcsp3-checker failed: {e}")
         finally:
             self._checking = False
