@@ -35,6 +35,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pycsp3.parser.xparser import ParserXCSP3
 
+def _disable_pycsp3_auto_compile():
+    """Prevent PyCSP3 from compiling an empty model at process exit."""
+    if sys.argv[-1:] != ["-nocompile"]:
+        sys.argv.append("-nocompile")
+
 def _parse_xcsp3(path: os.PathLike) -> "ParserXCSP3":
     """
     Parses an XCSP3 instance file (.xml) and returns a `ParserXCSP3` instance.
@@ -45,6 +50,7 @@ def _parse_xcsp3(path: os.PathLike) -> "ParserXCSP3":
     Returns:
         A parser object.
     """
+    _disable_pycsp3_auto_compile()
     try:
         from pycsp3.parser.xparser import ParserXCSP3
     except ImportError as e:
