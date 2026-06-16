@@ -245,9 +245,9 @@ class TestTransfDecomp:
         assert set(map(str, decompose_in_tree([cons.implies(bv)]))) == {"(sum(a, b, c) == 1) -> (bv)","a == 1"}  # decompose standard
         assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard
 
-        # custom decompose has precedence over positive decompose
-        decompose_custom = {"mycustomglobal": lambda x : ([cp.sum(x.args) == 5], [])}
-        assert set(map(str, decompose_in_tree([cons], decompose_custom=decompose_custom))) == {"sum(a, b, c) == 5"} # custom decompose
+        # custom positive decompose has precedence over positive decompose
+        decompose_custom_positive = {"mycustomglobal": lambda x : ([cp.sum(x.args) == 5], [])}
+        assert set(map(str, decompose_in_tree([cons], decompose_custom_positive=decompose_custom_positive))) == {"sum(a, b, c) == 5"} # custom decompose
 
 
     def test_issue_546(self):
