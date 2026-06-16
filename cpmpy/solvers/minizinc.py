@@ -892,15 +892,18 @@ class CPM_minizinc(SolverInterface):
 
         elif expr.name == "mdd":
             # mdd(array): transitions live in expr.mapping / expr.levels (not in args)
-            # MiniZinc mdd expects: mdd(x, N, level, E, from, label, to) with root=node 1 and sink as to=0
+            # MiniZinc mdd expects: mdd(x, N, level, E, from, label, to)
+            # with x=variables, N=number of nodes, level=level of each node, E=number of edges, from=source nodes, label=edge labels, to=target nodes
+            # with root node = 1 and sink node = 0
             assert isinstance(expr, MDD)
             array = expr.args[0]
             array_str = self._convert_expression(array)
             sink = expr.sink_node
-            # Renumber CPMpy node ids to integers 1..N (root must be node 1; sink encoded as 0 in to)
+            # Renumber CPMpy node ids to integers 1..N (root must be node with id 1; sink with id 0)
             nodes = sorted((n for n in expr.levels if n != sink),
                            key=lambda n: (expr.levels[n], str(n)))
             node_map = {n: i + 1 for i, n in enumerate(nodes)}
+            node_map[sink] = 0
             level_str = "[" + ",".join(str(expr.levels[n] + 1) for n in nodes) + "]"
             # Convert transitions to parallel arrays for MiniZinc
             from_list, label_list, to_list = [], [], []
@@ -909,7 +912,7 @@ class CPM_minizinc(SolverInterface):
                     id2 = expr.mapping[id1][val]
                     from_list.append(str(node_map[id1]))
                     label_list.append("{{{}}}".format(val))  # label is a set of int per edge
-                    to_list.append("0" if id2 == sink else str(node_map[id2]))
+                    to_list.append(str(node_map[id2]))
             from_str = "[{}]".format(",".join(from_list))
             label_str = "[{}]".format(",".join(label_list))
             to_str = "[{}]".format(",".join(to_list))
