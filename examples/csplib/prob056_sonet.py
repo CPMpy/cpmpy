@@ -14,7 +14,7 @@ the total number of ADMs used.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_056_sonet/csplib_056_sonet.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
 
 def sonet(r=4, n=10, demand=None, capacity_nodes=None):
@@ -32,22 +32,22 @@ def sonet(r=4, n=10, demand=None, capacity_nodes=None):
     if capacity_nodes is None:
         capacity_nodes = [3, 4, 5, 6]
 
-    model = Model()
+    model = cp.Model()
 
-    ring_config = boolvar(shape=(r, n), name="ring_config")
+    ring_config = cp.boolvar(shape=(r, n), name="ring_config")
 
     # Demand satisfaction
     for i in range(n):
         for j in range(i + 1, n):
             if demand[i][j] > 0:
                 on_common_ring = ring_config[:, i] & ring_config[:, j]
-                model += sum(on_common_ring) >= 1
+                model += cp.sum(on_common_ring) >= 1
 
     # Ring capacity
     for k in range(r):
-        model += sum(ring_config[k, :]) <= capacity_nodes[k]
+        model += cp.sum(ring_config[k, :]) <= capacity_nodes[k]
 
-    model.minimize(sum(ring_config))
+    model.minimize(cp.sum(ring_config))
 
     return model, (ring_config,)
 

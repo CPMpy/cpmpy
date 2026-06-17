@@ -12,7 +12,7 @@ given graph.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_074_maximum_clique/csplib_074_maximum_clique.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
 
 def maximum_clique(n=5, adj=None):
@@ -23,9 +23,9 @@ def maximum_clique(n=5, adj=None):
                [1, 0, 1, 0, 1],
                [0, 0, 1, 1, 0]]
 
-    c = boolvar(shape=n, name="c")
+    c = cp.boolvar(shape=n, name="c")
 
-    model = Model()
+    model = cp.Model()
 
     # Constraints
     # The clique property must hold: if two vertices i and j are not connected,
@@ -38,7 +38,7 @@ def maximum_clique(n=5, adj=None):
 
     # Objective: Maximize the size of the clique.
     # The size is the total number of vertices selected.
-    model.maximize(sum(c))
+    model.maximize(cp.sum(c))
 
     return model, (c,)
 

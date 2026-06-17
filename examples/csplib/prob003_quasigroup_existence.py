@@ -26,20 +26,20 @@ We only consider the QG3.m problem for this task.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_003_quasigroup_existence/csplib_003_quasigroup_existence.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
 def quasigroup_existence(m=8):
-    quasigroup = intvar(0, m - 1, shape=(m, m), name="quasigroup")
+    quasigroup = cp.intvar(0, m - 1, shape=(m, m), name="quasigroup")
 
-    model = Model()
+    model = cp.Model()
 
     # Each element occurs once in every row
     for i in range(m):
-        model += AllDifferent(quasigroup[i, :])
+        model += cp.AllDifferent(quasigroup[i, :])
 
     # Each element occurs once in every column
     for j in range(m):
-        model += AllDifferent(quasigroup[:, j])
+        model += cp.AllDifferent(quasigroup[:, j])
 
     # QG3.m property: (a*b)*(b*a) = a
     for a in range(m):
