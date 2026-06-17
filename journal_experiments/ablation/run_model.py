@@ -180,7 +180,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs):
     transformation_time = time.time() - t0
     solver.solve(time_limit=time_limit, **solver_kwargs)
 
-    status = model.status()
+    status = solver.status()
     return {
         "model": os.path.basename(model_path),
         "model_path": os.path.abspath(model_path),
