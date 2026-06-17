@@ -14,77 +14,69 @@ Find the minimum number of transfers of water between buckets to reach the goal.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_018_water_bucket/csplib_018_water_bucket.cpmpy.py)
 """
 
+import itertools
 import cpmpy as cp
 import numpy as np
 
+def water_bucket(capacities=[8, 5, 3], initial_state=[8, 0, 0], goal_state=[4, 4, 0], max_steps=20):
+    
+    total_water = sum(initial_state)
 
-def water_bucket(capacities=None, initial_state=None, goal_state=None, max_steps=20):
-    if capacities is None:
-        capacities = [8, 5, 3]
-    if initial_state is None:
-        initial_state = [8, 0, 0]
-    if goal_state is None:
-        goal_state = [4, 4, 0]
+    transitions = get_transitions(capacities, total_water)
 
-    padding_value = -1
-    total_water = max(initial_state)
-
-    # Pre-compute all valid state transitions
-    all_states = []
-    for i in range(capacities[0] + 1):
-        for j in range(capacities[1] + 1):
-            if 0 <= capacities[0] - i - j <= capacities[2]:
-                k = capacities[0] - i - j
-                all_states.append((i, j, k))
-
-    transitions = []
-    for state in all_states:
-        for i in range(3):
-            for j in range(3):
-                if i == j:
-                    continue
-                current_amounts = list(state)
-                pour_amount = min(current_amounts[i], capacities[j] - current_amounts[j])
-                if pour_amount > 0:
-                    next_state = list(current_amounts)
-                    next_state[i] -= pour_amount
-                    next_state[j] += pour_amount
-                    transitions.append(tuple(state) + tuple(next_state))
+    # once we reach the goal state, we can continue as is
+    transitions.append(tuple(goal_state) + tuple(goal_state))
     transitions = sorted(list(set(transitions)))
 
     model = cp.Model()
-
-    sequence = cp.intvar(padding_value, total_water, shape=(max_steps, 3), name="states")
+    
+    buckets = []
+    for b, cap in enumerate(capacities):
+        buckets.append(cp.intvar(0, cap, name=f"B{b}", shape=max_steps).T)        
+    sequence = cp.cpm_array(buckets).T
 
     # Sequence must start with initial state
-    model += sequence[0, :] == initial_state
-
-    # State properties
-    for t in range(max_steps):
-        is_padded = (sequence[t, 0] == padding_value)
-        model += (~is_padded).implies(sum(sequence[t, :]) == total_water)
-        for b in range(3):
-            model += (~is_padded).implies((sequence[t, b] >= 0) & (sequence[t, b] <= capacities[b]))
+    model += cp.all(sequence[0] == initial_state)
 
     # Transition logic
+    goal_states = []
     for t in range(max_steps - 1):
-        is_padded_t = (sequence[t, 0] == padding_value)
-        is_goal_t = (sequence[t, :] == goal_state).all()
+        
+        is_goal = cp.all(sequence[t] == goal_state)
+        goal_states.append(is_goal)
+        model += is_goal.implies(cp.all(sequence[t+1] == sequence[t])) # no more pouring once the goal is reached
 
-        model += is_goal_t.implies((sequence[t + 1, :] == padding_value).all())
-        model += is_padded_t.implies((sequence[t + 1, :] == padding_value).all())
+        # ensure valid transition at step t
+        model += cp.Table(sequence[t].tolist() + sequence[t+1].tolist(), transitions)
 
-        must_transfer = cp.Table(np.hstack([sequence[t, :], sequence[t + 1, :]]), transitions) & cp.any(sequence[t + 1, :] != sequence[t, :])
-        model += (~is_goal_t & ~is_padded_t).implies(must_transfer)
-
-    # Goal must be reached
-    model += cp.any([(sequence[t, :] == goal_state).all() for t in range(max_steps)])
-
-    cost = cp.sum([sequence[t, 0] != padding_value for t in range(max_steps)]) - 1
-    model.minimize(cost)
+    # minimize the number of non-goal states
+    model.minimize(max_steps - cp.sum(goal_states))
 
     return model, (sequence,)
 
+
+def get_transitions(capacities, total_water):
+    """define valid transitions, brute force enumeration"""
+    transitions = []
+    cap_ranges = [range(cap + 1) for cap in capacities]
+    for contents in itertools.product(*cap_ranges):
+        if sum(contents) != total_water:
+            continue # invalid state
+
+        # all possible pourings, from one bucket to another
+        for b_from in range(3):
+            for b_to in range(3):
+                if b_from == b_to:
+                    continue # cannot pour to and from the same bucket
+
+                pour_amount = min(contents[b_from], capacities[b_to] - contents[b_to])
+                if pour_amount > 0:
+                    new_contents = list(contents)
+                    new_contents[b_from] -= pour_amount
+                    new_contents[b_to] += pour_amount
+                    transitions.append(tuple(contents) + tuple(new_contents))
+    
+    return transitions
 
 if __name__ == "__main__":
     import argparse
@@ -96,14 +88,17 @@ if __name__ == "__main__":
 
     model, (sequence,) = water_bucket(max_steps=max_steps)
 
+    # print(model)
+
     if model.solve():
-        costs = model.objective_value()
-        print(f"Minimum transfers: {costs}")
+        cost = model.objective_value()
+        sequence = sequence.value()
+        print(f"Minimum transfers: {cost-1}")
         print("Sequence of states:")
         for t in range(max_steps):
-            state = sequence[t, :].value()
-            if state[0] == -1:
-                break
+            state = sequence[t]
             print(f"  Step {t}: {state.tolist()}")
+            if (state == sequence[t+1]).all(): 
+                break # we reached the goal state
     else:
         raise ValueError("Model is unsatisfiable")
