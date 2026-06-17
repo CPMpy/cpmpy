@@ -28,7 +28,7 @@ ABLATIONS    ?= baseline no-ilpfriendly no-detect-categorical
 # Per-solve wall-clock limit (seconds), forwarded to run_model.py.
 TIME_LIMIT   ?= 30
 
-EXAMPLES_DIR := ../examples/csplib
+EXAMPLES_DIR := ../../examples/csplib
 MODELS_DIR   := models
 RESULTS_DIR  := run-ablation
 FIGURES_DIR  := figures
