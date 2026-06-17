@@ -29,9 +29,13 @@ ABLATIONS    ?= baseline no-ilpfriendly no-detect-categorical
 TIME_LIMIT   ?= 30
 
 EXAMPLES_DIR := ../../examples/csplib
+CPMPY_DIR    := ../../cpmpy
 MODELS_DIR   := models
 RESULTS_DIR  := run-ablation
 FIGURES_DIR  := figures
+
+# Re-run ablation when any installed CPMpy source changes
+CPMPY_DEPS   := $(shell find $(CPMPY_DIR) -type f 2>/dev/null)
 
 # extract-models: one pickle per example script that solves a model. The grep
 # only excludes scripts that clearly never solve anything; some matched scripts
@@ -62,7 +66,7 @@ all:
 
 extract-models: $(MODEL_PICKLES)
 
-run-ablation: $(RESULTS)
+run-ablation: $(RESULTS) $(CPMPY_DEPS)
 
 plot: $(PLOT_STAMP)
 
@@ -73,7 +77,7 @@ $(MODELS_DIR)/%.pickle: $(EXAMPLES_DIR)/%.py dump_model.py
 # --- ablation runs: one pattern rule per (solver, ablation) -------------------
 # $(1) = solver, $(2) = ablation label, $(3) = run_model.py flag (none for baseline)
 define ABLATION_RULE
-$(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle run_model.py
+$(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle run_model.py $(CPMPY_DEPS)
 	@mkdir -p $(RESULTS_DIR)
 	$$(PYTHON) run_model.py $$< $(1) $(3) --out=$$@ time_limit=$$(TIME_LIMIT)
 endef
