@@ -178,7 +178,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs):
     transformation_time = time.time() - t0
     solver.solve(time_limit=time_limit, **solver_kwargs)
 
-    status = solver.status()
+    status = model.status()
     return {
         "model": os.path.basename(model_path),
         "model_path": os.path.abspath(model_path),
@@ -195,121 +195,8 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs):
     }
 
 
-def apply_memory_limit(bytes_limit):
-    """Apply a virtual-memory cap in the current process (Unix only)."""
-    import resource
-    resource.setrlimit(resource.RLIMIT_AS, (bytes_limit, bytes_limit))
-
-
-def run_worker(config_path):
-    """Child entry point: solve under an already-applied memory limit, write result JSON."""
-    with open(config_path, "r") as f:
-        config = json.load(f)
-
-    payload = {"ok": False, "reason": "error", "error": "unknown", "record": None}
-    try:
-        record = do_solve(
-            config["model_path"],
-            config["solver_name"],
-            config["ablate"],
-            config["time_limit"],
-            config["solver_kwargs"],
-        )
-        record["memory_limit_mb"] = config.get("memory_limit_mb")
-        payload = {"ok": True, "record": record}
-    except MemoryError as exc:
-        payload = {"ok": False, "reason": "memory_limit", "error": str(exc), "record": None}
-    except Exception as exc:
-        payload = {"ok": False, "reason": "error", "error": "{}: {}".format(type(exc).__name__, exc), "record": None}
-
-    with open(config["result_path"], "w") as f:
-        json.dump(payload, f)
-
-
-def solve_with_memory_limit(model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb):
-    """Run do_solve in a child process with RLIMIT_AS so the parent can report OOM."""
-    with tempfile.TemporaryDirectory(prefix="run_model_") as tmpdir:
-        config_path = os.path.join(tmpdir, "config.json")
-        result_path = os.path.join(tmpdir, "result.json")
-        config = {
-            "model_path": model_path,
-            "solver_name": solver_name,
-            "ablate": ablate,
-            "time_limit": time_limit,
-            "solver_kwargs": solver_kwargs,
-            "memory_limit_mb": memory_limit_mb,
-            "result_path": result_path,
-        }
-        with open(config_path, "w") as f:
-            json.dump(config, f)
-
-        preexec = functools.partial(apply_memory_limit, memory_limit_mb * 1024 * 1024)
-        proc = subprocess.Popen(
-            [sys.executable, os.path.abspath(__file__), "--worker", config_path],
-            preexec_fn=preexec,
-        )
-        proc.wait()
-
-        if os.path.exists(result_path):
-            with open(result_path, "r") as f:
-                payload = json.load(f)
-            if payload.get("ok"):
-                return payload["record"]
-            if payload.get("reason") == "memory_limit":
-                return _memory_limit_record(
-                    model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb,
-                    payload.get("error", "MemoryError"),
-                )
-
-        # Child was killed (often SIGKILL from the kernel OOM killer) or crashed
-        # without writing a result file.
-        if proc.returncode is not None and proc.returncode < 0 and -proc.returncode == signal.SIGKILL:
-            return _memory_limit_record(
-                model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb,
-                "process killed (signal {})".format(signal.SIGKILL),
-            )
-        return _error_record(
-            model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb,
-            "solver subprocess exited with code {}".format(proc.returncode),
-        )
-
-
-def _base_record(model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb):
-    return {
-        "model": os.path.basename(model_path),
-        "model_path": os.path.abspath(model_path),
-        "solver": solver_name,
-        "solver_kwargs": solver_kwargs,
-        "time_limit": time_limit,
-        "memory_limit_mb": memory_limit_mb,
-        "ablate": ablate,
-        "ablate_variant": None,
-        "runtime": None,
-        "transformation_time": None,
-        "status": "ERROR",
-        "objective_value": None,
-        "error": None,
-    }
-
-
-def _memory_limit_record(model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb, detail):
-    record = _base_record(model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb)
-    record["status"] = "MEMORY_LIMIT"
-    record["error"] = "Memory limit of {} MB exceeded: {}".format(memory_limit_mb, detail)
-    return record
-
-
-def _error_record(model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb, detail):
-    record = _base_record(model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb)
-    record["error"] = detail
-    return record
-
-
 if __name__ == "__main__":
-    if len(sys.argv) >= 3 and sys.argv[1] == "--worker":
-        run_worker(sys.argv[2])
-        sys.exit(0)
-
+  
     # Pull out the optional --ablate / --out / --memory-limit flags; everything else is positional.
     ablate = None
     out_path = None
@@ -352,16 +239,13 @@ if __name__ == "__main__":
 
     # time_limit / memory_limit are dedicated arguments, not solver-specific kwargs.
     time_limit = solver_kwargs.pop("time_limit", None)
-    if memory_limit_mb is None and "memory_limit" in solver_kwargs:
-        memory_limit_mb = int(solver_kwargs.pop("memory_limit"))
 
-    if memory_limit_mb is not None:
-        record = solve_with_memory_limit(
-            model_path, solver_name, ablate, time_limit, solver_kwargs, memory_limit_mb,
-        )
-    else:
-        record = do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs)
-        record["memory_limit_mb"] = None
+    if solver_name == "gurobi":
+        solver_kwargs['Threads'] = 1
+    if solver_name == "ortools":
+        solver_kwargs['num_workers'] = 1
+
+    record = do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs)
 
     if out_path is None:
         os.makedirs(OUTPUT_DIR, exist_ok=True)
