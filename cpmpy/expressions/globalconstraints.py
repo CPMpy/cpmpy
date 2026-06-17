@@ -625,15 +625,13 @@ class Table(GlobalConstraint):
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         arr, tab = self.args
-        if len(tab) == 1:
-            return [cp.all(t == a for (t, a) in zip(tab[0], arr))], []
         
-        row_selected = boolvar(shape=len(tab))
-        cons = [cp.any(row_selected)]
+        row_selected = boolvar(shape=(len(tab),))
+        defining = []
         for i, row in enumerate(tab):
             subexpr = cp.all([x == v for x,v in zip(arr, row)])
-            cons.append(row_selected[i].implies(subexpr))  # implication-only decomposition
-        return cons,[]
+            defining.append(row_selected[i].implies(subexpr))  # implication-only decomposition
+        return [cp.any(row_selected)], defining
 
     def _variable_ordering(self, heuristic:str="domain"):
         """
@@ -782,11 +780,11 @@ class ShortTable(GlobalConstraint):
         arr, tab = self.args
 
         row_selected = boolvar(shape=(len(tab),))
-        cons = [cp.sum(row_selected) == 1]
+        defining = []
         for i, row in enumerate(tab):
             subexpr = cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR])
-            cons.append(row_selected[i].implies(subexpr))  # implication-only decomposition
-        return cons, []
+            defining.append(row_selected[i].implies(subexpr))  # implication-only decomposition
+        return [cp.any(row_selected)], defining
 
     def value(self) -> Optional[bool]:
         """
@@ -949,9 +947,10 @@ class Regular(GlobalConstraint):
             sink = len(self.nodes)
             transitions.extend([[self.node_map[n], v, sink] for n in self.nodes for v in range(lb, ub + 1) if (n, v) not in self.trans_dict])
             transitions.extend([[sink, v, sink] for v in range(lb, ub + 1)])
+            self.nodes.append(sink)
 
         # keep track of current state when traversing the array
-        state_vars = intvar(0, len(self.nodes) if complete else len(self.nodes)-1, shape=len(arr))
+        state_vars = intvar(0, len(self.nodes)-1, shape=len(arr))
         id_start = self.node_map[start]
         # optimization: we know the entry node of the automaton, results in smaller table
         defining: list[Expression] = [Table([arr[0], state_vars[0]], [[v, e] for s, v, e in transitions if s == id_start])]
@@ -1025,6 +1024,7 @@ class Regular(GlobalConstraint):
 
         S = node_idx[start]
         E = [node_idx[a] for a in accepting]
+        # Variable s[i,j,q] is true iff at position i in the array, we take the transition from node q with value j
         s = cp.boolvar(shape=(len(arr), len(values), len(nodes)))
         sf = cp.boolvar(shape=(len(E),))
 

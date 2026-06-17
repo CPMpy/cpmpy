@@ -233,9 +233,53 @@ class TestTransfDecomp:
         assert set(map(str, decompose_in_tree([cons.implies(bv)]))) == {"(sum(a, b, c) == 1) -> (bv)","a == 1"}  # decompose standard
         assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard
 
-        # custom positive decompose has precedence over positive decompose
-        decompose_custom_positive = {"mycustomglobal": lambda x : ([cp.sum(x.args) == 5], [])}
-        assert set(map(str, decompose_in_tree([cons], decompose_custom_positive=decompose_custom_positive))) == {"sum(a, b, c) == 5"} # custom decompose
+
+
+
+    def test_decompose_custom(self):
+
+        # make a custom global constraint to test custom decompose
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+
+            def decompose(self):
+                return [cp.sum(self.args) == 1], []
+
+        a, b, c = cp.intvar(0, 10, shape=3, name=("a", "b", "c"))
+        bv = cp.boolvar(name="bv")
+        cons = MyCustomGlobal([a, b, c])
+
+        decompose_custom_positive = {"mycustomglobal": lambda x: ([cp.sum(x.args) == 5], [])}
+        decompose_custom = {"mycustomglobal": lambda x: ([cp.sum(x.args) == 3], [])}
+        # In positive context, custom positive decompose takes precedence over both custom decompose and standard decompose
+        assert (set(map(str, decompose_in_tree([cons],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"sum(a, b, c) == 5"})
+        assert (set(map(str, decompose_in_tree([bv.implies(cons)],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) -> (sum(a, b, c) == 5)"})
+        # In positive context, custom decompose takes precedence over standard decompose if no custom positive decomposition is provided
+        assert (set(map(str, decompose_in_tree([cons],
+                                               decompose_custom=decompose_custom)))
+                == {"sum(a, b, c) == 3"})
+        assert (set(map(str, decompose_in_tree([bv.implies(cons)],
+                                               decompose_custom=decompose_custom)))
+                == {"(bv) -> (sum(a, b, c) == 3)"})
+
+        # In non-positive context, custom positive decompose is disregarded
+        assert (set(map(str, decompose_in_tree([bv == cons],
+                                               decompose_custom=decompose_custom,
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) == (sum(a, b, c) == 3)"})
+        assert (set(map(str, decompose_in_tree([bv == cons],
+                                               decompose_custom_positive=decompose_custom_positive)))
+                == {"(bv) == (sum(a, b, c) == 1)"})
+
+        # Standard decomposition is called if no custom decomposition is provided
+        assert (set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) == 1"})
 
 
     def test_issue_546(self):
