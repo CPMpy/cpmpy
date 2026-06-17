@@ -864,7 +864,7 @@ class CallbacksCPMPy(Callbacks):
         return cpm_occurs
 
     def get_cpm_exprs(self, lst):
-        if not lst:
+        if len(lst) == 0:
             return []
         if isinstance(lst[0], XVar):
             return [self.get_cpm_var(x) for x in lst]
