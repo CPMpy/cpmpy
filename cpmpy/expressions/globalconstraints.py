@@ -784,7 +784,7 @@ class ShortTable(GlobalConstraint):
         for i, row in enumerate(tab):
             subexpr = cp.all([ai == ri for ai, ri in zip(arr, row) if ri != STAR])
             defining.append(row_selected[i].implies(subexpr))  # implication-only decomposition
-        return [cp.any(row_selected)], defining
+        return [cp.sum(row_selected) == 1], defining
 
     def value(self) -> Optional[bool]:
         """
