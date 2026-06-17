@@ -11,19 +11,17 @@ and H and I, respectively.
 
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_041_n_fractions/csplib_041_n_fractions.cpmpy.py)
 """
-
-from cpmpy import *
-
+import cpmpy as cp
 
 def n_fractions(n=9):
-    x = intvar(1, n, shape=9, name="x")
+    x = cp.intvar(1, n, shape=9, name="x")
     A, B, C, D, E, F, G, H, I = x
 
-    D1 = intvar(1, n * n, name="D1")
-    D2 = intvar(1, n * n, name="D2")
-    D3 = intvar(1, n * n, name="D3")
+    D1 = cp.intvar(1, n * n, name="D1")
+    D2 = cp.intvar(1, n * n, name="D2")
+    D3 = cp.intvar(1, n * n, name="D3")
 
-    model = Model([AllDifferent(x),
+    model = cp.Model([cp.AllDifferent(x),
                    D1 == 10 * B + C,
                    D2 == 10 * E + F,
                    D3 == 10 * H + I,

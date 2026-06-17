@@ -12,7 +12,7 @@ filled quasigroup.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_067_quasigroup_completion/csplib_067_quasigroup_completion.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 import numpy as np
 
 
@@ -24,9 +24,9 @@ def quasigroup_completion(N=5, start=None):
                  [0, 0, 0, 4, 0],
                  [0, 0, 0, 0, 5]]
 
-    puzzle = intvar(1, n, shape=(n, n), name="puzzle")
+    puzzle = cp.intvar(1, n, shape=(n, n), name="puzzle")
 
-    model = Model()
+    model = cp.Model()
 
     # Constraints
     # 1. Pre-fill the grid with the starting values.
@@ -39,11 +39,11 @@ def quasigroup_completion(N=5, start=None):
 
     # 2. Each row must contain unique values from 1 to N.
     for i in range(N):
-        model += AllDifferent(puzzle[i, :])
+        model += cp.AllDifferent(puzzle[i, :])
 
     # 3. Each column must contain unique values from 1 to N.
     for j in range(N):
-        model += AllDifferent(puzzle[:, j])
+        model += cp.AllDifferent(puzzle[:, j])
 
     return model, (puzzle,)
 

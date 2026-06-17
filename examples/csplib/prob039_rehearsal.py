@@ -14,8 +14,7 @@ minimize the total time that players are waiting to play.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_039_rehearsal/csplib_039_rehearsal.cpmpy.py)
 """
 
-from cpmpy import *
-import numpy as np
+import cpmpy as cp
 
 
 def rehearsal(num_pieces=9, num_players=5, duration=None, rehearsal_matrix=None):
@@ -28,19 +27,19 @@ def rehearsal(num_pieces=9, num_players=5, duration=None, rehearsal_matrix=None)
                             [1, 0, 0, 0, 1, 1, 0, 0, 1],
                             [0, 0, 1, 0, 1, 1, 1, 1, 0]]
 
-    duration = cpm_array(duration)
-    rehearsal = cpm_array(rehearsal_matrix)
+    duration = cp.cpm_array(duration)
+    rehearsal = cp.cpm_array(rehearsal_matrix)
 
-    model = Model()
+    model = cp.Model()
 
     # rehearsal_order[i] is the piece rehearsed in the i-th slot.
-    rehearsal_order = intvar(0, num_pieces - 1, shape=num_pieces, name="rehearsal_order")
+    rehearsal_order = cp.intvar(0, num_pieces - 1, shape=num_pieces, name="rehearsal_order")
     # arrival[p] is the first slot where player p is present.
-    arrival = intvar(0, num_pieces - 1, shape=num_players, name="arrival")
+    arrival = cp.intvar(0, num_pieces - 1, shape=num_players, name="arrival")
     # departure[p] is the last slot where player p is present.
-    departure = intvar(0, num_pieces - 1, shape=num_players, name="departure")
+    departure = cp.intvar(0, num_pieces - 1, shape=num_players, name="departure")
 
-    model += AllDifferent(rehearsal_order)
+    model += cp.AllDifferent(rehearsal_order)
 
     # Link arrival and departure times to the rehearsal schedule.
     # A player must be present for all pieces they play in.
@@ -63,7 +62,7 @@ def rehearsal(num_pieces=9, num_players=5, duration=None, rehearsal_matrix=None)
             # Add the duration of the piece if the player is waiting.
             waiting_times.append(duration[rehearsal_order[i]] * is_waiting)
 
-    model.minimize(sum(waiting_times))
+    model.minimize(cp.sum(waiting_times))
 
     return model, (rehearsal_order,)
 

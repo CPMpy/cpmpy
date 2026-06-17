@@ -15,31 +15,23 @@ Pedestrian light states: 0=red, 1=green
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_016_traffic_lights/csplib_016_traffic_lights.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
 
 def traffic_lights():
-    V1 = intvar(0, 3, name="V1")
-    V2 = intvar(0, 3, name="V2")
-    V3 = intvar(0, 3, name="V3")
-    V4 = intvar(0, 3, name="V4")
-    P1 = intvar(0, 1, name="P1")
-    P2 = intvar(0, 1, name="P2")
-    P3 = intvar(0, 1, name="P3")
-    P4 = intvar(0, 1, name="P4")
 
-    vehicle_lights = [V1, V2, V3, V4]
-    pedestrian_lights = [P1, P2, P3, P4]
-    lights = cpm_array([V1, V2, V3, V4, P1, P2, P3, P4])
+    vehicle_lights = cp.intvar(0, 3, shape=4, name=tuple(f"V{i}" for i in range(1, 5)))
+    pedestrian_lights = cp.intvar(0, 1, shape=4, name=tuple(f"P{i}" for i in range(1, 5)))
+    lights = cp.cpm_array([*vehicle_lights, *pedestrian_lights])
 
     # Allowed combinations for (V_i, P_i, V_{i+1}, P_{i+1})
     allowed_tuples = [[0, 0, 2, 1], [1, 0, 3, 0], [2, 1, 0, 0], [3, 0, 1, 0]]
 
-    model = Model()
+    model = cp.Model()
 
     for i in range(4):
-        model += Table([vehicle_lights[i], pedestrian_lights[i],
-                        vehicle_lights[(i + 1) % 4], pedestrian_lights[(i + 1) % 4]],
+        model += cp.Table(
+            [vehicle_lights[i], pedestrian_lights[i], vehicle_lights[(i + 1) % 4], pedestrian_lights[(i + 1) % 4]],
                        allowed_tuples)
 
     return model, (lights,)

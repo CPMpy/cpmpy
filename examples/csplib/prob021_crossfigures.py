@@ -70,14 +70,12 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 """
 
 import math
-from cpmpy import *
+import cpmpy as cp
 
-
-def member_of(x, val):
-    return [sum([x[i] == val for i in range(len(x))]) > 0]
 
 
 def is_prime(n):
+    """Check if n is a prime number."""
     if n < 2: return False
     if n == 2: return True
     if not n & 1:
@@ -89,28 +87,25 @@ def is_prime(n):
 
 
 def to_num(a, n, base):
+    """Constrain digit list a to represent number n in the given base."""
     tlen = len(a)
-    return n == sum([(base ** (tlen - i - 1)) * a[i] for i in range(tlen)])
+    return n == cp.sum([(base ** (tlen - i - 1)) * a[i] for i in range(tlen)])
 
 
 def across(Matrix, Across, Len, Row, Col):
+    """Link an across clue variable to its digit cells in the grid."""
     Row -= 1
     Col -= 1
-    tmp = intvar(0, 9999, shape=Len)
-    constraints = [to_num(tmp, Across, 10)]
-    for i in range(Len):
-        constraints += [Matrix[Row, Col + i] == tmp[i]]
-    return constraints
+    digits = [Matrix[Row, Col + i] for i in range(Len)]
+    return [to_num(digits, Across, 10)]
 
 
 def down(Matrix, Down, Len, Row, Col):
+    """Link a down clue variable to its digit cells in the grid."""
     Row -= 1
     Col -= 1
-    tmp = intvar(0, 9999, shape=Len)
-    constraints = [to_num(tmp, Down, 10)]
-    for i in range(Len):
-        constraints += [Matrix[Row + i, Col] == tmp[i]]
-    return constraints
+    digits = [Matrix[Row + i, Col] for i in range(Len)]
+    return [to_num(digits, Down, 10)]
 
 
 def crossfigures():
@@ -118,7 +113,7 @@ def crossfigures():
     D = 9999
 
     primes = [i for i in range(2, D + 1) if is_prime(i)]
-    squares = [i ** 2 for i in range(1, 1 + math.ceil(math.sqrt(D)))]
+    squares = [k * k for k in range(1, math.isqrt(D) + 1)]
 
     Z = -1
     B = -2
@@ -132,9 +127,9 @@ def crossfigures():
              [Z, Z, B, Z, Z, Z, B, Z, Z],
              [Z, Z, Z, Z, B, Z, Z, Z, Z]]
 
-    M = intvar(0, 9, shape=(n, n), name="M")
+    M = cp.intvar(0, 9, shape=(n, n), name="M")
 
-    model = Model()
+    model = cp.Model()
 
     for i in range(n):
         for j in range(n):
@@ -142,44 +137,44 @@ def crossfigures():
                 model += (M[i, j] == 0)
 
     # Across variables
-    A1 = intvar(0, D, name="A1")
-    A4 = intvar(0, D, name="A4")
-    A7 = intvar(0, D, name="A7")
-    A8 = intvar(0, D, name="A8")
-    A9 = intvar(0, D, name="A9")
-    A10 = intvar(0, D, name="A10")
-    A11 = intvar(0, D, name="A11")
-    A13 = intvar(0, D, name="A13")
-    A15 = intvar(0, D, name="A15")
-    A17 = intvar(0, D, name="A17")
-    A20 = intvar(0, D, name="A20")
-    A23 = intvar(0, D, name="A23")
-    A24 = intvar(0, D, name="A24")
-    A25 = intvar(0, D, name="A25")
-    A27 = intvar(0, D, name="A27")
-    A28 = intvar(0, D, name="A28")
-    A29 = intvar(0, D, name="A29")
-    A30 = intvar(0, D, name="A30")
+    A1 = cp.intvar(0, D, name="A1")
+    A4 = cp.intvar(0, D, name="A4")
+    A7 = cp.intvar(0, D, name="A7")
+    A8 = cp.intvar(0, D, name="A8")
+    A9 = cp.intvar(0, D, name="A9")
+    A10 = cp.intvar(0, D, name="A10")
+    A11 = cp.intvar(0, D, name="A11")
+    A13 = cp.intvar(0, D, name="A13")
+    A15 = cp.intvar(0, D, name="A15")
+    A17 = cp.intvar(0, D, name="A17")
+    A20 = cp.intvar(0, D, name="A20")
+    A23 = cp.intvar(0, D, name="A23")
+    A24 = cp.intvar(0, D, name="A24")
+    A25 = cp.intvar(0, D, name="A25")
+    A27 = cp.intvar(0, D, name="A27")
+    A28 = cp.intvar(0, D, name="A28")
+    A29 = cp.intvar(0, D, name="A29")
+    A30 = cp.intvar(0, D, name="A30")
 
     # Down variables
-    D1 = intvar(0, D, name="D1")
-    D2 = intvar(0, D, name="D2")
-    D3 = intvar(0, D, name="D3")
-    D4 = intvar(0, D, name="D4")
-    D5 = intvar(0, D, name="D5")
-    D6 = intvar(0, D, name="D6")
-    D10 = intvar(0, D, name="D10")
-    D12 = intvar(0, D, name="D12")
-    D14 = intvar(0, D, name="D14")
-    D16 = intvar(0, D, name="D16")
-    D17 = intvar(0, D, name="D17")
-    D18 = intvar(0, D, name="D18")
-    D19 = intvar(0, D, name="D19")
-    D20 = intvar(0, D, name="D20")
-    D21 = intvar(0, D, name="D21")
-    D22 = intvar(0, D, name="D22")
-    D26 = intvar(0, D, name="D26")
-    D28 = intvar(0, D, name="D28")
+    D1 = cp.intvar(0, D, name="D1")
+    D2 = cp.intvar(0, D, name="D2")
+    D3 = cp.intvar(0, D, name="D3")
+    D4 = cp.intvar(0, D, name="D4")
+    D5 = cp.intvar(0, D, name="D5")
+    D6 = cp.intvar(0, D, name="D6")
+    D10 = cp.intvar(0, D, name="D10")
+    D12 = cp.intvar(0, D, name="D12")
+    D14 = cp.intvar(0, D, name="D14")
+    D16 = cp.intvar(0, D, name="D16")
+    D17 = cp.intvar(0, D, name="D17")
+    D18 = cp.intvar(0, D, name="D18")
+    D19 = cp.intvar(0, D, name="D19")
+    D20 = cp.intvar(0, D, name="D20")
+    D21 = cp.intvar(0, D, name="D21")
+    D22 = cp.intvar(0, D, name="D22")
+    D26 = cp.intvar(0, D, name="D26")
+    D28 = cp.intvar(0, D, name="D28")
 
     # Set up matrix-digit constraints
     model += (across(M, A1, 4, 1, 1))
@@ -231,9 +226,9 @@ def crossfigures():
     model += (A13 == D26 * A23)
     model += (A15 == D6 - 350)
     model += (A17 == A25 * A23)
-    model += (member_of(squares, A20))
-    model += (member_of(primes, A23))
-    model += (member_of(squares, A24))
+    model += cp.any(A20 == s for s in squares)
+    model += cp.any(A23 == p for p in primes)
+    model += cp.any(A24 == s for s in squares)
     model += (17 * A25 == A20)
     model += (4 * A27 == D6)
     model += (A28 == 4 * 12)

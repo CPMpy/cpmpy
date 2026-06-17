@@ -23,7 +23,7 @@ the following conditions are met:
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_057_killer_sudoku/csplib_057_killer_sudoku.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
 
 def killer_sudoku(n=9, problem=None):
@@ -44,22 +44,22 @@ def killer_sudoku(n=9, problem=None):
                    [16, [[8, 3], [9, 3]]], [15, [[8, 6], [8, 7]]],
                    [13, [[9, 5], [9, 6], [9, 7]]], [17, [[9, 8], [9, 9]]]]
 
-    x = intvar(1, n, shape=(n, n), name="x")
+    x = cp.intvar(1, n, shape=(n, n), name="x")
 
-    model = Model()
+    model = cp.Model()
 
-    model += [AllDifferent(row) for row in x]
-    model += [AllDifferent(col) for col in x.transpose()]
+    model += [cp.AllDifferent(row) for row in x]
+    model += [cp.AllDifferent(col) for col in x.transpose()]
 
     for i in range(2):
         for j in range(2):
             cell = [x[r, c] for r in range(i * 3, i * 3 + 3) for c in range(j * 3, j * 3 + 3)]
-            model += [AllDifferent(cell)]
+            model += [cp.AllDifferent(cell)]
 
     for (res, segment) in problem:
         cage = [x[i[0] - 1, i[1] - 1] for i in segment]
-        model += sum(cage) == res
-        model += AllDifferent(cage)
+        model += cp.sum(cage) == res
+        model += cp.AllDifferent(cage)
 
     return model, (x,)
 

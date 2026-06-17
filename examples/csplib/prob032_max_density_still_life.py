@@ -18,13 +18,13 @@ The goal is to maximize the number of live cells.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_032_max_density_still_life/csplib_032_max_density_still_life.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
 
 def max_density_still_life(n=6, m=6):
-    grid = boolvar(shape=(n, m), name="grid")
+    grid = cp.boolvar(shape=(n, m), name="grid")
 
-    model = Model()
+    model = cp.Model()
 
     # Valid still-life combinations of (neighbor_count, cell_state)
     still_life_table = []
@@ -48,18 +48,18 @@ def max_density_still_life(n=6, m=6):
                     nx, ny = i + dx, j + dy
                     if 0 <= nx < n and 0 <= ny < m:
                         neighbors.append(grid[nx, ny])
-            num_neighbors = sum(neighbors)
+            num_neighbors = cp.sum(neighbors)
 
             # Enforce that the combination of the neighbor count and the cell's own state
             # is a valid still-life configuration.
-            model += Table([num_neighbors, grid[i, j]], still_life_table)
+            model += cp.Table([num_neighbors, grid[i, j]], still_life_table)
 
     # Symmetry breaking for square boards
     if n == m:
         model += grid[0, 0] >= grid[n - 1, m - 1]
         model += grid[0, m - 1] >= grid[n - 1, 0]
 
-    model.maximize(sum(grid))
+    model.maximize(cp.sum(grid))
 
     return model, (grid,)
 

@@ -15,19 +15,41 @@ are occupied by vessels.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_014_solitaire_battleships/csplib_014_solitaire_battleships.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
+# Cell types in the grid. Each cell is either water or part of a ship.
+# Ship cells indicate their position within the vessel:
+#   CIRCLE  - submarine (1-cell ship, occupies a single cell)
+#   LEFT    - leftmost cell of a horizontal ship
+#   RIGHT   - rightmost cell of a horizontal ship
+#   TOP     - topmost cell of a vertical ship
+#   BOTTOM  - bottommost cell of a vertical ship
+#   MIDDLE  - interior cell of a ship longer than 2
 WATER = 0
-CIRCLE = 2  # submarine
-LEFT = 3
-RIGHT = 4
-TOP = 5
-BOTTOM = 6
-MIDDLE = 7
+CIRCLE = 1
+LEFT = 2
+RIGHT = 3
+TOP = 4
+BOTTOM = 5
+MIDDLE = 6
 
 
 def solitaire_battleships(rows=10, cols=10, rowsum=None, colsum=None,
                           fleet_counts=None, hints=None):
+    if rows != 10 or cols != 10:
+        missing = []
+        if rowsum is None:
+            missing.append("rowsum")
+        if colsum is None:
+            missing.append("colsum")
+        if fleet_counts is None:
+            missing.append("fleet_counts")
+        if missing:
+            raise ValueError(
+                f"Default puzzle data is for a 10x10 grid, but got rows={rows}, cols={cols}. "
+                f"Please provide: {', '.join(missing)}"
+            )
+
     if rowsum is None:
         rowsum = [0, 2, 3, 1, 2, 4, 2, 1, 2, 3]
     if colsum is None:
@@ -39,9 +61,9 @@ def solitaire_battleships(rows=10, cols=10, rowsum=None, colsum=None,
 
     fleet_counts = dict(fleet_counts)
 
-    grid = intvar(0, 7, shape=(rows, cols), name="grid")
+    grid = cp.intvar(0, 6, shape=(rows, cols), name="grid")
 
-    model = Model()
+    model = cp.Model()
 
     # Hints constraint
     for r, c, v in hints:
@@ -49,9 +71,9 @@ def solitaire_battleships(rows=10, cols=10, rowsum=None, colsum=None,
 
     # Row and column sums
     for i in range(rows):
-        model += sum(grid[i, :] > WATER) == rowsum[i]
+        model += cp.sum(grid[i, :] > WATER) == rowsum[i]
     for j in range(cols):
-        model += sum(grid[:, j] > WATER) == colsum[j]
+        model += cp.sum(grid[:, j] > WATER) == colsum[j]
 
     # Adjacency and connectivity
     for r in range(rows):
@@ -66,7 +88,7 @@ def solitaire_battleships(rows=10, cols=10, rowsum=None, colsum=None,
                 diag_is_water.append(grid[r + 1, c - 1] == WATER)
             if r < rows - 1 and c < cols - 1:
                 diag_is_water.append(grid[r + 1, c + 1] == WATER)
-            model += (grid[r, c] > WATER).implies(all(diag_is_water))
+            model += (grid[r, c] > WATER).implies(cp.all(diag_is_water))
 
             # Orthogonal water neighbors
             ortho_is_water = []
@@ -80,7 +102,7 @@ def solitaire_battleships(rows=10, cols=10, rowsum=None, colsum=None,
                 ortho_is_water.append(grid[r, c + 1] == WATER)
 
             # A CIRCLE must be entirely surrounded by water
-            model += (grid[r, c] == CIRCLE).implies(all(ortho_is_water))
+            model += (grid[r, c] == CIRCLE).implies(cp.all(ortho_is_water))
 
             # LEFT piece
             model += (grid[r, c] == LEFT).implies(
@@ -126,18 +148,18 @@ def solitaire_battleships(rows=10, cols=10, rowsum=None, colsum=None,
             model += (grid[r, c] == MIDDLE).implies(is_hor_middle | is_ver_middle)
 
     # Fleet composition
-    model += sum(grid == CIRCLE) == fleet_counts[1]
+    model += cp.sum(grid == CIRCLE) == fleet_counts[1]
 
-    num_horizontal_ships = sum(grid == LEFT)
-    num_vertical_ships = sum(grid == TOP)
-    model += num_horizontal_ships == sum(grid == RIGHT)
-    model += num_vertical_ships == sum(grid == BOTTOM)
+    num_horizontal_ships = cp.sum(grid == LEFT)
+    num_vertical_ships = cp.sum(grid == TOP)
+    model += num_horizontal_ships == cp.sum(grid == RIGHT)
+    model += num_vertical_ships == cp.sum(grid == BOTTOM)
 
-    total_long_ships = sum(count for size, count in fleet_counts.items() if size > 1)
+    total_long_ships = cp.sum(count for size, count in fleet_counts.items() if size > 1)
     model += num_horizontal_ships + num_vertical_ships == total_long_ships
 
-    expected_middles = sum((size - 2) * count for size, count in fleet_counts.items() if size > 2)
-    model += sum(grid == MIDDLE) == expected_middles
+    expected_middles = cp.sum((size - 2) * count for size, count in fleet_counts.items() if size > 2)
+    model += cp.sum(grid == MIDDLE) == expected_middles
 
     return model, (grid,)
 
@@ -165,7 +187,7 @@ if __name__ == "__main__":
         pretty_print(grid)
         # get all solutions by restricting the grid to be different from previous solutions
         for _s in range(10):  # limit to 10 solutions
-            model += sum(grid != grid.value()) > 0  # at least one cell must differ
+            model += cp.sum(grid != grid.value()) > 0  # at least one cell must differ
             if model.solve():
                 pretty_print(grid)
             else:

@@ -14,11 +14,15 @@ The goal is to cover all tasks while minimizing the total number of shifts used.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_022_bus_driver_scheduling/csplib_022_bus_driver_scheduling.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
 
-def bus_driver_scheduling(num_work=12, num_shifts=14, shifts=None):
+def bus_driver_scheduling(num_tasks=12, num_shifts=14, shifts=None):
     if shifts is None:
+        # shifts: a list of available shifts; each inner list contains the
+        # indices of the pieces of work (tasks) that that shift covers. Tasks
+        # are numbered 0..(num_tasks-1). The model will choose a subset of these
+        # shifts so that every task is covered exactly once.
         shifts = [
             [0, 1, 2],
             [0, 1, 2, 3],
@@ -36,15 +40,15 @@ def bus_driver_scheduling(num_work=12, num_shifts=14, shifts=None):
             [3, 6, 8]
         ]
 
-    model = Model()
+    model = cp.Model()
 
-    x = boolvar(shape=num_shifts, name="x")
+    x = cp.boolvar(shape=num_shifts, name="x")
 
-    for t in range(num_work):
+    for t in range(num_tasks):
         covering_shifts = [x[i] for i in range(num_shifts) if t in shifts[i]]
-        model += (sum(covering_shifts) == 1)
+        model += (cp.sum(covering_shifts) == 1)
 
-    model.minimize(sum(x))
+    model.minimize(cp.sum(x))
 
     return model, (x,)
 

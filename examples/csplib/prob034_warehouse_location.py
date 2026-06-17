@@ -16,11 +16,25 @@ costs for all opened warehouses and the supply costs for all stores.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_034_warehouse_location/csplib_034_warehouse_location.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 
 
 def warehouse_location(n_suppliers=5, n_stores=10, building_cost=30,
                        capacity=None, cost_matrix=None):
+    # Default data is for 5 suppliers and 10 stores.
+    if n_suppliers != 5 or n_stores != 10:
+        missing = []
+        if capacity is None:
+            missing.append("capacity")
+        if cost_matrix is None:
+            missing.append("cost_matrix")
+        if missing:
+            raise ValueError(
+                f"Default data is for 5 suppliers and 10 stores, "
+                f"but got n_suppliers={n_suppliers}, n_stores={n_stores}. "
+                f"Please provide: {', '.join(missing)}"
+            )
+
     if capacity is None:
         capacity = [1, 4, 2, 1, 3]
     if cost_matrix is None:
@@ -37,23 +51,23 @@ def warehouse_location(n_suppliers=5, n_stores=10, building_cost=30,
             [47, 65, 55, 71, 95]
         ]
 
-    model = Model()
+    model = cp.Model()
 
-    supplier_assignment = intvar(0, n_suppliers - 1, shape=n_stores, name="supplier_assignment")
-    open_warehouses = boolvar(shape=n_suppliers, name="open_warehouses")
+    supplier_assignment = cp.intvar(0, n_suppliers - 1, shape=n_stores, name="supplier_assignment")
+    open_warehouses = cp.boolvar(shape=n_suppliers, name="open_warehouses")
 
     # Capacity constraints
     for w in range(n_suppliers):
-        model += (Count(supplier_assignment, w) <= capacity[w])
+        model += (cp.Count(supplier_assignment, w) <= capacity[w])
 
     # Channeling
     for w in range(n_suppliers):
-        model += (open_warehouses[w] == (Count(supplier_assignment, w) > 0))
+        model += (open_warehouses[w] == (cp.Count(supplier_assignment, w) > 0))
 
     # Objective
-    cost_matrix_cpm = cpm_array(cost_matrix)
-    supply_cost = sum([cost_matrix_cpm[s, supplier_assignment[s]] for s in range(n_stores)])
-    maintenance_cost = sum(open_warehouses) * building_cost
+    cost_matrix_cpm = cp.cpm_array(cost_matrix)
+    supply_cost = cp.sum([cost_matrix_cpm[s, supplier_assignment[s]] for s in range(n_stores)])
+    maintenance_cost = cp.sum(open_warehouses) * building_cost
     total_cost = supply_cost + maintenance_cost
     model.minimize(total_cost)
 

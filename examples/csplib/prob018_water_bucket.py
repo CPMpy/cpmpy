@@ -14,7 +14,7 @@ Find the minimum number of transfers of water between buckets to reach the goal.
 Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_018_water_bucket/csplib_018_water_bucket.cpmpy.py)
 """
 
-from cpmpy import *
+import cpmpy as cp
 import numpy as np
 
 
@@ -33,7 +33,7 @@ def water_bucket(capacities=None, initial_state=None, goal_state=None, max_steps
     all_states = []
     for i in range(capacities[0] + 1):
         for j in range(capacities[1] + 1):
-            if capacities[0] - i - j >= 0 and capacities[0] - i - j <= capacities[2]:
+            if 0 <= capacities[0] - i - j <= capacities[2]:
                 k = capacities[0] - i - j
                 all_states.append((i, j, k))
 
@@ -52,9 +52,9 @@ def water_bucket(capacities=None, initial_state=None, goal_state=None, max_steps
                     transitions.append(tuple(state) + tuple(next_state))
     transitions = sorted(list(set(transitions)))
 
-    model = Model()
+    model = cp.Model()
 
-    sequence = intvar(padding_value, total_water, shape=(max_steps, 3), name="states")
+    sequence = cp.intvar(padding_value, total_water, shape=(max_steps, 3), name="states")
 
     # Sequence must start with initial state
     model += sequence[0, :] == initial_state
@@ -74,14 +74,13 @@ def water_bucket(capacities=None, initial_state=None, goal_state=None, max_steps
         model += is_goal_t.implies((sequence[t + 1, :] == padding_value).all())
         model += is_padded_t.implies((sequence[t + 1, :] == padding_value).all())
 
-        must_transfer = Table(np.hstack([sequence[t, :], sequence[t + 1, :]]), transitions) & \
-                        any(sequence[t + 1, :] != sequence[t, :])
+        must_transfer = cp.Table(np.hstack([sequence[t, :], sequence[t + 1, :]]), transitions) & cp.any(sequence[t + 1, :] != sequence[t, :])
         model += (~is_goal_t & ~is_padded_t).implies(must_transfer)
 
     # Goal must be reached
-    model += any([(sequence[t, :] == goal_state).all() for t in range(max_steps)])
+    model += cp.any([(sequence[t, :] == goal_state).all() for t in range(max_steps)])
 
-    cost = sum([sequence[t, 0] != padding_value for t in range(max_steps)]) - 1
+    cost = cp.sum([sequence[t, 0] != padding_value for t in range(max_steps)]) - 1
     model.minimize(cost)
 
     return model, (sequence,)
