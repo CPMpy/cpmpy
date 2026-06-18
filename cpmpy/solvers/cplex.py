@@ -55,7 +55,7 @@ from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num
+from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
@@ -64,9 +64,9 @@ from ..transformations.get_variables import get_variables
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, \
     only_positive_bv_wsum_const, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
+from ..transformations.negation import push_down_negation
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
-
 
 class CPM_cplex(SolverInterface):
     """
@@ -252,7 +252,7 @@ class CPM_cplex(SolverInterface):
             if self.has_objective():
                 obj_val = self.cplex_model.get_objective_expr().solution_value
                 if round(obj_val) == obj_val: # it is an integer?:
-                    self.objective_value_ = int(obj_val)
+                    self.objective_value_ = round(obj_val)
                 else: #  can happen with DirectVar or when using floats as coefficients
                     self.objective_value_ = float(obj_val)
 
@@ -267,28 +267,31 @@ class CPM_cplex(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var):  # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                # special case, negative-bool-view (not supported as first-class var; use 1-bv in constraints)
+                if isinstance(cpm_var, NegBoolView):
+                    raise ValueError("Negative literals should not be part of any equation. "
+                                    "Should have been removed by the only_positive_bv() transformation. "
+                                    "See /transformations/linearize for more details")
+                revar = self.cplex_model.binary_var(name)
+            else:
+                revar = self.cplex_model.integer_var(cpm_var.lb, cpm_var.ub, name=name)
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        if isinstance(cpm_var, NegBoolView):
-            raise ValueError("Negative literals should not be part of any equation. "
-                            "Should have been removed by the only_positive_bv() transformation. "
-                            "See /transformations/linearize for more details")
-
-        # create if it does not exit
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.cplex_model.binary_var(cpm_var.name)
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.cplex_model.integer_var(cpm_var.lb, cpm_var.ub, name=str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize=True):
@@ -376,6 +379,7 @@ class CPM_cplex(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
@@ -609,7 +613,7 @@ class CPM_cplex(SolverInterface):
                     if cpm_var.is_bool():
                         cpm_var._value = solver_val >= 0.5
                     else:
-                        cpm_var._value = int(solver_val)
+                        cpm_var._value = round(solver_val)
 
                 # Translate objective
                 if self.has_objective():
