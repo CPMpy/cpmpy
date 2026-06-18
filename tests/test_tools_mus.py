@@ -22,7 +22,7 @@ class TestMus:
             (x[3] > x[1]).implies((x[3] > x[2]) & ((x[3] == 3) | (x[1] == x[2])))
         ]
 
-        assert set(self.mus_func(cons)) == set(cons[:3])
+        assert set(self.mus_func(cons, hard=[], solver=solver)) == set(cons[:3])
         assert set(self.naive_func(cons)) == set(cons[:3])
 
     def test_bug_191(self, solver):
@@ -34,7 +34,7 @@ class TestMus:
         hard = [~bv]
         soft = [bv]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard, solver="ortools") # crashes
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver) # crashes
         assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
         assert set(mus_naive_cons) == set(soft)
@@ -76,20 +76,14 @@ class TestMus:
 
         # non-determinstic
         #self.assertEqual(set(mus(cons)), set(cons[1:3]))
-        ms = self.mus_func(cons)
+        ms = self.mus_func(cons, solver=solver)
         assert len(ms) < len(cons)
         assert not cp.Model(ms).solve()
         ms = self.naive_func(cons)
         assert len(ms) < len(cons)
         assert not cp.Model(ms).solve()
         # self.assertEqual(set(self.naive_func(cons)), set(cons[:2]))
-
-@pytest.mark.requires_solver("exact")
-class TestNativeMusExact(TestMus):
-    def setup_method(self):
-        self.mus_func = lambda soft, hard=[], solver="exact": mus_native(soft, hard=hard, solver="exact")
-        self.naive_func = mus_naive
-
+        
     def test_decomposed_global(self, solver):
         x = cp.intvar(1, 5, shape=3, name="x")
         soft = [x[0] == x[1], x[1] == x[2]]
@@ -100,11 +94,11 @@ class TestNativeMusExact(TestMus):
         mus_naive_cons = self.naive_func(soft=soft, hard=hard)
         assert len(set(mus_naive_cons)) == 1
 
-
-@pytest.mark.requires_solver("gurobi")
-class TestNativeMusGurobi(TestMus):
+@pytest.mark.requires_solver("exact", "gurobi")
+class TestNativeMus(TestMus):
     def setup_method(self):
-        self.mus_func = lambda soft, hard=[], solver="gurobi": mus_native(soft, hard=hard, solver="gurobi")
+        solver = None
+        self.mus_func = lambda soft, hard=[], solver=solver: mus_native(soft, hard=hard, solver=solver)
         self.naive_func = mus_naive
 
 
