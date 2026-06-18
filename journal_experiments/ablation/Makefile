@@ -13,11 +13,13 @@
 
 PYTHON       ?= python3
 
-# Solvers with an ablation pipeline in run_model.py: gurobi, pysat, rc2, scip.
-SOLVERS      ?= gurobi scip
+ILP_SOLVERS   ?= gurobi scip highs
+CP_SOLVERS    ?= choco ortools
 
-# "baseline" is un-ablated; the rest map to run_model.py's --ablate values.
-ABLATIONS    ?= baseline no-ilpfriendly no-detect-categorical
+# ILP solvers: baseline, no-ilpfriendly, no-detect-categorical
+# CP solvers: baseline, ilpfriendly
+ILP_ABLATIONS ?= baseline no-ilpfriendly no-detect-categorical
+CP_ABLATIONS  ?= baseline ilpfriendly
 
 TIME_LIMIT   ?= 30
 
@@ -34,7 +36,9 @@ MODEL_PICKLES    := $(patsubst $(EXAMPLES_DIR)/%.py,$(MODELS_DIR)/%.pickle,$(MOD
 EXISTING_PICKLES := $(wildcard $(MODELS_DIR)/*.pickle)
 
 # run-ablation/<model>__<solver>__<ablation>.json
-RESULTS := $(foreach s,$(SOLVERS),$(foreach a,$(ABLATIONS),\
+RESULTS := $(foreach s,$(ILP_SOLVERS),$(foreach a,$(ILP_ABLATIONS),\
+             $(patsubst $(MODELS_DIR)/%.pickle,$(RESULTS_DIR)/%__$(s)__$(a).json,$(EXISTING_PICKLES)))) \
+           $(foreach s,$(CP_SOLVERS),$(foreach a,$(CP_ABLATIONS),\
              $(patsubst $(MODELS_DIR)/%.pickle,$(RESULTS_DIR)/%__$(s)__$(a).json,$(EXISTING_PICKLES))))
 
 PLOT_STAMP := $(FIGURES_DIR)/.plot.stamp
@@ -63,7 +67,8 @@ $(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle run_model.py $(CPMPY_D
 	$(PYTHON) run_model.py $$< $(1) $(call ablate_arg,$(2)) --out=$$@ time_limit=$(TIME_LIMIT)
 endef
 
-$(foreach s,$(SOLVERS),$(foreach a,$(ABLATIONS),$(eval $(call ABLATION_RULE,$(s),$(a)))))
+$(foreach s,$(ILP_SOLVERS),$(foreach a,$(ILP_ABLATIONS),$(eval $(call ABLATION_RULE,$(s),$(a)))))
+$(foreach s,$(CP_SOLVERS),$(foreach a,$(CP_ABLATIONS),$(eval $(call ABLATION_RULE,$(s),$(a)))))
 
 $(PLOT_STAMP): $(RESULTS) plot_ablation.py
 	$(PYTHON) plot_ablation.py $(RESULTS_DIR) $(FIGURES_DIR)
