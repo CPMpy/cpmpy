@@ -23,10 +23,12 @@ directory.
 monkey-patching the solver class's `transform` method with an ablated pipeline
 (defined below). Valid values:
     no-ilpfriendly        -> use the generic `decompose_in_tree` instead of the
-                             ILP-friendly `decompose_linear`
+                             ILP-friendly `decompose_linear` (ILP solvers)
     no-detect-categorical -> drop the `linearize_reified_variables` step that
-                             detects/encodes categorical variables
-Only the solvers with such a pipeline (gurobi, pysat, rc2, scip, highs) are supported.
+                             detects/encodes categorical variables (ILP solvers)
+    ilpfriendly           -> use `decompose_linear` instead of the generic
+                             `decompose_in_tree` (CP solvers: choco, ortools)
+Only the solvers with a matching pipeline are supported.
 
 The output JSON contains the model that was run, the solver and its
 parameters, the runtime, the solver status, and (for optimization problems)
@@ -47,7 +49,7 @@ from cpmpy.transformations.flatten_model import toplevel_list, flatten_constrain
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.transformations.decompose_global import decompose_in_tree
 from cpmpy.transformations.linearize import decompose_linear, linearize_constraint, \
-    linearize_reified_variables, only_positive_bv, only_positive_coefficients
+    linearize_reified_variables, only_positive_bv, only_positive_coefficients, canonical_comparison
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.negation import push_down_negation
@@ -62,17 +64,19 @@ OUTPUT_DIR = os.path.join(_HERE, "run_results")
 # Valid --ablate choices.
 ABLATE_NO_ILPFRIENDLY = "no-ilpfriendly"
 ABLATE_NO_CATEGORICAL = "no-detect-categorical"
-ABLATE_CHOICES = (ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL)
+ABLATE_ILPFRIENDLY = "ilpfriendly"
+ABLATE_CHOICES = (ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_ILPFRIENDLY)
 
 
 # The ablated transform pipelines. These were originally written as solver
 # subclasses in journal_experiments/ablation.py; they are inlined here as plain
-# (self, cpm_expr) methods so this script is self-contained. The two ablations
-# differ in only two places, so each solver has a single function that branches
-# on `ablate`:
+# (self, cpm_expr) methods so this script is self-contained. Each solver has a
+# single function that branches on `ablate`:
 #   - no-ilpfriendly:        decompose with the generic `decompose_in_tree`
 #   - no-detect-categorical: decompose with `decompose_linear` but skip the
 #                            `linearize_reified_variables` (categorical) step
+#   - ilpfriendly:           decompose with `decompose_linear` instead of
+#                            `decompose_in_tree` (CP solvers only)
 
 def gurobi_transform(self, cpm_expr, ablate):
     # expressions have to be linearized to fit in MIP model, see transformations/linearize
@@ -153,6 +157,41 @@ def highs_transform(self, cpm_expr, ablate):
     return cpm_cons
 
 
+def choco_transform(self, cpm_expr, ablate):
+    decompose = decompose_linear if ablate == ABLATE_ILPFRIENDLY else decompose_in_tree
+    cpm_cons = toplevel_list(cpm_expr)
+    cpm_cons = no_partial_functions(cpm_cons)
+    cpm_cons = push_down_negation(cpm_cons)
+    cpm_cons = decompose(cpm_cons,
+                         supported=self.supported_global_constraints,
+                         supported_reified=self.supported_reified_global_constraints,
+                         csemap=self._csemap)
+    cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
+    cpm_cons = canonical_comparison(cpm_cons)
+    cpm_cons = reify_rewrite(cpm_cons,
+                             supported=self.supported_global_constraints | {"sum", "wsum"},
+                             csemap=self._csemap)
+    cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)
+    return cpm_cons
+
+
+def ortools_transform(self, cpm_expr, ablate):
+    decompose = decompose_linear if ablate == ABLATE_ILPFRIENDLY else decompose_in_tree
+    cpm_cons = toplevel_list(cpm_expr)
+    cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"}))
+    cpm_cons = push_down_negation(cpm_cons)
+    cpm_cons = decompose(cpm_cons,
+                         supported=self.supported_global_constraints,
+                         supported_reified=self.supported_reified_global_constraints,
+                         csemap=self._csemap)
+    cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
+    cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
+    cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)
+    cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+    cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
+    return cpm_cons
+
+
 # Map a (base) solver name to its ablated transform. RC2 is PySAT-based and
 # reuses the PySAT pipeline.
 SOLVER_TRANSFORM = {
@@ -161,6 +200,19 @@ SOLVER_TRANSFORM = {
     "rc2": pysat_transform,
     "scip": scip_transform,
     "highs": highs_transform,
+    "choco": choco_transform,
+    "ortools": ortools_transform,
+}
+
+# Which ablations each solver supports.
+SOLVER_ABLATIONS = {
+    "gurobi": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
+    "pysat": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
+    "rc2": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
+    "scip": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
+    "highs": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
+    "choco": frozenset({ABLATE_ILPFRIENDLY}),
+    "ortools": frozenset({ABLATE_ILPFRIENDLY}),
 }
 
 
@@ -171,6 +223,9 @@ def patch_transform(solver_name, ablate):
     if base not in SOLVER_TRANSFORM:
         raise ValueError("No ablation pipeline for solver '{}' (have: {})".format(
             solver_name, ", ".join(sorted(SOLVER_TRANSFORM))))
+    if ablate not in SOLVER_ABLATIONS[base]:
+        raise ValueError("Ablation '{}' not supported for solver '{}' (choose from: {})".format(
+            ablate, solver_name, ", ".join(sorted(SOLVER_ABLATIONS[base]))))
 
     # patch the actual solver class CPMpy will instantiate for this name. The
     # transform stays a function defined in this module, so its helper imports
