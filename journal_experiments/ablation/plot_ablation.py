@@ -49,7 +49,9 @@ def load_results(results_dir):
     records = []
     for path in glob.glob(os.path.join(results_dir, "**", "*.json"), recursive=True):
         with open(path, "r") as f:
-            records.append(json.load(f))
+            content = f.read()
+            if len(content) > 0: # some files are empty due to crashes
+                records.append(json.loads(content))
     if not records:
         raise SystemExit("No result JSON files found under {}".format(results_dir))
     return pd.DataFrame(records)
@@ -107,6 +109,11 @@ def plot_all_solvers(df, figures_dir, runtime_col="runtime"):
     plot_df = df.copy()
     plot_df["ablate"] = plot_df["ablate"].fillna("baseline")
     plot_df["variant"] = plot_df["ablate"].map(VARIANT_LABEL).fillna(plot_df["ablate"])
+
+
+    time_limits = set(df['time_limit'])
+    if len(time_limits) > 1:
+        raise ValueError(f"Time limits are not consistent: {time_limits}")
 
     print(plot_df.groupby(['solver', 'variant']).size())
 
