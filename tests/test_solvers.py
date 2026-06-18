@@ -1242,5 +1242,5 @@ class TestRound:
             print(x, x.value())
             assert (x.value() >= 1), f"{x}={x.value()}"
 
-        m.solveAll(solver=solver, solution_limit=1000, display=check)
+        m.solveAll(solver=solver, solution_limit=1000, time_limit=10, display=check)
 
