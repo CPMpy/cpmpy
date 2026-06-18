@@ -4,7 +4,7 @@ import cpmpy as cp
 from cpmpy.tools import mss_opt, marco, OCUSException
 from cpmpy.tools.explain import mus, mus_naive, quickxplain, quickxplain_naive, optimal_mus, optimal_mus_naive, mss, mcs, ocus, ocus_naive, mus_native
 
-
+@pytest.mark.requires_solver("exact")
 class TestMus:
     def setup_method(self):
         self.mus_func = mus
@@ -89,7 +89,7 @@ class TestMus:
         soft = [x[0] == x[1], x[1] == x[2]]
         hard = [cp.AllDifferent(x)]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard)
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver)
         assert len(set(mus_cons)) == 1
         mus_naive_cons = self.naive_func(soft=soft, hard=hard)
         assert len(set(mus_naive_cons)) == 1
