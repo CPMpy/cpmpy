@@ -201,7 +201,7 @@ class TestSolvers:
         m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
         s = CPM_ortools(m_opt)
         cpm_status = s.solve(solution_callback=cb)
-        assert s.objective_value() == 5.0
+        assert s.objective_value() == 5
 
         assert x[0].value() > x[1].value()
 
@@ -881,6 +881,7 @@ class TestSupportedSolvers:
         assert s.solve()
         assert fs.value() == pytest.approx(2.4, abs=1e-05)
         assert len(s.user_vars) == 3
+        assert s.objective_value() is None # should be None, read from FloatSum.value()
 
     def test_floatsum_negboolview(self, solver):
         if solver not in self._floatsum_supported_solvers:
