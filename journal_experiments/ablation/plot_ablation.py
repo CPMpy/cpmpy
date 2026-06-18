@@ -38,9 +38,10 @@ DEFAULT_FIGURES_DIR = os.path.join(_HERE, "figures")
 
 # Human-friendly label per --ablate value (None/missing == the un-ablated baseline).
 VARIANT_LABEL = {
-    "baseline": "baseline",
+    "baseline": "pipeline",
     "no-ilpfriendly": "no linear-friendly",
     "no-detect-categorical": "no categorical",
+    "ilpfriendly": "linear-friendly",
 }
 
 
