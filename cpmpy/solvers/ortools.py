@@ -58,6 +58,7 @@ from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_c
     get_bounds, is_true_cst, \
     is_false_cst, implies, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+from ..transformations.negation import push_down_negation
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list
@@ -279,7 +280,7 @@ class CPM_ortools(SolverInterface):
             if self.has_objective():
                 ort_obj_val = self.ort_solver.objective_value
                 if round(ort_obj_val) == ort_obj_val: # it is an integer?
-                    self.objective_value_ = int(ort_obj_val)  # ensure it is an integer
+                    self.objective_value_ = round(ort_obj_val)  # ensure it is an integer
                 else: # can happen when using floats as coeff in objective
                     self.objective_value_ = float(ort_obj_val)
         else: # clear values of variables
@@ -428,6 +429,7 @@ class CPM_ortools(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"})) # before decompose, assumes total decomposition for partial functions
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
@@ -967,7 +969,7 @@ try:
                     if isinstance(cpm_var, _BoolVarImpl):
                         cpm_var._value = bool(self.Value(self._varmap[cpm_var.name]))
                     elif isinstance(cpm_var, _IntVarImpl):
-                        cpm_var._value = int(self.Value(self._varmap[cpm_var.name]))
+                        cpm_var._value = self.Value(self._varmap[cpm_var.name])
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 

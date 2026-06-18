@@ -68,6 +68,8 @@
     ..
 
     You can also implement a `.negate()` method if the global constraint has a better way to negate it than negating the decomposition.
+    The expression returned by `.negate()` should be equivalent to the negation of the global constraint, and is not allowed to introduce explicit `not` operators.
+    Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
 
     If it is a :class:`~cpmpy.expressions.globalfunctions.GlobalFunction` meaning that its return type is numeric (see :class:`~cpmpy.expressions.globalfunctions.Minimum` and :class:`~cpmpy.expressions.globalfunctions.Element`)
     then set `is_bool=False` in the super() constructor and preferably implement `.value()` accordingly.
@@ -179,6 +181,9 @@ class GlobalConstraint(Expression):
             To ensure equivalence of decomposition, we split into constraints determining the value of the global constraint, and defining-constraints.
             Defining constraints (totally) define new auxiliary variables needed for the decomposition, and can always be enforced at top-level.
 
+            The decomposition is not allowed to introduce explicit `not` operators.
+            Instead, use cpmpy.transformations.negation.recurse_negation to push down the negation if you want to negate an expression.
+
             Tip: avoid creating auxiliary variables and use nested expressions instead!
             (especially, don't create Booleans but use (iv == v) expressions instead, better for common subexpression elimination!)
 
@@ -186,6 +191,13 @@ class GlobalConstraint(Expression):
                 tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
         raise NotImplementedError("Decomposition for", self, "not available")
+
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        """
+        Positive decomposition of the global constraint, only valid when the constraint is posted toplevel or occurs in a positive nested context.
+        Defaults to the standard decomposition, but subclasses can implement a better version.
+        """
+        return self.decompose()
 
     def get_bounds(self) -> tuple[int, int]:
         """
@@ -1022,8 +1034,11 @@ class MDD(GlobalConstraint):
 
         return extended_mapping, invalid_edges
 
+    def decompose_positive(self) -> tuple[list[Expression], list[Expression]]:
+        return self.decompose(complete=False)
 
-    def decompose(self) -> tuple[list[Expression], list[Expression]]:
+
+    def decompose(self, complete=True) -> tuple[list[Expression], list[Expression]]:
         """
         Flow decomposition of the MDD global constraint.
         Enforces that the condition is satisfied, by ensuring that the flow in equals the flow out for every node.
@@ -1036,9 +1051,13 @@ class MDD(GlobalConstraint):
         """
         arr = self.args[0]
 
+        if complete:
         # MDD is extended with invalid edges, which are directed to the sink node
-        extended_mapping, invalid_edges_set = self._get_complete_mdd()
-        invalid_edges = frozenset(invalid_edges_set)
+            mapping, invalid_edges_set = self._get_complete_mdd()
+            invalid_edges = frozenset(invalid_edges_set)
+        else:
+            mapping = self.mapping
+            invalid_edges = frozenset()
 
         # Ingoing and outgoing flow for each node (key: node ID, value: list of edge variables)
         # The default is an empty list, representing no ingoing / outgoing flow.
@@ -1050,7 +1069,7 @@ class MDD(GlobalConstraint):
         invalid_edge_vars = []
 
         # Determine flow in and flow out for each node, and make a boolvar for each edge
-        for id1, edges in extended_mapping.items():
+        for id1, edges in mapping.items():
             for value, id2 in edges.items():
                 edge_var = cp.boolvar()
                 level = self.levels[id1]
@@ -1157,17 +1176,17 @@ class IfThenElse(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
+        from cpmpy.transformations.negation import recurse_negation
+
         condition, if_true, if_false = self.args
         if is_bool(condition):
             condition = cp.BoolVal(condition) # ensure it is a CPMpy expression
-        return [condition.implies(if_true), (~condition).implies(if_false)], []
+        return [condition.implies(if_true), 
+                recurse_negation(condition).implies(if_false)], []
 
     def __repr__(self) -> str:
         condition, if_true, if_false = self.args
         return "If {} Then {} Else {}".format(condition, if_true, if_false)
-
-    def negate(self) -> Expression:
-        return IfThenElse(self.args[0], self.args[2], self.args[1])
 
 
 
@@ -1263,6 +1282,8 @@ class Xor(GlobalConstraint):
         Returns:
             tuple[list[Expression], list[Expression]]: A tuple containing the constraints representing the constraint value and the defining constraints
         """
+        from cpmpy.transformations.negation import recurse_negation
+
         # lets first simplify the Xor by removing all constants:
         # True Xor x :: ~x  and  False Xor x :: x
         new_args: list[Expression] = []
@@ -1277,13 +1298,13 @@ class Xor(GlobalConstraint):
             return [BoolVal(parity)], []
         if parity:  # negate first Boolean variable
             changed = False
-            for i, a in enumerate(self.args):
+            for i, a in enumerate(new_args):  # index into new_args (constants already removed)
                 if isinstance(a, _BoolVarImpl):
-                    new_args[i] = ~a
+                    new_args[i] = ~a  # a is var, ok to be negated
                     changed = True
                     break
             if not changed:  # no variables, negate first argument
-                new_args[0] = ~new_args[0]  # Warning, creates a negated expression during decompose
+                new_args[0] = recurse_negation(new_args[0]) # decompose cannot introduce negation, so push down into arg
 
         # There are multiple decompositions possible,
         # recursively using sum allows it to be efficient for all solvers.
@@ -1306,19 +1327,20 @@ class Xor(GlobalConstraint):
         return "xor({})".format(self.args)
 
     def negate(self) -> Expression:
+        from cpmpy.transformations.negation import recurse_negation
+        
         # negate one of the arguments, ideally a variable
         new_args = list(self.args)  # takes shallow copy
         changed = False
         for i, a in enumerate(self.args):
             if isinstance(a, _BoolVarImpl):
-                new_args[i] = ~a
+                new_args[i] = ~a  # a is var, ok to be negated
                 changed = True
                 break
 
         if not changed:  # did not find a Boolean variable to negate
             # pick first arg, and push down negation
-            from cpmpy.transformations.negation import recurse_negation
-            new_args[0] = recurse_negation(self.args[0])           
+            new_args[0] = recurse_negation(new_args[0])  # .negate() cannot introduce negation, so push down into arg
 
         return Xor(new_args)
 
@@ -1979,11 +2001,21 @@ class GlobalCardinalityCount(GlobalConstraint):
         """
         Decomposition of the GlobalCardinalityCount constraint.
         Uses a conjunction of Count global function constraints.
+        
+        Same as the one MiniZinc uses:
+        https://github.com/MiniZinc/libminizinc/blob/master/share/minizinc/std/fzn_global_cardinality.mzn
         """
         vars, vals, occ = self.args
-        constraints = [cp.Count(vars, i) == v for i, v in zip(vals, occ)]
+        counts = [cp.Count(vars, v) for v in vals]
+        constraints = [cnt == o for cnt, o in zip(counts, occ)]
         if self.closed:
-            constraints += [InDomain(v, vals) for v in vars]
+            constraints.extend([InDomain(v, vals) for v in vars])
+            # redundant constraint
+            constraints.append(cp.sum(counts) == len(vars))
+        else:
+            # redundant constraint
+            constraints.append(cp.sum(counts) <= len(vars))
+            
         return constraints, []
 
     def value(self) -> Optional[bool]:

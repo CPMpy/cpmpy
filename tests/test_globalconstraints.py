@@ -817,7 +817,7 @@ class TestGlobal:
         expected = {
             # safening constraints
             "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
-            "(not((x >= 0) and (x <= 2))) -> (IV0 == 0)",
+            "((x < 0) or (x > 2)) -> (IV0 == 0)",
             "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
@@ -1480,14 +1480,31 @@ class TestBounds:
         x = cp.intvar(-8, 5)
         op = cp.Power(x,3)
         lb, ub = op.get_bounds()
-        assert lb ==-8 ** 3
-        assert ub ==5 ** 3
+        assert lb == (-8) ** 3
+        assert ub == 5 ** 3
 
         op = cp.Power(x, 4)
         lb, ub = op.get_bounds()
-        assert lb == 5 ** 4
+        assert lb == 0
+        assert ub == 8 ** 4
+        
+        x = cp.intvar(-5, 8)
+        op = cp.Power(x,3)
+        lb, ub = op.get_bounds()
+        assert lb == (-5) ** 3
+        assert ub == 8 ** 3
+
+        op = cp.Power(x, 4)
+        lb, ub = op.get_bounds()
+        assert lb == 0
         assert ub == 8 ** 4
 
+        op = cp.Power(x,0)
+        lb, ub = op.get_bounds()
+        assert lb == 1
+        assert ub == 1
+
+    
     def test_bounds_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
