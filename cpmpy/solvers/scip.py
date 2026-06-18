@@ -2,11 +2,16 @@
 """
     Interface to the SCIP's python "PySCIPOpt" package
 
-    First install the SCIPOptSuite on your machine, follow:
-    https://scipopt.org/index.php#download
+    ============
+    Installation
+    ============
 
-    Then install the 'pyscipopt' python package:
+    Requires that the 'PySCIPOpt' Python package is installed:
+
+    .. code-block:: console
+    
         $ pip install pyscipopt
+        
     (more information on https://github.com/scipopt/PySCIPOpt)
     
     ===============
