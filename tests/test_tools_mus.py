@@ -52,7 +52,7 @@ class TestMus:
             y == 4
         ]
 
-        mus_cons = self.mus_func(soft=soft, hard=hard) # crashes
+        mus_cons = self.mus_func(soft=soft, hard=hard, solver=solver) # crashes
         assert set(mus_cons) == set(soft)
         mus_naive_cons = self.naive_func(soft=soft, hard=hard) # crashes
         assert set(mus_naive_cons) == set(soft)
