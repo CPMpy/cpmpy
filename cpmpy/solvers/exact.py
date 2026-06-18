@@ -116,7 +116,7 @@ class CPM_exact(SolverInterface):
             return None
 
 
-    def __init__(self, cpm_model=None, subsolver=None, **kwargs):
+    def __init__(self, cpm_model=None, subsolver=None, incremental=True, **kwargs):
         """
         Constructor of the native solver object
 
@@ -126,6 +126,8 @@ class CPM_exact(SolverInterface):
         Arguments:
             cpm_model: Model(), a CPMpy Model() (optional)
             subsolver: None
+            incremental: if True (default), use toOptimum in solve() so the solver state
+                can be reused (e.g. change objective). If False, use runFull (faster one-shot).
 
         Exact takes options at initialization instead of solving.
         The Exact solver parameters are defined by https://gitlab.com/nonfiction-software/exact/-/blob/main/src/Options.hpp
@@ -138,6 +140,7 @@ class CPM_exact(SolverInterface):
         assert subsolver is None, "Exact does not allow subsolvers."
 
         from exact import Exact as xct
+        self.incremental = incremental
         # initialise the native solver object
         options = list(kwargs.items()) # options is a list of string-pairs, e.g. [("verbosity","1")]
         options = [(opt[0], str(opt[1])) for opt in options] # Ensure values are also strings
@@ -227,7 +230,11 @@ class CPM_exact(SolverInterface):
             
         # call the solver, with parameters
         start = time.time()
-        my_status, obj_val = self.xct_solver.toOptimum(timeout=timeout)
+        obj_val = None
+        if self.incremental:
+            my_status, obj_val = self.xct_solver.toOptimum(timeout=timeout)
+        else:
+            my_status = self.xct_solver.runFull(optimize=self.has_objective(), timeout=timeout)
         end = time.time()
 
         # new status, translate runtime
@@ -264,11 +271,15 @@ class CPM_exact(SolverInterface):
         # True/False depending on self.cpm_status
         ret = self._solve_return(self.cpm_status)
         self._fillVars(has_solution=ret)
-        if self.has_objective():
-            if self.objective_is_min_:
-                self.objective_value_ = obj_val
-            else: # maximize, so actually negative value
-                self.objective_value_ = -obj_val
+        if self.has_objective() and ret:
+            if self.incremental:
+                assert obj_val is not None
+                if self.objective_is_min_:
+                    self.objective_value_ = obj_val
+                else: # maximize, so actually negative value
+                    self.objective_value_ = -obj_val
+            else:
+                self.objective_value_ = self.objective_.value()
         
         return ret
 

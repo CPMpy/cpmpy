@@ -570,6 +570,36 @@ class TestSolvers:
         with open(proof_file+".proof", "r") as f:
             assert f.readline()[:-1] == "pseudo-Boolean proof version 1.1"# check header of proof-file
 
+    @pytest.mark.skipif(not CPM_exact.supported(), reason="Exact not installed")
+    def test_exact_incremental_solve(self):
+        iv = cp.intvar(0, 10, shape=2)
+        m = cp.Model(iv >= 1, iv <= 5)
+        m.maximize(sum(iv))
+
+        assert m.solve(solver="exact")
+        obj_model = m.objective_value()
+        status_model = m.status().exitstatus
+
+        s = cp.SolverLookup.get("exact", m, incremental=True)
+        assert s.solve()
+        assert s.objective_value() == obj_model
+        assert s.status().exitstatus == status_model
+
+    @pytest.mark.skipif(not CPM_scip.supported(), reason="SCIP not installed")
+    def test_scip_incremental_solve(self):
+        iv = cp.intvar(0, 10, shape=2)
+        m = cp.Model(iv >= 1, iv <= 5)
+        m.maximize(sum(iv))
+
+        assert m.solve(solver="scip")
+        obj_model = m.objective_value()
+        status_model = m.status().exitstatus
+
+        s = cp.SolverLookup.get("scip", m, incremental=True)
+        assert s.solve()
+        assert s.objective_value() == obj_model
+        assert s.status().exitstatus == status_model
+
     @pytest.mark.skipif(not CPM_choco.supported(),
                         reason="pychoco not installed")
     def test_choco(self):
