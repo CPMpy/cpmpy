@@ -68,7 +68,7 @@ def save_figure(fig, name):
     fig.savefig(f"{name}.png", dpi=150, bbox_inches="tight")
 
 
-def plot_runtime_ecdf(df, ax, solver, runtime_col="runtime", time_limit=None):
+def plot_runtime_ecdf(df, ax, solver, runtime_col="runtime", time_limit=None, hue_order=None):
     """Draw the per-variant ECDF of solve time for one ``solver`` on ``ax``.
 
     Each row of ``df`` is one (model, solver, ablation) run as written by
@@ -88,7 +88,12 @@ def plot_runtime_ecdf(df, ax, solver, runtime_col="runtime", time_limit=None):
     if time_limit is None:
         time_limit = float(df["time_limit"].max())
 
-    sns.ecdfplot(data=df, x=runtime_col, hue="variant", stat="count", ax=ax)
+    if hue_order is None:
+        hue_order = sorted(df["variant"].unique())
+        hue_order.remove("baseline")
+        hue_order.insert(0, "baseline")
+
+    sns.ecdfplot(data=df, x=runtime_col, hue="variant", stat="count", ax=ax, hue_order=hue_order)
     ax.set_xscale("log")
     ax.set_xlim(left=0.01, right=time_limit)
     ax.set_xlabel("solve time (s)")
@@ -102,7 +107,18 @@ def plot_all_solvers(df, figures_dir, runtime_col="runtime"):
     plot_df = df.copy()
     plot_df["ablate"] = plot_df["ablate"].fillna("baseline")
     plot_df["variant"] = plot_df["ablate"].map(VARIANT_LABEL).fillna(plot_df["ablate"])
+
+    print(plot_df.groupby(['solver', 'variant']).size())
+
     plot_df = get_finished_instances(plot_df)
+
+    hue_order = sorted(plot_df["variant"].unique())
+    hue_order.remove("baseline")
+    hue_order.insert(0, "baseline")
+
+    # fill rc2 solver with pysat
+    print(plot_df["solver"].unique())
+    plot_df.loc[plot_df["solver"] == "rc2", 'solver'] = "pysat"
 
     os.makedirs(figures_dir, exist_ok=True)
     for solver in sorted(plot_df["solver"].unique()):
@@ -119,6 +135,7 @@ if __name__ == "__main__":
     figures_dir = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_FIGURES_DIR
 
     df = load_results(results_dir)
-    print(df)
+    
+
 
     plot_all_solvers(df, figures_dir=figures_dir, runtime_col="runtime")
