@@ -369,15 +369,15 @@ class Multiplication(GlobalFunction):
         Normalizes so a constant is first when one factor is numeric (sets .is_lhs_num).
         """
         is_lhs_num = False
-        if is_num(x):
-            if not is_int(x):
-                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+        if is_int(x):
             is_lhs_num = True
-        elif is_num(y):
-            if not is_int(y):
-                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+        elif is_int(y):
             (x, y) = (y, x)
             is_lhs_num = True
+        elif isinstance(x, (float, np.floating)):
+            raise TypeError(f"Multiplication does not support float constants, got: {x}")
+        elif isinstance(y, (float, np.floating)):
+            raise TypeError(f"Multiplication does not support float constants, got: {y}")
 
         super().__init__("mul", (x, y))
         self.is_lhs_num = is_lhs_num
@@ -388,15 +388,15 @@ class Multiplication(GlobalFunction):
         """
         x, y = args
         is_lhs_num = False
-        if is_num(x):
-            if not is_int(x):
-                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+        if is_int(x):
             is_lhs_num = True
-        elif is_num(y):
-            if not is_int(y):
-                warnings.warn("Mul: float constants are deprecated. Some solvers support the new FloatSum() in the objective.", DeprecationWarning)
+        elif is_int(y):
             (x, y) = (y, x)
             is_lhs_num = True
+        elif isinstance(x, (float, np.floating)):
+            raise TypeError(f"Multiplication does not support float constants, got: {x}")
+        elif isinstance(y, (float, np.floating)):
+            raise TypeError(f"Multiplication does not support float constants, got: {y}")
 
         super().update_args((x, y))
         self.is_lhs_num = is_lhs_num
