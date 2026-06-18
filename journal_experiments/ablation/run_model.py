@@ -26,7 +26,7 @@ monkey-patching the solver class's `transform` method with an ablated pipeline
                              ILP-friendly `decompose_linear`
     no-detect-categorical -> drop the `linearize_reified_variables` step that
                              detects/encodes categorical variables
-Only the solvers with such a pipeline (gurobi, pysat, rc2, scip) are supported.
+Only the solvers with such a pipeline (gurobi, pysat, rc2, scip, highs) are supported.
 
 The output JSON contains the model that was run, the solver and its
 parameters, the runtime, the solver status, and (for optimization problems)
@@ -135,6 +135,24 @@ def scip_transform(self, cpm_expr, ablate):
     return cpm_cons
 
 
+def highs_transform(self, cpm_expr, ablate):
+    decompose = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    cpm_cons = toplevel_list(cpm_expr)
+    cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
+    cpm_cons = push_down_negation(cpm_cons)
+    cpm_cons = decompose(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
+    cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
+    cpm_cons = reify_rewrite(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)
+    cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)
+    if ablate == ABLATE_NO_ILPFRIENDLY:
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+    cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+    cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
+    cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum"}), csemap=self._csemap)
+    cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
+    return cpm_cons
+
+
 # Map a (base) solver name to its ablated transform. RC2 is PySAT-based and
 # reuses the PySAT pipeline.
 SOLVER_TRANSFORM = {
@@ -142,6 +160,7 @@ SOLVER_TRANSFORM = {
     "pysat": pysat_transform,
     "rc2": pysat_transform,
     "scip": scip_transform,
+    "highs": highs_transform,
 }
 
 
@@ -166,6 +185,7 @@ def patch_transform(solver_name, ablate):
 def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs):
     """Load a pickled model, optionally patch the transform, solve, return a record."""
     model = cp.Model.from_file(model_path)
+    sname = solver_name
     if model.has_objective() and sname == "pysat":
         sname = "rc2" # PySAT cannot handle objectives, switch to RC2 Max-SAT solver
 
