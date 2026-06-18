@@ -166,17 +166,17 @@ def patch_transform(solver_name, ablate):
 def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs):
     """Load a pickled model, optionally patch the transform, solve, return a record."""
     model = cp.Model.from_file(model_path)
-    if model.has_objective() and solver_name == "pysat":
-        solver_name = "rc2" # PySAT cannot handle objectives, switch to RC2 Max-SAT solver
+    if model.has_objective() and sname == "pysat":
+        sname = "rc2" # PySAT cannot handle objectives, switch to RC2 Max-SAT solver
 
     ablate_variant = None
     if ablate is not None:
-        ablate_variant = patch_transform(solver_name, ablate)
-        print("[run_model] patched {} transform with {}".format(solver_name, ablate_variant),
+        ablate_variant = patch_transform(sname, ablate)
+        print("[run_model] patched {} transform with {}".format(sname, ablate_variant),
               file=sys.stderr)
 
     t0 = time.time()
-    solver = cp.SolverLookup.get(solver_name, model)
+    solver = cp.SolverLookup.get(sname, model)
     transformation_time = time.time() - t0
     solver.solve(time_limit=time_limit, **solver_kwargs)
 
