@@ -397,6 +397,23 @@ If a model has no objective function specified, then it represents a satisfactio
 
 Any CPMpy expression can be added as objective function. Solvers are especially good in optimizing linear functions or the minimum/maximum of a set of expressions. Other (non-linear) expressions are supported too, just give it a try.
 
+### Float coefficients (advanced)
+
+CPMpy constraints and model objectives use integer (and boolean) expressions. For a weighted sum with **float coefficients**, some solvers also support [`FloatSum`](api/expressions/globalfunctions.html#cpmpy.expressions.globalfunctions.FloatSum) as argument to minimize/maximize, FLOBJ capability in the [supported solvers](index.rst#supported-solvers) table.
+
+This is for advanced users only, e.g. `solver.objective_value()` is always integer, so you must keep the floatsum and call `FloatSum.value()` to get the float objective value.
+
+```python
+import cpmpy as cp
+
+x, y, z = cp.boolvar(3)
+fs = cp.FloatSum([0.3, 0.4, 0.5], [x, y, z], const=0.8)  # 0.3x + 0.4y + 0.5z + 0.8
+s = cp.SolverLookup.get("ortools")
+s.maximize(fs)
+assert s.solve()
+print(fs.value())  # s.objective_value() is None here
+```
+
 ```python
 import cpmpy as cp
 m = cp.Model()

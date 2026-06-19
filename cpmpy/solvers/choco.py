@@ -63,6 +63,7 @@ from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.linearize import canonical_comparison
 from ..transformations.safening import no_partial_functions, safen_objective
+from ..transformations.negation import push_down_negation
 from ..transformations.reification import reify_rewrite
 from ..exceptions import ChocoBoundsException, NotSupportedError
 
@@ -408,6 +409,7 @@ class CPM_choco(SolverInterface):
 
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons)
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
@@ -634,7 +636,8 @@ class CPM_choco(SolverInterface):
                 from pychoco._handle_wrapper import _HandleWrapper
                 from pychoco._utils import make_int_2d_array, make_intvar_array
 
-                array, transitions = cpm_expr.args
+                array = cpm_expr.args[0]
+                transitions = [(id1, v, id2) for id1, tf in cpm_expr.mapping.items() for v, id2 in tf.items()]
                 node_map = {n: i for i, n in enumerate(cpm_expr.levels)}
                 node_map[cpm_expr.sink_node] = -1
                 transitions_int = [[node_map[src], val, node_map[dst]] for src, val, dst in transitions]

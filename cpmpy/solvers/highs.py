@@ -35,11 +35,12 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional
 
-import time
 import warnings
 
 import numpy as np
@@ -47,9 +48,10 @@ import numpy.typing as npt
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison, Operator
+from ..expressions.core import Expression, BoolVal, Comparison, Operator
 from ..expressions.utils import is_num, is_int
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -58,6 +60,7 @@ from ..transformations.linearize import decompose_linear, decompose_linear_objec
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
+from ..transformations.negation import push_down_negation
 
 
 class CPM_highs(SolverInterface):
@@ -118,6 +121,7 @@ class CPM_highs(SolverInterface):
 
         self._inf = highspy.kHighsInf
         self._obj_cols = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
@@ -214,6 +218,7 @@ class CPM_highs(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expects safe exprs
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
         cpm_cons = reify_rewrite(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)  # constraints that support reification
@@ -278,31 +283,51 @@ class CPM_highs(SolverInterface):
 
     __add__ = add
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize.
             Any constraints created during conversion are permanently posted.
         """
         import highspy
 
-        get_variables(expr, collect=self.user_vars)
+        self.objective_ = expr
 
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(
-            obj,
-            supported=self.supported_global_constraints,
-            supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap,
-        )
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        # only_positive_bv_wsum_const keeps the constant separate so it never ends up
-        # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
-        obj, obj_const = only_positive_bv_wsum_const(obj)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)
+            indices = np.array([self.solver_var(v) for v in vs.flat], dtype=np.int32)
+            values = np.asarray(ws, dtype=np.float64)
+            if np.unique(indices).size != indices.size:
+                # group duplicates
+                new_indices, group = np.unique(indices, return_inverse=True)
+                new_values = np.bincount(group, weights=values).astype(np.float64)
+                sel = (new_values != 0)
+                indices, values = new_indices[sel], new_values[sel]
+        else:
+            get_variables(expr, collect=self.user_vars)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(
+                obj,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            # only_positive_bv_wsum_const keeps the constant separate so it never ends up
+            # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
+            obj, obj_const = only_positive_bv_wsum_const(obj)
 
-        indices, values, const = self._row_from_linexpr(obj)
-        const += obj_const
+            self.add(safe_cons + decomp_cons + flat_cons)
+
+            indices, values, const = self._row_from_linexpr(obj)
+            const += obj_const
 
         # reset only columns that carried cost in the previous objective, then set new ones
         if self._obj_cols is not None and len(self._obj_cols):
@@ -417,10 +442,15 @@ class CPM_highs(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = val >= 0.5
                 else:
-                    cpm_var._value = int(round(val))
+                    cpm_var._value = round(val)
 
             if self.has_objective():
-                self.objective_value_ = info.objective_function_value
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None

@@ -6,6 +6,7 @@ import tempfile
 import pytest
 import numpy as np
 import cpmpy as cp
+from cpmpy.exceptions import MinizincNameException, NotSupportedError
 from cpmpy.expressions.globalconstraints import GlobalConstraint
 from cpmpy.expressions.utils import argvals
 
@@ -22,7 +23,6 @@ from cpmpy.solvers.cplex import CPM_cplex
 from cpmpy.solvers.scip import CPM_scip
 from cpmpy.solvers.highs import CPM_highs
 from cpmpy import SolverLookup
-from cpmpy.exceptions import MinizincNameException, NotSupportedError
 
 from test_constraints import numexprs
 from utils import skip_on_missing_pblib
@@ -201,7 +201,7 @@ class TestSolvers:
         m_opt = cp.Model([x[0] > x[1]], maximize=sum(x))
         s = CPM_ortools(m_opt)
         cpm_status = s.solve(solution_callback=cb)
-        assert s.objective_value() == 5.0
+        assert s.objective_value() == 5
 
         assert x[0].value() > x[1].value()
 
@@ -279,18 +279,6 @@ class TestSolvers:
         model += bv2 | bv3
 
         assert model.solve(solver="ortools")# this is a bug in ortools version 9.5, upgrade to version >=9.6 using pip install --upgrade ortools
-
-    def test_ortools_real_coeff(self):
-
-        m = cp.Model()
-        # this works in OR-Tools
-        x,y,z = cp.boolvar(shape=3, name=tuple("xyz"))
-        m.maximize(0.3 * x + 0.5 * y + 0.6 * z)
-        assert m.solve()
-        assert m.objective_value() == 1.4
-        # this does not
-        m += 0.7 * x + 0.8 * y >= 1
-        pytest.raises(TypeError, m.solve)
 
     @pytest.mark.skipif(not CPM_pysat.supported(),
                         reason="PySAT not installed")
@@ -493,9 +481,9 @@ class TestSolvers:
         assert s.solve()
 
         x = cp.intvar(0, 1)
-        m = cp.Model((x >= 0.1) & (x != 1))
+        m = cp.Model((x > 0) & (x != 1))
         s = cp.SolverLookup.get("z3", m)
-        assert not s.solve()# upgrade z3 with pip install --upgrade z3-solver
+        assert not s.solve()
 
     def test_pow(self):
         iv1 = cp.intvar(2,9)
@@ -712,30 +700,6 @@ class TestSolvers:
         assert s.solve()
         assert iv.value()[idx.value(), idx2.value()] == 8
 
-    @pytest.mark.skipif(not CPM_gurobi.supported(),
-                        reason="Gurobi not installed")
-    def test_gurobi_float_objective(self):
-        """Test that Gurobi properly handles float objective values."""
-        # Test case with float coefficients that should result in a float objective value
-        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-
-        # Create a model with float coefficients - this can happen with DirectVar
-        # or when using floats as coefficients
-        m = cp.Model()
-        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
-
-        s = cp.SolverLookup.get("gurobi", m)
-        assert s.solve()
-
-        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
-        expected_obj = 2.5
-        actual_obj = s.objective_value()
-
-        # Verify that the objective value is returned as a float (not int)
-        assert isinstance(actual_obj, float)
-        assert actual_obj == pytest.approx(expected_obj, abs=1e-05)
-
-
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
     def test_cplex(self):
@@ -763,29 +727,6 @@ class TestSolvers:
         s = cp.SolverLookup.get("cplex", m)
         assert s.solve()
 
-
-    @pytest.mark.skipif(not CPM_cplex.supported(),
-                        reason="cplex not installed")
-    def test_cplex_float_objective(self):
-        """Test that cplex properly handles float objective values."""
-        # Test case with float coefficients that should result in a float objective value
-        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
-
-        # Create a model with float coefficients - this can happen with DirectVar
-        # or when using floats as coefficients
-        m = cp.Model()
-        m.maximize(0.3 * x + 0.7 * y + 1.5 * z)
-
-        s = cp.SolverLookup.get("cplex", m)
-        assert s.solve()
-
-        # The optimal solution should be x=True, y=True, z=True with objective = 2.5
-        expected_obj = 2.5
-        actual_obj = s.objective_value()
-
-        # Verify that the objective value is returned as a float (not int)
-        assert isinstance(actual_obj, float)
-        assert actual_obj == pytest.approx(expected_obj, abs=1e-05)
 
     @pytest.mark.skipif(not CPM_cplex.supported(),
                         reason="cplex not installed")
@@ -851,6 +792,8 @@ class TestSolvers:
 
 @pytest.mark.usefixtures("solver")
 class TestSupportedSolvers:
+    _floatsum_supported_solvers = frozenset({"ortools", "gurobi", "cplex", "scip", "z3", "hexaly", "minizinc", "highs"})
+
     def test_installed_solvers(self, solver):
         # basic model
         v = cp.boolvar(3)
@@ -924,6 +867,36 @@ class TestSupportedSolvers:
         m.maximize(cp.min(iv))
         assert m.solve(solver=solver)
         assert m.objective_value() == 5
+
+    def test_floatsum_objective(self, solver):
+        if solver not in self._floatsum_supported_solvers:
+            pytest.skip(f"{solver} does not support FloatSum objective")
+        if solver == "z3":
+            solver = "z3:opt"
+        s = cp.SolverLookup.get(solver)
+
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        fs = cp.FloatSum([0.3, 0.5, 0.6], [x, y, z], const=1)
+        s.maximize(fs)
+        assert s.solve()
+        assert fs.value() == pytest.approx(2.4, abs=1e-05)
+        assert len(s.user_vars) == 3
+        assert s.objective_value() is None # should be None, read from FloatSum.value()
+
+    def test_floatsum_negboolview(self, solver):
+        if solver not in self._floatsum_supported_solvers:
+            pytest.skip(f"{solver} does not support FloatSum objective")
+        if solver == "z3":
+            solver = "z3:opt"
+        s = cp.SolverLookup.get(solver)
+
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        fs = cp.FloatSum([0.3, 0.5, 0.6], [~x, y, ~z], const=1)
+        s.maximize(fs)
+        assert s.solve()
+        assert (x.value(), y.value(), z.value()) == (False, True, False)
+        assert fs.value() == pytest.approx(2.4, abs=1e-05)
+        assert len(s.user_vars) == 3
 
     def test_value_cleared(self, solver):
         x, y, z = cp.boolvar(shape=3)
@@ -1253,3 +1226,22 @@ def test_highs_basic_ilp():
     assert x.value() == 0
     assert y.value() == 5
     assert s.objective_value_ == 5
+
+
+@pytest.mark.requires_solver("gurobi", "cplex", "scip", "highs", "hexaly")
+class TestRound:
+    def test_gurobi_read_integers_issue_858(self, solver):
+        x = cp.intvar(1, 3, name="x")
+        p = cp.intvar(0, 1, shape=3, name="p")
+        q = cp.intvar(0, 1, shape=3, name="q")
+        m = cp.Model()
+        m += cp.sum([p[0], p[1], p[2]]) == 1
+        m += cp.sum([3, 3, 1, -1] * cp.cpm_array([q[0], q[1], q[2], x])) == 0
+        m += cp.sum([q[0], q[1], q[2]]) == 1
+
+        def check():
+            print(x, x.value())
+            assert (x.value() >= 1), f"{x}={x.value()}"
+
+        m.solveAll(solver=solver, solution_limit=1000, time_limit=10, display=check)
+

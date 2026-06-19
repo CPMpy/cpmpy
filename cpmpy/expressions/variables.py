@@ -524,7 +524,7 @@ class NDVarArray(np.ndarray):
 
             # eliminate constant indices to reduce dimensionality
             selector = []
-            new_indices: list[Expression] = []
+            new_indices = []
             for idx in index:
                 if isinstance(idx, Expression):
                     selector.append(slice(None))  # keep this axis (equivalent to `:` when used as index), to pass to element constraint
