@@ -765,7 +765,8 @@ class Element(GlobalFunction):
 
     Note: because Element is a numeric global function, the return type of the `Element` function
     is always numeric, even if `Arr` only contains Boolean variables.
-    Element only supports 1D arrays; use NDElement for multi-dimensional indexing.
+
+    Note: Element only supports 1D arrays; use NDElement for multi-dimensional indexing.
     """
 
     def __init__(self, arr: ListLike[ExprLike], idx: Expression):
@@ -774,10 +775,9 @@ class Element(GlobalFunction):
             arr (ListLike[ExprLike]): List of expressions or constants to index into
             idx (Expression): Integer expression for the index (not a Boolean expression)
         """
-        if is_boolexpr(idx):
+        assert isinstance(idx, Expression), f"Element(arr, idx) takes an integer expression as second argument, got {type(idx)}: {idx}"
+        if idx.is_bool():
             raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a boolean expression: {idx}")
-        if is_any_list(idx):
-            raise TypeError(f"Element(arr, idx) takes an integer expression as second argument, not a list: {idx}")
         if isinstance(arr, np.ndarray):
             if arr.ndim != 1:
                 raise TypeError("Element only supports 1D arrays. Use NDElement for multi-dimensional arrays.")
@@ -884,12 +884,14 @@ class NDElement(GlobalFunction):
         """
         Arguments:
             arr (ListLike[ExprLike]): Multi-dimensional array of expressions or constants to index into
-            indices (ListLike[Expresssion]): Integer expressions for each dimension index (no Boolean expressions)
+            indices (ListLike[Expression]): Integer expressions for each dimension index (no Boolean expressions)
         """
         if not is_any_list(indices):
             raise TypeError(f"NDElement(arr, indices) takes a list of index expressions, not: {indices}")
-        if any(is_boolexpr(idx) for idx in indices):
-            raise TypeError("NDElement(arr, indices) takes integer expressions as indices, not boolean expressions")
+        for i, idx in enumerate(indices):
+            assert isinstance(idx, Expression), f"NDElement(arr, indices) takes integer expressions as indices, got {type(idx)} at position {i}: {idx}"
+            if idx.is_bool():
+                raise TypeError(f"NDElement(arr, indices) takes integer expressions as indices, not boolean expressions: {idx}")
 
         nd_array: NDVarArray
         if isinstance(arr, NDVarArray):

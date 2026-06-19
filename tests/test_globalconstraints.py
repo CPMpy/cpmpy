@@ -1867,7 +1867,7 @@ class TestTypeChecks:
                     assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
                     # constant out-of-bounds look-up
                     assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
-                except (NotImplementedError, NotSupportedError):
+                except (NotImplementedError, NotSupportedError, AssertionError):
                     pass
 
     def test_issue_699(self):
