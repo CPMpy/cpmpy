@@ -11,6 +11,7 @@
 import sys
 import requests
 import json
+from pathlib import Path
 
 import numpy as np
 
@@ -73,10 +74,9 @@ if __name__ == "__main__":
     import requests
 
     # argument parsing
-    url = "https://raw.githubusercontent.com/CPMpy/cpmpy/csplib/examples/csplib/prob008_vessel_loading.json"
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-instance', default="easy", help="Name of the problem instance found in file 'filename'")
-    parser.add_argument('-filename', default=url, help="File containing problem instances, can be local file or url")
+    parser.add_argument('-filename', default=str(Path(__file__).with_name("prob008_vessel_loading.json")), help="File containing problem instances, can be local file or url")
     parser.add_argument('--list-instances', help='List all problem instances', action='store_true')
 
     args = parser.parse_args()

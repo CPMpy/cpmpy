@@ -44,9 +44,10 @@ import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint, GlobalFunction, DirectConstraint
+from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
+from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
-from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_comparison, flatlist
+from ..expressions.utils import argval, argvals, is_num, is_int, is_any_list, eval_comparison, flatlist
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -65,7 +66,7 @@ class CPM_hexaly(SolverInterface):
     https://www.hexaly.com/docs/last/pythonapi/index.html
     """
 
-    supported_global_constraints = frozenset({"min", "max", "abs", "div", "mod", "pow", "element"})
+    supported_global_constraints = frozenset({"min", "max", "abs", "mul", "div", "mod", "pow", "element"})
     supported_reified_global_constraints = frozenset()
 
 
@@ -224,7 +225,7 @@ class CPM_hexaly(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = bool(self.hex_sol.get_value(sol_var))
                 else:
-                    cpm_var._value = int(self.hex_sol.get_value(sol_var))
+                    cpm_var._value = round(self.hex_sol.get_value(sol_var))
 
             # translate objective, for optimisation problems only
             if not self.is_satisfaction:
@@ -247,29 +248,33 @@ class CPM_hexaly(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        if is_num(cpm_var): # shortcut, eases posting constraints
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view, work directly on var inside the view
+                    revar = ~self.solver_var(cpm_var._bv)
+                else:
+                    revar = self.hex_model.bool()
+                    revar.set_name(name)
+            else:
+                revar = self.hex_model.int(cpm_var.lb, cpm_var.ub)
+                revar.set_name(name)
+            
+            self._varmap[name] = revar
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return ~self.solver_var(cpm_var._bv)
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                revar = self.hex_model.bool()
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = self.hex_model.int(cpm_var.lb, cpm_var.ub)
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            # set name of variable
-            revar.set_name(str(cpm_var))
-            self._varmap[cpm_var] = revar
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
     def objective(self, expr, minimize=True):
@@ -397,9 +402,6 @@ class CPM_hexaly(SolverInterface):
                 return a - b
             if cpm_expr.name == "-":
                 return -self._hex_expr(cpm_expr.args[0])
-            if cpm_expr.name == "mul":
-                a,b = self._hex_expr(cpm_expr.args)
-                return a * b
             raise ValueError(f"Unknown operator {cpm_expr}")
 
         elif isinstance(cpm_expr, Comparison):
@@ -421,6 +423,9 @@ class CPM_hexaly(SolverInterface):
                 return self.hex_model.at(hex_arr,idx)
             if cpm_expr.name == "abs":
                 return self.hex_model.abs(self._hex_expr(cpm_expr.args[0]))
+            if cpm_expr.name == "mul":
+                a, b = self._hex_expr(cpm_expr.args)
+                return a * b
             if cpm_expr.name == "min":
                 return self.hex_model.min(*self._hex_expr(cpm_expr.args))
             if cpm_expr.name == "max":
@@ -531,7 +536,7 @@ class HexSolutionPrinter:
         self._display = display
         self._solution_limit = solution_limit
         self._verbose = verbose
-        if isinstance(display, (list,Expression)):
+        if isinstance(display, Expression) or is_any_list(display):
             self._cpm_vars = get_variables(display)
         elif callable(display):
             # might use any, so populate all (user) variables with their values
@@ -549,29 +554,19 @@ class HexSolutionPrinter:
                 hex_sol = optimizer.get_solution()
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
-                    # it might be an NDVarArray
-                    if hasattr(cpm_var, "flat"):
-                        for cpm_subvar in cpm_var.flat:
-                            hex_var = self._solver.solver_var(cpm_subvar)
-                            cpm_subvar._value = int(hex_sol.get_value(hex_var))
-                    elif isinstance(cpm_var, _BoolVarImpl):
+                    if isinstance(cpm_var, _BoolVarImpl):
                         hex_var = self._solver.solver_var(cpm_var)
                         cpm_var._value = bool(hex_sol.get_value(hex_var))
-                    else:
+                    elif isinstance(cpm_var, _IntVarImpl):
                         hex_var = self._solver.solver_var(cpm_var)
-                        cpm_var._value = int(hex_sol.get_value(hex_var))
+                        cpm_var._value = round(hex_sol.get_value(hex_var))
+                    else:
+                        raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
                 # populate objective value
                 if self._solver.has_objective():
-                    self._solver.objective_value_ = int(hex_sol.get_objective_bound(0))
+                    self._solver.objective_value_ = round(hex_sol.get_objective_bound(0))
 
-                # display
-                if isinstance(self._display, Expression):
-                    print(argval(self._display))
-                elif isinstance(self._display, list):
-                    # explicit list of expressions to display
-                    print(argvals(self._display))
-                else: # callable
-                    self._display()
+                self._solver.print_display(self._display)
                 
             # update data
             self.__solution_count += 1

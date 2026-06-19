@@ -1,0 +1,47 @@
+name: Test solver (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      solver:
+        description: "Solver name to pass to pytest --solver"
+        required: true
+        type: string
+      install_commands:
+        description: "Shell commands to install solver dependencies"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install base test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install ".[test, ${{ inputs.solver }}]"
+          pip install pytest-xdist
+
+      - name: Install solver dependencies
+        if: ${{ inputs.install_commands != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ inputs.install_commands }}
+
+      - name: Test with pytest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest -n auto tests/ --solver "${{ inputs.solver }}" -ref
