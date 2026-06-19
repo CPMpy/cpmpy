@@ -876,17 +876,19 @@ def _disable_strict_variable_name_check():
     _VAR_NAME_CHECK_STATE.strict = False
 
 
+class _IgnoreStrictVariableNameCheck:
+    def __enter__(self):
+        self._previous = _get_strict_variable_name_check()
+        _disable_strict_variable_name_check()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _VAR_NAME_CHECK_STATE.strict = self._previous
+        # _update_variable_counters() # TODO: add automatic support for this later (different PR)
+        return False  # propagate exceptions
+
+
 def _ignore_strict_variable_name_check():
     """
     Context manager to temporarily disable strict variable name check.
     """
-    class IgnoreStrictVariableNameCheck:
-        def __enter__(self):
-            self._previous = _get_strict_variable_name_check()
-            _disable_strict_variable_name_check()
-        def __exit__(self, exc_type, exc_value, traceback):
-            _VAR_NAME_CHECK_STATE.strict = self._previous
-            # _update_variable_counters() # TODO: add automatic support for this later (different PR)
-            return False  # propagate exceptions
-
-    return IgnoreStrictVariableNameCheck()
+    return _IgnoreStrictVariableNameCheck()
