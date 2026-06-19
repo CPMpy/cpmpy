@@ -310,7 +310,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                         rec_newargs = arg.args  # let's be sure its set
 
                     if arg.name == "not":  # not(global) or negation left by a decomposition
-                        assert len(rec_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
+                        assert len(rec_newargs) == 1, f"decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
                         if isinstance(rec_newargs[0], GlobalConstraint):
                             if rec_changed:
                                 changed = True
