@@ -9,7 +9,7 @@ List of functions
     :nosignatures:
 
     load
-    read_formats
+    load_formats
 """
 
 from typing import Callable, List, Optional
@@ -54,7 +54,7 @@ def _get_loader(format: str) -> Callable[[str], cp.Model]:
 
     return _loader_map[format]
 
-def loader_formats() -> List[str]:
+def load_formats() -> List[str]:
     """
     List of supported load formats.
 

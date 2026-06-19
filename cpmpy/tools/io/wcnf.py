@@ -14,7 +14,7 @@ List of functions
 .. autosummary::
     :nosignatures:
 
-    read_wcnf
+    load_wcnf
 """
 
 
