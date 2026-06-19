@@ -94,7 +94,6 @@ import copy
 import warnings
 from dataclasses import dataclass
 from typing import Any, Final, Optional, TypeAlias, TypeVar, Union, Sequence, Iterable
-from frozendict import frozendict
 import numpy as np
 import cpmpy as cp
 
@@ -103,9 +102,9 @@ from ..exceptions import TypeError
 
 # Common typing helpers
 T = TypeVar("T")
-ListLike: TypeAlias = Union[list[T], tuple[T, ...], np.ndarray]  # matches is_any_list() check
+ListLike: TypeAlias = Union[Sequence[T], np.ndarray]  # similar to is_any_list() check  (Sequence a bit more general than list/tuple)
 ExprLike: TypeAlias = Union["Expression", int, np.integer, np.bool_]  # expression or int (incl np variants, e.g. user facing)
-
+BoolExprLike: TypeAlias = Union["Expression", bool, np.bool_]  # subtype of ExprLike (bool subtype int)
 
 class Expression(object):
     """
@@ -255,14 +254,14 @@ class Expression(object):
         warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
         return copy.deepcopy(self, memodict)
 
-    def implies(self, other: ExprLike, simplify: bool = False) -> "Expression":
+    def implies(self, other: BoolExprLike, simplify: bool = False) -> "Expression":
         """Implication constraint: ``self -> other``.
 
         Python does not offer relevant syntax for implication, call this method instead.
         For double reification (<->), use equivalence ``self == other``.
 
         Args:
-            other (ExprLike): the right-hand-side of the implication
+            other (BoolExprLike): the right-hand-side of the implication
             simplify (bool): if True, simplify by eliminating True/False constants (might remove expressions & their variables from user-view)
 
         Returns:
@@ -569,11 +568,11 @@ class BoolVal(Expression):
         """
         return False # BoolVal is a wrapper for a python or numpy constant boolean.
 
-    def implies(self, other: ExprLike, simplify: bool = False) -> Expression:
+    def implies(self, other: BoolExprLike, simplify: bool = False) -> Expression:
         """Implication constraint: ``BoolVal -> other``.
 
         Args:
-            other (ExprLike): the right-hand-side of the implication
+            other (BoolExprLike): the right-hand-side of the implication
             simplify (bool): simplify the implication, even if it means `other` dissappears from user-view
 
         Simplification rule:
@@ -646,7 +645,7 @@ class Operator(Expression):
     Convention for 2-ary operators: if one of the two is a constant,
     it is stored first (as expr[0]), this eases weighted sum detection
     """
-    allowed: Final = frozendict({
+    allowed: Final[dict[str, tuple[int, bool]]] = {
         #name: (arity, is_bool)       arity 0 = n-ary, min 2
         'and': (0, True),
         'or':  (0, True),
@@ -656,8 +655,8 @@ class Operator(Expression):
         'wsum': (2, False),
         'sub': (2, False), # x - y
         '-':   (1, False), # -x
-    })
-    printmap: Final = frozendict({'sum': '+', 'sub': '-'})
+    }
+    printmap: Final[dict[str, str]] = {'sum': '+', 'sub': '-'}
 
     def __init__(self, name: str, arg_list: Sequence[ExprLike | ListLike[ExprLike]]) -> None:
         """

@@ -61,10 +61,11 @@ from ..expressions.core import Comparison, Operator, BoolVal
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.linearize import only_positive_coefficients, decompose_linear
-from ..expressions.utils import flatlist
+from ..expressions.utils import flatlist, is_int
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint
 from ..transformations.linearize import linearize_constraint, linearize_reified_variables
+from ..transformations.negation import push_down_negation
 from ..transformations.normalize import toplevel_list, simplify_boolean
 from ..transformations.reification import only_implies, only_bv_reifies
 from ..transformations.safening import no_partial_functions
@@ -134,8 +135,7 @@ class CPM_pysat(SolverInterface):
             from pysat.solvers import SolverNames
             names = []
             for name, attr in vars(SolverNames).items():
-                # issue with cryptosat, so we don't include it in our https://github.com/msoos/cryptominisat/issues/765
-                if not name.startswith('__') and isinstance(attr, tuple) and name != 'cryptosat':
+                if not name.startswith('__') and isinstance(attr, tuple):
                     if name not in attr:
                         name = attr[-1]
                     names.append(name)  
@@ -314,32 +314,37 @@ class CPM_pysat(SolverInterface):
     def solver_var(self, cpm_var):
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created.
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
 
             Transforms cpm_var into CNF literal using ``self.pysat_vpool``
             (positive or negative integer).
 
             So vpool is the varmap (we don't use _varmap here).
         """
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    # special case, negative-bool-view: just a view, get actual var identifier, return -id
+                    return -self.pysat_vpool.id(cpm_var._bv.name) # use name of inner variable, not ~bv as name
+                return self.pysat_vpool.id(name)
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, BoolVal):
-            return cpm_var
-        elif isinstance(cpm_var, NegBoolView):
-            # just a view, get actual var identifier, return -id
-            return -self.pysat_vpool.id(cpm_var._bv.name)
-        elif isinstance(cpm_var, _BoolVarImpl):
-            return self.pysat_vpool.id(cpm_var.name)
-        elif isinstance(cpm_var, _IntVarImpl):  # intvar
-            if cpm_var.name not in self.ivarmap:
+            # intvar
+            if name not in self.ivarmap:
                 enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
                 self.add(cons)
             else:
-                enc = self.ivarmap[cpm_var.name]
+                enc = self.ivarmap[name]
             return self.solver_vars(enc.vars())
-        else:
-            raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
+
+        if isinstance(cpm_var, BoolVal):
+            return cpm_var
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
+            return cpm_var
+
+        raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
     def transform(self, cpm_expr):
         """
@@ -364,6 +369,7 @@ class CPM_pysat(SolverInterface):
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(
             cpm_cons,
             supported=self.supported_global_constraints,

@@ -162,12 +162,21 @@ def global_constraints(solver):
         elif name == "Table":
             yield cp.Table(NUM_ARGS, [[0,1,2],[1,2,0],[1,0,2]])
             yield cp.Table(BOOL_ARGS, [[1,0,0],[0,1,0],[0,0,1]])
+            # different domain sizes for variables (test ordering in linear decomposition)
+            yield cp.Table([cp.intvar(lb=1, ub=5), cp.intvar(lb=1, ub=2), cp.intvar(lb=1, ub=3)], [[1,1,3], [2,1,3], [3,2,3]])
         elif name == "Regular":
             yield cp.Regular(cp.intvar(0,3, shape=3), [("a", 1, "b"), ("b", 1, "c"), ("b", 0, "b"), ("c", 1, "c"), ("c", 0, "b")], "a", ["c"])
         elif name == "NegativeTable":
             yield cp.NegativeTable(NUM_ARGS, [[0, 1, 2], [1, 2, 0], [1, 0, 2]])
         elif name == "ShortTable":
             yield cp.ShortTable(NUM_ARGS, [[0,"*",2], ["*","*",1]])
+        elif name == "MDD":
+            yield cp.MDD(cp.intvar(lb=0, ub=1, shape=3, name="x"), [("r", 0, "n1"), ("n1", 0, "n2"), ("n2", 0, "t")])
+            yield cp.MDD(NUM_ARGS, [("r", 0, "n1"), ("r", 1, "n2"), ("r", 2, "n3"), ("n1", 2, "n4"), ("n2", 2, "n4"), ("n3", 0, "n5"),
+            ("n4", 0, "t"), ("n5", 1, "t")])
+            yield cp.MDD(NUM_ARGS, [("src", 2, "2"), ("src", 1, "1"), ("src", 4, "4"), ("src", 3, "3"),
+                          ("2", 1, "2,1"), ("1", 2, "1,2"), ("4", 3, "1,2"), ("3", 2, "3,2"),
+                          ("2,1", 1, "snk"), ("2,1", 2, "snk"), ("1,2", 3, "snk"), ("3,2", 2, "snk")])
         elif name == "IfThenElse":
             yield cp.IfThenElse(*BOOL_ARGS)
         elif name == "InDomain":

@@ -48,10 +48,10 @@ import warnings
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.globalconstraints import GlobalConstraint
+from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
+from ..expressions.utils import is_num, is_int, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -241,9 +241,6 @@ class CPM_cpo(SolverInterface):
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
                 if isinstance(cpm_var,_BoolVarImpl):
-                    # because cp optimizer does not have boolean variables we use an integer var x with domain 0, 1
-                    # and then replace a boolvar by x == 1
-                    sol_var = sol_var.children[0]
                     cpm_var._value = bool(self.cpo_result.get_var_solution(sol_var).get_value())
                 else:
                     cpm_var._value = self.cpo_result.get_var_solution(sol_var).get_value()
@@ -309,9 +306,6 @@ class CPM_cpo(SolverInterface):
                 sol_var = self.solver_var(cpm_var)
                 cpm_value = cpm_var._value
                 if isinstance(cpm_var, _BoolVarImpl):
-                    # because cp optimizer does not have boolean variables we use an integer var x with domain 0, 1
-                    # and then replace a boolvar by x == 1
-                    sol_var = sol_var.children[0]
                     cpm_value = int(cpm_value)
                 solvars.append(sol_var)
                 vals.append(cpm_value)
@@ -342,31 +336,35 @@ class CPM_cpo(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        docp = self.get_docp()
-        if is_num(cpm_var): # shortcut, eases posting constraints
+
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            docp = self.get_docp()
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    raise ValueError("Negative literals cannot be created in `solver_var()` for cpo, use `_cpo_expr()` instead")
+                else:
+                    # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
+                    revar = docp.expression.binary_var(name)
+            else:
+                revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=name)
+            
+            self._varmap[name] = revar
+             # ensure the model also has the variable, just creating the variable is not enough
+            self.cpo_model.add(revar >= cpm_var.lb) 
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return (self.solver_var(cpm_var._bv) == 0)
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
-                # we should add == 1 to turn it into a boolean expression
-                revar = docp.expression.binary_var(str(cpm_var)) == 1
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-            self.cpo_model.add(revar >= cpm_var.lb) # ensure the model also has the variable
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def objective(self, expr, minimize=True):
         """
@@ -450,13 +448,13 @@ class CPM_cpo(SolverInterface):
 
         for cpm_con in self.transform(cpm_expr):
             # translate each expression tree, then post straight away
-            cpo_con = self._cpo_expr(cpm_con)
+            cpo_con = self._cpo_expr(cpm_con, boolexpr=True)
             self.cpo_model.add(cpo_con)
 
         return self
     __add__ = add  # avoid redirect in superclass
 
-    def _cpo_expr(self, cpm_con):
+    def _cpo_expr(self, cpm_con, boolexpr=False):
         """
             CP Optimizer supports nested expressions,
             so we recursively translate our expressions to theirs.
@@ -466,8 +464,8 @@ class CPM_cpo(SolverInterface):
         """
         dom = self.get_docp().modeler
         if is_any_list(cpm_con):
-            # arguments can be lists
-            return [self._cpo_expr(con) for con in cpm_con]
+            # arguments can be lists, assume boolexpr is same for all arguments
+            return [self._cpo_expr(con, boolexpr=boolexpr) for con in cpm_con]
 
         elif isinstance(cpm_con, BoolVal):
             return cpm_con.args[0]
@@ -475,7 +473,15 @@ class CPM_cpo(SolverInterface):
         elif is_num(cpm_con):
             return cpm_con
 
-        elif isinstance(cpm_con, _NumVarImpl):
+        elif isinstance(cpm_con, _NumVarImpl): # handle variables
+            if isinstance(cpm_con, NegBoolView):
+                if boolexpr:
+                    return self.solver_var(cpm_con._bv) == 0
+                else:
+                    return 1 - self.solver_var(cpm_con._bv)
+            elif cpm_con.is_bool() and boolexpr:
+                return self.solver_var(cpm_con) == 1
+            # else: integer variable, or boolean variable used as integer
             return self.solver_var(cpm_con)
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
@@ -483,13 +489,13 @@ class CPM_cpo(SolverInterface):
             arity, _ = Operator.allowed[cpm_con.name]
             # 'and'/n, 'or'/n, '->'/2
             if cpm_con.name == 'and':
-                return dom.logical_and(self._cpo_expr(cpm_con.args))
+                return dom.logical_and(self._cpo_expr(cpm_con.args, boolexpr=True))
             elif cpm_con.name == 'or':
-                return dom.logical_or(self._cpo_expr(cpm_con.args))
+                return dom.logical_or(self._cpo_expr(cpm_con.args, boolexpr=True))
             elif cpm_con.name == '->':
-                return dom.if_then(*self._cpo_expr(cpm_con.args))
+                return dom.if_then(*self._cpo_expr(cpm_con.args, boolexpr=True))
             elif cpm_con.name == 'not':
-                return dom.logical_not(self._cpo_expr(cpm_con.args[0]))
+                return dom.logical_not(self._cpo_expr(cpm_con.args[0], boolexpr=True))
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
@@ -540,16 +546,25 @@ class CPM_cpo(SolverInterface):
                 arr, table = self._cpo_expr(cpm_con.args)
                 return dom.forbidden_assignments(arr, table)
             elif cpm_con.name == "cumulative" or cpm_con.name == "cumulative_optional":
-                if cpm_con.name == "cumulative_optional":
-                    start, dur, end, demand_lst, capacity, is_present = cpm_con.args
-                else:
-                    start, dur, end, demand_lst, capacity = cpm_con.args
+                if cpm_con.name == "cumulative":
                     is_present = None
+                    if len(cpm_con.args) == 4:
+                        start, dur, demand, capacity = cpm_con.args
+                        end = None
+                    else:
+                        start, dur, end, demand, capacity = cpm_con.args
+                
+                elif cpm_con.name == "cumulative_optional":
+                    if len(cpm_con.args) == 5:
+                        start, dur, demand, capacity, is_present = cpm_con.args
+                        end = None
+                    else:
+                        start, dur, end, demand, capacity, is_present = cpm_con.args
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
 
                 # usage constraints
-                demand_lst, demand_cons = get_nonneg_args(demand_lst, is_present)
+                demand_lst, demand_cons = get_nonneg_args(demand, is_present)
                 cons += self._cpo_expr(demand_cons)
 
                 total_usage = []
@@ -559,7 +574,7 @@ class CPM_cpo(SolverInterface):
                     else:
                         task_demand = dom.pulse(task, get_bounds(h))
                         if is_present is not None:
-                            cons += [dom.if_then(self.solver_var(is_present[i]),
+                            cons += [dom.if_then(self._cpo_expr(is_present[i], boolexpr=True),
                                                  self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
                         else:
                             cons += [self._cpo_expr(h) == dom.height_at_start(task, task_demand)]
@@ -567,12 +582,21 @@ class CPM_cpo(SolverInterface):
                
                 cons += [dom.sum(total_usage) <= self._cpo_expr(capacity)]
                 return cons
-            elif cpm_con.name == "no_overlap" or cpm_con.name == "no_overlap_optional":
-                if cpm_con.name == "no_overlap_optional":
-                    start, dur, end, is_present = cpm_con.args
+            elif cpm_con.name == "no_overlap":
+                if len(cpm_con.args) == 2:
+                    start, dur = cpm_con.args
+                    end = None
                 else:
                     start, dur, end = cpm_con.args
-                    is_present = None
+                tasks, cons = self._make_tasks(start, dur, end, None)
+                return cons + [dom.no_overlap(tasks)]
+            
+            elif cpm_con.name == "no_overlap_optional":
+                if len(cpm_con.args) == 3:
+                    start, dur, is_present = cpm_con.args
+                    end = None
+                else:
+                    start, dur, end, is_present = cpm_con.args
 
                 tasks, cons = self._make_tasks(start, dur, end, is_present)
                 return cons + [dom.no_overlap(tasks)]
@@ -659,7 +683,7 @@ class CPM_cpo(SolverInterface):
             extra_cons += [dom.if_then(dom.presence_of(task), dom.start_of(task) == self._cpo_expr(start)),
                            dom.if_then(dom.presence_of(task), dom.size_of(task) == self._cpo_expr(dur))]
             if is_optional: # enforce presence of task
-                extra_cons += [dom.presence_of(task) == self.solver_var(is_present)]
+                extra_cons += [dom.presence_of(task) == self._cpo_expr(is_present, boolexpr=True)]
             return task, extra_cons
         else:
             task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end), optional=is_optional)
@@ -667,7 +691,7 @@ class CPM_cpo(SolverInterface):
                            dom.if_then(dom.presence_of(task), dom.size_of(task) ==  self._cpo_expr(dur)),
                            dom.if_then(dom.presence_of(task), dom.end_of(task) == self._cpo_expr(end))]
             if is_optional: # enforce presence of task
-                extra_cons += [dom.presence_of(task) == self.solver_var(is_present)]
+                extra_cons += [dom.presence_of(task) == self._cpo_expr(is_present, boolexpr=True)]
             return task, extra_cons
 
 
@@ -768,11 +792,10 @@ try:
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
+                    sol_var = self._varmap[cpm_var.name]
                     if isinstance(cpm_var, _BoolVarImpl):
-                        sol_var = self._varmap[cpm_var].children[0]
                         cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
                     elif isinstance(cpm_var, _IntVarImpl):
-                        sol_var = self._varmap[cpm_var]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
