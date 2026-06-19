@@ -361,7 +361,7 @@ class CPM_choco(SolverInterface):
 
         # transform objective
         obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_objective(expr,
+        obj, decomp_cons = decompose_objective(obj,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
