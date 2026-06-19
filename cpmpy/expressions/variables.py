@@ -849,7 +849,7 @@ def _is_invalid_name(name: Any) -> bool:
         else:
             id = int(name[len(_IV_PREFIX):])
             if _IntVarImpl.counter > id:
-                return True # TODO: better error message
+                return True
             else:
                 return False
     
@@ -859,7 +859,7 @@ def _is_invalid_name(name: Any) -> bool:
         else:
             id = int(name[len(_BV_PREFIX):])
             if _BoolVarImpl.counter > id:
-                return True # TODO: better error message
+                return True
             else:
                 return False
     
@@ -890,5 +890,12 @@ class _IgnoreStrictVariableNameCheck:
 def _ignore_strict_variable_name_check():
     """
     Context manager to temporarily disable strict variable name check.
+
+    Example:
+
+        .. code-block:: python
+        
+            with _ignore_strict_variable_name_check():
+                ... create CPMpy model based on file contents here ...
     """
     return _IgnoreStrictVariableNameCheck()
