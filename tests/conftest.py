@@ -429,9 +429,17 @@ def pytest_collection_modifyitems(config, items):
                     skipped_solver_specific += 1
                     continue # filtered out
                 # B) If required solver is in the list of specified solvers on the command line, run the test
-                if parametrised_solver is not None and parametrised_solver in cmd_solvers:
+                if parametrised_solver is not None:
+                    if parametrised_solver in cmd_solvers:
+                        filtered.append(item) # included
+                    else:
+                        skipped_solver_specific += 1
+                        continue # filtered out
+                # C) Some solver-specific tests are not parametrized with the solver fixture.
+                #    For those, match the marker itself against the command-line solvers.
+                elif any(solver in cmd_solvers for solver in required_solver_marker.args):
                     filtered.append(item) # included
-                # C) If required solver is not in the list of specified solvers on the command line, filter the test
+                # D) If required solver is not in the list of specified solvers on the command line, filter the test
                 else:
                     skipped_solver_specific += 1
                     continue # filtered out
