@@ -6,7 +6,8 @@
 """
     This file implements helper functions for exporting CPMpy models from and to DIMACS format.
     DIMACS is a textual format to represent CNF problems.
-    The header of the file should be formatted as ``p cnf <n_vars> <n_constraints>``.
+
+    The header of the file can optionally be formatted as ``p cnf <n_vars> <n_constraints>``.
     If the number of variables and constraints are not given, it is inferred by the parser.
 
     Each remaining line of the file is formatted as a list of integers.
@@ -14,6 +15,8 @@
 """
 
 import os
+import builtins
+from typing import Optional, Callable, Union
 
 import cpmpy as cp
 
@@ -25,9 +28,6 @@ from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
 
-from typing import Optional, Callable, Union
-import builtins
-
 
 def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header:Optional[str]="DIMACS file written by CPMpy", open: Optional[Callable]=None, annotate: Optional[Callable]=None):
     """
@@ -37,15 +37,16 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
         .. todo::
             TODO: implement pseudoboolean constraints in to_cnf
 
-        :param model: a CPMpy model
-        :param fname: optional, file name to write the DIMACS output to
-        :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
-        :param p_header: whether to include the ``p ...`` problem header line (default: ``False``)
-        :param open: optional callable to open the file for writing (default: builtin ``open``).
+        Arguments:
+            model: a CPMpy model
+            fname: optional, file name to write the DIMACS output to
+            encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
+            p_header: whether to include the ``p ...`` problem header line (default: ``False``)
+            open: optional callable to open the file for writing (default: builtin ``open``).
             Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
-        :param annotator: variable annotation strategy. Controls how DIMACS literal IDs are
+            annotator: variable annotation strategy. Controls how DIMACS literal IDs are
             mapped back to original CPMpy variables. Options:
             - None (default): no annotation, output identical to previous behaviour
             - "dimacs_comments": Sugar-style 'c <id> <name>' comment lines (self-contained)
@@ -145,10 +146,11 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open=None):
         .. note::
             The p-line has to denote the correct number of variables and clauses
 
-        :param dimacs:
+        Arguments:
+            dimacs:
             - A file path to a DIMACS/WCNF file
             - OR a string containing DIMACS/WCNF content directly
-        :param open: optional callable to open the file for reading (default: builtin ``open``).
+            open: optional callable to open the file for reading (default: builtin ``open``).
             Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.cnf.xz``.
     """
     if open is None:

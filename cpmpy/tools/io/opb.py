@@ -247,7 +247,7 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None, annota
     a header specifying the number of variables and constraints, the objective (optional), and the 
     list of constraints using integer-weighted Boolean variables.
 
-    Args:
+    Arguments:
         model (cp.Model): The CPMpy model to export.
         fname (str, optional): The file name to write the OPB output to. If None, the OPB string is returned.
         encoding (str, optional): The encoding used for `int2bool`. Options: ("auto", "direct", "order", "binary").

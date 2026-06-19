@@ -69,13 +69,14 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
 
 def to_cnf_objective(expr, encoding="auto", csemap=None, ivarmap=None):
     """
-        Transform objective into weighted Boolean literals plus helper constraints.
+    Transform objective into weighted Boolean literals plus helper constraints.
 
-        :param csemap: optional shared CSE cache (populated in-place)
-        :param ivarmap: optional shared integer variable encoding dict (populated in-place)
+    Arguments:
+        csemap: optional shared CSE cache (populated in-place)
+        ivarmap: optional shared integer variable encoding dict (populated in-place)
 
-        Returns:
-            (weights, xs, const, extra_cons)
+    Returns:
+        (weights, xs, const, extra_cons)
     """
     if csemap is None:
         csemap = CSEMap()

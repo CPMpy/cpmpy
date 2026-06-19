@@ -319,17 +319,19 @@ class _SCIPWriter:
     
     def transform(self, cpm_expr):
         """
-            Transform arbitrary CPMpy expressions to constraints the solver supports
+        Transform arbitrary CPMpy expressions to constraints the solver supports
 
-            Implemented through chaining multiple solver-independent **transformation functions** from
-            the `cpmpy/transformations/` directory.
+        Implemented through chaining multiple solver-independent **transformation functions** from
+        the `cpmpy/transformations/` directory.
 
-            See the 'Adding a new solver' docs on readthedocs for more information.
+        See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        Arguments:
+            cpm_expr: CPMpy expression, or list thereof
+            type cpm_expr: Expression or list of Expression
 
-        :return: list of Expression
+        Returns:
+            list of Expression
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
@@ -364,21 +366,23 @@ class _SCIPWriter:
     
     def add(self, cpm_expr_orig):
         """
-                Eagerly add a constraint to the underlying solver.
+        Eagerly add a constraint to the underlying solver.
 
-                Any CPMpy expression given is immediately transformed (through `transform()`)
-                and then posted to the solver in this function.
+        Any CPMpy expression given is immediately transformed (through `transform()`)
+        and then posted to the solver in this function.
 
-                This can raise 'NotImplementedError' for any constraint not supported after transformation
+        This can raise 'NotImplementedError' for any constraint not supported after transformation
 
-                The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
-                the user knows and cares about (and will be populated with a value after solve). All other variables
-                are auxiliary variables created by transformations.
+        The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+        the user knows and cares about (and will be populated with a value after solve). All other variables
+        are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+        Arguments:
+            cpm_expr: CPMpy expression, or list thereof
+            type cpm_expr: Expression or list of Expression
 
-            :return: self
+        Returns:
+            self
         """
 
         # add new user vars to the set
@@ -640,9 +644,9 @@ def main():
     # Build the CPMpy model
     try:
         if args.string:
-            model = read_scip(args.model)
+            model = load_scip(args.model)
         else:
-            model = read_scip(os.path.expanduser(args.model))
+            model = load_scip(os.path.expanduser(args.model))
     except Exception as e:
         sys.stderr.write(f"Error reading model: {e}\n")
         sys.exit(1)

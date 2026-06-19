@@ -38,7 +38,7 @@ def _normalized_comparison(lst_of_expr):
     (using "wsum") and integer constants. Handles Boolean vars, reifications, implications,
     and ensures all equalities are decomposed into two inequalities.
     
-    Args:
+    Arguments:
         lst_of_expr (list): List of CPMpy Boolean-linear expressions.
 
     Returns:

@@ -42,7 +42,7 @@ def _tag_to_data(string, tag, skip_lines=0, datatype=None, names=None, dtype=Non
     """
     Extract data from a tagged section in the input string.
     
-    Args:
+    Arguments:
         string: Input string containing tagged sections
         tag: Tag name to search for (e.g., "SECTION_SHIFTS")
         skip_lines: Number of lines to skip after the tag
@@ -297,7 +297,7 @@ def model_nurserostering(horizon, shifts, staff, days_off, shift_on, shift_off, 
     """
     Create a CPMpy model for nurserostering.
     
-    Args:
+    Arguments:
         horizon: Number of days in the scheduling period
         shifts: Dict mapping shift_id to dict with shift data
         staff: List of dicts, each representing a nurse with their constraints
