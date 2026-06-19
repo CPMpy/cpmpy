@@ -1,9 +1,10 @@
+#!/usr/bin/env python
 """
 Load a pickled CPMpy model, solve it with a given solver and parameters, and
 write a JSON record of the run to a predefined output directory.
 
 Usage:
-    python run_model.py path/to/model.pickle <solver_name> [--ablate=...] [--out=<path>] [key=value ...]
+    python run_model.py path/to/model.pickle <solver_name> [--ablate=...] [--out=<path>] [--stop-after-transform] [key=value ...]
 
 Each `key=value` is passed as a solver kwarg. Values are parsed as JSON when
 possible (so `num_search_workers=4`, `cp_model_probing_level=0`, `foo=true`,
@@ -30,6 +31,11 @@ monkey-patching the solver class's `transform` method with an ablated pipeline
                              `decompose_in_tree` (CP solvers: choco, ortools)
 Only the solvers with a matching pipeline are supported.
 
+`--stop-after-transform` runs the transform pipeline only (no solve) and
+still writes a JSON record. The record always includes final model-size metrics
+(``n_constraints``, ``n_integer``, ``n_boolean``) together with the usual solve
+fields (which are null when ``--stop-after-transform`` is set).
+
 The output JSON contains the model that was run, the solver and its
 parameters, the runtime, the solver status, and (for optimization problems)
 the objective value.
@@ -45,6 +51,8 @@ import subprocess
 import tempfile
 
 import cpmpy as cp
+from cpmpy.transformations.get_variables import get_variables
+from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.transformations.flatten_model import toplevel_list, flatten_constraint
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.transformations.decompose_global import decompose_in_tree
@@ -64,8 +72,8 @@ OUTPUT_DIR = os.path.join(_HERE, "run_results")
 # Valid --ablate choices.
 ABLATE_NO_ILPFRIENDLY = "no-ilpfriendly"
 ABLATE_NO_CATEGORICAL = "no-detect-categorical"
-ABLATE_ILPFRIENDLY = "ilpfriendly"
-ABLATE_CHOICES = (ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_ILPFRIENDLY)
+ABLATION_NO_CP_FRIENDLY = "no-cp-friendly"
+ABLATE_CHOICES = (ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATION_NO_CP_FRIENDLY)
 
 
 # The ablated transform pipelines. These were originally written as solver
@@ -75,7 +83,7 @@ ABLATE_CHOICES = (ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_ILPFRIEND
 #   - no-ilpfriendly:        decompose with the generic `decompose_in_tree`
 #   - no-detect-categorical: decompose with `decompose_linear` but skip the
 #                            `linearize_reified_variables` (categorical) step
-#   - ilpfriendly:           decompose with `decompose_linear` instead of
+#   - no-cp-friendly:        decompose with `decompose_linear` instead of
 #                            `decompose_in_tree` (CP solvers only)
 
 def gurobi_transform(self, cpm_expr, ablate):
@@ -90,7 +98,9 @@ def gurobi_transform(self, cpm_expr, ablate):
     cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
     cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum']), csemap=self._csemap)  # constraints that support reification
     cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]), csemap=self._csemap)  # supports >, <, !=
-    if ablate == ABLATE_NO_ILPFRIENDLY:
+    if ablate == ABLATE_NO_CATEGORICAL:
+        pass
+    else: # don't detect categorical variables
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
     cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)  # anything that can create full reif should go above...
@@ -111,7 +121,9 @@ def pysat_transform(self, cpm_expr, ablate):
                          csemap=self._csemap)
     cpm_cons = simplify_boolean(cpm_cons)
     cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
-    if ablate == ABLATE_NO_ILPFRIENDLY:
+    if ablate == ABLATE_NO_CATEGORICAL:
+        pass
+    else: # don't detect categorical variables
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
     cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
@@ -130,7 +142,9 @@ def scip_transform(self, cpm_expr, ablate):
     cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
     cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
     cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
-    if ablate == ABLATE_NO_ILPFRIENDLY:
+    if ablate == ABLATE_NO_CATEGORICAL:
+        pass
+    else: # don't detect categorical variables
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
     cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
@@ -148,7 +162,9 @@ def highs_transform(self, cpm_expr, ablate):
     cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
     cpm_cons = reify_rewrite(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)
     cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset({"sum", "wsum", "sub"}), csemap=self._csemap)
-    if ablate == ABLATE_NO_ILPFRIENDLY:
+    if ablate == ABLATE_NO_CATEGORICAL:
+        pass
+    else: # don't detect categorical variables
         cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
     cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
     cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
@@ -158,7 +174,7 @@ def highs_transform(self, cpm_expr, ablate):
 
 
 def choco_transform(self, cpm_expr, ablate):
-    decompose = decompose_linear if ablate == ABLATE_ILPFRIENDLY else decompose_in_tree
+    decompose = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons)
     cpm_cons = push_down_negation(cpm_cons)
@@ -176,7 +192,7 @@ def choco_transform(self, cpm_expr, ablate):
 
 
 def ortools_transform(self, cpm_expr, ablate):
-    decompose = decompose_linear if ablate == ABLATE_ILPFRIENDLY else decompose_in_tree
+    decompose = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"}))
     cpm_cons = push_down_negation(cpm_cons)
@@ -211,8 +227,8 @@ SOLVER_ABLATIONS = {
     "rc2": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
     "scip": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
     "highs": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
-    "choco": frozenset({ABLATE_ILPFRIENDLY}),
-    "ortools": frozenset({ABLATE_ILPFRIENDLY}),
+    "choco": frozenset({ABLATION_NO_CP_FRIENDLY}),
+    "ortools": frozenset({ABLATION_NO_CP_FRIENDLY}),
 }
 
 
@@ -237,7 +253,24 @@ def patch_transform(solver_name, ablate):
     return "{}({})".format(transform.__name__, ablate)
 
 
-def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs):
+def count_transform_stats(solver, cpm_expr):
+    """Run ``solver.transform`` and return final model-size metrics."""
+    cpm_cons = solver.transform(cpm_expr)
+    n_integer = 0
+    n_boolean = 0
+    for v in get_variables(cpm_cons):
+        if isinstance(v, _BoolVarImpl):
+            n_boolean += 1
+        elif isinstance(v, _IntVarImpl):
+            n_integer += 1
+    return {
+        "n_constraints": len(cpm_cons),
+        "n_integer": n_integer,
+        "n_boolean": n_boolean,
+    }
+
+
+def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_after_transform=False):
     """Load a pickled model, optionally patch the transform, solve, return a record."""
     model = cp.Model.from_file(model_path)
     sname = solver_name
@@ -251,12 +284,11 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs):
               file=sys.stderr)
 
     t0 = time.time()
-    solver = cp.SolverLookup.get(sname, model)
+    solver = cp.SolverLookup.get(sname)
+    transform_stats = count_transform_stats(solver, model.constraints)
     transformation_time = time.time() - t0
-    solver.solve(time_limit=time_limit, **solver_kwargs)
 
-    status = solver.status()
-    return {
+    record = {
         "model": os.path.basename(model_path),
         "model_path": os.path.abspath(model_path),
         "solver": solver_name,
@@ -264,12 +296,26 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs):
         "time_limit": time_limit,
         "ablate": ablate,
         "ablate_variant": ablate_variant,
-        "runtime": status.runtime,
+        "stop_after_transform": stop_after_transform,
         "transformation_time": transformation_time,
-        "status": status.exitstatus.name,
-        "objective_value": model.objective_value() if model.has_objective() else None,
+        **transform_stats,
+        "runtime": None,
+        "status": None,
+        "objective_value": None,
         "error": None,
     }
+
+    if stop_after_transform:
+        return record
+
+    solver = cp.SolverLookup.get(sname, model)
+    solver.solve(time_limit=time_limit, **solver_kwargs)
+
+    status = solver.status()
+    record["runtime"] = status.runtime
+    record["status"] = status.exitstatus.name
+    record["objective_value"] = model.objective_value() if model.has_objective() else None
+    return record
 
 
 if __name__ == "__main__":
@@ -278,6 +324,7 @@ if __name__ == "__main__":
     ablate = None
     out_path = None
     memory_limit_mb = None
+    stop_after_transform = False
     positional = []
     for arg in sys.argv[1:]:
         if arg.startswith("--ablate="):
@@ -286,11 +333,14 @@ if __name__ == "__main__":
             out_path = arg.split("=", 1)[1]
         elif arg.startswith("--memory-limit="):
             memory_limit_mb = int(arg.split("=", 1)[1])
+        elif arg == "--stop-after-transform":
+            stop_after_transform = True
         else:
             positional.append(arg)
 
     if len(positional) < 2:
-        print("Usage: python run_model.py path/to/model.pickle <solver_name> [--ablate=...] [key=value ...]",
+        print("Usage: python run_model.py path/to/model.pickle <solver_name> "
+              "[--ablate=...] [--stop-after-transform] [key=value ...]",
               file=sys.stderr)
         sys.exit(1)
     if ablate is not None and ablate not in ABLATE_CHOICES:
@@ -322,7 +372,8 @@ if __name__ == "__main__":
     if solver_name == "ortools":
         solver_kwargs['num_workers'] = 1
 
-    record = do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs)
+    record = do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs,
+                      stop_after_transform=stop_after_transform)
 
     if out_path is None:
         os.makedirs(OUTPUT_DIR, exist_ok=True)

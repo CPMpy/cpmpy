@@ -1,17 +1,17 @@
+#!/usr/bin/env python
 """
-Plot an ECDF (cactus-style) of the ablation runtimes.
+Plot ablation study results written by ``run_model.py``.
 
-For each solver we draw, per ablation variant, the empirical cumulative
-distribution of solve time over all benchmark instances. Runs that errored or
-hit the time limit without a solution are treated as *unsolved* and dropped, so
-each curve plateaus at the number of instances that variant actually solved
-within the time limit (higher/left = better).
+1. **Runtime ECDFs** — per solver, cactus-style curves of solve time per variant.
+2. **Transform-size ECDFs** — per solver, cumulative distribution of
+   ``n_constraints``, ``n_integer``, and ``n_boolean`` across instances for each
+   ablation variant.
 
-Reads the flat JSON records written by ``run_model.py`` (searched recursively),
-one file per (model, solver, ablation) run.
+Reads flat JSON records (searched recursively), one file per (model, solver,
+ablation) run.
 
 Usage:
-    python journal_experiments/plot_ablation.py <results_dir> [<figures_dir>]
+    python journal_experiments/ablation/plot_ablation.py <results_dir> [<figures_dir>]
 
 Run with the repo conda env, e.g.::
 
@@ -43,6 +43,30 @@ VARIANT_LABEL = {
     "no-detect-categorical": "no categorical",
     "ilpfriendly": "linear-friendly",
 }
+
+STAT_METRICS = {
+    "n_constraints": "# constraints",
+    "n_integer": "# integer vars",
+    "n_boolean": "# boolean vars",
+}
+
+
+def prepare_plot_df(df):
+    """Add variant labels and merge rc2 into pysat."""
+    plot_df = df.copy()
+    plot_df["ablate"] = plot_df["ablate"].fillna("baseline")
+    plot_df["variant"] = plot_df["ablate"].map(VARIANT_LABEL).fillna(plot_df["ablate"])
+    plot_df.loc[plot_df["solver"] == "rc2", "solver"] = "pysat"
+    return plot_df
+
+
+def variant_hue_order(variants):
+    hue_order = sorted(variants)
+    baseline = VARIANT_LABEL["baseline"]
+    if baseline in hue_order:
+        hue_order.remove(baseline)
+        hue_order.insert(0, baseline)
+    return hue_order
 
 
 def load_results(results_dir):
@@ -92,9 +116,7 @@ def plot_runtime_ecdf(df, ax, solver, runtime_col="runtime", time_limit=None, hu
         time_limit = float(df["time_limit"].max())
 
     if hue_order is None:
-        hue_order = sorted(df["variant"].unique())
-        hue_order.remove("baseline")
-        hue_order.insert(0, "baseline")
+        hue_order = variant_hue_order(df["variant"].unique())
 
     sns.ecdfplot(data=df, x=runtime_col, hue="variant", stat="count", ax=ax, hue_order=hue_order)
     ax.set_xscale("log")
@@ -104,36 +126,72 @@ def plot_runtime_ecdf(df, ax, solver, runtime_col="runtime", time_limit=None, hu
     ax.set_title(solver)
     return ax
 
+def plot_stats(df, ax, metric, hue_order=None):
+    """ECDF of one transform-size metric across ablation variants."""
+    if hue_order is None:
+        hue_order = variant_hue_order(df["variant"].unique())
+
+    sns.ecdfplot(data=df, x=metric, hue="variant", ax=ax, hue_order=hue_order)
+    if metric == "n_constraints":
+        ax.set_xscale("log")
+    ax.set_xlabel(STAT_METRICS[metric])
+    ax.set_ylabel("cumulative proportion")
+    return ax
+
+
+def plot_all_stats(df, figures_dir):
+    """One figure per solver: ECDFs of constraints / integer / boolean vars."""
+    plot_df = prepare_plot_df(df)
+    for col in STAT_METRICS:
+        if col not in plot_df.columns:
+            print(f"No {col} column in results — skipping transform-size plots")
+            return
+
+    plot_df = plot_df.dropna(subset=list(STAT_METRICS.keys()))
+    if plot_df.empty:
+        print("No transform-size records found — skipping transform-size plots")
+        return
+
+    print(plot_df.groupby(["solver", "variant"]).size())
+
+    os.makedirs(figures_dir, exist_ok=True)
+    for solver in sorted(plot_df["solver"].unique()):
+        print("Plotting transform stats for solver:", solver)
+        solver_df = plot_df[plot_df["solver"] == solver]
+        hue_order = variant_hue_order(solver_df["variant"].unique())
+
+        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+        for ax, metric in zip(axes, STAT_METRICS):
+            plot_stats(solver_df, ax=ax, metric=metric, hue_order=hue_order)
+        fig.suptitle(f"{solver} transform size", fontweight="bold")
+        fig.tight_layout()
+        save_figure(fig, os.path.join(figures_dir, f"ablation_stats_{solver}"))
+        plt.close(fig)
+
 
 def plot_all_solvers(df, figures_dir, runtime_col="runtime"):
     """One ECDF figure per solver, saved into ``figures_dir``."""
-    plot_df = df.copy()
-    plot_df["ablate"] = plot_df["ablate"].fillna("baseline")
-    plot_df["variant"] = plot_df["ablate"].map(VARIANT_LABEL).fillna(plot_df["ablate"])
+    plot_df = prepare_plot_df(df)
 
-
-    time_limits = set(df['time_limit'])
+    time_limits = set(df["time_limit"].dropna())
     if len(time_limits) > 1:
         raise ValueError(f"Time limits are not consistent: {time_limits}")
 
-    print(plot_df.groupby(['solver', 'variant']).size())
+    print(plot_df.groupby(["solver", "variant"]).size())
 
     plot_df = get_finished_instances(plot_df)
 
-    hue_order = sorted(plot_df["variant"].unique())
-    hue_order.remove("baseline")
-    hue_order.insert(0, "baseline")
+    hue_order = variant_hue_order(plot_df["variant"].unique())
 
-    # fill rc2 solver with pysat
     print(plot_df["solver"].unique())
-    plot_df.loc[plot_df["solver"] == "rc2", 'solver'] = "pysat"
 
     os.makedirs(figures_dir, exist_ok=True)
     for solver in sorted(plot_df["solver"].unique()):
         print("Plotting solver:", solver)
         solver_df = plot_df[plot_df["solver"] == solver]
         fig, ax = plt.subplots(figsize=(4, 3))
-        plot_runtime_ecdf(solver_df, ax=ax, solver=solver, runtime_col=runtime_col)
+        plot_runtime_ecdf(solver_df, ax=ax, solver=solver, runtime_col=runtime_col,
+                          hue_order=hue_order)
         save_figure(fig, os.path.join(figures_dir, f"ablation_{solver}"))
         plt.close(fig)
 
@@ -143,7 +201,6 @@ if __name__ == "__main__":
     figures_dir = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_FIGURES_DIR
 
     df = load_results(results_dir)
-    
-
 
     plot_all_solvers(df, figures_dir=figures_dir, runtime_col="runtime")
+    plot_all_stats(df, figures_dir=figures_dir)

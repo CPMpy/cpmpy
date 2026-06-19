@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Run a CPMpy script but, instead of actually solving, dump every model that
 would be solved to a `.pickle` file.
