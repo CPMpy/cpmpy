@@ -871,16 +871,29 @@ class TestGlobal:
 
     def test_multid_element_index_dom_mismatched(self):
         """
-            Check solving `arr[a,b] == 3` where arr has shape (3,3) and a, b have bounds 0..10.
-            The unsafe index domains should be handled by safening with no_partial_functions, so only in-bounds
-            index assignments satisfy the model.
+            NDElement with OOB index domains: safened per dimension before decompose.
+            Toplevel `arr[a,b] == 3` only allows in-bounds index pairs.
         """
+        arr = cp.cpm_array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+        a = cp.intvar(0, 10, name="a")
+        b = cp.intvar(-1, 1, name="b")
+        y = cp.intvar(1, 5, name="y")
+        decomposed = decompose_in_tree(no_partial_functions([cp.NDElement(arr, [a, b]) <= y], safen_toplevel={"nd_element"}))
+        decomp = set(map(str, decomposed))
+        assert {
+            "((a >= 0) and (a <= 2)) -> ((IV0) == (a))",
+            "((a < 0) or (a > 2)) -> (IV0 == 0)",
+            "((b >= 0) and (b <= 2)) -> ((IV1) == (b))",
+            "((b < 0) or (b > 2)) -> (IV1 == 0)",
+            "(a >= 0) and (a <= 2)",
+            "(b >= 0) and (b <= 2)",
+        } <= decomp
+        assert any(c.endswith("<= (y)") for c in decomp)
+
         arr = cp.cpm_array(np.full((3, 3), 3))
         a, b = cp.intvar(0, 10, shape=2, name=tuple("ab"))
-        model = cp.Model(arr[a, b] == 3)
-
         sols = set()
-        n_sols = model.solveAll(display=lambda: sols.add((a.value(), b.value())))
+        n_sols = cp.Model(arr[a, b] == 3).solveAll(display=lambda: sols.add((a.value(), b.value())))
         assert n_sols == 9
         assert sols == {(i, j) for i in range(3) for j in range(3)}
 
