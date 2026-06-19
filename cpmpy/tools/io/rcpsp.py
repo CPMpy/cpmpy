@@ -14,7 +14,7 @@ List of functions
 .. autosummary::
     :nosignatures:
 
-    read_rcpsp
+    load_rcpsp
 """
 
 
@@ -24,10 +24,12 @@ import argparse
 import cpmpy as cp
 from io import StringIO
 from typing import Union
+from typing import Callable
+from typing import TextIO
 
 
 _std_open = open
-def load_rcpsp(rcpsp: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
     """
     Loader for PSPLIB RCPSP format. Loads an instance and returns its matching CPMpy model.
 
@@ -35,7 +37,7 @@ def load_rcpsp(rcpsp: Union[str, os.PathLike], open=open) -> cp.Model:
         rcpsp (str or os.PathLike):
             - A file path to a PSPLIB RCPSP file
             - OR a string containing the RCPSP content directly
-        open: (callable):
+        open (Callable):
             If rcpsp is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
@@ -56,8 +58,19 @@ def load_rcpsp(rcpsp: Union[str, os.PathLike], open=open) -> cp.Model:
     model, (start, end, makespan) = _model_rcpsp(job_data=table, capacities=capacities)
     return model
 
-def _parse_rcpsp(f):
+# TODO: Pandas as optional dependency
+def _parse_rcpsp(f: TextIO) -> tuple["pandas.DataFrame", dict]:
+    """
+    Parse a PSPLIB RCPSP instance file
 
+    Arguments:
+        f (TextIO): The file to parse.
+
+    Returns:
+        tuple[pd.DataFrame, dict]: Two objects:
+            - job_data: a pandas dataframe containing the job data  
+            - capacities: a dictionary containing the capacities of the resources
+    """
     data = dict()
 
     line = f.readline()

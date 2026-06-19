@@ -29,7 +29,14 @@ from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
 
 
-def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header:Optional[str]="DIMACS file written by CPMpy", open: Optional[Callable]=None, annotate: Optional[Callable]=None):
+def write_dimacs(
+        model: cp.Model, 
+        fname:Optional[str]=None, 
+        encoding:str="auto", 
+        p_header:bool=False, header:Optional[str]="DIMACS file written by CPMpy", 
+        open: Optional[Callable]=None, 
+        annotate: Optional[Callable]=None
+    ):
     """
     Writes CPMpy model to DIMACS format
     Uses the "to_cnf" transformation from CPMpy
@@ -38,21 +45,21 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
         TODO: implement pseudoboolean constraints in to_cnf
 
     Arguments:
-        model: a CPMpy model
-        fname: optional, file name to write the DIMACS output to
-        encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
-        p_header: whether to include the ``p ...`` problem header line (default: ``False``)
-        open: optional callable to open the file for writing (default: builtin ``open``).
-        Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
-        in loaders and allows custom compression or I/O (e.g.
-        ``lambda p, mode='w': lzma.open(p, 'wt')``).
-        annotator: variable annotation strategy. Controls how DIMACS literal IDs are
-        mapped back to original CPMpy variables. Options:
-        - None (default): no annotation, output identical to previous behaviour
-        - "dimacs_comments": Sugar-style 'c <id> <name>' comment lines (self-contained)
-        - "json_sidecar": comments + a .map.json sidecar file (BumbleBee pattern)
-        - "none": explicit no-op (same as None)
-        - VariableAnnotator instance: fully custom strategy
+        model (cp.Model): a CPMpy model
+        fname (str, optional): optional, file name to write the DIMACS output to
+        encoding (str): the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary") (default: "auto")
+        p_header (bool): whether to include the ``p ...`` problem header line (default: ``False``)
+            open (Callable, optional): optional callable to open the file for writing (default: builtin ``open``).
+            Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
+            in loaders and allows custom compression or I/O (e.g.
+            ``lambda p, mode='w': lzma.open(p, 'wt')``).
+        annotate (Callable, optional): variable annotation strategy. Controls how DIMACS literal IDs are
+            mapped back to original CPMpy variables. Options:
+            - None (default): no annotation, output identical to previous behaviour
+            - "dimacs_comments": Sugar-style 'c <id> <name>' comment lines (self-contained)
+            - "json_sidecar": comments + a .map.json sidecar file (BumbleBee pattern)
+            - "none": explicit no-op (same as None)
+            - VariableAnnotator instance: fully custom strategy
     """
 
     if model.has_objective():
@@ -78,7 +85,7 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
     mapping = {v : i+1 for i, v in enumerate(vars)}
     out = ""
 
-    
+    # Write constraints to DIMACS format
     for cons in constraints:
 
         if isinstance(cons, _BoolVarImpl):
@@ -99,6 +106,7 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
 
         out += hard_prefix + " ".join(ints + ["0"]) + "\n"
 
+    # Write objective to DIMACS format
     if model.has_objective():
         max_weight = max(objective_weights)
         for w, x in zip(objective_weights, objective_lits):
@@ -111,6 +119,7 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
             transformed_weight = max_weight - w if model.objective_is_min else w
             out += f"{transformed_weight} {lit} 0\n"
 
+    # Write annotations to DIMACS string
     if annotate is not None:
         if isinstance(annotate, Callable):
             comments = annotate(vars, ivarmap)
@@ -120,16 +129,19 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
         else:
             raise ValueError(f"Expected a Callable annotate, but got {type(annotate)}")
 
+    # Optional p-header
     if p_header:
         if model.has_objective():
             out = f"p wcnf {len(vars)} {len(constraints)} {max(objective_weights)}\n" + out
         else:
             out = f"p cnf {len(vars)} {len(constraints)}\n" + out
 
+    # Optional header
     if header is not None:
         header_lines = ["c " + line for line in header.splitlines()]
         out = "\n".join(header_lines) + "\n" + out
 
+    # Write to file
     if fname is not None:
         opener = open if open is not None else builtins.open
         with opener(fname, "w") as f:
@@ -144,18 +156,19 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open=None):
     https://web.archive.org/web/20190325181937/https://www.satcompetition.org/2009/format-benchmarks2009.html
 
     .. note::
-        The p-line has to denote the correct number of variables and clauses
+        The (optional) p-line has to denote the correct number of variables and clauses
 
     Arguments:
         dimacs:
-        - A file path to a DIMACS/WCNF file
-        - OR a string containing DIMACS/WCNF content directly
+            - A file path to a DIMACS/WCNF file
+            - OR a string containing DIMACS/WCNF content directly
         open: optional callable to open the file for reading (default: builtin ``open``).
-        Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.cnf.xz``.
+            Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.cnf.xz``.
     """
     if open is None:
         open = builtins.open
 
+    # Read from file or string
     if isinstance(dimacs, (str, os.PathLike)) and os.path.exists(dimacs):
         with open(dimacs, "r") as f:
             lines = f.readlines()
@@ -197,6 +210,7 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open=None):
     if not is_weighted and saw_clause_line and weighted_compatible:
         is_weighted = True
 
+    # If weighted, delegate to WCNF loader
     if is_weighted:
         from cpmpy.tools.io.wcnf import load_wcnf
         return load_wcnf(dimacs, open=open)

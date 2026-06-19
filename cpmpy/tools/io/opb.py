@@ -29,6 +29,7 @@ from typing import Union, Optional, Callable
 from functools import reduce
 from operator import mul
 
+import cpmpy as cp
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.to_opb import to_opb, to_opb_objective
@@ -68,6 +69,7 @@ def _parse_term(line, vars):
 
     terms = []
     text = line.strip()
+
     # Keep only the expression fragment for objective/constraint lines.
     if ":" in text:
         text = text.split(":", 1)[1]
@@ -284,6 +286,7 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None, annota
     csemap, ivarmap = CSEMap(), dict()
     opb_cons = to_opb(model.constraints, csemap, ivarmap, encoding)
 
+    # Transform objective, if present
     if model.objective_ is not None:
         opb_obj, const, extra_cons = to_opb_objective(model.objective_, csemap, ivarmap, encoding)
         opb_cons += to_opb(extra_cons, csemap, ivarmap, encoding)
@@ -300,24 +303,7 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None, annota
         header_lines = ["* " + line for line in str(header).splitlines()]
         out.extend(header_lines)
 
-    # if annotate is None:
-    #     reverse = _build_reverse_map(ivarmap)
-
-    #     # Simple default naming, matching the DIMACS notebook reference.
-    #     def annotate(v, ivarmap):
-    #         info = reverse.get(id(v))
-    #         if info is None:
-    #             if v.name[:2] == "BV": # aux vars introduced by CPMpy
-    #                 return "_" + v.name
-    #         elif info["encoding"] == "order":
-    #             return f"{info['source_name']}_ge_{info['threshold']}"
-    #         elif info["encoding"] == "binary":
-    #             return f"{info['source_name']}_bit{info['bit']}"
-    #         elif info["encoding"] == "direct":
-    #             return f"{info['source_name']}_eq_{info['value']}"
-    #         else:
-    #             return v.name
-
+    # Map variables to OPB variable names
     if annotate is None:
         varmap = {v: f"x{i+1}" for i, v in enumerate(all_vars)} 
     else:

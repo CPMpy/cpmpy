@@ -11,7 +11,7 @@ formats supported by the SCIP optimization suite.
 Installation
 ============
 
-The 'pyscipopt' python package must be installed separately through `pip`:
+The 'pyscipopt' optional dependency must be installed separately through `pip`:
 
 .. code-block:: console
     
@@ -24,7 +24,7 @@ List of functions
 .. autosummary::
     :nosignatures:
 
-    read_scip
+    load_scip
     write_scip
     to_scip
 """
@@ -55,33 +55,24 @@ from cpmpy.expressions.globalconstraints import DirectConstraint
 # from cpmpy.expressions.variables import ignore_variable_name_check
 from cpmpy.transformations.safening import no_partial_functions, safen_objective
 
-try:
-    from cpmpy.expressions.variables import _ignore_variable_name_check
-except ImportError:
-    from contextlib import contextmanager
-    @contextmanager
-    def _ignore_variable_name_check():
-        yield
-
 
 _std_open = open
-def load_scip(fname: Union[str, os.PathLike], open=open, assume_integer:bool=False) -> cp.Model:
+def load_scip(fname: Union[str, os.PathLike], open:Callable=open, assume_integer:bool=False) -> cp.Model:
     """
     Load a SCIP-compatible model from a file and return a CPMpy model.
 
     Arguments:
-        fname: The path to the SCIP-compatible file to read.
-        open: The function to use to open the file. (SCIP does not require this argument, will be ignored)
-        assume_integer: Whether to assume that all variables are integer.
+        fname (str or os.PathLike): The path to the SCIP-compatible file to read.
+        open (Callable): The function to use to open the file. (SCIP does not require this argument, will be ignored)
+        assume_integer (bool): Whether to assume that all variables are integer.
 
     Returns:
-        A CPMpy model.
+        cp.Model: A CPMpy model.
     """
+    # Check if SCIP is installed
     if not _SCIPWriter.supported():
         raise Exception("SCIP: Install SCIP IO dependencies: cpmpy[io.scip]")
 
-    # with ignore_variable_name_check():
-                
     from pyscipopt import Model
 
     # Load file into pyscipopt model
@@ -115,69 +106,69 @@ def load_scip(fname: Union[str, os.PathLike], open=open, assume_integer:bool=Fal
             raise ValueError(f"Unsupported variable type: {vtype}")
         
 
-        model = cp.Model()
+    model = cp.Model()
 
-        # 2) translate constraints
-        scip_cons = scip.getConss()
-        for cons in scip_cons:
-            ctype = cons.getConshdlrName()  # type of the constraint
+    # 2) translate constraints
+    scip_cons = scip.getConss()
+    for cons in scip_cons:
+        ctype = cons.getConshdlrName()  # type of the constraint
 
-            if ctype == "linear":
-                cons_vars = scip.getConsVars(cons)  # variables in the constraint (x)
-                cons_coeff = scip.getConsVals(cons) # coefficients of the variables (A)
+        if ctype == "linear":
+            cons_vars = scip.getConsVars(cons)  # variables in the constraint (x)
+            cons_coeff = scip.getConsVals(cons) # coefficients of the variables (A)
 
-                cpm_vars = [var_map[v.name] for v in cons_vars] # convert to CPMpy variables
-                cpm_sum = cp.sum(var*coeff for (var,coeff) in zip(cpm_vars, cons_coeff)) # Ax
+            cpm_vars = [var_map[v.name] for v in cons_vars] # convert to CPMpy variables
+            cpm_sum = cp.sum(var*coeff for (var,coeff) in zip(cpm_vars, cons_coeff)) # Ax
 
-                lhs = scip.getLhs(cons) # lhs of the constraint
-                rhs = scip.getRhs(cons) # rhs of the constraint
+            lhs = scip.getLhs(cons) # lhs of the constraint
+            rhs = scip.getRhs(cons) # rhs of the constraint
 
-                # convert to integer bounds
-                _lhs = int(math.ceil(lhs))
-                _rhs = int(math.floor(rhs))
-                if _lhs != int(lhs) or _rhs != int(rhs):
-                    if assume_integer:
-                        warnings.warn(f"Constraint {cons.name} has non-integer bounds. CPMpy will assume it is integer.")
-                    else:
-                        raise ValueError(f"Constraint {cons.name} has non-integer bounds. CPMpy does not support non-integer bounds.")
-
-                # add the constraint to the model
-                model += _lhs <= cpm_sum
-                model += cpm_sum <= _rhs
-
-            else: 
-                raise ValueError(f"Unsupported constraint type: {ctype}")
-
-        # 3) translate objective
-        scip_objective = scip.getObjective()
-        direction = scip.getObjectiveSense()
-
-        n_terms = len(scip_objective.terms)
-        obj_vars = cp.cpm_array([None]*n_terms)
-        obj_coeffs = np.zeros(n_terms, dtype=int)
-
-        for i, (term, coeff) in enumerate(scip_objective.terms.items()): # terms is a dictionary mapping terms to coefficients
-            if len(term.vartuple) > 1:
-                raise ValueError(f"Unsupported objective term: {term}") # TODO <- assumes linear, support higher-order terms
-            cpm_var = var_map[term.vartuple[0].name] # TODO <- assumes linear
-            obj_vars[i] = cpm_var
-            
-            _coeff = int(math.floor(coeff))
-            if _coeff != int(coeff):
+            # convert to integer bounds
+            _lhs = int(math.ceil(lhs))
+            _rhs = int(math.floor(rhs))
+            if _lhs != int(lhs) or _rhs != int(rhs):
                 if assume_integer:
-                    warnings.warn(f"Objective term {term} has non-integer coefficient. CPMpy will assume it is integer.")
+                    warnings.warn(f"Constraint {cons.name} has non-integer bounds. CPMpy will assume it is integer.")
                 else:
-                    raise ValueError(f"Objective term {term} has non-integer coefficient. CPMpy does not support non-integer coefficients.")
-            obj_coeffs[i] = _coeff
+                    raise ValueError(f"Constraint {cons.name} has non-integer bounds. CPMpy does not support non-integer bounds.")
 
-        if direction == "minimize":
-            model.minimize(cp.sum(obj_vars * obj_coeffs))
-        elif direction == "maximize":
-            model.maximize(cp.sum(obj_vars * obj_coeffs))
-        else:
-            raise ValueError(f"Unsupported objective sense: {direction}")
+            # add the constraint to the model
+            model += _lhs <= cpm_sum
+            model += cpm_sum <= _rhs
 
-        return model
+        else: 
+            raise ValueError(f"Unsupported constraint type: {ctype}")
+
+    # 3) translate objective
+    scip_objective = scip.getObjective()
+    direction = scip.getObjectiveSense()
+
+    n_terms = len(scip_objective.terms)
+    obj_vars = cp.cpm_array([None]*n_terms)
+    obj_coeffs = np.zeros(n_terms, dtype=int)
+
+    for i, (term, coeff) in enumerate(scip_objective.terms.items()): # terms is a dictionary mapping terms to coefficients
+        if len(term.vartuple) > 1:
+            raise ValueError(f"Unsupported objective term: {term}") # TODO <- assumes linear, support higher-order terms
+        cpm_var = var_map[term.vartuple[0].name] # TODO <- assumes linear
+        obj_vars[i] = cpm_var
+        
+        _coeff = int(math.floor(coeff))
+        if _coeff != int(coeff):
+            if assume_integer:
+                warnings.warn(f"Objective term {term} has non-integer coefficient. CPMpy will assume it is integer.")
+            else:
+                raise ValueError(f"Objective term {term} has non-integer coefficient. CPMpy does not support non-integer coefficients.")
+        obj_coeffs[i] = _coeff
+
+    if direction == "minimize":
+        model.minimize(cp.sum(obj_vars * obj_coeffs))
+    elif direction == "maximize":
+        model.maximize(cp.sum(obj_vars * obj_coeffs))
+    else:
+        raise ValueError(f"Unsupported objective sense: {direction}")
+
+    return model
 
 
 
@@ -190,7 +181,7 @@ class _SCIPWriter:
     TODO: code should be reused once SCIP has been added as a solver backend.
     """
 
-     # Globals we keep (decompose_in_tree) and how they are translated:
+    # Globals we keep (decompose_in_tree) and how they are translated:
     # - "xor": kept; linearize passes it through; we translate to addConsXor() in add().
     # - "abs": GlobalFunction supported natively (PySCIPOpt addCons(abs(x) <= k)).
     # SCIP has no native AllDifferent, Circuit, Table, Cumulative, etc.; others are decomposed by decompose_in_tree.
@@ -498,10 +489,12 @@ def _to_writer(model: cp.Model, problem_name: Optional[str] = None, require_obje
     Convert a CPMpy model to a SCIP writer
     
     Arguments:
-        model: CPMpy model
-        problem_name: Optional name for the problem
-        require_objective: If True, raise an error if model has no objective. 
-                          If False, allow satisfaction problems (no objective).
+        model (cp.Model): CPMpy model
+        problem_name (Optional[str]): Optional name for the problem
+        require_objective (bool): If True, raise an error if model has no objective. 
+                                  If False, allow satisfaction problems (no objective).
+    Returns:
+        _SCIPWriter: A SCIP writer.
     """
     writer = _SCIPWriter(problem_name=problem_name)
     # 1) post constraints
@@ -534,9 +527,9 @@ def _add_header(fname: os.PathLike, format: str, header: Optional[str] = None):
     Add a header to a file.
 
     Arguments:
-        fname: The path to the file to add the header to.
-        format: The format of the file.
-        header: The header to add.
+        fname (os.PathLike): The path to the file to add the header to.
+        format (str): The format of the file.
+        header (Optional[str]): The header to add.
     """
 
     with open(fname, "r") as f:
@@ -585,18 +578,18 @@ def write_scip(model: cp.Model, fname: Optional[str] = None, format: str = "mps"
     For more information, see the SCIP documentation: https://pyscipopt.readthedocs.io/en/latest/tutorials/readwrite.html
 
     Arguments:
-        model: CPMpy model to write.
-        fname: Path to write to. If None, the file content is returned as a string.
-        format: Output format (e.g. "mps", "lp", "cip", "fzn", "gms", "pip").
-        header: Optional header text to prepend (format-dependent comment style).
-        verbose: If True, allow SCIP to print progress.
-        open: Optional callable to open the file for writing (default: builtin ``open``).
+        model (cp.Model): CPMpy model to write.
+        fname (Optional[str]): Path to write to. If None, the file content is returned as a string.
+        format (str): Output format (e.g. "mps", "lp", "cip", "fzn", "gms", "pip").
+        header (Optional[str]): Optional header text to prepend (format-dependent comment style).
+        verbose (bool): If True, allow SCIP to print progress.
+        open (Optional[Callable]): Optional callable to open the file for writing (default: builtin ``open``).
             Called as ``open(fname, "w")``. Mirrors the ``open=`` argument in loaders and
             allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
 
     Returns:
-        The file content as a string (whether written to ``fname`` or not).
+        str: The file content as a string (whether written to ``fname`` or not).
     """
 
     # FZN format supports satisfaction problems (no objective), others may require it

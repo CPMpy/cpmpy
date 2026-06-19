@@ -23,7 +23,10 @@ import sys
 import argparse
 import tempfile
 import cpmpy as cp
-from typing import Union
+import re
+from typing import Union, Callable
+from typing import Optional
+from typing import Any
 
 # Optional dependencies
 try:
@@ -38,24 +41,32 @@ try:
 except ImportError:
     _HAS_FAKER = False
 
-def _tag_to_data(string, tag, skip_lines=0, datatype=None, names=None, dtype=None):
+def _tag_to_data(
+        string: str, 
+        tag: str, 
+        skip_lines: int=0, 
+        datatype: Optional[type]=None, 
+        names: Optional[list[str]]=None, 
+        dtype: Optional[dict[str, type]]=None
+    ) -> Optional[list[dict[str, Any]]]:
     """
     Extract data from a tagged section in the input string.
     
     Arguments:
-        string: Input string containing tagged sections
-        tag: Tag name to search for (e.g., "SECTION_SHIFTS")
-        skip_lines: Number of lines to skip after the tag
-        datatype: Type hint for return value. If None, returns list of dicts (CSV rows).
+        string (str): Input string containing tagged sections
+        tag (str): Tag name to search for (e.g., "SECTION_SHIFTS")
+        skip_lines (int): Number of lines to skip after the tag
+        datatype (Optional[type]): Type hint for return value. If None, returns list of dicts (CSV rows).
                   If int, str, etc., returns that type parsed from first line.
-        names: Optional list of column names to rename headers to. If provided, must match
+        names (Optional[list[str]]): Optional list of column names to rename headers to. If provided, must match
                the number of columns or be shorter (extra columns will keep original names).
-        dtype: Optional dict mapping column names to data types for conversion.
+        dtype (Optional[dict[str, type]]): Optional dict mapping column names to data types for conversion.
                Example: {'Length': int, 'ShiftID': str}
     
     Returns:
-        If datatype is None: list of dicts (CSV rows as dictionaries)
-        If datatype is int, str, etc.: parsed value from first line
+        Optional[list[dict[str, Any]]]: 
+            If datatype is None: list of dicts (CSV rows as dictionaries)
+            If datatype is int, str, etc.: parsed value from first line
     """
     regex = rf'{tag}[\s\S]*?($|(?=\n\s*\n))'
     match = re.search(regex, string)
@@ -125,8 +136,9 @@ def parse_scheduling_period(filename: str):
     Raises:
         ValueError: If the file is not found.
 
-    Use to_dataframes() transform to convert to pandas DataFrames if needed.
-    Use add_fake_names() transform to add randomly generated names to staff.
+    Note:
+        - Use to_dataframes() transform to convert to pandas DataFrames if needed.
+        - Use add_fake_names() transform to add randomly generated names to staff.
     """
     with open(filename, "r") as f:
         string = f.read()
@@ -200,7 +212,7 @@ def parse_scheduling_period(filename: str):
                 shift_on=shift_on, shift_off=shift_off, cover=cover)
 
 
-def add_fake_names(data, seed=0):
+def add_fake_names(data: dict[str, Any], seed: int=0) -> dict[str, Any]:
     """
     Transform function to add randomly generated names to staff using Faker.
     
@@ -222,11 +234,11 @@ def add_fake_names(data, seed=0):
         )
     
     Arguments:
-        data (dict): Dictionary returned by parse_scheduling_period()
+        data (dict[str, Any]): Dictionary returned by parse_scheduling_period()
         seed (int): Random seed for reproducible name generation (default: 0)
     
     Returns:
-        dict: Dictionary with 'name' field added to each staff member
+        dict[str, Any]: Dictionary with 'name' field added to each staff member
     
     Raises:
         ImportError: If Faker is not installed
@@ -244,7 +256,7 @@ def add_fake_names(data, seed=0):
     return data
 
 
-def to_dataframes(data):
+def to_dataframes(data: dict[str, Any]) -> dict[str, Any]:
     """
     Transform function to convert native data structures to pandas DataFrames.
     
@@ -258,10 +270,10 @@ def to_dataframes(data):
         )
     
     Arguments:
-        data (dict): Dictionary returned by parse_scheduling_period()
+        data (dict[str, Any]): Dictionary returned by parse_scheduling_period()
     
     Returns:
-        dict: Dictionary with pandas DataFrames instead of native structures
+        dict[str, Any]: Dictionary with pandas DataFrames instead of native structures
     
     Raises:
         ImportError: If pandas is not installed
@@ -293,18 +305,31 @@ def to_dataframes(data):
     return result
 
 
-def model_nurserostering(horizon, shifts, staff, days_off, shift_on, shift_off, cover):
+def model_nurserostering(
+        horizon: int, 
+        shifts: dict[str, dict[str, Any]], 
+        staff: list[dict[str, Any]], 
+        days_off: list[dict[str, Any]], 
+        shift_on: list[dict[str, Any]], 
+        shift_off: list[dict[str, Any]], 
+        cover: list[dict[str, Any]]
+    ) -> tuple[cp.Model, cp.IntVar]:
     """
     Create a CPMpy model for nurserostering.
     
     Arguments:
-        horizon: Number of days in the scheduling period
-        shifts: Dict mapping shift_id to dict with shift data
-        staff: List of dicts, each representing a nurse with their constraints
-        days_off: List of dicts with days off for each nurse
-        shift_on: List of dicts with shift-on requests for each nurse
-        shift_off: List of dicts with shift-off requests for each nurse
-        cover: List of dicts with cover requirements for each day and shift
+        horizon (int): Number of days in the scheduling period
+        shifts (dict[str, dict[str, Any]]): Dict mapping shift_id to dict with shift data
+        staff (list[dict[str, Any]]): List of dicts, each representing a nurse with their constraints
+        days_off (list[dict[str, Any]]): List of dicts with days off for each nurse
+        shift_on (list[dict[str, Any]]): List of dicts with shift-on requests for each nurse
+        shift_off (list[dict[str, Any]]): List of dicts with shift-off requests for each nurse
+        cover (list[dict[str, Any]]): List of dicts with cover requirements for each day and shift
+
+    Returns:
+        tuple[cp.Model, cp.IntVar]: A tuple containing the CPMpy model and the nurse view.
+            - model (cp.Model): The CPMpy model for the nurserostering problem.
+            - nurse_view (cp.IntVar): The nurse view variable.
     """
     n_nurses = len(staff)
 
@@ -393,7 +418,7 @@ def model_nurserostering(horizon, shifts, staff, days_off, shift_on, shift_off, 
 
 
 _std_open = open
-def load_nurserostering(instance: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_nurserostering(instance: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
     """
     Loader for Nurse Rostering format. Loads an instance and returns its matching CPMpy model.
 
@@ -401,7 +426,7 @@ def load_nurserostering(instance: Union[str, os.PathLike], open=open) -> cp.Mode
         instance (str or os.PathLike):
             - A file path to a Nurse Rostering file
             - OR a string containing the Nurse Rostering content directly
-        open (callable):
+        open (Callable):
             If instance is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
@@ -430,9 +455,6 @@ def load_nurserostering(instance: Union[str, os.PathLike], open=open) -> cp.Mode
         if isinstance(instance, str) and not os.path.exists(instance) and os.path.exists(fname):
             os.unlink(fname)
 
-# Backward compatibility alias
-read_nurserostering = load_nurserostering
-
 
 def main():
     parser = argparse.ArgumentParser(description="Parse and solve a Nurse Rostering model using CPMpy")
@@ -445,9 +467,9 @@ def main():
     # Build the CPMpy model
     try:
         if args.string:
-            model = read_nurserostering(args.model)
+            model = load_nurserostering(args.model)
         else:
-            model = read_nurserostering(os.path.expanduser(args.model))
+            model = load_nurserostering(os.path.expanduser(args.model))
     except Exception as e:
         sys.stderr.write(f"Error reading model: {e}\n")
         sys.exit(1)
@@ -470,8 +492,6 @@ def main():
     else:
         print("No solution found.")
 
-# Backward compatibility alias
-read_nurserostering = load_nurserostering
 
 if __name__ == "__main__":
     main()

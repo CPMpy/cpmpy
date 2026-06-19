@@ -23,23 +23,25 @@ import sys
 import argparse
 import cpmpy as cp
 from io import StringIO
-from typing import Union
+from typing import Union, Callable
 
 
-def _get_var(i, vars_dict):
+def _get_var(i: int, vars_dict: dict) -> cp.BoolVar:
     """
     Returns CPMpy boolean decision variable matching to index `i` if exists, else creates a new decision variable.
 
     Arguments:
-        i: index
+        i (int): index
         vars_dict (dict): dictionary to keep track of previously generated decision variables
+    Returns:
+        cp.BoolVar: The CPMpy boolean decision variable matching to index `i`.
     """
     if i not in vars_dict:
         vars_dict[i] = cp.boolvar(name=f"x{i}") # <- be carefull that name doesn't clash with generated variables during transformations / user variables
     return vars_dict[i]
 
 _std_open = open
-def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_wcnf(wcnf: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
     """
     Loader for WCNF format. Loads an instance and returns its matching CPMpy model.
 
@@ -47,7 +49,7 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
         wcnf (str or os.PathLike):
             - A file path to an WCNF file (optionally LZMA-compressed with `.xz`)
             - OR a string containing the WCNF content directly
-        open: (callable):
+        open (Callable):
             If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
