@@ -165,8 +165,7 @@ class CPM_gurobi(SolverInterface):
 
             Arguments:
                 time_limit (float, optional):  maximum solve time in seconds
-                solution_callback:             Gurobi callback function.
-                                               Takes precedence over ``display`` when both are set.
+                solution_callback:             Gurobi callback function, takes precedence over ``display`` when both are set.
                 display:                       generic solution callback for use during optimization.
                                                either a list of CPMpy expressions, OR a callback function which
                                                gets called after the variable-value mapping of the intermediate solution.
@@ -760,7 +759,7 @@ class CPM_gurobi(SolverInterface):
             events: iterable of gurobipy.GRB.Callback event codes
         """
 
-        self.events=  frozenset(events)
+        self.events = frozenset(events)
         if isinstance(display, Expression) or is_any_list(display):
             cpm_vars = get_variables(display)
         else:

@@ -1012,9 +1012,6 @@ class TestSupportedSolvers:
         assert len(sols) == 8
 
     def test_solution_callback(self, solver, capsys):
-        import random
-        random.seed(0)
-
         
         n = 10
         kwargs = dict(time_limit=3)

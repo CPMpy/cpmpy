@@ -165,7 +165,7 @@ class CPM_cpo(SolverInterface):
             Arguments:
                 time_limit (float, optional):   maximum solve time in seconds
                 solution_callback:              a ``docplex.cp.solver.solver_listener.CpoSolverListener`` or ``docplex.cp.solver.cpo_callback.CpoCallback`` object, or a list thereof
-                                                Takes precedence over ``display`` when both are set.
+                                                takes precedence over ``display`` when both are set.
                 display:                        generic solution callback for use during optimization.
                                                 either a list of CPMpy expressions, OR a callback function which
                                                 gets called after the variable-value mapping of the intermediate solution.
@@ -785,7 +785,7 @@ try:
                             default/None: nothing displayed
                 solution_limit (default = None): stop after this many solutions 
         """
-        def __init__(self, solver: CPM_cpo, display=None, solution_limit=None, verbose=False):
+        def __init__(self, solver: CPM_cpo, display:Optional[Callback]=None, solution_limit:Optional[int]=None, verbose:bool=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
             # we only need the cpmpy->solver varmap from the solver
