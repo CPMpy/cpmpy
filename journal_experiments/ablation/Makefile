@@ -34,7 +34,7 @@ STOP_AFTER_TRANSFORM ?= 0
 
 EXAMPLES_DIR := ../../examples/csplib
 CPMPY_DIR    := ../../cpmpy
-MODELS_DIR   := models
+MODELS_DIR   ?= models
 RESULTS_DIR  ?= $(if $(filter 1,$(STOP_AFTER_TRANSFORM)),run-ablation-stats,run-ablation)
 FIGURES_DIR  ?= $(if $(filter 1,$(STOP_AFTER_TRANSFORM)),figures-stats,figures)
 
@@ -65,12 +65,12 @@ all:
 		RESULTS_DIR=$(RESULTS_DIR)
 	$(MAKE) plot RESULTS_DIR=$(RESULTS_DIR) FIGURES_DIR=$(FIGURES_DIR)
 
-extract-models: $(MODEL_PICKLES)
+# extract-models: $(MODEL_PICKLES)
 run-ablation: $(RESULTS)
 plot: $(PLOT_STAMP)
 
-$(MODELS_DIR)/%.pickle: $(EXAMPLES_DIR)/%.py dump_model.py
-	$(PYTHON) dump_model.py --out=$(MODELS_DIR) $<
+# $(MODELS_DIR)/%.pickle: $(EXAMPLES_DIR)/%.py dump_model.py
+# 	$(PYTHON) dump_model.py --out=$(MODELS_DIR) $<
 
 define ABLATION_RULE
 $(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle run_model.py $(CPMPY_DEPS)
@@ -86,4 +86,4 @@ $(PLOT_STAMP): $(RESULTS) plot_ablation.py
 	@touch $@
 
 clean:
-	rm -rf $(MODELS_DIR) run-ablation run-ablation-stats figures figures-stats
+	rm -rf $(MODELS_DIR) $(RESULTS_DIR) $(FIGURES_DIR)
