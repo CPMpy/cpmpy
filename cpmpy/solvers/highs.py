@@ -48,7 +48,7 @@ import numpy.typing as npt
 
 from .solver_interface import Callback, SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, Expression, Operator
+from ..expressions.core import Expression, BoolVal, Comparison, Operator
 from ..expressions.utils import is_any_list, is_num, is_int
 from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalfunctions import FloatSum
@@ -402,7 +402,7 @@ class CPM_highs(SolverInterface):
             self.highs.stopCallback(callback_type)
         info = self.highs.getInfo()
         model_status = self.highs.getModelStatus()
-       
+        
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.highs.getRunTime()
 

@@ -44,7 +44,7 @@
     Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
-from typing import Optional, List, Callable, Iterable, TYPE_CHECKING
+from typing import Optional, List, Callable, Iterable
 import warnings
 import cpmpy as cp
 
@@ -767,10 +767,8 @@ class CPM_gurobi(SolverInterface):
         grb_vars = self.solver_vars(cpm_vars)
 
         import gurobipy as gp
-        from gurobipy import GRB
-        from gurobipy._callbackconst import CallbackConstClass
 
-        def callback(model:gp.Model, state:CallbackConstClass, **kwargs) -> None:
+        def callback(model:gp.Model, state:int, **kwargs) -> None:
             # fill in vars
             if state not in self.events:
                 return # irrelevant event
