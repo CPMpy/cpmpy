@@ -204,12 +204,16 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
+    # Enable named encoding variables for debugging in tests
+    from cpmpy.transformations.int2bool import IntVarEnc
+    IntVarEnc.NAMED = True
+
     # Configure logging for test filtering information
     logging.basicConfig(
         level=logging.INFO,
         format='%(levelname)s: %(message)s'
     )
-    
+
     # Register custom marker for pytest test collection
     for marker, description in MARKERS.items():
         config.addinivalue_line(
