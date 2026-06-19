@@ -273,7 +273,7 @@ class CPM_gcs(SolverInterface):
         return has_sol
 
     def _get_callback(self, display:Callback) -> Callable[[dict[str,int]], None]:
-        if isinstance(display, Expression) or is_any_list(Expression):
+        if isinstance(display, Expression) or is_any_list(display):
             cpm_vars = get_variables(display)
         else:
             cpm_vars = list(self.user_vars)

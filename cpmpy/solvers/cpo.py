@@ -726,9 +726,23 @@ try:
     from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
     class CpoSolutionCounter(CpoSolverListener):
         """
-            verbose (bool, default: False): whether to print info on every solution found 
-    """
+        Native CP Optimizer callback for solution counting.
 
+        It is based on cpo's built-in `CpoSolverListener`.
+
+        use with CPM_cpo as follows:
+
+        .. code-block:: python
+            
+            cb = CpoSolutionCounter()
+            s.solve(solution_callback=cb)
+
+        then retrieve the solution count with ``cb.solution_count()``
+
+        Arguments:
+            verbose (bool, default: False): whether to print info on every solution found 
+        """
+        
         def __init__(self, verbose=False):
             super().__init__()
             self.__solution_count = 0

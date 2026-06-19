@@ -184,7 +184,7 @@ class CPM_template(SolverInterface):
         """
         return self.TPL_model
 
-    def solve(self, time_limit:Optional[float]=None, display=Optional[Callback], **kwargs):
+    def solve(self, time_limit:Optional[float]=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the TEMPLATE solver
 

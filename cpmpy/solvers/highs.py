@@ -365,8 +365,6 @@ class CPM_highs(SolverInterface):
 
         HiGHS option reference: https://ergo-code.github.io/HiGHS/dev/options/definitions/
 
-        Solution callbacks are not connected yet; see HiGHS callback documentation for future reference:
-        https://ergo-code.github.io/HiGHS/stable/callbacks/
         """
         import highspy
 
@@ -400,9 +398,11 @@ class CPM_highs(SolverInterface):
                 warnings.warn(f"HiGHS: failed to set option '{key}' = {val!r}: {e}")
 
         status = self.highs.run()
+        if display is not None: # stop the callback
+            self.highs.stopCallback(callback_type)
         info = self.highs.getInfo()
         model_status = self.highs.getModelStatus()
-
+       
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.highs.getRunTime()
 

@@ -768,8 +768,9 @@ class CPM_gurobi(SolverInterface):
 
         import gurobipy as gp
         from gurobipy import GRB
+        from gurobipy._callbackconst import CallbackConstClass
 
-        def callback(model:gp.Model, state:GRB.Callback, **kwargs) -> None:
+        def callback(model:gp.Model, state:CallbackConstClass, **kwargs) -> None:
             # fill in vars
             if state not in self.events:
                 return # irrelevant event
