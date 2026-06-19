@@ -39,26 +39,35 @@ import numpy as np
 import cpmpy as cp
 import warnings
 
-from typing import Union, Optional
+from typing import Union, Optional, Callable
 
 from cpmpy.expressions.core import BoolVal, Comparison, Operator
 from cpmpy.expressions.variables import _NumVarImpl, _BoolVarImpl, NegBoolView, _IntVarImpl
 from cpmpy.transformations.comparison import only_numexpr_equality
-from cpmpy.transformations.decompose_global import decompose_in_tree
+from cpmpy.transformations.decompose_global import decompose_objective
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.linearize import linearize_constraint, only_positive_bv
+from cpmpy.transformations.linearize import decompose_linear, linearize_constraint, only_positive_bv, only_positive_bv_wsum
 from cpmpy.transformations.normalize import toplevel_list
-from cpmpy.transformations.reification import only_implies, reify_rewrite
+from cpmpy.transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from cpmpy.expressions.utils import is_any_list, is_num
 from cpmpy.expressions.globalconstraints import DirectConstraint
-from cpmpy.expressions.variables import ignore_variable_name_check
+# from cpmpy.expressions.variables import ignore_variable_name_check
+from cpmpy.transformations.safening import no_partial_functions, safen_objective
+
+try:
+    from cpmpy.expressions.variables import _ignore_variable_name_check
+except ImportError:
+    from contextlib import contextmanager
+    @contextmanager
+    def _ignore_variable_name_check():
+        yield
 
 
 _std_open = open
-def read_scip(fname: Union[str, os.PathLike], open=open, assume_integer:bool=False) -> cp.Model:
+def load_scip(fname: Union[str, os.PathLike], open=open, assume_integer:bool=False) -> cp.Model:
     """
-    Read a SCIP-compatible model from a file and return a CPMpy model.
+    Load a SCIP-compatible model from a file and return a CPMpy model.
 
     Arguments:
         fname: The path to the SCIP-compatible file to read.
@@ -71,39 +80,39 @@ def read_scip(fname: Union[str, os.PathLike], open=open, assume_integer:bool=Fal
     if not _SCIPWriter.supported():
         raise Exception("SCIP: Install SCIP IO dependencies: cpmpy[io.scip]")
 
-    with ignore_variable_name_check():
+    # with ignore_variable_name_check():
                 
-        from pyscipopt import Model
+    from pyscipopt import Model
 
-        # Load file into pyscipopt model
-        scip = Model()
-        scip.hideOutput()
-        scip.readProblem(filename=fname)
-        scip.hideOutput(quiet=False)
+    # Load file into pyscipopt model
+    scip = Model()
+    scip.hideOutput()
+    scip.readProblem(filename=fname)
+    scip.hideOutput(quiet=False)
 
-        # 1) translate variables
-        scip_vars = scip.getVars()
-        var_map = {}
-        for var in scip_vars:
-            name = var.name         # name of the variable
-            vtype = var.vtype()     # type of the variable
-            if vtype == "BINARY":
-                var_map[name] = cp.boolvar(name=name)
-            elif vtype == "INTEGER":
-                lb = int(var.getLbOriginal())
-                ub = int(var.getUbOriginal())
+    # 1) translate variables
+    scip_vars = scip.getVars()
+    var_map = {}
+    for var in scip_vars:
+        name = var.name         # name of the variable
+        vtype = var.vtype()     # type of the variable
+        if vtype == "BINARY":
+            var_map[name] = cp.boolvar(name=name)
+        elif vtype == "INTEGER":
+            lb = int(var.getLbOriginal())
+            ub = int(var.getUbOriginal())
+            var_map[name] = cp.intvar(lb, ub, name=name)
+        elif vtype == "CONTINUOUS":
+            if assume_integer:
+                lb = int(math.ceil(var.getLbOriginal()))
+                ub = int(math.floor(var.getUbOriginal()))
+                if lb != var.getLbOriginal() or ub != var.getUbOriginal():
+                    warnings.warn(f"Continuous variable {name} has non-integer bounds {var.getLbOriginal()} - {var.getUbOriginal()}. CPMpy will assume it is integer.")
                 var_map[name] = cp.intvar(lb, ub, name=name)
-            elif vtype == "CONTINUOUS":
-                if assume_integer:
-                    lb = int(math.ceil(var.getLbOriginal()))
-                    ub = int(math.floor(var.getUbOriginal()))
-                    if lb != var.getLbOriginal() or ub != var.getUbOriginal():
-                        warnings.warn(f"Continuous variable {name} has non-integer bounds {var.getLbOriginal()} - {var.getUbOriginal()}. CPMpy will assume it is integer.")
-                    var_map[name] = cp.intvar(lb, ub, name=name)
-                else:
-                    raise ValueError(f"CPMpy does not support continious variables: {name}")
             else:
-                raise ValueError(f"Unsupported variable type: {vtype}")
+                raise ValueError(f"CPMpy does not support continious variables: {name}")
+        else:
+            raise ValueError(f"Unsupported variable type: {vtype}")
         
 
         model = cp.Model()
@@ -181,6 +190,14 @@ class _SCIPWriter:
     TODO: code should be reused once SCIP has been added as a solver backend.
     """
 
+     # Globals we keep (decompose_in_tree) and how they are translated:
+    # - "xor": kept; linearize passes it through; we translate to addConsXor() in add().
+    # - "abs": GlobalFunction supported natively (PySCIPOpt addCons(abs(x) <= k)).
+    # SCIP has no native AllDifferent, Circuit, Table, Cumulative, etc.; others are decomposed by decompose_in_tree.
+    supported_global_constraints = frozenset({"xor", "abs"})
+    supported_reified_global_constraints = frozenset()
+
+
     @staticmethod
     def supported():
         # try to import the package
@@ -249,17 +266,23 @@ class _SCIPWriter:
                 are premanently posted to the solver)
         """
 
-        # make objective function non-nested
-        (flat_obj, flat_cons) = (flatten_objective(expr))
-        self += flat_cons
-        get_variables(flat_obj, collect=self.user_vars)  # add potentially created constraints
+        get_variables(expr, collect=self.user_vars)
 
-        # make objective function or variable and post
-        obj = self._make_numexpr(flat_obj)
+        obj, safe_cons = safen_objective(expr)
+        obj, decomp_cons = decompose_objective(obj,
+                                               supported=self.supported_global_constraints,
+                                               supported_reified=self.supported_reified_global_constraints,
+                                               csemap=self._csemap)
+        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+        obj = only_positive_bv_wsum(obj)
+
+        self.add(safe_cons + decomp_cons + flat_cons)
+
+        scip_obj = self._make_numexpr(obj)
         if minimize:
-            self.scip_model.setObjective(obj, sense='minimize')
+            self.scip_model.setObjective(scip_obj, sense='minimize')
         else:
-            self.scip_model.setObjective(obj, sense='maximize')
+            self.scip_model.setObjective(scip_obj, sense='maximize')
 
 
     def _make_numexpr(self, cpm_expr):
@@ -279,13 +302,16 @@ class _SCIPWriter:
             return self.solver_var(cpm_expr)
 
         # sum
-        if cpm_expr.name == "sum":
+        if hasattr(cpm_expr, "name") and cpm_expr.name == "sum":
             return scip.quicksum(self.solver_vars(cpm_expr.args))
-        if cpm_expr.name == "sub":
+        if hasattr(cpm_expr, "name") and cpm_expr.name == "sub":
             a,b = self.solver_vars(cpm_expr.args)
             return a - b
+        if hasattr(cpm_expr, "name") and cpm_expr.name == "abs":
+            (a,) = self.solver_vars(cpm_expr.args)
+            return abs(a)
         # wsum
-        if cpm_expr.name == "wsum":
+        if hasattr(cpm_expr, "name") and cpm_expr.name == "wsum":
             return scip.quicksum(w * self.solver_var(var) for w, var in zip(*cpm_expr.args))
 
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
@@ -307,15 +333,27 @@ class _SCIPWriter:
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
+
+        _csemap = {}
+
         cpm_cons = toplevel_list(cpm_expr)
-        supported = {"alldifferent"}  # alldiff has a specialized MIP decomp in linearize
-        cpm_cons = decompose_in_tree(cpm_cons, supported)
-        cpm_cons = flatten_constraint(cpm_cons)  # flat normal form
-        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum','sub']))  # constraints that support reification
-        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]))  # supports >, <, !=
-        cpm_cons = only_implies(cpm_cons)  # anything that can create full reif should go above...
-        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum","sub", "mul", "div"})) # the core of the MIP-linearization
-        cpm_cons = only_positive_bv(cpm_cons)  # after linearization, rewrite ~bv into 1-bv
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
+        # Use the same linear-first decomposition as MIP solver backends.
+        # This ensures globals such as alldifferent are decomposed with their
+        # specialized linear decompositions before linearize_constraint().
+        cpm_cons = decompose_linear(
+            cpm_cons,
+            supported=self.supported_global_constraints,
+            supported_reified=self.supported_reified_global_constraints,
+            csemap=self._csemap,
+        )
+        cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
+        cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(['sum', 'wsum', 'sub']), csemap=self._csemap)
+        cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum", "sub"]) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+        cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
+        cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "sub", "mul", "div", "sum!=", "wsum!="}) | self.supported_global_constraints, csemap=self._csemap)
+        cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
     def _get_constraint_name(self):
@@ -370,8 +408,9 @@ class _SCIPWriter:
                     sciplhs = self._make_numexpr(lhs)
                     self.scip_model.addCons(sciplhs >= sciprhs, name=self._get_constraint_name())
                 elif cpm_expr.name == '==':
+                    lhs_name = getattr(lhs, "name", None)
                     if isinstance(lhs, _NumVarImpl) \
-                            or (isinstance(lhs, Operator) and (lhs.name == 'sum' or lhs.name == 'wsum' or lhs.name == "sub")):
+                            or (lhs_name in {"sum", "wsum", "sub", "abs"}):
                         # a BoundedLinearExpression LHS, special case, like in objective
                         sciplhs = self._make_numexpr(lhs)
                         self.scip_model.addCons(sciplhs == sciprhs, name=self._get_constraint_name())
@@ -450,18 +489,25 @@ class _SCIPWriter:
     __add__ = add
 
 
-def _to_writer(model: cp.Model, problem_name: Optional[str] = None) -> _SCIPWriter:
+def _to_writer(model: cp.Model, problem_name: Optional[str] = None, require_objective: bool = False) -> _SCIPWriter:
     """
     Convert a CPMpy model to a SCIP writer
+    
+    Arguments:
+        model: CPMpy model
+        problem_name: Optional name for the problem
+        require_objective: If True, raise an error if model has no objective. 
+                          If False, allow satisfaction problems (no objective).
     """
     writer = _SCIPWriter(problem_name=problem_name)
     # 1) post constraints
     for constraint in model.constraints:
         writer += constraint
-    # 2) post objective
-    if not model.has_objective():
+    # 2) post objective (if present)
+    if model.has_objective():
+        writer.objective(model.objective_, model.objective_is_min)
+    elif require_objective:
         raise ValueError("Model has no objective function")
-    writer.objective(model.objective_, model.objective_is_min)
     return writer
 
 
@@ -520,41 +566,68 @@ def _add_header(fname: os.PathLike, format: str, header: Optional[str] = None):
         f.writelines(lines)
 
 
-def write_scip(model: cp.Model, fname: Optional[str] = None, format: str = "mps", header: Optional[str] = None, verbose: bool = False) -> str:
+def write_scip(model: cp.Model, fname: Optional[str] = None, format: str = "mps", header: Optional[str] = None, verbose: bool = False, open: Optional[Callable] = None) -> str:
     """
     Write a CPMpy model to file using a SCIP provided writer.
     Supported formats include: 
     - "mps"
     - "lp"
     - "cip"
-    - "fzn"
+    - "fzn" (supports both satisfaction and optimization problems)
     - "gms"
     - "pip"
 
     More formats can be supported upon the installation of additional dependencies (like SIMPL).
     For more information, see the SCIP documentation: https://pyscipopt.readthedocs.io/en/latest/tutorials/readwrite.html
+
+    Arguments:
+        model: CPMpy model to write.
+        fname: Path to write to. If None, the file content is returned as a string.
+        format: Output format (e.g. "mps", "lp", "cip", "fzn", "gms", "pip").
+        header: Optional header text to prepend (format-dependent comment style).
+        verbose: If True, allow SCIP to print progress.
+        open: Optional callable to open the file for writing (default: builtin ``open``).
+            Called as ``open(fname, "w")``. Mirrors the ``open=`` argument in loaders and
+            allows custom compression or I/O (e.g.
+            ``lambda p, mode='w': lzma.open(p, 'wt')``).
+
+    Returns:
+        The file content as a string (whether written to ``fname`` or not).
     """
 
-    writer = _to_writer(model, problem_name="CPMpy Model")
-    
-    # Decide where to write
-    if fname is None:
-        with tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False) as tmp:
-            fname = tmp.name
+    # FZN format supports satisfaction problems (no objective), others may require it
+    #require_obj = format != "fzn"
+    require_obj = False
+    writer = _to_writer(model, problem_name="CPMpy Model", require_objective=require_obj)
+
+    opener = open if open is not None else _std_open
+
+    # Always write via SCIP to a temp file, then add header and get content
+    with tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False) as tmp:
+        tmp_fname = tmp.name
+    try:
+        if not verbose:
+            writer.scip_model.hideOutput()
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        old_stdout = os.dup(1)
+        os.dup2(devnull, 1)
         try:
-            writer.scip_model.writeProblem(fname)
-            _add_header(fname, format, header)
-            with open(fname, "r") as f:
-                return f.read()
+            writer.scip_model.writeProblem(tmp_fname, verbose=verbose)
         finally:
-            os.remove(fname)
-    else:
-        if not verbose: writer.scip_model.hideOutput()
-        writer.scip_model.writeProblem(fname, verbose=verbose)
-        if not verbose: writer.scip_model.hideOutput(quiet=False)
-        _add_header(fname, format, header)
-        with open(fname, "r") as f:
-            return f.read()
+            os.dup2(old_stdout, 1)
+            os.close(devnull)
+            os.close(old_stdout)
+        if not verbose:
+            writer.scip_model.hideOutput(quiet=False)
+        _add_header(tmp_fname, format, header)
+        with _std_open(tmp_fname, "r") as f:
+            content = f.read()
+        if fname is not None:
+            with opener(fname, "w") as f:
+                f.write(content)
+        return content
+    finally:
+        os.remove(tmp_fname)
 
 def main():
     parser = argparse.ArgumentParser(description="Parse and solve a SCIP compatible model using CPMpy")
@@ -591,6 +664,7 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
 
 if __name__ == "__main__":
     main()

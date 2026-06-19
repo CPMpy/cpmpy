@@ -28,9 +28,9 @@ from typing import Union
 
 
 _std_open = open
-def read_jsplib(jsp: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_jsplib(jsp: Union[str, os.PathLike], open=open) -> cp.Model:
     """
-    Parser for JSPLib format. Reads in an instance and returns its matching CPMpy model.
+    Loader for JSPLib format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
         jsp (str or os.PathLike):
@@ -123,9 +123,9 @@ def main():
     # Build the CPMpy model
     try:
         if args.string:
-            model = read_jsplib(args.model)
+            model = load_jsplib(args.model)
         else:
-            model = read_jsplib(os.path.expanduser(args.model))
+            model = load_jsplib(os.path.expanduser(args.model))
     except Exception as e:
         sys.stderr.write(f"Error reading model: {e}\n")
         sys.exit(1)
@@ -147,6 +147,7 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
 
 if __name__ == "__main__":
     main()

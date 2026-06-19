@@ -25,7 +25,7 @@ import re
 import sys
 import argparse
 from io import StringIO
-from typing import Union
+from typing import Union, Optional, Callable
 from functools import reduce
 from operator import mul
 
@@ -33,20 +33,25 @@ from operator import mul
 import cpmpy as cp
 from cpmpy.transformations.normalize import toplevel_list,simplify_boolean
 from cpmpy.transformations.safening import no_partial_functions, safen_objective
-from cpmpy.transformations.decompose_global import decompose_in_tree, decompose_objective
 from cpmpy.transformations.flatten_model import flatten_constraint, flatten_objective
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
-from cpmpy.transformations.linearize import linearize_constraint, only_positive_bv_wsum
-from cpmpy.transformations.int2bool import int2bool, _encode_lin_expr
+from cpmpy.transformations.linearize import (
+    decompose_linear,
+    decompose_linear_objective,
+    linearize_constraint,
+    only_positive_bv_wsum,
+)
+from cpmpy.transformations.cse import CSEMap
+from cpmpy.transformations.int2bool import int2bool, _encode_int_var, _decide_encoding
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.expressions.variables import _IntVarImpl, NegBoolView, _BoolVarImpl
+from cpmpy.expressions.variables import _IntVarImpl, NegBoolView, _BoolVarImpl, allow_reserved_var_names
 from cpmpy.expressions.core import Operator, Comparison
-from cpmpy import __version__
-
+from cpmpy.expressions.utils import is_num
 
 # Regular expressions
 HEADER_RE = re.compile(r'(.*)\s*#variable=\s*(\d+)\s*#constraint=\s*(\d+).*')
-TERM_RE = re.compile(r"([+-]?\d+)((?:\s+~?x\d+)+)")
+TERM_RE = re.compile(r"([+-])\s*((?:(?:\d+\s+)?~?[^\s;]+(?:\s+~?[^\s;]+)*))(?=\s+[+-]|$)")
+TERM_RE = re.compile(r"([+-]?)\s*((?:(?:\d+\s+)?~?[^\s;=]+(?:\s+~?[^\s;=]+)*?))(?=\s*[+-]|\s*=|\s*;|$)")
 OBJ_TERM_RE = re.compile(r'^min:')
 IND_TERM_RE = re.compile(r'([>=|<=|=]+)\s+([+-]?\d+)')
 IND_TERM_RE = re.compile(r'(>=|<=|=)\s*([+-]?\d+)')
@@ -74,20 +79,52 @@ def _parse_term(line, vars):
     """
 
     terms = []
-    for w, vars_str in TERM_RE.findall(line):
-        factors = []
+    text = line.strip()
+    # Keep only the expression fragment for objective/constraint lines.
+    if ":" in text:
+        text = text.split(":", 1)[1]
+    text = text.replace(";", " ").strip()
+    if not text:
+        raise ValueError(f"Could not parse OPB term from empty line: {line}")
 
-        for v in vars_str.split():
-            if v.startswith("~x"):
-                idx = int(v[2:]) - 1 # remove "~x" and opb is 1-based indexing
-                factors.append(~vars[idx])
-            else:
-                idx = int(v[1:]) - 1 # remove "x" and opb is 1-based indexing
-                factors.append(vars[idx])
+    # OPB allows first term without an explicit sign. Normalize by prepending '+'
+    # and then parse term-by-term using TERM_RE.
+    if text and text[0] not in "+-":
+        text = "+ " + text
+
+    parsed_terms = TERM_RE.findall(text) # contains each part of the sum we're building
+    if not parsed_terms:
+        raise ValueError(f"Could not parse any OPB terms from line: {line}")
+
+    for sign_tok, body in parsed_terms:
+        parts = body.split()
+        if not parts:
+            raise ValueError(f"Missing variable token in OPB term: {line}")
+
+        coeff = 1
+        # Support unsigned/signed integer coefficients. Unsigned is interpreted as '+'.
+        if parts[0].lstrip("+-").isdigit():
+            coeff = int(parts[0])
+            parts = parts[1:]
+        if not parts:
+            raise ValueError(f"Missing variable token in OPB term: {line}")
+
+        factors = []
+        for tok in parts:
+            neg = tok.startswith("~")
+            var_name = tok[1:] if neg else tok
+            if var_name not in vars:
+                # OPB annotations may contain reserved prefixes (IV*/BV*); accept them while parsing.
+                with allow_reserved_var_names():
+                    vars[var_name] = cp.boolvar(name=var_name)
+            factors.append(~vars[var_name] if neg else vars[var_name])
         
-        term = int(w) * reduce(mul, factors, 1) # create weighted term
+        weight = -coeff if sign_tok == "-" else coeff
+        term = weight * reduce(mul, factors, 1) # create weighted term
         terms.append(term)
 
+    if len(terms) == 0:
+        raise ValueError(f"Could not parse any OPB terms from line: {line}")
     return cp.sum(terms)
 
 def _parse_constraint(line, vars):
@@ -107,10 +144,13 @@ def _parse_constraint(line, vars):
         sum([-1, -1] * [(IV1*IV14), (IV1*~IV17)]) >= -1
     """
 
-    op, ind_term = IND_TERM_RE.search(line).groups()
-    lhs = _parse_term(line, vars)
+    match = IND_TERM_RE.search(line)
+    if match is None:
+        raise ValueError(f"Could not parse OPB comparator/rhs from line: {line}")
+    op, ind_term = match.groups()
+    lhs = _parse_term(line[:match.start()], vars)
 
-    rhs = int(ind_term) if ind_term.lstrip("+-").isdigit() else vars[int(ind_term)]
+    rhs = int(ind_term) if ind_term.lstrip("+-").isdigit() else vars[ind_term]
 
     return cp.expressions.core.Comparison(
         name="==" if op == "=" else ">=",
@@ -119,9 +159,9 @@ def _parse_constraint(line, vars):
     )
 
 _std_open = open
-def read_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
     """
-    Parser for OPB (Pseudo-Boolean) format. Reads in an instance and returns its matching CPMpy model.
+    Loader for OPB (Pseudo-Boolean) format. Loads an instance and returns its matching CPMpy model.
 
     Based on PyPBLib's example parser: https://hardlog.udl.cat/static/doc/pypblib/html/library/index.html#example-from-opb-to-cnf-file
 
@@ -175,15 +215,13 @@ def read_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
         header = HEADER_RE.match(_line)
         if not header:
             raise ValueError(f"Missing or incorrect header: \n0: {line}1: {_line}2: ...")
-    nr_vars = int(header.group(2))
+    nr_vars_declared = int(header.group(2))
 
     # Generator without comment lines
-    reader = (l for l in map(str.strip, f) if l and l[0] != '*')
+    reader = (line_text for line_text in map(str.strip, f) if line_text and line_text[0] != '*')
 
     # CPMpy objects
-    vars = cp.boolvar(shape=nr_vars, name="x")
-    if nr_vars == 1:
-        vars = cp.cpm_array([vars]) # ensure vars is indexable even for single variable case
+    vars = {}
     model = cp.Model()
     
     # Special case for first line -> might contain objective function
@@ -196,11 +234,23 @@ def read_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
 
     # Start parsing line by line
     for line in reader:
-        model.add(_parse_constraint(line, vars))
+        cons = _parse_constraint(line, vars)
+        assert isinstance(cons, Comparison), cons
+        lhs, rhs = cons.args
+        assert isinstance(lhs, Operator) and lhs.name == "wsum" or lhs.name == "sum", lhs
+        assert isinstance(rhs, int), rhs
+        model.add(cons)
+
+    if len(vars) > nr_vars_declared:
+        import warnings
+        warnings.warn(
+            f"Header declares {nr_vars_declared} variables but found {len(vars)} unique variables while parsing",
+            stacklevel=2,
+        )
 
     return model
 
-def write_opb(model, fname=None, encoding="auto"):
+def write_opb(model, fname=None, encoding="auto", header=None, open=None, annotate: Optional[Callable] = None):
     """
     Export a CPMpy model to the OPB (Pseudo-Boolean) format.
 
@@ -213,21 +263,28 @@ def write_opb(model, fname=None, encoding="auto"):
         model (cp.Model): The CPMpy model to export.
         fname (str, optional): The file name to write the OPB output to. If None, the OPB string is returned.
         encoding (str, optional): The encoding used for `int2bool`. Options: ("auto", "direct", "order", "binary").
+        header (str, optional): Optional header text to add as OPB comments. If provided, each line
+            will be prefixed with "* ".
+        open (callable, optional): Callable to open the file for writing (default: builtin ``open``).
+            Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
+            in loaders and allows custom compression or I/O (e.g.
+            ``lambda p, mode='w': lzma.open(p, 'wt')``).
+        annotate (callable, optional): ``annotate(bool_var, ivarmap) -> str`` for each OPB identifier.
+            If omitted, uses names derived from the integer encoding map:
+            ``source>=threshold``, ``source=value``, or ``source[bit=i]`` (or ``var.name`` for plain Booleans).
 
     Returns:
         str or None: The OPB string if `fname` is None, otherwise nothing (writes to file).
 
     Format:
         * #variable= <n_vars> #constraint= <n_constraints>
-        * OPB file generated by CPMpy version <version>
         min/max: <objective>;
         <constraint_1>;
         <constraint_2>;
         ...
 
     Note:
-        Some solvers only support variable names of the form x<int>. The OPB writer will remap
-        all CPMpy variables to such a format internally.
+        Solvers that only accept ``x<int>`` can pass a custom ``annotate`` callback.
 
     Example:
         >>> from cpmpy import *
@@ -236,12 +293,12 @@ def write_opb(model, fname=None, encoding="auto"):
         >>> print(write_opb(m))
     """
 
-    csemap, ivarmap = dict(), dict()
+    csemap, ivarmap = CSEMap(), dict()
     opb_cons = _transform(model.constraints, csemap, ivarmap, encoding)
 
     if model.objective_ is not None:
         opb_obj, const, extra_cons = _transform_objective(model.objective_, csemap, ivarmap, encoding)
-        opb_cons += extra_cons
+        opb_cons += _transform(extra_cons, csemap, ivarmap, encoding)
     else:
         opb_obj = None
 
@@ -250,10 +307,33 @@ def write_opb(model, fname=None, encoding="auto"):
     all_vars = get_variables(opb_cons + ([opb_obj] if opb_obj is not None else []))
     out = [
         f"* #variable= {len(all_vars)} #constraint= {len(opb_cons)}",
-        f"* OPB file generated by CPMpy version {__version__}",
     ]
-    # Remap variables to 'x1', 'x2', ..., the standard OPB way
-    varmap = {v: f"x{i+1}" for i, v in enumerate(all_vars)}
+    if header:
+        header_lines = ["* " + line for line in str(header).splitlines()]
+        out.extend(header_lines)
+
+    # if annotate is None:
+    #     reverse = _build_reverse_map(ivarmap)
+
+    #     # Simple default naming, matching the DIMACS notebook reference.
+    #     def annotate(v, ivarmap):
+    #         info = reverse.get(id(v))
+    #         if info is None:
+    #             if v.name[:2] == "BV": # aux vars introduced by CPMpy
+    #                 return "_" + v.name
+    #         elif info["encoding"] == "order":
+    #             return f"{info['source_name']}_ge_{info['threshold']}"
+    #         elif info["encoding"] == "binary":
+    #             return f"{info['source_name']}_bit{info['bit']}"
+    #         elif info["encoding"] == "direct":
+    #             return f"{info['source_name']}_eq_{info['value']}"
+    #         else:
+    #             return v.name
+
+    if annotate is None:
+        varmap = {v: f"x{i+1}" for i, v in enumerate(all_vars)} 
+    else:
+        varmap = {v: ann for v, ann in zip(all_vars, annotate(all_vars, ivarmap))}
     
     # Write objective, if present
     if model.objective_ is not None:
@@ -271,9 +351,9 @@ def write_opb(model, fname=None, encoding="auto"):
     contents = "\n".join(out)
     if fname is None:
         return contents
-    else:
-        with open(fname, "w") as f:
-            f.write(contents)
+    opener = open if open is not None else _std_open
+    with opener(fname, "w") as f:
+        f.write(contents)
 
 def _normalized_comparison(lst_of_expr):
     """
@@ -292,9 +372,11 @@ def _normalized_comparison(lst_of_expr):
     """
     newlist = []
     for cpm_expr in lst_of_expr:
-        if isinstance(cpm_expr, cp.BoolVal) and cpm_expr.value() is False:
-            raise NotImplementedError(f"Cannot transform {cpm_expr} to OPB constraint")
-        
+        if isinstance(cpm_expr, cp.BoolVal):
+            if cpm_expr.value() is False:
+                raise NotImplementedError(f"Cannot transform {cpm_expr} to OPB constraint")
+            continue  # trivially True, skip
+
         # single Boolean variable
         if isinstance(cpm_expr, _BoolVarImpl):
             cpm_expr = Operator("sum", [cpm_expr]) >= 1
@@ -311,7 +393,7 @@ def _normalized_comparison(lst_of_expr):
         if isinstance(cpm_expr, Comparison):
             lhs, rhs = cpm_expr.args
 
-            if isinstance(lhs, _BoolVarImpl):
+            if isinstance(lhs, (_BoolVarImpl, _IntVarImpl)):
                 lhs = Operator("sum", [lhs])
             if lhs.name == "sum":
                 lhs = Operator("wsum", [[1]*len(lhs.args), lhs.args])
@@ -347,13 +429,11 @@ def _wsum_to_str(cpm_expr, varmap):
 
     out = []
     for w, var in zip(weights, args):
-        var = varmap[var] if not isinstance(var, NegBoolView) else f"~{varmap[var._bv]}"
-        if w < 0:
-            out.append(f"- {w} {var}")
-        elif w > 0:
-            out.append(f"+ {w} {var}")
-        else:
-            pass # zero weight, ignore
+        if w == 0:
+            continue
+        lit = varmap[var] if not isinstance(var, NegBoolView) else "~" + str(varmap[var._bv])
+        # OPB requires no space between sign and digits (e.g., "-2", "+4").
+        out.append(f"{w:+d} {lit}")
     
     str_out = " ".join(out)
     return str_out
@@ -365,9 +445,13 @@ def _transform(cpm_expr, csemap, ivarmap, encoding="auto"):
 
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
-    cpm_cons = decompose_in_tree(cpm_cons,
-        supported={"alldifferent"},  # alldiff has a specialized MIP decomp in linearize
-        csemap=csemap
+    # Use linear-specific decompositions (e.g. AllDifferent.decompose_linear)
+    # before linearization, consistent with MIP backends.
+    cpm_cons = decompose_linear(
+        cpm_cons,
+        supported=frozenset(),
+        supported_reified=frozenset(),
+        csemap=csemap,
     )
     cpm_cons = simplify_boolean(cpm_cons)
     cpm_cons = flatten_constraint(cpm_cons, csemap=csemap)  # flat normal form
@@ -387,8 +471,12 @@ def _transform_objective(expr, csemap, ivarmap, encoding="auto"):
 
     # transform objective
     obj, safe_cons = safen_objective(expr)
-    obj, decomp_cons = decompose_objective(obj, supported={"alldifferent"},
-                                            csemap=csemap)
+    obj, decomp_cons = decompose_linear_objective(
+        obj,
+        supported=frozenset(),
+        supported_reified=frozenset(),
+        csemap=csemap,
+    )
     obj, flat_cons = flatten_objective(obj, csemap=csemap)
     obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
@@ -414,6 +502,32 @@ def _transform_objective(expr, csemap, ivarmap, encoding="auto"):
     return obj, const, safe_cons + decomp_cons + flat_cons
 
 
+def _encode_lin_expr(ivarmap, xs, weights, encoding="auto"):
+    """
+    Encode a linear expression (weights * xs) to PB terms and domain constraints.
+
+    Returns:
+        (terms, constraints, k)
+    """
+    terms = []
+    constraints = []
+    k = 0
+
+    for w, x in zip(weights, xs):
+        if is_num(x):
+            k += w * x
+        elif isinstance(x, _BoolVarImpl):
+            terms.append((w, x))
+        else:
+            enc, cons = _encode_int_var(ivarmap, x, _decide_encoding(x, None, encoding))
+            constraints += cons
+            new_terms, k_i = enc.encode_term(w)
+            terms += new_terms
+            k += k_i
+
+    return terms, constraints, k
+
+
 def main():
     parser = argparse.ArgumentParser(description="Parse and solve an OPB model using CPMpy")
     parser.add_argument("model", help="Path to an OPB file (or raw OPB string if --string is given)")
@@ -425,11 +539,13 @@ def main():
     # Build the CPMpy model
     try:
         if args.string:
-            model = read_opb(args.model)
+            model = load_opb(args.model)
         else:
-            model = read_opb(os.path.expanduser(args.model))
+            model = load_opb(os.path.expanduser(args.model))
     except Exception as e:
         sys.stderr.write(f"Error reading model: {e}\n")
+        if isinstance(e, AssertionError):
+            raise e
         sys.exit(1)
 
     # Solve the model
@@ -449,6 +565,7 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
 
 if __name__ == "__main__":
     main()

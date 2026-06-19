@@ -39,9 +39,9 @@ def _get_var(i, vars_dict):
     return vars_dict[i]
 
 _std_open = open
-def read_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
+def load_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
     """
-    Parser for WCNF format. Reads in an instance and returns its matching CPMpy model.
+    Loader for WCNF format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
         wcnf (str or os.PathLike):
@@ -56,7 +56,7 @@ def read_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
     # If wcnf is a path to a file -> open file
     if isinstance(wcnf, (str, os.PathLike)) and os.path.exists(wcnf):
         if open is not None:
-            f = open(wcnf)
+            f = open(wcnf, "rt")
         else:
             f = _std_open(wcnf, "rt")
     # If wcnf is a string containing a model -> create a memory-mapped file
@@ -65,13 +65,20 @@ def read_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
 
     model = cp.Model()
     vars = {}
-    soft_terms = []
-
+    nr_vars_declared = None
+    unsatisfied_soft_terms = []
     for raw in f:
         line = raw.strip()
 
         # Empty line or a comment -> skip
         if not line or line.startswith("c"):
+            continue
+
+        # Problem line
+        if line.startswith("p"):
+            parts = line.split()
+            if len(parts) >= 4:
+                nr_vars_declared = int(parts[2])
             continue
 
         # Hard clause
@@ -88,13 +95,16 @@ def read_wcnf(wcnf: Union[str, os.PathLike], open=open) -> cp.Model:
             literals = map(int, parts[1:])
             clause = [_get_var(i, vars) if i > 0 else ~_get_var(-i, vars)
                     for i in literals if i != 0]
-            soft_terms.append(weight * cp.any(clause))
+            unsatisfied_soft_terms.append(weight * ~cp.any(clause))
 
-    # Objective = sum of soft clause terms
-    if soft_terms:
-        model.maximize(sum(soft_terms))
+    # WCNF/MaxSAT objective: minimize the sum of unsatisfied soft weights.
+    if unsatisfied_soft_terms:
+        model.minimize(sum(unsatisfied_soft_terms))
+
+    model.wcnf_max_var = nr_vars_declared if nr_vars_declared is not None else max(vars, default=0)
 
     return model
+
 
 def main():
     parser = argparse.ArgumentParser(description="Parse and solve a WCNF model using CPMpy")
@@ -107,9 +117,9 @@ def main():
     # Build the CPMpy model
     try:
         if args.string:
-            model = read_wcnf(args.model)
+            model = load_wcnf(args.model)
         else:
-            model = read_wcnf(os.path.expanduser(args.model))
+            model = load_wcnf(os.path.expanduser(args.model))
     except Exception as e:
         sys.stderr.write(f"Error reading model: {e}\n")
         sys.exit(1)
@@ -131,6 +141,7 @@ def main():
             print("Objective:", model.objective_value())
     else:
         print("No solution found.")
+
 
 if __name__ == "__main__":
     main()
