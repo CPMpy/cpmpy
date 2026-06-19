@@ -17,74 +17,16 @@ import os
 
 import cpmpy as cp
 
-from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl
+from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView
 from cpmpy.expressions.core import Operator
 
 from cpmpy.transformations.normalize import toplevel_list
-from cpmpy.transformations.to_cnf import to_cnf
+from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.safening import safen_objective
-from cpmpy.transformations.flatten_model import flatten_objective
-from cpmpy.transformations.linearize import decompose_linear_objective, only_positive_coefficients_
-from cpmpy.transformations.int2bool import _encode_lin_expr
 from cpmpy.transformations.cse import CSEMap
 
 from typing import Optional, Callable, Union
 import builtins
-
-
-
-def _transform_objective(expr, encoding="auto", csemap=None, ivarmap=None):
-    """
-        Transform objective into weighted Boolean literals plus helper constraints.
-
-        :param csemap: optional shared CSE cache (populated in-place)
-        :param ivarmap: optional shared integer variable encoding dict (populated in-place)
-
-        Returns:
-            (weights, xs, const, extra_cons)
-    """
-    if csemap is None:
-        csemap = CSEMap()
-    if ivarmap is None:
-        ivarmap = dict()
-    obj, safe_cons = safen_objective(expr)
-    obj, decomp_cons = decompose_linear_objective(
-        obj,
-        supported=frozenset(),
-        supported_reified=frozenset(),
-        csemap=csemap,
-    )
-    obj, flat_cons = flatten_objective(obj, csemap=csemap)
-
-    weights, xs, const = [], [], 0
-    # we assume obj is a var, a sum or a wsum (over int and bool vars)
-    if isinstance(obj, _IntVarImpl) or isinstance(obj, NegBoolView):  # includes _BoolVarImpl
-        weights = [1]
-        xs = [obj]
-    elif obj.name == "sum":
-        xs = obj.args
-        weights = [1] * len(xs)
-    elif obj.name == "wsum":
-        weights, xs = obj.args
-    else:
-        raise NotImplementedError(f"DIMACS: Non supported objective {obj} (yet?)")
-
-    terms, enc_cons, k = _encode_lin_expr(ivarmap, xs, weights, encoding, csemap=csemap)
-    const += k
-
-    extra_cons = safe_cons + decomp_cons + flat_cons + enc_cons
-
-    # remove terms with coefficient 0 (`only_positive_coefficients_` may return them and RC2 does not accept them)
-    terms = [(w, x) for w, x in terms if w != 0]
-    if len(terms) == 0:
-        return [], [], const, extra_cons
-
-    ws, xs = zip(*terms)  # unzip
-    new_weights, new_xs, k = only_positive_coefficients_(ws, xs)
-    const += k
-
-    return list(new_weights), list(new_xs), const, extra_cons
 
 
 def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header:Optional[str]="DIMACS file written by CPMpy", open: Optional[Callable]=None, annotate: Optional[Callable]=None):
@@ -125,7 +67,7 @@ def write_dimacs(model, fname=None, encoding="auto", p_header:bool=False, header
     objective_lits = []
     objective_weights = []
     if model.has_objective():
-        objective_weights, objective_lits, _, extra_cons = _transform_objective(
+        objective_weights, objective_lits, _, extra_cons = to_cnf_objective(
             model.objective_, encoding=encoding, csemap=csemap, ivarmap=ivarmap
         )
         constraints += extra_cons
@@ -306,6 +248,3 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open=None):
         assert len(m.constraints) == nr_cls_declared, f"Number of clauses was declared in p-line as {nr_cls_declared}, but was {len(m.constraints)}"
 
     return m
-
-# Backward compatibility alias
-read_dimacs = load_dimacs
