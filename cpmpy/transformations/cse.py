@@ -37,6 +37,26 @@ class CSEMap:
             
         return self.flat_map.get(expr, default)
 
+    def put(self, expr: Expression, var: _IntVarImpl) -> None:
+        """
+        Put the given expression and variable into the flat_map.
+        Only use this method if you want to save expr == var to the flat_map.
+        Use get_or_make_var instead to make a new variable for an expression.
+        Raises a ValueError if the expression is already in the flat_map.
+        """
+        if expr.is_bool():
+            assert var.is_bool(), f"{expr} is of type Boolean, but {var} is of type {type(var)}. Please report on github."
+            normal_expr, negate = self._canonicalize_boolexpr(expr)
+            if negate:
+                var = ~var
+            if normal_expr in self.flat_map:
+                raise ValueError(f"Expression {normal_expr} is already in the flat_map. Please report on github.")
+            self.flat_map[normal_expr] = var
+        else:
+            if expr in self.flat_map:
+                raise ValueError(f"Expression {expr} is already in the flat_map. Please report on github.")
+            self.flat_map[expr] = var
+
     def save_decomposition(self, expr: Expression, newexpr: Expression):
         """Save the decomposition of the given global constraint or global function."""
         self.decomp_map[expr] = newexpr
@@ -51,17 +71,22 @@ class CSEMap:
         """Get the decomposition of the given global constraint or global function."""
         return self.decomp_map.get(expr, default)
 
-    def get_reified_varvals(self) -> dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]:
-        """collect all bv <-> var == val expressions in flat_map"""
-        
-        var_vals = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var: [val, bv]
+    def get_reified_varvalbounds(self) -> tuple[dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]],
+                                                dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]]:
+        """Collect bv <-> var == val and bv <-> var >= val expressions in flat_map."""
+
+        comps = frozenset({"==", ">="})
+
+        var_vals = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var == val: var -> [(val, bv)]
+        var_bounds = dict[_IntVarImpl, list[tuple[int, _BoolVarImpl]]]()  # var >= val: var -> [(val, bv)]
         for expr, bv in self.flat_map.items():
-            if expr.name == "==":
+            if expr.name in comps:
                 var, val = expr.args
                 if isinstance(var, _IntVarImpl) and is_int(val):
-                    var_vals.setdefault(var, []).append((val, bv))
+                    target = var_vals if expr.name == "==" else var_bounds
+                    target.setdefault(var, []).append((val, bv))
 
-        return var_vals
+        return var_vals, var_bounds
 
     def get_or_make_var(self, expr: Expression) -> tuple[_IntVarImpl, Optional[Expression]]:
         """

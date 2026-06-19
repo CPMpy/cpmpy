@@ -80,13 +80,16 @@ class TestTransfDecomp:
         ivs = [cp.intvar(1,9,name=n) for n in "xyz"]
 
         cons = [cp.AllDifferent(ivs) == 0]
-        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [0 == cp.AllDifferent(ivs)]
-        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [cp.AllDifferent(ivs) == cp.AllEqual(ivs[:-1])]
         assert set(map(str,decompose_in_tree(cons))) == {"(and((x) != (y), (x) != (z), (y) != (z))) == ((x) == (y))"}
+
+        cons = [(ivs[0] == 0) | ~cp.AllDifferent(ivs)]
+        assert set(map(str,decompose_in_tree(cons))) == {"(x == 0) or (or((x) == (y), (x) == (z), (y) == (z)))"}
 
         cons = [cp.min(ivs) == cp.max(ivs)]
         assert set(map(str,decompose_in_tree(cons, supported={"min"}))) == \
@@ -102,6 +105,15 @@ class TestTransfDecomp:
 
         assert str(decompose_in_tree(cons, supported={"min"})) == \
                          "[(min(x,y)) == (z)]"
+
+    def test_decompose_allequal_reified(self):
+        # nested AllEqual decomposition can leave not(...) (e.g. False == (a|b)); must be pushed down
+        a, b = cp.boolvar(2, name=("a", "b"))
+        bv = cp.boolvar(name="bv")
+
+        cons = [bv.implies(cp.AllEqual(a, b, False, a | b))]
+        assert str(decompose_in_tree(cons)) == \
+            "[(bv) -> (and((a) == (b), ~b, (~a) and (~b)))]"
 
 
     def test_globals_in_decomp(self):
@@ -190,17 +202,53 @@ class TestTransfDecomp:
         # test element
         cons = cp.cpm_array([10,20,30,40])[x[0]] == 8
         assert set(map(str, decompose_linear([cons]))) == \
-                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3) 
+                            {"sum([20, 30, 40] * [a == 1, a == 2, a == 3]) == 8"}  # a == 0 is False (a in 1..3)
 
-        # test table
-        cons = cp.Table(x, [[1,1], [2,3]])
-        assert set(map(str, decompose_linear([cons]))) == \
-                            {'((a == 1) and (b == 1)) or ((a == 2) and (b == 3))'}
+        # supported="mdd", to avoid recursive decomposition
+        cons = cp.Table(x, [[1, 1], [2, 3]])
+        my_mdd = cp.MDD(x, [(0, 1, 1), (0, 2, 2), (1, 1, -1), (2, 3, -1)]) # ground truth MDD to which the table should be decomposed
+        decomp = decompose_linear([cons], supported={"mdd"})
+
+        assert len(decomp) == 1
+        assert isinstance(decomp[0], cp.MDD)
+        # need more thorough test, order of transitions is not fixed
+        arr = decomp[0].args[0]
+        decomp_transitions = [(id1, v, id2) for id1, tf in decomp[0].mapping.items() for v, id2 in tf.items()]
+        my_transitions = [(id1, v, id2) for id1, tf in my_mdd.mapping.items() for v, id2 in tf.items()]
+        assert str(arr) == str(my_mdd.args[0])
+        assert set(decomp_transitions) == set(my_transitions)
 
         # test count
         cons = cp.Count(x, 2) >= 1
         assert set(map(str, decompose_linear([cons]))) == \
                             {'(a == 2) + (b == 2) >= 1'}
+
+    def test_decompose_positive(self):
+
+        # make a custom global constraint to test specialized decompose
+        class MyCustomGlobal(GlobalConstraint):
+            def __init__(self, arr):
+                super().__init__("mycustomglobal", tuple(flatlist(arr)))
+            
+            def decompose(self):
+                return [cp.sum(self.args) == 1], [self.args[0] == 1] # some random defining constraint
+            def decompose_positive(self):
+                return [cp.sum(self.args) >= 1], [self.args[0] == 1] # some random defining constraint
+
+        a,b,c = cp.intvar(0,10,shape=3, name=("a","b","c"))
+        bv = cp.boolvar(name="bv")
+        cons = MyCustomGlobal([a,b,c])
+
+        assert set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) >= 1", "a == 1"} # decomposed at toplevel
+        assert set(map(str, decompose_in_tree([~cons]))) == {"sum(a, b, c) != 1", "a == 1"} # pushed down negation into standard decomp
+        assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == {"(bv) -> (sum(a, b, c) >= 1)", "a == 1"} # decompose positive
+        assert set(map(str, decompose_in_tree([cons.implies(bv)]))) == {"(sum(a, b, c) == 1) -> (bv)","a == 1"}  # decompose standard
+        assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard
+
+        # custom decompose has precedence over positive decompose
+        decompose_custom = {"mycustomglobal": lambda x : ([cp.sum(x.args) == 5], [])}
+        assert set(map(str, decompose_in_tree([cons], decompose_custom=decompose_custom))) == {"sum(a, b, c) == 5"} # custom decompose
+
 
     def test_issue_546(self):
         # https://github.com/CPMpy/cpmpy/issues/546

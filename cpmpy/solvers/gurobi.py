@@ -40,6 +40,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional, List, Callable, Iterable, TYPE_CHECKING
@@ -49,6 +51,7 @@ import cpmpy as cp
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
@@ -142,6 +145,7 @@ class CPM_gurobi(SolverInterface):
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -208,7 +212,6 @@ class CPM_gurobi(SolverInterface):
         # call the gurobi solver with callback
         self.grb_model.optimize(callback=callback)
         grb_status = self.grb_model.Status
-        grb_objective = self.grb_model.getObjective()
 
         # new status, translate runtime
         self.cpm_status = SolverStatus(self.name)
@@ -246,14 +249,14 @@ class CPM_gurobi(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = solver_val >= 0.5
                 else:
-                    cpm_var._value = int(solver_val)
-            # set _objective_value
+                    cpm_var._value = round(solver_val)
             if self.has_objective():
-                grb_obj_val = grb_objective.getValue()
-                if round(grb_obj_val) == grb_obj_val: # it is an integer?:
-                    self.objective_value_ = int(grb_obj_val)
-                else: #  can happen with DirectVar or when using floats as coefficients
-                    self.objective_value_ =  float(grb_obj_val)
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -291,7 +294,13 @@ class CPM_gurobi(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
@@ -303,22 +312,32 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
-        # save user variables
-        get_variables(expr, self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(obj,
-                                                      supported=self.supported_global_constraints,
-                                                      supported_reified=self.supported_reified_global_constraints,
-                                                      csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            import gurobipy as gp
+            grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
+        else:
+            # save user variables
+            get_variables(expr, self.user_vars)
 
-        # make objective function or variable and post
-        grb_obj = self._make_numexpr(obj)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(obj,
+                                                          supported=self.supported_global_constraints,
+                                                          supported_reified=self.supported_reified_global_constraints,
+                                                          csemap=self._csemap)
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            obj = only_positive_bv_wsum(obj)  # remove negboolviews
+
+            self.add(safe_cons + decomp_cons + flat_cons)
+
+            # make objective function or variable and post
+            grb_obj = self._make_numexpr(obj)
+
         if minimize:
             self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
         else:
@@ -553,50 +572,47 @@ class CPM_gurobi(SolverInterface):
         Returns a MUS (list of constraints from soft that is unsatisfiable together, and subset minimal).
         """
 
-        # TODO unsure if needed?
         soft_cons = toplevel_list(soft, merge_and=False)
 
         # instantiate Gurobi solver
         s = cls()
 
-        # we collect the Gurobi constraint objects, so we can enable their `IISConstrForce` attribute later
+        # collect the Gurobi constraint objects
         grb_hard_cons = []
-
-        # transform and add all hard constraints
-        for cpm_con in s.transform(hard):
-            # note: we use `s.transform`, then `_add_transformed`, to add some of the constraints to the solver, because need to introspect the transformation and require access to the Gurobi constraints. This bypasses normal creation of `user_vars`. This is safe to do since `user_vars` are not used in this algorithm, and the solver object does not leave this function.
-            grb_con = s._add_transformed(cpm_con)
-            grb_hard_cons.append(grb_con)
-
-        # The Gurobi IIS algorithm minimizes constraints directly, unlike assumption-based solvers. However, a user-level constraint may be transformed to a group of multiple Gurobi constraints. In this case, we have to represent this group by a *single* soft constraint, otherwise the Gurobi IIS may not map to the user-level constraint MUS. We collect `tf_soft` so that `tf_soft[i]` is a single soft constraint representing `soft[i]`. After calling `computeIIS`, we can read the `IISConstr` attribute to see which are in the IIS/MUS.
         grb_soft_cons = []
 
         for soft_con in soft_cons:
-            # manually transform the constraint so we can see whether `soft_con` is represented by more than one constraint
+            # transform each constraint seperately, can map to multiple Gurobi-level constraints
             soft_con_tf = s.transform(soft_con)
 
             if len(soft_con_tf) == 0:
-                # this uncommon case ensures `grb_soft_cons` maps to `soft_cons`
-                soft_con_rep = cp.BoolVal(True)
-            elif len(soft_con_tf) == 1:
+                # uncommon case, just ensure `grb_soft_con` and `soft` are same length
+                soft_con_tf = [cp.BoolVal(True)]
+            
+            if len(soft_con_tf) == 1:
                 # if `con` represented by a single transformed constraint, it can be added as-is
                 soft_con_rep = soft_con_tf[0]
+                grb_soft_cons.append(s._add_transformed(soft_con_rep))
             else:
-                # `soft_con_tf` is a group of multiple constraints. We introduce an assumption variable `a` and add *hard* constraint `a -> /\ tf_cons`. Then, `a` be a single soft constraint implying `soft_con`
+                # We introduce an assumption variable `a` and add *hard* constraints `a -> /\ tf_cons`.
+                # The lower bound fixing `a == 1` is the soft part Gurobi can select in the IIS.
                 assumption = cp.boolvar()
 
-                # adding `a -> /\ C` may require re-transform due to the added implication
-                additional_hard_constraint = assumption.implies(cp.all(soft_con_tf))
-                for tf_con in s.transform(additional_hard_constraint):
-                    grb_hard_cons.append(s._add_transformed(tf_con))
+                # add `a -> /\ C` as a hard constraint
+                hard.append(assumption.implies(cp.all(soft_con_tf)))
 
-                # `a >= 1` will be the single soft constraint to indicate whether `soft_cons[i]` is in the MUS
-                soft_con_rep = assumption >= 1
+                soft_con_rep = s.solver_var(assumption)
+                soft_con_rep.setAttr("LB", 1)
+                grb_soft_cons.append(soft_con_rep)
 
-            grb_soft_cons.append(s._add_transformed(soft_con_rep))
+                
 
+        # transform and add all hard constraints
+        for cpm_con in s.transform(hard):
+            # use ._add_transformed instead of .add because we need the Gurobi constraint object later
+            grb_hard_cons.append(s._add_transformed(cpm_con))
 
-        # update required to avoid `gurobipy._exception.GurobiError: GenConstr has not yet been added to the model` when accessing constraint attribute.
+        # update model so we can access constraint attribtutes
         # model updates can be expensive, so we do this only once!
         s.native_model.update()
         for grb_con in grb_hard_cons:
@@ -618,18 +634,20 @@ class CPM_gurobi(SolverInterface):
         except gp.GurobiError as e:
             if e.errno == gp.GRB.Error.IIS_NOT_INFEASIBLE:
                 raise AssertionError("MUS: model must be UNSAT")
-            raise
+            raise e # something else happened
 
         def in_iis(grb_con):
             """Check if `grb_con` is in the IIS. The exact attribute name depends on the type of Gurobi constraint."""
-            if isinstance(grb_con, gp.Constr):
+            if isinstance(grb_con, gp.Var):
+                return grb_con.IISLB == 1
+            elif isinstance(grb_con, gp.Constr):
                 return grb_con.IISConstr == 1
             elif isinstance(grb_con, gp.GenConstr):
                 return grb_con.IISGenConstr == 1
             elif isinstance(grb_con, gp.QConstr):
                 return grb_con.IISQConstr == 1
             elif isinstance(grb_con, gp.SOS):
-                return grb_con.IISSOSForce == 1
+                return grb_con.IISSOS == 1
             else:
                 raise TypeError(f"Unexpected Gurobi constraint {grb_con} of type {type(grb_con)}")
 
@@ -706,11 +724,15 @@ class CPM_gurobi(SolverInterface):
                 if cpm_var.is_bool():
                     cpm_var._value = solver_val >= 0.5
                 else:
-                    cpm_var._value = int(solver_val)
+                    cpm_var._value = round(solver_val)
 
-            # Translate objective
             if self.has_objective():
-                self.objective_value_ = self.grb_model.PoolObjVal
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
             self.print_display(display)
 
