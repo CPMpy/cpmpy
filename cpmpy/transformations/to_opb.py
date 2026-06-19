@@ -117,7 +117,7 @@ def _encode_lin_expr(ivarmap, xs, weights, encoding="auto"):
     return terms, constraints, k
 
 
-def transform(cpm_expr, csemap, ivarmap, encoding="auto"):
+def to_opb(cpm_expr, csemap, ivarmap, encoding="auto"):
     """
         Transform a list of CPMpy expressions into a list of Pseudo-Boolean constraints.
     """
@@ -144,7 +144,7 @@ def transform(cpm_expr, csemap, ivarmap, encoding="auto"):
     return _normalized_comparison(cpm_cons)
 
 
-def transform_objective(expr, csemap, ivarmap, encoding="auto"):
+def to_opb_objective(expr, csemap, ivarmap, encoding="auto"):
     """
     Transform a CPMpy objective expression into a weighted sum expression
     """

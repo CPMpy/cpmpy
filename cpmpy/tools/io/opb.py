@@ -31,7 +31,7 @@ from operator import mul
 
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.to_opb import transform, transform_objective
+from cpmpy.transformations.to_opb import to_opb, to_opb_objective
 from cpmpy.expressions.variables import NegBoolView, allow_reserved_var_names
 from cpmpy.expressions.core import Operator, Comparison
 
@@ -282,11 +282,11 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None, annota
     """
 
     csemap, ivarmap = CSEMap(), dict()
-    opb_cons = transform(model.constraints, csemap, ivarmap, encoding)
+    opb_cons = to_opb(model.constraints, csemap, ivarmap, encoding)
 
     if model.objective_ is not None:
-        opb_obj, const, extra_cons = transform_objective(model.objective_, csemap, ivarmap, encoding)
-        opb_cons += transform(extra_cons, csemap, ivarmap, encoding)
+        opb_obj, const, extra_cons = to_opb_objective(model.objective_, csemap, ivarmap, encoding)
+        opb_cons += to_opb(extra_cons, csemap, ivarmap, encoding)
     else:
         opb_obj = None
 
