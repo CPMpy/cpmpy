@@ -49,7 +49,7 @@ def killer_sudoku(n=9, problem=None):
     model = cp.Model()
 
     model += [cp.AllDifferent(row) for row in x]
-    model += [cp.AllDifferent(col) for col in x.transpose()]
+    model += [cp.AllDifferent(col) for col in x.T]
 
     for i in range(2):
         for j in range(2):

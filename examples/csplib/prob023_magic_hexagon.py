@@ -29,7 +29,8 @@ def _hex_coords(n):
     """Return axial coordinates (q, r) for a hexagon of edge length n.
 
     Coordinates are ordered row by row (top to bottom), left to right within
-    each row. This matches the traditional hex printing layout.
+    each row. The coordinate system is centered at (0, 0), i.e. the middle cell of the
+    hexagon has coordinate (0, 0). For n=3, this corresponds to cell J in the diagram above.
     """
     coords = []
     for r in range(-(n - 1), n):  # rows from top to bottom
@@ -64,22 +65,18 @@ def magic_hexagon(n=3):
 
     # Horizontal rows: group by r coordinate
     for r in range(-(n - 1), n):
-        row = [var_at[(q, r)] for q in range(-(n - 1), n)
-               if (q, r) in var_at]
+        row = [var_at[(q, r)] for q in range(-(n - 1), n) if (q, r) in var_at]
         model += cp.sum(row) == magic_sum
 
     # Diagonals (top-left to bottom-right): group by (q + r) coordinate
     for s in range(-(n - 1) * 2, (n - 1) * 2 + 1):
-        diag = [var_at[(q, r)] for q in range(-(n - 1), n)
-                for r in range(-(n - 1), n)
-                if (q, r) in var_at and q + r == s]
+        diag = [var_at[(q, r)] for q in range(-(n - 1), n) for r in range(-(n - 1), n) if (q, r) in var_at and q + r == s]
         if diag:
             model += cp.sum(diag) == magic_sum
 
     # Diagonals (top-right to bottom-left): group by q coordinate
     for q in range(-(n - 1), n):
-        diag = [var_at[(q, r)] for r in range(-(n - 1), n)
-                if (q, r) in var_at]
+        diag = [var_at[(q, r)] for r in range(-(n - 1), n) if (q, r) in var_at]
         if diag:
             model += cp.sum(diag) == magic_sum
 

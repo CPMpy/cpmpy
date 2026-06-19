@@ -12,54 +12,54 @@ not even diagonally. The digits along the right side of and below the grid
 indicate the number of grid squares in the corresponding rows and columns that
 are occupied by vessels.
 
-Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_014_solitaire_battleships/csplib_014_solitaire_battleships.cpmpy.py)
+Model from DCP-Bench-Open:
+https://github.com/DCP-Bench/DCP-Bench-Open/blob/main/dataset/csplib_014_solitaire_battleships/csplib_014_solitaire_battleships.cpmpy.py
 """
 
 import cpmpy as cp
 
+
 # Cell types in the grid. Each cell is either water or part of a ship.
-# Ship cells indicate their position within the vessel:
-#   CIRCLE  - submarine (1-cell ship, occupies a single cell)
-#   LEFT    - leftmost cell of a horizontal ship
-#   RIGHT   - rightmost cell of a horizontal ship
-#   TOP     - topmost cell of a vertical ship
-#   BOTTOM  - bottommost cell of a vertical ship
-#   MIDDLE  - interior cell of a ship longer than 2
-WATER = 0
-CIRCLE = 1
-LEFT = 2
-RIGHT = 3
-TOP = 4
-BOTTOM = 5
-MIDDLE = 6
+# Ship cells indicate their position within the vessel.
+WATER = 0    # water
+CIRCLE = 1   # submarine, a 1-cell ship
+LEFT = 2     # leftmost cell of a horizontal ship
+RIGHT = 3    # rightmost cell of a horizontal ship
+TOP = 4      # topmost cell of a vertical ship
+BOTTOM = 5   # bottommost cell of a vertical ship
+MIDDLE = 6   # interior cell of a ship longer than 2
 
 
-def solitaire_battleships(rows=10, cols=10, rowsum=None, colsum=None,
-                          fleet_counts=None, hints=None):
-    if rows != 10 or cols != 10:
-        missing = []
-        if rowsum is None:
-            missing.append("rowsum")
-        if colsum is None:
-            missing.append("colsum")
-        if fleet_counts is None:
-            missing.append("fleet_counts")
-        if missing:
-            raise ValueError(
-                f"Default puzzle data is for a 10x10 grid, but got rows={rows}, cols={cols}. "
-                f"Please provide: {', '.join(missing)}"
-            )
+DEFAULT_ROWSUM = (0, 2, 3, 1, 2, 4, 2, 1, 2, 3)
+DEFAULT_COLSUM = (1, 3, 3, 1, 5, 1, 2, 4, 0, 0)
+DEFAULT_FLEET_COUNTS = ((4, 1), (3, 2), (2, 3), (1, 4))
+DEFAULT_HINTS = ((7, 1, CIRCLE),)
 
-    if rowsum is None:
-        rowsum = [0, 2, 3, 1, 2, 4, 2, 1, 2, 3]
-    if colsum is None:
-        colsum = [1, 3, 3, 1, 5, 1, 2, 4, 0, 0]
-    if fleet_counts is None:
-        fleet_counts = [(4, 1), (3, 2), (2, 3), (1, 4)]
-    if hints is None:
-        hints = [(7, 1, CIRCLE)]
+
+def solitaire_battleships(
+    rowsum=DEFAULT_ROWSUM,
+    colsum=DEFAULT_COLSUM,
+    fleet_counts=DEFAULT_FLEET_COUNTS,
+    hints=DEFAULT_HINTS,
+):
+    rows = len(rowsum)
+    cols = len(colsum)
+
+    assert rows > 0, "rowsum must contain at least one row"
+    assert cols > 0, "colsum must contain at least one column"
+    assert all(0 <= v <= cols for v in rowsum), "Each row sum must be between 0 and the number of columns"
+    assert all(0 <= v <= rows for v in colsum), "Each column sum must be between 0 and the number of rows"
 
     fleet_counts = dict(fleet_counts)
+
+    assert all(size > 0 and count >= 0 for size, count in fleet_counts.items())
+    assert sum(rowsum) == sum(colsum), "Row sums and column sums must have the same total"
+    assert sum(rowsum) == sum(size * count for size, count in fleet_counts.items()), \
+        "Fleet size must match the total occupied cells from row/column sums"
+
+    for r, c, v in hints:
+        assert 0 <= r < rows and 0 <= c < cols, f"Hint {(r, c, v)} is outside the grid"
+        assert WATER <= v <= MIDDLE, f"Invalid cell value in hint {(r, c, v)}"
 
     grid = cp.intvar(0, 6, shape=(rows, cols), name="grid")
 
@@ -90,7 +90,6 @@ def solitaire_battleships(rows=10, cols=10, rowsum=None, colsum=None,
                 diag_is_water.append(grid[r + 1, c + 1] == WATER)
             model += (grid[r, c] > WATER).implies(cp.all(diag_is_water))
 
-            # Orthogonal water neighbors
             ortho_is_water = []
             if r > 0:
                 ortho_is_water.append(grid[r - 1, c] == WATER)
@@ -172,7 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("-cols", type=int, default=10, help="Number of columns")
 
     args = parser.parse_args()
-    model, (grid,) = solitaire_battleships(rows=args.rows, cols=args.cols)
+    model, (grid,) = solitaire_battleships()
 
     if model.solve():
         # print pretty board with symbols

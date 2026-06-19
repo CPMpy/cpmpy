@@ -19,37 +19,44 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 import cpmpy as cp
 
 
-def warehouse_location(n_suppliers=5, n_stores=10, building_cost=30,
-                       capacity=None, cost_matrix=None):
-    # Default data is for 5 suppliers and 10 stores.
-    if n_suppliers != 5 or n_stores != 10:
-        missing = []
-        if capacity is None:
-            missing.append("capacity")
-        if cost_matrix is None:
-            missing.append("cost_matrix")
-        if missing:
-            raise ValueError(
-                f"Default data is for 5 suppliers and 10 stores, "
-                f"but got n_suppliers={n_suppliers}, n_stores={n_stores}. "
-                f"Please provide: {', '.join(missing)}"
-            )
+DEFAULT_CAPACITY = (1, 4, 2, 1, 3)
 
-    if capacity is None:
-        capacity = [1, 4, 2, 1, 3]
-    if cost_matrix is None:
-        cost_matrix = [
-            [20, 24, 11, 25, 30],
-            [28, 27, 82, 83, 74],
-            [74, 97, 71, 96, 70],
-            [2, 55, 73, 69, 61],
-            [46, 96, 59, 83, 4],
-            [42, 22, 29, 67, 59],
-            [1, 5, 73, 59, 56],
-            [10, 73, 13, 43, 96],
-            [93, 35, 63, 85, 46],
-            [47, 65, 55, 71, 95]
-        ]
+DEFAULT_COST_MATRIX = (
+    (20, 24, 11, 25, 30),
+    (28, 27, 82, 83, 74),
+    (74, 97, 71, 96, 70),
+    (2, 55, 73, 69, 61),
+    (46, 96, 59, 83, 4),
+    (42, 22, 29, 67, 59),
+    (1, 5, 73, 59, 56),
+    (10, 73, 13, 43, 96),
+    (93, 35, 63, 85, 46),
+    (47, 65, 55, 71, 95),
+)
+
+def warehouse_location(
+    n_suppliers=5,
+    n_stores=10,
+    building_cost=30,
+    capacity=DEFAULT_CAPACITY,
+    cost_matrix=DEFAULT_COST_MATRIX,
+):
+    """Build a warehouse location model.
+
+    Args:
+        n_suppliers: Number of candidate warehouse locations.
+        n_stores: Number of stores to supply.
+        building_cost: Fixed cost for opening a warehouse.
+        capacity: Capacity of each warehouse, length n_suppliers.
+        cost_matrix: Supply cost matrix of shape n_stores x n_suppliers.
+
+    Returns:
+        (model, vars) where vars contains supplier assignments and open warehouses.
+    """
+    assert len(capacity) == n_suppliers
+    assert len(cost_matrix) == n_stores
+    assert all(len(row) == n_suppliers for row in cost_matrix)
+    assert sum(capacity) >= n_stores
 
     model = cp.Model()
 

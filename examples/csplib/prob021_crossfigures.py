@@ -71,7 +71,7 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 
 import math
 import cpmpy as cp
-
+import numpy as np
 
 
 def is_prime(n):
@@ -110,71 +110,72 @@ def down(Matrix, Down, Len, Row, Col):
 
 def crossfigures():
     n = 9
-    D = 9999
 
-    primes = [i for i in range(2, D + 1) if is_prime(i)]
-    squares = [k * k for k in range(1, math.isqrt(D) + 1)]
+    primes = [i for i in range(2, 10000) if is_prime(i)]
+    squares = [k * k for k in range(1, math.isqrt(9999) + 1)]
 
-    Z = -1
-    B = -2
-    Valid = [[Z, Z, Z, Z, B, Z, Z, Z, Z],
-             [Z, Z, B, Z, Z, Z, B, Z, Z],
-             [Z, B, Z, Z, B, Z, Z, B, Z],
-             [Z, Z, Z, Z, B, Z, Z, Z, Z],
-             [B, Z, B, B, B, B, B, Z, B],
-             [Z, Z, Z, Z, B, Z, Z, Z, Z],
-             [Z, B, Z, Z, B, Z, Z, B, Z],
-             [Z, Z, B, Z, Z, Z, B, Z, Z],
-             [Z, Z, Z, Z, B, Z, Z, Z, Z]]
+    Z = '_'
+    B = 'X'
+    valid = np.array([
+        [Z, Z, Z, Z, B, Z, Z, Z, Z],
+        [Z, Z, B, Z, Z, Z, B, Z, Z],
+        [Z, B, Z, Z, B, Z, Z, B, Z],
+        [Z, Z, Z, Z, B, Z, Z, Z, Z],
+        [B, Z, B, B, B, B, B, Z, B],
+        [Z, Z, Z, Z, B, Z, Z, Z, Z],
+        [Z, B, Z, Z, B, Z, Z, B, Z],
+        [Z, Z, B, Z, Z, Z, B, Z, Z],
+        [Z, Z, Z, Z, B, Z, Z, Z, Z]
+    ])
 
     M = cp.intvar(0, 9, shape=(n, n), name="M")
 
     model = cp.Model()
+    model += M[valid == B] == 0
 
-    for i in range(n):
-        for j in range(n):
-            if Valid[i][j] == B:
-                model += (M[i, j] == 0)
+    def clue_var(name, length):
+        """Create a clue variable whose bounds match its number of grid cells."""
+        return cp.intvar(10 ** (length - 1), 10 ** length - 1, name=name)
 
     # Across variables
-    A1 = cp.intvar(0, D, name="A1")
-    A4 = cp.intvar(0, D, name="A4")
-    A7 = cp.intvar(0, D, name="A7")
-    A8 = cp.intvar(0, D, name="A8")
-    A9 = cp.intvar(0, D, name="A9")
-    A10 = cp.intvar(0, D, name="A10")
-    A11 = cp.intvar(0, D, name="A11")
-    A13 = cp.intvar(0, D, name="A13")
-    A15 = cp.intvar(0, D, name="A15")
-    A17 = cp.intvar(0, D, name="A17")
-    A20 = cp.intvar(0, D, name="A20")
-    A23 = cp.intvar(0, D, name="A23")
-    A24 = cp.intvar(0, D, name="A24")
-    A25 = cp.intvar(0, D, name="A25")
-    A27 = cp.intvar(0, D, name="A27")
-    A28 = cp.intvar(0, D, name="A28")
-    A29 = cp.intvar(0, D, name="A29")
-    A30 = cp.intvar(0, D, name="A30")
+    A1 = clue_var("A1", 4)
+    A4 = clue_var("A4", 4)
+    A7 = clue_var("A7", 2)
+    A8 = clue_var("A8", 3)
+    A9 = clue_var("A9", 2)
+    A10 = clue_var("A10", 2)
+    A11 = clue_var("A11", 2)
+    A13 = clue_var("A13", 4)
+    A15 = clue_var("A15", 4)
+    A17 = clue_var("A17", 4)
+    A20 = clue_var("A20", 4)
+    A23 = clue_var("A23", 2)
+    A24 = clue_var("A24", 2)
+    A25 = clue_var("A25", 2)
+    A27 = clue_var("A27", 3)
+    A28 = clue_var("A28", 2)
+    A29 = clue_var("A29", 4)
+    A30 = clue_var("A30", 4)
 
     # Down variables
-    D1 = cp.intvar(0, D, name="D1")
-    D2 = cp.intvar(0, D, name="D2")
-    D3 = cp.intvar(0, D, name="D3")
-    D4 = cp.intvar(0, D, name="D4")
-    D5 = cp.intvar(0, D, name="D5")
-    D6 = cp.intvar(0, D, name="D6")
-    D10 = cp.intvar(0, D, name="D10")
-    D12 = cp.intvar(0, D, name="D12")
-    D14 = cp.intvar(0, D, name="D14")
-    D16 = cp.intvar(0, D, name="D16")
-    D17 = cp.intvar(0, D, name="D17")
-    D18 = cp.intvar(0, D, name="D18")
-    D19 = cp.intvar(0, D, name="D19")
-    D20 = cp.intvar(0, D, name="D20")
-    D21 = cp.intvar(0, D, name="D21")
-    D22 = cp.intvar(0, D, name="D22")
-    D26 = cp.intvar(0, D, name="D26")
-    D28 = cp.intvar(0, D, name="D28")
+    D1 = clue_var("D1", 4)
+    D2 = clue_var("D2", 2)
+    D3 = clue_var("D3", 4)
+    D4 = clue_var("D4", 4)
+    D5 = clue_var("D5", 2)
+    D6 = clue_var("D6", 4)
+    D10 = clue_var("D10", 2)
+    D12 = clue_var("D12", 2)
+    D14 = clue_var("D14", 3)
+    D16 = clue_var("D16", 3)
+    D17 = clue_var("D17", 4)
+    D18 = clue_var("D18", 2)
+    D19 = clue_var("D19", 4)
+    D20 = clue_var("D20", 4)
+    D21 = clue_var("D21", 2)
+    D22 = clue_var("D22", 4)
+    D26 = clue_var("D26", 2)
+    D28 = clue_var("D28", 2)
 
     # Set up matrix-digit constraints
     model += (across(M, A1, 4, 1, 1))
@@ -255,7 +256,7 @@ def crossfigures():
     model += (D26 == 5 * A24)
     model += (D28 == D21 + 27)
 
-    return model, (M,)
+    return model, (M, valid)
 
 
 if __name__ == "__main__":
@@ -264,10 +265,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.parse_args()
 
-    model, (M,) = crossfigures()
+    model, (M, layout) = crossfigures()
 
     if model.solve():
-        for row in M.value():
-            print(" ".join(str(int(cell)) for cell in row))
+        values = M.value()
+
+        for i, row in enumerate(values):
+            print(" ".join('X' if layout[i, j] == 'X' else str(v) for j, v in enumerate(row)))
     else:
         raise ValueError("Model is unsatisfiable")

@@ -29,22 +29,21 @@ Model from DCP-Bench-Open (https://github.com/DCP-Bench/DCP-Bench-Open/blob/main
 import cpmpy as cp
 
 def quasigroup_existence(m=8):
-    quasigroup = cp.intvar(0, m - 1, shape=(m, m), name="quasigroup")
+    quasigroup = cp.intvar(1, m, shape=(m, m), name="quasigroup")
 
     model = cp.Model()
 
-    # Each element occurs once in every row
-    for i in range(m):
-        model += cp.AllDifferent(quasigroup[i, :])
-
-    # Each element occurs once in every column
-    for j in range(m):
-        model += cp.AllDifferent(quasigroup[:, j])
+    # Each element occurs once in every row and column
+    model += [cp.AllDifferent(row) for row in quasigroup]
+    model += [cp.AllDifferent(col) for col in quasigroup.T]
 
     # QG3.m property: (a*b)*(b*a) = a
     for a in range(m):
         for b in range(m):
-            model += quasigroup[quasigroup[a, b], quasigroup[b, a]] == a
+            model += quasigroup[
+                quasigroup[a, b] - 1,
+                quasigroup[b, a] - 1,
+            ] == a + 1
 
     return model, (quasigroup,)
 

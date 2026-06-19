@@ -17,18 +17,16 @@ def n_fractions(n=9):
     x = cp.intvar(1, n, shape=9, name="x")
     A, B, C, D, E, F, G, H, I = x
 
-    D1 = cp.intvar(1, n * n, name="D1")
-    D2 = cp.intvar(1, n * n, name="D2")
-    D3 = cp.intvar(1, n * n, name="D3")
+    D1 = 10 * B + C
+    D2 = 10 * E + F
+    D3 = 10 * H + I
 
-    model = cp.Model([cp.AllDifferent(x),
-                   D1 == 10 * B + C,
-                   D2 == 10 * E + F,
-                   D3 == 10 * H + I,
-                   A * D2 * D3 + D * D1 * D3 + G * D1 * D2 == D1 * D2 * D3])
+    model = cp.Model([
+        cp.AllDifferent(x),
+        A * D2 * D3 + D * D1 * D3 + G * D1 * D2 == D1 * D2 * D3
+    ])
 
     return model, (x,)
-
 
 if __name__ == "__main__":
     import argparse

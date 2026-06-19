@@ -37,13 +37,8 @@ def quasigroup_completion(N=5, start=None):
             if start_np[i, j] != 0:
                 model += puzzle[i, j] == start_np[i, j]
 
-    # 2. Each row must contain unique values from 1 to N.
-    for i in range(N):
-        model += cp.AllDifferent(puzzle[i, :])
-
-    # 3. Each column must contain unique values from 1 to N.
-    for j in range(N):
-        model += cp.AllDifferent(puzzle[:, j])
+    model += [cp.AllDifferent(row) for row in puzzle]
+    model += [cp.AllDifferent(col) for col in puzzle.T]
 
     return model, (puzzle,)
 
