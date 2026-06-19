@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
+import threading
 import warnings # for deprecation warning
 from functools import reduce
 from typing import Any, Literal, Optional, overload
@@ -71,7 +72,7 @@ from .utils import is_num, is_int, is_boolexpr, get_bounds
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
 _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
-_VAR_STRICT_NAME_CHECK = True
+_VAR_NAME_CHECK_STATE = threading.local()
 
 def BoolVar(shape=1, name=None):
     """
@@ -843,7 +844,7 @@ def _is_invalid_name(name: Any) -> bool:
     or use the context manager `_ignore_strict_variable_name_check()`.
     """
     if name.startswith(_IV_PREFIX):
-        if _VAR_STRICT_NAME_CHECK:
+        if _get_strict_variable_name_check():
             return True
         else:
             id = int(name[len(_IV_PREFIX):])
@@ -853,7 +854,7 @@ def _is_invalid_name(name: Any) -> bool:
                 return False
     
     elif name.startswith(_BV_PREFIX):
-        if _VAR_STRICT_NAME_CHECK:
+        if _get_strict_variable_name_check():
             return True
         else:
             id = int(name[len(_BV_PREFIX):])
@@ -865,13 +866,14 @@ def _is_invalid_name(name: Any) -> bool:
     else:
         return False
 
+def _get_strict_variable_name_check():
+    return getattr(_VAR_NAME_CHECK_STATE, "strict", True)
+
 def _enable_strict_variable_name_check():
-    global _VAR_STRICT_NAME_CHECK
-    _VAR_STRICT_NAME_CHECK = True
+    _VAR_NAME_CHECK_STATE.strict = True
 
 def _disable_strict_variable_name_check():
-    global _VAR_STRICT_NAME_CHECK
-    _VAR_STRICT_NAME_CHECK = False
+    _VAR_NAME_CHECK_STATE.strict = False
 
 
 def _ignore_strict_variable_name_check():
@@ -880,9 +882,10 @@ def _ignore_strict_variable_name_check():
     """
     class IgnoreStrictVariableNameCheck:
         def __enter__(self):
+            self._previous = _get_strict_variable_name_check()
             _disable_strict_variable_name_check()
         def __exit__(self, exc_type, exc_value, traceback):
-            _enable_strict_variable_name_check()
+            _VAR_NAME_CHECK_STATE.strict = self._previous
             # _update_variable_counters() # TODO: add automatic support for this later (different PR)
             return False  # propagate exceptions
 
