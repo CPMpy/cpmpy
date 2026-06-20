@@ -52,7 +52,7 @@ from typing import Optional, Iterable
 from cpmpy.transformations.get_variables import get_variables
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, _IntVarImpl, intvar
@@ -362,7 +362,7 @@ class CPM_z3(SolverInterface):
             self.obj_handle = self.z3_solver.maximize(z3_obj)
             self._minimize = False # record direction of optimisation
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -372,7 +372,7 @@ class CPM_z3(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            :type cpm_expr: NestedBoolExprLike
 
             :return: list of Expression
         """
@@ -385,7 +385,7 @@ class CPM_z3(SolverInterface):
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_z3":
         """
             Z3 supports nested expressions so translate expression tree and post to solver API directly
 
@@ -399,7 +399,7 @@ class CPM_z3(SolverInterface):
             are auxiliary variables created by transformations.
 
         :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        :type cpm_expr: NestedBoolExprLike
 
         :return: self
         """

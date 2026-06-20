@@ -50,7 +50,7 @@ import cpmpy as cp
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
@@ -363,7 +363,7 @@ class CPM_gurobi(SolverInterface):
 
         raise NotImplementedError("gurobi: Not a known supported numexpr {}".format(cpm_expr))
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -373,7 +373,7 @@ class CPM_gurobi(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            :type cpm_expr: NestedBoolExprLike
 
             :return: list of Expression
         """
@@ -396,7 +396,7 @@ class CPM_gurobi(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_gurobi":
       """
             Eagerly add a constraint to the underlying solver.
 
@@ -410,18 +410,18 @@ class CPM_gurobi(SolverInterface):
             are auxiliary variables created by transformations.
 
         :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        :type cpm_expr: NestedBoolExprLike
 
         :return: self
       """
       from gurobipy import GRB
 
       # add new user vars to the set
-      get_variables(cpm_expr_orig, collect=self.user_vars)
+      get_variables(cpm_expr, collect=self.user_vars)
 
       # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
-          self._add_transformed(cpm_expr)
+      for con in self.transform(cpm_expr):
+          self._add_transformed(con)
 
       return self
 

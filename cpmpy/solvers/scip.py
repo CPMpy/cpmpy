@@ -29,7 +29,7 @@ from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, Operator
+from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
@@ -299,7 +299,7 @@ class CPM_scip(SolverInterface):
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
         cpm_cons = push_down_negation(cpm_cons)
@@ -314,7 +314,7 @@ class CPM_scip(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_scip":
         get_variables(cpm_expr, collect=self.user_vars)
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
         self.solver_vars(list(self.user_vars))

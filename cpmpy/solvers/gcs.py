@@ -59,7 +59,7 @@ from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies
 from ..exceptions import NotSupportedError, GCSVerificationException
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Comparison, Operator, BoolVal, ExprLike
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, ExprLike, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, _IntVarImpl, _NumVarImpl, NegBoolView, boolvar
 from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.utils import is_int, is_any_list
@@ -451,7 +451,7 @@ class CPM_gcs(SolverInterface):
         else:
             self.gcs.maximise(self.solver_var(obj_var))
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -461,7 +461,7 @@ class CPM_gcs(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
             :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            :type cpm_expr: NestedBoolExprLike
 
             :return: list of Expression
         """
@@ -533,20 +533,20 @@ class CPM_gcs(SolverInterface):
 
         return self.veripb_return_code
     
-    def add(self, cpm_cons):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_gcs":
         """
         Post a (list of) CPMpy constraints(=expressions) to the solver
         Note that we don't store the constraints in a cpm_model,
         we first transform the constraints into primitive constraints,
         then post those primitive constraints directly to the native solver
-        :param cpm_con CPMpy constraint, or list thereof
-        :type cpm_con (list of) Expression(s)
+
+        :param cpm_expr: CPMpy constraint, or list thereof
+        :type cpm_expr: NestedBoolExprLike
         """
         # add new user vars to the set
-                # add new user vars to the set
-        get_variables(cpm_cons, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
-        for con in self.transform(cpm_cons):
+        for con in self.transform(cpm_expr):
             cpm_expr = con
             if isinstance(cpm_expr, _BoolVarImpl):
                 # base case, just var or ~var

@@ -57,7 +57,7 @@ import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.linearize import only_positive_coefficients, decompose_linear
@@ -346,7 +346,7 @@ class CPM_pysat(SolverInterface):
 
         raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -363,7 +363,7 @@ class CPM_pysat(SolverInterface):
             - Pseudo-Boolean constraints (`wsum`)
 
             :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            :type cpm_expr: NestedBoolExprLike
 
             :return: list of Expression
         """
@@ -386,7 +386,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pysat":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -401,13 +401,18 @@ class CPM_pysat(SolverInterface):
 
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
+
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: NestedBoolExprLike
+
+            :return: self
         """
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-            self._post_constraint(cpm_expr)
+        for con in self.transform(cpm_expr):
+            self._post_constraint(con)
 
         return self
 

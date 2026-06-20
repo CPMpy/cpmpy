@@ -48,7 +48,7 @@ import numpy.typing as npt
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, Operator
+from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
 from ..expressions.utils import is_num, is_int
 from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalfunctions import FloatSum
@@ -210,7 +210,7 @@ class CPM_highs(SolverInterface):
 
         raise NotImplementedError(f"HiGHS: unexpected linear expression {linexpr}, please report on our issue tracker.")
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports.
 
@@ -230,12 +230,17 @@ class CPM_highs(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_highs":
         """
             Eagerly add a constraint to the underlying solver.
 
             Any CPMpy expression given is immediately transformed (through `transform()`)
             and then posted to the solver in this function.
+
+            :param cpm_expr: CPMpy expression, or list thereof
+            :type cpm_expr: NestedBoolExprLike
+
+            :return: self
         """
         # track user vars and ensure newly seen ones have solver columns
         get_variables(cpm_expr, collect=self.user_vars)

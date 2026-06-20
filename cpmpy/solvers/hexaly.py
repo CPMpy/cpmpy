@@ -49,7 +49,7 @@ import time
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import GlobalConstraint, DirectConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
@@ -335,7 +335,7 @@ class CPM_hexaly(SolverInterface):
 
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -345,7 +345,7 @@ class CPM_hexaly(SolverInterface):
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
         :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        :type cpm_expr: NestedBoolExprLike
 
         :return: list of Expression
         """
@@ -358,7 +358,7 @@ class CPM_hexaly(SolverInterface):
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_hexaly":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -372,16 +372,16 @@ class CPM_hexaly(SolverInterface):
             are auxiliary variables created by transformations.
 
         :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        :type cpm_expr: NestedBoolExprLike
 
         :return: self
         """
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-            hex_expr = self._hex_expr(cpm_expr)
+        for con in self.transform(cpm_expr):
+            hex_expr = self._hex_expr(con)
             self.hex_model.add_constraint(hex_expr)
 
         return self

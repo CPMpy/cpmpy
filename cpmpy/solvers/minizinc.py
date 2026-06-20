@@ -70,7 +70,7 @@ from cpmpy.expressions import NoOverlap
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import MinizincNameException, MinizincBoundsException
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
@@ -616,13 +616,13 @@ class CPM_minizinc(SolverInterface):
     def has_objective(self):
         return self.mzn_txt_solve != "solve satisfy;"
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Decompose globals not supported (and flatten globalfunctions)
             ensure it is a list of constraints
 
             :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            :type cpm_expr: NestedBoolExprLike
 
             :return: list of Expression
         """
@@ -633,7 +633,7 @@ class CPM_minizinc(SolverInterface):
                                      csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_minizinc":
         """
             Translate a CPMpy constraint to MiniZinc string and add it to the solver
 
@@ -647,7 +647,7 @@ class CPM_minizinc(SolverInterface):
             are auxiliary variables created by transformations.
 
         :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        :type cpm_expr: NestedBoolExprLike
 
         :return: self
         """
