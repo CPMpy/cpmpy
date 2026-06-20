@@ -3,11 +3,12 @@
 """
 
 import copy
+from collections.abc import Callable, Iterable
 
 import numpy as np
 import cpmpy as cp
 
-from ..expressions.core import BoolVal, Expression, Comparison, Operator
+from ..expressions.core import BoolVal, Expression, Comparison, Operator, NestedBoolExprLike
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.utils import eval_comparison, is_false_cst, is_true_cst, is_boolexpr, is_num, is_bool
 from ..expressions.variables import _BoolVarImpl
@@ -15,17 +16,17 @@ from ..exceptions import NotSupportedError
 from ..expressions.globalconstraints import GlobalConstraint
 
 
-def toplevel_list(cpm_expr, merge_and=True):
+def toplevel_list(cpm_expr: NestedBoolExprLike, merge_and: bool = True) -> list[Expression]:
     """
     Unravels nested lists and top-level AND's and ensures every element returned is a CPMpy Expression with :func:`~cpmpy.expressions.core.Expression.is_bool()` true.
 
     Arguments:
-        cpm_expr:   Expression or list of Expressions
-        merge_and:  if True then a toplevel 'and' will have its arguments merged at top level
+        cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+        merge_and (bool):  if True then a toplevel 'and' will have its arguments merged at top level
     """
 
     # very efficient version with limited function lookups and list operations
-    def unravel(lst, append):
+    def unravel(lst: Iterable, append: Callable[[Expression], None]) -> None:
         for e in lst:
             if isinstance(e, Expression):
                 if merge_and and e.name == "and":
@@ -38,11 +39,11 @@ def toplevel_list(cpm_expr, merge_and=True):
             elif isinstance(e, (list, tuple, np.flatiter)):
                 unravel(e, append)
             elif e is False or e is np.False_:
-                append(BoolVal(e))
+                append(BoolVal(False))
             elif e is not True and e is not np.True_:  # if True: pass
                 raise NotSupportedError(f"Expression {e} is not a valid CPMpy constraint")
 
-    newlist = []
+    newlist: list[Expression] = []
     append = newlist.append
     unravel((cpm_expr,), append)
 
