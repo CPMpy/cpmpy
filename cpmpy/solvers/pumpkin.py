@@ -56,6 +56,7 @@ from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..transformations.flatten_model import flatten_constraint, get_or_make_var
 from ..transformations.comparison import only_numexpr_equality
+from ..transformations.negation import push_down_negation
 from ..transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from ..transformations.safening import no_partial_functions, safen_objective
 
@@ -379,6 +380,7 @@ class CPM_pumpkin(SolverInterface):
         cpm_cons = toplevel_list(cpm_expr)
 
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"element", "div", "mod"}) # safen toplevel elements, assume total decomposition for partial functions
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints - self.disabled_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints - self.disabled_global_constraints,
@@ -512,6 +514,8 @@ class CPM_pumpkin(SolverInterface):
         elif isinstance(cpm_expr, Operator):
             if cpm_expr.name == "or": 
                 return [constraints.Clause(self.solver_vars(cpm_expr.args), constraint_tag=tag)]
+            if cpm_expr.name == "and":
+                return [clause for arg in cpm_expr.args for clause in self._get_constraint(arg, tag=tag)]
 
             raise NotImplementedError("Pumpkin: operator not (yet) supported", cpm_expr)
 
