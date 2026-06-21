@@ -22,8 +22,6 @@ List of classes
     InverseOne
     Channel
     NegativeShortTable
-    MDD
-    Regular
     NotInDomain
     NoOverlap2d
     IfThenElseNum
