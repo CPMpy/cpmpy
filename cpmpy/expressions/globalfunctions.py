@@ -932,26 +932,35 @@ class NDElement(GlobalFunction):
         """
         Decomposition of NDElement global function.
 
-        Rewritten as 1-D Element with a linear index into the flattened array.
-        Example: ``arr = [[10, 20, 30], [40, 50, 60]]`` and indices ``(1, 2)``
+        Rewritten as 1-D Element with a linear index into the flattened array (offset 0).
+        Example: 2x3 array ``arr = [[10, 20, 30], [40, 50, 60]]`` and indices ``(1, 2)``
         gives ``arr[1, 2] == 60``. After Decomposing to 1-D Element, ``arr.reshape(-1)`` is
-        ``[10, 20, 30, 40, 50, 60]`` and the linear index is ``1*3 + 2 = 5``,
-        so this becomes ``Element(arr.reshape(-1), 5) == 60``.
+        ``[10, 20, 30, 40, 50, 60]`` and the linear index is ``1*3 + 2 = 5``.
+
+        Symbolically, for a AxB array and expression indices ``(x,y)``
+        the linear index is ``x*B + y``.
+
+        More generally, for an N-dimensional array with sizes D1,D2,...,Dn
+        and expression indices ``(X1,X2,...,Xn)``
+        the linear index is ``X1*(D2*...*Dn) + X2*(D3*...*Dn) + ... + X(n-1)*Dn + Xn``.
 
         Returns:
             tuple[Expression, list[Expression]]: The Element expression and an empty list of defining constraints
         """
         arr, *indices = self.args
+        shape = arr.shape
 
         defining = []
         flat_index: list[Expression] = []
-        for dim, idx in enumerate(indices):
-            lb, ub = idx.get_bounds()
-            if lb < 0 or ub >= arr.shape[dim]:
-                warnings.warn(f"NDElement constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
-                defining += [idx >= 0, idx < arr.shape[dim]]
+        for dim_idx, dim_var in enumerate(indices):
+            dim_size = shape[dim_idx]
+            lb, ub = dim_var.get_bounds()
 
-            flat_index.append(idx * math.prod(arr.shape[dim+1:]))  # stride on dim: flat offset per +1 (product of later axis sizes)
+            if lb < 0 or ub >= dim_size:
+                warnings.warn(f"NDElement constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
+                defining += [dim_var >= 0, dim_var < dim_size]
+
+            flat_index.append(dim_var * math.prod(shape[dim_idx+1:]))  # Xi*(D(i+1)*...*Dn)
         
         return Element(arr.reshape(-1), cp.sum(flat_index)), defining
 
