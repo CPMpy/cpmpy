@@ -50,16 +50,6 @@ STAT_METRICS = {
     "n_boolean": "# boolean vars",
 }
 
-
-def prepare_plot_df(df):
-    """Add variant labels and merge rc2 into pysat."""
-    plot_df = df.copy()
-    plot_df["ablate"] = plot_df["ablate"].fillna("baseline")
-    plot_df["variant"] = plot_df["ablate"].map(VARIANT_LABEL).fillna(plot_df["ablate"])
-    plot_df.loc[plot_df["solver"] == "rc2", "solver"] = "pysat"
-    return plot_df
-
-
 def variant_hue_order(variants):
     hue_order = sorted(variants)
     baseline = VARIANT_LABEL["baseline"]
@@ -79,7 +69,15 @@ def load_results(results_dir):
                 records.append(json.loads(content))
     if not records:
         raise SystemExit("No result JSON files found under {}".format(results_dir))
-    return pd.DataFrame(records)
+
+    df = pd.DataFrame(records)
+    df['error'].fillna("OK", inplace=True)
+    df['status'].fillna("OK", inplace=True)
+    # fill baseline
+    df["ablate"] = df["ablate"].fillna("baseline")
+    df["variant"] = df["ablate"].map(VARIANT_LABEL).fillna(df["ablate"])
+    df.loc[df["solver"] == "rc2", "solver"] = "pysat"
+    return df
 
 
 def get_finished_instances(df):
@@ -91,7 +89,7 @@ def get_finished_instances(df):
 
 
 def save_figure(fig, name):
-    fig.savefig(f"{name}.pdf", bbox_inches="tight")
+    # fig.savefig(f"{name}.pdf", bbox_inches="tight")
     fig.savefig(f"{name}.png", dpi=150, bbox_inches="tight")
 
 
@@ -128,10 +126,15 @@ def plot_runtime_ecdf(df, ax, solver, runtime_col="runtime", time_limit=None, hu
 
 def plot_stats(df, ax, metric, hue_order=None):
     """ECDF of one transform-size metric across ablation variants."""
+
+    df = df.copy()
     if hue_order is None:
         hue_order = variant_hue_order(df["variant"].unique())
+    
+    # num_solved = df.groupby("variant").size()
+    # df['variant'] = df["variant"].map(lambda x: f"{x} ({num_solved[x]})")
 
-    sns.ecdfplot(data=df, x=metric, hue="variant", ax=ax, hue_order=hue_order)
+    sns.ecdfplot(data=df, x=metric, hue="variant", ax=ax, hue_order=hue_order, stat="count")
     if metric == "n_constraints":
         ax.set_xscale("log")
     ax.set_xlabel(STAT_METRICS[metric])
@@ -141,7 +144,7 @@ def plot_stats(df, ax, metric, hue_order=None):
 
 def plot_all_stats(df, figures_dir):
     """One figure per solver: ECDFs of constraints / integer / boolean vars."""
-    plot_df = prepare_plot_df(df)
+    plot_df = df.copy()
     for col in STAT_METRICS:
         if col not in plot_df.columns:
             print(f"No {col} column in results — skipping transform-size plots")
@@ -163,6 +166,7 @@ def plot_all_stats(df, figures_dir):
         fig, axes = plt.subplots(1, 3, figsize=(12, 4))
         for ax, metric in zip(axes, STAT_METRICS):
             plot_stats(solver_df, ax=ax, metric=metric, hue_order=hue_order)
+        
         fig.suptitle(f"{solver} transform size", fontweight="bold")
         fig.tight_layout()
         save_figure(fig, os.path.join(figures_dir, f"ablation_stats_{solver}"))
@@ -171,7 +175,7 @@ def plot_all_stats(df, figures_dir):
 
 def plot_all_solvers(df, figures_dir, runtime_col="runtime"):
     """One ECDF figure per solver, saved into ``figures_dir``."""
-    plot_df = prepare_plot_df(df)
+    plot_df = df.copy()
 
     time_limits = set(df["time_limit"].dropna())
     if len(time_limits) > 1:
@@ -202,5 +206,12 @@ if __name__ == "__main__":
 
     df = load_results(results_dir)
 
-    plot_all_solvers(df, figures_dir=figures_dir, runtime_col="runtime")
+    print(df.columns)
+
+   
+
+    print("Raw data:")
+    print(df.groupby(["solver", "variant", "status"]).size())
+
+    # plot_all_solvers(df, figures_dir=figures_dir, runtime_col="runtime")
     plot_all_stats(df, figures_dir=figures_dir)
