@@ -86,6 +86,15 @@ List of classes
 
     Dataset
     FileDataset
+
+==================
+List of functions
+==================
+
+.. autosummary::
+    :nosignatures:
+
+    from_files
 """
 from __future__ import annotations
 
