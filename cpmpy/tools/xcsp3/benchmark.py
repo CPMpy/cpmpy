@@ -257,7 +257,7 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
             status = line
 
         else:
-            raise()
+            raise TypeError(f"unexpected pipe message type {type(line).__name__}: {line!r}")
 
     # Parse the exit status
     if status["status"] == "error":
@@ -371,8 +371,6 @@ def xcsp3_benchmark(year: int, track: str, solver: str, workers: int = 1,
                 pass
             except Exception as e:
                 print(f"Job {i}: {dataset[i][1]['name']}, ProcessPoolExecutor caught: {e}")
-
-        raise()
     
     return output_file
 
