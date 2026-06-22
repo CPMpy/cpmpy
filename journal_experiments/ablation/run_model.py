@@ -41,7 +41,9 @@ parameters, the runtime, the solver status, and (for optimization problems)
 the objective value.
 """
 
+import argparse
 import os
+import resource
 import sys
 import json
 import time
@@ -250,7 +252,7 @@ def patch_transform(solver_name, ablate):
     transform = SOLVER_TRANSFORM[base]
     solver_cls = cp.SolverLookup.lookup(solver_name)
     solver_cls.transform = functools.partialmethod(transform, ablate=ablate)
-    return "{}({})".format(transform.__name__, ablate)
+    return solver_cls
 
 
 def count_transform_stats(solver, cpm_expr):
@@ -277,83 +279,92 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_af
     if model.has_objective() and sname == "pysat":
         sname = "rc2" # PySAT cannot handle objectives, switch to RC2 Max-SAT solver
 
-    ablate_variant = None
     if ablate is not None:
-        ablate_variant = patch_transform(sname, ablate)
-        print("[run_model] patched {} transform with {}".format(sname, ablate_variant),
-              file=sys.stderr)
+        solver_cls = patch_transform(sname, ablate)
+        print("Patched solver {} for ablation {}".format(sname, ablate))
 
-    t0 = time.time()
-    solver = cp.SolverLookup.get(sname)
-    transform_stats = count_transform_stats(solver, model.constraints)
-    transformation_time = time.time() - t0
+    try:
+        t0 = time.time()
+        solver = cp.SolverLookup.get(sname)
+        transform_stats = count_transform_stats(solver, model.constraints)
+        transformation_time = time.time() - t0
 
-    record = {
-        "model": os.path.basename(model_path),
-        "model_path": os.path.abspath(model_path),
-        "solver": solver_name,
-        "solver_kwargs": solver_kwargs,
-        "time_limit": time_limit,
-        "ablate": ablate,
-        "ablate_variant": ablate_variant,
-        "stop_after_transform": stop_after_transform,
-        "transformation_time": transformation_time,
-        **transform_stats,
-        "runtime": None,
-        "status": None,
-        "objective_value": None,
-        "error": None,
-    }
+        record = {
+            "model": os.path.basename(model_path),
+            "model_path": os.path.abspath(model_path),
+            "solver": solver_name,
+            "solver_kwargs": solver_kwargs,
+            "time_limit": time_limit,
+            "ablate": ablate,
+            "stop_after_transform": stop_after_transform,
+            "transformation_time": transformation_time,
+            **transform_stats,
+            "runtime": None,
+            "status": None,
+            "objective_value": None,
+            "error": None,
+        }
+    
+    except Exception as e:
+        print("[run_model] error during init: {}".format(e), file=sys.stderr)
+        return {
+            "model": os.path.basename(model_path),
+            "model_path": os.path.abspath(model_path),
+            "solver": solver_name,
+            "solver_kwargs": solver_kwargs,
+            "time_limit": time_limit,
+            "status": "error",
+            "error": str(e),
+        }
 
     if stop_after_transform:
         return record
 
-    solver = cp.SolverLookup.get(sname, model)
-    solver.solve(time_limit=time_limit, **solver_kwargs)
+    try:
+        # do the solve
+        solver.solve(time_limit=time_limit, **solver_kwargs)
 
-    status = solver.status()
-    record["runtime"] = status.runtime
-    record["status"] = status.exitstatus.name
-    record["objective_value"] = model.objective_value() if model.has_objective() else None
-    return record
+        status = solver.status()
+        record["runtime"] = status.runtime
+        record["status"] = status.exitstatus.name
+        record["objective_value"] = model.objective_value() if model.has_objective() else None
+        return record
+    except Exception as e:
+        print("[run_model] error during solving: {}".format(e), file=sys.stderr)
+        record['status'] = "error"
+        record['error'] = str(e)
+        return record
 
 
 if __name__ == "__main__":
-  
-    # Pull out the optional --ablate / --out / --memory-limit flags; everything else is positional.
-    ablate = None
-    out_path = None
-    memory_limit_mb = None
-    stop_after_transform = False
-    positional = []
-    for arg in sys.argv[1:]:
-        if arg.startswith("--ablate="):
-            ablate = arg.split("=", 1)[1]
-        elif arg.startswith("--out="):
-            out_path = arg.split("=", 1)[1]
-        elif arg.startswith("--memory-limit="):
-            memory_limit_mb = int(arg.split("=", 1)[1])
-        elif arg == "--stop-after-transform":
-            stop_after_transform = True
-        else:
-            positional.append(arg)
+    parser = argparse.ArgumentParser(
+        description="Load a pickled CPMpy model and solve it with a given solver.")
+    parser.add_argument("model_path", help="path to model.pickle")
+    parser.add_argument("solver_name", help="solver name (e.g. ortools, gurobi)")
+    parser.add_argument("--ablate", choices=ABLATE_CHOICES, default=None,
+                        help="disable one transformation optimization")
+    parser.add_argument("--out", default=None, help="write JSON record to this path")
+    parser.add_argument("--memory-limit", type=int, default=None,
+                        dest="memory_limit_gb", help="memory cap in gigabytes (RLIMIT_AS)")
+    parser.add_argument("--time-limit", type=int, default=None,
+                        dest="time_limit", help="time limit in seconds")
+    parser.add_argument("--stop-after-transform", action="store_true",
+                        help="run transform pipeline only, skip solve")
+    parser.add_argument("solver_kwargs", nargs="*",
+                        help="solver kwargs as key=value (values parsed as JSON when possible)")
+    args = parser.parse_args()
 
-    if len(positional) < 2:
-        print("Usage: python run_model.py path/to/model.pickle <solver_name> "
-              "[--ablate=...] [--stop-after-transform] [key=value ...]",
-              file=sys.stderr)
-        sys.exit(1)
-    if ablate is not None and ablate not in ABLATE_CHOICES:
-        print("Invalid --ablate value '{}' (choose from: {})".format(
-            ablate, ", ".join(ABLATE_CHOICES)), file=sys.stderr)
-        sys.exit(1)
+    model_path = args.model_path
+    solver_name = args.solver_name
+    ablate = args.ablate
+    out_path = args.out
+    memory_limit_gb = args.memory_limit_gb
+    time_limit = args.time_limit
+    stop_after_transform = args.stop_after_transform
 
-    model_path = positional[0]
-    solver_name = positional[1]
-
-    # Parse the remaining "key=value" arguments into solver kwargs.
+    # Parse the "key=value" arguments into solver kwargs.
     solver_kwargs = {}
-    for arg in positional[2:]:
+    for arg in args.solver_kwargs:
         if "=" not in arg:
             print("Ignoring malformed kwarg (expected key=value): {}".format(arg), file=sys.stderr)
             continue
@@ -364,13 +375,19 @@ if __name__ == "__main__":
             value = raw_value  # leave as plain string
         solver_kwargs[key] = value
 
-    # time_limit / memory_limit are dedicated arguments, not solver-specific kwargs.
     time_limit = solver_kwargs.pop("time_limit", None)
 
     if solver_name == "gurobi":
         solver_kwargs['Threads'] = 1
     if solver_name == "ortools":
         solver_kwargs['num_workers'] = 1
+
+    # set memory limit if specified
+    if memory_limit_gb is not None:
+        print("Setting memory limit to {} GB".format(memory_limit_gb), file=sys.stderr)
+        limit_bytes = memory_limit_gb * 1024 * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, # convert to bytes
+                                                2*limit_bytes))
 
     record = do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs,
                       stop_after_transform=stop_after_transform)

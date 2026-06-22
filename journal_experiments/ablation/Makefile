@@ -22,8 +22,8 @@
 
 PYTHON       ?= python3
 
-ILP_SOLVERS   ?= gurobi pysat highs
-CP_SOLVERS    ?= choco ortools
+ILP_SOLVERS   ?= gurobi
+CP_SOLVERS    ?= ortools
 
 # ILP solvers: baseline, no-ilpfriendly, no-detect-categorical
 # CP solvers: baseline, no-cp-friendly
@@ -31,6 +31,7 @@ ILP_ABLATIONS ?= baseline no-ilpfriendly no-detect-categorical
 CP_ABLATIONS  ?= baseline no-cp-friendly
 
 TIME_LIMIT   ?= 30
+MEMORY_LIMIT_GB ?= 8 # 8GB
 
 # 1 = run transform only (--stop-after-transform); 0 = solve as usual
 STOP_AFTER_TRANSFORM ?= 0
@@ -69,7 +70,7 @@ plot: $(PLOT_STAMP)
 define ABLATION_RULE
 $(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle run_model.py $(CPMPY_DEPS)
 	@mkdir -p $(RESULTS_DIR)
-	$(PYTHON) run_model.py $$< $(1) $(call ablate_arg,$(2)) $(stop_after_transform_arg) --out=$$@ time_limit=$(TIME_LIMIT)
+	$(PYTHON) run_model.py $$< $(1) $(call ablate_arg,$(2)) $(stop_after_transform_arg) --out=$$@ --time-limit=$(TIME_LIMIT) --memory-limit=$(MEMORY_LIMIT_GB)
 endef
 
 $(foreach s,$(ILP_SOLVERS),$(foreach a,$(ILP_ABLATIONS),$(eval $(call ABLATION_RULE,$(s),$(a)))))
