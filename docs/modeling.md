@@ -605,6 +605,39 @@ For solvers other than "ortools", you will need to **install additional package(
     ModuleNotFoundError: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
 ```
 
+## Datasets
+
+When experimenting with models or comparing solvers, it is useful to benchmark them against standard problem collections from the community. CPMpy datasets provide a small, PyTorch-style interface for downloading benchmark instances, iterating over them, and accessing their metadata.
+
+For example, the XCSP3 dataset gives access to instances from the XCSP3 competitions:
+
+```python
+from cpmpy.tools.datasets import XCSP3Dataset
+
+dataset = XCSP3Dataset(year=2024, track="CSP", download=True)
+
+instance_file, metadata = dataset[0]
+print(instance_file)
+print(metadata["name"], metadata["categories"])
+
+for instance_file, metadata in dataset:
+    print("Instance:", metadata["name"])
+```
+
+If CPMpy does not yet provide the dataset you need, you can still use the same interface by creating your own dataset class on top of {class}`~cpmpy.tools.datasets.core.Dataset` with minimal effort. 
+
+For a local directory of instance files, the convenience function `from_files()` is often enough:
+
+```python
+from cpmpy.tools.datasets.core import from_files
+
+dataset = from_files("./my_instances/", extension=".txt")
+
+for instance_file, metadata in dataset:
+    print(metadata["name"], instance_file)
+```
+
+See the [datasets API documentation](./api/tools/datasets.rst) for the available datasets and the full dataset interface.
 
 ## Model versus solver interface
 
