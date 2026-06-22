@@ -345,7 +345,7 @@ if __name__ == "__main__":
     parser.add_argument("--out", default=None, help="write JSON record to this path")
     parser.add_argument("--memory-limit", type=int, default=None,
                         dest="memory_limit_gb", help="memory cap in gigabytes (RLIMIT_AS)")
-    parser.add_argument("--time-limit", type=int, default=None,
+    parser.add_argument("--time-limit", type=int, required=True,
                         dest="time_limit", help="time limit in seconds")
     parser.add_argument("--stop-after-transform", action="store_true",
                         help="run transform pipeline only, skip solve")
@@ -373,8 +373,6 @@ if __name__ == "__main__":
         except json.JSONDecodeError:
             value = raw_value  # leave as plain string
         solver_kwargs[key] = value
-
-    time_limit = solver_kwargs.pop("time_limit", None)
 
     if solver_name == "gurobi":
         solver_kwargs['Threads'] = 1
