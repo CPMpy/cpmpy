@@ -386,7 +386,12 @@ if __name__ == "__main__":
         resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, # convert to bytes
                                                 resource.RLIM_INFINITY))
 
-    record = do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs,
+    record = do_solve(model_path=model_path, 
+                      solver_name=solver_name, 
+                      ablate=ablate, 
+                      time_limit=time_limit, 
+                      solver_kwargs=solver_kwargs,
+                      memory_limit_gb=memory_limit_gb, 
                       stop_after_transform=stop_after_transform)
 
     if out_path is None:
