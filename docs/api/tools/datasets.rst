@@ -1,12 +1,20 @@
 Datasets (:mod:`cpmpy.tools.datasets`)
 =======================================
 
-.. automodule:: cpmpy.tools.datasets
+.. py:module:: cpmpy.tools.datasets
+
+.. automodule:: cpmpy.tools.datasets.core
     :members:
     :undoc-members:
     :inherited-members:
 
-.. include:: ./datasets/core.rst
-.. include:: ./datasets/xcsp3.rst
 
+
+Available datasets:
+-------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    datasets/xcsp3
 
