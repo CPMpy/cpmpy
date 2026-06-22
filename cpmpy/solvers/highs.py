@@ -35,21 +35,23 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
 from typing import Optional
 
-import time
 import warnings
 
 import numpy as np
 import numpy.typing as npt
 
-from .solver_interface import SolverInterface, SolverStatus, ExitStatus
+from .solver_interface import Callback, SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison, Operator
-from ..expressions.utils import is_num, is_int
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.core import Expression, BoolVal, Comparison, Operator
+from ..expressions.utils import is_any_list, is_num, is_int
+from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
@@ -119,6 +121,7 @@ class CPM_highs(SolverInterface):
 
         self._inf = highspy.kHighsInf
         self._obj_cols = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="highs", cpm_model=cpm_model)
@@ -280,31 +283,51 @@ class CPM_highs(SolverInterface):
 
     __add__ = add
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize.
             Any constraints created during conversion are permanently posted.
         """
         import highspy
 
-        get_variables(expr, collect=self.user_vars)
+        self.objective_ = expr
 
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(
-            obj,
-            supported=self.supported_global_constraints,
-            supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap,
-        )
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        # only_positive_bv_wsum_const keeps the constant separate so it never ends up
-        # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
-        obj, obj_const = only_positive_bv_wsum_const(obj)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)
+            indices = np.array([self.solver_var(v) for v in vs.flat], dtype=np.int32)
+            values = np.asarray(ws, dtype=np.float64)
+            if np.unique(indices).size != indices.size:
+                # group duplicates
+                new_indices, group = np.unique(indices, return_inverse=True)
+                new_values = np.bincount(group, weights=values).astype(np.float64)
+                sel = (new_values != 0)
+                indices, values = new_indices[sel], new_values[sel]
+        else:
+            get_variables(expr, collect=self.user_vars)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(
+                obj,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            # only_positive_bv_wsum_const keeps the constant separate so it never ends up
+            # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
+            obj, obj_const = only_positive_bv_wsum_const(obj)
 
-        indices, values, const = self._row_from_linexpr(obj)
-        const += obj_const
+            self.add(safe_cons + decomp_cons + flat_cons)
+
+            indices, values, const = self._row_from_linexpr(obj)
+            const += obj_const
 
         # reset only columns that carried cost in the previous objective, then set new ones
         if self._obj_cols is not None and len(self._obj_cols):
@@ -322,12 +345,16 @@ class CPM_highs(SolverInterface):
     def has_objective(self):
         return self._obj_cols is not None
 
-    def solve(self, time_limit=None, **kwargs):
+    def solve(self, time_limit=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the HiGHS solver.
 
             Arguments:
             - time_limit: maximum solve time in seconds (float, optional)
+            - display:    callback function to call after each solution is found
+                          either a list of CPMpy expressions, OR a callback function which
+                          gets called after the variable-value mapping of the intermediate solution.
+                          default/None: nothing is displayed
             - kwargs:     any keyword argument, mapped to HiGHS options via ``setOptionValue``.
                           Unknown/invalid options are ignored with a warning.
 
@@ -338,8 +365,6 @@ class CPM_highs(SolverInterface):
 
         HiGHS option reference: https://ergo-code.github.io/HiGHS/dev/options/definitions/
 
-        Solution callbacks are not connected yet; see HiGHS callback documentation for future reference:
-        https://ergo-code.github.io/HiGHS/stable/callbacks/
         """
         import highspy
 
@@ -359,6 +384,12 @@ class CPM_highs(SolverInterface):
             # (re)set to no limit (for HiGHS: infinity)
             self.highs.setOptionValue("time_limit", highspy.kHighsInf)
 
+        if display is not None:
+            callback_type = hscb.HighsCallbackType.kCallbackMipSolution
+            callback = HighsSolutionPrinter(self, display, callback_type)
+            self.highs.setCallback(callback.callback, None)
+            self.highs.startCallback(callback_type)
+
         # map additional kwargs to HiGHS options
         for key, val in kwargs.items():
             try:
@@ -367,9 +398,11 @@ class CPM_highs(SolverInterface):
                 warnings.warn(f"HiGHS: failed to set option '{key}' = {val!r}: {e}")
 
         status = self.highs.run()
+        if display is not None: # stop the callback
+            self.highs.stopCallback(callback_type)
         info = self.highs.getInfo()
         model_status = self.highs.getModelStatus()
-
+        
         self.cpm_status = SolverStatus(self.name)
         self.cpm_status.runtime = self.highs.getRunTime()
 
@@ -422,10 +455,51 @@ class CPM_highs(SolverInterface):
                     cpm_var._value = round(val)
 
             if self.has_objective():
-                self.objective_value_ = info.objective_function_value
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None
 
         return has_sol
 
+
+if CPM_highs.supported():
+    from highspy import cb as hscb
+    
+    class HighsSolutionPrinter:
+        """
+        CPMpy callback for HiGHs
+        """
+
+        def __init__(self, cpm_solver: CPM_highs, display:Callback, mip_solution_callback_type = hscb.HighsCallbackType.kCallbackMipSolution):
+            self.mip_solution_callback_type = mip_solution_callback_type
+            self._cpm_solver = cpm_solver
+            self._display = display
+            if isinstance(display, Expression) or is_any_list(display):
+                self._cpm_vars = get_variables(display)
+            elif callable(display):
+                # might use any, so populate all (user) variables with their values
+                self._cpm_vars = cpm_solver.user_vars
+
+        def callback(self, callback_type, message, data_out, data_in, user_data):
+            if callback_type != self.mip_solution_callback_type:
+                return
+
+            col_values = data_out.mip_solution
+
+            # map variables
+            for cpm_var in self._cpm_vars:
+    
+                col_idx = self._cpm_solver._varmap[cpm_var.name]
+                val = col_values[col_idx]
+                if cpm_var.is_bool():
+                    cpm_var._value = val >= 0.5
+                else:
+                    cpm_var._value = int(round(val))
+
+            self._cpm_solver.print_display(self._display)

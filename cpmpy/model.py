@@ -28,15 +28,13 @@
 from __future__ import annotations
 import copy
 import warnings
-from typing import Optional
-
-import numpy as np
+from typing import Optional, Any
 
 from .exceptions import NotSupportedError
 from .expressions.core import Expression
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
-from .solvers.solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
+from .solvers.solver_interface import SolverInterface, SolverStatus, Callback
 
 import pickle
 
@@ -72,7 +70,7 @@ class Model(object):
     CPMpy Model object, contains the constraint and objective expressions
     """
 
-    def __init__(self, *args, minimize=None, maximize=None):
+    def __init__(self, *args, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
         """
             Arguments of constructor:
 
@@ -87,9 +85,9 @@ class Model(object):
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
         # init list of constraints and objective
-        self.constraints = []
-        self.objective_ = None
-        self.objective_is_min = None
+        self.constraints: list[Any] = []  # TODO: determine type
+        self.objective_: Optional[Expression] = None
+        self.objective_is_min: Optional[bool] = None
 
         if len(args) == 1 and is_any_list(args):
             args = args[0]  # historical shortcut, treat as *args
@@ -146,7 +144,7 @@ class Model(object):
     __add__ = add  # Make __add__() (for the += operation) be the same as add() 
 
 
-    def minimize(self, expr):
+    def minimize(self, expr: Expression) -> None:
         """
             Minimize the given objective function
 
@@ -154,7 +152,7 @@ class Model(object):
         """
         self.objective(expr, minimize=True)
 
-    def maximize(self, expr):
+    def maximize(self, expr: Expression) -> None:
         """
             Maximize the given objective function
 
@@ -162,7 +160,7 @@ class Model(object):
         """
         self.objective(expr, minimize=False)
 
-    def objective(self, expr, minimize):
+    def objective(self, expr: Expression, minimize: bool) -> None:
         """
             Users will typically use :meth:`minimize() <cpmpy.model.Model.minimize>` or :meth:`maximize() <cpmpy.model.Model.maximize>` to set the objective function,
             this is the generic implementation for both.
@@ -173,10 +171,11 @@ class Model(object):
 
             ``objective()`` can be called multiple times, only the last one is stored
         """
+        assert isinstance(expr, Expression), f"Model only accepts an Expression as objective, got {type(expr)} instead"
         self.objective_ = expr
         self.objective_is_min = minimize
 
-    def has_objective(self):
+    def has_objective(self) -> bool:
         """
             Check if the model has an objective function
 
@@ -185,13 +184,15 @@ class Model(object):
         """
         return self.objective_ is not None
 
-    def objective_value(self):
+    def objective_value(self) -> Optional[int]:
         """
             Returns the value of the objective function of the last solver run on this model
 
             Returns:
                 int, optional:  The objective value as an integer or ``None`` if it is not run or is a satisfaction problem
         """
+        if self.objective_ is None:
+            return None
         return self.objective_.value()
 
     def solve(self, solver:Optional[str]=None, time_limit:Optional[int|float]=None, **kwargs):

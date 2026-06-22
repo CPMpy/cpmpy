@@ -9,6 +9,8 @@ from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Comparison, Operator, Expression
 from cpmpy.expressions.utils import eval_comparison, get_bounds
 
+from cpmpy.exceptions import MinizincNameException, NotSupportedError, TypeError as CPMpyTypeError
+
 from utils import inclusive_range
 
 
@@ -165,6 +167,18 @@ class TestWeightedSum:
         assert(str(expr1) == str(expr2))
         assert(str(expr1) == str(expr3))
 
+    def test_reject_float_coefficients(self):
+        m = cp.Model()
+        x, y, z = cp.boolvar(shape=3, name=tuple("xyz"))
+        with pytest.raises(CPMpyTypeError, match="float constants"):
+            m.add(0.7 * x + 0.8 * y >= 1)
+
+    def test_floatsum_objective_only(self):
+        x = cp.boolvar(name="x")
+        fs = cp.FloatSum([0.5], [x])
+        with pytest.raises(CPMpyTypeError, match="cannot be used as an expression"):
+            _ = fs >= 1
+
 class TestMul:
 
     def setup_method(self) -> None:
@@ -223,10 +237,6 @@ class TestMul:
         expr = x * 3
         assert expr.is_lhs_num is True
         assert expr.args[0] == 3 and expr.args[1] is x
-        # real coeff: 0.3 * x -> is_lhs_num True (for objectives)
-        expr = 0.3 * x
-        assert expr.is_lhs_num is True
-        assert expr.args[0] == 0.3 and expr.args[1] is x
         # var * var -> no constant, is_lhs_num False
         y = cp.intvar(0, 5, name="y")
         expr = x * y
@@ -270,7 +280,7 @@ class TestArrayExpressions:
         assert y.value() == res
         # with axis arg
         x = intvar(0,5,shape=(10,4), name="x")
-        y = intvar(0, 1000, shape=10, name="y")
+        y = intvar(0, 200, shape=10, name="y")
         model = cp.Model(y == x.prod(axis=1))  # y[i] = product(x[i,:])
         model.solve()
         for i,vv in enumerate(x):
@@ -491,11 +501,9 @@ class TestBounds:
         assert int == type(cp.sum(x[0]).value())
         assert int == type(cp.sum(x).value())
         assert int == type(cp.sum([1,2,3] * x[0]).value())
-        assert float == type(cp.sum([0.1,0.2,0.3] * x[0]).value())
         
         # also numpy should be converted to Python native when callig value()
         assert int == type(cp.sum(np.array([1, 2, 3]) * x[0]).value())
-        assert float == type(cp.sum(np.array([0.1,0.2,0.3]) * x[0]).value())
         
         # test binary operators
         a,b = x[0,[0,1]]
