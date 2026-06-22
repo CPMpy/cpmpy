@@ -378,7 +378,7 @@ class CPM_z3(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element", "nd_element"})
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,

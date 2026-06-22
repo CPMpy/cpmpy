@@ -57,6 +57,7 @@ from ..expressions.utils import argval, argvals, is_num, is_any_list, eval_compa
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
+from ..transformations.safening import no_partial_functions
 
 
 class CPM_hexaly(SolverInterface):
@@ -351,7 +352,7 @@ class CPM_hexaly(SolverInterface):
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        # no flattening, so also no safening required
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"nd_element"})
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
