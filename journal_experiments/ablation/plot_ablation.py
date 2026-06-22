@@ -138,7 +138,7 @@ def plot_stats(df, ax, metric, hue_order=None):
     if metric == "n_constraints":
         ax.set_xscale("log")
     ax.set_xlabel(STAT_METRICS[metric])
-    ax.set_ylabel("cumulative proportion")
+    ax.set_ylabel("Number of instances")
     return ax
 
 
