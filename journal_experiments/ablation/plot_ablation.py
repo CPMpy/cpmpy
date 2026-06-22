@@ -18,6 +18,7 @@ Run with the repo conda env, e.g.::
     /Users/ignaceb/miniforge3/envs/cpmpy/bin/python journal_experiments/plot_ablation.py run-ablation figures
 """
 import os
+from re import U
 import sys
 import json
 import glob
@@ -77,6 +78,9 @@ def load_results(results_dir):
     df["ablate"] = df["ablate"].fillna("baseline")
     df["variant"] = df["ablate"].map(VARIANT_LABEL).fillna(df["ablate"])
     df.loc[df["solver"] == "rc2", "solver"] = "pysat"
+
+    df['total_time'] = df['runtime'] + df['transformation_time']
+
     return df
 
 
@@ -111,14 +115,16 @@ def plot_runtime_ecdf(df, ax, solver, runtime_col="runtime", time_limit=None, hu
         The Axes ``ax``.
     """
     if time_limit is None:
-        time_limit = float(df["time_limit"].max())
+        time_limit=600
+        # time_limit = float(df["time_limit"].max())
 
     if hue_order is None:
         hue_order = variant_hue_order(df["variant"].unique())
-
+    
     sns.ecdfplot(data=df, x=runtime_col, hue="variant", stat="count", ax=ax, hue_order=hue_order)
+    # sns.ecdfplot(data=df, x='total_time', hue="variant", stat="count", ax=ax, hue_order=hue_order, linestyle="--")
     ax.set_xscale("log")
-    ax.set_xlim(left=0.01, right=time_limit)
+    ax.set_xlim(left=df[runtime_col].min(), right=time_limit)
     ax.set_xlabel("solve time (s)")
     ax.set_ylabel("number of instances solved")
     ax.set_title(solver)
@@ -134,9 +140,17 @@ def plot_stats(df, ax, metric, hue_order=None):
     # num_solved = df.groupby("variant").size()
     # df['variant'] = df["variant"].map(lambda x: f"{x} ({num_solved[x]})")
 
-    sns.ecdfplot(data=df, x=metric, hue="variant", ax=ax, hue_order=hue_order, stat="count")
-    if metric == "n_constraints":
-        ax.set_xscale("log")
+    # filter to instances that are solved by all variants
+    grouped = df.groupby("model")['variant'].count()
+    finished_by_all = grouped[grouped == len(hue_order)].index
+    df = df[df["model"].isin(finished_by_all)]
+
+    print(df.groupby(['solver', 'variant']).size())
+
+    sns.boxplot(data=df, x=metric, y="variant", ax=ax, order=hue_order, palette="pastel", legend=False)
+    # sns.ecdfplot(data=df, x=metric, hue="variant", ax=ax, hue_order=hue_order, stat="count")
+    # if metric == "n_constraints":
+    ax.set_xscale("log")
     ax.set_xlabel(STAT_METRICS[metric])
     ax.set_ylabel("Number of instances")
     return ax
@@ -213,5 +227,5 @@ if __name__ == "__main__":
     print("Raw data:")
     print(df.groupby(["solver", "variant", "status"]).size())
 
-    # plot_all_solvers(df, figures_dir=figures_dir, runtime_col="runtime")
-    plot_all_stats(df, figures_dir=figures_dir)
+    plot_all_solvers(df, figures_dir=figures_dir, runtime_col="runtime")
+    # plot_all_stats(df, figures_dir=figures_dir)
