@@ -180,6 +180,28 @@ def highs_transform(self, cpm_expr, ablate):
     cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
     return cpm_cons
 
+def pindakaas_transform(self, cpm_expr, ablate):
+    decompose = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
+    cpm_cons = toplevel_list(cpm_expr)
+    cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+    cpm_cons = push_down_negation(cpm_cons)
+    cpm_cons = decompose(
+        cpm_cons,
+        supported=self.supported_global_constraints,
+        supported_reified=self.supported_reified_global_constraints,
+        csemap=self._csemap,
+    )
+    cpm_cons = simplify_boolean(cpm_cons)
+    cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)  # flat normal form
+    if ablate == ABLATE_NO_CATEGORICAL:
+        pass
+    else: # don't detect categorical variables
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap, ivarmap=self.ivarmap)
+    cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+    cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
+    cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "and", "or"}), csemap=self._csemap)
+    cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
+    return cpm_cons
 
 def choco_transform(self, cpm_expr, ablate):
     decompose = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
@@ -226,6 +248,7 @@ SOLVER_TRANSFORM = {
     "highs": highs_transform,
     "choco": choco_transform,
     "ortools": ortools_transform,
+    "pindakaas": pindakaas_transform,
 }
 
 # Which ablations each solver supports.
@@ -237,6 +260,7 @@ SOLVER_ABLATIONS = {
     "highs": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
     "choco": frozenset({ABLATION_NO_CP_FRIENDLY}),
     "ortools": frozenset({ABLATION_NO_CP_FRIENDLY}),
+    "pindakaas": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
 }
 
 
@@ -337,7 +361,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_af
             for c in toplevel_list(model.constraints):
                 if c.value() is False:
                     record['error'] = "Solution check failed: constraint {} is not satisfied".format(c)
-                    
+
         return record
     except Exception as e:
         print("[run_model] error during solving: {}".format(e), file=sys.stderr)
