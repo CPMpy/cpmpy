@@ -1,12 +1,27 @@
 """
-Dataset Base Classes
-
 This module provides an abstract, PyTorch-style dataset interface for Constraint Optimisation (CO) benchmarks.
 With a single line of code, classical benchmarks such as XCSP3, PSPLib, JSPLib, etc. can be downloaded and iterated over.
 
-Whilst the class hierarchy put in place will support more exotic dataset types in the future, with a structure 
-put in place that takes inspiration from conventions within the ML community, currently only file-based datasets 
-are supported, i.e. datasets where the instances are stored as files on disk. 
+**Available datasets:**
+
+- :doc:`XCSP3Dataset </api/tools/datasets/xcsp3>`: XCSP3 competition benchmark instances for constraint satisfaction and optimization.
+
+
+.. note::
+
+    Whilst the dataset class provides a PyTorch compatible access pattern, it has no actual dependency on 
+    PyTorch and can be used without installing this library.
+
+**Class hierarchy**::
+
+    Dataset (ABC)
+    └── FileDataset (ABC)
+        └── XCSP3Dataset
+        └── (your dataset here)
+
+Whilst the class hierarchy will support more exotic dataset types in the future, with a structure put in place 
+that takes inspiration from conventions within the ML community, currently only file-based datasets are supported, 
+i.e. datasets where the instances are stored as files on disk. 
 
 The base classes standardize:
 
@@ -14,33 +29,21 @@ The base classes standardize:
 - instance access via ``__len__`` / ``__getitem__`` (PyTorch compatibility)
 - optional ``parse``/``transform``/``target_transform`` arguments
 - dataset metadata (with sidecar collection)
-
-Main classes:
-
-- :class:`Dataset`: minimal dataset base, instances are accessible by index and through iteration
-- :class:`FileDataset`: file-based dataset base with download + metadata support
-
-Class hierarchy::
-
-    Dataset (ABC)
-    └── FileDataset (ABC)
-        └── XCSP3Dataset
-        └── (your dataset here)
-
-Whilst the dataset class provides a PyTorch compatible access pattern, it has no actual dependency on PyTorch and can be used without 
-installing this library.
     
 To implement a new dataset, one needs to subclass one of the abstract dataset classes,
 and provide implementation for the following methods:
+
 - ``category``: return a dictionary of category labels, describing to which subset the dataset has been restricted (year, track, ...)
 - ``download``: download the dataset (helper function :func:`_download_file` is provided)
 
 Some optional methods to overwrite are:
+
 - ``collect_instance_metadata``: collect metadata about individual instances (e.g. number of variables, constraints, ...), 
   potentially domain specific 
 - ``open``: how to open the instance file (e.g. for compressed files using .xz, .lzma, .gz, ...)
 
 Datasets must also implement the following dataset metadata attributes:
+
 - ``name``: the name of the dataset
 - ``description``: a short description of the dataset
 - ``homepage``: a URL to the homepage of the dataset
@@ -54,6 +57,7 @@ instance-level metadata gets automatically collected and stored in a JSON sideca
 will use the sidecar file to avoid re-collecting the metadata.
 
 Iterating over the dataset is done in the same way as a PyTorch dataset. It returns 2-tuples (x,y) of:
+
 - x: instance reference (a file path is the only supported instance reference type at the moment)
 - y: instance metadata  (solution, features, origin, etc.)
 
@@ -72,6 +76,16 @@ The dataset also supports PyTorch-style transforms and target transforms.
     dataset = MyDataset(download=True, transform=my_model_loader)
     for model, info in dataset:
         ...
+
+===============
+List of classes
+===============
+
+.. autosummary::
+    :nosignatures:
+
+    Dataset
+    FileDataset
 """
 from __future__ import annotations
 
