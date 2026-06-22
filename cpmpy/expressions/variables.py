@@ -73,6 +73,7 @@ _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
 _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
 _VAR_NAME_CHECK_STATE = threading.local()
+_VAR_NAME_CHECK_STATE.strict = True # default to strict mode
 
 def BoolVar(shape=1, name=None):
     """
@@ -867,7 +868,7 @@ def _is_invalid_name(name: Any) -> bool:
         return False
 
 def _get_strict_variable_name_check():
-    return getattr(_VAR_NAME_CHECK_STATE, "strict", True)
+    return _VAR_NAME_CHECK_STATE.strict
 
 def _enable_strict_variable_name_check():
     _VAR_NAME_CHECK_STATE.strict = True
