@@ -110,6 +110,11 @@ def gurobi_transform(self, cpm_expr, ablate):
     # gurobi does not round towards zero, so no 'div' in supported set: https://github.com/CPMpy/cpmpy/pull/593#issuecomment-2786707188
     cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub", "min", "max", "mul", "abs", "pow"}), csemap=self._csemap)  # the core of the MIP-linearization
     cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
+
+    print("Transformed constraints:")
+    for c in cpm_cons:
+        print(c)
+
     return cpm_cons
 
 
@@ -259,19 +264,14 @@ def patch_transform(solver_name, ablate):
 def count_transform_stats(solver, cpm_expr):
     """Run ``solver.transform`` and return final model-size metrics."""
     cpm_cons = solver.transform(cpm_expr)
-    n_integer = 0
-    n_boolean = 0
-    for v in get_variables(cpm_cons):
-        if isinstance(v, _BoolVarImpl):
-            n_boolean += 1
-        elif isinstance(v, _IntVarImpl):
-            n_integer += 1
+    vars = get_variables(cpm_cons)
+    n_bool = sum(1 for v in vars if v.is_bool())
+    n_int = len(vars) - n_bool
     return {
         "n_constraints": len(cpm_cons),
-        "n_integer": n_integer,
-        "n_boolean": n_boolean,
+        "n_integer": n_int,
+        "n_boolean": n_bool,
     }
-
 
 def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_after_transform=False):
     """Load a pickled model, optionally patch the transform, solve, return a record."""
@@ -316,17 +316,28 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_af
         record["error"] = str(e)
         return record
 
+    gc.collect() # force garbage collection to free up memory
     if stop_after_transform:
         return record
 
     try:
         # do the solve
+        # re-initialize the solver... no easy way to count transform and also do the solve...
+        # could split it up, but lets keep this for now...
+        solver = cp.SolverLookup.get(sname, model)
         solver.solve(time_limit=time_limit, **solver_kwargs)
 
         status = solver.status()
         record["runtime"] = status.runtime
         record["status"] = status.exitstatus.name
         record["objective_value"] = model.objective_value() if model.has_objective() else None
+
+        if status.exitstatus.name == "FEASIBLE" or status.exitstatus.name == "OPTIMAL":
+            # check that all constraints are satisfied
+            for c in toplevel_list(model.constraints):
+                if c.value() is False:
+                    record['error'] = "Solution check failed: constraint {} is not satisfied".format(c)
+                    
         return record
     except Exception as e:
         print("[run_model] error during solving: {}".format(e), file=sys.stderr)
@@ -338,8 +349,8 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_af
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Load a pickled CPMpy model and solve it with a given solver.")
-    parser.add_argument("model_path", help="path to model.pickle")
-    parser.add_argument("solver_name", help="solver name (e.g. ortools, gurobi)")
+    parser.add_argument("--model-path", help="path to model.pickle")
+    parser.add_argument("--solver-name", help="solver name (e.g. ortools, gurobi)")
     parser.add_argument("--ablate", choices=ABLATE_CHOICES, default=None,
                         help="disable one transformation optimization")
     parser.add_argument("--out", default=None, help="write JSON record to this path")
