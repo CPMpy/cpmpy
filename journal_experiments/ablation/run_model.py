@@ -51,6 +51,7 @@ import signal
 import functools
 import subprocess
 import tempfile
+import gc
 
 import cpmpy as cp
 from cpmpy.transformations.get_variables import get_variables
@@ -283,39 +284,37 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_af
         solver_cls = patch_transform(sname, ablate)
         print("Patched solver {} for ablation {}".format(sname, ablate))
 
+    record = {
+        "model": os.path.basename(model_path),
+        "model_path": os.path.abspath(model_path),
+        "solver": solver_name,
+        "solver_kwargs": solver_kwargs,
+        "time_limit": time_limit,
+        "ablate": ablate,
+        "stop_after_transform": stop_after_transform,
+        "transformation_time": None,
+        "runtime": None,
+        "status": None,
+        "objective_value": None,
+        "error": None
+    }
+
     try:
         t0 = time.time()
         solver = cp.SolverLookup.get(sname)
         transform_stats = count_transform_stats(solver, model.constraints)
         transformation_time = time.time() - t0
 
-        record = {
-            "model": os.path.basename(model_path),
-            "model_path": os.path.abspath(model_path),
-            "solver": solver_name,
-            "solver_kwargs": solver_kwargs,
-            "time_limit": time_limit,
-            "ablate": ablate,
-            "stop_after_transform": stop_after_transform,
-            "transformation_time": transformation_time,
-            **transform_stats,
-            "runtime": None,
-            "status": None,
-            "objective_value": None,
-            "error": None,
-        }
+        record["transformation_time"] = transformation_time
+        record.update(transform_stats)
     
     except Exception as e:
+        # clean up memory, its probably a memory error...
+        gc.collect()
         print("[run_model] error during init: {}".format(e), file=sys.stderr)
-        return {
-            "model": os.path.basename(model_path),
-            "model_path": os.path.abspath(model_path),
-            "solver": solver_name,
-            "solver_kwargs": solver_kwargs,
-            "time_limit": time_limit,
-            "status": "error",
-            "error": str(e),
-        }
+        record["status"] = "error"
+        record["error"] = str(e)
+        return record
 
     if stop_after_transform:
         return record
@@ -387,7 +386,7 @@ if __name__ == "__main__":
         print("Setting memory limit to {} GB".format(memory_limit_gb), file=sys.stderr)
         limit_bytes = memory_limit_gb * 1024 * 1024 * 1024
         resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, # convert to bytes
-                                                2*limit_bytes))
+                                                resource.RLIM_INFINITY))
 
     record = do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs,
                       stop_after_transform=stop_after_transform)
