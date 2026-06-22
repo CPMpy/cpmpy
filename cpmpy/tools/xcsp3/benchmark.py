@@ -55,7 +55,7 @@ from datetime import datetime
 from filelock import FileLock
 from concurrent.futures import ThreadPoolExecutor
 
-from cpmpy.tools.xcsp3.dataset import XCSP3Dataset
+from cpmpy.tools.datasets.xcsp3 import XCSP3Dataset
 from cpmpy.tools.xcsp3.xcsp3_cpmpy import xcsp3_cpmpy, init_signal_handlers, ExitStatus
 
 class Tee:
@@ -155,8 +155,9 @@ def execute_instance(args: Tuple[str, dict, str, int, int, int, str, bool, bool,
                   'time_total', 'time_parse', 'time_model', 'time_post', 'time_solve',
                   'status', 'objective_value', 'solution', 'intermediate', 'checker_result']
     result = dict.fromkeys(fieldnames)  # init all fields to None
-    result['year'] = metadata['year']
-    result['track'] = metadata['track']
+    categories = metadata.get('categories', metadata)
+    result['year'] = categories['year']
+    result['track'] = categories['track']
     result['instance'] = metadata['name'] 
     result['solver'] = solver
 
