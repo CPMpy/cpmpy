@@ -66,8 +66,8 @@ def no_partial_functions(lst_of_expr: list[Expression],
         _toplevel (None): DEPRECATED
         _nbc (None): DEPRECATED
         safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
-                                    a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`), 
-                                    or when the solver does not support the global function, and it needs to be decomposed.
+                                    a solver supports the global function natively (not decomposed) but does not accept
+                                    unsafe values in its API (e.g., OR-Tools for `div`).
     """
 
     assert _toplevel is None, "no_partial_functions:  argument '_toplevel' is deprecated, do not use/modify it"
@@ -108,7 +108,8 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
         lst_of_expr (list[Expression]): list of CPMpy expressions
         is_toplevel (bool): whether ``lst_of_expr`` is the toplevel list of constraints.
         safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
-                                        a solver does not support unsafe values in its API (e.g., OR-Tools for `div`).
+                                        a solver supports the global function natively but does not accept unsafe 
+                                        values in its API (e.g., OR-Tools for `div`).
 
     Returns:
         tuple[bool, list[Expression], list[Expression], list[Expression]]
@@ -147,7 +148,8 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
 
             # safen its arguments first
             if cpm_expr.has_subexpr():
-                rec_changed, newargs, rec_toplevel, rec_nbc= _no_partial_functions(cpm_expr.args, is_toplevel=False, safen_toplevel=safen_toplevel)
+                stays_toplevel = is_toplevel and not cpm_expr.is_bool()
+                rec_changed, newargs, rec_toplevel, rec_nbc= _no_partial_functions(cpm_expr.args, is_toplevel=stays_toplevel, safen_toplevel=safen_toplevel)
                 if rec_changed:
                     cpm_expr = copy(cpm_expr)
                     cpm_expr.update_args(newargs)
