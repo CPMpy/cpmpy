@@ -255,7 +255,7 @@ class CPM_pindakaas(SolverInterface):
 
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset())
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(
             cpm_cons,
