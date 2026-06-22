@@ -61,7 +61,8 @@ When contributing changes back to use, we kindly ask you to add some documentati
 
 Further guidelines:
 
-- use backlinks to the referenced code whenever possible (e.g. ``:func:`SolverLookup.solvernames() <cpmpy.solvers.utils.SolverLookup.solvernames>` ``)
+- use backlinks to the referenced code whenever possible (e.g. ``:meth:`cp.SolverLookup.get("ortools") <cpmpy.solvers.utils.SolverLookup.get>` ``)
+- use `:func:` for module-level functions (e.g. ``:func:`boolvar() <cpmpy.expressions.variables.boolvar>` ``); use `:meth:` for class/instance methods (e.g. ``:meth:`model.minimize(obj) <cpmpy.model.Model.minimize>` ``). Links to other modules/files need the full qualified path in `<...>`.
 - use double backticks whenever an inline piece of text should be rendered as code, use codeblocks (``.. code-block:: python``) for multiline code blocks.
 - when possible, include type hints for the arguments and the return value.
 - when applicable, document the default values of argument: ``(default: ...)``
