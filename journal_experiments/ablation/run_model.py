@@ -391,7 +391,6 @@ if __name__ == "__main__":
                       ablate=ablate, 
                       time_limit=time_limit, 
                       solver_kwargs=solver_kwargs,
-                      memory_limit_gb=memory_limit_gb, 
                       stop_after_transform=stop_after_transform)
 
     if out_path is None:
