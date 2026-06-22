@@ -1872,16 +1872,16 @@ class TestTypeChecks:
         pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
         pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
 
-    def test_issue627(self):
-        for s, cls in cp.SolverLookup.base_solvers():
-            if cls.supported():
-                try:
-                    # constant look-up
-                    assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
-                    # constant out-of-bounds look-up
-                    assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
-                except (NotImplementedError, NotSupportedError, AssertionError):
-                    pass
+    # def test_issue627(self): -> not allowed anymore; index must be an Expression
+    #     for s, cls in cp.SolverLookup.base_solvers():
+    #         if cls.supported():
+    #             try:
+    #                 # constant look-up
+    #                 assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
+    #                 # constant out-of-bounds look-up
+    #                 assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
+    #             except (NotImplementedError, NotSupportedError, AssertionError):
+    #                 pass
 
     def test_issue_699(self):
         x,y = cp.intvar(0,10, shape=2, name=tuple("xy"))
