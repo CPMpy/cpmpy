@@ -1,10 +1,9 @@
 import cpmpy as cp
-from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.expressions.utils import argval
 
 
-class TestTransLinearize:
+class TestTransSafen:
 
     def test_division_by_zero(self):
         a = cp.intvar(1, 10, name="a")
@@ -132,3 +131,31 @@ class TestTransLinearize:
 
         safe_expr = no_partial_functions([expr], safen_toplevel={"div"})
         assert cp.Model([safe_expr, idx == 4]).solve()
+
+    def test_partial_under_numerical_is_not_nested(self):
+        """Partial functions under sum/min/max still have the constraint root as nearest bool parent."""
+        a = cp.intvar(1, 5)
+        b = cp.intvar(0, 2)
+        c = cp.intvar(1, 3)
+        arr = cp.intvar(1, 3, shape=3)
+        idx = cp.intvar(-1, 4)
+
+        for expr in [
+            cp.sum([a // b, c]) == 4,
+            cp.min([a // b, c]) == 2,
+            cp.sum([arr[idx], c]) == 4,
+            (a // b) == 2,
+            arr[idx] == 2,
+        ]:
+            assert str(no_partial_functions([expr])) == str([expr])
+
+    def test_partial_under_nested_bool_is_safened(self):
+        a = cp.intvar(1, 5)
+        b = cp.intvar(0, 2)
+        bv = cp.boolvar()
+        orig = bv == ((a // b) == 2)
+
+        safe = no_partial_functions([orig])
+        assert safe != [orig]
+        assert "and(" in str(safe[0])
+        assert cp.Model(safe).solve()
