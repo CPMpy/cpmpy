@@ -24,6 +24,7 @@ def no_partial_functions(lst_of_expr: list[Expression],
     - (Integer) division ``x // y``: undefined when y=0
     - Modulo ``x mod y``: undefined when y=0
     - Element ``Arr[idx]``: undefined when idx is not in the range of Arr
+    - NDElement ``Arr[idx1, idx2, ...]``: undefined when any idx is not in the range of the corresponding dim of Arr
 
     A toplevel constraint must always be true, so constraint solvers simply propagate the 'unsafe'
     value(s) away. However, CPMpy allows arbitrary nesting and reification of constraints, so an
@@ -174,7 +175,7 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
                     guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(0, len(arr)-1), idx_to_safen=1)
 
                     nbc_for_each_expr[i].append(guard)  # guard must be added to nearest Boolean context
-                    toplevel += extra_cons  # any additional constraint that must be true
+                    toplevel.extend(extra_cons)  # any additional constraint that must be true
                     cpm_expr = output_expr  # replace partial function by this (total) new output expression
                     changed = True
 
@@ -191,7 +192,7 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
                         guard, output_expr, extra_cons = _safen_range(cpm_expr, safe_range=(0, dim-1), idx_to_safen=1+dim_idx)
 
                         nbc_for_each_expr[i].append(guard)  # guard must be added to nearest Boolean context
-                        toplevel += extra_cons  # any additional constraint that must be true
+                        toplevel.extend(extra_cons)  # any additional constraint that must be true
                         cpm_expr = output_expr  # replace partial function by this (total) new output expression
                         changed = True
 
@@ -216,7 +217,7 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
                         guard, output_expr, extra_cons = _safen_hole(cpm_expr, exclude=0, idx_to_safen=idx_to_safen)
 
                     nbc_for_each_expr[i].append(guard)  # guard must be added to nearest Boolean context
-                    toplevel += extra_cons  # any additional constraint that must be true
+                    toplevel.extend(extra_cons)  # any additional constraint that must be true
                     cpm_expr = output_expr  # replace partial function by this (total) new output expression
                     changed = True
 
