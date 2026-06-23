@@ -304,7 +304,7 @@ class CPM_pysdd(SolverInterface):
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset())
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=None)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
