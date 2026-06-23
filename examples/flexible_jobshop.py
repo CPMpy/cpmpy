@@ -23,7 +23,7 @@ horizon = df_data.groupby("job_id")["duration"].max().sum()
 start = cp.intvar(0, horizon, shape=num_jobs, name="start")
 # Decision `end[j]`: integer end time for each job `j`
 end = cp.intvar(0, horizon, shape=num_jobs, name="end")
-# Decision `active[(j,m)]`: Per compatible combination, Boolean indicating if it is used
+# Decision `active[c]`: Per compatible job/machine combination `c`, Boolean indicating if it is used
 active = cp.boolvar(shape=num_compatible, name="active")
 
 model = cp.Model()
