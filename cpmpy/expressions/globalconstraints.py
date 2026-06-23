@@ -940,7 +940,9 @@ class MDD(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the input sequence
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
-            reduce (bool, default=True): Whether to reduce the MDD by merging nodes with equivalent suffixes, reducing the size of the MDD
+            reduce (bool, default=True): During decomposition, whether to reduce the MDD as a first decomposition step
+                by merging nodes with equivalent suffixes, reducing the size of the MDD
+
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
