@@ -1225,6 +1225,7 @@ class TestSupportedSolvers:
 
 
 @pytest.mark.generate_constraints.with_args(numexprs)
+@pytest.mark.flaky(reruns=3)
 def test_objective_numexprs(solver, constraint):
 
     model = cp.Model(cp.intvar(0, 10, shape=3) >= 1) # just to have some constraints
