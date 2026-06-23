@@ -968,9 +968,8 @@ class MDD(GlobalConstraint):
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
 
-        # reduce the MDD if requested
-        if reduce:
-            self._reduce()
+        # store whether the MDD should be reduced during decomposition
+        self.reduce = reduce
 
     def _reduce(self):
         """
@@ -1045,6 +1044,10 @@ class MDD(GlobalConstraint):
                 A tuple containing the constraints representing the constraint value and the defining constraints.
         """
         arr = self.args[0]
+
+        # Reduce the MDD if requested
+        if self.reduce:
+            self._reduce()
 
         if complete:
         # MDD is extended with invalid edges, which are directed to the sink node
