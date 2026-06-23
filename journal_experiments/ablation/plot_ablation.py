@@ -191,7 +191,10 @@ def plot_all_solvers(df, figures_dir, runtime_col="runtime"):
     """One ECDF figure per solver, saved into ``figures_dir``."""
     plot_df = df.copy()
 
-    time_limits = set(df["time_limit"].dropna())
+    time_limit = 3600
+    plot_df = plot_df[plot_df['time_limit'] == time_limit]
+
+    time_limits = set(plot_df["time_limit"].dropna())
     if len(time_limits) > 1:
         raise ValueError(f"Time limits are not consistent: {time_limits}")
 
