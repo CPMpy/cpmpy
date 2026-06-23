@@ -331,12 +331,12 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] solvers typically can not handle partial functions (e.g. element, div, mod)
         #             this transformation makes all partial functions total following the relational semantics
         obj, safe_cons = safen_objective(expr)
+        obj = push_down_negation([obj])[0]
         # [GUIDELINE] all unsupported global functions and (reified) global constraints are decomposed here
         obj, decomp_cons = decompose_objective(expr,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
-        obj = push_down_negation([obj])[0]
         # [GUIDELINE] after this, the objective will be a variable, sum, wsum or supported global function
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 

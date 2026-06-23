@@ -328,11 +328,11 @@ class CPM_cplex(SolverInterface):
 
             # transform objective
             obj, safe_cons = safen_objective(expr)
+            obj = push_down_negation([obj])[0]
             obj, decomp_cons = decompose_linear_objective(obj,
                                                           supported=self.supported_global_constraints,
                                                           supported_reified=self.supported_reified_global_constraints,
                                                           csemap=self._csemap)
-            obj = push_down_negation([obj])[0]
             obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
             obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
 

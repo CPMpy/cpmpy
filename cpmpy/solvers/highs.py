@@ -313,13 +313,13 @@ class CPM_highs(SolverInterface):
             get_variables(expr, collect=self.user_vars)
 
             obj, safe_cons = safen_objective(expr)
+            obj = push_down_negation([obj])[0]
             obj, decomp_cons = decompose_linear_objective(
                 obj,
                 supported=self.supported_global_constraints,
                 supported_reified=self.supported_reified_global_constraints,
                 csemap=self._csemap,
             )
-            obj = push_down_negation([obj])[0]
             obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
             # only_positive_bv_wsum_const keeps the constant separate so it never ends up
             # as a numeric element in the wsum vars list (which _row_from_linexpr cannot handle)
