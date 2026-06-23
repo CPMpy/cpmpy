@@ -1,5 +1,6 @@
 import cpmpy as cp
 from cpmpy.expressions.core import Operator, BoolVal, Comparison
+from cpmpy.transformations.negation import push_down_negation
 from cpmpy.transformations.normalize import simplify_boolean, toplevel_list
 
 
@@ -9,7 +10,7 @@ class TestTransSimplify:
         self.bvs = cp.boolvar(shape=3, name="bv")
         self.ivs = cp.intvar(0, 5, shape=3, name="iv")
 
-        self.transform = lambda x: simplify_boolean(toplevel_list(x))
+        self.transform = lambda x: simplify_boolean(push_down_negation(toplevel_list(x)))
 
     def test_bool_ops(self):
         expr = Operator("or", self.bvs.tolist() + [False])
@@ -93,7 +94,7 @@ class TestTransSimplify:
         assert str(self.transform(expr)) == '[max(iv[0],iv[1],iv[2],boolval(True)) == 0]'
 
         expr = (self.ivs[0] <= self.ivs[1]) == 0
-        assert str(self.transform(expr)) == '[not((iv[0]) <= (iv[1]))]'
+        assert str(self.transform(expr)) == '[(iv[0]) > (iv[1])]'
 
         expr = (self.ivs[0] == self.ivs[1]) == 1
         assert str(self.transform(expr)) == '[(iv[0]) == (iv[1])]'
