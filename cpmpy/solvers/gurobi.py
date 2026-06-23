@@ -40,15 +40,18 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Callable, Iterable
 import warnings
 import cpmpy as cp
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.globalfunctions import FloatSum
 from ..expressions.utils import argvals, argval, is_any_list, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
@@ -72,11 +75,11 @@ class CPM_gurobi(SolverInterface):
     Interface to Gurobi's Python API
 
     Creates the following attributes (see parent constructor for more):
-    
+
     - ``grb_model``: object, TEMPLATE's model object
 
     The :class:`~cpmpy.expressions.globalconstraints.DirectConstraint`, when used, calls a function on the ``grb_model`` object.
-    
+
     Documentation of the solver's own Python API:
     https://docs.gurobi.com/projects/optimizer/en/current/reference/python.html
     """
@@ -114,7 +117,7 @@ class CPM_gurobi(SolverInterface):
         except Exception as e:
             warnings.warn(f"Problem encountered with Gurobi license: {e}")
             return False
-        
+
     @staticmethod
     def version() -> Optional[str]:
         """
@@ -135,13 +138,14 @@ class CPM_gurobi(SolverInterface):
             subsolver: None, not used
         """
         if not self.installed():
-            raise ModuleNotFoundError("CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.") 
+            raise ModuleNotFoundError("CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.")
         elif not self.license_ok():
             raise ModuleNotFoundError("CPM_gurobi: No license found or a problem occured during license check. Make sure your license is activated!")
         import gurobipy as gp
 
         # TODO: subsolver could be a GRB_ENV if a user would want to hand one over
         self.grb_model = gp.Model(env=GRB_ENV)
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         # it is sufficient to implement add() and minimize/maximize() below
@@ -155,13 +159,17 @@ class CPM_gurobi(SolverInterface):
         return self.grb_model
 
 
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback:Optional[Callable]=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the gurobi solver
 
             Arguments:
                 time_limit (float, optional):  maximum solve time in seconds
-                solution_callback:             Gurobi callback function
+                solution_callback:             Gurobi callback function, takes precedence over ``display`` when both are set.
+                display:                       generic solution callback for use during optimization.
+                                               either a list of CPMpy expressions, OR a callback function which
+                                               gets called after the variable-value mapping of the intermediate solution.
+                                               default/None: nothing is displayed
                 **kwargs:                      any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -182,20 +190,26 @@ class CPM_gurobi(SolverInterface):
         # edge case, empty model, ensure the solver has something to solve
         if not len(self.user_vars):
             self.add(intvar(1, 1) == 1)
-        
+
         # set time limit
         if time_limit is not None:
             if time_limit <= 0:
                 raise ValueError("Time limit must be positive")
             self.grb_model.setParam("TimeLimit", time_limit)
 
+        # handle solution callbacks
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
+        elif display is not None:
+            callback = self._get_callback(display, events=[GRB.Callback.MIPSOL])
+
         # call the solver, with parameters
         for param, val in kwargs.items():
             self.grb_model.setParam(param, val)
 
-        _ = self.grb_model.optimize(callback=solution_callback)
-        grb_objective = self.grb_model.getObjective()
-
+        # call the gurobi solver with callback
+        self.grb_model.optimize(callback=callback)
         grb_status = self.grb_model.Status
 
         # new status, translate runtime
@@ -235,13 +249,13 @@ class CPM_gurobi(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = round(solver_val)
-            # set _objective_value
             if self.has_objective():
-                grb_obj_val = grb_objective.getValue()
-                if round(grb_obj_val) == grb_obj_val: # it is an integer?:
-                    self.objective_value_ = round(grb_obj_val)
-                else: #  can happen with DirectVar or when using floats as coefficients
-                    self.objective_value_ =  float(grb_obj_val)
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -279,7 +293,13 @@ class CPM_gurobi(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
@@ -291,22 +311,32 @@ class CPM_gurobi(SolverInterface):
         """
         from gurobipy import GRB
 
-        # save user variables
-        get_variables(expr, self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(obj,
-                                                      supported=self.supported_global_constraints,
-                                                      supported_reified=self.supported_reified_global_constraints,
-                                                      csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj = only_positive_bv_wsum(obj)  # remove negboolviews
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            import gurobipy as gp
+            grb_obj = gp.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
+        else:
+            # save user variables
+            get_variables(expr, self.user_vars)
 
-        # make objective function or variable and post
-        grb_obj = self._make_numexpr(obj)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj, decomp_cons = decompose_linear_objective(obj,
+                                                          supported=self.supported_global_constraints,
+                                                          supported_reified=self.supported_reified_global_constraints,
+                                                          csemap=self._csemap)
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            obj = only_positive_bv_wsum(obj)  # remove negboolviews
+
+            self.add(safe_cons + decomp_cons + flat_cons)
+
+            # make objective function or variable and post
+            grb_obj = self._make_numexpr(obj)
+
         if minimize:
             self.grb_model.setObjective(grb_obj, sense=GRB.MINIMIZE)
         else:
@@ -361,7 +391,7 @@ class CPM_gurobi(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element", "nd_element"})  # linearize and decompose expect safe exprs
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
@@ -511,7 +541,7 @@ class CPM_gurobi(SolverInterface):
         https://docs.gurobi.com/projects/optimizer/en/current/reference/attributes/variable.html#varhintval
 
         Optionally, you can also set the relative priority of the hint, using:
-        
+
         .. code-block:: python
 
             solver.solver_var(cpm_var).setAttr("VarHintPri", <priority>)
@@ -660,10 +690,10 @@ class CPM_gurobi(SolverInterface):
                 "try setting solution limit to a large number")
 
         # Force gurobi to keep searching in the tree for optimal solutions
-        sa_kwargs = {"PoolSearchMode":2, "PoolSolutions":solution_limit}
+        kwargs.update({"PoolSearchMode":2, "PoolSolutions":solution_limit})
 
         # solve the model
-        self.solve(time_limit=time_limit, **sa_kwargs, **kwargs)
+        self.solve(time_limit=time_limit, **kwargs)
 
         optimal_val = None
         solution_count = self.grb_model.SolCount
@@ -695,9 +725,13 @@ class CPM_gurobi(SolverInterface):
                 else:
                     cpm_var._value = round(solver_val)
 
-            # Translate objective
             if self.has_objective():
-                self.objective_value_ = self.grb_model.PoolObjVal
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
             self.print_display(display)
 
@@ -706,13 +740,46 @@ class CPM_gurobi(SolverInterface):
 
         if opt_sol_count:
             if opt_sol_count == solution_limit:
-                self.cpm_status.exitstatus = ExitStatus.FEASIBLE 
+                self.cpm_status.exitstatus = ExitStatus.FEASIBLE
             else:
                 grb_status = self.grb_model.Status
                 if grb_status == GRB.TIME_LIMIT: # reached time limit
                     self.cpm_status.exitstatus = ExitStatus.FEASIBLE
-                else: # found all solutions   
+                else: # found all solutions
                     self.cpm_status.exitstatus = ExitStatus.OPTIMAL
         # if unsat or timout with no solution, .solve() will have already set the state accordingly (so nothing to update)
 
         return opt_sol_count
+
+    def _get_callback(self, display:Callback, events:Iterable) -> Callable:
+        """
+        Get the callback function to use for Gurobi.
+        Arguments:
+            display: either an expression, a list of expressions, or a callback function
+            events: iterable of gurobipy.GRB.Callback event codes
+        """
+
+        self.events = frozenset(events)
+        if isinstance(display, Expression) or is_any_list(display):
+            cpm_vars = get_variables(display)
+        else:
+            cpm_vars = list(self.user_vars)
+        grb_vars = self.solver_vars(cpm_vars)
+
+        import gurobipy as gp
+
+        def callback(model:gp.Model, state:int, **kwargs) -> None:
+            # fill in vars
+            if state not in self.events:
+                return # irrelevant event
+
+            grb_sol = model.cbGetSolution(grb_vars)
+            for cpm_var, solver_val in zip(cpm_vars, grb_sol):
+                if cpm_var.is_bool():
+                    cpm_var._value = solver_val >= 0.5
+                else:
+                    cpm_var._value = int(solver_val)
+
+            self.print_display(display)
+
+        return callback

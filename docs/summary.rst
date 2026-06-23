@@ -121,7 +121,7 @@ Guidelines and tips
 - Do not ``from cpmpy import *``, the implicit overloading of any/all and sum may break or slow down other libraries.
 - Explicitly use CPMpy versions of built-in functions (``cp.sum``, ``cp.all``, etc.).
 - Use global constraints/global functions where possible, some solvers will be much faster.
-- Stick to integer constants; floats and fractional numbers are not supported.
+- Stick to integer constants in constraints and model objectives (some solvers support FloatSum but its very limited)
 - For maintainability, use logical code organization and comments to explain your constraints.
 
 
