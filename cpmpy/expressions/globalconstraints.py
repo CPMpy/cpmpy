@@ -1024,6 +1024,8 @@ class Regular(GlobalConstraint):
                 flow_out[snk].append((v, snk))
                 flow_in[snk].append((v, snk))
 
+            nodes.append(snk)
+
         defining = []
         constraining = []
 

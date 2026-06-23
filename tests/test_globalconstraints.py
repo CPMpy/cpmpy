@@ -639,7 +639,7 @@ class TestGlobal:
         assert num_true + num_false == 2**7
         assert len(true_sols & false_sols) == 0# no solutions can be in both
 
-    def test_regular_multiple_accepting_nodes(self):
+    def test_regular_multiple_accepting_nodes(self, solver):
         # testing DFA with multiple accepting nodes
         x = cp.intvar(0, 1, shape=3)
 
@@ -655,8 +655,8 @@ class TestGlobal:
         true_model = cp.Model(cp.Regular(x, transitions, start, ends))
         false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
 
-        num_true = true_model.solveAll(display=lambda : true_sols.add(tuple(argvals(x))))
-        num_false = false_model.solveAll(display=lambda : false_sols.add(tuple(argvals(x))))
+        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))))
+        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))))
 
         assert num_true == len(solutions)
         assert true_sols == set(solutions)

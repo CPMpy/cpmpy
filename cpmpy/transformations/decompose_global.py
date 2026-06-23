@@ -56,7 +56,7 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param supported_reified: a set of names of supported reified global constraints (those with Boolean return type only).
     :param _toplevel: DEPRECATED
     :param nested: DEPRECATED
-    :param csemap: a dictionary of 'expr: expr' mappings, for Common Subexpression Elimination.
+    :param csemap: CSEMap object used to avoid decomposing the same global constraint twice
     :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
     :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
 
