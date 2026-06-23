@@ -106,9 +106,11 @@ class ParameterTuner:
             timeout = self.best_runtime
             # set timeout depending on time budget
             if time_limit is not None:
-                if (time.time() - start_time) >= time_limit:
-                    break
-                timeout = min(timeout, time_limit - (time.time() - start_time))
+                curr_time = time.time()
+                if (curr_time - start_time) >= time_limit:
+                    break # time budged exceeded
+                # set timeout to remaining time budget
+                timeout = min(timeout, time_limit - (curr_time - start_time))
 
             if verbose >= 1:
                 print(f"Starting trial {i+1}/{max_tries}, cap: {timeout:.1f}s  -- remaining configs: {len(combos_np)}" + f" budget: {time_limit-(time.time()-start_time):.1f}s" if time_limit else "")
@@ -210,9 +212,11 @@ class GridSearchTuner(ParameterTuner):
             timeout = self.best_runtime
             # set timeout depending on time budget
             if time_limit is not None:
-                if (time.time() - start_time) >= time_limit:
-                    break
-                timeout = min(timeout, time_limit - (time.time() - start_time))
+                curr_time = time.time()
+                if (curr_time - start_time) >= time_limit:
+                    break # time budged exceeded
+                # set timeout to remaining time budget
+                timeout = min(timeout, time_limit - (curr_time - start_time))
             
             if verbose >= 1:
                 print(f"Starting trial {i+1}/{len(combos)}, cap: {timeout:.1f}s" + f" budget: {time_limit-(time.time()-start_time):.1f}s" if time_limit else "")
@@ -254,13 +258,13 @@ def _has_finished(solver):
         """
     if isinstance(solver,MultiSolver):
         return solver.has_finished()
-    elif (((solver.has_objective() and solver.status().exitstatus == ExitStatus.OPTIMAL) or
-          (not solver.has_objective() and solver.status().exitstatus == ExitStatus.FEASIBLE)) or
-          (solver.status().exitstatus == ExitStatus.UNSATISFIABLE)):
-        return True
-    return False
-
-
+    if solver.has_objective() and solver.status().exitstatus == ExitStatus.OPTIMAL:
+        return True # optimal solution to optimization problem
+    if not solver.has_objective() and solver.status().exitstatus == ExitStatus.FEASIBLE:
+        return True # feasible solution to satisfaction problem
+    if solver.status().exitstatus == ExitStatus.UNSATISFIABLE:
+        return True # unsat problem
+    return False # unknown status
 
 class MultiSolver(SolverInterface):
     """

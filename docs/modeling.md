@@ -397,6 +397,23 @@ If a model has no objective function specified, then it represents a satisfactio
 
 Any CPMpy expression can be added as objective function. Solvers are especially good in optimizing linear functions or the minimum/maximum of a set of expressions. Other (non-linear) expressions are supported too, just give it a try.
 
+### Float coefficients (advanced)
+
+CPMpy constraints and model objectives use integer (and boolean) expressions. For a weighted sum with **float coefficients**, some solvers also support [`FloatSum`](api/expressions/globalfunctions.html#cpmpy.expressions.globalfunctions.FloatSum) as argument to minimize/maximize, FLOBJ capability in the [supported solvers](index.rst#supported-solvers) table.
+
+This is for advanced users only, e.g. `solver.objective_value()` is always integer, so you must keep the floatsum and call `FloatSum.value()` to get the float objective value.
+
+```python
+import cpmpy as cp
+
+x, y, z = cp.boolvar(3)
+fs = cp.FloatSum([0.3, 0.4, 0.5], [x, y, z], const=0.8)  # 0.3x + 0.4y + 0.5z + 0.8
+s = cp.SolverLookup.get("ortools")
+s.maximize(fs)
+assert s.solve()
+print(fs.value())  # s.objective_value() is None here
+```
+
 ```python
 import cpmpy as cp
 m = cp.Model()
@@ -605,6 +622,39 @@ For solvers other than "ortools", you will need to **install additional package(
     ModuleNotFoundError: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
 ```
 
+## Datasets
+
+When experimenting with models or comparing solvers, it is useful to benchmark them against standard problem collections from the community. CPMpy datasets provide a small, PyTorch-style interface for downloading benchmark instances, iterating over them, and accessing their metadata.
+
+For example, the XCSP3 dataset gives access to instances from the XCSP3 competitions:
+
+```python
+from cpmpy.tools.datasets import XCSP3Dataset
+
+dataset = XCSP3Dataset(year=2024, track="CSP", download=True)
+
+instance_file, metadata = dataset[0]
+print(instance_file)
+print(metadata["name"], metadata["categories"])
+
+for instance_file, metadata in dataset:
+    print("Instance:", metadata["name"])
+```
+
+If CPMpy does not yet provide the dataset you need, you can still use the same interface by creating your own dataset class on top of {class}`~cpmpy.tools.datasets.core.Dataset` with minimal effort. 
+
+For a local directory of instance files, the convenience function `from_files()` is often enough:
+
+```python
+from cpmpy.tools.datasets.core import from_files
+
+dataset = from_files("./my_instances/", extension=".txt")
+
+for instance_file, metadata in dataset:
+    print(metadata["name"], instance_file)
+```
+
+See the [datasets API documentation](./api/tools/datasets.rst) for the available datasets and the full dataset interface.
 
 ## Model versus solver interface
 

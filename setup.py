@@ -22,11 +22,12 @@ with open("README.md", "r", encoding="utf8") as readme_file:
 solver_dependencies = {
     "ortools": ["ortools>=9.3.10497,!=9.9.*,!=9.10.*,!=9.11.*"], # exclusion due to bug #191
     "z3": ["z3-solver>=4.8.15.0"],
-    "choco": ["pychoco>=0.2.1"],
+    "choco": ["pychoco>=0.2.1,<0.3.0"],  # 0.3.0 breaks CPMpy tests
     "exact": ["exact>=2.1.0"], # older versions (<2.2.1) are bugged on py3.13
     "minizinc": ["minizinc>=0.7.0"],
     "pysat": ["python-sat>=1.8.dev4"],
     "gurobi": ["gurobipy>=11.0.0"],
+    "highs": ["highspy"],
     "pysdd": ["pysdd>=0.2.11"],
     "gcs": ["gcspy>=0.1.9"], # first version to pass all tests
     "cpo": ["docplex>=2.28.240"],
@@ -55,7 +56,6 @@ setup(
         'numpy>=1.5',
         'setuptools',
         'packaging', # to check solver versions
-        'frozendict', # standard in newer Python versions
     ],
     extras_require={
         # Solvers
@@ -64,6 +64,7 @@ setup(
         "xcsp3": ["pycsp3", "requests", "tqdm", "matplotlib", "psutil", "filelock", "gnureadline; platform_system != 'Windows'", "pyreadline3; platform_system == 'Windows'"], # didn't add CLI-specific req since some are not cross-platform
         # Other
         "test": ["pytest", "pytest-timeout"],
+        "type": ["mypy", "types-tqdm"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
     },
     entry_points={

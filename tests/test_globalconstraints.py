@@ -639,6 +639,28 @@ class TestGlobal:
         assert num_true + num_false == 2**7
         assert len(true_sols & false_sols) == 0# no solutions can be in both
 
+    def test_mdd(self):
+        x = cp.intvar(0, 3, shape=3)
+
+        start = "src"
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+        solutions = [(0,1,0), (1,1,0), (2,2,0)]
+
+        mdd_orig = cp.MDD(x, transitions, start=start, reduce=False)
+        mdd_redu = cp.MDD(x, transitions, start=start, reduce=True)
+        assert mdd_orig.levels.keys() - mdd_redu.levels.keys() == {"b1", "b2", "c2"}
+
+        sols_orig = set()
+        num_orig = cp.Model(mdd_orig).solveAll(display=lambda : sols_orig.add(tuple(argvals(x))))
+        assert sols_orig == set(solutions)
+
+        sols_redu = set()
+        num_redu = cp.Model(mdd_redu).solveAll(display=lambda : sols_redu.add(tuple(argvals(x))))
+        assert sols_redu == set(solutions)
+
+        assert num_orig == num_redu
+
 
     def test_minimum(self):
         iv = cp.intvar(-8, 8, 3)
@@ -771,6 +793,28 @@ class TestGlobal:
         expr = x[1,2,a]
         assert str(expr) == "[x[1,2,0] x[1,2,1] x[1,2,2] x[1,2,3] x[1,2,4]][a]"
 
+    def test_multid_element(self):
+        x = cp.intvar(1,9, shape=(3,4,5), name="x")
+        a = cp.intvar(0,2, name="a")
+        b = cp.intvar(0,3, name="b")
+        c = cp.intvar(0,4, name="c")
+
+        expr = x[a,b,c]
+        assert isinstance(expr, cp.NDElement)
+        cons = expr == 7
+        model = cp.Model(cons)
+        assert model.solve()
+        assert cons.value()
+        assert x.value()[a.value(), b.value(), c.value()] == 7
+
+        expr = x[a,b,2]
+        assert isinstance(expr, cp.NDElement)
+        cons = expr == 4
+        model = cp.Model(cons)
+        assert model.solve()
+        assert cons.value()
+        assert x.value()[a.value(), b.value(), 2] == 4
+
     def test_element_onearg(self):
 
         iv = cp.intvar(0, 10)
@@ -795,7 +839,7 @@ class TestGlobal:
         expected = {
             # safening constraints
             "((x >= 0) and (x <= 2)) -> ((IV0) == (x))",
-            "(not((x >= 0) and (x <= 2))) -> (IV0 == 0)",
+            "((x < 0) or (x > 2)) -> (IV0 == 0)",
             "(x >= 0) and (x <= 2)",
             # actual decomposition
             '(IV0 == 0) -> (IV1 == 0)',
@@ -824,6 +868,34 @@ class TestGlobal:
             }
             assert set(map(str, decomp)) == expected
             assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+
+    def test_multid_element_index_dom_mismatched(self):
+        """
+            NDElement with OOB index domains: safened per dimension before decompose.
+            Toplevel `arr[a,b] == 3` only allows in-bounds index pairs.
+        """
+        arr = cp.cpm_array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+        a = cp.intvar(0, 10, name="a")
+        b = cp.intvar(-1, 1, name="b")
+        y = cp.intvar(1, 5, name="y")
+        decomposed = decompose_in_tree(no_partial_functions([cp.NDElement(arr, [a, b]) <= y], safen_toplevel={"nd_element"}))
+        decomp = set(map(str, decomposed))
+        assert {
+            "((a >= 0) and (a <= 2)) -> ((IV0) == (a))",
+            "((a < 0) or (a > 2)) -> (IV0 == 0)",
+            "((b >= 0) and (b <= 2)) -> ((IV1) == (b))",
+            "((b < 0) or (b > 2)) -> (IV1 == 0)",
+            "(a >= 0) and (a <= 2)",
+            "(b >= 0) and (b <= 2)",
+        } <= decomp
+        assert any(c.endswith("<= (y)") for c in decomp)
+
+        arr = cp.cpm_array(np.full((3, 3), 3))
+        a, b = cp.intvar(0, 10, shape=2, name=tuple("ab"))
+        sols = set()
+        n_sols = cp.Model(arr[a, b] == 3).solveAll(display=lambda: sols.add((a.value(), b.value())))
+        assert n_sols == 9
+        assert sols == {(i, j) for i in range(3) for j in range(3)}
 
     def test_modulo(self):
 
@@ -1458,14 +1530,31 @@ class TestBounds:
         x = cp.intvar(-8, 5)
         op = cp.Power(x,3)
         lb, ub = op.get_bounds()
-        assert lb ==-8 ** 3
-        assert ub ==5 ** 3
+        assert lb == (-8) ** 3
+        assert ub == 5 ** 3
 
         op = cp.Power(x, 4)
         lb, ub = op.get_bounds()
-        assert lb == 5 ** 4
+        assert lb == 0
+        assert ub == 8 ** 4
+        
+        x = cp.intvar(-5, 8)
+        op = cp.Power(x,3)
+        lb, ub = op.get_bounds()
+        assert lb == (-5) ** 3
+        assert ub == 8 ** 3
+
+        op = cp.Power(x, 4)
+        lb, ub = op.get_bounds()
+        assert lb == 0
         assert ub == 8 ** 4
 
+        op = cp.Power(x,0)
+        lb, ub = op.get_bounds()
+        assert lb == 1
+        assert ub == 1
+
+    
     def test_bounds_element(self):
         x = cp.intvar(-8, 8)
         y = cp.intvar(-7, -1)
@@ -1783,16 +1872,16 @@ class TestTypeChecks:
         pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
         pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
 
-    def test_issue627(self):
-        for s, cls in cp.SolverLookup.base_solvers():
-            if cls.supported():
-                try:
-                    # constant look-up
-                    assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
-                    # constant out-of-bounds look-up
-                    assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
-                except (NotImplementedError, NotSupportedError):
-                    pass
+    # def test_issue627(self): -> not allowed anymore; index must be an Expression
+    #     for s, cls in cp.SolverLookup.base_solvers():
+    #         if cls.supported():
+    #             try:
+    #                 # constant look-up
+    #                 assert cp.Model([cp.boolvar() == cp.Element([0], 0)]).solve(solver=s)
+    #                 # constant out-of-bounds look-up
+    #                 assert not cp.Model([cp.boolvar() == cp.Element([0], 1)]).solve(solver=s)
+    #             except (NotImplementedError, NotSupportedError, AssertionError):
+    #                 pass
 
     def test_issue_699(self):
         x,y = cp.intvar(0,10, shape=2, name=tuple("xy"))

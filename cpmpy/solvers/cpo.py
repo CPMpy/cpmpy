@@ -44,6 +44,8 @@
 
 from typing import Optional
 import warnings
+import time
+
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from .. import DirectConstraint
@@ -51,7 +53,7 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalconstraints import Cumulative, CumulativeOptional, GlobalConstraint, NoOverlap, NoOverlapOptional
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
-from ..expressions.utils import is_num, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
+from ..expressions.utils import is_num, is_int, is_any_list, eval_comparison, argval, argvals, get_bounds, get_nonneg_args, implies
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
@@ -156,14 +158,18 @@ class CPM_cpo(SolverInterface):
         """
         return self.cpo_model
     
-    def solve(self, time_limit:Optional[float]=None, solution_callback=None, **kwargs):
+    def solve(self, time_limit:Optional[float]=None, solution_callback=None, display:Optional[Callback]=None, **kwargs):
         """
             Call the CP Optimizer solver
 
             Arguments:
-                time_limit (float, optional):   maximum solve time in seconds 
-                solution_callback (an `docplex.cp.solver.solver_listener.CpoSolverListener` object):   CPMpy includes its own, namely `CpoSolutionCounter`. If you want to count all solutions, 
-                                                                                                        don't forget to also add the keyword argument 'enumerate_all_solutions=True'.
+                time_limit (float, optional):   maximum solve time in seconds
+                solution_callback:              a ``docplex.cp.solver.solver_listener.CpoSolverListener`` or ``docplex.cp.solver.cpo_callback.CpoCallback`` object, or a list thereof
+                                                takes precedence over ``display`` when both are set.
+                display:                        generic solution callback for use during optimization.
+                                                either a list of CPMpy expressions, OR a callback function which
+                                                gets called after the variable-value mapping of the intermediate solution.
+                                                default/None: nothing is displayed
                 kwargs:                         any keyword argument, sets parameters of solver object
 
             Arguments that correspond to solver parameters:
@@ -199,14 +205,31 @@ class CPM_cpo(SolverInterface):
         # set time limit
         if time_limit is not None and time_limit <= 0:
             raise ValueError("Time limit must be positive")
-        
+
         # create solver object
         self.cpo_solver = docp.solver.solver.CpoSolver(
             self.cpo_model,
-            TimeLimit=time_limit, 
-            **kwargs, 
-            listeners=[solution_callback] if solution_callback is not None else None
+            TimeLimit=time_limit,
+            **kwargs,
         )
+
+        callback = None
+        if solution_callback is not None:
+            callback = solution_callback
+            if not isinstance(callback, list):
+                callback = [callback]
+        elif display is not None:
+            callback = [CpoSolutionPrinter(self, display)]
+
+        if callback is not None:
+            for cb in callback:
+                if isinstance(cb, CpoSolverListener):
+                    self.cpo_solver.add_listener(cb)
+                    # By default `solve()` only notifies listeners once with the final/best result.
+                    # Enable search_next mode so listeners are warned about every intermediate solution.
+                    self.cpo_solver.set_solve_with_search_next(True)
+                if isinstance(cb, CpoCallback):
+                    self.cpo_solver.add_callback(cb)
 
         self.cpo_result = self.cpo_solver.solve()
 
@@ -241,9 +264,6 @@ class CPM_cpo(SolverInterface):
             for cpm_var in self.user_vars:
                 sol_var = self.solver_var(cpm_var)
                 if isinstance(cpm_var,_BoolVarImpl):
-                    # because cp optimizer does not have boolean variables we use an integer var x with domain 0, 1
-                    # and then replace a boolvar by x == 1
-                    sol_var = sol_var.children[0]
                     cpm_var._value = bool(self.cpo_result.get_var_solution(sol_var).get_value())
                 else:
                     cpm_var._value = self.cpo_result.get_var_solution(sol_var).get_value()
@@ -309,9 +329,6 @@ class CPM_cpo(SolverInterface):
                 sol_var = self.solver_var(cpm_var)
                 cpm_value = cpm_var._value
                 if isinstance(cpm_var, _BoolVarImpl):
-                    # because cp optimizer does not have boolean variables we use an integer var x with domain 0, 1
-                    # and then replace a boolvar by x == 1
-                    sol_var = sol_var.children[0]
                     cpm_value = int(cpm_value)
                 solvars.append(sol_var)
                 vals.append(cpm_value)
@@ -342,31 +359,35 @@ class CPM_cpo(SolverInterface):
         """
             Creates solver variable for cpmpy variable
             or returns from cache if previously created
+            or returns a constant if the variable is a constant
         """
-        docp = self.get_docp()
-        if is_num(cpm_var): # shortcut, eases posting constraints
+
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # not yet created, make a new solver var
+            docp = self.get_docp()
+            if cpm_var.is_bool():
+                if isinstance(cpm_var, NegBoolView):
+                    raise ValueError("Negative literals cannot be created in `solver_var()` for cpo, use `_cpo_expr()` instead")
+                else:
+                    # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
+                    revar = docp.expression.binary_var(name)
+            else:
+                revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=name)
+            
+            self._varmap[name] = revar
+             # ensure the model also has the variable, just creating the variable is not enough
+            self.cpo_model.add(revar >= cpm_var.lb) 
+            return revar
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             return cpm_var
 
-        # special case, negative-bool-view
-        # work directly on var inside the view
-        if isinstance(cpm_var, NegBoolView):
-            return (self.solver_var(cpm_var._bv) == 0)
-
-        # create if it does not exist
-        if cpm_var not in self._varmap:
-            if isinstance(cpm_var, _BoolVarImpl):
-                # note that a binary var is an integer var with domain (0,1), you cannot do boolean operations on it.
-                # we should add == 1 to turn it into a boolean expression
-                revar = docp.expression.binary_var(str(cpm_var)) == 1
-            elif isinstance(cpm_var, _IntVarImpl):
-                revar = docp.expression.integer_var(min=cpm_var.lb, max=cpm_var.ub, name=str(cpm_var))
-            else:
-                raise NotImplementedError("Not a known var {}".format(cpm_var))
-            self._varmap[cpm_var] = revar
-            self.cpo_model.add(revar >= cpm_var.lb) # ensure the model also has the variable
-
-        # return from cache
-        return self._varmap[cpm_var]
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
     def objective(self, expr, minimize=True):
         """
@@ -418,7 +439,7 @@ class CPM_cpo(SolverInterface):
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({}))
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"nd_element"}))
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
                                      supported_reified=self.supported_reified_global_constraints,
@@ -450,13 +471,13 @@ class CPM_cpo(SolverInterface):
 
         for cpm_con in self.transform(cpm_expr):
             # translate each expression tree, then post straight away
-            cpo_con = self._cpo_expr(cpm_con)
+            cpo_con = self._cpo_expr(cpm_con, boolexpr=True)
             self.cpo_model.add(cpo_con)
 
         return self
     __add__ = add  # avoid redirect in superclass
 
-    def _cpo_expr(self, cpm_con):
+    def _cpo_expr(self, cpm_con, boolexpr=False):
         """
             CP Optimizer supports nested expressions,
             so we recursively translate our expressions to theirs.
@@ -466,8 +487,8 @@ class CPM_cpo(SolverInterface):
         """
         dom = self.get_docp().modeler
         if is_any_list(cpm_con):
-            # arguments can be lists
-            return [self._cpo_expr(con) for con in cpm_con]
+            # arguments can be lists, assume boolexpr is same for all arguments
+            return [self._cpo_expr(con, boolexpr=boolexpr) for con in cpm_con]
 
         elif isinstance(cpm_con, BoolVal):
             return cpm_con.args[0]
@@ -475,7 +496,15 @@ class CPM_cpo(SolverInterface):
         elif is_num(cpm_con):
             return cpm_con
 
-        elif isinstance(cpm_con, _NumVarImpl):
+        elif isinstance(cpm_con, _NumVarImpl): # handle variables
+            if isinstance(cpm_con, NegBoolView):
+                if boolexpr:
+                    return self.solver_var(cpm_con._bv) == 0
+                else:
+                    return 1 - self.solver_var(cpm_con._bv)
+            elif cpm_con.is_bool() and boolexpr:
+                return self.solver_var(cpm_con) == 1
+            # else: integer variable, or boolean variable used as integer
             return self.solver_var(cpm_con)
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
@@ -483,13 +512,13 @@ class CPM_cpo(SolverInterface):
             arity, _ = Operator.allowed[cpm_con.name]
             # 'and'/n, 'or'/n, '->'/2
             if cpm_con.name == 'and':
-                return dom.logical_and(self._cpo_expr(cpm_con.args))
+                return dom.logical_and(self._cpo_expr(cpm_con.args, boolexpr=True))
             elif cpm_con.name == 'or':
-                return dom.logical_or(self._cpo_expr(cpm_con.args))
+                return dom.logical_or(self._cpo_expr(cpm_con.args, boolexpr=True))
             elif cpm_con.name == '->':
-                return dom.if_then(*self._cpo_expr(cpm_con.args))
+                return dom.if_then(*self._cpo_expr(cpm_con.args, boolexpr=True))
             elif cpm_con.name == 'not':
-                return dom.logical_not(self._cpo_expr(cpm_con.args[0]))
+                return dom.logical_not(self._cpo_expr(cpm_con.args[0], boolexpr=True))
 
             # 'sum'/n, 'wsum'/2
             elif cpm_con.name == 'sum':
@@ -568,7 +597,7 @@ class CPM_cpo(SolverInterface):
                     else:
                         task_demand = dom.pulse(task, get_bounds(h))
                         if is_present is not None:
-                            cons += [dom.if_then(self.solver_var(is_present[i]),
+                            cons += [dom.if_then(self._cpo_expr(is_present[i], boolexpr=True),
                                                  self._cpo_expr(h) == dom.height_at_start(task, task_demand))]
                         else:
                             cons += [self._cpo_expr(h) == dom.height_at_start(task, task_demand)]
@@ -677,7 +706,7 @@ class CPM_cpo(SolverInterface):
             extra_cons += [dom.if_then(dom.presence_of(task), dom.start_of(task) == self._cpo_expr(start)),
                            dom.if_then(dom.presence_of(task), dom.size_of(task) == self._cpo_expr(dur))]
             if is_optional: # enforce presence of task
-                extra_cons += [dom.presence_of(task) == self.solver_var(is_present)]
+                extra_cons += [dom.presence_of(task) == self._cpo_expr(is_present, boolexpr=True)]
             return task, extra_cons
         else:
             task = docp.expression.interval_var(start=get_bounds(start), size=get_bounds(dur), end=get_bounds(end), optional=is_optional)
@@ -685,16 +714,16 @@ class CPM_cpo(SolverInterface):
                            dom.if_then(dom.presence_of(task), dom.size_of(task) ==  self._cpo_expr(dur)),
                            dom.if_then(dom.presence_of(task), dom.end_of(task) == self._cpo_expr(end))]
             if is_optional: # enforce presence of task
-                extra_cons += [dom.presence_of(task) == self.solver_var(is_present)]
+                extra_cons += [dom.presence_of(task) == self._cpo_expr(is_present, boolexpr=True)]
             return task, extra_cons
 
 
 # solvers are optional, so this file should be interpretable
 # even if cpo is not installed...
 try:
+    from docplex.cp.solver.cpo_callback import CpoCallback, EVENT_SOLUTION
     from docplex.cp.solver.solver_listener import CpoSolverListener
-    import time
-
+    from docplex.cp.solver.solver import CpoSolver, CpoSolveResult
     class CpoSolutionCounter(CpoSolverListener):
         """
         Native CP Optimizer callback for solution counting.
@@ -712,7 +741,7 @@ try:
 
         Arguments:
             verbose (bool, default: False): whether to print info on every solution found 
-    """
+        """
 
         def __init__(self, verbose=False):
             super().__init__()
@@ -721,15 +750,18 @@ try:
             if self.__verbose:
                 self.__start_time = time.time()
 
-        def result_found(self, solver, sres):
-            """Called on each new solution."""
+        def result_found(self, solver: CpoSolver, sres: CpoSolveResult):
+            """Keep track of solution count, invoked for each solution"""
+            if not sres.is_new_solution():
+                return # ignore non-new solutions
+
             if self.__verbose:
                 current_time = time.time()
                 obj = sres.get_objective_value()
                 print('Solution %i, time = %0.2f s, objective = %i' %
                       (self.__solution_count, current_time - self.__start_time, obj))
             self.__solution_count += 1
-
+        
         def solution_count(self):
             """Returns the number of solutions found."""
             return self.__solution_count
@@ -767,7 +799,7 @@ try:
                             default/None: nothing displayed
                 solution_limit (default = None): stop after this many solutions 
         """
-        def __init__(self, solver, display=None, solution_limit=None, verbose=False):
+        def __init__(self, solver: CPM_cpo, display:Optional[Callback]=None, solution_limit:Optional[int]=None, verbose:bool=False):
             super().__init__(verbose)
             self._solution_limit = solution_limit
             # we only need the cpmpy->solver varmap from the solver
@@ -780,28 +812,25 @@ try:
             elif callable(display):
                 # might use any, so populate all (user) variables with their values
                 self._cpm_vars = solver.user_vars
+            self._cpm_solver = solver
 
-        def result_found(self, solver, sres):
-            """Called on each new solution."""
+        def result_found(self, solver:CpoSolver, sres:CpoSolveResult):
+            
+            if not sres.is_new_solution():
+                return # ignore non-new solutions
+
             if len(self._cpm_vars):
                 # populate values before printing
                 for cpm_var in self._cpm_vars:
+                    sol_var = self._varmap[cpm_var.name]
                     if isinstance(cpm_var, _BoolVarImpl):
-                        sol_var = self._varmap[cpm_var].children[0]
                         cpm_var._value = bool(sres.get_var_solution(sol_var).get_value())
                     elif isinstance(cpm_var, _IntVarImpl):
-                        sol_var = self._varmap[cpm_var]
                         cpm_var._value = sres.get_var_solution(sol_var).get_value()
                     else:
                         raise NotImplementedError(f"Unexpected variable type {type(cpm_var)}")
 
-                if isinstance(self._display, Expression):
-                    print(argval(self._display))
-                elif is_any_list(self._display):
-                    # explicit list of expressions to display
-                    print(argvals(self._display))
-                else: # callable
-                    self._display()
+                self._cpm_solver.print_display(self._display)
 
             # check for count limit
             if self.solution_count() == self._solution_limit:

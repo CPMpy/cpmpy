@@ -50,6 +50,7 @@ from .globalconstraints import (
     NoOverlap,
     NoOverlapOptional,
     NegativeTable,
+    MDD,
     Regular,
 )
 from .globalfunctions import (
@@ -61,10 +62,12 @@ from .globalfunctions import (
     Modulo,
     Power,
     Element,
+    NDElement,
     Count,
     Among,
     NValue,
     NValueExcept,
+    FloatSum,
 )
 from .core import BoolVal
 from .python_builtins import all, any, max, min, sum, abs
@@ -87,10 +90,13 @@ __all__ = [
     "Modulo",
     "Power",
     "Element",
+    "NDElement",
     "Count",
     "Among",
     "NValue",
     "NValueExcept",
+# Objective-only (not an Expression)
+    "FloatSum",
 # Global constraints
     "AllDifferent",
     "AllDifferentExcept0",
@@ -116,6 +122,7 @@ __all__ = [
     "LexChainLessEq",
     "LexLess",
     "LexLessEq",
+    "MDD",
     "NegativeTable",
     "NoOverlap",
     "NoOverlapOptional",

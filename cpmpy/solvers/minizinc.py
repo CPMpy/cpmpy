@@ -52,6 +52,8 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import re
 from typing import Optional
@@ -72,8 +74,8 @@ from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.python_builtins import any as cpm_any
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
 from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
-from ..expressions.globalfunctions import Multiplication
-from ..expressions.utils import is_num, is_any_list, argvals, argval, get_nonneg_args
+from ..expressions.globalfunctions import Multiplication, FloatSum
+from ..expressions.utils import is_int, is_any_list, argvals, argval, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
 from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
@@ -103,7 +105,7 @@ class CPM_minizinc(SolverInterface):
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
                                               "precedence", "no_overlap",
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among"})
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "nd_element"})
     supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
 
     required_version = (2, 8, 2)
@@ -292,6 +294,7 @@ class CPM_minizinc(SolverInterface):
         # Prepare solve statement, so it can be overwritten on demand
         self.mzn_txt_solve = "solve satisfy;"
         self.mzn_result = None
+        self.objective_ = None
 
         # initialise everything else and post the constraints/objective
         super().__init__(name="minizinc:"+subsolver, cpm_model=cpm_model)
@@ -402,8 +405,13 @@ class CPM_minizinc(SolverInterface):
                 else:
                     raise ValueError(f"Var {cpm_var} is unknown to the Minizinc solver, this is unexpected - please report on github...")
 
-            # translate objective, for optimisation problems only (otherwise None)
-            self.objective_value_ = self.mzn_result.objective
+            if self.has_objective():
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -519,71 +527,86 @@ class CPM_minizinc(SolverInterface):
     def solver_var(self, cpm_var) -> str:
         """
             Creates solver variable for cpmpy variable
-            or returns from cache if previously created.
+            or returns from cache if previously created
+            or returns a constant if the variable is a constant
 
             Returns:
                 minizinc-friendly 'string' name of var.
-
-            .. warning::
-                WARNING, this assumes it is never given a 'NegBoolView'
-                might not be true... e.g. in revar after solve?
         """
-        if is_num(cpm_var):
+        if isinstance(cpm_var, _NumVarImpl):
+            name = cpm_var.name
+            revar = self._varmap.get(name)
+            if revar is not None:
+                return revar
+
+            # Assumes it is never given a 'NegBoolView', handled in self.add
+            if isinstance(cpm_var, NegBoolView):
+                raise NotSupportedError("Negative literals are not handled here. Please report.")
+                
+
+            # not yet created, make a new solver var
+            mzn_var = name.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
+
+            # test if the name is a valid minizinc identifier
+            if not self.mzn_name_pattern.search(mzn_var):
+                raise MinizincNameException("Minizinc only accept names with alphabetic characters, digits and underscores." 
+                                            f"First character must be an alphabetic character: {mzn_var}")
+            if mzn_var in self.keywords:
+                raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
+
+            if cpm_var.is_bool():
+                self.mzn_model.add_string(f"var bool: {mzn_var};\n")
+            else:
+                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
+                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
+                                                  "of range (-2147483646..2147483646)")
+                self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
+            self._varmap[name] = mzn_var
+            return mzn_var
+
+        if is_int(cpm_var):  # shortcut, eases posting constraints
             if cpm_var < -2147483646 or cpm_var > 2147483646:
                 raise MinizincBoundsException(
                     "minizinc does not accept integer literals with bounds outside of range (-2147483646..2147483646)")
             return str(cpm_var)
 
-        # Assumes it is never given a 'NegBoolView'
-        if isinstance(cpm_var, NegBoolView):
-            raise NotSupportedError("Negative literals are not handled here. Please report.")
+        raise NotImplementedError("Not a known var {}".format(cpm_var))
 
-        if cpm_var not in self._varmap:
-            # clean the varname
-            varname = cpm_var.name
-            mzn_var = varname.replace(',', '_').replace('.', '_').replace(' ', '_').replace('[', '_').replace(']', '')
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
 
-            # test if the name is a valid minizinc identifier
-            if not self.mzn_name_pattern.search(mzn_var):
-                raise MinizincNameException("Minizinc only accept names with alphabetic characters, "
-                                            "digits and underscores. "
-                                "First character must be an alphabetic character")
-            if mzn_var in self.keywords:
-                raise MinizincNameException(f"This variable name is a disallowed keyword in MiniZinc: {mzn_var}")
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
 
-            if isinstance(cpm_var, _BoolVarImpl):
-                self.mzn_model.add_string(f"var bool: {mzn_var};\n")
-            elif isinstance(cpm_var, _IntVarImpl):
-                if cpm_var.lb < -2147483646 or cpm_var.ub > 2147483646:
-                    raise MinizincBoundsException("minizinc does not accept variables with bounds outside "
-                                                  "of range (-2147483646..2147483646)")
-                self.mzn_model.add_string(f"var {cpm_var.lb}..{cpm_var.ub}: {mzn_var};\n")
-            self._varmap[cpm_var] = mzn_var
-
-        return self._varmap[cpm_var]
-
-    def objective(self, expr, minimize):
+    def objective(self, expr: Expression | FloatSum, minimize: bool) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
-            - expr: Expression, the CPMpy expression that represents the objective function
+            - expr: Expression or FloatSum, the objective function
             - minimize: Bool, whether it is a minimization problem (True) or maximization problem (False)
 
             'objective()' can be called multiple times, only the last one is stored
         """
+        self.objective_ = expr
 
-        # save user variables
-        get_variables(expr, collect=self.user_vars) # add objvars to vars
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
+            mzn_parts = [f"({float(w)}) * ({vv})" for w, vv in zip(ws, self.solver_vars(vs))]
+            mzn_obj = " + ".join(mzn_parts)
+            if const:
+                mzn_obj = f"{mzn_obj} + {const}"
+        else:
+            get_variables(expr, collect=self.user_vars)  # add objvars to vars
+            obj, decomp_cons = decompose_objective(
+                expr,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            self.add(decomp_cons)
+            mzn_obj = self._convert_expression(obj)
 
-        obj, decomp_cons = decompose_objective(expr,
-                                               supported=self.supported_global_constraints,
-                                               supported_reified=self.supported_reified_global_constraints,
-                                               csemap=self._csemap)
-        self.add(decomp_cons)
-
-        # make objective function or variable and post
-
-        mzn_obj = self._convert_expression(obj)
         # do not add it to the mzn_model yet, supports only one 'solve' entry
         if minimize:
             self.mzn_txt_solve = "solve minimize {};\n".format(mzn_obj)
@@ -778,7 +801,7 @@ class CPM_minizinc(SolverInterface):
             # TODO: pretty printing of () as in Operator?
 
             # special case: unary -
-            if self.name == '-':
+            if expr.name == '-':
                 return "-{}".format(args_str[0])
 
             # very special case: weighted sum (before 2-ary)
@@ -819,6 +842,26 @@ class CPM_minizinc(SolverInterface):
                                                                                              len(expr.args[0]) - 1,
                                                                                              args_str[0])
             txt += f"      arr[{idx}]"
+            return txt
+        elif expr.name == "nd_element":
+            arr = expr.args[0]
+            subtype = "int"
+            if all(isinstance(v, bool) or \
+                   (isinstance(v, Expression) and v.is_bool()) \
+                   for v in arr.flat):
+                subtype = "bool"
+            idx_ranges = ",".join(f"0..{dim - 1}" for dim in arr.shape)
+            idx_tuple = ",".join(args_str[1:])
+
+            # minizinc is offset 1, which can be problematic for element
+            txt = "\n    let {{ array[{}] of var {}: arr=array{}d({},{}) }} in\n".format(
+                ",".join("int" for _ in arr.shape),
+                subtype,
+                arr.ndim,
+                idx_ranges,
+                args_str[0],
+            )
+            txt += f"      arr[{idx_tuple}]"
             return txt
 
         # rest: global constraints
