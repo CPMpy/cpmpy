@@ -1070,6 +1070,13 @@ class TestSupportedSolvers:
             pytest.skip("solver does not support this test context")
         if solver == 'cplex':
             pytest.skip("skip for cplex, cplex supports solveall only for MILPs, and this is not linear.")
+
+        kwargs = dict()
+        if solver == "hexaly":
+            kwargs["time_limit"] = 2
+        else:
+            kwargs["solution_limit"] = 15
+            
         x,y,d,r = cp.intvar(-5, 5, shape=4,name=['x','y','d','r'])
         vars = [x,y,d,r]
         m = cp.Model()
@@ -1077,14 +1084,27 @@ class TestSupportedSolvers:
         m += x // y == d
         m += x % y == r
         sols = set()
-        solution_limit = 15  # ILP solvers don't like this model and tend to get stuck finding all solutions
-        m.solveAll(solver=solver, solution_limit=solution_limit, display=lambda: sols.add(tuple(argvals(vars))))
+        m.solveAll(solver=solver, **kwargs, display=lambda: sols.add(tuple(argvals(vars))))
         for sol in sols:
             xv, yv, dv, rv = sol
             assert dv * yv + rv == xv
             assert (cp.Division(xv, yv)).value() == dv
             assert (cp.Modulo(xv, yv)).value() == rv
 
+
+    def test_div_towards_zero(self, solver):
+        
+        x,y,z = cp.intvar(-10,10, shape=3)
+        cons = x // y == z
+        m = cp.Model(cons, x == -10, y == 3, z == -3)
+        assert m.solve(solver=solver)
+        
+        m = cp.Model(cons, x == 10, y == -3, z == -3)
+        assert m.solve(solver=solver)
+
+        m = cp.Model(cons, x == -10, y == -3, z == 3)
+        assert m.solve(solver=solver)
+        
 
     def test_status(self, solver):
 
@@ -1218,6 +1238,8 @@ class TestSupportedSolvers:
         kwargs = {}
         if solver in ("gurobi", "cplex"):
             kwargs["solution_limit"] = 10
+        if solver == "hexaly":
+            kwargs["time_limit"] = 2
         p, q = cp.boolvar(2)
         model = cp.Model(p.implies(3 * q == 2))
         assert model.solve(solver)
@@ -1233,7 +1255,7 @@ def test_objective_numexprs(solver, constraint):
         assert model.solve(solver=solver, time_limit=3)
         assert constraint.value() < constraint.get_bounds()[1] # bounds are not always tight, but should be smaller than ub for sure
         model.maximize(constraint)
-        assert model.solve(solver=solver)
+        assert model.solve(solver=solver, time_limit=3)
         assert constraint.value() > constraint.get_bounds()[0] # bounds are not always tight, but should be larger than lb for sure
     except NotSupportedError:
         pytest.skip(reason=f"{solver} does not support optimisation")
