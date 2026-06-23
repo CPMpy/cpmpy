@@ -52,15 +52,22 @@ def toplevel_list(cpm_expr, merge_and=True):
 
 def simplify_boolean(lst_of_expr: list[Expression], num_context=False) -> list[Expression]:
     """
-    Removes boolean constants from all CPMpy expressions, except for constants in global constraints/functions.
-    Solver interfaces are expected to implement special cases of typing for global constraints themselves.
+    Removes Boolean constants from CPMpy expressions, except inside global constraints/functions.
 
-    Only resulting Boolean constant is literal 'false'.
-    Boolean constants are promoted to `int` if in a numerical context,
-    `ints` are never converted to `bool`.
-    
+    Solver interfaces are expected to handle typing of Boolean constants in global
+    constraints/functions themselves. Expects all ``not`` operators to have been eliminated by
+    :func:`push_down_negation() <cpmpy.transformations.negation.push_down_negation>` beforehand
+    (except ``not`` over a :class:`~cpmpy.expressions.globalconstraints.GlobalConstraint`).
+
+    Boolean constants are promoted to integers in numerical context (e.g. in wsum);
+    integers are never converted to Booleans. 
+
     Arguments:
-        list_of_expr: list of CPMpy expressions
+        lst_of_expr (list[Expression]): list of CPMpy expressions
+        num_context (bool): whether the expressions are used as numeric arguments (default: False)
+
+    Returns:
+        list[Expression]: simplified expressions; returns ``lst_of_expr`` unchanged if nothing changed
     """
 
     newlist: list[Expression] = []
@@ -161,13 +168,8 @@ def _simplify_boolean_expr(expr: Expression, num_context=False) -> tuple[bool, E
             return False, expr
 
         elif expr.name == "not":
-            if isinstance(args[0], _BoolVarImpl):
-                return True, ~args[0]
-            elif is_true_cst(args[0]):
-                return True, BoolVal(False)
-            elif is_false_cst(args[0]):
-                return True, BoolVal(True)
-
+            assert isinstance(args[0], GlobalConstraint), f"push_down_negation should have eliminated all `not` operators except ~GlobalConstraint,  but got {args[0]} instead, please report on github."
+         
             if changed:
                 newexpr = copy.copy(expr)
                 newexpr.update_args(args)
