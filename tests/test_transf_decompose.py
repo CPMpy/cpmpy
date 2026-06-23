@@ -80,13 +80,16 @@ class TestTransfDecomp:
         ivs = [cp.intvar(1,9,name=n) for n in "xyz"]
 
         cons = [cp.AllDifferent(ivs) == 0]
-        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [0 == cp.AllDifferent(ivs)]
-        assert set(map(str,decompose_in_tree(cons))) == {"not(and((x) != (y), (x) != (z), (y) != (z)))"}
+        assert set(map(str,decompose_in_tree(cons))) == {"or((x) == (y), (x) == (z), (y) == (z))"}
 
         cons = [cp.AllDifferent(ivs) == cp.AllEqual(ivs[:-1])]
         assert set(map(str,decompose_in_tree(cons))) == {"(and((x) != (y), (x) != (z), (y) != (z))) == ((x) == (y))"}
+
+        cons = [(ivs[0] == 0) | ~cp.AllDifferent(ivs)]
+        assert set(map(str,decompose_in_tree(cons))) == {"(x == 0) or (or((x) == (y), (x) == (z), (y) == (z)))"}
 
         cons = [cp.min(ivs) == cp.max(ivs)]
         assert set(map(str,decompose_in_tree(cons, supported={"min"}))) == \
@@ -102,6 +105,15 @@ class TestTransfDecomp:
 
         assert str(decompose_in_tree(cons, supported={"min"})) == \
                          "[(min(x,y)) == (z)]"
+
+    def test_decompose_allequal_reified(self):
+        # nested AllEqual decomposition can leave not(...) (e.g. False == (a|b)); must be pushed down
+        a, b = cp.boolvar(2, name=("a", "b"))
+        bv = cp.boolvar(name="bv")
+
+        cons = [bv.implies(cp.AllEqual(a, b, False, a | b))]
+        assert str(decompose_in_tree(cons)) == \
+            "[(bv) -> (and((a) == (b), ~b, (~a) and (~b)))]"
 
 
     def test_globals_in_decomp(self):
@@ -228,7 +240,7 @@ class TestTransfDecomp:
         cons = MyCustomGlobal([a,b,c])
 
         assert set(map(str, decompose_in_tree([cons]))) == {"sum(a, b, c) >= 1", "a == 1"} # decomposed at toplevel
-        assert set(map(str, decompose_in_tree([~cons]))) == {"not(sum(a, b, c) == 1)", "a == 1"} # pushed down negation into standard decomp -- TODO: update after #916 is merged
+        assert set(map(str, decompose_in_tree([~cons]))) == {"sum(a, b, c) != 1", "a == 1"} # pushed down negation into standard decomp
         assert set(map(str, decompose_in_tree([bv.implies(cons)]))) == {"(bv) -> (sum(a, b, c) >= 1)", "a == 1"} # decompose positive
         assert set(map(str, decompose_in_tree([cons.implies(bv)]))) == {"(sum(a, b, c) == 1) -> (bv)","a == 1"}  # decompose standard
         assert set(map(str, decompose_in_tree([bv == (cons)]))) == {"(bv) == (sum(a, b, c) == 1)", "a == 1"} # decompose standard

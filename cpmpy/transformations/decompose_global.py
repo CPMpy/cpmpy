@@ -14,7 +14,8 @@ E.g., bv <-> max(a,b,c) >= 4 can be rewritten as [bv <-> IV0 >= 4, IV0 == max(a,
 
 Unsupported global constraints and global functions are decomposed in-place and the resulting set of constraints
 is wrapped in a conjunction.
-E.g., x + ~AllDifferent(a,b,c) >= 2 is decomposed into x + ~((a) != (b) & (a) != (c) & (b) != (c)) >= 2
+Negation is pushed down into the decomposition when the global constraint is decomposed
+E.g., x + ~AllDifferent(a,b,c) >= 2 is decomposed into x + ~((a) != (b) & (a) != (c) & (b) != (c)) >= 2 and in turn written to x + (a == b) | (a == c) | (b == c)
 This allows to post the decomposed expression tree to the solver if it supports it (e.g., SMT-solvers, MiniZinc, CPO)
 """
 
@@ -29,6 +30,7 @@ from ..expressions.globalconstraints import GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction
 from ..expressions.variables import NDVarArray, cpm_array
 from ..expressions.python_builtins import all as cpm_all
+from ..transformations.negation import recurse_negation
 
 class CustomDecomp(Protocol):
     @overload
@@ -96,8 +98,29 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             # TODO: violates type!!! from `.decompose()` functions that are not cleaned yet
             changed = True
             newlist.append(BoolVal(expr))
+
+        elif expr.name == "not":  # not(global) or negation left by a decomposition
+            args_changed, expr_newargs, expr_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+            if len(expr_toplevel) > 0:
+                todolist.extend(expr_toplevel)
+            if not args_changed:
+                expr_newargs = expr.args  # lets be sure its set
+
+            assert len(expr_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {expr_newargs}"
+            if isinstance(expr_newargs[0], GlobalConstraint):
+                if args_changed:
+                    changed = True
+                    # supported nested global whose args have changed
+                    expr = copy.copy(expr)
+                    expr.update_args(expr_newargs)
+            else:
+                changed = True
+                # decomposed global or boolean expr from decomposition; push negation down
+                expr = recurse_negation(expr_newargs[0])
+            newlist.append(expr)
+
         elif expr.has_subexpr():
-            # special case for positive reified
+            # first, special case for positive reified
             decomposed_positive = False
             if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
                 changed = True
@@ -108,15 +131,16 @@ def decompose_in_tree(lst_of_expr: list[Expression],
                 decomposed_positive = True
 
             # decompose its arguments
-            arg_changed, arg_newargs, arg_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-            if arg_changed:
+            args_changed, expr_newargs, expr_toplevel = _decompose_in_tree_args(expr.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
+            if args_changed:
                 changed = True
-                if len(arg_toplevel) > 0:
-                    todolist.extend(arg_toplevel)
+                if len(expr_toplevel) > 0:
+                    todolist.extend(expr_toplevel)
+
                 # if decompose_positive: we know 'expr' is a fresh expression
                 if not decomposed_positive:
                     expr = copy.copy(expr)
-                expr.update_args(arg_newargs)
+                expr.update_args(expr_newargs)
 
             newlist.append(expr)
         else:
@@ -280,12 +304,26 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                 # if it has subexprs, decompose its arguments
                 if arg.has_subexpr():
                     rec_changed, rec_newargs, rec_toplevel = _decompose_in_tree_args(arg.args, supported=supported, supported_reified=supported_reified, csemap=csemap, decompose_custom=decompose_custom)
-                    if rec_changed:
+                    if len(rec_toplevel) > 0:
+                        toplevel.extend(rec_toplevel)
+                    if not rec_changed:
+                        rec_newargs = arg.args  # let's be sure its set
+
+                    if arg.name == "not":  # not(global) or negation left by a decomposition
+                        assert len(rec_newargs) == 1, f"decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
+                        if isinstance(rec_newargs[0], GlobalConstraint):
+                            if rec_changed:
+                                changed = True
+                                arg = copy.copy(arg)
+                                arg.update_args(rec_newargs)
+                        else:
+                            changed = True
+                            arg = recurse_negation(rec_newargs[0])
+                    elif rec_changed:
                         changed = True
                         arg = copy.copy(arg)
                         arg.update_args(rec_newargs)
-                        if len(rec_toplevel) > 0:
-                            toplevel.extend(rec_toplevel)
+                            
                     newargs.append(arg)
                     continue
         
