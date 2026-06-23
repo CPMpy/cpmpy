@@ -1,5 +1,7 @@
+#!/usr/bin/env python
 # Parallel machine scheduling: a set of jobs must be scheduled, each can be run on compatible machines,
 # with different duration and energy consumption. Minimize makespan and total energy consumption
+
 import cpmpy as cp
 import pandas as pd
 import random; random.seed(1)
@@ -59,8 +61,8 @@ if model.solve():
     if SHOW_VISUALISATION:
         import plotly.express as px
         df_solution = df_data[active.value() == True].copy()  # Select rows where active is True
-        df_solution["start"] = pd.to_datetime(start[df_solution.index].value(), unit="m")
-        df_solution["end"] = pd.to_datetime(end[df_solution.index].value(), unit="m")
+        df_solution["start"] = pd.to_datetime(start.value(), unit="m") # start vars are ordered by job_id
+        df_solution["end"] = pd.to_datetime(end.value(), unit="m") # end vars are ordered by job_id
         import plotly.io as pio; pio.renderers.default = "browser"
         px.timeline(df_solution, x_start="start", x_end="end", y="machine_id", color="job_id", text="energy").show()
 else:
