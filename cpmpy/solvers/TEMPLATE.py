@@ -333,7 +333,7 @@ class CPM_template(SolverInterface):
         obj, safe_cons = safen_objective(expr)
         obj = push_down_negation([obj])[0]
         # [GUIDELINE] all unsupported global functions and (reified) global constraints are decomposed here
-        obj, decomp_cons = decompose_objective(expr,
+        obj, decomp_cons = decompose_objective(obj,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
