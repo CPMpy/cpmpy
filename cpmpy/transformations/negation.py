@@ -52,6 +52,17 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
         return lst_of_expr
     return newlist
 
+def push_down_negation_objective(expr: Expression) -> Expression:
+    """
+    Push down negation into the objective expression.
+    """
+    assert isinstance(expr, Expression), "push_down_negation_objective: expected a single expression as objective but got {expr}"
+
+    changed, newexpr = _push_down_negation_expr(expr)
+    if changed:
+        return newexpr
+    else:
+        return expr
 
 def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
     """

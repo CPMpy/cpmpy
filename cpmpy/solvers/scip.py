@@ -39,7 +39,7 @@ from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -252,7 +252,7 @@ class CPM_scip(SolverInterface):
             self.solver_vars(list(self.user_vars))
 
             obj, safe_cons = safen_objective(expr)
-            obj = push_down_negation([obj])[0]
+            obj = push_down_negation_objective(obj)
             obj, decomp_cons = decompose_linear_objective(
                 obj,
                 supported=self.supported_global_constraints,

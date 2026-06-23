@@ -60,7 +60,7 @@ from ..transformations.linearize import decompose_linear, decompose_linear_objec
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 
 
 class CPM_highs(SolverInterface):
@@ -313,7 +313,7 @@ class CPM_highs(SolverInterface):
             get_variables(expr, collect=self.user_vars)
 
             obj, safe_cons = safen_objective(expr)
-            obj = push_down_negation([obj])[0]
+            obj = push_down_negation_objective(obj)
             obj, decomp_cons = decompose_linear_objective(
                 obj,
                 supported=self.supported_global_constraints,

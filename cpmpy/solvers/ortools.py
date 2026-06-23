@@ -61,7 +61,7 @@ from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_c
     get_bounds, is_true_cst, \
     is_false_cst, implies, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list
@@ -388,7 +388,7 @@ class CPM_ortools(SolverInterface):
 
             # transform objective
             obj, safe_cons = safen_objective(expr)
-            obj = push_down_negation([obj])[0]
+            obj = push_down_negation_objective(obj)
             obj, decomp_cons = decompose_objective(obj,
                                                 supported=self.supported_global_constraints,
                                                 supported_reified=self.supported_reified_global_constraints,
