@@ -382,6 +382,7 @@ class CPM_ortools(SolverInterface):
                                                 supported=self.supported_global_constraints,
                                                 supported_reified=self.supported_reified_global_constraints,
                                                 csemap=self._csemap)
+            obj = push_down_negation([obj])[0]
             obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 
             self.add(safe_cons+decomp_cons+flat_cons)

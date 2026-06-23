@@ -317,6 +317,7 @@ class CPM_template(SolverInterface):
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
+        obj = push_down_negation([obj])[0]
         # [GUIDELINE] after this, the objective will be a variable, sum, wsum or supported global function
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
 

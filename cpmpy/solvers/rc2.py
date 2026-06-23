@@ -53,6 +53,8 @@
 import os
 
 from threading import Timer
+
+from cpmpy.transformations.negation import push_down_negation
 from .solver_interface import SolverStatus, ExitStatus
 from .pysat import CPM_pysat
 from ..transformations.decompose_global import decompose_objective
@@ -224,6 +226,7 @@ class CPM_rc2(CPM_pysat):
             supported_reified=self.supported_reified_global_constraints,
             csemap=self._csemap
         )
+        obj = push_down_negation([obj])[0]
         obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
         self.add(safe_cons + decomp_cons + flat_cons)
 
