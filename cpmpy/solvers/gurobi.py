@@ -47,6 +47,7 @@
 from typing import Optional, List, Callable, Iterable
 import warnings
 import cpmpy as cp
+from cpmpy.transformations.negation import push_down_negation, push_down_negation_objective
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
@@ -329,6 +330,7 @@ class CPM_gurobi(SolverInterface):
                                                           supported=self.supported_global_constraints,
                                                           supported_reified=self.supported_reified_global_constraints,
                                                           csemap=self._csemap)
+            obj = push_down_negation_objective(obj)
             obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
             obj = only_positive_bv_wsum(obj)  # remove negboolviews
 
@@ -392,6 +394,7 @@ class CPM_gurobi(SolverInterface):
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element", "nd_element"})  # linearize and decompose expect safe exprs
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
