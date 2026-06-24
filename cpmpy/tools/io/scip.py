@@ -39,7 +39,10 @@ import numpy as np
 import cpmpy as cp
 import warnings
 
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import pyscipopt
 
 from cpmpy.expressions.core import BoolVal, Comparison, Operator
 from cpmpy.expressions.variables import _NumVarImpl, _BoolVarImpl, NegBoolView, _IntVarImpl
@@ -144,7 +147,7 @@ def load_scip(fname: Union[str, os.PathLike], open:Callable=open, assume_integer
     direction = scip.getObjectiveSense()
 
     n_terms = len(scip_objective.terms)
-    obj_vars = cp.cpm_array([None]*n_terms)
+    obj_vars = cp.cpm_array([None] * n_terms)  # type: ignore[list-item]
     obj_coeffs = np.zeros(n_terms, dtype=int)
 
     for i, (term, coeff) in enumerate(scip_objective.terms.items()): # terms is a dictionary mapping terms to coefficients
@@ -186,7 +189,7 @@ class _SCIPWriter:
     # - "abs": GlobalFunction supported natively (PySCIPOpt addCons(abs(x) <= k)).
     # SCIP has no native AllDifferent, Circuit, Table, Cumulative, etc.; others are decomposed by decompose_in_tree.
     supported_global_constraints = frozenset({"xor", "abs"})
-    supported_reified_global_constraints = frozenset()
+    supported_reified_global_constraints: frozenset[str] = frozenset()
 
 
     @staticmethod
@@ -206,9 +209,9 @@ class _SCIPWriter:
 
         self.scip_model = scip.Model(problem_name)
 
-        self.user_vars = set() 
-        self._varmap = dict()  # maps cpmpy variables to native solver variables
-        self._csemap = dict()  # maps cpmpy expressions to solver expressions
+        self.user_vars: set[Any] = set()
+        self._varmap: dict[Any, Any] = dict()  # maps cpmpy variables to native solver variables
+        self._csemap: dict[Any, Any] = dict()  # maps cpmpy expressions to solver expressions
 
         self._cons_counter = 0
 
@@ -522,42 +525,45 @@ def to_scip(model: cp.Model) -> "pyscipopt.Model":
     return writer.scip_model
 
 
-def _add_header(fname: os.PathLike, format: str, header: Optional[str] = None):
+def _add_header(fname: Union[str, os.PathLike], format: str, header: Optional[str] = None):
     """
     Add a header to a file.
 
     Arguments:
-        fname (os.PathLike): The path to the file to add the header to.
+        fname (str or os.PathLike): The path to the file to add the header to.
         format (str): The format of the file.
         header (Optional[str]): The header to add.
     """
+
+    if header is None:
+        header = ""
 
     with open(fname, "r") as f:
         lines = f.readlines()
 
     if format == "mps":
-        header = ["* " + line + "\n" for line in header.splitlines()]
-        lines = header + lines
+        header_lines = ["* " + line + "\n" for line in header.splitlines()]
+        lines = header_lines + lines
         
     elif format == "lp":
-        header = ["\\ " + line + "\n" for line in header.splitlines()]
-        lines = header + lines
+        header_lines = ["\\ " + line + "\n" for line in header.splitlines()]
+        lines = header_lines + lines
 
     elif format == "cip":
-        header = ["# " + line + "\n" for line in header.splitlines()]
-        lines = header + lines
+        header_lines = ["# " + line + "\n" for line in header.splitlines()]
+        lines = header_lines + lines
 
     elif format == "fzn":
-        header = ["% " + line + "\n" for line in header.splitlines()]
-        lines = header + lines
+        header_lines = ["% " + line + "\n" for line in header.splitlines()]
+        lines = header_lines + lines
 
     elif format == "gms":
-        header = ["* " + line + "\n" for line in header.splitlines()]
-        lines = [lines[0]] + header + lines[1:] # handle first line: $OFFLISTING
+        header_lines = ["* " + line + "\n" for line in header.splitlines()]
+        lines = [lines[0]] + header_lines + lines[1:] # handle first line: $OFFLISTING
 
     elif format == "pip":
-        header = ["\\ " + line + "\n" for line in header.splitlines()]
-        lines = header + lines
+        header_lines = ["\\ " + line + "\n" for line in header.splitlines()]
+        lines = header_lines + lines
 
     with open(fname, "w") as f:
         f.writelines(lines)

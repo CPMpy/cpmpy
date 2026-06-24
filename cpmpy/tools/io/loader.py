@@ -22,7 +22,7 @@ from cpmpy.tools.io.opb import load_opb
 from cpmpy.tools.io.utils import _derive_format
 
 # mapping format names to appropriate loader functions
-_loader_map = {
+_loader_map: dict[str, Callable[..., cp.Model]] = {
     "mps": load_scip,
     "lp": load_scip,
     "cip": load_scip,
@@ -35,7 +35,7 @@ _loader_map = {
 }
 
 
-def _get_loader(format: str) -> Callable[[str], cp.Model]:
+def _get_loader(format: str) -> Callable[..., cp.Model]:
     """
     Get the loader function for a given format.
 

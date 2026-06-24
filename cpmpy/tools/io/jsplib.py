@@ -24,8 +24,9 @@ import argparse
 import cpmpy as cp
 import numpy as np
 from io import StringIO
-from typing import Union, Callable
-from typing import TextIO
+from typing import Union, Callable, TextIO
+
+from cpmpy.expressions.variables import NDVarArray, _IntVarImpl
 
 
 _std_open = open
@@ -51,7 +52,7 @@ def load_jsplib(jsp: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
             f = _std_open(jsp, "rt")
     # If rcpsp is a string containing a model -> create a memory-mapped file
     else:
-        f = StringIO(jsp)
+        f = StringIO(str(jsp))
 
 
     task_to_machines, task_durations = _parse_jsplib(f)
@@ -89,7 +90,7 @@ def _parse_jsplib(f: TextIO) -> tuple[np.ndarray, np.ndarray]:
 
 
 
-def _model_jsplib(task_to_machines: np.ndarray, task_durations: np.ndarray) -> tuple[cp.Model, tuple[np.ndarray, np.ndarray]]:
+def _model_jsplib(task_to_machines: np.ndarray, task_durations: np.ndarray) -> tuple[cp.Model, tuple[NDVarArray, _IntVarImpl]]:
 
     # Check if the shapes of the matrices are compatible
     assert task_to_machines.shape == task_durations.shape

@@ -24,9 +24,9 @@ import argparse
 import tempfile
 import cpmpy as cp
 import re
-from typing import Union, Callable
-from typing import Optional
-from typing import Any
+from typing import Union, Callable, Optional, Any
+
+from cpmpy.expressions.variables import NDVarArray
 
 # Optional dependencies
 try:
@@ -48,7 +48,7 @@ def _tag_to_data(
         datatype: Optional[type]=None, 
         names: Optional[list[str]]=None, 
         dtype: Optional[dict[str, type]]=None
-    ) -> Optional[list[dict[str, Any]]]:
+    ) -> Union[int, float, str, list[dict[str, Any]], None]:
     """
     Extract data from a tagged section in the input string.
     
@@ -144,24 +144,29 @@ def parse_scheduling_period(filename: str):
         string = f.read()
 
     # Parse scheduling horizon
-    horizon = int(_tag_to_data(string, "SECTION_HORIZON", skip_lines=2, datatype=int))
+    horizon_val = _tag_to_data(string, "SECTION_HORIZON", skip_lines=2, datatype=int)
+    if not isinstance(horizon_val, int):
+        raise ValueError("Missing SECTION_HORIZON in nurserostering instance")
+    horizon = horizon_val
     
     # Parse shifts - list of dicts with ShiftID as key
     shifts_rows = _tag_to_data(string, "SECTION_SHIFTS",
                                names=["ShiftID", "Length", "cannot follow"],
                                dtype={'ShiftID': str, 'Length': int, 'cannot follow': str})
     shifts = {}
-    for row in shifts_rows:
-        cannot_follow_str = row.get("cannot follow") or ""
-        shifts[row["ShiftID"]] = {
-            "Length": row["Length"],
-            "cannot follow": [v.strip() for v in cannot_follow_str.split("|") if v.strip()]
-        }
+    if isinstance(shifts_rows, list):
+        for row in shifts_rows:
+            cannot_follow_str = row.get("cannot follow") or ""
+            shifts[row["ShiftID"]] = {
+                "Length": row["Length"],
+                "cannot follow": [v.strip() for v in cannot_follow_str.split("|") if v.strip()]
+            }
     
     # Parse staff - list of dicts
-    staff = _tag_to_data(string, "SECTION_STAFF", 
+    staff_rows = _tag_to_data(string, "SECTION_STAFF", 
                          names=["ID", "MaxShifts", "MaxTotalMinutes", "MinTotalMinutes", "MaxConsecutiveShifts", "MinConsecutiveShifts", "MinConsecutiveDaysOff", "MaxWeekends"],
                          dtype={'MaxShifts': str, 'MaxTotalMinutes': int, 'MinTotalMinutes': int, 'MaxConsecutiveShifts': int, 'MinConsecutiveShifts': int, 'MinConsecutiveDaysOff': int, 'MaxWeekends': int})
+    staff: list[dict[str, Any]] = staff_rows if isinstance(staff_rows, list) else []
     
     # Process MaxShifts column - split by | and create max_shifts_* columns
     for idx, nurse in enumerate(staff):
@@ -180,7 +185,7 @@ def parse_scheduling_period(filename: str):
     # Parse as raw string since column count varies per row
     days_off_raw = _tag_to_data(string, "SECTION_DAYS_OFF", datatype=str)
     days_off = []
-    if days_off_raw:
+    if isinstance(days_off_raw, str):
         for line in days_off_raw.split("\n"):
             line = line.strip()
             if not line or line.startswith("#") or line.lower().startswith("employeeid"):
@@ -198,18 +203,20 @@ def parse_scheduling_period(filename: str):
                             days_off.append({"EmployeeID": employee_id, "DayIndex": day_idx})
     
     # Parse shift requests
-    shift_on = _tag_to_data(string, "SECTION_SHIFT_ON_REQUESTS",
+    shift_on_rows = _tag_to_data(string, "SECTION_SHIFT_ON_REQUESTS",
                             names=["EmployeeID", "Day", "ShiftID", "Weight"],
                             dtype={'Weight': int, "Day": int, "ShiftID": str})
-    shift_off = _tag_to_data(string, "SECTION_SHIFT_OFF_REQUESTS",
+    shift_off_rows = _tag_to_data(string, "SECTION_SHIFT_OFF_REQUESTS",
                             names=["EmployeeID", "Day", "ShiftID", "Weight"],
                             dtype={'Weight': int, "Day": int, "ShiftID": str})
-    cover = _tag_to_data(string, "SECTION_COVER",
+    cover_rows = _tag_to_data(string, "SECTION_COVER",
                          names=["Day", "ShiftID", "Requirement", "Weight for under", "Weight for over"],
                          dtype={'Day': int, 'ShiftID': str, 'Requirement': int, 'Weight for under': int, 'Weight for over': int})
 
     return dict(horizon=horizon, shifts=shifts, staff=staff, days_off=days_off, 
-                shift_on=shift_on, shift_off=shift_off, cover=cover)
+                shift_on=shift_on_rows if isinstance(shift_on_rows, list) else [],
+                shift_off=shift_off_rows if isinstance(shift_off_rows, list) else [],
+                cover=cover_rows if isinstance(cover_rows, list) else [])
 
 
 def add_fake_names(data: dict[str, Any], seed: int=0) -> dict[str, Any]:
@@ -313,7 +320,7 @@ def model_nurserostering(
         shift_on: list[dict[str, Any]], 
         shift_off: list[dict[str, Any]], 
         cover: list[dict[str, Any]]
-    ) -> tuple[cp.Model, cp.IntVar]:
+    ) -> tuple[cp.Model, NDVarArray]:
     """
     Create a CPMpy model for nurserostering.
     
@@ -327,9 +334,9 @@ def model_nurserostering(
         cover (list[dict[str, Any]]): List of dicts with cover requirements for each day and shift
 
     Returns:
-        tuple[cp.Model, cp.IntVar]: A tuple containing the CPMpy model and the nurse view.
+        tuple[cp.Model, NDVarArray]: A tuple containing the CPMpy model and the nurse view.
             - model (cp.Model): The CPMpy model for the nurserostering problem.
-            - nurse_view (cp.IntVar): The nurse view variable.
+            - nurse_view (NDVarArray): The nurse view variable.
     """
     n_nurses = len(staff)
 
@@ -363,23 +370,26 @@ def model_nurserostering(
     # Maximum number of consecutive shifts that can be worked before having a day off.
     for i, nurse in enumerate(staff):
         max_days = nurse.get('MaxConsecutiveShifts')
-        for d in range(horizon - max_days):
-            window = nurse_view[i,d:d+max_days+1]
-            model += cp.Count(window, FREE) >= 1  # at least one holiday in this window
+        if max_days is not None:
+            for d in range(horizon - max_days):
+                window = nurse_view[i,d:d+max_days+1]
+                model += cp.Count(window, FREE) >= 1  # at least one holiday in this window
 
     # Minimum number of consecutive shifts that must be worked before having a day off.
     for i, nurse in enumerate(staff):
         min_days = nurse.get('MinConsecutiveShifts')
-        for d in range(1, horizon):
-            is_start_of_working_period = (nurse_view[i, d-1] == FREE) & (nurse_view[i, d] != FREE)
-            model += is_start_of_working_period.implies(cp.all(nurse_view[i,d:d+min_days] != FREE))
+        if min_days is not None:
+            for d in range(1, horizon):
+                is_start_of_working_period = (nurse_view[i, d-1] == FREE) & (nurse_view[i, d] != FREE)
+                model += is_start_of_working_period.implies(cp.all(nurse_view[i,d:d+min_days] != FREE))
 
     # Minimum number of consecutive days off.
     for i, nurse in enumerate(staff):
         min_days = nurse.get('MinConsecutiveDaysOff')
-        for d in range(1, horizon):
-            is_start_of_free_period = (nurse_view[i, d - 1] != FREE) & (nurse_view[i, d] == FREE)
-            model += is_start_of_free_period.implies(cp.all(nurse_view[i, d:d + min_days] == FREE))
+        if min_days is not None:
+            for d in range(1, horizon):
+                is_start_of_free_period = (nurse_view[i, d - 1] != FREE) & (nurse_view[i, d] == FREE)
+                model += is_start_of_free_period.implies(cp.all(nurse_view[i, d:d + min_days] == FREE))
 
     # Max number of working weekends for each nurse
     weekends = [(i - 1, i) for i in range(1, horizon) if (i + 1) % 7 == 0]
@@ -389,21 +399,24 @@ def model_nurserostering(
 
     # Days off
     for holiday in days_off:
-        i = next((idx for idx, nurse in enumerate(staff) if nurse['ID'] == holiday['EmployeeID']), None) # index of employee
-        model += nurse_view[i,holiday['DayIndex']] == FREE
+        nurse_idx = next((idx for idx, nurse in enumerate(staff) if nurse['ID'] == holiday['EmployeeID']), None) # index of employee
+        if nurse_idx is not None:
+            model += nurse_view[nurse_idx,holiday['DayIndex']] == FREE
 
     # Shift requests, encode in linear objective
     objective = 0
-    for request in shift_on:
-        i = next((idx for idx, nurse in enumerate(staff) if nurse['ID'] == request['EmployeeID']), None) # index of employee
-        cpm_request = nurse_view[i, request['Day']] == SHIFTS.index(request['ShiftID'])
-        objective += request['Weight'] * ~cpm_request
+    for request in shift_on or []:
+        nurse_idx = next((idx for idx, nurse in enumerate(staff) if nurse['ID'] == request['EmployeeID']), None) # index of employee
+        if nurse_idx is not None:
+            cpm_request = nurse_view[nurse_idx, request['Day']] == SHIFTS.index(request['ShiftID'])
+            objective += request['Weight'] * ~cpm_request
 
     # Shift off requests, encode in linear objective
-    for request in shift_off:
-        i = next((idx for idx, nurse in enumerate(staff) if nurse['ID'] == request['EmployeeID']), None) # index of employee
-        cpm_request = nurse_view[i, request['Day']] != SHIFTS.index(request['ShiftID'])
-        objective += request['Weight'] * ~cpm_request
+    for request in shift_off or []:
+        nurse_idx = next((idx for idx, nurse in enumerate(staff) if nurse['ID'] == request['EmployeeID']), None) # index of employee
+        if nurse_idx is not None:
+            cpm_request = nurse_view[nurse_idx, request['Day']] != SHIFTS.index(request['ShiftID'])
+            objective += request['Weight'] * ~cpm_request
 
     # Cover constraints, encode in objective with slack variables
     for cover_request in cover:
@@ -434,12 +447,12 @@ def load_nurserostering(instance: Union[str, os.PathLike], open:Callable=open) -
     """
     # If instance is a path to a file that exists -> use it directly
     if isinstance(instance, (str, os.PathLike)) and os.path.exists(instance):
-        fname = instance
+        fname = os.fspath(instance)
     # If instance is a string containing file content -> write to temp file
     else:
         # Create a temporary file and write the content
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as tmp:
-            tmp.write(instance)
+            tmp.write(str(instance))
             fname = tmp.name
 
     try:

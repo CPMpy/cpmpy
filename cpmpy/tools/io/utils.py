@@ -15,7 +15,7 @@ _format_map = {
     "xcsp3" : "xcsp3",
 }
 
-_extension_map = {}
+_extension_map: dict[str, list[str]] = {}
 for extension, format in _format_map.items():
     _extension_map[format] = _extension_map.get(format, []) + [extension]
 

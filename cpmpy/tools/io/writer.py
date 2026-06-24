@@ -24,7 +24,7 @@ from cpmpy.tools.io.opb import write_opb
 from cpmpy.tools.io.utils import _derive_format
 
 # mapping format names to appropriate writer functions
-_writer_map = {
+_writer_map: dict[str, Callable[..., str]] = {
     "mps": partial(write_scip, format="mps"),
     "lp": partial(write_scip, format="lp"),
     "cip": partial(write_scip, format="cip"),
@@ -44,7 +44,7 @@ _writer_map = {
 }
 
 
-def _get_writer(format: str) -> Callable:
+def _get_writer(format: str) -> Callable[..., str]:
     """
     Get the writer function for a given format.
 

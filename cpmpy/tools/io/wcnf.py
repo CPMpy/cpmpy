@@ -25,8 +25,10 @@ import cpmpy as cp
 from io import StringIO
 from typing import Union, Callable
 
+from cpmpy.expressions.variables import _BoolVarImpl
 
-def _get_var(i: int, vars_dict: dict) -> cp.BoolVar:
+
+def _get_var(i: int, vars_dict: dict[int, _BoolVarImpl]) -> _BoolVarImpl:
     """
     Returns CPMpy boolean decision variable matching to index `i` if exists, else creates a new decision variable.
 
@@ -63,10 +65,10 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
             f = _std_open(wcnf, "rt")
     # If wcnf is a string containing a model -> create a memory-mapped file
     else:
-        f = StringIO(wcnf)
+        f = StringIO(str(wcnf))
 
     model = cp.Model()
-    vars = {}
+    vars: dict[int, _BoolVarImpl] = {}
     nr_vars_declared = None
     unsatisfied_soft_terms = []
     for raw in f:
@@ -103,7 +105,7 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
     if unsatisfied_soft_terms:
         model.minimize(sum(unsatisfied_soft_terms))
 
-    model.wcnf_max_var = nr_vars_declared if nr_vars_declared is not None else max(vars, default=0)
+    setattr(model, "wcnf_max_var", nr_vars_declared if nr_vars_declared is not None else max(vars, default=0))
 
     return model
 

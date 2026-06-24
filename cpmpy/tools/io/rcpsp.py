@@ -23,9 +23,7 @@ import sys
 import argparse
 import cpmpy as cp
 from io import StringIO
-from typing import Union
-from typing import Callable
-from typing import TextIO
+from typing import Union, Callable, TextIO, Any
 
 
 _std_open = open
@@ -51,7 +49,7 @@ def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
             f = _std_open(rcpsp, "rt")
     # If rcpsp is a string containing a model -> create a memory-mapped file
     else:
-        f = StringIO(rcpsp)
+        f = StringIO(str(rcpsp))
 
 
     table, capacities = _parse_rcpsp(f)
@@ -59,7 +57,7 @@ def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
     return model
 
 # TODO: Pandas as optional dependency
-def _parse_rcpsp(f: TextIO) -> tuple["pandas.DataFrame", dict]:
+def _parse_rcpsp(f: TextIO) -> tuple[Any, dict[str, int]]:
     """
     Parse a PSPLIB RCPSP instance file
 

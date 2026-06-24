@@ -20,13 +20,14 @@ from typing import Optional, Callable, Union
 
 import cpmpy as cp
 
-from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView
+from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView, NDVarArray
 from cpmpy.expressions.core import Operator
 
 from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
+from cpmpy.transformations.int2bool import IntVarEnc
 
 
 def write_dimacs(
@@ -69,7 +70,8 @@ def write_dimacs(
 
     # Shared maps so both objective and constraint transformations populate
     # the same ivarmap, enabling annotation of all integer variable encodings.
-    ivarmap, csemap = dict(), CSEMap()
+    ivarmap: dict[str, IntVarEnc] = dict()
+    csemap = CSEMap()
 
     constraints = toplevel_list(model.constraints)
     objective_lits = []
@@ -121,7 +123,7 @@ def write_dimacs(
 
     # Write annotations to DIMACS string
     if annotate is not None:
-        if isinstance(annotate, Callable):
+        if callable(annotate):
             comments = annotate(vars, ivarmap)
             if comments:
                 comment_block = "\n".join(f"c {i+1} " + c for i,c in enumerate(comments)) + "\n"
@@ -217,7 +219,7 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open=None):
 
     # CNF parse (strict with p-line counts when present, inferred otherwise)
     m = cp.Model()
-    clause = []
+    clause: list[int] = []
     clauses = []
     nr_vars_declared = None
     nr_cls_declared = None
@@ -252,13 +254,14 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open=None):
     if nr_vars_declared is not None:
         assert max_var <= nr_vars_declared, f"Expected at most {nr_vars_declared} variables (from p-line) but found literal index {max_var}"
 
-    bvs = cp.boolvar(shape=(nr_vars,)) if nr_vars > 0 else []
-    for cl in clauses:
-        lits = []
-        for i in cl:
-            bv = bvs[abs(i)-1]
-            lits.append(bv if i > 0 else ~bv)
-        m += cp.any(lits)
+    if nr_vars > 0:
+        bvs: NDVarArray = cp.boolvar(shape=(nr_vars,))
+        for cl in clauses:
+            lits = []
+            for i in cl:
+                bv = bvs[abs(i)-1]
+                lits.append(bv if i > 0 else ~bv)
+            m += cp.any(lits)
 
     if nr_cls_declared is not None:
         assert len(m.constraints) == nr_cls_declared, f"Number of clauses was declared in p-line as {nr_cls_declared}, but was {len(m.constraints)}"

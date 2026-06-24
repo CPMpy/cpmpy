@@ -25,7 +25,7 @@ import re
 import sys
 import argparse
 from io import StringIO
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, Any
 from functools import reduce
 from operator import mul
 
@@ -195,7 +195,7 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
             f = _std_open(opb, "rt")
     # If opb is a string containing a model -> create a memory-mapped file
     else:
-        f = StringIO(opb)
+        f = StringIO(str(opb))
 
     # Look for header on first line
     line = f.readline()
@@ -211,7 +211,7 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
     reader = (line_text for line_text in map(str.strip, f) if line_text and line_text[0] != '*')
 
     # CPMpy objects
-    vars = {}
+    vars: dict[str, Any] = {}
     model = cp.Model()
     
     # Special case for first line -> might contain objective function
@@ -283,7 +283,7 @@ def write_opb(model, fname=None, encoding="auto", header=None, open=None, annota
         >>> print(write_opb(m))
     """
 
-    csemap, ivarmap = CSEMap(), dict()
+    csemap, ivarmap = CSEMap(), dict[str, Any]()
     opb_cons = to_opb(model.constraints, csemap, ivarmap, encoding)
 
     # Transform objective, if present
