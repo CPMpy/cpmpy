@@ -98,8 +98,10 @@ def write(model: cp.Model, file_path: Optional[str] = None, format: Optional[str
 
     Arguments:
         model (cp.Model): The model to write.
-        file_path (Optional[str]): The path to the file to write the model to. If None, only a string containing the model will be returned.
-        format (Optional[str]): The format to write the model in. If None and file_path is provided, the format will be derived from the file path extension.
+        file_path (Optional[str]): The path to the file to write the model to. If None, only a string containing the model will be returned and nothing will be written.
+        format (Optional[str]): The format to write the model in. If None and file_path is provided, the format will be derived from the file path extension 
+                                (best effort, might raise a ValueError if the format could not be derived from the file path).
+                                Might raise a ValueError if the format is not supported.
         verbose (bool): Whether to print verbose output.
         header (Optional[str]): The header to put at the top of the file. If None, a default header will be created. Pass an empty string to skip adding a header.
         **kwargs: Additional arguments to pass to the writer.
@@ -108,9 +110,9 @@ def write(model: cp.Model, file_path: Optional[str] = None, format: Optional[str
         ValueError: If the format is not supported or could not be derived from the file path.
 
     Example:
-        >>> write(model, "output.opb")  # Format auto-detected from .opb
+        >>> write(model, "output.opb")                # Format auto-detected from .opb
         >>> write(model, "output.txt", format="opb")  # Format explicitly specified
-        >>> write(model, format="opb")  # Returns string, format must be specified
+        >>> write(model, format="opb")                # Only returns a string, format must be specified
     """
 
     # Derive format from file_path if not provided
