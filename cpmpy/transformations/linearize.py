@@ -640,7 +640,20 @@ def get_linear_decompositions():
         InDomain=InDomain.decompose_linear,
         regular=Regular.decompose_linear,
     )
-    # Should we add Gleb's table decomposition? or is it not non-reifiable?
+
+def get_linear_positive_decompositions():
+    """
+        Implementation of custom linear decompositions for some global constraints, that are only valid in positive context.
+
+        returns:
+            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
+    """
+    return dict(
+        regular=Regular.decompose_linear_positive,
+        circuit=Circuit.decompose_linear_positive,
+    )
+
+
 
 def get_linear_positive_decompositions():
     """

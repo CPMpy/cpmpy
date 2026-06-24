@@ -279,7 +279,7 @@ class CallbacksCPMPy(Callbacks):
         self.cpm_model += cp.Regular(self.get_cpm_vars(scope), transitions, start_state, final_states)
 
     def ctr_mdd(self, scope: list[Variable], transitions: list):
-        self.cpm_model += xglobals.MDD(self.get_cpm_vars(scope), transitions)
+        self.cpm_model += cp.MDD(self.get_cpm_vars(scope), transitions)
 
     def ctr_all_different(self, scope: list[Variable] | list[Node], excepting: None | list[int]):
         cpm_exprs = self.get_cpm_exprs(scope)

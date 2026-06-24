@@ -52,7 +52,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pycsp3.parser.xparser import ParserXCSP3
 
-from .dataset import XCSP3Dataset  # for easier importing
+from cpmpy.tools.datasets.xcsp3 import XCSP3Dataset  # for easier importing
 
 
 def _parse_xcsp3(path: os.PathLike) -> "ParserXCSP3":

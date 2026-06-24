@@ -56,7 +56,17 @@ def decompose_in_tree(lst_of_expr: list[Expression],
     :param supported_reified: a set of names of supported reified global constraints (those with Boolean return type only).
     :param _toplevel: DEPRECATED
     :param nested: DEPRECATED
-    :param csemap: a dictionary of 'expr: expr' mappings, for Common Subexpression Elimination
+    :param csemap: CSEMap object used to avoid decomposing the same global constraint twice
+    :param decompose_custom: a dictionary mapping names of global constraints to their custom decompositions.
+    :param decompose_custom_positive: a dictionary mapping names of global constraints to their custom decompositions, which are valid only in positive context.
+
+    To decompose a global constraint in positive context:
+    1. Check `decompose_positive_custom`
+    2. Check `decompose_custom`
+    3. Call `global.decompose_positive()`
+
+    The assumption is that `decompose_custom` generally works better compared to the standard global decomposition,
+    even if the custom decomposition is not specialized for positive-only use.
 
     Supported numerical global functions remain in the expression tree as is. They can be rewritten using
     :func:`cpmpy.transformations.reification.reify_rewrite`
@@ -129,7 +139,13 @@ def decompose_in_tree(lst_of_expr: list[Expression],
             decomposed_positive = False
             if expr.name == "->" and isinstance(expr.args[1], GlobalConstraint) and expr.args[1].name not in supported_reified:
                 changed = True
-                exprs, toplevel_exprs = expr.args[1].decompose_positive()
+                subexpr = expr.args[1]
+                if decompose_custom_positive is not None and subexpr.name in decompose_custom_positive:
+                    exprs, toplevel_exprs = decompose_custom_positive[subexpr.name](subexpr)
+                elif decompose_custom is not None and subexpr.name in decompose_custom:
+                    exprs, toplevel_exprs = decompose_custom[subexpr.name](subexpr)
+                else:
+                    exprs, toplevel_exprs = subexpr.decompose_positive()
                 if len(toplevel_exprs) > 0:
                     todolist.extend(toplevel_exprs)
                 expr = Operator("->", [expr.args[0], cpm_all(exprs)])   
@@ -315,7 +331,7 @@ def _decompose_in_tree_args(args: list[Any]|tuple[Any, ...],
                         rec_newargs = arg.args  # let's be sure its set
 
                     if arg.name == "not":  # not(global) or negation left by a decomposition
-                        assert len(rec_newargs) == 1, "decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
+                        assert len(rec_newargs) == 1, f"decompose_in_tree: expected a single argument to negate but got {rec_newargs}"
                         if isinstance(rec_newargs[0], GlobalConstraint):
                             if rec_changed:
                                 changed = True

@@ -81,11 +81,11 @@ class TestTransfNegation:
         assert str(push_down_negation([~expr])) == "[(a) < (b)]"
         assert str(recurse_negation(expr)) == "(a) < (b)"
 
-    def negation_in_subexpr(self):
+    def test_negation_in_subexpr(self):
 
         expr = self.iv[0] + ~(self.bv[0] | self.bv[1]) <= 1
-        assert str(push_down_negation(expr)) == "[x + (~a and ~b) <= 1]"
-        assert str(recurse_negation(expr)) == "x + (~a and ~b) > 1"
+        assert str(push_down_negation([expr])) == "[(x) + ((~a) and (~b)) <= 1]"
+        assert str(recurse_negation(expr)) == "(x) + ((~a) and (~b)) > 1"
 
     def test_deeply_nested_negation(self): # (old flatten tests)
 
