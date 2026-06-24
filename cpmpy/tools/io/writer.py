@@ -15,6 +15,7 @@ List of functions
 import inspect
 from typing import Callable, Optional, List
 from functools import partial
+import warnings
 
 import cpmpy as cp
 from .dimacs import write_dimacs
@@ -132,6 +133,10 @@ def write(model: cp.Model, file_path: Optional[str] = None, format: Optional[str
         k: v for k, v in kwargs.items()
         if k in allowed
     }
+    # warn if any kwargs are not supported by the writer
+    unsupported = set(kwargs.keys()) - set(allowed)
+    if unsupported:
+        warnings.warn(f"Unsupported kwargs: {unsupported}")
 
     # create header if not provided
     if header is None:
