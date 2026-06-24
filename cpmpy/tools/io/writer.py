@@ -88,7 +88,7 @@ def _create_header(format: str) -> str:
     header = "-"*100 + "\n"
     header += "File written by CPMpy\n"
     header += f"    Format: '{format}'\n"
-    # header += f"    CPMpy Version: {cp.__version__}\n"
+    header += f"    CPMpy Version: {cp.__version__}\n"
     header += "-"*100 + "\n"
     return header
 
