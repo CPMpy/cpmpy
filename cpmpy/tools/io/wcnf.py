@@ -4,7 +4,7 @@
 ## wcnf.py
 ##
 """
-Parser for the WCNF format.
+Helper functions for the WCNF format.
 
 
 =================
@@ -21,6 +21,7 @@ List of functions
 import os
 import sys
 import argparse
+import builtins
 import cpmpy as cp
 from io import StringIO
 from typing import Union, Callable
@@ -42,36 +43,34 @@ def _get_var(i: int, vars_dict: dict[int, _BoolVarImpl]) -> _BoolVarImpl:
         vars_dict[i] = cp.boolvar(name=f"x{i}") # <- be carefull that name doesn't clash with generated variables during transformations / user variables
     return vars_dict[i]
 
-_std_open = open
 def load_wcnf(wcnf: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
     """
     Loader for WCNF format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
         wcnf (str or os.PathLike):
-            - A file path to an WCNF file (optionally LZMA-compressed with `.xz`)
-            - OR a string containing the WCNF content directly
-        open (Callable):
-            If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
+            - A file path to an WCNF file (optionally LZMA-compressed with `.xz`), or
+            - A string containing the WCNF content directly
+        open (Callable, optional): callable to open the file for reading (default: builtin ``open``).
 
     Returns:
         cp.Model: The CPMpy model of the WCNF instance.
     """
-    # If wcnf is a path to a file -> open file
+    if open is None:
+        open = builtins.open
+
+    # Read from file or string
     if isinstance(wcnf, (str, os.PathLike)) and os.path.exists(wcnf):
-        if open is not None:
-            f = open(wcnf, "rt")
-        else:
-            f = _std_open(wcnf, "rt")
-    # If wcnf is a string containing a model -> create a memory-mapped file
+        with open(wcnf, "r") as f:
+            lines = f.readlines()
     else:
-        f = StringIO(str(wcnf))
+        lines = str(wcnf).splitlines()
 
     model = cp.Model()
     vars: dict[int, _BoolVarImpl] = {}
     nr_vars_declared = None
     unsatisfied_soft_terms = []
-    for raw in f:
+    for raw in lines:
         line = raw.strip()
 
         # Empty line or a comment -> skip

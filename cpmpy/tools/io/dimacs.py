@@ -40,7 +40,15 @@ Full example:
     -2 -3 0
     -1 0
     
+=================
+List of functions
+=================
 
+.. autosummary::
+    :nosignatures:
+
+    load_dimacs
+    write_dimacs
 """
 
 import os
@@ -52,7 +60,6 @@ import cpmpy as cp
 from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView, NDVarArray
 from cpmpy.expressions.core import Operator
 
-from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
