@@ -10,10 +10,6 @@ List of functions
 
     write
     write_formats
-
-==============
-Module details
-==============
 """
 
 import inspect
@@ -111,8 +107,12 @@ def write_formats() -> List[str]:
 
     .. code-block:: python
 
-        from cpmpy.tools.io import write, write_formats, get_extension
+        from cpmpy.tools.io import write, write_formats
+        assert "mps" in write_formats()
+        write(model, format="mps")
+
         write(model, format=write_formats()[0])  # Returns string
+        from cpmpy.tools.io import get_extension
         write(model, f"model.{get_extension(write_formats()[1])}")  # Writes to file, format auto-detected
     """
     return list(_writer_map.keys())

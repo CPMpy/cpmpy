@@ -37,16 +37,16 @@ _loader_map = {
 
 def _get_loader(format: str) -> Callable[[str], cp.Model]:
     """
-    Get the reader function for a given format.
+    Get the loader function for a given format.
 
     Arguments:
-        format (str): The name of the format to get a reader for.
+        format (str): The name of the format to get a loader for.
 
     Raises:
         ValueError: If the format is not supported.
 
     Returns:
-        A callable that reads a model from a file.
+        A callable that loads a model from a file in the given format.
     """
 
     if format not in _loader_map:
@@ -63,15 +63,17 @@ def load_formats() -> List[str]:
 
     .. code-block:: python      
 
-        from cpmpy.tools.io import load
-        model = load(file_path, format="mps")
-        model = load(file_path, format="lp")
+        from cpmpy.tools.io import load, load_formats
+        assert "mps" in load_formats()
+        model = load(file_path_to_mps, format="mps")
+        assert "lp" in load_formats()
+        model = load(file_path_to_lp, format="lp")
     """
     return list(_loader_map.keys())
 
 def _derive_format(file_path: str) -> str:
     """
-    Derive the format of a file from its path.
+    Derive the format of a file from its path by looking at its file extension.
 
     Arguments:
         file_path (str): The path to the file to derive the format from.
@@ -87,6 +89,8 @@ def _derive_format(file_path: str) -> str:
         "mps"
         >>> _derive_format("instance.lp.xz")
         "lp"
+        >>> _derive_format("instance.cnf")
+        "dimacs"
     """
 
     # Iterate over the file path extensions in reverse order
@@ -104,10 +108,11 @@ def load(file_path: str, format: Optional[str] = None) -> cp.Model:
 
     Arguments:
         file_path (str): The path to the file to load.
-        format (Optional[str]): The format of the file to load. If None, the format will be derived from the file path.
+        format (Optional[str]): The format of the file to load. If None, the format will be derived from the file path (best effort). 
+                                Might raise a ValueError if the format could not be derived from the file path, or if the format is not supported.
 
     Raises:
-        ValueError: If the format is not supported.
+        ValueError: If the format is not supported or could not be derived from the file path.
 
     Returns:
         A CPMpy model.
