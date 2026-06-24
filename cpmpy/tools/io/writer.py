@@ -20,7 +20,7 @@ import cpmpy as cp
 from .dimacs import write_dimacs
 from cpmpy.tools.io.scip import write_scip
 from cpmpy.tools.io.opb import write_opb
-from cpmpy.tools.io.utils import get_format
+from cpmpy.tools.io.utils import _derive_format
 
 # mapping format names to appropriate writer functions
 _writer_map = {
@@ -91,35 +91,6 @@ def _create_header(format: str) -> str:
     header += f"    CPMpy Version: {cp.__version__}\n"
     header += "-"*100 + "\n"
     return header
-
-def _derive_format(file_path: str) -> str:
-    """
-    Derive the format of a file from its path.
-
-    Arguments:
-        file_path (str): The path to the file to derive the format from.
-
-    Raises:
-        ValueError: If the format could not be derived from the file path.
-
-    Returns:
-        The name of the format.
-
-    Example:
-        >>> _derive_format("output.mps")
-        "mps"
-        >>> _derive_format("output.lp.xz")
-        "lp"
-    """
-
-    # Iterate over the file path extensions in reverse order
-    for ext in file_path.split(".")[::-1]:
-        try:
-            return get_format(ext)
-        except (ValueError, KeyError):
-            continue
-
-    raise ValueError(f"No file format provided and could not derive format from file path: {file_path}")
 
 def write(model: cp.Model, file_path: Optional[str] = None, format: Optional[str] = None, verbose: bool = False, header: Optional[str] = None, **kwargs) -> str:
     """

@@ -33,3 +33,34 @@ def get_format(extension: str) -> str:
     Get the format for a given file extension.
     """
     return _format_map[extension]
+
+def _derive_format(file_path: str) -> str:
+    """
+    Derive the format of a file from its path by looking at its file extension.
+
+    Arguments:
+        file_path (str): The path to the file to derive the format from.
+
+    Raises:
+        ValueError: If the format could not be derived from the file path.
+
+    Returns:
+        The name of the format.
+
+    Example:
+        >>> _derive_format("instance.mps")
+        "mps"
+        >>> _derive_format("instance.lp.xz")
+        "lp"
+        >>> _derive_format("instance.cnf")
+        "dimacs"
+    """
+
+    # Iterate over the file path extensions in reverse order
+    for ext in file_path.split(".")[::-1]:
+        try:
+            return get_format(ext)
+        except ValueError:
+            continue
+
+    raise ValueError(f"No file format provided and could not derive format from file path: {file_path}")
