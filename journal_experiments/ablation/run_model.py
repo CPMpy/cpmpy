@@ -37,8 +37,8 @@ still writes a JSON record. The record always includes final model-size metrics
 fields (which are null when ``--stop-after-transform`` is set).
 
 The output JSON contains the model that was run, the solver and its
-parameters, the runtime, the solver status, and (for optimization problems)
-the objective value.
+parameters, the runtime, the solver status, the CPMpy git commit (when
+available), and (for optimization problems) the objective value.
 """
 
 import argparse
@@ -264,6 +264,24 @@ SOLVER_ABLATIONS = {
 }
 
 
+def cpmpy_git_info():
+    """Return (commit hash, commit message) for the CPMpy checkout, or (None, None)."""
+    pkg_dir = os.path.dirname(os.path.abspath(cp.__file__))
+    try:
+        root = subprocess.run(
+            ["git", "-C", pkg_dir, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=5, check=True,
+        ).stdout.strip()
+        out = subprocess.run(
+            ["git", "-C", root, "log", "-1", "--format=%H%n%s"],
+            capture_output=True, text=True, timeout=5, check=True,
+        ).stdout
+        commit, _, message = out.partition("\n")
+        return commit.strip(), message.rstrip("\n")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return None, None
+
+
 def patch_transform(solver_name, ablate):
     """Replace the `transform` of the solver class for `solver_name` with the
     ablated pipeline `ablate`. Returns a short description of what was patched."""
@@ -308,6 +326,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_af
         solver_cls = patch_transform(sname, ablate)
         print("Patched solver {} for ablation {}".format(sname, ablate))
 
+    cpmpy_commit, cpmpy_commit_message = cpmpy_git_info()
     record = {
         "model": os.path.basename(model_path),
         "model_path": os.path.abspath(model_path),
@@ -316,6 +335,8 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_af
         "time_limit": time_limit,
         "ablate": ablate,
         "stop_after_transform": stop_after_transform,
+        "cpmpy_commit": cpmpy_commit,
+        "cpmpy_commit_message": cpmpy_commit_message,
         "transformation_time": None,
         "runtime": None,
         "status": None,

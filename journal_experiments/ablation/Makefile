@@ -4,6 +4,7 @@
 #   make plot             draw runtime ECDFs and transform-size boxplots
 #   make all              run-ablation then plot
 #   make clean            remove generated results and figures (not models)
+#   make clean-errors     remove result JSONs that recorded an error (for re-run)
 #
 # Input models are read from MODELS_DIR (default: models/). Each *.pickle
 # file is run against every solver x ablation combination.
@@ -36,12 +37,9 @@ MEMORY_LIMIT_GB ?= 8 # 8GB
 # 1 = run transform only (--stop-after-transform); 0 = solve as usual
 STOP_AFTER_TRANSFORM ?= 0
 
-CPMPY_DIR    := ../../cpmpy
 MODELS_DIR   ?= models
 RESULTS_DIR  ?= $(if $(filter 1,$(STOP_AFTER_TRANSFORM)),run-ablation-stats,run-ablation)
 FIGURES_DIR  ?= $(if $(filter 1,$(STOP_AFTER_TRANSFORM)),figures-stats,figures)
-
-CPMPY_DEPS   := $(shell find $(CPMPY_DIR) -type f 2>/dev/null)
 
 MODEL_PICKLES := $(wildcard $(MODELS_DIR)/*.pickle)
 
@@ -56,7 +54,7 @@ PLOT_STAMP := $(FIGURES_DIR)/.plot.stamp
 ablate_arg = $(if $(filter baseline,$(1)),,--ablate=$(1))
 stop_after_transform_arg = $(if $(filter 1,$(STOP_AFTER_TRANSFORM)),--stop-after-transform,)
 
-.PHONY: all run-ablation plot clean
+.PHONY: all run-ablation plot clean clean-errors
 .DELETE_ON_ERROR:
 
 all:
@@ -68,7 +66,7 @@ run-ablation: $(RESULTS)
 plot: $(PLOT_STAMP)
 
 define ABLATION_RULE
-$(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle run_model.py $(CPMPY_DEPS)
+$(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle run_model.py
 	@mkdir -p $(RESULTS_DIR)
 	$(PYTHON) run_model.py --model-path=$$< --solver-name=$(1) $(call ablate_arg,$(2)) $(stop_after_transform_arg) --out=$$@ --time-limit=$(TIME_LIMIT) --memory-limit=$(MEMORY_LIMIT_GB)
 endef
@@ -82,3 +80,6 @@ $(PLOT_STAMP): $(RESULTS) plot_ablation.py
 
 clean:
 	rm -rf run-ablation run-ablation-stats figures figures-stats
+
+clean-errors:
+	$(PYTHON) clean_errors.py $(RESULTS_DIR)
