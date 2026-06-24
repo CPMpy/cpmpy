@@ -10,7 +10,7 @@ _format_map = {
     "gms"   : "gms",
     "pip"   : "pip",
     "wcnf"  : "wcnf",
-    "cnf"   : "dimacs",
+    "cnf"   : "cnf",
     "opb"   : "opb",
     "xcsp3" : "xcsp3",
 }

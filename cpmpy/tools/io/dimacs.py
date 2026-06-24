@@ -193,7 +193,7 @@ def write_dimacs(
     return out
 
 
-def load_dimacs(dimacs: Union[str, os.PathLike], open: Optional[Callable] = None):
+def load_dimacs(dimacs: Union[str, os.PathLike], open: Optional[Callable] = None, type: Optional[str] = None):
     """
     Load a CPMpy model from a DIMACS formatted file strictly following the specification.
 
@@ -207,6 +207,14 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Optional[Callable] = None
             - A string containing DIMACS/WCNF content directly
         open (Callable, optional): callable to open the file for reading (default: builtin ``open``).
             Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.cnf.xz``.
+        type (str, optional): type of the file to load. If None, it is inferred from the file content.
+            Supported types: "cnf", "wcnf".
+
+    Returns:
+        cp.Model: The CPMpy model of the DIMACS instance.
+
+    Raises:
+        ValueError: If the optional type argument is not supported.
     """
     if open is None:
         open = builtins.open
@@ -218,45 +226,59 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Optional[Callable] = None
     else:
         lines = str(dimacs).splitlines()
 
-    # Auto-detect weighted instances:
-    # - explicit `p wcnf ...` header
-    # - any hard-clause line starting with `h`
-    # - no header but all non-comment clause lines look weighted (weight literals... 0)
-    is_weighted = False
-    weighted_compatible = True
-    saw_clause_line = False
-    for raw in lines:
-        line = raw.strip()
-        if line == "" or line.startswith("c"):
-            continue
-        if line.startswith("p"):
-            params = line.split()
-            assert len(params) >= 4, f"Expected p-header to be formed `p <typ> ...` but got {line}"
-            _, typ, *_ = params
-            if typ == "wcnf":
-                is_weighted = True
-            elif typ != "cnf":
-                raise ValueError(f"Expected `cnf` or `wcnf` as file format, but got {typ} which is not supported.")
-            break
-        if line.startswith("h"):
-            is_weighted = True
-            break
-        saw_clause_line = True
-        try:
-            ints = [int(tok) for tok in line.split()]
-        except ValueError:
-            weighted_compatible = False
-            continue
-        if len(ints) < 2 or ints[-1] != 0 or ints[0] < 0:
-            weighted_compatible = False
 
-    if not is_weighted and saw_clause_line and weighted_compatible:
+    # No type hint provided -> auto-detect type
+    if type is None:
+
+        # Auto-detect weighted instances:
+        # - explicit `p wcnf ...` header
+        # - any hard-clause line starting with `h`
+        # - no header but all non-comment clause lines look weighted (weight literals... 0)
+        is_weighted = False
+        weighted_compatible = True
+        saw_clause_line = False
+        for raw in lines:
+            line = raw.strip()
+            if line == "" or line.startswith("c"):
+                continue
+            if line.startswith("p"):
+                params = line.split()
+                assert len(params) >= 4, f"Expected p-header to be formed `p <typ> ...` but got {line}"
+                _, typ, *_ = params
+                if typ == "wcnf":
+                    is_weighted = True
+                elif typ != "cnf":
+                    raise ValueError(f"Expected `cnf` or `wcnf` as file format, but got {typ} which is not supported.")
+                break
+            if line.startswith("h"):
+                is_weighted = True
+                break
+            saw_clause_line = True
+            try:
+                ints = [int(tok) for tok in line.split()]
+            except ValueError:
+                weighted_compatible = False
+                continue
+            if len(ints) < 2 or ints[-1] != 0 or ints[0] < 0:
+                weighted_compatible = False
+
+        if not is_weighted and saw_clause_line and weighted_compatible:
+            is_weighted = True
+        
+    # Type hint provided -> use it
+    elif type == "wcnf":
         is_weighted = True
+    elif type == "cnf":
+        is_weighted = False
+    else:
+        raise ValueError(f"Expected `cnf` or `wcnf` as optional type argument, but got {type} instead.")
 
     # If weighted, delegate to WCNF loader
     if is_weighted:
         from cpmpy.tools.io.wcnf import load_wcnf
         return load_wcnf(dimacs, open=open)
+
+    # -------------------------------- CNF parser -------------------------------- #
 
     # CNF parse (strict with p-line counts when present, inferred otherwise)
     m = cp.Model()

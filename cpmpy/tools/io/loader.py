@@ -13,6 +13,7 @@ List of functions
 """
 
 from typing import Callable, List, Optional
+from functools import partial
 
 import cpmpy as cp
 from .dimacs import load_dimacs
@@ -31,6 +32,7 @@ _loader_map: dict[str, Callable[..., cp.Model]] = {
     "pip": load_scip,
     "dimacs": load_dimacs,
     "opb": load_opb,
+    "cnf": partial(load_dimacs, type="cnf"),
     "wcnf": load_wcnf,
 }
 
