@@ -20,6 +20,7 @@ List of functions
 
 import os
 import sys
+import builtins
 import argparse
 import tempfile
 import cpmpy as cp
@@ -123,12 +124,12 @@ def _tag_to_data(
     
     return rows
 
-def parse_scheduling_period(filename: str):
+def parse_scheduling_period(instance: Union[str, os.PathLike]):
     """
     Parse a nurserostering instance file.
     
     Arguments:
-        filename (str): Path to the nurserostering instance file.
+        filename (str or os.PathLike): Path to the nurserostering instance file.
     
     Returns:
         dict: A dictionary with native Python data structures (lists of dicts).
@@ -140,9 +141,12 @@ def parse_scheduling_period(filename: str):
         - Use to_dataframes() transform to convert to pandas DataFrames if needed.
         - Use add_fake_names() transform to add randomly generated names to staff.
     """
-    with open(filename, "r") as f:
-        string = f.read()
-
+    # If instance is a path to a file that exists -> use it directly
+    if isinstance(instance, (str, os.PathLike)):
+        string = open(instance).read()
+    else:
+        string = str(instance)
+    
     # Parse scheduling horizon
     horizon_val = _tag_to_data(string, "SECTION_HORIZON", skip_lines=2, datatype=int)
     if not isinstance(horizon_val, int):
@@ -222,24 +226,7 @@ def parse_scheduling_period(filename: str):
 def add_fake_names(data: dict[str, Any], seed: int=0) -> dict[str, Any]:
     """
     Transform function to add randomly generated names to staff using Faker.
-    
-    This function can be used as a transform argument to NurseRosteringDataset
-    to add fake names to the parsed data.
-    
-    Example:
-        dataset = NurseRosteringDataset(
-            root=".", 
-            transform=lambda fname: add_fake_names(parse_scheduling_period(fname))
-        )
-    
-    Or combine with other transforms:
-        dataset = NurseRosteringDataset(
-            root=".", 
-            transform=lambda fname: to_dataframes(
-                add_fake_names(parse_scheduling_period(fname))
-            )
-        )
-    
+        
     Arguments:
         data (dict[str, Any]): Dictionary returned by parse_scheduling_period()
         seed (int): Random seed for reproducible name generation (default: 0)
@@ -265,16 +252,7 @@ def add_fake_names(data: dict[str, Any], seed: int=0) -> dict[str, Any]:
 
 def to_dataframes(data: dict[str, Any]) -> dict[str, Any]:
     """
-    Transform function to convert native data structures to pandas DataFrames.
-    
-    This function can be used as a transform argument to NurseRosteringDataset
-    to convert the parsed data into pandas DataFrames for easier manipulation.
-    
-    Example:
-        dataset = NurseRosteringDataset(
-            root=".", 
-            transform=lambda fname: to_dataframes(parse_scheduling_period(fname))
-        )
+    Transform function to convert native data structures to Pandas DataFrames.
     
     Arguments:
         data (dict[str, Any]): Dictionary returned by parse_scheduling_period()
@@ -429,9 +407,7 @@ def model_nurserostering(
 
     return model, nurse_view
 
-
-_std_open = open
-def load_nurserostering(instance: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
+def load_nurserostering(instance: Union[str, os.PathLike], open:Callable=builtins.open) -> cp.Model:
     """
     Loader for Nurse Rostering format. Loads an instance and returns its matching CPMpy model.
 
@@ -447,26 +423,16 @@ def load_nurserostering(instance: Union[str, os.PathLike], open:Callable=open) -
     """
     # If instance is a path to a file that exists -> use it directly
     if isinstance(instance, (str, os.PathLike)) and os.path.exists(instance):
-        fname = os.fspath(instance)
-    # If instance is a string containing file content -> write to temp file
-    else:
-        # Create a temporary file and write the content
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as tmp:
-            tmp.write(str(instance))
-            fname = tmp.name
+        instance = os.fspath(instance)
 
-    try:
-        # Use the existing parser from the dataset (expects a file path)
-        data = parse_scheduling_period(fname)
-        
-        # Create the CPMpy model using the existing model builder
-        model, _ = model_nurserostering(**data)
-        
-        return model
-    finally:
-        # Clean up temporary file if we created one
-        if isinstance(instance, str) and not os.path.exists(instance) and os.path.exists(fname):
-            os.unlink(fname)
+    # Use the parser (expects a file path)
+    data = parse_scheduling_period(instance)
+    
+    # Create the CPMpy model using the existing model builder
+    model, _ = model_nurserostering(**data)
+    
+    return model
+
 
 
 def main():
