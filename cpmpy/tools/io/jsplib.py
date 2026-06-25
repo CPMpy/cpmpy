@@ -36,8 +36,8 @@ def load_jsplib(jsp: Union[str, os.PathLike], open:Callable=builtins.open) -> cp
 
     Arguments: 
         jsp (str or os.PathLike):
-            - A file path to a JSPlib file
-            - OR a string containing the JSPLib content directly
+            - A file path to a JSPlib file, or
+            - A string containing the JSPLib content directly
         open (Callable):
             If jsp is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
@@ -50,7 +50,6 @@ def load_jsplib(jsp: Union[str, os.PathLike], open:Callable=builtins.open) -> cp
     # If rcpsp is a string containing a model -> create a memory-mapped file
     else:
         f = StringIO(str(jsp))
-
 
     task_to_machines, task_durations = _parse_jsplib(f)
     model, (start, makespan) = _model_jsplib(task_to_machines=task_to_machines, task_durations=task_durations)
@@ -86,8 +85,20 @@ def _parse_jsplib(f: TextIO) -> tuple[np.ndarray, np.ndarray]:
     return task_to_machines, task_durations
 
 
-
 def _model_jsplib(task_to_machines: np.ndarray, task_durations: np.ndarray) -> tuple[cp.Model, tuple[NDVarArray, _IntVarImpl]]:
+    """
+    Model a JSPLib instance
+
+    Arguments:
+        task_to_machines (np.ndarray): The task to machines matrix
+        task_durations (np.ndarray): The task durations matrix
+
+    Returns:
+        tuple[cp.Model, tuple[NDVarArray, _IntVarImpl]]: The model and the start and makespan variables
+
+    Raises:
+        AssertionError: If the shapes of the matrices are not compatible
+    """
 
     # Check if the shapes of the matrices are compatible
     assert task_to_machines.shape == task_durations.shape
