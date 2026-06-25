@@ -290,7 +290,7 @@ def to_dataframes(data: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def model_nurserostering(
+def _model_nurserostering(
         horizon: int, 
         shifts: dict[str, dict[str, Any]], 
         staff: list[dict[str, Any]], 
@@ -429,7 +429,7 @@ def load_nurserostering(instance: Union[str, os.PathLike], open:Callable=builtin
     data = parse_scheduling_period(instance)
     
     # Create the CPMpy model using the existing model builder
-    model, _ = model_nurserostering(**data)
+    model, _ = _model_nurserostering(**data)
     
     return model
 
