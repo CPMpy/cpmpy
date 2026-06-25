@@ -1113,7 +1113,9 @@ class MDD(GlobalConstraint):
             array (ListLike[Expression]): List of expressions representing the input sequence
             transitions (ListLike[tuple[int | str, int, int | str]]): List of transition triples (node_id1, value, node_id2)
             start (Optional[int | str]): Root node_id, if None, the root node is assumed to be the first node in the transition table (i.e., transitions[0][0])
-            reduce (bool, default=True): Whether to reduce the MDD by merging nodes with equivalent suffixes, reducing the size of the MDD
+            reduce (bool, default=True): During decomposition, whether to reduce the MDD as a first decomposition step
+                by merging nodes with equivalent suffixes, reducing the size of the MDD
+
         """
         array = flatlist(array)
         if not all(isinstance(x, Expression) for x in array):
@@ -1146,9 +1148,8 @@ class MDD(GlobalConstraint):
         assert len(sink_nodes) == 1
         self.sink_node = sink_nodes[0]
 
-        # reduce the MDD if requested
-        if reduce:
-            self._reduce()
+        # store whether the MDD should be reduced during decomposition
+        self.reduce = reduce
 
     def _reduce(self):
         """
@@ -1223,6 +1224,10 @@ class MDD(GlobalConstraint):
                 A tuple containing the constraints representing the constraint value and the defining constraints.
         """
         arr = self.args[0]
+
+        # Reduce the MDD if requested
+        if self.reduce:
+            self._reduce()
 
         if complete:
         # MDD is extended with invalid edges, which are directed to the sink node
