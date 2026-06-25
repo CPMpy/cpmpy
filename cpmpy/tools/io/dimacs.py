@@ -140,7 +140,7 @@ def write_dimacs(
         else:
             if not (isinstance(cons, Operator) and cons.name == "or"):
                 raise NotImplementedError(f"Unsupported constraint {cons}")
-            literals = cons.args
+            literals = list(cons.args)
 
 
         # Write clause to DIMACS format
