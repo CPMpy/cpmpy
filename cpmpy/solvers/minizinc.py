@@ -96,7 +96,7 @@ class CPM_minizinc(SolverInterface):
     https://minizinc-python.readthedocs.io/
     """
 
-    supported_global_constraint = frozenset({"alldifferent", "alldifferent_except0", "allequal",
+    supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
                                               "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "cumulative", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
