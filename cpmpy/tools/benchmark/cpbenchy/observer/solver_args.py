@@ -182,6 +182,8 @@ class SolverArgsObserver(Observer):
         if solver_params:
             res |= solver_params
 
+        res |= {"IntegralityFocus": 1} # to fix precision errors related to the MIPGap
+
         if intermediate and model.has_objective():
 
             class GurobiSolutionCallback:
