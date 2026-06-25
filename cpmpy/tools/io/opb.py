@@ -7,6 +7,8 @@
 OPB parser.
 
 Currently only the restricted OPB PB24 format is supported (without WBO).
+More can be read about it here:
+- https://www.cril.univ-artois.fr/PB24/OPBgeneral.pdf
 
 
 =================
@@ -17,6 +19,16 @@ List of functions
     :nosignatures:
 
     read_opb
+    write_opb
+
+====================
+Available annotators
+====================
+
+.. autosummary::
+    :nosignatures:
+
+    annotate_x
 """
 
 
@@ -24,6 +36,7 @@ import os
 import re
 import sys
 import argparse
+import builtins
 from io import StringIO
 from typing import Union, Optional, Callable, Any
 from functools import reduce
@@ -57,12 +70,13 @@ def _parse_term(line, vars):
 
     Arguments:
         line (str):                 A string containing one or more terms.
-        vars (list[cp.boolvar]):    List or array of CPMpy Boolean variables.
+        vars (list[cp._BoolVarImpl]):    List or array of CPMpy Boolean variables.
 
     Returns:
         cp.Expression: A CPMpy expression representing the sum of all parsed terms.
 
     Example:
+        >>> vars = list(cp.boolvars(5))
         >>> _parse_term("2 x2 x3 +3 x4 ~x5", vars)
         sum([2, 3] * [(IV2*IV3), (IV4*~IV5)])
     """
@@ -115,6 +129,7 @@ def _parse_term(line, vars):
 
     if len(terms) == 0:
         raise ValueError(f"Could not parse any OPB terms from line: {line}")
+
     return cp.sum(terms)
 
 def _parse_constraint(line, vars):
@@ -148,8 +163,15 @@ def _parse_constraint(line, vars):
         right=rhs
     )
 
-_std_open = open
-def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
+def _add_constraint(model: cp.Model, line: str, vars: dict[str, Any]):
+    cons = _parse_constraint(line, vars)
+    assert isinstance(cons, Comparison), cons
+    lhs, rhs = cons.args
+    assert isinstance(lhs, Operator) and lhs.name == "wsum" or lhs.name == "sum", lhs
+    assert isinstance(rhs, int), rhs
+    model.add(cons)
+
+def load_opb(opb: Union[str, os.PathLike], open:Optional[Callable] = None) -> cp.Model:
     """
     Loader for OPB (Pseudo-Boolean) format. Loads an instance and returns its matching CPMpy model.
 
@@ -186,13 +208,12 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
         - Only "min:" objectives are supported; "max:" is not recognized.
     """
 
+    if open is None:
+        open = builtins.open
     
     # If opb is a path to a file -> open file
     if isinstance(opb, (str, os.PathLike)) and os.path.exists(opb):
-        if open is not None:
-            f = open(opb)
-        else:
-            f = _std_open(opb, "rt")
+        f = open(opb)
     # If opb is a string containing a model -> create a memory-mapped file
     else:
         f = StringIO(str(opb))
@@ -220,16 +241,11 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
         obj_expr = _parse_term(first_line, vars)
         model.minimize(obj_expr)
     else: # no objective found, parse as a constraint instead
-        model.add(_parse_constraint(first_line, vars))
+        _add_constraint(model, first_line, vars)
 
     # Start parsing line by line
     for line in reader:
-        cons = _parse_constraint(line, vars)
-        assert isinstance(cons, Comparison), cons
-        lhs, rhs = cons.args
-        assert isinstance(lhs, Operator) and lhs.name == "wsum" or lhs.name == "sum", lhs
-        assert isinstance(rhs, int), rhs
-        model.add(cons)
+        _add_constraint(model, line, vars)
 
     if len(vars) > nr_vars_declared:
         import warnings
@@ -240,95 +256,21 @@ def load_opb(opb: Union[str, os.PathLike], open=open) -> cp.Model:
 
     return model
 
-def write_opb(model, fname=None, encoding="auto", header=None, open=None, annotate: Optional[Callable] = None):
+def annotate_x(vars, ivarmap: dict[str, Any]) -> list[str]:
     """
-    Export a CPMpy model to the OPB (Pseudo-Boolean) format.
+    Annotate CPMpy variables as OPB ``x<int>`` identifiers.
 
-    This function transforms the given CPMpy model into OPB format, which is a standard textual
-    format for representing Pseudo-Boolean optimization problems. The OPB file will contain
-    a header specifying the number of variables and constraints, the objective (optional), and the 
-    list of constraints using integer-weighted Boolean variables.
+    For solvers that only accept ``x<int>`` variable names, pass
+    ``annotate=annotate_x`` to :func:`write_opb` (default).
 
     Arguments:
-        model (cp.Model): The CPMpy model to export.
-        fname (str, optional): The file name to write the OPB output to. If None, the OPB string is returned.
-        encoding (str, optional): The encoding used for `int2bool`. Options: ("auto", "direct", "order", "binary").
-        header (str, optional): Optional header text to add as OPB comments. If provided, each line
-            will be prefixed with "* ".
-        open (callable, optional): Callable to open the file for writing (default: builtin ``open``).
-            Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
-            in loaders and allows custom compression or I/O (e.g.
-            ``lambda p, mode='w': lzma.open(p, 'wt')``).
-        annotate (callable, optional): ``annotate(bool_var, ivarmap) -> str`` for each OPB identifier.
-            If omitted, uses names derived from the integer encoding map:
-            ``source>=threshold``, ``source=value``, or ``source[bit=i]`` (or ``var.name`` for plain Booleans).
+        vars: Boolean variables occurring in the exported OPB model.
+        ivarmap: Integer encoding map populated during OPB transformation.
 
     Returns:
-        str or None: The OPB string if `fname` is None, otherwise nothing (writes to file).
-
-    Format:
-        * #variable= <n_vars> #constraint= <n_constraints>
-        min/max: <objective>;
-        <constraint_1>;
-        <constraint_2>;
-        ...
-
-    Note:
-        Solvers that only accept ``x<int>`` can pass a custom ``annotate`` callback.
-
-    Example:
-        >>> from cpmpy import *
-        >>> x = boolvar(shape=3)
-        >>> m = Model(x[0] + x[1] + x[2] >= 2)
-        >>> print(write_opb(m))
+        OPB variable names ``x1``, ``x2``, ..., in the same order as ``vars``.
     """
-
-    csemap, ivarmap = CSEMap(), dict[str, Any]()
-    opb_cons = to_opb(model.constraints, csemap, ivarmap, encoding)
-
-    # Transform objective, if present
-    if model.objective_ is not None:
-        opb_obj, const, extra_cons = to_opb_objective(model.objective_, csemap, ivarmap, encoding)
-        opb_cons += to_opb(extra_cons, csemap, ivarmap, encoding)
-    else:
-        opb_obj = None
-
-    # Form header and variable mapping
-    # Use all variables occurring in constraints and the objective
-    all_vars = get_variables(opb_cons + ([opb_obj] if opb_obj is not None else []))
-    out = [
-        f"* #variable= {len(all_vars)} #constraint= {len(opb_cons)}",
-    ]
-    if header:
-        header_lines = ["* " + line for line in str(header).splitlines()]
-        out.extend(header_lines)
-
-    # Map variables to OPB variable names
-    if annotate is None:
-        varmap = {v: f"x{i+1}" for i, v in enumerate(all_vars)} 
-    else:
-        varmap = {v: ann for v, ann in zip(all_vars, annotate(all_vars, ivarmap))}
-    
-    # Write objective, if present
-    if model.objective_ is not None:
-        objective_str = _wsum_to_str(opb_obj, varmap)
-        out.append(f"{'min' if model.objective_is_min else 'max'}: {objective_str};")
-
-    # Write constraints
-    for cons in opb_cons:
-        assert isinstance(cons, Comparison), f"Expected a comparison, but got {cons}"
-        lhs, rhs = cons.args
-        constraint_str = f"{_wsum_to_str(lhs, varmap)} {cons.name} {rhs};"
-        out.append(constraint_str)
-
-    # Output to file or string
-    contents = "\n".join(out)
-    if fname is None:
-        return contents
-    opener = open if open is not None else _std_open
-    with opener(fname, "w") as f:
-        f.write(contents)
-
+    return [f"x{i+1}" for i, _ in enumerate(vars)]
 
 def _wsum_to_str(cpm_expr, varmap):
     """
@@ -351,6 +293,99 @@ def _wsum_to_str(cpm_expr, varmap):
     
     str_out = " ".join(out)
     return str_out
+
+def write_opb(
+        model:cp.Model, 
+        fname:Optional[Union[str, os.PathLike]] = None, 
+        encoding:str="auto", 
+        header:Optional[str] = None, 
+        open:Optional[Callable] = None, 
+        annotate: Optional[Callable] = annotate_x
+    ) -> str:
+    """
+    Export a CPMpy model to the OPB (Pseudo-Boolean) format.
+
+    This function transforms the given CPMpy model into OPB format, which is a standard textual
+    format for representing Pseudo-Boolean (optimization) problems. The OPB file will contain
+    a header specifying the number of variables and constraints, an objective function (optional), 
+    and a list of constraints using integer-weighted Boolean variables.
+
+    Arguments:
+        model (cp.Model): The CPMpy model to export.
+        fname (str or os.PathLike, optional): The file name to write the OPB output to.
+        encoding (str, optional): The encoding used for `int2bool`. Options: ("auto", "direct", "order", "binary").
+        header (str, optional): Optional header text to add as OPB comments. If provided, each line
+            will be prefixed with "* ".
+        open (callable, optional): Callable to open the file for writing (default: builtin ``open``).
+            Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
+            in loaders and allows custom compression or I/O (e.g.
+            ``lambda p, mode='w': lzma.open(p, 'wt')``).
+        annotate (callable): ``annotate(vars, ivarmap) -> list[str]`` mapping each
+            Boolean variable to an OPB identifier. Default: sequential ``x1``, ``x2``, ...
+            (:func:`annotate_x`).
+
+    Returns:
+        str: The OPB string (as it is optionally written to a file).
+
+    Format:
+        * #variable= <n_vars> #constraint= <n_constraints>
+        min/max: <objective>;
+        <constraint_1>;
+        <constraint_2>;
+        ...
+
+    Example:
+        >>> from cpmpy import *
+        >>> x = boolvar(shape=3)
+        >>> m = Model(x[0] + x[1] + x[2] >= 2)
+        >>> print(write_opb(m))
+    """
+
+    if open is None:
+        open = builtins.open
+
+    csemap, ivarmap = CSEMap(), dict[str, Any]()
+    opb_cons = to_opb(model.constraints, csemap, ivarmap, encoding)
+
+    # Transform objective, if present
+    if model.objective_ is not None:
+        opb_obj, const, extra_cons = to_opb_objective(model.objective_, csemap, ivarmap, encoding)
+        opb_cons += to_opb(extra_cons, csemap, ivarmap, encoding)
+    else:
+        opb_obj = None
+
+    # Form header and variable mapping
+    # Use all variables occurring in constraints and the objective
+    all_vars = get_variables(opb_cons + ([opb_obj] if opb_obj is not None else []))
+    out = [
+        f"* #variable= {len(all_vars)} #constraint= {len(opb_cons)}",
+    ]
+    if header:
+        header_lines = ["* " + line for line in str(header).splitlines()]
+        out.extend(header_lines)
+
+    # Map variables to OPB variable names
+    varmap = {v: ann for v, ann in zip(all_vars, annotate(all_vars, ivarmap))}
+    
+    # Write objective, if present
+    if model.objective_ is not None:
+        objective_str = _wsum_to_str(opb_obj, varmap)
+        out.append(f"{'min' if model.objective_is_min else 'max'}: {objective_str};")
+
+    # Write constraints
+    for cons in opb_cons:
+        assert isinstance(cons, Comparison), f"Expected a comparison, but got {cons}"
+        lhs, rhs = cons.args
+        constraint_str = f"{_wsum_to_str(lhs, varmap)} {cons.name} {rhs};"
+        out.append(constraint_str)
+
+    # Output to file or string
+    contents = "\n".join(out)
+    if fname is not None:
+        with open(fname, "w") as f:
+            f.write(contents)
+        
+    return contents
 
 
 def main():
