@@ -20,14 +20,14 @@ List of functions
 
 import os
 import sys
+import builtins
 import argparse
 import cpmpy as cp
 from io import StringIO
 from typing import Union, Callable, TextIO, Any
 
 
-_std_open = open
-def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
+def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=builtins.open) -> cp.Model:
     """
     Loader for PSPLIB RCPSP format. Loads an instance and returns its matching CPMpy model.
 
@@ -43,10 +43,7 @@ def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
     """
     # If rcpsp is a path to a file -> open file
     if isinstance(rcpsp, (str, os.PathLike)) and os.path.exists(rcpsp):
-        if open is not None:
-            f = open(rcpsp)
-        else:
-            f = _std_open(rcpsp, "rt")
+        f = open(rcpsp)
     # If rcpsp is a string containing a model -> create a memory-mapped file
     else:
         f = StringIO(str(rcpsp))

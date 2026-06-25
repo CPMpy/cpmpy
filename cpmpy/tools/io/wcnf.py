@@ -43,7 +43,7 @@ def _get_var(i: int, vars_dict: dict[int, _BoolVarImpl]) -> _BoolVarImpl:
         vars_dict[i] = cp.boolvar(name=f"x{i}") # <- be carefull that name doesn't clash with generated variables during transformations / user variables
     return vars_dict[i]
 
-def load_wcnf(wcnf: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
+def load_wcnf(wcnf: Union[str, os.PathLike], open:Callable=builtins.open) -> cp.Model:
     """
     Loader for WCNF format. Loads an instance and returns its matching CPMpy model.
 
@@ -51,13 +51,11 @@ def load_wcnf(wcnf: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
         wcnf (str or os.PathLike):
             - A file path to an WCNF file (optionally LZMA-compressed with `.xz`), or
             - A string containing the WCNF content directly
-        open (Callable, optional): callable to open the file for reading (default: builtin ``open``).
+        open (Callable): callable to open the file for reading (default: builtin ``open``).
 
     Returns:
         cp.Model: The CPMpy model of the WCNF instance.
     """
-    if open is None:
-        open = builtins.open
 
     # Read from file or string
     if isinstance(wcnf, (str, os.PathLike)) and os.path.exists(wcnf):

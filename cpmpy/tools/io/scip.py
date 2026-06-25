@@ -46,13 +46,13 @@ if TYPE_CHECKING:
 from cpmpy.solvers.scip import CPM_scip
 
 
-def load_scip(fname: Union[str, os.PathLike], open:Optional[Callable] = None, assume_integer:bool=False) -> cp.Model:
+def load_scip(fname: Union[str, os.PathLike], open:Callable = builtins.open, assume_integer:bool=False) -> cp.Model:
     """
     Load a SCIP-compatible model from a file and return a CPMpy model.
 
     Arguments:
         fname (str or os.PathLike): The path to the SCIP-compatible file to read.
-        open (Callable, optional): The function to use to open the file. (SCIP does not require this argument, will be ignored)
+        open (Callable): The function to use to open the file. (SCIP does not require this argument, will be ignored)
         assume_integer (bool): Whether to assume that all variables are integer.
 
     Warning:
@@ -232,7 +232,7 @@ def write_scip(
         format: str = "mps", 
         header: Optional[str] = None, 
         verbose: bool = False, 
-        open: Optional[Callable] = None
+        open: Callable = builtins.open
     ) -> str:
     """
     Write a CPMpy model to file using the SCIP solver.
@@ -254,7 +254,7 @@ def write_scip(
         format (str): Output format (e.g. "mps", "lp", "cip", "fzn", "gms", "pip").
         header (Optional[str]): Optional header text to prepend (format-dependent comment style).
         verbose (bool): If True, allow SCIP to print progress.
-        open (Optional[Callable]): Optional callable to open the file for writing (default: builtin ``open``).
+        open (Callable): Callable to open the file for writing (default: builtin ``open``).
             Called as ``open(fname, "w")``. Mirrors the ``open=`` argument in loaders and
             allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
@@ -262,9 +262,6 @@ def write_scip(
     Returns:
         str: The file content as a string (whether written to ``fname`` or not).
     """
-
-    if open is None:
-        open = builtins.open
 
     writer = _SCIPWriter(model, problem_name="CPMpy Model")
 

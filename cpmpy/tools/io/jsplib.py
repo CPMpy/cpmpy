@@ -20,6 +20,7 @@ List of functions
 
 import os
 import sys
+import builtins
 import argparse
 import cpmpy as cp
 import numpy as np
@@ -29,8 +30,7 @@ from typing import Union, Callable, TextIO
 from cpmpy.expressions.variables import NDVarArray, _IntVarImpl
 
 
-_std_open = open
-def load_jsplib(jsp: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
+def load_jsplib(jsp: Union[str, os.PathLike], open:Callable=builtins.open) -> cp.Model:
     """
     Loader for JSPLib format. Loads an instance and returns its matching CPMpy model.
 
@@ -46,10 +46,7 @@ def load_jsplib(jsp: Union[str, os.PathLike], open:Callable=open) -> cp.Model:
     """
     # If rcpsp is a path to a file -> open file
     if isinstance(jsp, (str, os.PathLike)) and os.path.exists(jsp):
-        if open is not None:
-            f = open(jsp)
-        else:
-            f = _std_open(jsp, "rt")
+        f = open(jsp)
     # If rcpsp is a string containing a model -> create a memory-mapped file
     else:
         f = StringIO(str(jsp))

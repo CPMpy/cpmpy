@@ -171,7 +171,7 @@ def _add_constraint(model: cp.Model, line: str, vars: dict[str, Any]):
     assert isinstance(rhs, int), rhs
     model.add(cons)
 
-def load_opb(opb: Union[str, os.PathLike], open:Optional[Callable] = None) -> cp.Model:
+def load_opb(opb: Union[str, os.PathLike], open:Callable = builtins.open) -> cp.Model:
     """
     Loader for OPB (Pseudo-Boolean) format. Loads an instance and returns its matching CPMpy model.
 
@@ -207,9 +207,6 @@ def load_opb(opb: Union[str, os.PathLike], open:Optional[Callable] = None) -> cp
         - Comment lines starting with '*' are ignored.
         - Only "min:" objectives are supported; "max:" is not recognized.
     """
-
-    if open is None:
-        open = builtins.open
     
     # If opb is a path to a file -> open file
     if isinstance(opb, (str, os.PathLike)) and os.path.exists(opb):
@@ -299,8 +296,8 @@ def write_opb(
         fname:Optional[Union[str, os.PathLike]] = None, 
         encoding:str="auto", 
         header:Optional[str] = None, 
-        open:Optional[Callable] = None, 
-        annotate: Optional[Callable] = annotate_x
+        open:Callable = builtins.open, 
+        annotate: Callable = annotate_x
     ) -> str:
     """
     Export a CPMpy model to the OPB (Pseudo-Boolean) format.
@@ -316,7 +313,7 @@ def write_opb(
         encoding (str, optional): The encoding used for `int2bool`. Options: ("auto", "direct", "order", "binary").
         header (str, optional): Optional header text to add as OPB comments. If provided, each line
             will be prefixed with "* ".
-        open (callable, optional): Callable to open the file for writing (default: builtin ``open``).
+        open (callable): Callable to open the file for writing (default: builtin ``open``).
             Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).

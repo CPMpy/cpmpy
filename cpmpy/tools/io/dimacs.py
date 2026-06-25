@@ -71,9 +71,9 @@ def write_dimacs(
         fname: Optional[str] = None, 
         encoding: str = "auto", 
         p_header: bool = False, header : Optional[str] = "DIMACS file written by CPMpy", 
-        open: Optional[Callable] = None, 
+        open: Callable = builtins.open, 
         annotate: Optional[Callable] = None
-    ):
+    ) -> str:
     """
     Writes a CPMpy model to DIMACS format.
     Uses the "to_cnf" transformation from CPMpy.
@@ -86,7 +86,7 @@ def write_dimacs(
         fname (str, optional): file name to write the DIMACS output to. If None, the DIMACS string is returned.
         encoding (str): the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary") (default: "auto")
         p_header (bool): whether to include the ``p ...`` problem header line (default: ``False``)
-        open (Callable, optional): callable to open the file for writing (default: builtin ``open``).
+        open (Callable): callable to open the file for writing (default: builtin ``open``).
             Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
@@ -193,14 +193,13 @@ def write_dimacs(
 
     # Write to file
     if fname is not None:
-        opener = open if open is not None else builtins.open
-        with opener(fname, "w") as f:
+        with open(fname, "w") as f:
             f.write(out)
 
     return out
 
 
-def load_dimacs(dimacs: Union[str, os.PathLike], open: Optional[Callable] = None, type: Optional[str] = None):
+def load_dimacs(dimacs: Union[str, os.PathLike], open: Callable = builtins.open, type: Optional[str] = None):
     """
     Load a CPMpy model from a DIMACS formatted file strictly following the specification.
 
@@ -212,7 +211,7 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Optional[Callable] = None
         dimacs (str or os.PathLike):
             - A file path to a DIMACS/WCNF file, or
             - A string containing DIMACS/WCNF content directly
-        open (Callable, optional): callable to open the file for reading (default: builtin ``open``).
+        open (Callable): callable to open the file for reading (default: builtin ``open``).
             Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.cnf.xz``.
         type (str, optional): type of the file to load. If None, it is inferred from the file content.
             Supported types: "cnf", "wcnf".
@@ -223,8 +222,6 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Optional[Callable] = None
     Raises:
         ValueError: If the optional type argument is not supported.
     """
-    if open is None:
-        open = builtins.open
 
     # Read from file or string
     if isinstance(dimacs, (str, os.PathLike)) and os.path.exists(dimacs):
