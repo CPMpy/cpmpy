@@ -26,6 +26,13 @@ import cpmpy as cp
 from io import StringIO
 from typing import Union, Callable, TextIO, Any
 
+# Optional dependencies
+try:
+    import pandas as pd
+    _HAS_PANDAS = True
+except ImportError:
+    _HAS_PANDAS = False
+
 
 def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=builtins.open) -> cp.Model:
     """
@@ -49,22 +56,23 @@ def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=builtins.open) -> c
         f = StringIO(str(rcpsp))
 
 
-    table, capacities = _parse_rcpsp(f)
-    model, (start, end, makespan) = _model_rcpsp(job_data=table, capacities=capacities)
+    data = parse_rcpsp(f)
+    model, _ = _model_rcpsp(**data)
     return model
 
-# TODO: Pandas as optional dependency
-def _parse_rcpsp(f: TextIO) -> tuple[Any, dict[str, int]]:
+def parse_rcpsp(f: TextIO) -> dict[str, Any]:
     """
-    Parse a PSPLIB RCPSP instance file
+    Parse a PSPLIB RCPSP instance file.
 
     Arguments:
         f (TextIO): The file to parse.
 
     Returns:
-        tuple[pd.DataFrame, dict]: Two objects:
-            - job_data: a pandas dataframe containing the job data  
-            - capacities: a dictionary containing the capacities of the resources
+        dict[str, Any]: Native Python structures with keys ``jobs``, ``resource_names``,
+            and ``capacities``.
+
+    Note:
+        Use :func:`to_dataframe` to convert job data to a pandas DataFrame if needed.
     """
     data = dict()
 
@@ -105,37 +113,63 @@ def _parse_rcpsp(f: TextIO) -> tuple[Any, dict[str, int]]:
     f.readline() # skip header
     capacities = [int(x) for x in f.readline().split(" ") if len(x)]
 
-    import pandas as pd
-    df =pd.DataFrame([dict(jobnr=k ,**info) for k, info in data.items()], 
-                        columns=["jobnr", "mode", "duration", "successors", *resource_names])
-    df.set_index("jobnr", inplace=True)
+    return {
+        "jobs": data,
+        "resource_names": resource_names,
+        "capacities": dict(zip(resource_names, capacities)),
+    }
 
-    return df, dict(zip(resource_names, capacities))
 
-def _model_rcpsp(job_data, capacities):
+def to_dataframe(data: dict[str, Any]):
+    """
+    Convert parsed RCPSP job data to a pandas DataFrame.
+
+    Arguments:
+        data (dict[str, Any]): Dictionary returned by :func:`parse_rcpsp`.
+
+    Returns:
+        pd.DataFrame: Job data indexed by job number.
+
+    Raises:
+        ImportError: If pandas is not installed.
+    """
+    if not _HAS_PANDAS:
+        raise ImportError("pandas is required for to_dataframe(). Install it with: pip install pandas")
+
+    resource_names = data["resource_names"]
+    df = pd.DataFrame(
+        [dict(jobnr=k, **info) for k, info in data["jobs"].items()],
+        columns=["jobnr", "mode", "duration", "successors", *resource_names],
+    )
+    return df.set_index("jobnr")
+
+
+def _model_rcpsp(jobs: dict[int, dict[str, Any]], resource_names: list[str], capacities: dict[str, int]):
 
     model = cp.Model()
 
-    horizon = job_data.duration.sum() # worst case, all jobs sequential on a machine
+    job_order = list(jobs.keys())
+    durations = [jobs[j]["duration"] for j in job_order]
+    horizon = sum(durations)  # worst case, all jobs sequential on a machine
     makespan = cp.intvar(0, horizon, name="makespan")
 
-    start = cp.intvar(0, horizon, name="start", shape=len(job_data))
-    end = cp.intvar(0, horizon, name="end", shape=len(job_data))
+    start = cp.intvar(0, horizon, name="start", shape=len(job_order))
+    end = cp.intvar(0, horizon, name="end", shape=len(job_order))
 
     # ensure capacity is not exceeded
-    for rescource, capa in capacities.items():
+    for resource in resource_names:
         model += cp.Cumulative(
-            start = start,
-            duration = job_data['duration'].tolist(),
-            end = end,
-            demand = job_data[rescource].tolist(),
-            capacity = capa
+            start=start,
+            duration=durations,
+            end=end,
+            demand=[jobs[j][resource] for j in job_order],
+            capacity=capacities[resource],
         )
 
     # enforce precedences
-    for idx, (jobnr, info) in enumerate(job_data.iterrows()):
-        for succ in info['successors']:
-            model += end[idx] <= start[succ-1] # job ids start at idx 1
+    for idx, jobnr in enumerate(job_order):
+        for succ in jobs[jobnr]["successors"]:
+            model += end[idx] <= start[succ - 1]  # job ids start at idx 1
 
     model += end <= makespan
     model.minimize(makespan)
