@@ -53,6 +53,8 @@ from typing import Optional, List, Iterable
 
 from packaging.version import Version
 
+from cpmpy.transformations.negation import push_down_negation, push_down_negation_objective
+
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
 from ..expressions.globalfunctions import Multiplication
@@ -444,6 +446,7 @@ class CPM_exact(SolverInterface):
 
         # transform objective
         obj, safe_cons = safen_objective(expr)
+        obj = push_down_negation_objective(obj)
         obj, decomp_cons = decompose_linear_objective(obj,
                                                       supported=self.supported_global_constraints,
                                                       supported_reified=self.supported_reified_global_constraints,
@@ -514,7 +517,8 @@ class CPM_exact(SolverInterface):
         """
 
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"}) # linearize and decompose expects safe exprs
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element", "nd_element"}) # linearize and decompose expects safe exprs
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified = self.supported_reified_global_constraints,

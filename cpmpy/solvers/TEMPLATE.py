@@ -65,7 +65,7 @@ from ..transformations.flatten_model import flatten_constraint, flatten_objectiv
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.reification import reify_rewrite, only_bv_reifies
 from ..transformations.safening import safen_objective
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 
 
 class CPM_template(SolverInterface):
@@ -331,8 +331,9 @@ class CPM_template(SolverInterface):
         # [GUIDELINE] solvers typically can not handle partial functions (e.g. element, div, mod)
         #             this transformation makes all partial functions total following the relational semantics
         obj, safe_cons = safen_objective(expr)
+        obj = push_down_negation_objective(obj)
         # [GUIDELINE] all unsupported global functions and (reified) global constraints are decomposed here
-        obj, decomp_cons = decompose_objective(expr,
+        obj, decomp_cons = decompose_objective(obj,
                                                supported=self.supported_global_constraints,
                                                supported_reified=self.supported_reified_global_constraints,
                                                csemap=self._csemap)
@@ -406,7 +407,7 @@ class CPM_template(SolverInterface):
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)  # to also safen at toplevel, add: `, safen_toplevel={"element", "div", "mod"})`
+        cpm_cons = no_partial_functions(cpm_cons)  # to also safen at toplevel, add: `, safen_toplevel={"element", "nd_element", "div", "mod"})`
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
