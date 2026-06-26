@@ -431,6 +431,12 @@ class TestGlobal:
         model = cp.Model(constraints[0].decompose())
         assert not model.solve()
 
+    def test_table_with_subexpr(self):
+        iv = cp.intvar(0, 10, shape=3)
+        c = cp.Table(iv+iv, [[10, 8, 2], [5, 9, 2]])
+        assert cp.Model(c).solve()
+        assert cp.Model(c.decompose()).solve()
+
     def test_table_value(self):
         """Test Table.value() with known assignments (and unassigned -> None)."""
         iv = cp.intvar(0, 10, shape=3)
