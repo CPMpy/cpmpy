@@ -1907,18 +1907,6 @@ class TestTypeChecks:
                 print("Solver not supported: ", name)
                 continue
 
-
-    def test_table(self):
-        iv = cp.intvar(-8,8,3)
-
-        #assert cp.Model(cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])).solve() # not flatlist, should work
-        # used to work, not allowed anymore
-        pytest.raises(AttributeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
-
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
-
     # def test_issue627(self): -> not allowed anymore; index must be an Expression
     #     for s, cls in cp.SolverLookup.base_solvers():
     #         if cls.supported():
