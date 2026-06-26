@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
+import threading
 import warnings # for deprecation warning
 from functools import reduce
 from typing import Any, Literal, Optional, overload
@@ -71,6 +72,8 @@ from .utils import is_num, is_int, is_boolexpr, get_bounds
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
 _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
+_VAR_NAME_CHECK_STATE = threading.local()
+_VAR_NAME_CHECK_STATE.strict = True # default to strict mode
 
 def BoolVar(shape=1, name=None):
     """
@@ -827,8 +830,73 @@ def _genname(basename: Optional[str], idxs: tuple[int|np.integer, ...]) -> Optio
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
 
 def _is_invalid_name(name: Any) -> bool:
-    if isinstance(name, str):
-        return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
-    # rest invalid indeed
-    return True
+    """
+    Check if a variable name is invalid.
 
+    In 'strict' mode, the name is invalid if it starts with {_IV_PREFIX} or {_BV_PREFIX}.
+    In 'non-strict' mode, the name is invalid if it starts with {_IV_PREFIX} or {_BV_PREFIX} 
+    and the variables' counter is greater than the index, i.e. the name is already in use.
+
+    Toggle the strict mode with `_enable_strict_variable_name_check()` and `_disable_strict_variable_name_check()`,
+    or use the context manager `_ignore_strict_variable_name_check()`.
+    """
+    if name.startswith(_IV_PREFIX):
+        if _get_strict_variable_name_check():
+            return True
+        else:
+            id = int(name[len(_IV_PREFIX):])
+            if _IntVarImpl.counter > id:
+                return True
+            else:
+                return False
+    
+    elif name.startswith(_BV_PREFIX):
+        if _get_strict_variable_name_check():
+            return True
+        else:
+            id = int(name[len(_BV_PREFIX):])
+            if _BoolVarImpl.counter > id:
+                return True
+            else:
+                return False
+    
+    else:
+        return False
+
+def _get_strict_variable_name_check():
+    return _VAR_NAME_CHECK_STATE.strict
+
+def _enable_strict_variable_name_check():
+    _VAR_NAME_CHECK_STATE.strict = True
+
+def _disable_strict_variable_name_check():
+    _VAR_NAME_CHECK_STATE.strict = False
+
+
+class _IgnoreStrictVariableNameCheck:
+    def __enter__(self):
+        depth = getattr(_VAR_NAME_CHECK_STATE, "ignore_check_depth", 0)
+        if depth > 0:
+            raise RuntimeError("_ignore_strict_variable_name_check() cannot be nested")
+        _VAR_NAME_CHECK_STATE.ignore_check_depth = depth + 1
+        _disable_strict_variable_name_check()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _VAR_NAME_CHECK_STATE.ignore_check_depth = 0
+        _enable_strict_variable_name_check()
+        # _update_variable_counters() # TODO: add automatic support for this later (different PR)
+        return False  # propagate exceptions
+
+
+def _ignore_strict_variable_name_check():
+    """
+    Context manager to temporarily disable strict variable name check.
+
+    Example:
+
+        .. code-block:: python
+        
+            with _ignore_strict_variable_name_check():
+                ... create CPMpy model based on file contents here ...
+    """
+    return _IgnoreStrictVariableNameCheck()
