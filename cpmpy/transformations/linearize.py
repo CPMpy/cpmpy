@@ -655,20 +655,6 @@ def get_linear_positive_decompositions():
 
 
 
-def get_linear_positive_decompositions():
-    """
-        Implementation of custom linear decompositions for some global constraints, that are only valid in positive context.
-
-        returns:
-            dict: a dictionary mapping expression names to a function, taking as argument the expression to decompose
-    """
-    return dict(
-        regular=Regular.decompose_linear_positive,
-        circuit=Circuit.decompose_linear_positive,
-    )
-
-
-
 
 def linearize_reified_variables(constraints:list[Expression], 
                                 min_values:int=3,
