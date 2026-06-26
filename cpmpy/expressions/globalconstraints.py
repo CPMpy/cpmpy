@@ -145,7 +145,7 @@ import cpmpy as cp
 
 from ..exceptions import TypeError
 from .core import Expression, BoolVal, ExprLike, BoolExprLike, ListLike
-from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray
+from .variables import cpm_array, intvar, boolvar, _BoolVarImpl, NDVarArray, _NumVarImpl
 from .utils import all_pairs, is_bool, STAR, get_bounds, argvals, is_any_list, flatlist, is_num, is_boolexpr, implies, argval
 
 if TYPE_CHECKING:
@@ -591,7 +591,7 @@ class Table(GlobalConstraint):
         else:
             has_subexpr = False
             for x in array:  # C-style python
-                if x.has_subexpr():
+                if isinstance(x, Expression) and not isinstance(x, (_NumVarImpl, BoolVal)):
                     has_subexpr = True
                     break
 
@@ -744,7 +744,7 @@ class ShortTable(GlobalConstraint):
         else:
             has_subexpr = False
             for x in array:  # C-style python
-                if x.has_subexpr():
+                if isinstance(x, Expression) and not isinstance(x, (_NumVarImpl, BoolVal)):
                     has_subexpr = True
                     break
 
@@ -826,7 +826,7 @@ class NegativeTable(GlobalConstraint):
         else:
             has_subexpr = False
             for x in array:  # C-style python
-                if x.has_subexpr():
+                if isinstance(x, Expression) and not isinstance(x, (_NumVarImpl, BoolVal)):
                     has_subexpr = True
                     break
 
