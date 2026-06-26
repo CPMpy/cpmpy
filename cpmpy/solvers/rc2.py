@@ -53,6 +53,8 @@
 import os
 
 from threading import Timer
+
+from cpmpy.transformations.negation import push_down_negation, push_down_negation_objective
 from .solver_interface import SolverStatus, ExitStatus
 from .pysat import CPM_pysat
 from ..transformations.decompose_global import decompose_objective
@@ -218,6 +220,7 @@ class CPM_rc2(CPM_pysat):
 
         # transform objective
         obj, safe_cons = safen_objective(expr)
+        obj = push_down_negation_objective(obj)
         obj, decomp_cons = decompose_linear_objective(
             obj,
             supported=self.supported_global_constraints,

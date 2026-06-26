@@ -2,11 +2,16 @@
 """
     Interface to the SCIP's python "PySCIPOpt" package
 
-    First install the SCIPOptSuite on your machine, follow:
-    https://scipopt.org/index.php#download
+    ============
+    Installation
+    ============
 
-    Then install the 'pyscipopt' python package:
+    Requires that the 'PySCIPOpt' Python package is installed:
+
+    .. code-block:: console
+    
         $ pip install pyscipopt
+        
     (more information on https://github.com/scipopt/PySCIPOpt)
     
     ===============
@@ -21,18 +26,20 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import warnings
 from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison, Operator
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
+from ..expressions.core import Expression, BoolVal, Comparison, Operator
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
-from ..expressions.globalfunctions import GlobalFunction
+from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -96,7 +103,7 @@ class CPM_scip(SolverInterface):
 
         self.scip_model = scip.Model()
         self.scip_model.setParam("display/verblevel", 0)  # remove solver logs from output
-        self.objective_value_ = None
+        self.objective_ = None
         super().__init__(name="scip", cpm_model=cpm_model)
 
     @property
@@ -166,7 +173,12 @@ class CPM_scip(SolverInterface):
                     cpm_var._value = round(solver_val)
 
             if self.has_objective():
-                self.objective_value_ = self.scip_model.getObjVal()
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
         else:
             for cpm_var in self.user_vars:
                 cpm_var._value = None
@@ -219,26 +231,43 @@ class CPM_scip(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
-        get_variables(expr, collect=self.user_vars)
-        # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
-        self.solver_vars(list(self.user_vars))
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
 
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(
-            obj,
-            supported=self.supported_global_constraints,
-            supported_reified=self.supported_reified_global_constraints,
-            csemap=self._csemap,
-        )
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj = only_positive_bv_wsum(obj)
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
 
-        # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
-        for cpm_expr in self.transform(safe_cons + decomp_cons + flat_cons):
-            self._add_transformed_constraint(cpm_expr)
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
+        self.objective_ = expr
 
-        scip_obj = self._make_numexpr(obj)
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
+
+            import pyscipopt as scip
+            scip_obj = scip.quicksum(w * sv for w, sv in zip(ws, self.solver_vars(vs))) + const
+        else:
+            get_variables(expr, collect=self.user_vars)
+            # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
+            self.solver_vars(list(self.user_vars))
+
+            obj, safe_cons = safen_objective(expr)
+            obj = push_down_negation_objective(obj)
+            obj, decomp_cons = decompose_linear_objective(
+                obj,
+                supported=self.supported_global_constraints,
+                supported_reified=self.supported_reified_global_constraints,
+                csemap=self._csemap,
+            )
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            obj = only_positive_bv_wsum(obj)
+
+            # transform and add constraints (via `_add_transformed_constraint` as to not pollute `user_vars`)
+            for cpm_expr in self.transform(safe_cons + decomp_cons + flat_cons):
+                self._add_transformed_constraint(cpm_expr)
+
+            scip_obj = self._make_numexpr(obj)
+
         if minimize:
             self.scip_model.setObjective(scip_obj, sense='minimize')
         else:
@@ -278,7 +307,7 @@ class CPM_scip(SolverInterface):
 
     def transform(self, cpm_expr):
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element", "nd_element"})
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons, supported=self.supported_global_constraints, supported_reified=self.supported_reified_global_constraints, csemap=self._csemap)
         cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
