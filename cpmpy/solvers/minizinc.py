@@ -97,7 +97,7 @@ class CPM_minizinc(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "cumulative", "circuit", "gcc",
+                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "regular", "cumulative", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
@@ -960,14 +960,14 @@ class CPM_minizinc(SolverInterface):
             return "mdd({}, {}, {}, {}, {}, {}, {})".format(
                 array_str, len(nodes), level_str, len(from_list), from_str, label_str, to_str)
 
-        elif isinstance(expr, Regular):
+        elif expr.name == "regular":
             # MiniZinc: `regular(array[int] of var int: x, array[int,int] of opt int: d, int: q0, set of int: F)`
             # We map CPMpy's named states to 1-indexed integers.
             # Example:
             #   CPMpy:   `Regular([IV0,IV1,IV2], [('a',1,'b'),('b',1,'c'),('b',0,'b'),('c',1,'c'),('c',0,'b')], 'a', ['c'])`
             #   MiniZinc: `constraint regular([IV0,IV1,IV2], array2d(1..3, 0..1, [<>,2,2,3,2,3]), 1, {3})`
             #            note: `d` is a 2D array `[|<>,2|2,3|2,3|]` with rows=states, cols=values
-
+            assert isinstance(expr, Regular)
             array, _, start, accepting = expr.args
 
             # Map states to 1..Q (MiniZinc states are 1-indexed)
