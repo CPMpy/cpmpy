@@ -188,11 +188,20 @@ class Model(object):
         if kwargs and solver is None:
             raise NotSupportedError("Specify the solver when using kwargs, since they are solver-specific!")
 
+        if isinstance(solver, str):
+            name = solver.split(":", 1)[0]
+        elif isinstance(solver, type) and issubclass(solver, SolverInterface):
+            name = solver.__name__.removeprefix("CPM_").lower()
+        else:
+            name = None
+
+        init_kwargs = {"incremental": False} if name in ("exact", "scip") else {}
+
         if isinstance(solver, SolverInterface):
             # for advanced use, call its constructor with this model
-            s = solver(self)
+            s = solver(self, **init_kwargs)
         else:
-            s = SolverLookup.get(solver, self)
+            s = SolverLookup.get(solver, self, **init_kwargs)
 
         # call solver
         ret = s.solve(time_limit=time_limit, **kwargs)
