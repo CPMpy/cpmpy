@@ -100,6 +100,12 @@ class TestSolvers:
             cp.intvar(0, 10, name="BV123")
             cp.intvar(0, 10, name="IV123")
 
+    def test_ignore_strict_variable_name_check_nested(self):
+        with _ignore_strict_variable_name_check():
+            with pytest.raises(RuntimeError, match="cannot be nested"):
+                with _ignore_strict_variable_name_check():
+                    pass
+
     def test_clear(self):
         def n_none(v):
             val = v.value()

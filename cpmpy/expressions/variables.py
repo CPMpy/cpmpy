@@ -879,9 +879,14 @@ def _disable_strict_variable_name_check():
 
 class _IgnoreStrictVariableNameCheck:
     def __enter__(self):
+        depth = getattr(_VAR_NAME_CHECK_STATE, "ignore_check_depth", 0)
+        if depth > 0:
+            raise RuntimeError("_ignore_strict_variable_name_check() cannot be nested")
+        _VAR_NAME_CHECK_STATE.ignore_check_depth = depth + 1
         _disable_strict_variable_name_check()
 
     def __exit__(self, exc_type, exc_value, traceback):
+        _VAR_NAME_CHECK_STATE.ignore_check_depth = 0
         _enable_strict_variable_name_check()
         # _update_variable_counters() # TODO: add automatic support for this later (different PR)
         return False  # propagate exceptions
