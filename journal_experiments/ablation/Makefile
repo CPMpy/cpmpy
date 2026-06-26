@@ -68,7 +68,7 @@ run-ablation: $(RESULTS)
 plot: $(PLOT_STAMP)
 
 define ABLATION_RULE
-$(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle run_model.py
+$(RESULTS_DIR)/%__$(1)__$(2).json: $(MODELS_DIR)/%.pickle
 	@mkdir -p $(RESULTS_DIR)
 	$(PYTHON) run_model.py --model-path=$$< --solver-name=$(1) $(call ablate_arg,$(2)) $(stop_after_transform_arg) --out=$$@ --time-limit=$(TIME_LIMIT) --memory-limit=$(MEMORY_LIMIT_GB) \
 		|| $(PYTHON) -c 'import json,sys; json.dump({"model": sys.argv[2]+".pickle","solver": sys.argv[3],"solver_kwargs": {},"time_limit": int(sys.argv[5]),"ablate": json.loads(sys.argv[4]),"stop_after_transform": json.loads(sys.argv[6]),"cpmpy_commit": None,"cpmpy_commit_message": None,"transformation_time": None,"runtime": None,"status": "error","objective_value": None,"error": "run_model.py exited nonzero (killed: OOM/segfault)"}, open(sys.argv[1],"w"), indent=2)' $$@ $$* $(1) '$(call ablate_json,$(2))' $(TIME_LIMIT) $(stop_after_transform_json)
