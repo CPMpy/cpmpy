@@ -27,8 +27,11 @@ monkey-patching the solver class's `transform` method with an ablated pipeline
                              ILP-friendly `decompose_linear` (ILP solvers)
     no-detect-categorical -> drop the `linearize_reified_variables` step that
                              detects/encodes categorical variables (ILP solvers)
-    ilpfriendly           -> use `decompose_linear` instead of the generic
+    no-cp-friendly        -> use `decompose_linear` instead of the generic
                              `decompose_in_tree` (CP solvers: choco, ortools)
+    no-positive-decompositions -> skip positive-only decompositions (use
+                             `decompose` / linear decomp instead of
+                             `decompose_positive` / linear-positive)
 Only the solvers with a matching pipeline are supported.
 
 `--stop-after-transform` runs the transform pipeline only (no solve) and
@@ -59,8 +62,9 @@ from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
 from cpmpy.transformations.flatten_model import toplevel_list, flatten_constraint
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.transformations.decompose_global import decompose_in_tree
-from cpmpy.transformations.linearize import decompose_linear, linearize_constraint, \
-    linearize_reified_variables, only_positive_bv, only_positive_coefficients, canonical_comparison
+from cpmpy.transformations.linearize import decompose_linear, get_linear_decompositions, \
+    linearize_constraint, linearize_reified_variables, only_positive_bv, \
+    only_positive_coefficients, canonical_comparison
 from cpmpy.transformations.reification import reify_rewrite, only_bv_reifies, only_implies
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.transformations.negation import push_down_negation
@@ -76,7 +80,72 @@ OUTPUT_DIR = os.path.join(_HERE, "run_results")
 ABLATE_NO_ILPFRIENDLY = "no-ilpfriendly"
 ABLATE_NO_CATEGORICAL = "no-detect-categorical"
 ABLATION_NO_CP_FRIENDLY = "no-cp-friendly"
-ABLATE_CHOICES = (ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATION_NO_CP_FRIENDLY)
+ABLATE_NO_POSITIVE = "no-positive-decompositions"
+ABLATE_CHOICES = (
+    ABLATE_NO_ILPFRIENDLY,
+    ABLATE_NO_CATEGORICAL,
+    ABLATION_NO_CP_FRIENDLY,
+    ABLATE_NO_POSITIVE,
+)
+
+
+class FallbackToNormalDecomp:
+    """Dict stand-in: intercept positive decomps, fall back to normal ones."""
+
+    def __init__(self, decompose_custom=None):
+        self._decompose_custom = decompose_custom or {}
+
+    def __contains__(self, name):
+        return True
+
+    def __getitem__(self, name):
+        if name in self._decompose_custom:
+            return self._decompose_custom[name]
+        return lambda expr: expr.decompose()
+
+
+def decompose_no_positive(lst_of_expr, *, supported=None, supported_reified=None,
+                          csemap=None, decompose_custom=None):
+    dcp = FallbackToNormalDecomp(decompose_custom)
+    return decompose_in_tree(
+        list(lst_of_expr),
+        supported=supported,
+        supported_reified=supported_reified,
+        csemap=csemap,
+        decompose_custom=decompose_custom,
+        decompose_custom_positive=dcp,
+    )
+
+
+def decompose_linear_no_positive(lst_of_expr, supported=None, supported_reified=None,
+                                 csemap=None):
+    dc = get_linear_decompositions()
+    return decompose_no_positive(
+        lst_of_expr,
+        supported=supported,
+        supported_reified=supported_reified,
+        csemap=csemap,
+        decompose_custom=dc,
+    )
+
+
+def decompose_in_tree_no_positive(lst_of_expr, supported=None, supported_reified=None,
+                                  csemap=None):
+    return decompose_no_positive(
+        lst_of_expr,
+        supported=supported,
+        supported_reified=supported_reified,
+        csemap=csemap,
+    )
+
+
+def pick_decompose(ablate, base_decompose):
+    """Apply no-positive ablation on top of the solver's default decompose step."""
+    if ablate == ABLATE_NO_POSITIVE:
+        if base_decompose is decompose_linear:
+            return decompose_linear_no_positive
+        return decompose_in_tree_no_positive
+    return base_decompose
 
 
 # The ablated transform pipelines. These were originally written as solver
@@ -91,7 +160,8 @@ ABLATE_CHOICES = (ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATION_NO_CP_F
 
 def gurobi_transform(self, cpm_expr, ablate):
     # expressions have to be linearized to fit in MIP model, see transformations/linearize
-    decompose = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    base = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    decompose = pick_decompose(ablate, base)
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
     cpm_cons = decompose(cpm_cons,
@@ -119,7 +189,8 @@ def gurobi_transform(self, cpm_expr, ablate):
 
 
 def pysat_transform(self, cpm_expr, ablate):
-    decompose = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    base = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    decompose = pick_decompose(ablate, base)
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
     cpm_cons = push_down_negation(cpm_cons)
@@ -142,7 +213,8 @@ def pysat_transform(self, cpm_expr, ablate):
 
 
 def scip_transform(self, cpm_expr, ablate):
-    decompose = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    base = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    decompose = pick_decompose(ablate, base)
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
     cpm_cons = push_down_negation(cpm_cons)
@@ -162,7 +234,8 @@ def scip_transform(self, cpm_expr, ablate):
 
 
 def highs_transform(self, cpm_expr, ablate):
-    decompose = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    base = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    decompose = pick_decompose(ablate, base)
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})
     cpm_cons = push_down_negation(cpm_cons)
@@ -181,7 +254,8 @@ def highs_transform(self, cpm_expr, ablate):
     return cpm_cons
 
 def pindakaas_transform(self, cpm_expr, ablate):
-    decompose = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
+    base = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
+    decompose = pick_decompose(ablate, base)
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
     cpm_cons = push_down_negation(cpm_cons)
@@ -204,7 +278,8 @@ def pindakaas_transform(self, cpm_expr, ablate):
     return cpm_cons
 
 def choco_transform(self, cpm_expr, ablate):
-    decompose = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
+    base = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
+    decompose = pick_decompose(ablate, base)
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons)
     cpm_cons = push_down_negation(cpm_cons)
@@ -222,7 +297,8 @@ def choco_transform(self, cpm_expr, ablate):
 
 
 def ortools_transform(self, cpm_expr, ablate):
-    decompose = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
+    base = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
+    decompose = pick_decompose(ablate, base)
     cpm_cons = toplevel_list(cpm_expr)
     cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod"}))
     cpm_cons = push_down_negation(cpm_cons)
@@ -253,14 +329,14 @@ SOLVER_TRANSFORM = {
 
 # Which ablations each solver supports.
 SOLVER_ABLATIONS = {
-    "gurobi": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
-    "pysat": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
-    "rc2": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
-    "scip": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
-    "highs": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
-    "choco": frozenset({ABLATION_NO_CP_FRIENDLY}),
-    "ortools": frozenset({ABLATION_NO_CP_FRIENDLY}),
-    "pindakaas": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL}),
+    "gurobi": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
+    "pysat": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
+    "rc2": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
+    "scip": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
+    "highs": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
+    "choco": frozenset({ABLATION_NO_CP_FRIENDLY, ABLATE_NO_POSITIVE}),
+    "ortools": frozenset({ABLATION_NO_CP_FRIENDLY, ABLATE_NO_POSITIVE}),
+    "pindakaas": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
 }
 
 

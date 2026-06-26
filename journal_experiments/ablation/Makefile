@@ -23,15 +23,15 @@
 
 PYTHON       ?= python3
 
-ILP_SOLVERS   ?= gurobi
-CP_SOLVERS    ?= ortools
+ILP_SOLVERS   ?= gurobi pysat
+CP_SOLVERS    ?= 
 
-# ILP solvers: baseline, no-ilpfriendly, no-detect-categorical
-# CP solvers: baseline, no-cp-friendly
-ILP_ABLATIONS ?= baseline no-ilpfriendly no-detect-categorical
-CP_ABLATIONS  ?= baseline no-cp-friendly
+# ILP solvers: baseline, no-ilpfriendly, no-detect-categorical, no-positive-decompositions
+# CP solvers: baseline, no-cp-friendly, no-positive-decompositions
+ILP_ABLATIONS ?= baseline no-ilpfriendly no-detect-categorical no-positive-decompositions
+CP_ABLATIONS  ?= baseline no-cp-friendly no-positive-decompositions
 
-TIME_LIMIT   ?= 600
+TIME_LIMIT   ?= 3600
 MEMORY_LIMIT_GB ?= 8 # 8GB
 
 # 1 = run transform only (--stop-after-transform); 0 = solve as usual
