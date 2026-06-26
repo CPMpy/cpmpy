@@ -72,23 +72,6 @@ from .utils import is_num, is_int, is_boolexpr, get_bounds
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
 _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
-_ALLOW_RESERVED_NAMES = False
-
-
-@contextmanager
-def allow_reserved_var_names():
-    """
-    Temporarily allow names starting with reserved internal prefixes (``IV``/``BV``).
-
-    Useful for parsers that need to ingest external formats containing such names.
-    """
-    global _ALLOW_RESERVED_NAMES
-    prev = _ALLOW_RESERVED_NAMES
-    _ALLOW_RESERVED_NAMES = True
-    try:
-        yield
-    finally:
-        _ALLOW_RESERVED_NAMES = prev
 
 def BoolVar(shape=1, name=None):
     """
