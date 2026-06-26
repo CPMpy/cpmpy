@@ -42,7 +42,8 @@ VARIANT_LABEL = {
     "baseline": "pipeline",
     "no-ilpfriendly": "no linear-friendly",
     "no-detect-categorical": "no categorical",
-    "ilpfriendly": "linear-friendly",
+    "no-cp-friendly": "linear-friendly",
+    "no-positive-decompositions": "no positive decomps",
 }
 
 STAT_METRICS = {
@@ -72,8 +73,8 @@ def load_results(results_dir):
         raise SystemExit("No result JSON files found under {}".format(results_dir))
 
     df = pd.DataFrame(records)
-    df['error'].fillna("OK", inplace=True)
-    df['status'].fillna("OK", inplace=True)
+    df['error'] = df['error'].fillna("OK")
+
     # fill baseline
     df["ablate"] = df["ablate"].fillna("baseline")
     df["variant"] = df["ablate"].map(VARIANT_LABEL).fillna(df["ablate"])
@@ -93,70 +94,13 @@ def get_finished_instances(df):
 
 
 def save_figure(fig, name):
+    print(f"Saving figure to {name}.png/pdf")
     # fig.savefig(f"{name}.pdf", bbox_inches="tight")
     fig.savefig(f"{name}.png", dpi=150, bbox_inches="tight")
 
 
-def plot_runtime_ecdf(df, ax, solver, runtime_col="runtime", time_limit=None, hue_order=None):
-    """Draw the per-variant ECDF of solve time for one ``solver`` on ``ax``.
 
-    Each row of ``df`` is one (model, solver, ablation) run as written by
-    run_model.py. Unsolved runs are dropped, so each curve plateaus at the
-    number of instances that variant solved within the time limit.
-
-    Arguments:
-        df: results DataFrame (one row per run), already filtered to one solver.
-        ax: matplotlib Axes to draw on.
-        solver: solver name (used for the title).
-        runtime_col: which runtime column to put on the x-axis.
-        time_limit: x-axis upper bound (s); inferred from the data if None.
-
-    Returns:
-        The Axes ``ax``.
-    """
-    if time_limit is None:
-        time_limit=600
-        # time_limit = float(df["time_limit"].max())
-
-    if hue_order is None:
-        hue_order = variant_hue_order(df["variant"].unique())
-    
-    sns.ecdfplot(data=df, x=runtime_col, hue="variant", stat="count", ax=ax, hue_order=hue_order)
-    # sns.ecdfplot(data=df, x='total_time', hue="variant", stat="count", ax=ax, hue_order=hue_order, linestyle="--")
-    ax.set_xscale("log")
-    ax.set_xlim(left=df[runtime_col].min(), right=time_limit)
-    ax.set_xlabel("solve time (s)")
-    ax.set_ylabel("number of instances solved")
-    ax.set_title(solver)
-    return ax
-
-def plot_stats(df, ax, metric, hue_order=None):
-    """ECDF of one transform-size metric across ablation variants."""
-
-    df = df.copy()
-    if hue_order is None:
-        hue_order = variant_hue_order(df["variant"].unique())
-    
-    # num_solved = df.groupby("variant").size()
-    # df['variant'] = df["variant"].map(lambda x: f"{x} ({num_solved[x]})")
-
-    # filter to instances that are solved by all variants
-    grouped = df.groupby("model")['variant'].count()
-    finished_by_all = grouped[grouped == len(hue_order)].index
-    df = df[df["model"].isin(finished_by_all)]
-
-    print(df.groupby(['solver', 'variant']).size())
-
-    sns.boxplot(data=df, x=metric, y="variant", ax=ax, order=hue_order, palette="pastel", legend=False)
-    # sns.ecdfplot(data=df, x=metric, hue="variant", ax=ax, hue_order=hue_order, stat="count")
-    # if metric == "n_constraints":
-    ax.set_xscale("log")
-    ax.set_xlabel(STAT_METRICS[metric])
-    ax.set_ylabel("Number of instances")
-    return ax
-
-
-def plot_all_stats(df, figures_dir):
+def plot_stats(df, figures_dir, subtitle=None):
     """One figure per solver: ECDFs of constraints / integer / boolean vars."""
     plot_df = df.copy()
     for col in STAT_METRICS:
@@ -169,50 +113,64 @@ def plot_all_stats(df, figures_dir):
         print("No transform-size records found — skipping transform-size plots")
         return
 
-    print(plot_df.groupby(["solver", "variant"]).size())
-
     os.makedirs(figures_dir, exist_ok=True)
     for solver in sorted(plot_df["solver"].unique()):
         print("Plotting transform stats for solver:", solver)
         solver_df = plot_df[plot_df["solver"] == solver]
         hue_order = variant_hue_order(solver_df["variant"].unique())
 
+        solver_df = solver_df[solver_df.groupby("model")["model"].transform("size") == len(hue_order)]
+
         fig, axes = plt.subplots(1, 3, figsize=(12, 4))
         for ax, metric in zip(axes, STAT_METRICS):
-            plot_stats(solver_df, ax=ax, metric=metric, hue_order=hue_order)
+            
+            sns.ecdfplot(data=solver_df, 
+                         x=metric, hue="variant", ax=ax, hue_order=hue_order, stat="count")
+            ax.set_xscale("log")
+            ax.set_xlabel(STAT_METRICS[metric])
+            ax.set_ylabel("Number of instances")
+            
+        title = f"Model size after transformations for {solver}, shown on instances finsished by all variants"
+        if subtitle is not None:
+            title += f"\n{subtitle}"
         
-        fig.suptitle(f"{solver} transform size", fontweight="bold")
+        fig.suptitle(title)
         fig.tight_layout()
         save_figure(fig, os.path.join(figures_dir, f"ablation_stats_{solver}"))
         plt.close(fig)
 
 
-def plot_all_solvers(df, figures_dir, runtime_col="runtime"):
+def plot_runtime(df, figures_dir, runtime_col="runtime", subtitle=None):
     """One ECDF figure per solver, saved into ``figures_dir``."""
-    plot_df = df.copy()
 
-    time_limit = 3600
-    plot_df = plot_df[plot_df['time_limit'] == time_limit]
 
-    time_limits = set(plot_df["time_limit"].dropna())
+    hue_order = variant_hue_order(df["variant"].unique())
+    solvers = sorted(df["solver"].unique())
+    os.makedirs(figures_dir, exist_ok=True)
+
+    time_limits = set(df["time_limit"].unique())
     if len(time_limits) > 1:
         raise ValueError(f"Time limits are not consistent: {time_limits}")
+    time_limit = time_limits.pop()
 
-    print(plot_df.groupby(["solver", "variant"]).size())
-
-    plot_df = get_finished_instances(plot_df)
-
-    hue_order = variant_hue_order(plot_df["variant"].unique())
-
-    print(plot_df["solver"].unique())
-
-    os.makedirs(figures_dir, exist_ok=True)
-    for solver in sorted(plot_df["solver"].unique()):
+    ylim = int(df.groupby(["solver", "variant"]).size().max() * 1.1) # add 10% margin
+    
+    for solver in solvers:
         print("Plotting solver:", solver)
-        solver_df = plot_df[plot_df["solver"] == solver]
         fig, ax = plt.subplots(figsize=(4, 3))
-        plot_runtime_ecdf(solver_df, ax=ax, solver=solver, runtime_col=runtime_col,
-                          hue_order=hue_order)
+        
+        sns.ecdfplot(data=df[df["solver"] == solver], 
+                     x=runtime_col, hue="variant", stat="count", ax=ax, hue_order=hue_order)
+        
+        ax.set_xscale("log")
+        ax.set_xlabel("runtime (seconds)")
+        ax.set_ylabel("Number of instances")
+        ax.set_xlim(ax.get_xlim()[0], time_limit)
+        ax.set_ylim(0, ylim)
+        title = f"Runtime for {solver}"
+        if subtitle is not None:
+            title += f"\n{subtitle}"
+        ax.set_title(title)
         save_figure(fig, os.path.join(figures_dir, f"ablation_{solver}"))
         plt.close(fig)
 
@@ -223,12 +181,15 @@ if __name__ == "__main__":
 
     df = load_results(results_dir)
 
-    print(df.columns)
-
-   
-
     print("Raw data:")
     print(df.groupby(["solver", "variant", "status"]).size())
 
-    plot_all_solvers(df, figures_dir=figures_dir, runtime_col="runtime")
-    # plot_all_stats(df, figures_dir=figures_dir)
+    finished = get_finished_instances(df)
+    print("Finished instances:")
+    print(finished.groupby(["solver", "variant"]).size())
+
+    subtitle = results_dir.split("/")[-1]
+
+    print(df)
+    plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle)
+    plot_stats(finished, figures_dir=figures_dir, subtitle=subtitle)
