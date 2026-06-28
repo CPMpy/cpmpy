@@ -101,8 +101,14 @@ The CPMpy package provides a large testsuite on which newly added solvers can be
 Note that for this testsuite to work, you need to add your solver to the `SolverLookup` utility.
 This is done by adding an import statement in `/solvers/__init__.py` and adding an entry in the list of solvers in  `/solvers/utils.py`.
 
-To run the testsuite on your solver, go to `/tests/test_constraints.py` and set `SOLVERNAMES` to the name of your solver. By running the file, every constraint allowed by the Flat Normal Form will be generated and posted to your solver interface.
-As not every solver should support all possible constraints, you can exclude some using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` and `EXCLUDE_IMPL` dictionaries.
+To run the (extensive) testsuite on your solver, run:
+
+```bash
+python -m pytest tests/ --solver <YOUR SOLVER>
+```
+
+it will automatically test all of the allowed expressions through a constraint generator in `/tests/test_constraints.py`.
+As not every solver has to support all possible constraints, you can exclude some using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS`, etc dictionaries.
 After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
 
 Once your solver is passing the test suite, it is a good idea to check test coverage to see which lines of your solver code are never executed during the tests. Missing coverage may indicate missing tests, but it could also mean that code you intended to run was silently bypassed. For example, if you added native support for a constraint but a transformation is decomposing it before it reaches your solver, performance could suffer. You can generate an HTML coverage report in `htmlcov` using the [pytest-cov](https://pypi.org/project/pytest-cov/) plugin:
