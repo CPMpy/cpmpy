@@ -55,7 +55,6 @@ import os
 import builtins
 from io import StringIO
 from typing import TextIO
-from pathlib import Path
 from typing import Optional, Callable, Union
 
 import cpmpy as cp
@@ -67,7 +66,7 @@ from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.int2bool import IntVarEnc
-from cpmpy.tools.io.utils import _is_potential_path
+from cpmpy.tools.io.utils import _handle_loader_input
 
 
 def write_dimacs(
@@ -203,7 +202,7 @@ def write_dimacs(
     return out
 
 
-def load_dimacs(dimacs: Union[str, os.PathLike], open: Callable = builtins.open, type: Optional[str] = None):
+def load_dimacs(dimacs: Union[str, os.PathLike, TextIO], open: Callable = builtins.open, type: Optional[str] = None):
     """
     Load a CPMpy model from a DIMACS formatted file strictly following the specification.
 
@@ -212,9 +211,10 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Callable = builtins.open,
         The (optional) p-line has to denote the correct number of variables and clauses.
 
     Arguments:
-        dimacs (str or os.PathLike):
+        dimacs (str or os.PathLike or TextIO):
             - A file path to a DIMACS/WCNF file, or
-            - A string containing DIMACS/WCNF content directly
+            - A string containing DIMACS/WCNF content directly, or
+            - A TextIO object already open for reading
         open (Callable): callable to open the file for reading (default: builtin ``open``).
             Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.cnf.xz``.
         type (str, optional): type of the file to load. If None, it is inferred from the file content.
@@ -227,19 +227,7 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Callable = builtins.open,
         ValueError: If the optional type argument is not supported.
     """
 
-    f: Union[list[str], TextIO]
-
-    # Read from file or string
-    if _is_potential_path(dimacs):
-        path = Path(dimacs)
-        if path.exists():
-            f = open(path, "r")
-        else:
-            raise FileNotFoundError(path)
-    else:
-        f = dimacs.splitlines()
-
-    try: # try...finally block to ensure file f is closed
+    with _handle_loader_input(dimacs, open=open) as f:
 
         # No type hint provided -> auto-detect type
         if type is None:
@@ -347,7 +335,3 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Callable = builtins.open,
             assert len(m.constraints) == nr_cls_declared, f"Number of clauses was declared in p-line as {nr_cls_declared}, but was {len(m.constraints)}"
 
         return m
-    
-    finally:
-        if isinstance(f, TextIO):
-            f.close()
