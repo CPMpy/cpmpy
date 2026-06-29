@@ -28,6 +28,7 @@
     You will also need to install CPLEX Optimization Studio from IBM's website.
     There is a free community version available.
     https://www.ibm.com/products/ilog-cplex-optimization-studio
+
     See detailed installation instructions at:
     https://www.ibm.com/docs/en/icos/22.1.2?topic=2212-installing-cplex-optimization-studio
     
@@ -49,24 +50,27 @@
     ==============
     Module details
     ==============
+
+    Supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives.
 """
 import warnings
 from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..expressions.core import Expression, Comparison, Operator, BoolVal
-from ..expressions.utils import argvals, argval, eval_comparison, flatlist, is_any_list, is_bool, is_num, is_int
-from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar
+from ..expressions.globalfunctions import FloatSum
+from ..expressions.utils import eval_comparison, flatlist, is_bool, is_num, is_int
+from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
-from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, only_positive_bv_wsum, \
+from ..transformations.linearize import linearize_constraint, linearize_reified_variables, only_positive_bv, \
     only_positive_bv_wsum_const, decompose_linear, decompose_linear_objective
 from ..transformations.normalize import toplevel_list
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.reification import only_implies, reify_rewrite, only_bv_reifies
 from ..transformations.safening import no_partial_functions, safen_objective
-
 
 class CPM_cplex(SolverInterface):
     """
@@ -149,6 +153,7 @@ class CPM_cplex(SolverInterface):
         from docplex.mp.model import Model
         self.cplex_model = Model()
         self._obj_offset = 0
+        self.objective_ = None
 
         super().__init__(name="cplex", cpm_model=cpm_model)
 
@@ -248,13 +253,13 @@ class CPM_cplex(SolverInterface):
                     cpm_var._value = solver_val >= 0.5
                 else:
                     cpm_var._value = round(solver_val)
-            # set _objective_value
             if self.has_objective():
-                obj_val = self.cplex_model.get_objective_expr().solution_value
-                if round(obj_val) == obj_val: # it is an integer?:
-                    self.objective_value_ = round(obj_val)
-                else: #  can happen with DirectVar or when using floats as coefficients
-                    self.objective_value_ = float(obj_val)
+                assert self.objective_ is not None
+                val = self.objective_.value()
+                if val is not None and round(val) == val:
+                    self.objective_value_ = int(val)
+                else:  # FloatSum, float value must be read through FloatSum.value()
+                    self.objective_value_ = None
 
         else: # clear values of variables
             for cpm_var in self.user_vars:
@@ -294,7 +299,13 @@ class CPM_cplex(SolverInterface):
         raise NotImplementedError("Not a known var {}".format(cpm_var))
 
 
-    def objective(self, expr, minimize=True):
+    def minimize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=True)
+
+    def maximize(self, expr: Expression | FloatSum) -> None:
+        self.objective(expr, minimize=False)
+
+    def objective(self, expr: Expression | FloatSum, minimize: bool = True) -> None:
         """
             Post the given expression to the solver as objective to minimize/maximize
 
@@ -304,22 +315,31 @@ class CPM_cplex(SolverInterface):
                 technical side note: any constraints created during conversion of the objective
                 are premanently posted to the solver
         """
-        # save user vars
-        get_variables(expr, self.user_vars)
+        self.objective_ = expr
 
-        # transform objective
-        obj, safe_cons = safen_objective(expr)
-        obj, decomp_cons = decompose_linear_objective(obj,
-                                                      supported=self.supported_global_constraints,
-                                                      supported_reified=self.supported_reified_global_constraints,
-                                                      csemap=self._csemap)
-        obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
-        obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
+        if isinstance(expr, FloatSum):
+            ws, vs, const = expr.components()
+            self.user_vars.update(vs)  # save user variables
+            self._obj_offset = const
+            cplex_obj = self.cplex_model.scal_prod(self.solver_vars(vs), ws)
+        else:
+            # save user vars
+            get_variables(expr, self.user_vars)
 
-        self.add(safe_cons + decomp_cons + flat_cons)
+            # transform objective
+            obj, safe_cons = safen_objective(expr)
+            obj = push_down_negation_objective(obj)
+            obj, decomp_cons = decompose_linear_objective(obj,
+                                                          supported=self.supported_global_constraints,
+                                                          supported_reified=self.supported_reified_global_constraints,
+                                                          csemap=self._csemap)
+            obj, flat_cons = flatten_objective(obj, csemap=self._csemap)
+            obj, self._obj_offset = only_positive_bv_wsum_const(obj) # remove negboolviews
 
-        # make objective function or variable and post
-        cplex_obj = self._make_numexpr(obj)
+            self.add(safe_cons + decomp_cons + flat_cons)
+
+            # make objective function or variable and post
+            cplex_obj = self._make_numexpr(obj)
         if minimize:
             self.cplex_model.set_objective('min', cplex_obj)
         else:
@@ -378,7 +398,8 @@ class CPM_cplex(SolverInterface):
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element"})  # linearize and decompose expect safe exprs
+        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element", "nd_element"})  # linearize and decompose expect safe exprs
+        cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(cpm_cons,
                                     supported=self.supported_global_constraints,
                                     supported_reified=self.supported_reified_global_constraints,
@@ -614,9 +635,13 @@ class CPM_cplex(SolverInterface):
                     else:
                         cpm_var._value = round(solver_val)
 
-                # Translate objective
                 if self.has_objective():
-                    self.objective_value_ = sol_obj_val + self._obj_offset
+                    assert self.objective_ is not None
+                    val = self.objective_.value()
+                    if val is not None and round(val) == val:
+                        self.objective_value_ = int(val)
+                    else:  # FloatSum, float value must be read through FloatSum.value()
+                        self.objective_value_ = None
 
                 self.print_display(display)
 

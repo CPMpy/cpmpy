@@ -34,7 +34,8 @@ solver_dependencies = {
     "pumpkin": ["pumpkin-solver>=0.3.0"], # CPMpy requires features only available from Pumpkin version >=0.3.0
     "pindakaas": ["pindakaas>=0.5.0"],
     "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
-    "scip": ["pyscipopt>=6.1"]
+    "scip": ["pyscipopt>=6.1"],
+    "rc2": ["python-sat>=1.9.dev5", "pypblib"]
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
@@ -56,7 +57,6 @@ setup(
         'numpy>=1.5',
         'setuptools',
         'packaging', # to check solver versions
-        'frozendict', # standard in newer Python versions
     ],
     extras_require={
         # Solvers
@@ -65,6 +65,7 @@ setup(
         "xcsp3": ["pycsp3", "requests", "tqdm", "matplotlib", "psutil", "filelock", "gnureadline; platform_system != 'Windows'", "pyreadline3; platform_system == 'Windows'"], # didn't add CLI-specific req since some are not cross-platform
         # Other
         "test": ["pytest", "pytest-timeout"],
+        "type": ["mypy", "types-tqdm"],
         "docs": ["sphinx>=5.3.0", "sphinx_rtd_theme>=2.0.0", "myst_parser", "sphinx-automodapi", "readthedocs-sphinx-search>=0.3.2"],
     },
     entry_points={
