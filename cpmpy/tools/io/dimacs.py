@@ -53,7 +53,6 @@ List of functions
 
 import os
 import builtins
-from io import StringIO
 from typing import TextIO
 from typing import Optional, Callable, Union
 
@@ -275,8 +274,7 @@ def load_dimacs(dimacs: Union[str, os.PathLike, TextIO], open: Callable = builti
         else:
             raise ValueError(f"Expected `cnf` or `wcnf` as optional type argument, but got {type} instead.")
 
-        if isinstance(f, TextIO):
-            f.seek(0)
+        f.seek(0)
 
         # If weighted, delegate to WCNF loader
         if is_weighted:

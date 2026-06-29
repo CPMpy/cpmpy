@@ -1,6 +1,7 @@
 import warnings
 import os
 from contextlib import contextmanager
+from io import StringIO, TextIOBase
 from pathlib import Path
 from typing import Union, TextIO, Callable, Iterator
 import builtins
@@ -93,13 +94,13 @@ def _is_potential_path(instance: Union[str, os.PathLike]) -> bool:
 def _handle_loader_input(
     source: Union[str, os.PathLike, TextIO],
     open: Callable = builtins.open,
-) -> Iterator[Union[list[str], TextIO]]:
+) -> Iterator[TextIO]:
     """
     Context manager yielding a line-iterable source for format loaders.
 
     - path / PathLike: opened with ``open`` (closed on exit)
     - TextIO: yielded as-is (not closed)
-    - inline str: ``splitlines()`` list (no close needed)
+    - inline str: yielded as ``StringIO`` (no close needed)
 
     Arguments:
         source (str or os.PathLike or TextIO): The source to handle.
@@ -107,29 +108,29 @@ def _handle_loader_input(
             Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.cnf.xz``.
 
     Returns:
-        An iterator over the lines of the source.
+        A text stream over the source.
 
     Raises:
         ValueError: If the source is not a string, os.PathLike, or TextIO.
         FileNotFoundError: If the source is a path-like object and does not exist.
     """
-    f: Union[list[str], TextIO]
+    f: TextIO
     should_close = False
 
-    if _is_potential_path(source):
+    if isinstance(source, TextIOBase):
+        f = source
+    elif _is_potential_path(source):
         path = Path(source)
         if path.exists():
             f = open(path, "r")
             should_close = True
         elif isinstance(source, str):
             # e.g. "p cnf 0 0" — no newlines, not an existing path: inline content
-            f = source.splitlines()
+            f = StringIO(source)
         else:
             raise FileNotFoundError(path)
-    elif isinstance(source, TextIO):
-        f = source
     elif isinstance(source, str):
-        f = source.splitlines()
+        f = StringIO(source)
     else:
         raise ValueError(f"Expected a string, os.PathLike, or TextIO, but got {type(source)}")
 

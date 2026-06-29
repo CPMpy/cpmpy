@@ -22,13 +22,13 @@ import os
 import sys
 import builtins
 import argparse
-import tempfile
 import re
-from typing import Union, Callable, Optional, Any
+from typing import Union, Callable, Optional, Any, TextIO
 
 import cpmpy as cp
 from cpmpy.expressions.variables import NDVarArray
 from cpmpy.expressions.core import Expression
+from cpmpy.tools.io.utils import _handle_loader_input
 
 # Optional dependencies
 try:
@@ -125,12 +125,12 @@ def _tag_to_data(
     
     return rows
 
-def parse_scheduling_period(instance: Union[str, os.PathLike]):
+def parse_scheduling_period(instance: Union[str, os.PathLike, TextIO], open:Callable=builtins.open):
     """
     Parse a nurserostering instance file.
     
     Arguments:
-        filename (str or os.PathLike): Path to the nurserostering instance file.
+        instance (str or os.PathLike or TextIO): Path, raw instance text, or a TextIO object.
     
     Returns:
         dict: A dictionary with native Python data structures (lists of dicts).
@@ -142,11 +142,8 @@ def parse_scheduling_period(instance: Union[str, os.PathLike]):
         - Use to_dataframes() transform to convert to pandas DataFrames if needed.
         - Use add_fake_names() transform to add randomly generated names to staff.
     """
-    # If instance is a path to a file that exists -> use it directly
-    if isinstance(instance, (str, os.PathLike)):
-        string = open(instance).read()
-    else:
-        string = str(instance)
+    with _handle_loader_input(instance, open=open) as f:
+        string = f.read()
     
     # Parse scheduling horizon
     horizon_val = _tag_to_data(string, "SECTION_HORIZON", skip_lines=2, datatype=int)
@@ -411,26 +408,22 @@ def _model_nurserostering(
 
     return model, nurse_view
 
-def load_nurserostering(instance: Union[str, os.PathLike], open:Callable=builtins.open) -> cp.Model:
+def load_nurserostering(instance: Union[str, os.PathLike, TextIO], open:Callable=builtins.open) -> cp.Model:
     """
     Loader for Nurse Rostering format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
-        instance (str or os.PathLike):
+        instance (str or os.PathLike or TextIO):
             - A file path to a Nurse Rostering file
             - OR a string containing the Nurse Rostering content directly
+            - OR a TextIO object already open for reading
         open (Callable):
             If instance is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
         cp.Model: The CPMpy model of the Nurse Rostering instance.
     """
-    # If instance is a path to a file that exists -> use it directly
-    if isinstance(instance, (str, os.PathLike)) and os.path.exists(instance):
-        instance = os.fspath(instance)
-
-    # Use the parser (expects a file path)
-    data = parse_scheduling_period(instance)
+    data = parse_scheduling_period(instance, open=open)
     
     # Create the CPMpy model using the existing model builder
     model, _ = _model_nurserostering(**data)
@@ -478,4 +471,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

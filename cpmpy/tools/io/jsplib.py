@@ -24,34 +24,29 @@ import builtins
 import argparse
 import cpmpy as cp
 import numpy as np
-from io import StringIO
 from typing import Union, Callable, TextIO
 
 from cpmpy.expressions.variables import NDVarArray, _IntVarImpl
+from cpmpy.tools.io.utils import _handle_loader_input
 
 
-def load_jsplib(jsp: Union[str, os.PathLike], open:Callable=builtins.open) -> cp.Model:
+def load_jsplib(jsp: Union[str, os.PathLike, TextIO], open:Callable=builtins.open) -> cp.Model:
     """
     Loader for JSPLib format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
-        jsp (str or os.PathLike):
+        jsp (str or os.PathLike or TextIO):
             - A file path to a JSPlib file, or
-            - A string containing the JSPLib content directly
+            - A string containing the JSPLib content directly, or
+            - A TextIO object already open for reading
         open (Callable):
             If jsp is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
         cp.Model: The CPMpy model of the JSPLib instance.
     """
-    # If rcpsp is a path to a file -> open file
-    if isinstance(jsp, (str, os.PathLike)) and os.path.exists(jsp):
-        f = open(jsp)
-    # If rcpsp is a string containing a model -> create a memory-mapped file
-    else:
-        f = StringIO(str(jsp))
-
-    task_to_machines, task_durations = _parse_jsplib(f)
+    with _handle_loader_input(jsp, open=open) as f:
+        task_to_machines, task_durations = _parse_jsplib(f)
     model, (start, makespan) = _model_jsplib(task_to_machines=task_to_machines, task_durations=task_durations)
     return model
 

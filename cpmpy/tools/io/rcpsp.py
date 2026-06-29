@@ -23,8 +23,8 @@ import sys
 import builtins
 import argparse
 import cpmpy as cp
-from io import StringIO
 from typing import Union, Callable, TextIO, Any
+from cpmpy.tools.io.utils import _handle_loader_input
 
 # Optional dependencies
 try:
@@ -34,29 +34,23 @@ except ImportError:
     _HAS_PANDAS = False
 
 
-def load_rcpsp(rcpsp: Union[str, os.PathLike], open:Callable=builtins.open) -> cp.Model:
+def load_rcpsp(rcpsp: Union[str, os.PathLike, TextIO], open:Callable=builtins.open) -> cp.Model:
     """
     Loader for PSPLIB RCPSP format. Loads an instance and returns its matching CPMpy model.
 
     Arguments: 
-        rcpsp (str or os.PathLike):
+        rcpsp (str or os.PathLike or TextIO):
             - A file path to a PSPLIB RCPSP file
             - OR a string containing the RCPSP content directly
+            - OR a TextIO object already open for reading
         open (Callable):
             If rcpsp is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
     Returns:
         cp.Model: The CPMpy model of the PSPLIB RCPSP instance.
     """
-    # If rcpsp is a path to a file -> open file
-    if isinstance(rcpsp, (str, os.PathLike)) and os.path.exists(rcpsp):
-        f = open(rcpsp)
-    # If rcpsp is a string containing a model -> create a memory-mapped file
-    else:
-        f = StringIO(str(rcpsp))
-
-
-    data = parse_rcpsp(f)
+    with _handle_loader_input(rcpsp, open=open) as f:
+        data = parse_rcpsp(f)
     model, _ = _model_rcpsp(**data)
     return model
 

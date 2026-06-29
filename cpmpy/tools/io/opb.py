@@ -37,8 +37,7 @@ import re
 import sys
 import argparse
 import builtins
-from io import StringIO
-from typing import Union, Optional, Callable, Any
+from typing import Union, Optional, Callable, Any, TextIO
 from functools import reduce
 from operator import mul
 
@@ -49,6 +48,7 @@ from cpmpy.transformations.to_opb import to_opb, to_opb_objective
 from cpmpy.expressions.variables import NegBoolView, _ignore_strict_variable_name_check
 from cpmpy.expressions.core import Operator, Comparison
 from cpmpy.model import _update_variable_counters
+from cpmpy.tools.io.utils import _handle_loader_input
 
 
 # Regular expressions
@@ -170,7 +170,7 @@ def _add_constraint(model: cp.Model, line: str, vars: dict[str, Any]):
     assert isinstance(rhs, int), rhs
     model.add(cons)
 
-def load_opb(opb: Union[str, os.PathLike], open:Callable = builtins.open) -> cp.Model:
+def load_opb(opb: Union[str, os.PathLike, TextIO], open:Callable = builtins.open) -> cp.Model:
     """
     Loader for OPB (Pseudo-Boolean) format. Loads an instance and returns its matching CPMpy model.
 
@@ -183,9 +183,10 @@ def load_opb(opb: Union[str, os.PathLike], open:Callable = builtins.open) -> cp.
         - Comparison operators in constraints: '=', '>='
 
     Arguments:
-        opb (str or os.PathLike): 
+        opb (str or os.PathLike or TextIO): 
             - A file path to an OPB file (optionally LZMA-compressed with `.xz`)
             - OR a string containing the OPB content directly
+            - OR a TextIO object already open for reading
         open: (callable):
             If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
 
@@ -206,53 +207,46 @@ def load_opb(opb: Union[str, os.PathLike], open:Callable = builtins.open) -> cp.
         - Comment lines starting with '*' are ignored.
         - Only "min:" objectives are supported; "max:" is not recognized.
     """
-    
-    # If opb is a path to a file -> open file
-    if isinstance(opb, (str, os.PathLike)) and os.path.exists(opb):
-        f = open(opb)
-    # If opb is a string containing a model -> create a memory-mapped file
-    else:
-        f = StringIO(str(opb))
+    with _handle_loader_input(opb, open=open) as f:
+        # Look for header on first line
+        line = f.readline()
+        header = HEADER_RE.match(line)
+        if not header: # If not found on first line, look on second (happens when passing multi line string)
+            _line = f.readline()
+            header = HEADER_RE.match(_line)
+            if not header:
+                raise ValueError(f"Missing or incorrect header: \n0: {line}1: {_line}2: ...")
+        nr_vars_declared = int(header.group(2))
+        nr_constraints_declared = int(header.group(3))
 
-    # Look for header on first line
-    line = f.readline()
-    header = HEADER_RE.match(line)
-    if not header: # If not found on first line, look on second (happens when passing multi line string)
-        _line = f.readline()
-        header = HEADER_RE.match(_line)
-        if not header:
-            raise ValueError(f"Missing or incorrect header: \n0: {line}1: {_line}2: ...")
-    nr_vars_declared = int(header.group(2))
+        # Generator without comment lines
+        reader = (line_text for line_text in map(str.strip, f) if line_text and line_text[0] != '*')
 
-    # Generator without comment lines
-    reader = (line_text for line_text in map(str.strip, f) if line_text and line_text[0] != '*')
+        # CPMpy objects
+        vars: dict[str, Any] = {}
+        model = cp.Model()
 
-    # CPMpy objects
-    vars: dict[str, Any] = {}
-    model = cp.Model()
+        with _ignore_strict_variable_name_check():
+            # Special case for first line -> might contain objective function
+            first_line = next(reader)
+            if OBJ_TERM_RE.match(first_line):
+                obj_expr = _parse_term(first_line, vars)
+                model.minimize(obj_expr)
+            else: # no objective found, parse as a constraint instead
+                _add_constraint(model, first_line, vars)
 
-    with _ignore_strict_variable_name_check():
-        # Special case for first line -> might contain objective function
-        first_line = next(reader)
-        if OBJ_TERM_RE.match(first_line):
-            obj_expr = _parse_term(first_line, vars)
-            model.minimize(obj_expr)
-        else: # no objective found, parse as a constraint instead
-            _add_constraint(model, first_line, vars)
+            # Start parsing line by line
+            for line in reader:
+                _add_constraint(model, line, vars)
+        _update_variable_counters(model)
 
-        # Start parsing line by line
-        for line in reader:
-            _add_constraint(model, line, vars)
-    _update_variable_counters(model)
+        if len(vars) != nr_vars_declared:
+            raise ValueError(f"Header declares {nr_vars_declared} variables but found {len(vars)} unique variables while parsing")
+        
+        if len(model.constraints) != nr_constraints_declared:
+            raise ValueError(f"Header declares {nr_constraints_declared} constraints but found {len(model.constraints)} constraints while parsing")
 
-    if len(vars) > nr_vars_declared:
-        import warnings
-        warnings.warn(
-            f"Header declares {nr_vars_declared} variables but found {len(vars)} unique variables while parsing",
-            stacklevel=2,
-        )
-
-    return model
+        return model
 
 def annotate_x(vars, ivarmap: dict[str, Any]) -> list[str]:
     """
