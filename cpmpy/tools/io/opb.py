@@ -46,8 +46,9 @@ import cpmpy as cp
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.to_opb import to_opb, to_opb_objective
-from cpmpy.expressions.variables import NegBoolView, allow_reserved_var_names
+from cpmpy.expressions.variables import NegBoolView, _ignore_strict_variable_name_check
 from cpmpy.expressions.core import Operator, Comparison
+from cpmpy.model import _update_variable_counters
 
 
 # Regular expressions
@@ -118,9 +119,7 @@ def _parse_term(line, vars):
             neg = tok.startswith("~")
             var_name = tok[1:] if neg else tok
             if var_name not in vars:
-                # OPB annotations may contain reserved prefixes (IV*/BV*); accept them while parsing.
-                with allow_reserved_var_names():
-                    vars[var_name] = cp.boolvar(name=var_name)
+                vars[var_name] = cp.boolvar(name=var_name)
             factors.append(~vars[var_name] if neg else vars[var_name])
         
         weight = -coeff if sign_tok == "-" else coeff
@@ -231,18 +230,20 @@ def load_opb(opb: Union[str, os.PathLike], open:Callable = builtins.open) -> cp.
     # CPMpy objects
     vars: dict[str, Any] = {}
     model = cp.Model()
-    
-    # Special case for first line -> might contain objective function
-    first_line = next(reader)
-    if OBJ_TERM_RE.match(first_line):
-        obj_expr = _parse_term(first_line, vars)
-        model.minimize(obj_expr)
-    else: # no objective found, parse as a constraint instead
-        _add_constraint(model, first_line, vars)
 
-    # Start parsing line by line
-    for line in reader:
-        _add_constraint(model, line, vars)
+    with _ignore_strict_variable_name_check():
+        # Special case for first line -> might contain objective function
+        first_line = next(reader)
+        if OBJ_TERM_RE.match(first_line):
+            obj_expr = _parse_term(first_line, vars)
+            model.minimize(obj_expr)
+        else: # no objective found, parse as a constraint instead
+            _add_constraint(model, first_line, vars)
+
+        # Start parsing line by line
+        for line in reader:
+            _add_constraint(model, line, vars)
+    _update_variable_counters(model)
 
     if len(vars) > nr_vars_declared:
         import warnings
