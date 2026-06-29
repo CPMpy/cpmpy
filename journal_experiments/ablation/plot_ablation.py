@@ -43,7 +43,7 @@ VARIANT_LABEL = {
     "no-ilpfriendly": "no linear-friendly",
     "no-detect-categorical": "no categorical",
     "no-cp-friendly": "linear-friendly",
-    "no-positive-decompositions": "no positive decomps",
+    "no-positive-decompositions": "no positive decomp",
 }
 
 STAT_METRICS = {
@@ -100,7 +100,7 @@ def save_figure(fig, name):
 
 
 
-def plot_stats(df, figures_dir, subtitle=None):
+def plot_stats(df, figures_dir, subtitle=None, fname=None):
     """One figure per solver: ECDFs of constraints / integer / boolean vars."""
     plot_df = df.copy()
     for col in STAT_METRICS:
@@ -136,11 +136,13 @@ def plot_stats(df, figures_dir, subtitle=None):
         
         fig.suptitle(title)
         fig.tight_layout()
-        save_figure(fig, os.path.join(figures_dir, f"ablation_stats_{solver}"))
+        if fname is None:
+            fname = "ablation_stats_{}"
+        save_figure(fig, os.path.join(figures_dir, fname.format(solver)))
         plt.close(fig)
 
 
-def plot_runtime(df, figures_dir, runtime_col="runtime", subtitle=None):
+def plot_runtime(df, figures_dir, runtime_col="runtime", subtitle=None, fname=None):
     """One ECDF figure per solver, saved into ``figures_dir``."""
 
 
@@ -171,7 +173,9 @@ def plot_runtime(df, figures_dir, runtime_col="runtime", subtitle=None):
         if subtitle is not None:
             title += f"\n{subtitle}"
         ax.set_title(title)
-        save_figure(fig, os.path.join(figures_dir, f"ablation_{solver}"))
+        if fname is None:
+            fname = "ablation_{}"
+        save_figure(fig, os.path.join(figures_dir,fname.format(solver)))
         plt.close(fig)
 
 
@@ -180,16 +184,25 @@ if __name__ == "__main__":
     figures_dir = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_FIGURES_DIR
 
     df = load_results(results_dir)
+    
+    df = df.sort_values(['solver','model','variant'])
+    df.to_csv("results_"+results_dir.split("/")[-1]+".csv")
+
+    df_csp = df[df['objective_value'].isna()]
+    df_cop = df[~df['objective_value'].isna()]
+
 
     print("Raw data:")
     print(df.groupby(["solver", "variant", "status"]).size())
 
-    finished = get_finished_instances(df)
-    print("Finished instances:")
-    print(finished.groupby(["solver", "variant"]).size())
+    finished = get_finished_instances(df_csp)
+    subtitle="XCSP3 2024 CSP"
 
-    subtitle = results_dir.split("/")[-1]
+    plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_csp24_{}")
+    plot_stats(finished, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_csp24_{}")
 
-    print(df)
-    plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle)
-    plot_stats(finished, figures_dir=figures_dir, subtitle=subtitle)
+    finished = get_finished_instances(df_cop)
+    subtitle= "XCSP3 2024 COP"
+    
+    plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_cop24_{}")
+    plot_stats(finished, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_cop24_{}")
