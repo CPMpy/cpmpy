@@ -16,7 +16,7 @@ import inspect
 from typing import Callable, Optional, List
 from functools import partial
 import warnings
-
+import os
 import cpmpy as cp
 from .dimacs import write_dimacs
 from cpmpy.tools.io.scip import write_scip
@@ -93,7 +93,7 @@ def _create_header(format: str) -> str:
     header += "-"*100 + "\n"
     return header
 
-def write(model: cp.Model, file_path: Optional[str] = None, format: Optional[str] = None, verbose: bool = False, header: Optional[str] = None, **kwargs) -> str:
+def write(model: cp.Model, file_path: Optional[os.PathLike] = None, format: Optional[str] = None, verbose: bool = False, header: Optional[str] = None, **kwargs) -> str:
     """
     Write a model to a file.
 

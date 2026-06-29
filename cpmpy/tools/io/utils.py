@@ -1,5 +1,5 @@
 import warnings
-
+import os
 
 # mapping file extensions to appropriate format names
 _format_map = {
@@ -34,7 +34,7 @@ def get_format(extension: str) -> str:
     """
     return _format_map[extension]
 
-def _derive_format(file_path: str) -> str:
+def _derive_format(file_path: os.PathLike) -> str:
     """
     Derive the format of a file from its path by looking at its file extension.
 
@@ -57,7 +57,7 @@ def _derive_format(file_path: str) -> str:
     """
 
     # Iterate over the file path extensions in reverse order
-    for ext in file_path.split(".")[::-1]:
+    for ext in str(file_path).split(".")[::-1]:
         try:
             return get_format(ext)
         except ValueError:

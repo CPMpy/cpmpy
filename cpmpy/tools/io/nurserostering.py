@@ -23,11 +23,12 @@ import sys
 import builtins
 import argparse
 import tempfile
-import cpmpy as cp
 import re
 from typing import Union, Callable, Optional, Any
 
+import cpmpy as cp
 from cpmpy.expressions.variables import NDVarArray
+from cpmpy.expressions.core import Expression
 
 # Optional dependencies
 try:
@@ -403,7 +404,10 @@ def _model_nurserostering(
         model += nb_nurses - slack_over + slack_under == cover_request["Requirement"]
         objective += cover_request["Weight for over"] * slack_over + cover_request["Weight for under"] * slack_under
 
-    model.minimize(objective)
+    if isinstance(objective, Expression):
+        model.minimize(objective)
+    else:
+        raise ValueError("Objective is not an Expression, model seems to be empty or invalid.")
 
     return model, nurse_view
 

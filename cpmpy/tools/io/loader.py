@@ -12,9 +12,10 @@ List of functions
     load_formats
 """
 
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
 from functools import partial
-
+import os
+from pathlib import Path
 import cpmpy as cp
 from .dimacs import load_dimacs
 from cpmpy.tools.io.scip import load_scip
@@ -75,7 +76,7 @@ def load_formats() -> List[str]:
 
 
 
-def load(file_path: str, format: Optional[str] = None) -> cp.Model:
+def load(file_path: Union[str, os.PathLike], format: Optional[str] = None) -> cp.Model:
     """
     Load a model from a file.
 
@@ -92,7 +93,10 @@ def load(file_path: str, format: Optional[str] = None) -> cp.Model:
     """
 
     if format is None:
-        format = _derive_format(file_path)
+        if isinstance(file_path, str) or isinstance(file_path, os.PathLike):
+            format = _derive_format(Path(file_path))
+        else:
+            raise ValueError(f"No format provided and could not derive format from string")
 
     loader = _get_loader(format)
     return loader(file_path)
