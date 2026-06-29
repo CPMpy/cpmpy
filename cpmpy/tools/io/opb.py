@@ -118,6 +118,7 @@ def _parse_term(line, vars):
         for tok in parts:
             neg = tok.startswith("~")
             var_name = tok[1:] if neg else tok
+            var_name = var_name.replace("\"", "") # support extended naming format
             if var_name not in vars:
                 vars[var_name] = cp.boolvar(name=var_name)
             factors.append(~vars[var_name] if neg else vars[var_name])
@@ -248,6 +249,12 @@ def load_opb(opb: Union[str, os.PathLike, TextIO], open:Callable = builtins.open
 
         return model
 
+def annotate_extended(vars, ivarmap: dict[str, Any]) -> list[str]:
+    """
+    Annotate CPMpy variables as OPB ``x<int>`` identifiers.
+    """
+    return [f'"{v.name}"' for v in vars]
+
 def annotate_x(vars, ivarmap: dict[str, Any]) -> list[str]:
     """
     Annotate CPMpy variables as OPB ``x<int>`` identifiers.
@@ -292,7 +299,7 @@ def write_opb(
         encoding:str="auto", 
         header:Optional[str] = None, 
         open:Callable = builtins.open, 
-        annotate: Callable = annotate_x
+        annotate: Callable = annotate_extended
     ) -> str:
     """
     Export a CPMpy model to the OPB (Pseudo-Boolean) format.
