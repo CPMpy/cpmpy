@@ -1,34 +1,42 @@
 # Adding a new solver
 
-Any solver that has a Python interface can be added as a solver to CPMpy. See the bottom of this page for tips in case the/your solver does not have a Python interface yet.
+Any solver that has a Python interface can be added as a solver to CPMpy. See lower on this page for tips in case your solver does not have a Python interface yet.
 
-To add your solver to CPMpy, you should copy [cpmpy/solvers/TEMPLATE.py](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/solvers/TEMPLATE.py) directory, rename it to your solver name and start filling in the template. You can also look at how it is done for other solvers, they all follow the template.
+To add your solver to CPMpy, you should copy [cpmpy/solvers/TEMPLATE.py](https://github.com/CPMpy/cpmpy/blob/master/cpmpy/solvers/TEMPLATE.py), rename it to your solver name and start filling in the template. You can also look at how it is done for other solvers, they all follow the template.
 
 Implementing the template consists of the following parts:
 
-  * `version()` where you return the installed version of the solver's Python API, if available.
+  * `version()` where you return the installed version of the solver's Python API, if its installed.
   * `supported()` where you check whether the solver is ready to use. Never include the solver python package at the top-level of the file, CPMpy has to work even if a user did not install your solver package. If needed, split this into helper checks such as `installed()`, `license_ok()`, `executable_installed()`, or version checks.
-  * `__init__()` where you initialize the underlying solver object
-  * `solver_var()` where you create new solver variables and map them to CPMpy decision variables
-  * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving
-  * `objective()` if your solver supports optimisation (optionally override `minimize`/`maximize`/`objective` with `Expression | FloatSum` type hints if your solver supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives)
-  * `supported_global_constraints` and `supported_reified_global_constraints` where you declare which global constraints should reach the solver interface directly instead of being decomposed first
-  * `transform()` where you call the necessary transformations in `cpmpy.transformations` to transform CPMpy expressions to those that the solver supports
-  * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver
-  * `solvernames()` and `solverversion()` if the interface exposes named subsolvers
+  * `__init__()` and `native_model()` where you initialize and return the underlying solver object.
+  * `solver_var()` where you create new solver variables and map them to CPMpy decision variables.
+  * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving.
+  * `objective()` if your solver supports optimisation (optionally override `minimize`/`maximize`/`objective` with `Expression | FloatSum` type hints if your solver also supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives).
+  * `supported_global_constraints` and `supported_reified_global_constraints` where you declare which integer functions and global constraints should reach the solver interface directly instead of being decomposed first.
+  * `transform()` where you call the necessary transformations in `cpmpy.transformations` to transform CPMpy expressions to those that the solver supports.
+  * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver.
 
-Once the core interface works, consider exposing extra solver features through CPMpy as well. These hooks are optional and can be added incrementally:
+Now, to get your solver known and easy to use, you also have to register it in a number of places:
 
-  * `solveAll()` if the solver natively supports solution enumeration
-  * `native_model` to expose the underlying solver model for direct access or direct constraints
-  * native callback support, such as `solution_callback`, listeners, log callbacks, or progress callbacks
+  * ``cpmpy/solvers/utils.py`` in the `SolverLookup.base_solvers()` function, the SOLVER_NAME you choose there is the one users will use when calling `model.solve(solver=<SOLVER_NAME>)`
+  * ``README.md`` so the world knows its in CPMpy
+  * ``docs/index.rst`` so the world knows its capabilities. To test for incremental capabilities, use the ``examples/advanced/test_incremental_solving.py`` script
+  * ``docs/api/solvers/`` needs a `.rst` file for your solver, to appear in CPMpy's [API documentation](./api/solvers.rst) (copy one of the other solvers' file and make the necessary changes)
+  * ``cpmpy/solvers/__init__.py`` in the *"List of classes"*, the imports and the all, so its easy to import from cpmpy.solvers
+  * ``mypy.ini`` if your solver is not typed, you should set ignore_missing_imports for it here
+  * ``setup.py`` you can add a group to ease install; our policy is to only forbid existing solver versions that we know are incompatible
+  * ``.github/workflows/python-test.yml`` if the solver is free to use, then this will make the GitHub CI run the test-suite on every commit (highly recommended)
+  * ``tests/test_solvers.py`` its not really required, but you can add one explicit test for your solver here, it will always run if the solver is installed
+  * if you want your solver to be named in different places in the docs, check ``docs/solvers.md`` and ``docs/installation_instructions.rst`` for solvers mentioned there
+
+Once the above works, consider connection optional extra solver features, if your solver supports them. These can also always be added in later commits.
+
   * `solution_hint()` for warm-starting the solver with a suggested variable assignment
-  * `get_core()` if `solve(assumptions=...)` supports UNSAT core extraction
-  * `mus_native()` as a classmethod if the solver has a native MUS/IIS extractor, used by `cpmpy.tools.explain.mus_native()`
-
-For your new solver to appear in CPMpy's [API documentation](./api/solvers.rst), add a `.rst` file in ``/docs/api/solvers`` (copy one of the other solvers' file and make the necessary changes) and add your solver to the *"List of submodules"* and the *"List of classes"* in the file ``/cpmpy/solvers/__init__.py``. And also to the overview table of solvers in ``docs/index.rst``. To test for incremental capabilities, use the ``examples/advanced/test_incremental_solving.py`` script.
-
-To ease the installation process of your solver, add it to CPMpy's `setup.py` if it has a pip-installable Python package. Add an entry to `solver_dependencies`, mapping the cpmpy-native name for your solver (the same one used when calling `model.solve(solver=<SOLVER_NAME>)`) to the name of your pip-installable Python package and all its required dependencies. If the solver also requires a separate binary, executable, server, or license, document those requirements in the solver interface docstring and solver documentation.
+  * `solve(solution_callback=..., display=...)` if the optimisation solver can return intermediate solutions during search
+  * `solveAll()` if the solver natively supports solution enumeration
+  * `solvernames()` and `solverversion()` if the interface exposes named subsolvers
+  * `solve(assumptions=...)` and `get_core()` if the solver supports solving under assumptions and UNSAT core extraction
+  * `mus_native()` if the solver has a native MUS/IIS extractor (used by `cpmpy.tools.explain)
 
 ## Transformations and posting constraints
 
@@ -115,11 +123,11 @@ This is done by adding an import statement in `/solvers/__init__.py` and adding 
 To run the (extensive) testsuite on your solver, run:
 
 ```bash
-python -m pytest tests/ --solver <YOUR SOLVER>
+python -m pytest tests/ --solver <SOLVER_NAME>
 ```
 
 it will automatically test all of the allowed expressions through a constraint generator in `/tests/test_constraints.py`.
-For a quicker feedback loop during development, you can run focused tests such as `tests/test_solverinterface.py` or `tests/test_solvers_solhint.py` with `--solver <YOUR SOLVER>` as well.
+For a quicker feedback loop during development, you can run focused tests such as `tests/test_solverinterface.py` or `tests/test_solvers_solhint.py` with `--solver <SOLVER_NAME>` as well.
 Using the transformation stack your solver should be able to handle all constraints and operators. However, during development there may be an exception to this rule.
 You can exclude a global constraint or an operation using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` dictionaries respectively.
 After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
