@@ -181,10 +181,6 @@ def gurobi_transform(self, cpm_expr, ablate):
     cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "sub", "min", "max", "mul", "abs", "pow"}), csemap=self._csemap)  # the core of the MIP-linearization
     cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
 
-    print("Transformed constraints:")
-    for c in cpm_cons:
-        print(c)
-
     return cpm_cons
 
 
