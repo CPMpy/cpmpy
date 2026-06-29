@@ -65,14 +65,14 @@ from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.int2bool import IntVarEnc
-from cpmpy.tools.io.utils import _handle_loader_input
+from cpmpy.tools.io.utils import _create_header, _handle_loader_input
 
 
 def write_dimacs(
         model: cp.Model, 
         fname: Optional[str] = None, 
         encoding: str = "auto", 
-        p_header: bool = False, header : Optional[str] = "DIMACS file written by CPMpy", 
+        p_header: bool = False, header : Optional[str] = None, 
         open: Callable = builtins.open, 
         annotate: Optional[Callable] = None
     ) -> str:
@@ -88,6 +88,9 @@ def write_dimacs(
         fname (str, optional): file name to write the DIMACS output to. If None, the DIMACS string is returned.
         encoding (str): the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary") (default: "auto")
         p_header (bool): whether to include the ``p ...`` problem header line (default: ``False``)
+        header (str, optional): Optional header text to prepend as DIMACS comments.
+            If None, a default CPMpy header is created only when writing to ``fname``.
+            Pass an empty string to skip adding a header.
         open (Callable): callable to open the file for writing (default: builtin ``open``).
             Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
@@ -100,6 +103,11 @@ def write_dimacs(
             - "json_sidecar": comments + a .map.json sidecar file (BumbleBee pattern)
             - VariableAnnotator instance: fully custom strategy
     """
+
+    if header is None:
+        header = _create_header(format="wcnf" if model.has_objective() else "cnf") if fname is not None else None
+    elif header == "":
+        header = None
 
     if model.has_objective():
         hard_prefix = "h "

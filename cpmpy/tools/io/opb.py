@@ -48,7 +48,7 @@ from cpmpy.transformations.to_opb import to_opb, to_opb_objective
 from cpmpy.expressions.variables import NegBoolView, _ignore_strict_variable_name_check
 from cpmpy.expressions.core import Operator, Comparison
 from cpmpy.model import _update_variable_counters
-from cpmpy.tools.io.utils import _handle_loader_input
+from cpmpy.tools.io.utils import _create_header, _handle_loader_input
 
 
 # Regular expressions
@@ -313,8 +313,9 @@ def write_opb(
         model (cp.Model): The CPMpy model to export.
         fname (str or os.PathLike, optional): The file name to write the OPB output to.
         encoding (str, optional): The encoding used for `int2bool`. Options: ("auto", "direct", "order", "binary").
-        header (str, optional): Optional header text to add as OPB comments. If provided, each line
-            will be prefixed with "* ".
+        header (str, optional): Optional header text to add as OPB comments.
+            If None, a default CPMpy header is created only when writing to ``fname``.
+            Pass an empty string to skip adding a header.
         open (callable): Callable to open the file for writing (default: builtin ``open``).
             Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
@@ -342,6 +343,10 @@ def write_opb(
 
     if open is None:
         open = builtins.open
+    if header is None:
+        header = _create_header(format="opb") if fname is not None else None
+    elif header == "":
+        header = None
 
     csemap, ivarmap = CSEMap(), dict[str, Any]()
     opb_cons = to_opb(model.constraints, csemap, ivarmap, encoding)

@@ -38,6 +38,19 @@ def get_format(extension: str) -> str:
     """
     return _format_map[extension]
 
+def _create_header(format: str) -> str:
+    """
+    Default header for an exported file.
+    """
+    import cpmpy as cp
+
+    header = "-"*100 + "\n"
+    header += "File written by CPMpy\n"
+    header += f"    Format: '{format}'\n"
+    header += f"    CPMpy Version: {cp.__version__}\n"
+    header += "-"*100 + "\n"
+    return header
+
 def _derive_format(file_path: os.PathLike) -> str:
     """
     Derive the format of a file from its path by looking at its file extension.

@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     import pyscipopt
 
 from cpmpy.solvers.scip import CPM_scip
-from cpmpy.tools.io.utils import _derive_format, get_extension
+from cpmpy.tools.io.utils import _create_header, _derive_format, get_extension
 
 
 def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtins.open, assume_integer:bool=False, type: Optional[str]=None) -> cp.Model:
@@ -287,6 +287,8 @@ def write_scip(
         fname (Optional[str]): Path to write to. If None, the file content is returned as a string.
         format (str): Output format (e.g. "mps", "lp", "cip", "fzn", "gms", "pip").
         header (Optional[str]): Optional header text to prepend (format-dependent comment style).
+            If None, a default CPMpy header is created only when writing to ``fname``.
+            Pass an empty string to skip adding a header.
         verbose (bool): If True, allow SCIP to print progress.
         open (Callable): Callable to open the file for writing (default: builtin ``open``).
             Called as ``open(fname, "w")``. Mirrors the ``open=`` argument in loaders and
@@ -298,6 +300,10 @@ def write_scip(
     """
 
     writer = _SCIPWriter(model, problem_name="CPMpy Model")
+    if header is None:
+        header = _create_header(format=format) if fname is not None else None
+    elif header == "":
+        header = None
 
     # Always write via SCIP to a temp file, then add header and get content
     with tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False) as tmp:

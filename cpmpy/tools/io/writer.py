@@ -21,7 +21,7 @@ import cpmpy as cp
 from .dimacs import write_dimacs
 from cpmpy.tools.io.scip import write_scip
 from cpmpy.tools.io.opb import write_opb
-from cpmpy.tools.io.utils import _derive_format
+from cpmpy.tools.io.utils import _create_header, _derive_format
 
 # mapping format names to appropriate writer functions
 _writer_map: dict[str, Callable[..., str]] = {
@@ -82,17 +82,6 @@ def write_formats() -> List[str]:
     """
     return list(_writer_map.keys())
 
-def _create_header(format: str) -> str:
-    """
-    Default header for a file.
-    """
-    header = "-"*100 + "\n"
-    header += "File written by CPMpy\n"
-    header += f"    Format: '{format}'\n"
-    header += f"    CPMpy Version: {cp.__version__}\n"
-    header += "-"*100 + "\n"
-    return header
-
 def write(model: cp.Model, file_path: Optional[os.PathLike] = None, format: Optional[str] = None, verbose: bool = False, header: Optional[str] = None, **kwargs) -> str:
     """
     Write a model to a file.
@@ -138,10 +127,8 @@ def write(model: cp.Model, file_path: Optional[os.PathLike] = None, format: Opti
     if unsupported:
         warnings.warn(f"Unsupported kwargs: {unsupported}")
 
-    # create header if not provided
+    # Create a default header for files, but keep returned strings clean by default.
     if header is None:
-        header = _create_header(format)
-    if header == "":
-        header = None
+        header = _create_header(format) if file_path is not None else None
 
     return writer(model, fname=file_path, header=header, **filtered_kwargs)
