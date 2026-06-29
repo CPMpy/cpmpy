@@ -27,14 +27,15 @@ solver_dependencies = {
     "minizinc": ["minizinc>=0.7.0"],
     "pysat": ["python-sat>=1.8.dev4"],
     "gurobi": ["gurobipy>=11.0.0"],
-    "highs": ["highspy"],
+    "highs": ["highspy <=1.14.0"],
     "pysdd": ["pysdd>=0.2.11"],
     "gcs": ["gcspy>=0.1.9"], # first version to pass all tests
     "cpo": ["docplex>=2.28.240"],
     "pumpkin": ["pumpkin-solver>=0.3.0"], # CPMpy requires features only available from Pumpkin version >=0.3.0
     "pindakaas": ["pindakaas>=0.5.0"],
     "cplex": ["docplex>=2.28.240", "cplex>=20.1.0.4"],
-    "scip": ["pyscipopt>=6.1"]
+    "scip": ["pyscipopt>=6.1"],
+    "rc2": ["python-sat>=1.9.dev5", "pypblib"]
 }
 solver_dependencies["all"] = list({pkg for group in solver_dependencies.values() for pkg in group}) 
 
