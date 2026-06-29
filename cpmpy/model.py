@@ -88,7 +88,7 @@ class Model(object):
             con (NestedBoolExprLike): Boolean constraint expression or constant, or nested list/tuple thereof
 
         Returns:
-            Model: Returns ``self`` to allow for method chaining
+            self
 
         Example:
             .. code-block:: python
