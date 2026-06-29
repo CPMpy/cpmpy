@@ -12,7 +12,7 @@ List of functions
     load_formats
 """
 
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Union, TextIO
 from functools import partial
 import os
 from pathlib import Path
@@ -25,12 +25,12 @@ from cpmpy.tools.io.utils import _derive_format, _is_potential_path
 
 # mapping format names to appropriate loader functions
 _loader_map: dict[str, Callable[..., cp.Model]] = {
-    "mps": load_scip,
-    "lp": load_scip,
-    "cip": load_scip,
-    "fzn": load_scip,
-    "gms": load_scip,
-    "pip": load_scip,
+    "mps": partial(load_scip, type="mps"),
+    "lp": partial(load_scip, type="lp"),
+    "cip": partial(load_scip, type="cip"),
+    "fzn": partial(load_scip, type="fzn"),
+    "gms": partial(load_scip, type="gms"),
+    "pip": partial(load_scip, type="pip"),
     "dimacs": load_dimacs,
     "opb": load_opb,
     "cnf": partial(load_dimacs, type="cnf"),
@@ -74,12 +74,12 @@ def load_formats() -> List[str]:
     """
     return list(_loader_map.keys())
 
-def load(instance: Union[str, os.PathLike], format: Optional[str] = None) -> cp.Model:
+def load(instance: Union[str, os.PathLike, TextIO], format: Optional[str] = None) -> cp.Model:
     """
     Load an instance from a file into a CPMpy model..
 
     Arguments:
-        instance (str or os.PathLike): The path to the instance file to load or the instance itself as a string.
+        instance (str or os.PathLike or TextIO): The path to the instance file to load, the instance itself as a string, or a TextIO object.
         format (Optional[str]): The format of the file to load. If None, the format will be derived from the file path (best effort). 
                                 Might raise a ValueError if the format could not be derived from the file path, or if the format is not supported.
 

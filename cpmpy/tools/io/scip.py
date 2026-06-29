@@ -34,26 +34,29 @@ import math
 import os
 import sys
 import tempfile
+from io import TextIOBase
 import numpy as np
 import cpmpy as cp
 import warnings
 import builtins
-from typing import Union, Optional, Callable, TYPE_CHECKING
+from typing import Union, Optional, Callable, TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
     import pyscipopt
 
 from cpmpy.solvers.scip import CPM_scip
+from cpmpy.tools.io.utils import _derive_format, get_extension
 
 
-def load_scip(fname: Union[str, os.PathLike], open:Callable = builtins.open, assume_integer:bool=False) -> cp.Model:
+def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtins.open, assume_integer:bool=False, type: Optional[str]=None) -> cp.Model:
     """
     Load a SCIP-compatible model from a file and return a CPMpy model.
 
     Arguments:
-        fname (str or os.PathLike): The path to the SCIP-compatible file to read.
+        instance (str or os.PathLike or TextIO): The path to the SCIP-compatible file to read, a string containing the model content directly, or a TextIO object already open for reading.
         open (Callable): The function to use to open the file. (SCIP does not require this argument, will be ignored)
         assume_integer (bool): Whether to assume that all variables are integer.
+        type (str, optional): Type of the inline string or unnamed TextIO input. Required when ``instance`` is a raw string.
 
     Warning:
         Setting assumes_integer to True will cause CPMpy to assume that all variables are integer, 
@@ -69,11 +72,42 @@ def load_scip(fname: Union[str, os.PathLike], open:Callable = builtins.open, ass
 
     from pyscipopt import Model
 
+    content = None
+    if isinstance(instance, TextIOBase):
+        content = instance.read()
+        if type is None:
+            try:
+                type = _derive_format(getattr(instance, "name", ""))
+            except (KeyError, ValueError):
+                raise ValueError("Type must be provided when loading a SCIP model from an unnamed TextIO object.")
+    elif isinstance(instance, str) and not os.path.exists(instance):
+        if type is None:
+            raise ValueError("Type must be provided when loading a SCIP model from a string.")
+        content = instance
+
+    # SCIP's parser only supports file paths
+    # -> write content to a temporary file
+    tmp_fname = None
+    if content is not None:
+        try:
+            suffix = "." + get_extension(type)
+        except KeyError as e:
+            raise ValueError(f"Unsupported SCIP file type: {type}") from e
+
+        with tempfile.NamedTemporaryFile(suffix=suffix, mode="w", delete=False) as tmp:
+            tmp.write(content)
+            tmp_fname = tmp.name
+        instance = tmp_fname
+
     # Load file into pyscipopt model
     scip = Model()
-    scip.hideOutput() # suppress SCIP output
-    scip.readProblem(filename=fname)
-    scip.hideOutput(quiet=False)
+    try:
+        scip.hideOutput() # suppress SCIP output
+        scip.readProblem(filename=instance)
+        scip.hideOutput(quiet=False)
+    finally:
+        if tmp_fname is not None:
+            os.remove(tmp_fname)
 
     # 1) translate variables
     scip_vars = scip.getVars()
