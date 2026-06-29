@@ -12,7 +12,6 @@ _format_map = {
     "wcnf"  : "wcnf",
     "cnf"   : "cnf",
     "opb"   : "opb",
-    "xcsp3" : "xcsp3",
 }
 
 _extension_map: dict[str, list[str]] = {}
