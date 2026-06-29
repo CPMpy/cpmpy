@@ -14,6 +14,7 @@ import cpmpy as cp
 import importlib
 import warnings
 import logging
+import os
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -184,6 +185,7 @@ MARKERS = {
     "requires_dependency": "mark test as requiring a specific dependency",              # to filter (not skip) tests when required dependency is not installed
     "generate_constraints": "mark test as generating constraints",                      # to make multiple copies of the same test, based on a generated set of constraints
     "depends_on_solver": "mark test as depending on solvers (directly or indirectly)",  # for marking tests that indirectly use a solver (without using the solver fixture)
+    "dataset_download": "mark test as requiring dataset downloads",                     # skipped unless --include-datasets (or env override) is enabled
 }
 
 # ---------------------------------------------------------------------------- #
@@ -196,6 +198,15 @@ def pytest_addoption(parser):
     """
     parser.addoption(
         "--solver", type=str, action="store", default=None, help="Only run the tests on these solvers. Can be a single solver, a comma-separated list (e.g., 'ortools,cplex'), 'all' to use all installed solvers, or 'None' to skip all solver-parametrized tests."
+    )
+    parser.addoption(
+        "--include-datasets",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable tests marked with 'dataset_download'. "
+            "By default these tests are skipped because they download dataset files from the network. "
+        ),
     )
 
 # ---------------------------------------------------------------------------- #
@@ -357,6 +368,7 @@ def pytest_collection_modifyitems(config, items):
     
     cmd_solver_option = config.getoption("--solver") # get cli `--solver`` arg
     cmd_solvers = _parse_solver_option(cmd_solver_option)  # parse into list
+    run_download_tests = config.getoption("--include-datasets")
     
     # Uncomment for debugging
     # if cmd_solver_option:
@@ -381,6 +393,17 @@ def pytest_collection_modifyitems(config, items):
         required_solver_marker = item.get_closest_marker("requires_solver")
         required_dependency_marker = item.get_closest_marker("requires_dependency")
         depends_on_solver_marker = item.get_closest_marker("depends_on_solver")
+        dataset_download_marker = item.get_closest_marker("dataset_download")
+
+        if dataset_download_marker and not run_download_tests:
+            item.add_marker(
+                pytest.mark.skip(
+                    reason=(
+                        "Test requires downloading dataset files. "
+                        "Use --include-datasets to enable."
+                    )
+                )
+            )
 
         # --------------------------------- Dependency filtering --------------------------------- #
 

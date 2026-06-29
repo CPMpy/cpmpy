@@ -1,5 +1,11 @@
 """
     Transformations dealing with negations (used by other transformations).
+
+    After calling `push_down_negation()`, only two 'negative' expressions remain:
+    - NegBoolView(var), which represents ~var
+    - Operator("not", [GlobalConstraint]) in case GlobalConstraint did not overwrite the .negate() method.
+    
+    The latter can be further handled by `decompose_in_tree()`, e.g. it will negate the decomposition.
 """
 import copy
 import warnings  # for deprecation warning
@@ -25,9 +31,11 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
             list of Expressions
     """
     newlist: list[Expression] = []
+    changed = False
     for expr in lst_of_expr:
-        changed, newexpr = _push_down_negation_expr(expr)
-        if changed:
+        changed_expr, newexpr = _push_down_negation_expr(expr)
+        if changed_expr:
+            changed = True
             if toplevel and newexpr.name == "and":
                 for b in newexpr.args:
                     if isinstance(b, Expression):
@@ -39,8 +47,22 @@ def push_down_negation(lst_of_expr: list[Expression], toplevel=True) -> list[Exp
                 newlist.append(newexpr)
         else:
             newlist.append(expr)
+    
+    if not changed:
+        return lst_of_expr
     return newlist
 
+def push_down_negation_objective(expr: Expression) -> Expression:
+    """
+    Push down negation into the objective expression.
+    """
+    assert isinstance(expr, Expression), "push_down_negation_objective: expected a single expression as objective but got {expr}"
+
+    changed, newexpr = _push_down_negation_expr(expr)
+    if changed:
+        return newexpr
+    else:
+        return expr
 
 def _push_down_negation_expr(expr: Expression) -> tuple[bool, Expression]:
     """
@@ -250,11 +272,16 @@ def recurse_negation(expr: Expression|bool|np.bool_) -> Expression:
         
     # global constraints
     elif isinstance(expr, GlobalConstraint):
-        new_glob = copy.copy(expr)
+        # first recurse to see if the arguments contain negations
         rec_changed, rec_args = _push_down_negation_args(expr.args)
         if rec_changed:
+            new_glob = copy.copy(expr)
             new_glob.update_args(rec_args)
-        return new_glob.negate()
+            expr = new_glob
+
+        # by default, global.negate() will return ~global
+        # some global constraints may have a better way to negate them, and overwrite global.negate()
+        return expr.negate()
            
     else:
         raise ValueError(f"Unsupported expression to negate: {expr}")

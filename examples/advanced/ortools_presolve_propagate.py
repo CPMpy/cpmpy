@@ -21,7 +21,8 @@ s.solve(stop_after_presolve=True, fill_tightened_domains_in_response=True)
 
 # Get bounds from response proto send to the native solver object
 bounds = s.ort_solver.ResponseProto().tightened_variables
-for cpm_var, ort_var in s._varmap.items():
+for cpm_var in s.user_vars:
+    ort_var = s.solver_var(cpm_var)
     # Get bounds for variable
     bound = bounds[ort_var.Index()]
     """

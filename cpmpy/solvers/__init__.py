@@ -45,6 +45,7 @@ List of solver submodules
     optalcp
     rc2
     scip
+    highs
 
 =========================
 List of helper submodules
@@ -82,6 +83,7 @@ from .hexaly import CPM_hexaly
 from .optalcp import CPM_optalcp
 from .rc2 import CPM_rc2
 from .scip import CPM_scip
+from .highs import CPM_highs
 
 __all__ = [
     "CPM_choco",
@@ -91,6 +93,7 @@ __all__ = [
     "CPM_gcs",
     "CPM_gurobi",
     "CPM_hexaly",
+    "CPM_highs",
     "CPM_minizinc",
     "CPM_optalcp",
     "CPM_ortools",

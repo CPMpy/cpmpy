@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
+import threading
 import warnings # for deprecation warning
 from functools import reduce
 from typing import Any, Literal, Optional, overload
@@ -71,6 +72,8 @@ from .utils import is_num, is_int, is_boolexpr, get_bounds
 _BV_PREFIX = "BV"
 _IV_PREFIX = "IV"
 _VAR_ERR  = f"Variable names starting with {_IV_PREFIX} or {_BV_PREFIX} are reserved for internal use only, chose a different name"
+_VAR_NAME_CHECK_STATE = threading.local()
+_VAR_NAME_CHECK_STATE.strict = True # default to strict mode
 
 def BoolVar(shape=1, name=None):
     """
@@ -510,36 +513,32 @@ class NDVarArray(np.ndarray):
     def __getitem__(self, index):  # TODO: any typing would have to be compatible with supertype "numpy.ndarray"
         # array access, check if variables are used in the indexing
 
-        # index is single expression: direct element
+        # index is single expression: direct element (1D only)
         if isinstance(index, Expression):
+            if self.ndim != 1:
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
             return cp.Element(self, index)
 
         # multi-dimensional index
         if isinstance(index, tuple) and any(isinstance(el, Expression) for el in index):
 
             if len(index) != self.ndim:
-                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension. If you really need this, please report on github.")
+                raise NotImplementedError("CPMpy does not support returning an array from an Element constraint. Provide an index for each dimension (comma separated indices). If you really need this, please report on github.")
 
-            # find dimension of expression in index
-            expr_dim = [dim for dim,idx in enumerate(index) if isinstance(idx, Expression)]
-            if len(expr_dim) == 1: # optimization, only 1 expression, reshape to 1d-element
-                # TODO can we do the same for more than one Expression? Not sure...
-                index  = list(index)
-                index.append(index.pop(expr_dim[0]))
+            # eliminate constant indices to reduce dimensionality
+            selector = []
+            new_indices = []
+            for idx in index:
+                if isinstance(idx, Expression):
+                    selector.append(slice(None))  # keep this axis (equivalent to `:` when used as index), to pass to element constraint
+                    new_indices.append(idx)
+                else:
+                    selector.append(idx)  # constant index
+            arr = self[tuple(selector)]
 
-                arr = np.moveaxis(self, expr_dim[0], -1)
-                return cp.Element(arr[(*index[:-1],)], index[-1])
-
-
-            arr = self[tuple(index[:expr_dim[0]])] # select remaining dimensions
-            index = index[expr_dim[0]:]
-
-            # calculate index for flat array
-            flat_index = index[-1]
-            for dim, idx in enumerate(index[:-1]):
-                flat_index += idx * math.prod(arr.shape[dim+1:])
-            # using index expression as single var for flat array
-            return cp.Element(arr.flatten(), flat_index)
+            if len(new_indices) == 1:
+                return cp.Element(arr, new_indices[0])
+            return cp.NDElement(arr, new_indices)
 
         return super().__getitem__(index)
 
@@ -831,8 +830,73 @@ def _genname(basename: Optional[str], idxs: tuple[int|np.integer, ...]) -> Optio
     return f"{basename}[{stridxs}]" # "<name>[<idx0>,<idx1>,...]"
 
 def _is_invalid_name(name: Any) -> bool:
-    if isinstance(name, str):
-        return name.startswith(_IV_PREFIX) or name.startswith(_BV_PREFIX)
-    # rest invalid indeed
-    return True
+    """
+    Check if a variable name is invalid.
 
+    In 'strict' mode, the name is invalid if it starts with {_IV_PREFIX} or {_BV_PREFIX}.
+    In 'non-strict' mode, the name is invalid if it starts with {_IV_PREFIX} or {_BV_PREFIX} 
+    and the variables' counter is greater than the index, i.e. the name is already in use.
+
+    Toggle the strict mode with `_enable_strict_variable_name_check()` and `_disable_strict_variable_name_check()`,
+    or use the context manager `_ignore_strict_variable_name_check()`.
+    """
+    if name.startswith(_IV_PREFIX):
+        if _get_strict_variable_name_check():
+            return True
+        else:
+            id = int(name[len(_IV_PREFIX):])
+            if _IntVarImpl.counter > id:
+                return True
+            else:
+                return False
+    
+    elif name.startswith(_BV_PREFIX):
+        if _get_strict_variable_name_check():
+            return True
+        else:
+            id = int(name[len(_BV_PREFIX):])
+            if _BoolVarImpl.counter > id:
+                return True
+            else:
+                return False
+    
+    else:
+        return False
+
+def _get_strict_variable_name_check():
+    return _VAR_NAME_CHECK_STATE.strict
+
+def _enable_strict_variable_name_check():
+    _VAR_NAME_CHECK_STATE.strict = True
+
+def _disable_strict_variable_name_check():
+    _VAR_NAME_CHECK_STATE.strict = False
+
+
+class _IgnoreStrictVariableNameCheck:
+    def __enter__(self):
+        depth = getattr(_VAR_NAME_CHECK_STATE, "ignore_check_depth", 0)
+        if depth > 0:
+            raise RuntimeError("_ignore_strict_variable_name_check() cannot be nested")
+        _VAR_NAME_CHECK_STATE.ignore_check_depth = depth + 1
+        _disable_strict_variable_name_check()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _VAR_NAME_CHECK_STATE.ignore_check_depth = 0
+        _enable_strict_variable_name_check()
+        # _update_variable_counters() # TODO: add automatic support for this later (different PR)
+        return False  # propagate exceptions
+
+
+def _ignore_strict_variable_name_check():
+    """
+    Context manager to temporarily disable strict variable name check.
+
+    Example:
+
+        .. code-block:: python
+        
+            with _ignore_strict_variable_name_check():
+                ... create CPMpy model based on file contents here ...
+    """
+    return _IgnoreStrictVariableNameCheck()
