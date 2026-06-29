@@ -53,6 +53,7 @@ List of functions
 
 import os
 import builtins
+from pathlib import Path
 from typing import Optional, Callable, Union
 
 import cpmpy as cp
@@ -64,6 +65,7 @@ from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.int2bool import IntVarEnc
+from cpmpy.tools.io.utils import _is_potential_path
 
 
 def write_dimacs(
@@ -224,12 +226,15 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Callable = builtins.open,
     """
 
     # Read from file or string
-    if isinstance(dimacs, (str, os.PathLike)) and os.path.exists(dimacs):
-        with open(dimacs, "r") as f:
-            lines = f.readlines()
+    if _is_potential_path(dimacs):
+        path = Path(dimacs)
+        if path.exists():
+            with open(path, "r") as f:
+                lines = f.readlines()
+        else:
+            raise FileNotFoundError(path)
     else:
         lines = str(dimacs).splitlines()
-
 
     # No type hint provided -> auto-detect type
     if type is None:

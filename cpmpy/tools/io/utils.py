@@ -1,5 +1,6 @@
 import warnings
 import os
+from typing import Union
 
 # mapping file extensions to appropriate format names
 _format_map = {
@@ -63,3 +64,24 @@ def _derive_format(file_path: os.PathLike) -> str:
             continue
 
     raise ValueError(f"No file format provided and could not derive format from file path: {file_path}")
+
+def _is_potential_path(instance: Union[str, os.PathLike]) -> bool:
+    """
+    Check if a given instance is a potential path.
+    """
+
+    is_pathlike = isinstance(instance, os.PathLike)
+    is_string = isinstance(instance, str)
+
+    if is_pathlike:
+        return True
+
+    if not is_pathlike and not is_string:
+        raise ValueError("Instance must be a string or a path-like object")
+
+    if is_string:
+        if ("\n" in instance or "\r" in instance): # typical indicator of inline contents, not present in a path string
+            return False
+        return True
+
+    return False

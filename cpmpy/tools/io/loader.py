@@ -21,7 +21,7 @@ from .dimacs import load_dimacs
 from cpmpy.tools.io.scip import load_scip
 from cpmpy.tools.io.wcnf import load_wcnf
 from cpmpy.tools.io.opb import load_opb
-from cpmpy.tools.io.utils import _derive_format
+from cpmpy.tools.io.utils import _derive_format, _is_potential_path
 
 # mapping format names to appropriate loader functions
 _loader_map: dict[str, Callable[..., cp.Model]] = {
@@ -74,14 +74,12 @@ def load_formats() -> List[str]:
     """
     return list(_loader_map.keys())
 
-
-
-def load(file_path: Union[str, os.PathLike], format: Optional[str] = None) -> cp.Model:
+def load(instance: Union[str, os.PathLike], format: Optional[str] = None) -> cp.Model:
     """
-    Load a model from a file.
+    Load an instance from a file into a CPMpy model..
 
     Arguments:
-        file_path (str): The path to the file to load.
+        instance (str or os.PathLike): The path to the instance file to load or the instance itself as a string.
         format (Optional[str]): The format of the file to load. If None, the format will be derived from the file path (best effort). 
                                 Might raise a ValueError if the format could not be derived from the file path, or if the format is not supported.
 
@@ -91,12 +89,17 @@ def load(file_path: Union[str, os.PathLike], format: Optional[str] = None) -> cp
     Returns:
         A CPMpy model.
     """
+    
+    if format is not None:
+        return _get_loader(format)(instance)
 
-    if format is None:
-        if isinstance(file_path, str) or isinstance(file_path, os.PathLike):
-            format = _derive_format(Path(file_path))
+    else:
+        if _is_potential_path(instance):
+            path = Path(instance)
+            if path.exists():
+                format = _derive_format(instance)
+                return _get_loader(format)(instance)
+            else:
+                raise FileNotFoundError(instance)
         else:
-            raise ValueError(f"No format provided and could not derive format from string")
-
-    loader = _get_loader(format)
-    return loader(file_path)
+            raise ValueError("Format must be provided when loading instance from a string.")
