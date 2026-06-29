@@ -66,18 +66,15 @@ from packaging.version import Version
 
 import numpy as np
 
-from cpmpy.expressions import NoOverlap
-
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..exceptions import MinizincNameException, MinizincBoundsException
+from ..exceptions import MinizincNameException, MinizincBoundsException, MinizincPathException, NotSupportedError
 from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.python_builtins import any as cpm_any
-from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, cpm_array
-from ..expressions.globalconstraints import Cumulative, DirectConstraint, GlobalCardinalityCount
+from ..expressions.variables import _NumVarImpl, NegBoolView
+from ..expressions.globalconstraints import DirectConstraint, GlobalCardinalityCount, MDD, Regular
 from ..expressions.globalfunctions import Multiplication, FloatSum
-from ..expressions.utils import is_int, is_any_list, argvals, argval, get_nonneg_args
+from ..expressions.utils import is_int, is_any_list, get_bounds, get_nonneg_args
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..exceptions import MinizincPathException, NotSupportedError
 from ..transformations.get_variables import get_variables
 from ..transformations.normalize import toplevel_list
 
@@ -100,13 +97,13 @@ class CPM_minizinc(SolverInterface):
     """
 
     supported_global_constraints = frozenset({"alldifferent", "alldifferent_except0", "allequal",
-                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "cumulative", "circuit", "gcc",
+                                              "inverse", "ite", "xor", "table", "InDomain", "negative_table", "mdd", "regular", "cumulative", "circuit", "gcc",
                                               "increasing", "decreasing",
                                               "strictly_increasing", "strictly_decreasing", "lex_lesseq", "lex_less",
                                               "lex_chain_less","lex_chain_lesseq",
                                               "precedence", "no_overlap",
-                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among"})
-    supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence"}
+                                              "min", "max", "abs", "mul", "div", "mod", "pow", "element", "count", "nvalue", "among", "nd_element"})
+    supported_reified_global_constraints = supported_global_constraints - {"circuit", "precedence", "regular"}
 
     required_version = (2, 8, 2)
 
@@ -679,6 +676,9 @@ class CPM_minizinc(SolverInterface):
         if isinstance(expr, (bool, np.bool_)):
             expr = BoolVal(expr)
 
+        if isinstance(expr, str):
+            return f'\"{expr}\"'
+
         if not isinstance(expr, Expression):
             return self.solver_var(expr)  # constants
 
@@ -843,6 +843,26 @@ class CPM_minizinc(SolverInterface):
                                                                                              args_str[0])
             txt += f"      arr[{idx}]"
             return txt
+        elif expr.name == "nd_element":
+            arr = expr.args[0]
+            subtype = "int"
+            if all(isinstance(v, bool) or \
+                   (isinstance(v, Expression) and v.is_bool()) \
+                   for v in arr.flat):
+                subtype = "bool"
+            idx_ranges = ",".join(f"0..{dim - 1}" for dim in arr.shape)
+            idx_tuple = ",".join(args_str[1:])
+
+            # minizinc is offset 1, which can be problematic for element
+            txt = "\n    let {{ array[{}] of var {}: arr=array{}d({},{}) }} in\n".format(
+                ",".join("int" for _ in arr.shape),
+                subtype,
+                arr.ndim,
+                idx_ranges,
+                args_str[0],
+            )
+            txt += f"      arr[{idx_tuple}]"
+            return txt
 
         # rest: global constraints
         elif expr.name.endswith('circuit'):  # circuit, subcircuit
@@ -911,25 +931,68 @@ class CPM_minizinc(SolverInterface):
                 domain_str = self._convert_expression(domain)
             return "({} in {})".format(arg0_str, domain_str)
 
-        elif expr.name == "regular":
-            # regular(array, transitions, start, accepting)
-            # MiniZinc regular constraint expects: regular(array, transitions_table, start, accepting)
-            # where transitions_table is a 2D array
-            array, transitions, start, accepting = expr.args
+        elif expr.name == "mdd":
+            # mdd(array): transitions live in expr.mapping / expr.levels (not in args)
+            # MiniZinc mdd expects: mdd(x, N, level, E, from, label, to)
+            # with x=variables, N=number of nodes, level=level of each node, E=number of edges, from=source nodes, label=edge labels, to=target nodes
+            # with root node = 1 and sink node = 0
+            assert isinstance(expr, MDD)
+            array = expr.args[0]
             array_str = self._convert_expression(array)
-            # Convert transitions to a 2D array format for MiniZinc
-            # transitions is a list of (src, value, dst) tuples
-            transitions_list = []
-            for src, val, dst in transitions:
-                transitions_list.append("[{}, {}, {}]".format(
-                    self._convert_expression(src),
-                    self._convert_expression(val),
-                    self._convert_expression(dst)
-                ))
-            transitions_str = "[{}]".format(",".join(transitions_list))
-            start_str = self._convert_expression(start)
-            accepting_str = self._convert_expression(accepting)
-            return "regular({}, {}, {}, {})".format(array_str, transitions_str, start_str, accepting_str)
+            sink = expr.sink_node
+            # Renumber CPMpy node ids to integers 1..N (root must be node with id 1; sink with id 0)
+            nodes = sorted((n for n in expr.levels if n != sink),
+                           key=lambda n: (expr.levels[n], str(n)))
+            node_map = {n: i + 1 for i, n in enumerate(nodes)}
+            node_map[sink] = 0
+            level_str = "[" + ",".join(str(expr.levels[n] + 1) for n in nodes) + "]"
+            # Convert transitions to parallel arrays for MiniZinc
+            from_list, label_list, to_list = [], [], []
+            for id1 in sorted(expr.mapping.keys(), key=lambda n: (expr.levels[n], str(n))):
+                for val in sorted(expr.mapping[id1].keys()):
+                    id2 = expr.mapping[id1][val]
+                    from_list.append(str(node_map[id1]))
+                    label_list.append("{{{}}}".format(val))  # label is a set of int per edge
+                    to_list.append(str(node_map[id2]))
+            from_str = "[{}]".format(",".join(from_list))
+            label_str = "[{}]".format(",".join(label_list))
+            to_str = "[{}]".format(",".join(to_list))
+            return "mdd({}, {}, {}, {}, {}, {}, {})".format(
+                array_str, len(nodes), level_str, len(from_list), from_str, label_str, to_str)
+
+        elif expr.name == "regular":
+            # MiniZinc: `regular(array[int] of var int: x, array[int,int] of opt int: d, int: q0, set of int: F)`
+            # We map CPMpy's named states to 1-indexed integers.
+            # Example:
+            #   CPMpy:   `Regular([IV0,IV1,IV2], [('a',1,'b'),('b',1,'c'),('b',0,'b'),('c',1,'c'),('c',0,'b')], 'a', ['c'])`
+            #   MiniZinc: `constraint regular([IV0,IV1,IV2], array2d(1..3, 0..1, [<>,2,2,3,2,3]), 1, {3})`
+            #            note: `d` is a 2D array `[|<>,2|2,3|2,3|]` with rows=states, cols=values
+            assert isinstance(expr, Regular)
+            array, _, start, accepting = expr.args
+
+            # Map states to 1..Q (MiniZinc states are 1-indexed)
+            node_map = {n: i + 1 for n, i in expr.node_map.items()}
+            Q = len(expr.nodes)
+
+            # Alphabet must cover the full variable domain (undefined transitions are <>)
+            lbs, ubs = get_bounds(array)
+            val_min, val_max = min(lbs), max(ubs)
+
+            # Transform transition dict to use 1-indexed state identifiers
+            trans = {(node_map[s], v): node_map[e] for (s, v), e in expr.trans_dict.items()}
+
+            # Build 2D transition table d[1..Q, val_min..val_max] with <> for undefined
+            d_entries = []
+            for q in range(1, Q + 1):
+                for v in range(val_min, val_max + 1):
+                    d_entries.append(str(trans.get((q, v), "<>")))
+            d_str = "array2d(1..{}, {}..{}, [{}])".format(Q, val_min, val_max, ",".join(d_entries))
+
+            array_str = self._convert_expression(array)
+            q0 = node_map[start]
+            F = "{{{}}}".format(",".join(str(node_map[a]) for a in accepting))
+
+            return "regular({}, {}, {}, {})".format(array_str, d_str, q0, F)
 
         # a direct constraint, treat differently for MiniZinc, a text-based language
         # use the name as, unpack the arguments from the argument tuple
