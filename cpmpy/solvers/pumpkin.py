@@ -371,10 +371,11 @@ class CPM_pumpkin(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
@@ -643,10 +644,11 @@ class CPM_pumpkin(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         if self.pum_solver.is_inconsistent():
             return self # cannot post any more constraints once inconsistency is reached

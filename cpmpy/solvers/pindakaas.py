@@ -254,6 +254,20 @@ class CPM_pindakaas(SolverInterface):
         raise TypeError(f"Unexpected type: {cpm_var}")
 
     def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+        """
+            Transform arbitrary CPMpy expressions to constraints the solver supports
+
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
+
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                list[Expression]: transformed constraints
+        """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element", "nd_element"})
         cpm_cons = push_down_negation(cpm_cons)
@@ -273,6 +287,24 @@ class CPM_pindakaas(SolverInterface):
         return cpm_cons
 
     def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pindakaas":
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                self
+        """
         import pindakaas as pdk
 
         if self.unsatisfiable:

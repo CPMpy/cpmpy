@@ -362,10 +362,11 @@ class CPM_pysat(SolverInterface):
             - Cardinality constraint (`sum`)
             - Pseudo-Boolean constraints (`wsum`)
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element", "nd_element"})
@@ -402,10 +403,11 @@ class CPM_pysat(SolverInterface):
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)

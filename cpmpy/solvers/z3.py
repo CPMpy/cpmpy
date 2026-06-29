@@ -370,10 +370,11 @@ class CPM_z3(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -397,10 +398,11 @@ class CPM_z3(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
         # all variables are user variables, handled in `solver_var()`
         # unless their constraint gets simplified away, so lets collect them anyway

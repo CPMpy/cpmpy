@@ -449,10 +449,11 @@ class CPM_ortools(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div", "mod", "nd_element"})) # before decompose, assumes total decomposition for partial functions
@@ -482,10 +483,11 @@ class CPM_ortools(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)

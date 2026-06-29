@@ -404,7 +404,8 @@ class CPM_choco(SolverInterface):
             Arguments:
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            Returns: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -439,7 +440,8 @@ class CPM_choco(SolverInterface):
             Arguments:
                 cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            Returns: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)

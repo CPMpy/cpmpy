@@ -215,6 +215,12 @@ class CPM_highs(SolverInterface):
             Transform arbitrary CPMpy expressions to constraints the solver supports.
 
             Follows the ILP-style pipeline with linearize-friendly decompositions and treatment of reified variables.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                list[Expression]: transformed constraints
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element", "nd_element"})  # linearize and decompose expects safe exprs
@@ -237,10 +243,11 @@ class CPM_highs(SolverInterface):
             Any CPMpy expression given is immediately transformed (through `transform()`)
             and then posted to the solver in this function.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         # track user vars and ensure newly seen ones have solver columns
         get_variables(cpm_expr, collect=self.user_vars)

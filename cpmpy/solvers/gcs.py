@@ -476,10 +476,11 @@ class CPM_gcs(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons)
@@ -556,8 +557,11 @@ class CPM_gcs(SolverInterface):
         we first transform the constraints into primitive constraints,
         then post those primitive constraints directly to the native solver
 
-        :param cpm_expr: CPMpy constraint, or list thereof
-        :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy constraint, or list thereof
+
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)

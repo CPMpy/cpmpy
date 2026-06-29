@@ -385,10 +385,11 @@ class CPM_gurobi(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
@@ -423,10 +424,11 @@ class CPM_gurobi(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
       """
       from gurobipy import GRB
 

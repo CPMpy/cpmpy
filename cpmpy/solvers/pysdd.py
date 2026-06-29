@@ -297,10 +297,11 @@ class CPM_pysdd(SolverInterface):
 
             For PySDD, it can be beneficial to add a big model (collection of constraints) at once...
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # works on list of nested expressions
         cpm_cons = toplevel_list(cpm_expr)
@@ -325,10 +326,11 @@ class CPM_pysdd(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
 
         newvars = get_variables(cpm_expr)

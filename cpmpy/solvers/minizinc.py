@@ -618,10 +618,11 @@ class CPM_minizinc(SolverInterface):
             Decompose globals not supported (and flatten globalfunctions)
             ensure it is a list of constraints
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = decompose_in_tree(cpm_cons,
@@ -643,10 +644,11 @@ class CPM_minizinc(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
         get_variables(cpm_expr, collect=self.user_vars)
         # transform and post the constraints
