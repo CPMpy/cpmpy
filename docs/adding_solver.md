@@ -6,11 +6,13 @@ To add your solver to CPMpy, you should copy [cpmpy/solvers/TEMPLATE.py](https:/
 
 Implementing the template consists of the following parts:
 
-  * `supported()` where you check if the solver package is installed. Never include the solver python package at the top-level of the file, CPMpy has to work even if a user did not install your solver package.
+  * `version()` where you return the installed version of the solver's Python API, if available.
+  * `supported()` where you check whether the solver is ready to use. Never include the solver python package at the top-level of the file, CPMpy has to work even if a user did not install your solver package. If needed, split this into helper checks such as `installed()`, `license_ok()`, `executable_installed()`, or version checks.
   * `__init__()` where you initialize the underlying solver object
   * `solver_var()` where you create new solver variables and map them to CPMpy decision variables
   * `solve()` where you call the solver, get the status and runtime, and reverse-map the variable values after solving
   * `objective()` if your solver supports optimisation (optionally override `minimize`/`maximize`/`objective` with `Expression | FloatSum` type hints if your solver supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives)
+  * `supported_global_constraints` and `supported_reified_global_constraints` where you declare which global constraints should reach the solver interface directly instead of being decomposed first
   * `transform()` where you call the necessary transformations in `cpmpy.transformations` to transform CPMpy expressions to those that the solver supports
   * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver
   * `solvernames()` and `solverversion()` if the interface exposes named subsolvers
@@ -26,7 +28,7 @@ Once the core interface works, consider exposing extra solver features through C
 
 For your new solver to appear in CPMpy's [API documentation](./api/solvers.rst), add a `.rst` file in ``/docs/api/solvers`` (copy one of the other solvers' file and make the necessary changes) and add your solver to the *"List of submodules"* and the *"List of classes"* in the file ``/cpmpy/solvers/__init__.py``. And also to the overview table of solvers in ``docs/index.rst``. To test for incremental capabilities, use the ``examples/advanced/test_incremental_solving.py`` script.
 
-To ease the installation process of your solver, be sure to add it to CPMpy's `setup.py`. Simply add an entry to `solver_dependencies`, mapping the cpmpy-native name for your solver (the same one used when calling `model.solve(solver=<SOLVER_NAME>)`) to the name of your pip-installable Python package and all its required dependencies.
+To ease the installation process of your solver, add it to CPMpy's `setup.py` if it has a pip-installable Python package. Add an entry to `solver_dependencies`, mapping the cpmpy-native name for your solver (the same one used when calling `model.solve(solver=<SOLVER_NAME>)`) to the name of your pip-installable Python package and all its required dependencies. If the solver also requires a separate binary, executable, server, or license, document those requirements in the solver interface docstring and solver documentation.
 
 ## Transformations and posting constraints
 
@@ -34,17 +36,17 @@ CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to 
 
 CPMpy is designed to separate *transforming* arbitrary CPMpy expressions to constraints the solver supports, from actually *posting* the supported constraints directly to the solver.
 
-For example, a SAT solver only accepts clauses (disjunctions) as constraints. So, its `transform()` method has the challenge of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. This is exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory that can achieve that and more. You hence only need to chain the right transformations in the solver's `transform()` method. It is best to look at a solver accepting a similar input, to see what transformations (and in what order) that one uses. 
+For example, a SAT solver only accepts clauses (disjunctions) as constraints. So, its `transform()` method has the challenge of mapping an arbitrary CPMpy expression to CPMpy 'or' expressions. Transformations like these are exactly the task of a constraint modelling language like CPMpy, and we implement it through multiple solver-independent **transformation functions** in the `cpmpy/transformations/` directory that can achieve that and more. You hence only need to chain the right transformations in the solver's `transform()` method. It is best to look at a solver accepting a similar input, to see what transformations (and in what order) that one uses. 
 
 The `__add__()` method will first call this `transform()`. This will return a list of CPMpy 'or' expression over decision variables. It then only has to iterate over those and call the solver its native API to create such clauses. All other constraints may not be directly supported by the solver, and can hence be rejected.
 
-So for any solver you wish to add, chances are that most of the transformations you need are already implemented. Any solver can use any transformation in any order that the transformations allow. If you need additional transformations, or want to know how they work, read on.
+So for any solver you wish to add, chances are that most of the transformations you need are already implemented. A solver can choose the transformations it needs, but their order is not arbitrary: many transformations assume a particular input form, such as safe expressions, decomposed globals, flat normal form, or implication-only reification. Check the docstring of each transformation and look at solvers with a similar target language for a suitable chain. If you need additional transformations, or want to know how they work, read on.
 
 ## Stateless transformation functions
 
 Because CPMpy's solver-interfaces transform and post constraints *eagerly*, they can be used *incremental*, meaning that you can add some constraints, call `solve()`, add some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
 
-The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs to. They take expressions as input and compute expressions as output. That means they can be called over and over again. Do note that the order of transformations may matter as certain transformation functions may expect the input constraints to take a specific form, which is achieved by adding the necessary transformation before it.
+The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs to. They take expressions as input and compute expressions as output. Some transformations take solver-specific arguments, such as the set of supported globals. The output can depend on those arguments, but the transformation itself still does not keep hidden state between calls. That means they can be called over and over again. Do note that the order of transformations may matter as certain transformation functions may expect the input constraints to take a specific form, which is achieved by adding the necessary transformation before it.
 
 Transformations are also modular, and any solver can use any combination of transformations that it needs. We continue to add and improve the transformations, and we are happy to discuss transformations you are missing, or variants of existing transformations that can be refined.
 
@@ -117,6 +119,7 @@ python -m pytest tests/ --solver <YOUR SOLVER>
 ```
 
 it will automatically test all of the allowed expressions through a constraint generator in `/tests/test_constraints.py`.
+For a quicker feedback loop during development, you can run focused tests such as `tests/test_solverinterface.py` or `tests/test_solvers_solhint.py` with `--solver <YOUR SOLVER>` as well.
 Using the transformation stack your solver should be able to handle all constraints and operators. However, during development there may be an exception to this rule.
 You can exclude a global constraint or an operation using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` dictionaries respectively.
 After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
