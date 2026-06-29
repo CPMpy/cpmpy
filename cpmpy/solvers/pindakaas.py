@@ -39,7 +39,7 @@ Module details
 
 import time
 from datetime import timedelta
-from typing import Iterable, Optional, List, Any
+from typing import Iterable, Optional, List, Any, Set
 
 from ..exceptions import NotSupportedError
 from ..expressions.core import BoolVal, Comparison
@@ -123,7 +123,18 @@ class CPM_pindakaas(SolverInterface):
     def native_model(self):
         return self.pdk_solver
 
-    def _int2bool_user_vars(self):
+    def _int2bool_user_vars(self) -> Set[_BoolVarImpl]:
+        """
+        Encode all integer user variables to Booleans and register them with the solver.
+
+        Ensures every user variable is known to the solver back-end: integer variables
+        are encoded via `int2bool` (their encoding constraints are posted and their
+        encoding Booleans registered), while Boolean variables are registered directly.
+
+        :return: a new set containing only the Boolean user variables (integer user
+            variables replaced by their encoding Booleans), so that e.g. `solveAll`
+            behaves consistently.
+        """
 
         # ensure all vars are known to solver
         for cpm_var in self.user_vars:

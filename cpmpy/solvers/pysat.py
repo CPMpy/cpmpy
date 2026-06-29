@@ -52,7 +52,7 @@
     ==============
 """
 from threading import Timer
-from typing import Optional, List, Iterable
+from typing import Optional, List, Iterable, Set
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
@@ -215,7 +215,18 @@ class CPM_pysat(SolverInterface):
         """
         return self.pysat_solver
 
-    def _int2bool_user_vars(self):
+    def _int2bool_user_vars(self) -> Set[_BoolVarImpl]:
+        """
+        Encode all integer user variables to Booleans and register them with the solver.
+
+        Ensures every user variable is known to the solver back-end: integer variables
+        are encoded via `int2bool` (their encoding constraints are posted and their
+        encoding Booleans registered), while Boolean variables are registered directly.
+
+        :return: a new set containing only the Boolean user variables (integer user
+            variables replaced by their encoding Booleans), so that e.g. `solveAll`
+            behaves consistently.
+        """
         # ensure all vars are known to solver
         for cpm_var in self.user_vars:
             if isinstance(cpm_var, _NumVarImpl) and not cpm_var.is_bool():
