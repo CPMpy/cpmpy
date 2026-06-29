@@ -53,6 +53,8 @@ List of functions
 
 import os
 import builtins
+from io import StringIO
+from typing import TextIO
 from pathlib import Path
 from typing import Optional, Callable, Union
 
@@ -225,117 +227,127 @@ def load_dimacs(dimacs: Union[str, os.PathLike], open: Callable = builtins.open,
         ValueError: If the optional type argument is not supported.
     """
 
+    f: Union[list[str], TextIO]
+
     # Read from file or string
     if _is_potential_path(dimacs):
         path = Path(dimacs)
         if path.exists():
-            with open(path, "r") as f:
-                lines = f.readlines()
+            f = open(path, "r")
         else:
             raise FileNotFoundError(path)
     else:
-        lines = str(dimacs).splitlines()
+        f = dimacs.splitlines()
 
-    # No type hint provided -> auto-detect type
-    if type is None:
+    try: # try...finally block to ensure file f is closed
 
-        # Auto-detect weighted instances:
-        # - explicit `p wcnf ...` header
-        # - any hard-clause line starting with `h`
-        # - no header but all non-comment clause lines look weighted (weight literals... 0)
-        is_weighted = False
-        weighted_compatible = True
-        saw_clause_line = False
-        for raw in lines:
+        # No type hint provided -> auto-detect type
+        if type is None:
+
+            # Auto-detect weighted instances:
+            # - explicit `p wcnf ...` header
+            # - any hard-clause line starting with `h`
+            # - no header but all non-comment clause lines look weighted (weight literals... 0)
+            is_weighted = False
+            weighted_compatible = True
+            saw_clause_line = False
+            for raw in f:
+                line = raw.strip()
+                if line == "" or line.startswith("c"):
+                    continue
+                if line.startswith("p"):
+                    params = line.split()
+                    assert len(params) >= 4, f"Expected p-header to be formed `p <typ> ...` but got {line}"
+                    _, typ, *_ = params
+                    if typ == "wcnf":
+                        is_weighted = True
+                    elif typ != "cnf":
+                        raise ValueError(f"Expected `cnf` or `wcnf` as file format, but got {typ} which is not supported.")
+                    break
+                if line.startswith("h"):
+                    is_weighted = True
+                    break
+                saw_clause_line = True
+                try:
+                    ints = [int(tok) for tok in line.split()]
+                except ValueError:
+                    weighted_compatible = False
+                    continue
+                if len(ints) < 2 or ints[-1] != 0 or ints[0] < 0:
+                    weighted_compatible = False
+
+            if not is_weighted and saw_clause_line and weighted_compatible:
+                is_weighted = True
+            
+        # Type hint provided -> use it
+        elif type == "wcnf":
+            is_weighted = True
+        elif type == "cnf":
+            is_weighted = False
+        else:
+            raise ValueError(f"Expected `cnf` or `wcnf` as optional type argument, but got {type} instead.")
+
+        if isinstance(f, TextIO):
+            f.seek(0)
+
+        # If weighted, delegate to WCNF loader
+        if is_weighted:
+            from cpmpy.tools.io.wcnf import load_wcnf
+            return load_wcnf(f)
+
+        # -------------------------------- CNF parser -------------------------------- #
+
+        # CNF parse (strict with p-line counts when present, inferred otherwise)
+        m = cp.Model()
+        clause: list[int] = []
+        clauses = []
+        nr_vars_declared = None
+        nr_cls_declared = None
+        max_var = 0
+
+        for raw in f:
             line = raw.strip()
             if line == "" or line.startswith("c"):
-                continue
+                continue  # skip empty and comment lines
             if line.startswith("p"):
                 params = line.split()
-                assert len(params) >= 4, f"Expected p-header to be formed `p <typ> ...` but got {line}"
-                _, typ, *_ = params
-                if typ == "wcnf":
-                    is_weighted = True
-                elif typ != "cnf":
-                    raise ValueError(f"Expected `cnf` or `wcnf` as file format, but got {typ} which is not supported.")
-                break
-            if line.startswith("h"):
-                is_weighted = True
-                break
-            saw_clause_line = True
-            try:
-                ints = [int(tok) for tok in line.split()]
-            except ValueError:
-                weighted_compatible = False
+                assert len(params) == 4, f"Expected p-header to be formed `p cnf nr_vars nr_cls` but got {line}"
+                _, typ, nr_vars, nr_cls = params
+                if typ != "cnf":
+                    raise ValueError(f"Expected `cnf` (i.e. DIMACS) as file format, but got {typ} which is not supported.")
+                nr_vars_declared = int(nr_vars)
+                nr_cls_declared = int(nr_cls)
                 continue
-            if len(ints) < 2 or ints[-1] != 0 or ints[0] < 0:
-                weighted_compatible = False
 
-        if not is_weighted and saw_clause_line and weighted_compatible:
-            is_weighted = True
-        
-    # Type hint provided -> use it
-    elif type == "wcnf":
-        is_weighted = True
-    elif type == "cnf":
-        is_weighted = False
-    else:
-        raise ValueError(f"Expected `cnf` or `wcnf` as optional type argument, but got {type} instead.")
+            for token in line.split():
+                i = int(token)
+                if i == 0: # end of clause
+                    clauses.append(clause)
+                    clause = []
+                else:
+                    max_var = max(max_var, abs(i)) # keep running max literal ID
+                    clause.append(i)
 
-    # If weighted, delegate to WCNF loader
-    if is_weighted:
-        from cpmpy.tools.io.wcnf import load_wcnf
-        return load_wcnf(dimacs, open=open)
+        assert len(clause) == 0, "Expected last clause to be terminated by 0"
 
-    # -------------------------------- CNF parser -------------------------------- #
+        nr_vars = nr_vars_declared if nr_vars_declared is not None else max_var
+        if nr_vars_declared is not None:
+            assert max_var <= nr_vars_declared, f"Expected at most {nr_vars_declared} variables (from p-line) but found literal index {max_var}"
 
-    # CNF parse (strict with p-line counts when present, inferred otherwise)
-    m = cp.Model()
-    clause: list[int] = []
-    clauses = []
-    nr_vars_declared = None
-    nr_cls_declared = None
-    max_var = 0
+        if nr_vars > 0:
+            bvs: NDVarArray = cp.boolvar(shape=(nr_vars,))
+            for cl in clauses:
+                lits = []
+                for lit_id in cl:
+                    bv = bvs[abs(lit_id)-1]
+                    lits.append(bv if lit_id > 0 else ~bv)
+                m += cp.any(lits)
 
-    for raw in lines:
-        line = raw.strip()
-        if line == "" or line.startswith("c"):
-            continue  # skip empty and comment lines
-        if line.startswith("p"):
-            params = line.split()
-            assert len(params) == 4, f"Expected p-header to be formed `p cnf nr_vars nr_cls` but got {line}"
-            _, typ, nr_vars, nr_cls = params
-            if typ != "cnf":
-                raise ValueError(f"Expected `cnf` (i.e. DIMACS) as file format, but got {typ} which is not supported.")
-            nr_vars_declared = int(nr_vars)
-            nr_cls_declared = int(nr_cls)
-            continue
+        if nr_cls_declared is not None:
+            assert len(m.constraints) == nr_cls_declared, f"Number of clauses was declared in p-line as {nr_cls_declared}, but was {len(m.constraints)}"
 
-        for token in line.split():
-            i = int(token)
-            if i == 0: # end of clause
-                clauses.append(clause)
-                clause = []
-            else:
-                max_var = max(max_var, abs(i)) # keep running max literal ID
-                clause.append(i)
-
-    assert len(clause) == 0, "Expected last clause to be terminated by 0"
-
-    nr_vars = nr_vars_declared if nr_vars_declared is not None else max_var
-    if nr_vars_declared is not None:
-        assert max_var <= nr_vars_declared, f"Expected at most {nr_vars_declared} variables (from p-line) but found literal index {max_var}"
-
-    if nr_vars > 0:
-        bvs: NDVarArray = cp.boolvar(shape=(nr_vars,))
-        for cl in clauses:
-            lits = []
-            for lit_id in cl:
-                bv = bvs[abs(lit_id)-1]
-                lits.append(bv if lit_id > 0 else ~bv)
-            m += cp.any(lits)
-
-    if nr_cls_declared is not None:
-        assert len(m.constraints) == nr_cls_declared, f"Number of clauses was declared in p-line as {nr_cls_declared}, but was {len(m.constraints)}"
-
-    return m
+        return m
+    
+    finally:
+        if isinstance(f, TextIO):
+            f.close()
