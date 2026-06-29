@@ -323,6 +323,8 @@ class _NumVarImpl(Expression):
     including bounds checking and value management. It should not be instantiated
     directly, but rather through the helper functions :func:`~cpmpy.expressions.variables.intvar` and :func:`~cpmpy.expressions.variables.boolvar`.
     """
+    __slots__ = ('lb', 'ub', 'name', '_value')
+
     def __init__(self, lb: int, ub: int, name: str):
         assert (is_num(lb) and is_num(ub))
         assert (lb <= ub)
@@ -435,6 +437,8 @@ class NegBoolView(_BoolVarImpl):
 
         Do not create this object directly, use the `~` operator instead: `~bv`
     """
+    __slots__ = ('_bv',)
+
     def __init__(self, bv: _BoolVarImpl):
         #assert(isinstance(bv, _BoolVarImpl))
         self._bv = bv
