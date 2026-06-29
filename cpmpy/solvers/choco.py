@@ -400,10 +400,10 @@ class CPM_choco(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns: list of Expression
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -435,10 +435,10 @@ class CPM_choco(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: NestedBoolExprLike
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns: self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
@@ -457,9 +457,8 @@ class CPM_choco(SolverInterface):
         """
         Get a solver's constraint by a supported CPMpy constraint
 
-        :param cpm_expr: CPMpy expression
-        :type cpm_expr: Expression
-
+        Arguments:
+            cpm_expr (Expression): CPMpy expression
         """
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)
