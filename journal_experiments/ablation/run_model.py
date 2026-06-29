@@ -253,6 +253,31 @@ def highs_transform(self, cpm_expr, ablate):
     cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
     return cpm_cons
 
+
+def exact_transform(self, cpm_expr, ablate):
+    base = decompose_in_tree if ablate == ABLATE_NO_ILPFRIENDLY else decompose_linear
+    decompose = pick_decompose(ablate, base)
+    cpm_cons = toplevel_list(cpm_expr)
+    cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"mod", "div", "element", "nd_element"})
+    cpm_cons = push_down_negation(cpm_cons)
+    cpm_cons = decompose(cpm_cons,
+                         supported=self.supported_global_constraints,
+                         supported_reified=self.supported_reified_global_constraints,
+                         csemap=self._csemap)
+    cpm_cons = flatten_constraint(cpm_cons, csemap=self._csemap)
+    cpm_cons = reify_rewrite(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
+    cpm_cons = only_numexpr_equality(cpm_cons, supported=frozenset(["sum", "wsum"]), csemap=self._csemap)
+    if ablate == ABLATE_NO_CATEGORICAL:
+        pass
+    else: # don't detect categorical variables
+        cpm_cons = linearize_reified_variables(cpm_cons, min_values=2, csemap=self._csemap)
+    cpm_cons = only_bv_reifies(cpm_cons, csemap=self._csemap)
+    cpm_cons = only_implies(cpm_cons, csemap=self._csemap)
+    cpm_cons = linearize_constraint(cpm_cons, supported=frozenset({"sum", "wsum", "->", "mul"}), csemap=self._csemap)
+    cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
+    return cpm_cons
+
+
 def pindakaas_transform(self, cpm_expr, ablate):
     base = decompose_linear if ablate == ABLATION_NO_CP_FRIENDLY else decompose_in_tree
     decompose = pick_decompose(ablate, base)
@@ -322,6 +347,7 @@ SOLVER_TRANSFORM = {
     "rc2": pysat_transform,
     "scip": scip_transform,
     "highs": highs_transform,
+    "exact": exact_transform,
     "choco": choco_transform,
     "ortools": ortools_transform,
     "pindakaas": pindakaas_transform,
@@ -334,6 +360,7 @@ SOLVER_ABLATIONS = {
     "rc2": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
     "scip": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
     "highs": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
+    "exact": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
     "choco": frozenset({ABLATION_NO_CP_FRIENDLY, ABLATE_NO_POSITIVE}),
     "ortools": frozenset({ABLATION_NO_CP_FRIENDLY, ABLATE_NO_POSITIVE}),
     "pindakaas": frozenset({ABLATE_NO_ILPFRIENDLY, ABLATE_NO_CATEGORICAL, ABLATE_NO_POSITIVE}),
