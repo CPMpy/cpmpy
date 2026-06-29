@@ -13,7 +13,16 @@ Implementing the template consists of the following parts:
   * `objective()` if your solver supports optimisation (optionally override `minimize`/`maximize`/`objective` with `Expression | FloatSum` type hints if your solver supports :class:`~cpmpy.expressions.globalfunctions.FloatSum` objectives)
   * `transform()` where you call the necessary transformations in `cpmpy.transformations` to transform CPMpy expressions to those that the solver supports
   * `__add__()` where you call transform and map the resulting CPMpy expressions, that the solver supports, to API function calls on the underlying solver
-  * `solveAll()` optionally, if the solver natively supports solution enumeration
+  * `solvernames()` and `solverversion()` if the interface exposes named subsolvers
+
+Once the core interface works, consider exposing extra solver features through CPMpy as well. These hooks are optional and can be added incrementally:
+
+  * `solveAll()` if the solver natively supports solution enumeration
+  * `native_model` to expose the underlying solver model for direct access or direct constraints
+  * native callback support, such as `solution_callback`, listeners, log callbacks, or progress callbacks
+  * `solution_hint()` for warm-starting the solver with a suggested variable assignment
+  * `get_core()` if `solve(assumptions=...)` supports UNSAT core extraction
+  * `mus_native()` as a classmethod if the solver has a native MUS/IIS extractor, used by `cpmpy.tools.explain.mus_native()`
 
 For your new solver to appear in CPMpy's [API documentation](./api/solvers.rst), add a `.rst` file in ``/docs/api/solvers`` (copy one of the other solvers' file and make the necessary changes) and add your solver to the *"List of submodules"* and the *"List of classes"* in the file ``/cpmpy/solvers/__init__.py``. And also to the overview table of solvers in ``docs/index.rst``. To test for incremental capabilities, use the ``examples/advanced/test_incremental_solving.py`` script.
 
@@ -21,7 +30,7 @@ To ease the installation process of your solver, be sure to add it to CPMpy's `s
 
 ## Transformations and posting constraints
 
-CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed (throught `transform()`) and then posted to the solver.
+CPMpy solver interfaces are *eager*, meaning that any CPMpy expression given to it (through `__add__()`) is immediately transformed (through `transform()`) and then posted to the solver.
 
 CPMpy is designed to separate *transforming* arbitrary CPMpy expressions to constraints the solver supports, from actually *posting* the supported constraints directly to the solver.
 
@@ -33,13 +42,13 @@ So for any solver you wish to add, chances are that most of the transformations 
 
 ## Stateless transformation functions
 
-Because CPMpy's solver-interfaces transform and post constraints *eagerly*, they can be used *incremental*, meaning that you can add some constraints, call `solve()` add some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
+Because CPMpy's solver-interfaces transform and post constraints *eagerly*, they can be used *incremental*, meaning that you can add some constraints, call `solve()`, add some more constraints and solve again. If the underlying solver is also incremental, it will reuse knowledge of the previous solve call to speed up this solve call.
 
-The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs to. They take expressions as input and compute expressions as output. That means they can be called over and over again, and chained in any combination or order.
+The way that CPMpy succeeds to be an incremental modeling language, is by making all transformation functions *stateless*. Every transformation function is a python *function* that maps a (list of) CPMpy expressions to (a list of) equivalent CPMpy expressions. Transformations are not classes, they do not store state, they do not know (or care) what model a constraint belongs to. They take expressions as input and compute expressions as output. That means they can be called over and over again. Do note that the order of transformations may matter as certain transformation functions may expect the input constraints to take a specific form, which is achieved by adding the necessary transformation before it.
 
-That also makes them modular, and any solver can use any combination of transformations that it needs. We continue to add and improve the transformations, and we are happy to discuss transformations you are missing, or variants of existing transformations that can be refined.
+Transformations are also modular, and any solver can use any combination of transformations that it needs. We continue to add and improve the transformations, and we are happy to discuss transformations you are missing, or variants of existing transformations that can be refined.
 
-Most transformations do not need any state, they just do a bit of rewriting. Some transformations do, for example in the case of [Common Subexpression Elimination (CSE)](https://en.wikipedia.org/wiki/Common_subexpression_elimination). In that case, the solver interface (you who are reading this), should store a dictionary in your solver interface class, and pass that as (optional) argument to the transformation function. The transformation function will read and write to that dictionary as it needs, while still remaining stateless on its own. Each transformation function documents when it supports an optional state dictionary, see all available transformations in `cpmpy/transformations/`.
+One exception to the stateless-ness of transformations is that we allow for [Common Subexpression Elimination (CSE)](https://en.wikipedia.org/wiki/Common_subexpression_elimination). In that case, the solver interface (you who are reading this), should store a dictionary in your solver interface class, and pass that as (optional) argument to the transformation function. The transformation function will read and write to that dictionary as it needs, while still remaining stateless on its own. Each transformation function documents when it supports an optional state dictionary, see all available transformations in `cpmpy/transformations/`.
 
 
 ## What is a good Python interface for a solver?
@@ -108,7 +117,8 @@ python -m pytest tests/ --solver <YOUR SOLVER>
 ```
 
 it will automatically test all of the allowed expressions through a constraint generator in `/tests/test_constraints.py`.
-As not every solver has to support all possible constraints, you can exclude some using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS`, etc dictionaries.
+Using the transformation stack your solver should be able to handle all constraints and operators. However, during development there may be an exception to this rule.
+You can exclude a global constraint or an operation using the `EXCLUDE_GLOBAL`, `EXCLUDE_OPERATORS` dictionaries respectively.
 After posting the constraint, the answer of your solver is checked so you will both be able to monitor when your interface crashes or when a translation to the solver is incorrect.
 
 Once your solver is passing the test suite, it is a good idea to check test coverage to see which lines of your solver code are never executed during the tests. Missing coverage may indicate missing tests, but it could also mean that code you intended to run was silently bypassed. For example, if you added native support for a constraint but a transformation is decomposing it before it reaches your solver, performance could suffer. You can generate an HTML coverage report in `htmlcov` using the [pytest-cov](https://pypi.org/project/pytest-cov/) plugin:
@@ -120,6 +130,6 @@ pytest --cov=cpmpy --cov-report=html -n auto
 
 ## Tunable hyperparameters
 CPMpy offers a tool for searching the best hyperparameter configuration for a given model on a solver (see [corresponding documentation](./solver_parameters.md)).
-Solvers wanting to support this tool should add the following attributes to their interface: `tunable_params` and `default_params` (see [OR-Tools](https://github.com/CPMpy/cpmpy/blob/11ae35b22357ad9b8d6f47317df2c236c3ef5997/cpmpy/solvers/ortools.py#L473) for an example).
+Solvers wanting to support this tool should add the following classmethods to their interface: `tunable_params()` and `default_params()` (see [OR-Tools](https://github.com/CPMpy/cpmpy/blob/11ae35b22357ad9b8d6f47317df2c236c3ef5997/cpmpy/solvers/ortools.py#L473) for an example).
 
 
