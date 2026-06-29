@@ -306,11 +306,11 @@ def load_dimacs(dimacs: Union[str, os.PathLike, TextIO], open: Callable = builti
             if line.startswith("p"):
                 params = line.split()
                 assert len(params) == 4, f"Expected p-header to be formed `p cnf nr_vars nr_cls` but got {line}"
-                _, typ, nr_vars, nr_cls = params
+                _, typ, nr_vars_text, nr_cls_text = params
                 if typ != "cnf":
                     raise ValueError(f"Expected `cnf` (i.e. DIMACS) as file format, but got {typ} which is not supported.")
-                nr_vars_declared = int(nr_vars)
-                nr_cls_declared = int(nr_cls)
+                nr_vars_declared = int(nr_vars_text)
+                nr_cls_declared = int(nr_cls_text)
                 continue
 
             for token in line.split():

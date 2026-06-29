@@ -341,8 +341,6 @@ def write_opb(
         >>> print(write_opb(m))
     """
 
-    if open is None:
-        open = builtins.open
     if header is None:
         header = _create_header(format="opb") if fname is not None else None
     elif header == "":

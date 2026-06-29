@@ -94,7 +94,7 @@ def load(instance: Union[str, os.PathLike, TextIO], format: Optional[str] = None
         return _get_loader(format)(instance)
 
     else:
-        if _is_potential_path(instance):
+        if isinstance(instance, (str, os.PathLike)) and _is_potential_path(instance):
             path = Path(instance)
             if path.exists():
                 format = _derive_format(instance)

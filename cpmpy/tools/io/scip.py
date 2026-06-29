@@ -76,10 +76,11 @@ def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtin
     if isinstance(instance, TextIOBase):
         content = instance.read()
         if type is None:
-            try:
-                type = _derive_format(getattr(instance, "name", ""))
-            except (KeyError, ValueError):
+            stream_name = getattr(instance, "name", None)
+            if not isinstance(stream_name, (str, os.PathLike)):
                 raise ValueError("Type must be provided when loading a SCIP model from an unnamed TextIO object.")
+            type = _derive_format(stream_name)
+      
     elif isinstance(instance, str) and not os.path.exists(instance):
         if type is None:
             raise ValueError("Type must be provided when loading a SCIP model from a string.")
@@ -89,6 +90,7 @@ def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtin
     # -> write content to a temporary file
     tmp_fname = None
     if content is not None:
+        assert type is not None
         try:
             suffix = "." + get_extension(type)
         except KeyError as e:

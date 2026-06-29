@@ -3,7 +3,7 @@ import os
 from contextlib import contextmanager
 from io import StringIO, TextIOBase
 from pathlib import Path
-from typing import Union, TextIO, Callable, Iterator
+from typing import Union, TextIO, Callable, Iterator, cast
 import builtins
 
 # mapping file extensions to appropriate format names
@@ -51,7 +51,7 @@ def _create_header(format: str) -> str:
     header += "-"*100 + "\n"
     return header
 
-def _derive_format(file_path: os.PathLike) -> str:
+def _derive_format(file_path: Union[str, os.PathLike]) -> str:
     """
     Derive the format of a file from its path by looking at its file extension.
 
@@ -87,16 +87,13 @@ def _is_potential_path(instance: Union[str, os.PathLike]) -> bool:
     Check if a given instance is a potential path.
     """
 
-    is_pathlike = isinstance(instance, os.PathLike)
-    is_string = isinstance(instance, str)
-
-    if is_pathlike:
+    if isinstance(instance, os.PathLike):
         return True
 
-    if not is_pathlike and not is_string:
+    if not isinstance(instance, str):
         raise ValueError("Instance must be a string or a path-like object")
 
-    if is_string:
+    if isinstance(instance, str):
         if ("\n" in instance or "\r" in instance): # typical indicator of inline contents, not present in a path string
             return False
         return True
@@ -131,8 +128,8 @@ def _handle_loader_input(
     should_close = False
 
     if isinstance(source, TextIOBase):
-        f = source
-    elif _is_potential_path(source):
+        f = cast(TextIO, source)
+    elif isinstance(source, (str, os.PathLike)) and _is_potential_path(source):
         path = Path(source)
         if path.exists():
             f = open(path, "r")
