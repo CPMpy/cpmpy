@@ -55,6 +55,7 @@ import os
 import builtins
 import warnings
 from typing import TextIO
+from functools import partial
 from typing import Optional, Callable, Union
 
 import cpmpy as cp
@@ -75,7 +76,7 @@ def write_dimacs(
         path: Optional[Union[str, os.PathLike]] = None, 
         encoding: str = "auto", 
         p_header: bool = False, header : Optional[str] = None, 
-        open: Callable = builtins.open, 
+        open: Callable = partial(builtins.open, mode="w"), 
         annotate: Optional[AnnotationCallable] = None
     ) -> str:
     """
@@ -217,7 +218,7 @@ def write_dimacs(
 
     # Write to file
     if path is not None:
-        with open(path, "w") as f:
+        with open(path) as f:
             f.write(out)
 
     return out

@@ -38,6 +38,7 @@ import builtins
 from typing import Union, Optional, Callable, Any, TextIO
 from functools import reduce
 from operator import mul
+from functools import partial
 
 import cpmpy as cp
 from cpmpy.transformations.cse import CSEMap
@@ -297,7 +298,7 @@ def write_opb(
         path:Optional[Union[str, os.PathLike]] = None, 
         encoding:str="auto", 
         header:Optional[str] = None, 
-        open:Callable = builtins.open, 
+        open:Callable = partial(builtins.open, mode="w"), 
         annotate: AnnotationCallable = annotate_extended
     ) -> str:
     """
@@ -384,7 +385,7 @@ def write_opb(
     # Output to file or string
     contents = "\n".join(out)
     if path is not None:
-        with open(path, "w") as f:
+        with open(path) as f:
             f.write(contents)
         
     return contents

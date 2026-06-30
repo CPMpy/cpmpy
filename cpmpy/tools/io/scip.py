@@ -37,6 +37,7 @@ import cpmpy as cp
 import warnings
 import builtins
 from typing import Union, Optional, Callable, TYPE_CHECKING, TextIO
+from functools import partial
 
 if TYPE_CHECKING:
     import pyscipopt
@@ -295,7 +296,7 @@ def write_scip(
         format: str = "mps", 
         header: Optional[str] = None, 
         verbose: bool = False, 
-        open: Callable = builtins.open
+        open: Callable = partial(builtins.open, mode="w")
     ) -> str:
     """
     Write a CPMpy model to file using the SCIP solver.
@@ -355,7 +356,7 @@ def write_scip(
         with builtins.open(tmp_fname, "r") as f:
             content = f.read()
         if path is not None:
-            with open(path, "w") as f:
+            with open(path) as f:
                 f.write(content)
         return content
     finally:
