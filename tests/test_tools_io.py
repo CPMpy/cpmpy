@@ -253,10 +253,6 @@ CASES = [
                       "Objective: minimize sum(x1, x2, x3)",
         load_format="wcnf",
         write_format="wcnf",
-        # write_dimacs' WCNF objective encoding does not round-trip through the loader
-        # (the soft-clause weights are not recovered), so neither direction is equivalent.
-        roundtrip_model=False,
-        roundtrip_instance=False,
     ),
     IOCase(
         id="wcnf_dimacs",
@@ -266,8 +262,6 @@ CASES = [
                       "Objective: minimize sum(x1, x2, x3)",
         load_format="dimacs",
         write_format="dimacs",
-        roundtrip_model=False,
-        roundtrip_instance=False,
     ),
     IOCase(
         id="mps",
