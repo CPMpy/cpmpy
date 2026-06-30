@@ -46,7 +46,7 @@ from packaging.version import Version
 
 from cpmpy.exceptions import NotSupportedError
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import Cumulative, GlobalConstraint, NoOverlap
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl, intvar, boolvar
 from ..expressions.utils import is_num, is_int, is_any_list, get_bounds
@@ -362,7 +362,7 @@ class CPM_pumpkin(SolverInterface):
         return self._objective is not None
 
     # `__add__()` first calls `transform()`
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -371,10 +371,11 @@ class CPM_pumpkin(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations
         cpm_cons = toplevel_list(cpm_expr)
@@ -630,7 +631,7 @@ class CPM_pumpkin(SolverInterface):
             raise ValueError("Unexpected constraint:", cpm_expr)
 
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pumpkin":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -643,25 +644,26 @@ class CPM_pumpkin(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         if self.pum_solver.is_inconsistent():
             return self # cannot post any more constraints once inconsistency is reached
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         try:
-            for cpm_expr in self.transform(cpm_expr_orig):
-                if isinstance(cpm_expr, Operator) and cpm_expr.name == "->": # found implication
-                    bv, subexpr = cpm_expr.args
+            for con in self.transform(cpm_expr):
+                if isinstance(con, Operator) and con.name == "->": # found implication
+                    bv, subexpr = con.args
                     for pum_cons in self._get_constraint(subexpr):
                         self.pum_solver.add_implication(pum_cons, self.solver_var(bv))
                 else:
-                    for pum_cons in self._get_constraint(cpm_expr):
+                    for pum_cons in self._get_constraint(con):
                         self.pum_solver.add_constraint(pum_cons)
             return self
 

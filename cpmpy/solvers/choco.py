@@ -51,7 +51,7 @@ import warnings
 
 from ..transformations.normalize import toplevel_list
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import Cumulative, DirectConstraint
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, intvar
 from ..expressions.globalconstraints import GlobalConstraint
@@ -392,7 +392,7 @@ class CPM_choco(SolverInterface):
         return self._to_var(vals)
 
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -401,10 +401,11 @@ class CPM_choco(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -423,7 +424,7 @@ class CPM_choco(SolverInterface):
 
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_choco":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -436,10 +437,11 @@ class CPM_choco(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
@@ -458,9 +460,8 @@ class CPM_choco(SolverInterface):
         """
         Get a solver's constraint by a supported CPMpy constraint
 
-        :param cpm_expr: CPMpy expression
-        :type cpm_expr: Expression
-
+        Arguments:
+            cpm_expr (Expression): CPMpy expression
         """
 
         # Operators: base (bool), lhs=numexpr, lhs|rhs=boolexpr (reified ->)

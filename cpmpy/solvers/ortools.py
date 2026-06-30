@@ -52,7 +52,7 @@ import numpy as np
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalconstraints import DirectConstraint
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.variables import _NumVarImpl, _IntVarImpl, _BoolVarImpl, NegBoolView, boolvar, intvar
@@ -61,7 +61,7 @@ from ..expressions.utils import is_bool, get_nonneg_args, is_num, is_int, eval_c
     get_bounds, is_true_cst, \
     is_false_cst, implies, is_any_list
 from ..transformations.decompose_global import decompose_in_tree, decompose_objective
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.get_variables import get_variables
 from ..transformations.flatten_model import flatten_constraint, flatten_objective, get_or_make_var
 from ..transformations.normalize import toplevel_list
@@ -388,6 +388,7 @@ class CPM_ortools(SolverInterface):
 
             # transform objective
             obj, safe_cons = safen_objective(expr)
+            obj = push_down_negation_objective(obj)
             obj, decomp_cons = decompose_objective(obj,
                                                 supported=self.supported_global_constraints,
                                                 supported_reified=self.supported_reified_global_constraints,
@@ -439,7 +440,7 @@ class CPM_ortools(SolverInterface):
         raise NotImplementedError("ORTools: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -448,10 +449,11 @@ class CPM_ortools(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod"}) # no support for `0` in denominator in API
@@ -468,7 +470,7 @@ class CPM_ortools(SolverInterface):
                                              # reified expr must go before this
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_ortools":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -481,10 +483,11 @@ class CPM_ortools(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)

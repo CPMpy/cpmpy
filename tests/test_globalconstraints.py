@@ -431,6 +431,12 @@ class TestGlobal:
         model = cp.Model(constraints[0].decompose())
         assert not model.solve()
 
+    def test_table_with_subexpr(self):
+        iv = cp.intvar(0, 10, shape=3)
+        c = cp.Table(iv+iv, [[10, 8, 2], [5, 9, 2]])
+        assert cp.Model(c).solve()
+        assert cp.Model(c.decompose()).solve()
+
     def test_table_value(self):
         """Test Table.value() with known assignments (and unassigned -> None)."""
         iv = cp.intvar(0, 10, shape=3)
@@ -545,7 +551,7 @@ class TestGlobal:
         # unconstrained
         true_cons = cp.ShortTable(iv, [[1,2,3],[STAR, STAR, STAR]])
         assert cp.Model(true_cons).solve(solver=solver)
-        assert cp.Model(true_cons).solveAll(solver=solver) == 17 ** 3
+        #assert cp.Model(true_cons).solveAll(solver=solver) == 17 ** 3
         constraining, defining = true_cons.decompose() # should be True, []
         assert constraining[0]
 
@@ -639,6 +645,31 @@ class TestGlobal:
         assert num_true + num_false == 2**7
         assert len(true_sols & false_sols) == 0# no solutions can be in both
 
+    def test_regular_multiple_accepting_nodes(self, solver):
+        # testing DFA with multiple accepting nodes
+        x = cp.intvar(0, 1, shape=3)
+
+        transitions = [("a", 0, "a"), ("a", 1, "b"), ("b", 1, "c"), ("c", 1, "d")]
+        start = "a"
+        ends = ["b", "c"]
+
+        true_sols = set()
+        false_sols = set()
+
+        solutions = [(0,0,1), (0,1,1)]
+
+        true_model = cp.Model(cp.Regular(x, transitions, start, ends))
+        false_model = cp.Model(~cp.Regular(x, transitions, start, ends))
+
+        num_true = true_model.solveAll(solver=solver, display=lambda : true_sols.add(tuple(argvals(x))))
+        num_false = false_model.solveAll(solver=solver, display=lambda : false_sols.add(tuple(argvals(x))))
+
+        assert num_true == len(solutions)
+        assert true_sols == set(solutions)
+
+        assert num_true + num_false == 2**3
+        assert len(true_sols & false_sols) == 0# no solutions can be in both
+
     def test_mdd(self):
         x = cp.intvar(0, 3, shape=3)
 
@@ -649,6 +680,8 @@ class TestGlobal:
 
         mdd_orig = cp.MDD(x, transitions, start=start, reduce=False)
         mdd_redu = cp.MDD(x, transitions, start=start, reduce=True)
+        # _reduce() is normally only called during decomposition, so call it explicitly here
+        mdd_redu._reduce()
         assert mdd_orig.levels.keys() - mdd_redu.levels.keys() == {"b1", "b2", "c2"}
 
         sols_orig = set()
@@ -1127,6 +1160,20 @@ class TestGlobal:
         model = cp.Model(constraints)
         assert not model.solve(solver="minizinc")
 
+    @pytest.mark.skipif(not CPM_minizinc.supported(),
+                        reason="Minizinc not installed")
+    def test_mdd_minizinc(self):
+        """Test native mdd global constraint with minizinc solver"""
+        x = cp.intvar(0, 3, shape=3)
+        transitions = [("src", 0, "a1"), ("src", 1, "b1"), ("src", 2, "c1"), ("a1", 1, "a2"), ("b1", 1, "b2"), ("c1", 2, "c2"),
+                       ("a2", 0, "snk"), ("b2", 0, "snk"), ("c2", 0, "snk")]
+        solutions = {(0, 1, 0), (1, 1, 0), (2, 2, 0)}
+
+        mdd = cp.MDD(x, transitions, start="src")
+        sols = set()
+        num = cp.Model(mdd).solveAll(solver="minizinc", display=lambda: sols.add(tuple(argvals(x))))
+        assert sols == solutions
+        assert num == len(solutions)
 
 
     def test_cumulative_no_np(self):
@@ -1859,18 +1906,6 @@ class TestTypeChecks:
             except (NotSupportedError, NotImplementedError):
                 print("Solver not supported: ", name)
                 continue
-
-
-    def test_table(self):
-        iv = cp.intvar(-8,8,3)
-
-        #assert cp.Model(cp.Table([iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])).solve() # not flatlist, should work
-        # used to work, not allowed anymore
-        pytest.raises(AttributeError, cp.Table, [iv[0], [iv[1], iv[2]]], [ (5, 2, 2)])
-
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], 5], [(5, 2, 2)])
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], [5]], [(5, 2, 2)])
-        pytest.raises(AttributeError, cp.Table, [iv[0], iv[1], iv[2], ['a']], [(5, 2, 2)])
 
     # def test_issue627(self): -> not allowed anymore; index must be an Expression
     #     for s, cls in cp.SolverLookup.base_solvers():

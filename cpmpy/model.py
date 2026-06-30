@@ -25,12 +25,13 @@
 
         Model
 """
+from __future__ import annotations
 import copy
 import warnings
-from typing import Optional, Any
+from typing import Optional
 
 from .exceptions import NotSupportedError
-from .expressions.core import Expression
+from .expressions.core import Expression, NestedBoolExprLike
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, Callback
@@ -42,12 +43,12 @@ class Model(object):
     CPMpy Model object, contains the constraint and objective expressions
     """
 
-    def __init__(self, *args, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
+    def __init__(self, *args: NestedBoolExprLike, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
         """
             Arguments of constructor:
 
             Arguments:
-                *args (Expression or list[Expression]): The constraints of the model
+                *args (NestedBoolExprLike): constraints passed to :meth:`add`
                 minimize (Expression): The objective to minimize
                 maximize (Expression): The objective to maximize
 
@@ -57,15 +58,16 @@ class Model(object):
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
         # init list of constraints and objective
-        self.constraints: list[Any] = []  # TODO: determine type
+        self.constraints: list[NestedBoolExprLike] = []
         self.objective_: Optional[Expression] = None
         self.objective_is_min: Optional[bool] = None
 
         if len(args) == 1 and is_any_list(args):
             args = args[0]  # historical shortcut, treat as *args
-        # use `__add__()` for typecheck
+
+        # pass by `add()` for typecheck
         if is_any_list(args):
-            # add (and type-check) one by one
+            # user intention is that each argument is a separate constraint
             for a in args:
                 self.add(a)
         else:
@@ -78,15 +80,15 @@ class Model(object):
             self.minimize(minimize)
 
         
-    def add(self, con):
+    def add(self, con: NestedBoolExprLike) -> "Model":
         """
         Add one or more constraints to the model.
 
         Arguments:
-            con (Expression or list[Expression]): Expression object(s) or list(s) of Expression objects representing constraints
+            con (NestedBoolExprLike): Boolean constraint expression or constant, or nested list/tuple thereof
 
         Returns:
-            Model: Returns ``self`` to allow for method chaining
+            self
 
         Example:
             .. code-block:: python
@@ -285,28 +287,7 @@ class Model(object):
         with open(fname, "rb") as f:
             m = pickle.load(f)
             # bug 158, we should increase the boolvar/intvar counters to avoid duplicate names
-            from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
-            from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, _BV_PREFIX, _IV_PREFIX # avoid circular import
-            vs = get_variables_model(m)
-            bv_counter = 0
-            iv_counter = 0
-            for v in vs:
-                if v.name.startswith(_BV_PREFIX):
-                    try:
-                        bv_counter = max(bv_counter, int(v.name[2:])+1)
-                    except:
-                        pass
-                elif v.name.startswith(_IV_PREFIX):
-                    try:
-                        iv_counter = max(iv_counter, int(v.name[2:])+1)
-                    except:
-                        pass
-
-            if (_BoolVarImpl.counter > 0 and bv_counter > 0) or \
-                    (_IntVarImpl.counter > 0 and iv_counter > 0):
-                warnings.warn(f"from_file '{fname}': contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
-            _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
-            _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)
+            _update_variable_counters(m)
             return m
 
     def copy(self):
@@ -325,3 +306,29 @@ class Model(object):
     def deepcopy(self, memodict={}):
         warnings.warn("Deprecated, use copy.deepcopy() instead, will be removed in stable version", DeprecationWarning)
         return copy.deepcopy(self, memodict)
+
+
+def _update_variable_counters(model: Model):
+    from cpmpy.transformations.get_variables import get_variables_model  # avoid circular import
+    from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, _BV_PREFIX, _IV_PREFIX # avoid circular import
+            
+    vs = get_variables_model(model)
+    bv_counter = 0
+    iv_counter = 0
+    for v in vs:
+        if v.name.startswith(_BV_PREFIX):
+            try:
+                bv_counter = max(bv_counter, int(v.name[2:])+1)
+            except: # When name starts with _BV_PREFIX but is not a valid integer (user created name), ignore
+                pass
+        elif v.name.startswith(_IV_PREFIX):
+            try:
+                iv_counter = max(iv_counter, int(v.name[2:])+1)
+            except: # When name starts with _IV_PREFIX but is not a valid integer (user created name), ignore
+                pass
+
+    if (_BoolVarImpl.counter > 0 and bv_counter > 0) or (_IntVarImpl.counter > 0 and iv_counter > 0):
+        warnings.warn(f"Model contains auxiliary {_IV_PREFIX}*/{_BV_PREFIX}* variables with the same name as already created. Only add expressions created AFTER loadig this model to avoid issues with duplicate variables.")
+    # update counters for future variables
+    _BoolVarImpl.counter = max(_BoolVarImpl.counter, bv_counter)
+    _IntVarImpl.counter = max(_IntVarImpl.counter, iv_counter)

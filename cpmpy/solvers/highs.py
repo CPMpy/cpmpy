@@ -48,7 +48,7 @@ import numpy.typing as npt
 
 from .solver_interface import Callback, SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, Operator
+from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
 from ..expressions.utils import is_any_list, is_num, is_int
 from ..expressions.variables import NegBoolView, _NumVarImpl, intvar
 from ..expressions.globalfunctions import FloatSum
@@ -60,7 +60,7 @@ from ..transformations.linearize import decompose_linear, decompose_linear_objec
 from ..transformations.normalize import toplevel_list
 from ..transformations.reification import only_bv_reifies, only_implies, reify_rewrite
 from ..transformations.safening import no_partial_functions, safen_objective
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 
 
 class CPM_highs(SolverInterface):
@@ -210,11 +210,17 @@ class CPM_highs(SolverInterface):
 
         raise NotImplementedError(f"HiGHS: unexpected linear expression {linexpr}, please report on our issue tracker.")
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports.
 
             Follows the ILP-style pipeline with linearize-friendly decompositions and treatment of reified variables.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                list[Expression]: transformed constraints
         """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=None)
@@ -230,12 +236,18 @@ class CPM_highs(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearisation, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_highs":
         """
             Eagerly add a constraint to the underlying solver.
 
             Any CPMpy expression given is immediately transformed (through `transform()`)
             and then posted to the solver in this function.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                self
         """
         # track user vars and ensure newly seen ones have solver columns
         get_variables(cpm_expr, collect=self.user_vars)
@@ -313,6 +325,7 @@ class CPM_highs(SolverInterface):
             get_variables(expr, collect=self.user_vars)
 
             obj, safe_cons = safen_objective(expr)
+            obj = push_down_negation_objective(obj)
             obj, decomp_cons = decompose_linear_objective(
                 obj,
                 supported=self.supported_global_constraints,

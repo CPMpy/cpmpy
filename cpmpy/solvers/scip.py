@@ -34,12 +34,12 @@ from typing import Optional
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, BoolVal, Comparison, Operator
+from ..expressions.core import Expression, BoolVal, Comparison, Operator, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl
 from ..expressions.globalconstraints import DirectConstraint, GlobalConstraint
 from ..expressions.globalfunctions import GlobalFunction, FloatSum
 from ..expressions.utils import is_num, is_int, is_true_cst, is_false_cst
-from ..transformations.negation import push_down_negation
+from ..transformations.negation import push_down_negation, push_down_negation_objective
 from ..transformations.comparison import only_numexpr_equality
 from ..transformations.flatten_model import flatten_constraint, flatten_objective
 from ..transformations.get_variables import get_variables
@@ -252,6 +252,7 @@ class CPM_scip(SolverInterface):
             self.solver_vars(list(self.user_vars))
 
             obj, safe_cons = safen_objective(expr)
+            obj = push_down_negation_objective(obj)
             obj, decomp_cons = decompose_linear_objective(
                 obj,
                 supported=self.supported_global_constraints,
@@ -304,7 +305,21 @@ class CPM_scip(SolverInterface):
         raise NotImplementedError("scip: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+        """
+            Transform arbitrary CPMpy expressions to constraints the solver supports
+
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
+
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                list[Expression]: transformed constraints
+        """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=None)
         cpm_cons = push_down_negation(cpm_cons)
@@ -319,7 +334,25 @@ class CPM_scip(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_scip":
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                self
+        """
         get_variables(cpm_expr, collect=self.user_vars)
         # Ensure every user var has a solver variable (so we get values after solve even if the constraint was simplified away and the var never appears in transformed constraints)
         self.solver_vars(list(self.user_vars))
