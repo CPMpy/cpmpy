@@ -25,7 +25,7 @@ import time
 from enum import Enum
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import Expression, ListLike, ExprLike
+from ..expressions.core import Expression, ListLike, ExprLike, NestedBoolExprLike
 from ..expressions.variables import _NumVarImpl
 from ..transformations.cse import CSEMap
 from ..transformations.get_variables import get_variables
@@ -200,7 +200,7 @@ class SolverInterface(object):
                 res.append(self.solver_var(cpm_var))
         return res
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -209,14 +209,15 @@ class SolverInterface(object):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         return toplevel_list(cpm_expr)  # replace by the transformations your solver needs
 
-    def add(self, cpm_expr):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -229,10 +230,11 @@ class SolverInterface(object):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: self
+            Returns:
+                self
         """
         # add new user vars to the set
         get_variables(cpm_expr, collect=self.user_vars)
@@ -244,7 +246,7 @@ class SolverInterface(object):
         return self
     
     # needed here for subclasses that don't do the more direct `__add__ = add` in their class
-    def __add__(self, cpm_expr):
+    def __add__(self, cpm_expr: NestedBoolExprLike) -> "SolverInterface":
         return self.add(cpm_expr)
 
 

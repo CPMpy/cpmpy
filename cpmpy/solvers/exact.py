@@ -56,7 +56,7 @@ from packaging.version import Version
 from cpmpy.transformations.negation import push_down_negation, push_down_negation_objective
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalfunctions import Multiplication
 from ..expressions.variables import intvar, boolvar, _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..transformations.comparison import only_numexpr_equality
@@ -501,7 +501,7 @@ class CPM_exact(SolverInterface):
 
         return xcfvars, self.fix(xrhs)
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
         Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -510,10 +510,11 @@ class CPM_exact(SolverInterface):
 
         See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        Arguments:
+            cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: list of Expression
+        Returns:
+            list[Expression]: transformed constraints
         """
 
         cpm_cons = toplevel_list(cpm_expr)
@@ -549,7 +550,7 @@ class CPM_exact(SolverInterface):
     def is_multiplication(cpm_expr):  # helper function (Multiplication is GlobalFunction name 'mul')
         return isinstance(cpm_expr, Multiplication)
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_exact":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -562,22 +563,23 @@ class CPM_exact(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr_orig: CPMpy expression, or list thereof
-        :type cpm_expr_orig: Expression or list of Expression
+        Arguments:
+            cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+        Returns:
+            self
         """
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
+        for con in self.transform(cpm_expr):
             # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
             # numexpr `comp` bvar|const
-            if isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
-                if cpm_expr.name == "==":
+            if isinstance(con, Comparison):
+                lhs, rhs = con.args
+                if con.name == "==":
                     # lhs can be Operator (sum, wsum) or Multiplication (GlobalFunction name 'mul')
                     if lhs.name == "mul":
                         if is_num(rhs): # make dummy var
@@ -592,26 +594,26 @@ class CPM_exact(SolverInterface):
                         xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                         self._add_xct_constr(xct_cfvars, True, xct_rhs, True, xct_rhs)
 
-                elif cpm_expr.name == "<=":
+                elif con.name == "<=":
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                     self._add_xct_constr(xct_cfvars, False, 0, True, xct_rhs)
 
-                elif cpm_expr.name == ">=":
+                elif con.name == ">=":
                     xct_cfvars, xct_rhs = self._make_numexpr(lhs, rhs)
                     self._add_xct_constr(xct_cfvars, True, xct_rhs, False, 0)
 
                 else:
-                    raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+                    raise NotImplementedError(con)  # if you reach this... please report on github
 
-            elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+            elif isinstance(con, Operator) and con.name == "->":
                 # Indicator constraints
                 # Take form bvar -> sum(x,y,z) >= rvar
-                cond, sub_expr = cpm_expr.args
-                assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+                cond, sub_expr = con.args
+                assert isinstance(cond, _BoolVarImpl), f"Implication constraint {con} must have BoolVar as lhs"
                 assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
 
                 if sub_expr.name not in ["==", ">=", "<="]:
-                    raise NotImplementedError("Constraint not supported by Exact '{}' {}".format(lhs.name, cpm_expr))
+                    raise NotImplementedError("Constraint not supported by Exact '{}' {}".format(lhs.name, con))
 
                 lhs, rhs = sub_expr.args
                 xct_cfvars, xct_rhs = self._make_numexpr(lhs,rhs)
@@ -629,16 +631,16 @@ class CPM_exact(SolverInterface):
                     self._add_xct_reif_right(cond, bool_val, [(-x,y) for x,y in xct_cfvars], -xct_rhs)
 
             # True or False
-            elif isinstance(cpm_expr, BoolVal):
-                self._add_xct_constr([], True, 0 if cpm_expr.args[0] else 1, False, 0)
+            elif isinstance(con, BoolVal):
+                self._add_xct_constr([], True, 0 if con.args[0] else 1, False, 0)
 
             # a direct constraint, pass to solver
-            elif isinstance(cpm_expr, DirectConstraint):
-                cpm_expr.callSolver(self, self.xct_solver)
+            elif isinstance(con, DirectConstraint):
+                con.callSolver(self, self.xct_solver)
                 return self
 
             else:
-                raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+                raise NotImplementedError(con)  # if you reach this... please report on github
             
         return self
     __add__ = add  # avoid redirect in superclass

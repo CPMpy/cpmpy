@@ -28,10 +28,10 @@
 from __future__ import annotations
 import copy
 import warnings
-from typing import Optional, Any
+from typing import Optional
 
 from .exceptions import NotSupportedError
-from .expressions.core import Expression
+from .expressions.core import Expression, NestedBoolExprLike
 from .expressions.utils import is_any_list
 from .solvers.utils import SolverLookup
 from .solvers.solver_interface import SolverInterface, SolverStatus, Callback
@@ -43,12 +43,12 @@ class Model(object):
     CPMpy Model object, contains the constraint and objective expressions
     """
 
-    def __init__(self, *args, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
+    def __init__(self, *args: NestedBoolExprLike, minimize: Optional[Expression] = None, maximize: Optional[Expression] = None):
         """
             Arguments of constructor:
 
             Arguments:
-                *args (Expression or list[Expression]): The constraints of the model
+                *args (NestedBoolExprLike): constraints passed to :meth:`add`
                 minimize (Expression): The objective to minimize
                 maximize (Expression): The objective to maximize
 
@@ -58,15 +58,16 @@ class Model(object):
         self.cpm_status = SolverStatus("Model") # status of solving this model, will be replaced
 
         # init list of constraints and objective
-        self.constraints: list[Any] = []  # TODO: determine type
+        self.constraints: list[NestedBoolExprLike] = []
         self.objective_: Optional[Expression] = None
         self.objective_is_min: Optional[bool] = None
 
         if len(args) == 1 and is_any_list(args):
             args = args[0]  # historical shortcut, treat as *args
-        # use `__add__()` for typecheck
+
+        # pass by `add()` for typecheck
         if is_any_list(args):
-            # add (and type-check) one by one
+            # user intention is that each argument is a separate constraint
             for a in args:
                 self.add(a)
         else:
@@ -79,15 +80,15 @@ class Model(object):
             self.minimize(minimize)
 
         
-    def add(self, con):
+    def add(self, con: NestedBoolExprLike) -> "Model":
         """
         Add one or more constraints to the model.
 
         Arguments:
-            con (Expression or list[Expression]): Expression object(s) or list(s) of Expression objects representing constraints
+            con (NestedBoolExprLike): Boolean constraint expression or constant, or nested list/tuple thereof
 
         Returns:
-            Model: Returns ``self`` to allow for method chaining
+            self
 
         Example:
             .. code-block:: python

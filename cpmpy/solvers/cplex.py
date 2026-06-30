@@ -57,7 +57,7 @@ import warnings
 from typing import Optional, List
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.globalfunctions import FloatSum
 from ..expressions.utils import eval_comparison, flatlist, is_bool, is_num, is_int
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _NumVarImpl, intvar
@@ -381,7 +381,7 @@ class CPM_cplex(SolverInterface):
         raise NotImplementedError("CPLEX: Not a known supported numexpr {}".format(cpm_expr))
 
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -390,10 +390,11 @@ class CPM_cplex(SolverInterface):
 
             See the :ref:`Adding a new solver` docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations, then post internally
         # expressions have to be linearized to fit in MIP model. See /transformations/linearize
@@ -414,7 +415,7 @@ class CPM_cplex(SolverInterface):
         cpm_cons = only_positive_bv(cpm_cons, csemap=self._csemap)  # after linearization, rewrite ~bv into 1-bv
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_cplex":
       """
         Eagerly add a constraint to the underlying solver.
 
@@ -427,31 +428,32 @@ class CPM_cplex(SolverInterface):
         the user knows and cares about (and will be populated with a value after solve). All other variables
         are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+        Arguments:
+            cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+        Returns:
+            self
       """
       # add new user vars to the set
-      get_variables(cpm_expr_orig, collect=self.user_vars)
+      get_variables(cpm_expr, collect=self.user_vars)
 
       # transform and post the constraints
-      for cpm_expr in self.transform(cpm_expr_orig):
+      for con in self.transform(cpm_expr):
 
         # Comparisons: only numeric ones as 'only_implies()' has removed the '==' reification for Boolean expressions
         # numexpr `comp` bvar|const
-        if isinstance(cpm_expr, Comparison):
-            lhs, rhs = cpm_expr.args
+        if isinstance(con, Comparison):
+            lhs, rhs = con.args
             cplexrhs = self.solver_var(rhs)
 
             # Thanks to `only_numexpr_equality()` only supported comparisons should remain
-            if cpm_expr.name == '<=':
+            if con.name == '<=':
                 cplexlhs = self._make_numexpr(lhs)
                 self.cplex_model.add_constraint(cplexlhs <= cplexrhs)
-            elif cpm_expr.name == '>=':
+            elif con.name == '>=':
                 cplexlhs = self._make_numexpr(lhs)
                 self.cplex_model.add_constraint(cplexlhs >= cplexrhs)
-            elif cpm_expr.name == '==':
+            elif con.name == '==':
                 if isinstance(lhs, _NumVarImpl) \
                         or (isinstance(lhs, Operator) and (lhs.name in {'sum', 'wsum', 'sub'})):
                     # a BoundedLinearExpression LHS, special case, like in objective
@@ -467,16 +469,16 @@ class CPM_cplex(SolverInterface):
                         self.cplex_model.add_constraint(self.cplex_model.abs(self.solver_var(lhs.args[0])) == cplexrhs)
                     else:
                         raise NotImplementedError(
-                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
+                        "Not a known supported cplex comparison '{}' {}".format(lhs.name, con))
             else:
                 raise NotImplementedError(
-                "Not a known supported cplex comparison '{}' {}".format(lhs.name, cpm_expr))
+                "Not a known supported cplex comparison '{}' {}".format(lhs.name, con))
 
-        elif isinstance(cpm_expr, Operator) and cpm_expr.name == "->":
+        elif isinstance(con, Operator) and con.name == "->":
             # Indicator constraints
             # Take form bvar -> sum(x,y,z) >= rvar
-            cond, sub_expr = cpm_expr.args
-            assert isinstance(cond, _BoolVarImpl), f"Implication constraint {cpm_expr} must have BoolVar as lhs"
+            cond, sub_expr = con.args
+            assert isinstance(cond, _BoolVarImpl), f"Implication constraint {con} must have BoolVar as lhs"
             assert isinstance(sub_expr, Comparison), "Implication must have linear constraints on right hand side"
             if isinstance(cond, NegBoolView):
                 cond, trigger_val = self.solver_var(cond._bv), False
@@ -487,24 +489,24 @@ class CPM_cplex(SolverInterface):
             if isinstance(lhs, _NumVarImpl) or (lhs.name in {'sum', 'wsum', 'sub'}):
                 lin_expr = self._make_numexpr(lhs)
             else:
-                raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {cpm_expr}")
+                raise ValueError(f"Unknown linear expression {lhs} on right side of indicator constraint: {con}")
             constraint = eval_comparison(sub_expr.name, lin_expr, self.solver_var(rhs))
             self.cplex_model.add_indicator(cond, constraint, trigger_val)
 
         # True or False
-        elif isinstance(cpm_expr, BoolVal):
-            if cpm_expr.args[0]: # just true
+        elif isinstance(con, BoolVal):
+            if con.args[0]: # just true
                 pass # do nothing
             else: # just false
                 a = self.cplex_model.binary_var()
                 self.cplex_model.add_constraint(a - a >= 1) # create a constraint that is always false
 
         # a direct constraint, pass to solver
-        elif isinstance(cpm_expr, DirectConstraint):
-            cpm_expr.callSolver(self, self.cplex_model)
+        elif isinstance(con, DirectConstraint):
+            con.callSolver(self, self.cplex_model)
 
         else:
-            raise NotImplementedError(cpm_expr)  # if you reach this... please report on github
+            raise NotImplementedError(con)  # if you reach this... please report on github
 
       return self
     __add__ = add  # avoid redirect in superclass

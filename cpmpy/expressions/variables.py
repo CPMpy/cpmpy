@@ -264,7 +264,7 @@ def cparray(arr):
     return cpm_array(arr)
 
 
-def cpm_array(arr: ListLike[ExprLike]) -> NDVarArray:
+def cpm_array(arr: ListLike[ExprLike|Any]) -> NDVarArray:
     """
     N-dimensional wrapper, to wrap standard numpy arrays or lists.
 

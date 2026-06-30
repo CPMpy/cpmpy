@@ -54,7 +54,7 @@ import warnings
 from packaging.version import Version
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus, Callback
-from ..expressions.core import Expression, Comparison, Operator
+from ..expressions.core import Expression, Comparison, Operator, NestedBoolExprLike
 from ..expressions.variables import _BoolVarImpl, NegBoolView, _IntVarImpl, _NumVarImpl
 from ..expressions.utils import is_num, is_int, is_any_list, is_boolexpr, argvals
 from ..transformations.get_variables import get_variables
@@ -390,7 +390,7 @@ class CPM_template(SolverInterface):
         raise NotImplementedError("TEMPLATE: Not a known supported numexpr {}".format(cpm_expr))
 
     # `add()` first calls `transform()`
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -399,10 +399,11 @@ class CPM_template(SolverInterface):
 
             See the 'Adding a new solver' docs on readthedocs for more information.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
@@ -420,7 +421,7 @@ class CPM_template(SolverInterface):
         # ...
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_template":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -433,27 +434,28 @@ class CPM_template(SolverInterface):
             the user knows and cares about (and will be populated with a value after solve). All other variables
             are auxiliary variables created by transformations.
 
-        :param cpm_expr: CPMpy expression, or list thereof
-        :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-        :return: self
+            Returns:
+                self
         """
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
+        for con in self.transform(cpm_expr):
 
-            if isinstance(cpm_expr, _BoolVarImpl):
+            if isinstance(con, _BoolVarImpl):
                 # base case, just var or ~var
-                self.TPL_solver.add_clause([ self.solver_var(cpm_expr) ])
+                self.TPL_solver.add_clause([ self.solver_var(con) ])
 
-            elif isinstance(cpm_expr, Operator):
-                if cpm_expr.name == "or":
-                    self.TPL_solver.add_clause(self.solver_vars(cpm_expr.args))
-                elif cpm_expr.name == "->": # half-reification
-                    bv, subexpr = cpm_expr.args
+            elif isinstance(con, Operator):
+                if con.name == "or":
+                    self.TPL_solver.add_clause(self.solver_vars(con.args))
+                elif con.name == "->": # half-reification
+                    bv, subexpr = con.args
                     # [GUIDELINE] example code for a half-reified sum/wsum comparison e.g. BV -> sum(IVs) >= 5
                     if isinstance(subexpr, Comparison):
                         lhs, rhs = subexpr.args
@@ -466,14 +468,14 @@ class CPM_template(SolverInterface):
                     else:
                         raise NotImplementedError("TEMPLATE: no support for half-reified constraint:", subexpr)
 
-            elif isinstance(cpm_expr, Comparison):
-                lhs, rhs = cpm_expr.args
+            elif isinstance(con, Comparison):
+                lhs, rhs = con.args
 
                 # [GUIDELINE] == is used for both double reification and numerical comparisons
                 #       need case by case analysis here. Note that if your solver does not support full-reification,
                 #       you can rely on the transformation only_implies to convert all reifications to half-reification
                 #       for more information, please reach out on github!
-                if cpm_expr.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
+                if con.name == "==" and is_boolexpr(lhs) and is_boolexpr(rhs): # reification
                     bv, subexpr = lhs, rhs
                     assert isinstance(lhs, _BoolVarImpl), "lhs of reification should be var because of only_bv_reifies"
 
@@ -491,9 +493,9 @@ class CPM_template(SolverInterface):
                 # otherwise, numerical comparisons
                 if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and lhs.name in {"sum", "wsum"}):
                     TPL_lhs = self._make_numexpr(lhs)
-                    self.TPL_solver.add_comparison(TPL_lhs, cpm_expr.name, self.solver_var(rhs))
+                    self.TPL_solver.add_comparison(TPL_lhs, con.name, self.solver_var(rhs))
                 # global functions
-                elif cpm_expr.name == "==":
+                elif con.name == "==":
                     TPL_rhs = self.solver_var(rhs)
                     if lhs.name == "max":
                         self.TPL_solver.add_max_constraint(self.solver_vars(lhs), TPL_rhs)
@@ -502,15 +504,15 @@ class CPM_template(SolverInterface):
                         self.TPL_solver.add_element_constraint(TPL_arr, TPL_idx, TPL_rhs)
                     # elif...
                     else:
-                        raise NotImplementedError("TEMPLATE: unknown equality constraint:", cpm_expr)
+                        raise NotImplementedError("TEMPLATE: unknown equality constraint:", con)
                 else:
-                    raise NotImplementedError("TEMPLATE: unknown comparison constraint", cpm_expr)
+                    raise NotImplementedError("TEMPLATE: unknown comparison constraint", con)
 
             # global constraints
-            elif cpm_expr.name == "alldifferent":
-                self.TPL_solver.add_alldifferent(self.solver_vars(cpm_expr.args))
+            elif con.name == "alldifferent":
+                self.TPL_solver.add_alldifferent(self.solver_vars(con.args))
             else:
-                raise NotImplementedError("TEMPLATE: constraint not (yet) supported", cpm_expr)
+                raise NotImplementedError("TEMPLATE: constraint not (yet) supported", con)
 
         return self
     __add__ = add  # avoid redirect in superclass

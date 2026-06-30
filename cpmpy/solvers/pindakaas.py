@@ -42,7 +42,7 @@ from datetime import timedelta
 from typing import Iterable, Optional, List, Any
 
 from ..exceptions import NotSupportedError
-from ..expressions.core import BoolVal, Comparison
+from ..expressions.core import Expression, BoolVal, Comparison, NestedBoolExprLike
 from ..expressions.utils import eval_comparison, is_int
 from ..expressions.variables import NegBoolView, _BoolVarImpl, _NumVarImpl
 from ..transformations.flatten_model import flatten_constraint
@@ -253,7 +253,21 @@ class CPM_pindakaas(SolverInterface):
 
         raise TypeError(f"Unexpected type: {cpm_var}")
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
+        """
+            Transform arbitrary CPMpy expressions to constraints the solver supports
+
+            Implemented through chaining multiple solver-independent **transformation functions** from
+            the `cpmpy/transformations/` directory.
+
+            See the :ref:`Adding a new solver` docs on readthedocs for more information.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                list[Expression]: transformed constraints
+        """
         cpm_cons = toplevel_list(cpm_expr)
         cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element", "nd_element"})
         cpm_cons = push_down_negation(cpm_cons)
@@ -272,19 +286,37 @@ class CPM_pindakaas(SolverInterface):
         cpm_cons = int2bool(cpm_cons, self.ivarmap, encoding=self.encoding, csemap=self._csemap)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pindakaas":
+        """
+            Eagerly add a constraint to the underlying solver.
+
+            Any CPMpy expression given is immediately transformed (through `transform()`)
+            and then posted to the solver in this function.
+
+            This can raise 'NotImplementedError' for any constraint not supported after transformation
+
+            The variables used in expressions given to add are stored as 'user variables'. Those are the only ones
+            the user knows and cares about (and will be populated with a value after solve). All other variables
+            are auxiliary variables created by transformations.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                self
+        """
         import pindakaas as pdk
 
         if self.unsatisfiable:
             return self
 
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
         try:
-            for cpm_expr in self.transform(cpm_expr_orig):
-                self._post_constraint(cpm_expr)
+            for con in self.transform(cpm_expr):
+                self._post_constraint(con)
         except pdk.Unsatisfiable:
             self.unsatisfiable = True
 
