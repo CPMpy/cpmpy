@@ -35,7 +35,6 @@ import os
 import sys
 import tempfile
 from io import TextIOBase
-import numpy as np
 import cpmpy as cp
 import warnings
 import builtins
@@ -183,32 +182,48 @@ def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtin
     scip_objective = scip.getObjective()
     direction = scip.getObjectiveSense()
 
-    n_terms = len(scip_objective.terms)
-    obj_vars = cp.cpm_array([None] * n_terms)  # type: ignore[list-item]
-    obj_coeffs = np.zeros(n_terms, dtype=int)
+    objective = _load_scip_objective(scip_objective, var_map, assume_integer)
 
-    for i, (term, coeff) in enumerate(scip_objective.terms.items()): # terms is a dictionary mapping terms to coefficients
-        if len(term.vartuple) > 1:
-            raise ValueError(f"Unsupported objective term: {term}") # TODO <- assumes linear, support higher-order terms
-        cpm_var = var_map[term.vartuple[0].name] # TODO <- assumes linear
-        obj_vars[i] = cpm_var
-        
+    if direction == "minimize":
+        model.minimize(objective)
+    elif direction == "maximize":
+        model.maximize(objective)
+    else:
+        raise ValueError(f"Unsupported objective sense: {direction}")
+
+    return model
+
+def _load_scip_objective(scip_objective, var_map, assume_integer: bool):
+    """
+    Translate a SCIP objective to a CPMpy objective.
+
+    Arguments:
+        scip_objective: The SCIP objective to translate.
+        var_map: A dictionary mapping SCIP variable names to CPMpy variables.
+        assume_integer: Whether to assume that all variables are integer.
+
+    Returns:
+        The CPMpy objective.
+
+    Raises:
+        ValueError: If the objective term has a non-integer coefficient and assume_integer is False.
+    """
+    obj_terms = []
+
+    for term, coeff in scip_objective.terms.items(): # terms is a dictionary mapping terms to coefficients
         _coeff = int(math.floor(coeff))
         if _coeff != int(coeff):
             if assume_integer:
                 warnings.warn(f"Objective term {term} has non-integer coefficient. CPMpy will assume it is integer.")
             else:
                 raise ValueError(f"Objective term {term} has non-integer coefficient. CPMpy does not support non-integer coefficients.")
-        obj_coeffs[i] = _coeff
 
-    if direction == "minimize":
-        model.minimize(cp.sum(obj_vars * obj_coeffs))
-    elif direction == "maximize":
-        model.maximize(cp.sum(obj_vars * obj_coeffs))
-    else:
-        raise ValueError(f"Unsupported objective sense: {direction}")
+        cpm_term = 1
+        for scip_var in term.vartuple:
+            cpm_term *= var_map[scip_var.name]
+        obj_terms.append(_coeff * cpm_term)
 
-    return model
+    return cp.sum(obj_terms)
 
 class _SCIPWriter(CPM_scip):
     """
