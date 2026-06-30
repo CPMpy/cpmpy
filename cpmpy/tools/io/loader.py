@@ -22,7 +22,7 @@ import builtins
 
 import cpmpy as cp
 from cpmpy.tools.io.dimacs import load_dimacs
-from cpmpy.tools.io.scip import load_scip
+from cpmpy.tools.io.scip_formats import load_scip
 from cpmpy.tools.io.wcnf import load_wcnf
 from cpmpy.tools.io.opb import load_opb
 from cpmpy.tools.io.xcsp3 import load_xcsp3
