@@ -187,8 +187,8 @@ def load_opb(opb: Union[str, os.PathLike, TextIO], open:Callable = builtins.open
             - A file path to an OPB file (optionally LZMA-compressed with `.xz`)
             - OR a string containing the OPB content directly
             - OR a TextIO object already open for reading
-        open: (callable):
-            If wcnf is the path to a file, a callable to "open" that file (default=python standard library's 'open').
+        open (Callable): callable to open the file for reading (default: builtin ``open``).
+            Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.opb.xz``.
 
     Returns:
         cp.Model: The CPMpy model of the OPB instance.

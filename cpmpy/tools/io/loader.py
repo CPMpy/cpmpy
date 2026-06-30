@@ -18,6 +18,8 @@ from functools import partial
 import os
 from pathlib import Path
 import sys
+import builtins
+
 import cpmpy as cp
 from cpmpy.tools.io.dimacs import load_dimacs
 from cpmpy.tools.io.scip import load_scip
@@ -84,7 +86,7 @@ def load_formats() -> List[str]:
     """
     return list(_loader_map.keys())
 
-def load(instance: Union[str, os.PathLike, TextIO], format: Optional[str] = None) -> cp.Model:
+def load(instance: Union[str, os.PathLike, TextIO], format: Optional[str] = None, open: Callable = builtins.open) -> cp.Model:
     """
     Load an instance from a file into a CPMpy model..
 
@@ -92,7 +94,8 @@ def load(instance: Union[str, os.PathLike, TextIO], format: Optional[str] = None
         instance (str or os.PathLike or TextIO): The path to the instance file to load, the instance itself as a string, or a TextIO object.
         format (Optional[str]): The format of the file to load. If None, the format will be derived from the file path (best effort). 
                                 Might raise a ValueError if the format could not be derived from the file path, or if the format is not supported.
-
+        open (Callable): callable to open the file for reading (default: builtin ``open``).
+            Use for decompression, e.g. ``lambda p: lzma.open(p, 'rt')`` for ``.xz``.
     Raises:
         ValueError: If the format is not supported or could not be derived from the file path.
 
@@ -101,14 +104,14 @@ def load(instance: Union[str, os.PathLike, TextIO], format: Optional[str] = None
     """
     
     if format is not None:
-        return _get_loader(format)(instance)
+        return _get_loader(format)(instance, open=open)
 
     else:
         if isinstance(instance, (str, os.PathLike)) and _is_potential_path(instance):
             path = Path(instance)
             if path.exists():
                 format = _derive_format(instance)
-                return _get_loader(format)(instance)
+                return _get_loader(format)(instance, open=open)
             else:
                 raise FileNotFoundError(instance)
         else:
