@@ -7,6 +7,7 @@ from ..solvers.pindakaas import CPM_pindakaas
 
 from cpmpy.expressions.variables import NegBoolView, _IntVarImpl
 
+from cpmpy.transformations.negation import push_down_negation_objective
 from cpmpy.transformations.safening import safen_objective
 from cpmpy.transformations.flatten_model import flatten_objective
 from cpmpy.transformations.linearize import decompose_linear_objective, only_positive_coefficients_
@@ -67,13 +68,16 @@ def to_cnf(constraints, csemap=None, ivarmap=None, encoding="auto"):
 
     return clauses
 
-def to_cnf_objective(expr, encoding="auto", csemap=None, ivarmap=None):
+def to_cnf_objective(expr, encoding="auto", csemap=None, ivarmap=None, supported=frozenset(), supported_reified=frozenset()):
     """
     Transform objective into weighted Boolean literals plus helper constraints.
 
     Arguments:
+        encoding: the encoding used for `int2bool`
         csemap: optional shared CSE cache (populated in-place)
         ivarmap: optional shared integer variable encoding dict (populated in-place)
+        supported: supported global constraints for objective decomposition
+        supported_reified: supported reified global constraints for objective decomposition
 
     Returns:
         (weights, xs, const, extra_cons)
@@ -83,10 +87,11 @@ def to_cnf_objective(expr, encoding="auto", csemap=None, ivarmap=None):
     if ivarmap is None:
         ivarmap = dict()
     obj, safe_cons = safen_objective(expr)
+    obj = push_down_negation_objective(obj)
     obj, decomp_cons = decompose_linear_objective(
         obj,
-        supported=frozenset(),
-        supported_reified=frozenset(),
+        supported=supported,
+        supported_reified=supported_reified,
         csemap=csemap,
     )
     obj, flat_cons = flatten_objective(obj, csemap=csemap)
