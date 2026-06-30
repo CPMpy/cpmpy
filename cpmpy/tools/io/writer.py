@@ -13,7 +13,7 @@ List of functions
 """
 
 import inspect
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, Union
 from functools import partial
 import warnings
 import os
@@ -82,14 +82,21 @@ def write_formats() -> List[str]:
     """
     return list(_writer_map.keys())
 
-def write(model: cp.Model, file_path: Optional[os.PathLike] = None, format: Optional[str] = None, verbose: bool = False, header: Optional[str] = None, **kwargs) -> str:
+def write(
+    model: cp.Model,
+    path: Optional[Union[str, os.PathLike]] = None,
+    format: Optional[str] = None,
+    verbose: bool = False,
+    header: Optional[str] = None,
+    **kwargs,
+) -> str:
     """
     Write a model to a file.
 
     Arguments:
         model (cp.Model): The model to write.
-        file_path (Optional[str]): The path to the file to write the model to. If None, only a string containing the model will be returned and nothing will be written.
-        format (Optional[str]): The format to write the model in. If None and file_path is provided, the format will be derived from the file path extension 
+        path (str or os.PathLike, optional): The file path to write the model to. If None, only a string containing the model will be returned and nothing will be written.
+        format (Optional[str]): The format to write the model in. If None and path is provided, the format will be derived from the file path extension 
                                 (best effort, might raise a ValueError if the format could not be derived from the file path).
                                 Might raise a ValueError if the format is not supported.
         verbose (bool): Whether to print verbose output.
@@ -107,9 +114,9 @@ def write(model: cp.Model, file_path: Optional[os.PathLike] = None, format: Opti
 
     # Derive format from file_path if not provided
     if format is None:
-        if file_path is None:
-            raise ValueError("Either 'format' or 'file_path' must be provided")
-        format = _derive_format(file_path)
+        if path is None:
+            raise ValueError("Either 'format' or 'path' must be provided")
+        format = _derive_format(path)
 
     writer = _get_writer(format)
 
@@ -129,6 +136,6 @@ def write(model: cp.Model, file_path: Optional[os.PathLike] = None, format: Opti
 
     # Create a default header for files, but keep returned strings clean by default.
     if header is None:
-        header = _create_header(format) if file_path is not None else None
+        header = _create_header(format) if path is not None else None
 
-    return writer(model, fname=file_path, header=header, **filtered_kwargs)
+    return writer(model, path=path, header=header, **filtered_kwargs)

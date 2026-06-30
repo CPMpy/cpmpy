@@ -295,7 +295,7 @@ def _wsum_to_str(cpm_expr, varmap):
 
 def write_opb(
         model:cp.Model, 
-        fname:Optional[Union[str, os.PathLike]] = None, 
+        path:Optional[Union[str, os.PathLike]] = None, 
         encoding:str="auto", 
         header:Optional[str] = None, 
         open:Callable = builtins.open, 
@@ -311,13 +311,13 @@ def write_opb(
 
     Arguments:
         model (cp.Model): The CPMpy model to export.
-        fname (str or os.PathLike, optional): The file name to write the OPB output to.
+        path (str or os.PathLike, optional): The file path to write the OPB output to.
         encoding (str, optional): The encoding used for `int2bool`. Options: ("auto", "direct", "order", "binary").
         header (str, optional): Optional header text to add as OPB comments.
-            If None, a default CPMpy header is created only when writing to ``fname``.
+            If None, a default CPMpy header is created only when writing to ``path``.
             Pass an empty string to skip adding a header.
         open (callable): Callable to open the file for writing (default: builtin ``open``).
-            Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
+            Called as ``open(path, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
         annotate (callable): ``annotate(vars, ivarmap) -> list[str]`` mapping each
@@ -342,7 +342,7 @@ def write_opb(
     """
 
     if header is None:
-        header = _create_header(format="opb") if fname is not None else None
+        header = _create_header(format="opb") if path is not None else None
     elif header == "":
         header = None
 
@@ -383,8 +383,8 @@ def write_opb(
 
     # Output to file or string
     contents = "\n".join(out)
-    if fname is not None:
-        with open(fname, "w") as f:
+    if path is not None:
+        with open(path, "w") as f:
             f.write(contents)
         
     return contents

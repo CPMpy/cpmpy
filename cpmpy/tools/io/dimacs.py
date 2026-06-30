@@ -70,7 +70,7 @@ from cpmpy.tools.io.utils import _create_header, _handle_loader_input
 
 def write_dimacs(
         model: cp.Model, 
-        fname: Optional[str] = None, 
+        path: Optional[Union[str, os.PathLike]] = None, 
         encoding: str = "auto", 
         p_header: bool = False, header : Optional[str] = None, 
         open: Callable = builtins.open, 
@@ -85,14 +85,14 @@ def write_dimacs(
 
     Arguments:
         model (cp.Model): a CPMpy model
-        fname (str, optional): file name to write the DIMACS output to. If None, the DIMACS string is returned.
+        path (str or os.PathLike, optional): file path to write the DIMACS output to. If None, the DIMACS string is returned.
         encoding (str): the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary") (default: "auto")
         p_header (bool): whether to include the ``p ...`` problem header line (default: ``False``)
         header (str, optional): Optional header text to prepend as DIMACS comments.
-            If None, a default CPMpy header is created only when writing to ``fname``.
+            If None, a default CPMpy header is created only when writing to ``path``.
             Pass an empty string to skip adding a header.
         open (Callable): callable to open the file for writing (default: builtin ``open``).
-            Called as ``open(fname, "w")``. This mirrors the ``open=`` argument
+            Called as ``open(path, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
         annotate (Callable, optional): variable annotation strategy. Controls how DIMACS literal IDs are
@@ -105,7 +105,7 @@ def write_dimacs(
     """
 
     if header is None:
-        header = _create_header(format="wcnf" if model.has_objective() else "cnf") if fname is not None else None
+        header = _create_header(format="wcnf" if model.has_objective() else "cnf") if path is not None else None
     elif header == "":
         header = None
 
@@ -202,8 +202,8 @@ def write_dimacs(
         out = "\n".join(header_lines) + "\n" + out
 
     # Write to file
-    if fname is not None:
-        with open(fname, "w") as f:
+    if path is not None:
+        with open(path, "w") as f:
             f.write(out)
 
     return out

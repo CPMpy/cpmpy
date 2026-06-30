@@ -214,12 +214,12 @@ class _SCIPWriter(CPM_scip):
         super().__init__(model)
         self.scip_model.setProbName(problem_name)
 
-def _add_header(fname: Union[str, os.PathLike], format: str, header: Optional[str] = None):
+def _add_header(path: Union[str, os.PathLike], format: str, header: Optional[str] = None):
     """
     Add a header to a file.
 
     Arguments:
-        fname (str or os.PathLike): The path to the file to add the header to.
+        path (str or os.PathLike): The path to the file to add the header to.
         format (str): The format of the file.
         header (Optional[str]): The header to add.
     """
@@ -227,7 +227,7 @@ def _add_header(fname: Union[str, os.PathLike], format: str, header: Optional[st
     if header is None:
         header = ""
 
-    with open(fname, "r") as f:
+    with open(path, "r") as f:
         lines = f.readlines()
 
     if format == "mps":
@@ -258,13 +258,13 @@ def _add_header(fname: Union[str, os.PathLike], format: str, header: Optional[st
         warnings.warn(f"Unsupported format for header: {format}")
         return
 
-    with open(fname, "w") as f:
+    with open(path, "w") as f:
         f.writelines(lines)
 
 
 def write_scip(
         model: cp.Model, 
-        fname: Optional[str] = None, 
+        path: Optional[Union[str, os.PathLike]] = None, 
         format: str = "mps", 
         header: Optional[str] = None, 
         verbose: bool = False, 
@@ -286,24 +286,24 @@ def write_scip(
 
     Arguments:
         model (cp.Model): CPMpy model to write.
-        fname (Optional[str]): Path to write to. If None, the file content is returned as a string.
+        path (str or os.PathLike, optional): The file path to write the SCIP output to. If None, the SCIP string is returned.
         format (str): Output format (e.g. "mps", "lp", "cip", "fzn", "gms", "pip").
         header (Optional[str]): Optional header text to prepend (format-dependent comment style).
-            If None, a default CPMpy header is created only when writing to ``fname``.
+            If None, a default CPMpy header is created only when writing to ``path``.
             Pass an empty string to skip adding a header.
         verbose (bool): If True, allow SCIP to print progress.
         open (Callable): Callable to open the file for writing (default: builtin ``open``).
-            Called as ``open(fname, "w")``. Mirrors the ``open=`` argument in loaders and
+            Called as ``open(path, "w")``. Mirrors the ``open=`` argument in loaders and
             allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
 
     Returns:
-        str: The file content as a string (whether written to ``fname`` or not).
+        str: The file content as a string (whether written to ``path`` or not).
     """
 
     writer = _SCIPWriter(model, problem_name="CPMpy Model")
     if header is None:
-        header = _create_header(format=format) if fname is not None else None
+        header = _create_header(format=format) if path is not None else None
     elif header == "":
         header = None
 
@@ -327,8 +327,8 @@ def write_scip(
         _add_header(tmp_fname, format, header)
         with builtins.open(tmp_fname, "r") as f:
             content = f.read()
-        if fname is not None:
-            with open(fname, "w") as f:
+        if path is not None:
+            with open(path, "w") as f:
                 f.write(content)
         return content
     finally:
