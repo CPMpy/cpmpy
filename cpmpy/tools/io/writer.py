@@ -21,7 +21,7 @@ import builtins
 
 import cpmpy as cp
 from cpmpy.tools.io.dimacs import write_dimacs
-from cpmpy.tools.io.scip import write_scip
+from cpmpy.tools.io.scip_formats import write_scip
 from cpmpy.tools.io.opb import write_opb
 from cpmpy.tools.io.utils import _derive_format
 

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import cpmpy as cp
 
-from cpmpy.tools.io.scip import _load_scip_objective
+from cpmpy.tools.io.scip_formats import _load_scip_objective
 
 
 _SCIPVar = namedtuple("_SCIPVar", ["name"])
