@@ -105,15 +105,15 @@ def _model_jsplib(task_to_machines: np.ndarray, task_durations: np.ndarray) -> t
     makespan = cp.intvar(0, task_durations.sum(), name="makespan") # extremely bad upperbound... TODO
 
     model = cp.Model()
-    model += start + task_durations == end
-    model += end[:,:-1] <= start[:,1:] # precedences
+    model.add(start + task_durations == end)
+    model.add(end[:,:-1] <= start[:,1:]) # precedences
 
     for machine in set(task_to_machines.flat):
-        model += cp.NoOverlap(start[task_to_machines == machine],
+        model.add(cp.NoOverlap(start[task_to_machines == machine],
                               task_durations[task_to_machines == machine],
-                              end[task_to_machines == machine])
+                              end[task_to_machines == machine]))
 
-    model += end <= makespan
+    model.add(end <= makespan)
     model.minimize(makespan)
 
     return model, (start, makespan)
