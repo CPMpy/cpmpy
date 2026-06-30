@@ -2405,7 +2405,7 @@ class LexLess(GlobalConstraint):
         # Constraint ensuring that each element in X is less than or equal to the corresponding element in Y,
         # until a strict inequality is encountered.
         defining = []
-        defining.extend(bvar == ((X <= Y) & ((X < Y) | bvar[1:])))  # vectorized expression, treat as list
+        defining.extend(bvar[:-1] == (X <= Y) & ((X < Y) | bvar[1:]))  # vectorized for all but the last
         # enforce the last element to be true iff (X[-1] < Y[-1]), enforcing strict lexicographic order
         defining.append(bvar[-1] == (X[-1] < Y[-1]))
         constraining = [bvar[0]]
@@ -2464,7 +2464,7 @@ class LexLessEq(GlobalConstraint):
 
         bvar = boolvar(shape=(len(X) + 1))
         defining = []
-        defining.extend(bvar == ((X <= Y) & ((X < Y) | bvar[1:])))  # vectorized expression, treat as list
+        defining.extend(bvar[:-1] == (X <= Y) & ((X < Y) | bvar[1:]))  # vectorized for all but the last
         defining.append(bvar[-1] == (X[-1] <= Y[-1]))
         constraining = [bvar[0]]
 
