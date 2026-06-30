@@ -66,6 +66,7 @@ from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.int2bool import IntVarEnc
+from cpmpy.tools.io.annotate import AnnotationCallable
 from cpmpy.tools.io.utils import _create_header, _handle_loader_input
 
 
@@ -75,7 +76,7 @@ def write_dimacs(
         encoding: str = "auto", 
         p_header: bool = False, header : Optional[str] = None, 
         open: Callable = builtins.open, 
-        annotate: Optional[Callable] = None
+        annotate: Optional[AnnotationCallable] = None
     ) -> str:
     """
     Writes a CPMpy model to DIMACS format.
@@ -99,13 +100,9 @@ def write_dimacs(
             Called as ``open(path, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
-        annotate (Callable, optional): variable annotation strategy. Controls how DIMACS literal IDs are
-            mapped back to original CPMpy variables. 
-            Options:
-            - None (default): no annotation
-            - "dimacs_comments": Sugar-style 'c <id> <name>' comment lines (self-contained)
-            - "json_sidecar": comments + a .map.json sidecar file (BumbleBee pattern)
-            - VariableAnnotator instance: fully custom strategy
+        annotate (AnnotationCallable, optional): variable annotation strategy with
+            shape ``annotate(vars, ivarmap) -> list[str]``. Controls how DIMACS
+            literal IDs are mapped back to original CPMpy variables.
     """
 
     if header is None:

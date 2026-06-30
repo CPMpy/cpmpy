@@ -46,6 +46,7 @@ from cpmpy.transformations.to_opb import to_opb, to_opb_objective
 from cpmpy.expressions.variables import NegBoolView, _ignore_strict_variable_name_check
 from cpmpy.expressions.core import Operator, Comparison
 from cpmpy.model import _update_variable_counters
+from cpmpy.tools.io.annotate import AnnotationCallable
 from cpmpy.tools.io.utils import _create_header, _handle_loader_input
 
 
@@ -297,7 +298,7 @@ def write_opb(
         encoding:str="auto", 
         header:Optional[str] = None, 
         open:Callable = builtins.open, 
-        annotate: Callable = annotate_extended
+        annotate: AnnotationCallable = annotate_extended
     ) -> str:
     """
     Export a CPMpy model to the OPB (Pseudo-Boolean) format.
@@ -318,9 +319,10 @@ def write_opb(
             Called as ``open(path, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
-        annotate (callable): ``annotate(vars, ivarmap) -> list[str]`` mapping each
-            Boolean variable to an OPB identifier. Default: sequential ``x1``, ``x2``, ...
-            (:func:`annotate_x`).
+        annotate (AnnotationCallable): variable annotation strategy with shape
+            ``annotate(vars, ivarmap) -> list[str]`` mapping each Boolean
+            variable to an OPB identifier. Default: extended quoted names
+            (:func:`annotate_extended`).
 
     Returns:
         str: The OPB string (as it is optionally written to a file).

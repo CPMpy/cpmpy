@@ -1,11 +1,15 @@
-from multiprocessing.process import parent_process
-from cpmpy.tools.io.opb import load_opb, write_opb
-import cpmpy as cp
-from cpmpy.transformations.get_variables import get_variables_model, get_variables
-from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView
+import re
 import pytest
 
-OPB_BASIC = "* #variable= 3 #constraint= 1\nmin: +2 x1 +1 x2;\n+1 x1 +2 x2 -1 x3 >= 2;\n"
+import cpmpy as cp
+from cpmpy.tools.io.opb import load_opb, write_opb
+from cpmpy.tools.io.annotate import annotate_cpmpy, annotate_sugar, annotate_veripb
+from cpmpy.transformations.get_variables import get_variables_model
+from cpmpy.expressions.variables import _BoolVarImpl, NegBoolView
+
+def _assert_names_in_opb(text, expected_names):
+    names = {token.removeprefix("~") for token in re.findall(r"[+-]\d+\s+(~?\S+)", text)}
+    assert expected_names <= names
 
 class TestLoadOPB:
 
@@ -81,5 +85,26 @@ class TestLoadOPB:
             assert isinstance(v, NegBoolView)
 
 
+class TestWriteOPB:
+
+    @pytest.mark.parametrize("encoding,annotate,expected_names", [
+        ("direct", annotate_cpmpy, {"x=1", "x=2", "x=3", "b"}),
+        ("order", annotate_cpmpy, {"x>=2", "x>=3", "b"}),
+        ("binary", annotate_cpmpy, {"x[bit=0]", "x[bit=1]", "b"}),
+        ("direct", annotate_sugar, {"px=1", "px=2", "px=3", "b"}),
+        ("order", annotate_sugar, {"px,2", "px,3", "b"}),
+        ("binary", annotate_sugar, {"px#0", "px#1", "b"}),
+        ("direct", annotate_veripb, {"x_eq_1", "x_eq_2", "x_eq_3", "b"}),
+        ("order", annotate_veripb, {"x_ge_2", "x_ge_3", "b"}),
+        ("binary", annotate_veripb, {"x_bit0", "x_bit1", "b"}),
+    ])
+    def test_annotate_writer_names_for_integer_encodings(self, encoding, annotate, expected_names):
+        x = cp.intvar(1, 3, name="x")
+        b = cp.boolvar(name="b")
+        model = cp.Model(x >= 2, b)
+
+        text = write_opb(model, encoding=encoding, annotate=annotate, header="")
+
+        _assert_names_in_opb(text, expected_names)
 
 
