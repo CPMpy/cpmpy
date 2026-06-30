@@ -91,7 +91,7 @@ def write(
     format: Optional[str] = None,
     verbose: bool = False,
     header: Optional[str] = None,
-    open: Callable = builtins.open,
+    open: Callable = partial(builtins.open, mode="w"),
     **kwargs,
 ) -> str:
     """
