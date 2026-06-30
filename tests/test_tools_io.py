@@ -202,7 +202,7 @@ class IOCase:
     A dataclass to help write IO related tests.
     """
     id: str
-    model: cp.Model                          # writer input
+    model: Optional[cp.Model]                # writer input; None for read-only formats
     filename: str                            # instance under tests/data/io/loader
     expected_repr: str                       # exact str(model) a correct loader produces
     load_format: Optional[str] = None        # key for load(); None -> not loadable
@@ -333,7 +333,7 @@ CASES = [
 
 
 def _case_needs(case, *modes) -> Tuple[str, ...]:
-    needs = []
+    needs: list[str] = []
     for mode in modes:
         if mode == "load":
             needs.extend(_format_needs(case.load_format))
@@ -342,6 +342,11 @@ def _case_needs(case, *modes) -> Tuple[str, ...]:
         else:
             raise ValueError(f"unknown dependency mode: {mode}")
     return tuple(dict.fromkeys(needs))
+
+
+def _writer_model(case: IOCase) -> cp.Model:
+    assert case.model is not None
+    return case.model
 
 
 def _params(cases, *modes):
@@ -378,7 +383,7 @@ class TestWriter:
     @pytest.mark.parametrize("case", _params(WRITE_CASES, "write"))
     def test_write_to_string(self, case):
         # the writer returns non-empty content
-        text = write(case.model, format=case.write_format)
+        text = write(_writer_model(case), format=case.write_format)
         assert isinstance(text, str)
         assert text.strip() != ""
 
@@ -387,7 +392,7 @@ class TestWriter:
         # writing to a file produces exactly what the writer returns (empty header so the
         # file is identical to the returned string)
         with tempfile.NamedTemporaryFile(suffix=f".{case.write_format}") as tmp:
-            text = write(case.model, path=tmp.name, format=case.write_format, header="")
+            text = write(_writer_model(case), path=tmp.name, format=case.write_format, header="")
             with open(tmp.name, "r") as f:
                 written = f.read()
         assert written.strip() != ""
@@ -397,7 +402,7 @@ class TestWriter:
     def test_header(self, case):
         # the provided header is written out verbatim
         header = "This is a header\n----------------"
-        text = write(case.model, format=case.write_format, header=header)
+        text = write(_writer_model(case), format=case.write_format, header=header)
         assert "This is a header" in text
         assert "----------------" in text
 
@@ -504,9 +509,10 @@ class TestRoundtrip:
     @pytest.mark.parametrize("case", _params(RT_MODEL_CASES, "write", "load"))
     def test_write_then_load(self, case):
         # model -> write -> load yields a solution-equivalent model
-        text = write(case.model, format=case.write_format)
+        model = _writer_model(case)
+        text = write(model, format=case.write_format)
         loaded = load(text, format=case.load_format)
-        _assert_same_solutions(case.model, loaded)
+        _assert_same_solutions(model, loaded)
 
     @pytest.mark.parametrize("case", _params(RT_INSTANCE_CASES, "write", "load"))
     def test_load_write_load(self, case):
