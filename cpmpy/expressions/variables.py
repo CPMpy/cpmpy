@@ -660,23 +660,29 @@ class NDVarArray(np.ndarray):
                np.asarray(ubs).reshape(self.shape)
 
     # VECTORIZED master function (delegate)
-    def _vectorized(self, other: ExprLike|Iterable|Any, attr: str) -> NDVarArray:
+    def _vectorized(self, other: ExprLike|Iterable|Any, attr: str, **kwargs) -> NDVarArray:
         """
-        Vectorized implementation of the given attribute (e.g. __eq__, __add__, etc.)
+        NumPy-broadcast ``other`` to ``self.shape``, then apply ``attr`` element-wise.
 
         Args:
             other (ExprLike|Iterable|Any): The other operand.
                 Typically an array/list of Expressions, or a single Expression, or a constant (or anything np compatible)
-            attr (str): The attribute to vectorize (e.g. __eq__, __add__, etc.)
+            attr (str): The attribute to vectorize (e.g. ``__eq__``, ``__add__``, ``implies``, etc.)
+            **kwargs: Extra keyword arguments passed to each element call (e.g. ``simplify`` for ``implies``).
 
         Returns:
             NDVarArray: The vectorized result.
         """
-        if not isinstance(other, Iterable):
-            other = [other]*len(self)
-        # this is a bit cryptic, but it calls 'attr' on s with o as arg
+        if not isinstance(other, np.ndarray):
+            other = np.asarray(other)
+        try:
+            other = np.broadcast_to(other, self.shape)
+        except ValueError as e:
+            raise ValueError(
+                f"operands could not be broadcast together with shapes {self.shape} {other.shape}"
+            ) from e
         # s.__eq__(o) <-> getattr(s, '__eq__')(o)
-        return cpm_array([getattr(s,attr)(o) for s,o in zip(self, other)])
+        return cpm_array([getattr(s, attr)(o, **kwargs) for s, o in zip(self.flat, other.flat)]).reshape(self.shape)
 
     # VECTORIZED comparisons
     def __eq__(self, other):
@@ -773,9 +779,7 @@ class NDVarArray(np.ndarray):
         return self._vectorized(other, '__rxor__')
 
     def implies(self, other: BoolExprLike|Iterable[BoolExprLike], simplify=False) -> NDVarArray:
-        if not isinstance(other, Iterable):
-            other = [other] * len(self)
-        return cpm_array([s.implies(o, simplify=simplify) for s, o in zip(self, other)])
+        return self._vectorized(other, 'implies', simplify=simplify)
 
     #in	  __contains__(self, value) 	Check membership
     # CANNOT meaningfully overwrite, python always returns True/False

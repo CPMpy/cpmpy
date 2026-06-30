@@ -253,6 +253,29 @@ class TestMul:
         for expr in prod:
             assert isinstance(expr, Expression) or expr == 0
 
+class TestNDVarArrayBroadcast:
+
+    def test_numpy_array_mul(self):
+        x = intvar(0, 10, shape=(3, 4), name="x")
+        w = np.array([1, 2, 3, 4])
+        expr = x * w
+        ref = np.multiply(x, w)
+        assert expr.shape == ref.shape
+        for idx in np.ndindex(expr.shape):
+            assert str(expr[idx]) == str(ref[idx])
+
+    def test_numpy_scalar_mul(self):
+        x = intvar(0, 10, shape=(3, 4), name="x")
+        expr = x * 2
+        ref = np.multiply(x, 2)
+        for idx in np.ndindex(expr.shape):
+            assert str(expr[idx]) == str(ref[idx])
+
+    def test_incompatible_broadcast_raises(self):
+        x = intvar(0, 10, shape=(3, 4), name="x")
+        with pytest.raises(ValueError, match="broadcast"):
+            x * np.array([1, 2])
+
 class TestArrayExpressions:
 
     def test_sum(self):
