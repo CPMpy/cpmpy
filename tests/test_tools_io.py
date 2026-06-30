@@ -22,6 +22,7 @@ ground-truth strings stable.
 import os
 import re
 import runpy
+import sys
 import tempfile
 import importlib.util
 from dataclasses import dataclass
@@ -33,6 +34,7 @@ import pytest
 
 import cpmpy as cp
 from cpmpy.tools.io import load, write
+import cpmpy.tools.io.loader as loader_module
 from cpmpy.tools.io.loader import _get_loader
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl, _BV_PREFIX, _IV_PREFIX
 from cpmpy.transformations.get_variables import get_variables_model
@@ -679,3 +681,88 @@ class TestLargerInstance:
     def test_writer_only_file_exists(self, case_id, filename):
         assert case_id
         assert os.path.getsize(_fixture(filename)) > 0
+
+
+class TestLoaderCLI:
+    def test_main_autodetects_file_format(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["loader", _fixture("basic.cnf")])
+
+        loader_module.main()
+
+        captured = capsys.readouterr()
+        assert "Status:" in captured.out
+        assert captured.err == ""
+
+    def test_main_loads_explicit_format(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["loader", _fixture("jsplib_ft06.txt"), "--format", "jsplib", "--time-limit", "1"],
+        )
+
+        loader_module.main()
+
+        captured = capsys.readouterr()
+        assert "Status:" in captured.out
+        assert captured.err == ""
+
+    def test_main_loads_raw_string_with_explicit_format(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["loader", "p cnf 1 1\n1 0", "--string", "--format", "cnf"],
+        )
+
+        loader_module.main()
+
+        captured = capsys.readouterr()
+        assert "Status:" in captured.out
+        assert captured.err == ""
+
+    def test_main_raw_string_requires_format(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["loader", "p cnf 1 1\n1 0", "--string"])
+
+        with pytest.raises(SystemExit) as exc:
+            loader_module.main()
+
+        captured = capsys.readouterr()
+        assert exc.value.code == 1
+        assert "Error reading model:" in captured.err
+
+    def test_main_reports_unsat_status(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["loader", "p cnf 1 2\n1 0\n-1 0", "--string", "--format", "cnf"],
+        )
+
+        loader_module.main()
+
+        captured = capsys.readouterr()
+        assert "Status:" in captured.out
+        assert "UNSATISFIABLE" in captured.out
+        assert captured.err == ""
+
+    def test_main_bad_solver_reports_solve_error(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["loader", _fixture("basic.cnf"), "--solver", "not_a_solver"],
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            loader_module.main()
+
+        captured = capsys.readouterr()
+        assert exc.value.code == 1
+        assert "Error solving model:" in captured.err
+
+    def test_main_rejects_unknown_format(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["loader", _fixture("basic.cnf"), "--format", "unknown"])
+
+        with pytest.raises(SystemExit) as exc:
+            loader_module.main()
+
+        captured = capsys.readouterr()
+        assert exc.value.code == 2
+        assert "invalid choice" in captured.err
