@@ -39,8 +39,9 @@ _writer_map: dict[str, Callable[..., str]] = {
     # "wbo": partial(write_scip, format="wbo"),      # requires SIMPL, not included in pip package   
     # "zpl": partial(write_scip, format="zpl"),      # requires SIMPL, not included in pip package
     "dimacs": write_dimacs,
-    "opb": write_opb,
+    "cnf": write_dimacs,
     "wcnf": write_dimacs,
+    "opb": write_opb,
 }
 
 
