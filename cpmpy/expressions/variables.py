@@ -682,7 +682,11 @@ class NDVarArray(np.ndarray):
                 f"operands could not be broadcast together with shapes {self.shape} {other.shape}"
             ) from e
         # s.__eq__(o) <-> getattr(s, '__eq__')(o)
-        return cpm_array([getattr(s, attr)(o, **kwargs) for s, o in zip(self.flat, other.flat)]).reshape(self.shape)
+        # unwrap numpy scalars so e.g. int <= np.int64 does not return NotImplemented
+        return cpm_array([
+            getattr(s, attr)(o if not isinstance(o, np.generic) else o.item(), **kwargs)
+            for s, o in zip(self.flat, other.flat)
+        ]).reshape(self.shape)
 
     # VECTORIZED comparisons
     def __eq__(self, other):
