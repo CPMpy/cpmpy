@@ -27,7 +27,7 @@ solver_dependencies = {
     "minizinc": ["minizinc>=0.7.0"],
     "pysat": ["python-sat>=1.8.dev4"],
     "gurobi": ["gurobipy>=11.0.0"],
-    "highs": ["highspy"],
+    "highs": ["highspy <=1.14.0"],
     "pysdd": ["pysdd>=0.2.11"],
     "gcs": ["gcspy>=0.1.9"], # first version to pass all tests
     "cpo": ["docplex>=2.28.240"],

@@ -58,7 +58,6 @@ from .solver_interface import SolverStatus, ExitStatus
 from .pysat import CPM_pysat
 from ..exceptions import NotSupportedError
 from ..transformations.get_variables import get_variables
-from ..transformations.int2bool import replace_int_user_vars
 from ..transformations.to_cnf import to_cnf_objective
 
 
@@ -156,10 +155,7 @@ class CPM_rc2(CPM_pysat):
         from pysat.examples import rc2
 
         # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
-
-        # the user vars should have all and only Booleans (e.g. to ensure solveAll behaves consistently)
-        self.user_vars = replace_int_user_vars(self.user_vars, self.ivarmap)
+        self.user_vars = self._int2bool_user_vars()
 
         if not self.has_objective():
             raise NotSupportedError("CPM_rc2: RC2 does not support solving decision problems. Add an objective to your problem.")

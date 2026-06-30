@@ -52,12 +52,12 @@
     ==============
 """
 from threading import Timer
-from typing import Optional, List, Iterable
+from typing import Optional, List, Iterable, Set
 import warnings
 
 from .solver_interface import SolverInterface, SolverStatus, ExitStatus
 from ..exceptions import NotSupportedError
-from ..expressions.core import Comparison, Operator, BoolVal
+from ..expressions.core import Expression, Comparison, Operator, BoolVal, NestedBoolExprLike
 from ..expressions.variables import _NumVarImpl, _BoolVarImpl, _IntVarImpl, NegBoolView
 from ..expressions.globalconstraints import DirectConstraint
 from ..transformations.linearize import only_positive_coefficients, decompose_linear
@@ -215,6 +215,31 @@ class CPM_pysat(SolverInterface):
         """
         return self.pysat_solver
 
+    def _int2bool_user_vars(self) -> Set[_BoolVarImpl]:
+        """
+        Encode all integer user variables to Booleans and register them with the solver.
+
+        Ensures every user variable is known to the solver back-end: integer variables
+        are encoded via `int2bool` (their encoding constraints are posted and their
+        encoding Booleans registered), while Boolean variables are registered directly.
+
+        :return: a new set containing only the Boolean user variables (integer user
+            variables replaced by their encoding Booleans), so that e.g. `solveAll`
+            behaves consistently.
+        """
+        # ensure all vars are known to solver
+        for cpm_var in self.user_vars:
+            if isinstance(cpm_var, _NumVarImpl) and not cpm_var.is_bool():
+                if cpm_var.name not in self.ivarmap:
+                    _, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
+                    for cpm_expr in self.transform(cons):
+                        self._post_constraint(cpm_expr)
+                for bv in self.ivarmap[cpm_var.name].vars().flatten():
+                    self.solver_var(bv)
+            else:
+                self.solver_var(cpm_var)
+        # the user vars should have all and only Booleans (e.g. to ensure solveAll behaves consistently)
+        return replace_int_user_vars(self.user_vars, self.ivarmap)
 
     def solve(self, time_limit:Optional[float]=None, assumptions:Optional[Iterable[_BoolVarImpl]]=None):
         """
@@ -231,10 +256,7 @@ class CPM_pysat(SolverInterface):
                             Note: the PySAT interface is statefull, so you can incrementally call solve() with assumptions and it will reuse learned clauses
         """
 
-        # ensure all vars are known to solver
-        self.solver_vars(list(self.user_vars))
-        # the user vars should have all and only Booleans (e.g. to ensure solveAll behaves consistently)
-        self.user_vars = replace_int_user_vars(self.user_vars, self.ivarmap)
+        self.user_vars = self._int2bool_user_vars()
 
         if assumptions is None:
             pysat_assum_vars = [] # default if no assumptions
@@ -323,20 +345,12 @@ class CPM_pysat(SolverInterface):
             So vpool is the varmap (we don't use _varmap here).
         """
         if isinstance(cpm_var, _NumVarImpl):
-            name = cpm_var.name
-            if cpm_var.is_bool():
-                if isinstance(cpm_var, NegBoolView):
-                    # special case, negative-bool-view: just a view, get actual var identifier, return -id
-                    return -self.pysat_vpool.id(cpm_var._bv.name) # use name of inner variable, not ~bv as name
-                return self.pysat_vpool.id(name)
-
-            # intvar
-            if name not in self.ivarmap:
-                enc, cons = _encode_int_var(self.ivarmap, cpm_var, _decide_encoding(cpm_var, None, encoding=self.encoding))
-                self.add(cons)
-            else:
-                enc = self.ivarmap[name]
-            return self.solver_vars(enc.vars())
+            if not cpm_var.is_bool():
+                raise TypeError(f"CPM_pysat.solver_var only supports Boolean variables, not {cpm_var}")
+            if isinstance(cpm_var, NegBoolView):
+                # special case, negative-bool-view: just a view, get actual var identifier, return -id
+                return -self.pysat_vpool.id(cpm_var._bv.name) # use name of inner variable, not ~bv as name
+            return self.pysat_vpool.id(cpm_var.name)
 
         if isinstance(cpm_var, BoolVal):
             return cpm_var
@@ -346,7 +360,7 @@ class CPM_pysat(SolverInterface):
 
         raise NotImplementedError(f"CPM_pysat: variable {cpm_var} not supported")
 
-    def transform(self, cpm_expr):
+    def transform(self, cpm_expr: NestedBoolExprLike) -> list[Expression]:
         """
             Transform arbitrary CPMpy expressions to constraints the solver supports
 
@@ -362,13 +376,14 @@ class CPM_pysat(SolverInterface):
             - Cardinality constraint (`sum`)
             - Pseudo-Boolean constraints (`wsum`)
 
-            :param cpm_expr: CPMpy expression, or list thereof
-            :type cpm_expr: Expression or list of Expression
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
 
-            :return: list of Expression
+            Returns:
+                list[Expression]: transformed constraints
         """
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element", "nd_element"})
+        cpm_cons = no_partial_functions(cpm_cons)
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_linear(
             cpm_cons,
@@ -386,7 +401,7 @@ class CPM_pysat(SolverInterface):
         cpm_cons = only_positive_coefficients(cpm_cons)
         return cpm_cons
 
-    def add(self, cpm_expr_orig):
+    def add(self, cpm_expr: NestedBoolExprLike) -> "CPM_pysat":
         """
             Eagerly add a constraint to the underlying solver.
 
@@ -401,13 +416,19 @@ class CPM_pysat(SolverInterface):
 
             What 'supported' means depends on the solver capabilities, and in effect on what transformations
             are applied in `transform()`.
+
+            Arguments:
+                cpm_expr (NestedBoolExprLike): CPMpy expression, or list thereof
+
+            Returns:
+                self
         """
         # add new user vars to the set
-        get_variables(cpm_expr_orig, collect=self.user_vars)
+        get_variables(cpm_expr, collect=self.user_vars)
 
         # transform and post the constraints
-        for cpm_expr in self.transform(cpm_expr_orig):
-            self._post_constraint(cpm_expr)
+        for con in self.transform(cpm_expr):
+            self._post_constraint(con)
 
         return self
 

@@ -108,21 +108,24 @@ class SolverLookup():
                 print(f"{basename}: Not supported (missing Python package, binary or license).")
 
     @classmethod
-    def supported(cls):
+    def supported(cls, subsolvers=True):
         """
-            Return the list of names of all solvers (and subsolvers) supported on this system.
+            Return the list of names of all solvers (and optionally subsolvers) supported on this system.
 
             If a solver name is returned, it means that the solver's `.supported()` function returns True
             and it is hence ready for immediate use
             (e.g. any separate binaries are also installed if necessary, and licenses are active if needed).
 
             Typical use case is to use these names in `SolverLookup.get(name)`.
+
+            :param subsolvers: if True (default), also include installed subsolvers as
+                ``<base_solver>:<subsolver>`` entries in the list; otherwise only the <base_solver> is added.
         """
         names = []
         for (basename, CPM_slv) in cls.base_solvers():
             if CPM_slv.supported():
                 names.append(basename)
-                if hasattr(CPM_slv, "solvernames"):
+                if subsolvers and hasattr(CPM_slv, "solvernames"):
                     subnames = CPM_slv.solvernames(installed=True)
                     for subn in subnames:
                         names.append(basename+":"+subn)
