@@ -609,6 +609,27 @@ LARGER_INSTANCE_CASES = [
         expected_vars=77,
         expected_constraints=102,
     ),
+    LargerInstanceCase(
+        id="jsplib-ft06",
+        filename="jsplib_ft06.txt",
+        load_format="jsplib",
+        expected_vars=73,
+        expected_constraints=9,
+    ),
+    LargerInstanceCase(
+        id="rcpsp-j3013-1",
+        filename="rcpsp_j3013_1.sm",
+        load_format="rcpsp",
+        expected_vars=65,
+        expected_constraints=53,
+    ),
+    LargerInstanceCase(
+        id="nurserostering-instance1",
+        filename="nurserostering_instance1.txt",
+        load_format="nurserostering",
+        expected_vars=140,
+        expected_constraints=334,
+    ),
 ]
 
 
