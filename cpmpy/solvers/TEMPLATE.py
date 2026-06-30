@@ -408,7 +408,8 @@ class CPM_template(SolverInterface):
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"div"})) # global functions that are decomposed later don't have to be safened toplevel!
+        cpm_cons = no_partial_functions(cpm_cons) # if the solver requires supported partial function globals to be safened, use the follwing instead:
+        # cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"element", "nd_element", "div", "mod"}))        
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,
