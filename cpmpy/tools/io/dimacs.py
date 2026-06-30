@@ -53,6 +53,7 @@ List of functions
 
 import os
 import builtins
+import warnings
 from typing import TextIO
 from typing import Optional, Callable, Union
 
@@ -80,14 +81,17 @@ def write_dimacs(
     Writes a CPMpy model to DIMACS format.
     Uses the "to_cnf" transformation from CPMpy.
 
-    .. todo::
-        TODO: implement pseudoboolean constraints in to_cnf
+    .. note::
+        If the model has an objective, WCNF is emitted. DIMACS/WCNF has no field for
+        constant objective offsets; when objective transformation introduces one, it
+        is ignored and a warning is raised. The written model still preserves the
+        optimisation, but its objective value may differ by that constant.
 
     Arguments:
         model (cp.Model): a CPMpy model
         path (str or os.PathLike, optional): file path to write the DIMACS output to. If None, the DIMACS string is returned.
         encoding (str): the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary") (default: "auto")
-        p_header (bool): whether to include the ``p ...`` problem header line (default: ``False``)
+        p_header (bool): whether to include the ``p ...`` problem header line. Replaces the ``h`` prefix for WCNF with a ``top`` weight. (default: ``False``)
         header (str, optional): Optional header text to prepend as DIMACS comments.
             If None, a default CPMpy header is created only when writing to ``path``.
             Pass an empty string to skip adding a header.
@@ -109,11 +113,6 @@ def write_dimacs(
     elif header == "":
         header = None
 
-    if model.has_objective():
-        hard_prefix = "h "
-    else:
-        hard_prefix = ""
-
     # Shared maps so both objective and constraint transformations populate
     # the same ivarmap, enabling annotation of all integer variable encodings.
     ivarmap: dict[str, IntVarEnc] = dict()
@@ -122,12 +121,20 @@ def write_dimacs(
     constraints = list.copy(model.constraints)
     objective_lits = []
     objective_weights = []
+    objective_const = 0
 
     # Transform objective, if present
     if model.has_objective():
-        objective_weights, objective_lits, _, extra_cons = to_cnf_objective(
+        objective_weights, objective_lits, objective_const, extra_cons = to_cnf_objective(
             model.objective_, encoding=encoding, csemap=csemap, ivarmap=ivarmap
         )
+        if objective_const != 0:
+            warnings.warn(
+                "DIMACS/WCNF cannot represent constant objective offsets; "
+                f"ignoring offset {objective_const}.",
+                UserWarning,
+                stacklevel=2,
+            )
         # Add constraints resulting from the objective transformation
         constraints += extra_cons
     # Transform constraints to CNF
@@ -137,6 +144,11 @@ def write_dimacs(
     vars = get_variables(constraints + objective_lits)
     mapping = {v : i+1 for i, v in enumerate(vars)}
 
+    top_weight = sum(objective_weights) + 1 if objective_weights else 1
+    if model.has_objective():
+        hard_prefix = f"{top_weight} " if p_header else "h "
+    else:
+        hard_prefix = ""
 
     out = ""  # DIMACS string
 
@@ -165,19 +177,23 @@ def write_dimacs(
 
         out += hard_prefix + " ".join(dimacs_clause_ints + ["0"]) + "\n"
 
+    def _dimacs_lit(lit, flip_sign=False):
+        sign = -1 if flip_sign else 1
+        if isinstance(lit, NegBoolView):
+            return str(-sign * mapping[lit._bv])
+        if isinstance(lit, _BoolVarImpl):
+            return str(sign * mapping[lit])
+        raise ValueError(f"Expected Boolean literal in objective, but got {lit} of type {type(lit)}")
+
     # Write objective to DIMACS format
     if model.has_objective():
-        max_weight = max(objective_weights)
         for w, x in zip(objective_weights, objective_lits):
-            if isinstance(x, NegBoolView):
-                lit = -mapping[x._bv]
-            elif isinstance(x, _BoolVarImpl):
-                lit = mapping[x]
-            else:
-                raise ValueError(f"Expected Boolean literal in objective, but got {x} of type {type(x)}")
-            # Take care of the optimisation direction
-            transformed_weight = max_weight - w if model.objective_is_min else w
-            out += f"{transformed_weight} {lit} 0\n"
+            # WCNF minimizes the weight of unsatisfied soft clauses. Each objective
+            # literal is written as a one-literal soft clause: for minimization we
+            # flip the literal sign, so the penalty is paid when the original
+            # literal is true; for maximization we keep the sign.
+            lit = _dimacs_lit(x, flip_sign=model.objective_is_min)
+            out += f"{w} {lit} 0\n"
 
     # Write annotations to DIMACS string
     if annotate is not None:
@@ -192,7 +208,8 @@ def write_dimacs(
     # Optional p-header
     if p_header:
         if model.has_objective():
-            out = f"p wcnf {len(vars)} {len(constraints)} {max(objective_weights)}\n" + out
+            nr_clauses = len(constraints) + len(objective_weights)
+            out = f"p wcnf {len(vars)} {nr_clauses} {top_weight}\n" + out
         else:
             out = f"p cnf {len(vars)} {len(constraints)}\n" + out
 
