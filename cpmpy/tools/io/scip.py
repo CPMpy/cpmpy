@@ -44,6 +44,8 @@ if TYPE_CHECKING:
     import pyscipopt
 
 from cpmpy.solvers.scip import CPM_scip
+from cpmpy.expressions.variables import _ignore_strict_variable_name_check
+from cpmpy.model import _update_variable_counters
 from cpmpy.tools.io.utils import _create_header, _derive_format, get_extension
 
 
@@ -113,26 +115,27 @@ def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtin
     # 1) translate variables
     scip_vars = scip.getVars()
     var_map = {}
-    for var in scip_vars:
-        name = var.name         # name of the variable
-        vtype = var.vtype()     # type of the variable
-        if vtype == "BINARY":
-            var_map[name] = cp.boolvar(name=name)
-        elif vtype == "INTEGER":
-            lb = int(var.getLbOriginal())
-            ub = int(var.getUbOriginal())
-            var_map[name] = cp.intvar(lb, ub, name=name)
-        elif vtype == "CONTINUOUS":
-            if assume_integer:
-                lb = int(math.ceil(var.getLbOriginal()))
-                ub = int(math.floor(var.getUbOriginal()))
-                if lb != var.getLbOriginal() or ub != var.getUbOriginal():
-                    warnings.warn(f"Continuous variable {name} has non-integer bounds {var.getLbOriginal()} - {var.getUbOriginal()}. CPMpy will assume it is integer.")
+    with _ignore_strict_variable_name_check():
+        for var in scip_vars:
+            name = var.name         # name of the variable
+            vtype = var.vtype()     # type of the variable
+            if vtype == "BINARY":
+                var_map[name] = cp.boolvar(name=name)
+            elif vtype == "INTEGER":
+                lb = int(var.getLbOriginal())
+                ub = int(var.getUbOriginal())
                 var_map[name] = cp.intvar(lb, ub, name=name)
+            elif vtype == "CONTINUOUS":
+                if assume_integer:
+                    lb = int(math.ceil(var.getLbOriginal()))
+                    ub = int(math.floor(var.getUbOriginal()))
+                    if lb != var.getLbOriginal() or ub != var.getUbOriginal():
+                        warnings.warn(f"Continuous variable {name} has non-integer bounds {var.getLbOriginal()} - {var.getUbOriginal()}. CPMpy will assume it is integer.")
+                    var_map[name] = cp.intvar(lb, ub, name=name)
+                else:
+                    raise ValueError(f"CPMpy does not support continious variables: {name}")
             else:
-                raise ValueError(f"CPMpy does not support continious variables: {name}")
-        else:
-            raise ValueError(f"Unsupported variable type: {vtype}")
+                raise ValueError(f"Unsupported variable type: {vtype}")
         
 
     model = cp.Model()
@@ -191,6 +194,7 @@ def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtin
     else:
         raise ValueError(f"Unsupported objective sense: {direction}")
 
+    _update_variable_counters(model)
     return model
 
 def _load_scip_objective(scip_objective, var_map, assume_integer: bool):

@@ -32,6 +32,8 @@ import cpmpy as cp
 
 # Special case for optional cpmpy dependencies
 from typing import TYPE_CHECKING
+from cpmpy.expressions.variables import _ignore_strict_variable_name_check
+from cpmpy.model import _update_variable_counters
 from cpmpy.tools.io.utils import _handle_loader_input
 
 if TYPE_CHECKING:
@@ -74,11 +76,13 @@ def _load_xcsp3(parser: "ParserXCSP3") -> cp.Model:
     """
     from .parser_callbacks import CallbacksCPMPy
     from pycsp3.parser.xparser import CallbackerXCSP3
-    callbacks = CallbacksCPMPy()
-    callbacks.force_exit = True
-    callbacker = CallbackerXCSP3(parser, callbacks)
-    callbacker.load_instance()
+    with _ignore_strict_variable_name_check():
+        callbacks = CallbacksCPMPy()
+        callbacks.force_exit = True
+        callbacker = CallbackerXCSP3(parser, callbacks)
+        callbacker.load_instance()
     model = callbacks.cpm_model
+    _update_variable_counters(model)
    
     return model
 
