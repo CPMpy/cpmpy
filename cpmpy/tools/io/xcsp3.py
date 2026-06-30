@@ -26,9 +26,9 @@ import builtins
 
 
 import cpmpy as cp
-from cpmpy.tools.xcsp3.parser import load_xcsp3 as load_xcsp3_parser
 
 
 def load_xcsp3(xcsp3: Union[str, os.PathLike, TextIO], open: Callable = builtins.open) -> cp.Model:
-    return load_xcsp3_parser(xcsp3, open=open)
+    from cpmpy.tools.xcsp3.parser import load_xcsp3 as load_xcsp3_parser
 
+    return load_xcsp3_parser(xcsp3, open=open)
