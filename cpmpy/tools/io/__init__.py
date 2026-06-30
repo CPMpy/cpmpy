@@ -20,7 +20,27 @@ from .rcpsp import load_rcpsp
 
 # Standard format loaders and writers
 from .opb import load_opb, write_opb
-from .scip import load_scip, write_scip
+from .scip_formats import load_scip, write_scip
 from .wcnf import load_wcnf
 from .dimacs import load_dimacs, write_dimacs
 from .xcsp3 import load_xcsp3
+
+_all__ = [
+    "load",
+    "load_formats",
+    "write",
+    "write_formats",
+    "load_opb",
+    "write_opb",
+    "load_scip",
+    "write_scip",
+    "load_dimacs",
+    "write_dimacs",
+    "load_wcnf",
+    "load_xcsp3",
+    "load_jsplib",
+    "load_rcpsp",
+    "load_nurserostering",
+    "get_extension",
+    "get_format",
+]
