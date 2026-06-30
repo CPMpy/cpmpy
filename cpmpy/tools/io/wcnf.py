@@ -15,6 +15,8 @@ List of functions
     :nosignatures:
 
     load_wcnf
+
+For writing, use :func:`write_dimacs`.
 """
 
 

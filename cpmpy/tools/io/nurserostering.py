@@ -4,8 +4,9 @@
 ## nurserostering.py
 ##
 """
-Parser for the Nurse Rostering format.
+Helper functions for the Nurse Rostering format.
 
+The Nurse Rostering format is a textual format to represent Nurse Rostering problems.
 
 =================
 List of functions
@@ -14,7 +15,10 @@ List of functions
 .. autosummary::
     :nosignatures:
 
-    read_nurserostering
+    load_nurserostering
+    parse_scheduling_period
+    add_fake_names
+    to_dataframes
 """
 
 

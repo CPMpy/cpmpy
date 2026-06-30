@@ -4,7 +4,7 @@
 ## jsplib.py
 ##
 """
-Parser for the JSPLib format.
+Loader for the JSPLib format.
 
 
 =================

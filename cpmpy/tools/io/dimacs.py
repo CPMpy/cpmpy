@@ -8,6 +8,7 @@ Helper functions for loading CPMpy models from and writing to DIMACS format.
 
 DIMACS is a textual format to represent CNF problems.
 More can be read about it here: 
+
 - https://satisfiability.org/competition/2009/format-benchmarks2009.html
 - https://people.sc.fsu.edu/~jburkardt/data/cnf/cnf.html
 
@@ -15,17 +16,21 @@ More can be read about it here:
 Format:
 =======
 
-The header of the file can optionally include a p-line; ``p cnf <n_vars> <n_constraints>``.
+The header of the file can optionally include a p-line; ``p cnf <n_vars> <n_constraints> [<top_weight>]``.
 If the number of variables and constraints are not given, it is inferred by the parser.
 
 .. note::
 
-    It is not preferred by the SAT competition to no longer include the p-line.
+    It is preferred by the SAT competition to no longer include the p-line.
 
 Each remaining line of the file is formatted as a list of integers with a trailing 0; literals belonging to the same clause.
-An integer represents a Boolean variable and a negative Boolean variable is represented using a `'-'` sign.
+Each integer references a Boolean variable by its index (1-based) and a negative Boolean variable is represented using a `'-'` sign.
 
 E.g. the clause ``(a or b or c)`` is represented as ``1 2 3 0``.
+
+In the case of weighted instances, soft clauses are represented as ``<weight> <literal> 0``.
+
+E.g. the soft clause ``(a or b or c)`` with weight 3 is represented as ``3 1 2 3 0``.
 
 Comments are lines starting with a `c` character.
 
@@ -83,7 +88,7 @@ def write_dimacs(
     Writes a CPMpy model to DIMACS format.
     Uses the "to_cnf" transformation from CPMpy.
 
-    .. note::
+    .. warning::
         If the model has an objective, WCNF is emitted. DIMACS/WCNF has no field for
         constant objective offsets; when objective transformation introduces one, it
         is ignored and a warning is raised. The written model still preserves the

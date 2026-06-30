@@ -622,6 +622,47 @@ For solvers other than "ortools", you will need to **install additional package(
     ModuleNotFoundError: CPM_gurobi: Install the python package 'cpmpy[gurobi]' to use this solver interface.
 ```
 
+## Input and output
+
+CPMpy can read and write several common constraint programming and optimization formats, such as OPB, DIMACS/CNF/WCNF, XCSP3, and SCIP-compatible formats like MPS and LP. Additionally, it can read application-specific formats, such as JSPLIB for job-shop scheduling, RCPSP for resource-constrained project scheduling, and Nurse rostering instances.
+
+The generic `load()` and `write()` helpers choose the right parser or writer based on the file extension when possible, or you can pass the format explicitly.
+
+```python
+import cpmpy as cp
+from cpmpy.tools.io import load, write
+
+# Load an instance from a file
+model = load("instance.opb")
+jobshop_model = load("ft06.jsp", format="jsplib")
+
+# Or write your own model to a file/string
+x = cp.boolvar(shape=3, name="x")
+model = cp.Model(cp.sum(x) >= 2)
+
+opb_text = write(model, format="opb")   # returns a string
+write(model, "model.opb")               # writes to file, format from extension
+```
+
+For raw instance strings, pass `format=` explicitly. Format-specific helpers such as `load_opb()`, `write_opb()`, `load_dimacs()` and `write_dimacs()` are also available when you want direct access to one parser or writer.
+
+Because all loaders return a CPMpy `Model`, you can also use CPMpy as a small translation layer between formats. This is useful when working with datasets: load each benchmark instance once, then export it to the format expected by another tool or solver.
+
+```python
+from pathlib import Path
+from cpmpy.tools.datasets import XCSP3Dataset
+from cpmpy.tools.io import load, write
+
+dataset = XCSP3Dataset(year=2024, track="CSP", download=True)
+
+for instance_file, metadata in dataset:
+    model = load(instance_file, format="xcsp3")
+    out_file = Path("converted") / f"{metadata['name']}.opb"
+    write(model, out_file, format="opb")
+```
+
+See the [I/O API documentation](./api/tools/io.rst) for the available formats and options.
+
 ## Datasets
 
 When experimenting with models or comparing solvers, it is useful to benchmark them against standard problem collections from the community. CPMpy datasets provide a small, PyTorch-style interface for downloading benchmark instances, iterating over them, and accessing their metadata.
@@ -639,6 +680,27 @@ print(metadata["name"], metadata["categories"])
 
 for instance_file, metadata in dataset:
     print("Instance:", metadata["name"])
+```
+
+The dataset interface supports PyTorch-style transforms. You can pass a CPMpy loader as
+the `transform` argument so that iterating over the dataset immediately returns CPMpy
+models instead of file paths:
+
+```python
+from functools import partial
+from cpmpy.tools.datasets import XCSP3Dataset
+from cpmpy.tools.io import load_xcsp3
+
+dataset = XCSP3Dataset(
+    year=2024,
+    track="CSP",
+    download=True,
+    transform=load_xcsp3
+)
+
+for model, metadata in dataset:
+    print("Solving", metadata["name"])
+    model.solve()
 ```
 
 If CPMpy does not yet provide the dataset you need, you can still use the same interface by creating your own dataset class on top of {class}`~cpmpy.tools.datasets.core.Dataset` with minimal effort. 

@@ -18,7 +18,7 @@ List of functions
 .. autosummary::
     :nosignatures:
 
-    read_opb
+    load_opb
     write_opb
 
 ====================
@@ -29,6 +29,7 @@ Available annotators
     :nosignatures:
 
     annotate_x
+    annotate_extended
 """
 
 

@@ -4,7 +4,9 @@
 ## rcpsp.py
 ##
 """
-Parser for the PSPLIB RCPSP format.
+Helper functions for the PSPLIB RCPSP format.
+
+The PSPLIB RCPSP format is a textual format to represent Resource-Constrained Project Scheduling problems.
 
 
 =================
@@ -15,6 +17,8 @@ List of functions
     :nosignatures:
 
     load_rcpsp
+    parse_rcpsp
+    to_dataframe
 """
 
 
