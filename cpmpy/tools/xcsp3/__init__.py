@@ -47,17 +47,18 @@ import lzma
 from io import StringIO
 from typing import Union, TextIO, Callable
 import builtins
-from warnings import deprecated
-
+import warnings
 import cpmpy as cp
 from cpmpy.tools.datasets.xcsp3 import XCSP3Dataset  # for easier importing
 from .parser import load_xcsp3 
 
 
 # Backward compatibility alias
-@deprecated("Use load_xcsp3 instead")
 def read_xcsp3(xcsp3: Union[str, os.PathLike, TextIO], open: Callable = builtins.open) -> cp.Model:
     """
+    .. deprecated:: 1.0.0
+          Please use :func:`load_xcsp3` instead.
+
     Reads in an XCSP3 instance (.xml or .xml.lzma) and returns its matching CPMpy model.
 
     Arguments:
@@ -71,6 +72,7 @@ def read_xcsp3(xcsp3: Union[str, os.PathLike, TextIO], open: Callable = builtins
     Returns:
         The XCSP3 instance loaded as a CPMpy model.
     """
+    warnings.warn("Deprecated, use load_xcsp3 instead", DeprecationWarning)
     return load_xcsp3(xcsp3, open=open)
 
 
