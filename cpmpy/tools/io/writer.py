@@ -134,8 +134,4 @@ def write(
     if unsupported:
         warnings.warn(f"Unsupported kwargs: {unsupported}")
 
-    # Create a default header for files, but keep returned strings clean by default.
-    if header is None:
-        header = _create_header(format) if path is not None else None
-
     return writer(model, path=path, header=header, **filtered_kwargs)
