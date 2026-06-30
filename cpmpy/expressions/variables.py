@@ -57,13 +57,11 @@
 """
 from __future__ import annotations
 
-import math
 from collections.abc import Iterable
 import threading
 import warnings # for deprecation warning
 from functools import reduce
 from typing import Any, Literal, Optional, overload
-from contextlib import contextmanager
 
 import numpy as np
 import cpmpy as cp  # to avoid circular import
