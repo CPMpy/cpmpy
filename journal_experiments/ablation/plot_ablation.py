@@ -130,7 +130,7 @@ def plot_stats(df, figures_dir, subtitle=None, fname=None):
             ax.set_xlabel(STAT_METRICS[metric])
             ax.set_ylabel("Number of instances")
             
-        title = f"Model size after transformations for {solver}, shown on instances finsished by all variants"
+        title = f"Model size after transformations for {solver}"
         if subtitle is not None:
             title += f"\n{subtitle}"
         
@@ -164,7 +164,7 @@ def plot_runtime(df, figures_dir, runtime_col="runtime", subtitle=None, fname=No
         sns.ecdfplot(data=df[df["solver"] == solver], 
                      x=runtime_col, hue="variant", stat="count", ax=ax, hue_order=hue_order)
         
-        ax.set_xscale("log")
+        #ax.set_xscale("log")
         ax.set_xlabel("runtime (seconds)")
         ax.set_ylabel("Number of instances")
         ax.set_xlim(ax.get_xlim()[0], time_limit)
@@ -184,25 +184,35 @@ if __name__ == "__main__":
     figures_dir = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_FIGURES_DIR
 
     df = load_results(results_dir)
+
+    print("Raw data:")
+    print(df.groupby(["solver", "variant", "status"]).size())
     
     df = df.sort_values(['solver','model','variant'])
     df.to_csv("results_"+results_dir.split("/")[-1]+".csv")
 
-    df_csp = df[df['objective_value'].isna()]
-    df_cop = df[~df['objective_value'].isna()]
+    CSP_prefix = "/cw/dtailocal/ignaceb/datasets/xcsp3/2024/CSP/"
+    COP_prefix = "/cw/dtailocal/ignaceb/datasets/xcsp3/2024/COP/"
 
+    # remove the errors
+    df = df[df['error'] == "OK"]
 
-    print("Raw data:")
-    print(df.groupby(["solver", "variant", "status"]).size())
+    df_csp = df[df['model_path'].str.startswith(CSP_prefix)]
+    df_cop = df[df['model_path'].str.startswith(COP_prefix)]
 
-    finished = get_finished_instances(df_csp)
-    subtitle="XCSP3 2024 CSP"
+    for fname in sorted(df_cop['model'].unique()):
+        print(f"cp {fname.replace('.pickle', '')}_*.json ../xcsp3_2024_COP/")
 
-    plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_csp24_{}")
-    plot_stats(finished, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_csp24_{}")
-
-    finished = get_finished_instances(df_cop)
-    subtitle= "XCSP3 2024 COP"
     
-    plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_cop24_{}")
-    plot_stats(finished, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_cop24_{}")
+
+    # finished = get_finished_instances(df_csp)
+    # subtitle="XCSP3 2024 CSP"
+
+    # plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_csp24_{}")
+    # plot_stats(df_csp, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_csp24_{}")
+
+    # finished = get_finished_instances(df_cop)
+    # subtitle= "XCSP3 2024 COP"
+    
+    # plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_cop24_{}")
+    # plot_stats(df_cop, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_cop24_{}")
