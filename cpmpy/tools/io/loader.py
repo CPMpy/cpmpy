@@ -21,6 +21,7 @@ from .dimacs import load_dimacs
 from cpmpy.tools.io.scip import load_scip
 from cpmpy.tools.io.wcnf import load_wcnf
 from cpmpy.tools.io.opb import load_opb
+from cpmpy.tools.io.xcsp3 import load_xcsp3
 from cpmpy.tools.io.utils import _derive_format, _is_potential_path
 
 # mapping format names to appropriate loader functions
@@ -35,6 +36,7 @@ _loader_map: dict[str, Callable[..., cp.Model]] = {
     "opb": load_opb,
     "cnf": partial(load_dimacs, type="cnf"),
     "wcnf": load_wcnf,
+    "xcsp3": load_xcsp3,
 }
 
 

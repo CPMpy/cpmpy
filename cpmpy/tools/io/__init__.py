@@ -23,4 +23,4 @@ from .opb import load_opb, write_opb
 from .scip import load_scip, write_scip
 from .wcnf import load_wcnf
 from .dimacs import load_dimacs, write_dimacs
-from ..xcsp3 import read_xcsp3
+from .xcsp3 import load_xcsp3
