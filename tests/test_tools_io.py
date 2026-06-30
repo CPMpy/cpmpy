@@ -20,10 +20,14 @@ ground-truth strings stable.
 """
 
 import os
+import re
+import runpy
 import tempfile
 import importlib.util
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
+from functools import lru_cache
+from typing import Optional, Tuple
+from unittest.mock import patch
 
 import pytest
 
@@ -75,6 +79,40 @@ _CAPABILITIES = {
 
 def _missing(needs) -> list:
     return [cap for cap in needs if not _CAPABILITIES[cap]()]
+
+
+def _capability_from_requirement(req: str) -> str:
+    return re.split(r"[<>=!~;\s\[]", req, 1)[0].lower()
+
+
+@lru_cache(maxsize=1)
+def _format_dependencies() -> dict[str, Tuple[str, ...]]:
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    setup_path = os.path.join(repo_root, "setup.py")
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(repo_root)
+        with patch("setuptools.setup"):
+            setup_vars = runpy.run_path(setup_path)
+    finally:
+        os.chdir(old_cwd)
+
+    dependencies = {}
+    for extra, reqs in setup_vars["format_dependencies"].items():
+        if not extra.startswith("io.") or extra == "io.all":
+            continue
+        fmt = extra.removeprefix("io.")
+        dependencies[fmt] = tuple(
+            cap for req in reqs
+            if (cap := _capability_from_requirement(req)) in _CAPABILITIES
+        )
+    return dependencies
+
+
+def _format_needs(format: Optional[str]) -> Tuple[str, ...]:
+    if format is None:
+        return ()
+    return _format_dependencies().get(format, ())
 
 
 # --------------------------------------------------------------------------- #
@@ -169,8 +207,6 @@ class IOCase:
     expected_repr: str                       # exact str(model) a correct loader produces
     load_format: Optional[str] = None        # key for load(); None -> not loadable
     write_format: Optional[str] = None        # key for write(); None -> not writable
-    load_needs: Tuple[str, ...] = ()
-    write_needs: Tuple[str, ...] = ()
     # loader capabilities
     autodetect: bool = True                  # load(path) (no format) resolves to this format
     string_load: bool = True                 # loader accepts a raw string / open handle (not path-only)
@@ -190,7 +226,6 @@ CASES = [
                       "Objective: minimize sum([2, 1] * [x1, x2])",
         load_format="opb",
         write_format="opb",
-        write_needs=("pindakaas",),
     ),
     IOCase(
         id="cnf",
@@ -199,8 +234,7 @@ CASES = [
         expected_repr="Constraints:\n    (~BV1) or (~BV2)\n    or(BV2, BV1, BV0)\n    ~BV0\n"
                       "Objective: None",
         load_format="cnf",
-        # "cnf" is a load-only key; the writable equivalent is "dimacs" (see cnf_dimacs).
-        write_format=None,
+        write_format="cnf",
     ),
     IOCase(
         id="cnf_dimacs",
@@ -210,7 +244,6 @@ CASES = [
                       "Objective: None",
         load_format="dimacs",
         write_format="dimacs",
-        write_needs=("pindakaas",),
     ),
     IOCase(
         id="wcnf",
@@ -220,7 +253,6 @@ CASES = [
                       "Objective: minimize sum(x1, x2, x3)",
         load_format="wcnf",
         write_format="wcnf",
-        write_needs=("pindakaas",),
         # write_dimacs' WCNF objective encoding does not round-trip through the loader
         # (the soft-clause weights are not recovered), so neither direction is equivalent.
         roundtrip_model=False,
@@ -234,7 +266,6 @@ CASES = [
                       "Objective: minimize sum(x1, x2, x3)",
         load_format="dimacs",
         write_format="dimacs",
-        write_needs=("pindakaas",),
         roundtrip_model=False,
         roundtrip_instance=False,
     ),
@@ -246,8 +277,6 @@ CASES = [
                       "Objective: maximize sum([2, 1] * [y, x])",
         load_format="mps",
         write_format="mps",
-        load_needs=("pyscipopt",),
-        write_needs=("pyscipopt",),
     ),
     IOCase(
         id="lp",
@@ -257,8 +286,6 @@ CASES = [
                       "Objective: maximize sum([2, 1] * [y, x])",
         load_format="lp",
         write_format="lp",
-        load_needs=("pyscipopt",),
-        write_needs=("pyscipopt",),
     ),
     IOCase(
         id="cip",
@@ -268,8 +295,6 @@ CASES = [
                       "Objective: maximize sum([2, 1] * [y, x])",
         load_format="cip",
         write_format="cip",
-        load_needs=("pyscipopt",),
-        write_needs=("pyscipopt",),
     ),
     IOCase(
         id="fzn",
@@ -279,8 +304,6 @@ CASES = [
                       "Objective: maximize sum([2, 1] * [y, x])",
         load_format="fzn",
         write_format="fzn",
-        load_needs=("pyscipopt",),
-        write_needs=("pyscipopt",),
     ),
     IOCase(
         id="pip",
@@ -290,8 +313,6 @@ CASES = [
                       "Objective: maximize sum([2, 1] * [y, x])",
         load_format="pip",
         write_format="pip",
-        load_needs=("pyscipopt",),
-        write_needs=("pyscipopt",),
     ),
     # gms can be written but not read back (this SCIP build has no GAMS reader plugin).
     IOCase(
@@ -301,7 +322,6 @@ CASES = [
         expected_repr="",
         load_format=None,
         write_format="gms",
-        write_needs=("pyscipopt",),
     ),
     # XCSP3 is read-only (no writer), reads a file path only, and is registered in the
     # loader dispatch but deliberately not in the extension map: it cannot be auto-detected.
@@ -312,20 +332,31 @@ CASES = [
         expected_repr="Constraints:\n    (x) + (-(y)) < 0\nObjective: None",
         load_format="xcsp3",
         write_format=None,
-        load_needs=("pycsp3",),
         autodetect=False,
         string_load=False,
     ),
 ]
 
 
-def _params(cases, *needs_attrs):
+def _case_needs(case, *modes) -> Tuple[str, ...]:
+    needs = []
+    for mode in modes:
+        if mode == "load":
+            needs.extend(_format_needs(case.load_format))
+        elif mode == "write":
+            needs.extend(_format_needs(case.write_format))
+        else:
+            raise ValueError(f"unknown dependency mode: {mode}")
+    return tuple(dict.fromkeys(needs))
+
+
+def _params(cases, *modes):
     """
     Build pytest params, skipping a case when any required capability is missing.
     """
     out = []
     for c in cases:
-        needs = tuple({cap for attr in needs_attrs for cap in getattr(c, attr)})
+        needs = _case_needs(c, *modes)
         missing = _missing(needs)
         marks = [pytest.mark.skip(reason=f"requires {missing}")] if missing else []
         out.append(pytest.param(c, id=c.id, marks=marks))
@@ -350,14 +381,14 @@ RT_INSTANCE_CASES = [c for c in CASES if c.load_format and c.write_format and c.
 
 class TestWriter:
 
-    @pytest.mark.parametrize("case", _params(WRITE_CASES, "write_needs"))
+    @pytest.mark.parametrize("case", _params(WRITE_CASES, "write"))
     def test_write_to_string(self, case):
         # the writer returns non-empty content
         text = write(case.model, format=case.write_format)
         assert isinstance(text, str)
         assert text.strip() != ""
 
-    @pytest.mark.parametrize("case", _params(WRITE_CASES, "write_needs"))
+    @pytest.mark.parametrize("case", _params(WRITE_CASES, "write"))
     def test_write_to_file(self, case):
         # writing to a file produces exactly what the writer returns (empty header so the
         # file is identical to the returned string)
@@ -368,7 +399,7 @@ class TestWriter:
         assert written.strip() != ""
         assert text == written
 
-    @pytest.mark.parametrize("case", _params(WRITE_CASES, "write_needs"))
+    @pytest.mark.parametrize("case", _params(WRITE_CASES, "write"))
     def test_header(self, case):
         # the provided header is written out verbatim
         header = "This is a header\n----------------"
@@ -383,7 +414,7 @@ class TestWriter:
 
 class TestLoader:
 
-    @pytest.mark.parametrize("case", _params(STRING_LOAD_CASES, "load_needs"))
+    @pytest.mark.parametrize("case", _params(STRING_LOAD_CASES, "load"))
     def test_load_from_string(self, case):
         with open(_fixture(case.filename), "r") as f:
             text = f.read()
@@ -392,14 +423,14 @@ class TestLoader:
         assert model is not None
         assert str(model) == case.expected_repr
 
-    @pytest.mark.parametrize("case", _params(LOAD_CASES, "load_needs"))
+    @pytest.mark.parametrize("case", _params(LOAD_CASES, "load"))
     def test_load_from_file(self, case):
         _reset_var_counters()
         model = load(_fixture(case.filename), format=case.load_format)
         assert model is not None
         assert str(model) == case.expected_repr
 
-    @pytest.mark.parametrize("case", _params(STRING_LOAD_CASES, "load_needs"))
+    @pytest.mark.parametrize("case", _params(STRING_LOAD_CASES, "load"))
     def test_load_from_textio(self, case):
         _reset_var_counters()
         with open(_fixture(case.filename), "r") as f:
@@ -407,12 +438,12 @@ class TestLoader:
         assert model is not None
         assert str(model) == case.expected_repr
 
-    @pytest.mark.parametrize("case", _params(LOAD_CASES, "load_needs"))
+    @pytest.mark.parametrize("case", _params(LOAD_CASES, "load"))
     def test_get_loader(self, case):
         # every load format resolves to a callable loader
         assert callable(_get_loader(case.load_format))
 
-    @pytest.mark.parametrize("case", _params(AUTODETECT_CASES, "load_needs"))
+    @pytest.mark.parametrize("case", _params(AUTODETECT_CASES, "load"))
     def test_load_autodetect_from_path(self, case):
         # loading a file path without an explicit format auto-detects it from the extension
         _reset_var_counters()
@@ -421,14 +452,14 @@ class TestLoader:
         autodetected = load(_fixture(case.filename))
         assert str(autodetected) == str(explicit)
 
-    @pytest.mark.parametrize("case", _params(NON_AUTODETECT_CASES, "load_needs"))
+    @pytest.mark.parametrize("case", _params(NON_AUTODETECT_CASES, "load"))
     def test_load_autodetect_unsupported(self, case):
         # formats declared non-auto-detectable (e.g. xcsp3: its .xml extension is not in the
         # format map) must require an explicit format=; loading by path alone fails.
         with pytest.raises((ValueError, KeyError)):
             load(_fixture(case.filename))
 
-    @pytest.mark.parametrize("case", _params(LOAD_CASES, "load_needs"))
+    @pytest.mark.parametrize("case", _params(LOAD_CASES, "load"))
     def test_load_updates_var_counters(self, case):
         # After loading, the global name counters must be advanced past every auto-named
         # (BV*/IV*) variable the loader created, so variables created afterwards never
@@ -476,14 +507,14 @@ class TestRoundtrip:
     so the model structure is not preserved verbatim; what must be preserved is the
     observable behaviour (optimal objective, or number of solutions)."""
 
-    @pytest.mark.parametrize("case", _params(RT_MODEL_CASES, "write_needs", "load_needs"))
+    @pytest.mark.parametrize("case", _params(RT_MODEL_CASES, "write", "load"))
     def test_write_then_load(self, case):
         # model -> write -> load yields a solution-equivalent model
         text = write(case.model, format=case.write_format)
         loaded = load(text, format=case.load_format)
         _assert_same_solutions(case.model, loaded)
 
-    @pytest.mark.parametrize("case", _params(RT_INSTANCE_CASES, "write_needs", "load_needs"))
+    @pytest.mark.parametrize("case", _params(RT_INSTANCE_CASES, "write", "load"))
     def test_load_write_load(self, case):
         # instance -> load -> write -> load yields a solution-equivalent model
         first = load(_fixture(case.filename), format=case.load_format)
@@ -500,10 +531,9 @@ class TestRoundtrip:
 class LargerInstanceCase:
     id: str
     filename: str
-    loader: Callable[[object], cp.Model]
+    load_format: str
     expected_vars: int
     expected_constraints: int
-    load_needs: Tuple[str, ...] = ()
     string_load: bool = True
     solve_result: Optional[bool] = None
 
@@ -512,88 +542,82 @@ LARGER_INSTANCE_CASES = [
     LargerInstanceCase(
         id="cnf-tseitin",
         filename="large_tseitin_n18.cnf",
-        loader=lambda src: load(src, format="cnf"),
+        load_format="cnf",
         expected_vars=27,
         expected_constraints=72,
     ),
     LargerInstanceCase(
         id="dimacs-tseitin",
         filename="large_tseitin_n18.cnf",
-        loader=lambda src: load(src, format="dimacs"),
+        load_format="dimacs",
         expected_vars=27,
         expected_constraints=72,
     ),
     LargerInstanceCase(
         id="wcnf-ramsey",
         filename="large_ramsey_k4_n5.wcnf",
-        loader=lambda src: load(src, format="wcnf"),
+        load_format="wcnf",
         expected_vars=10,
         expected_constraints=0,
     ),
     LargerInstanceCase(
         id="opb-tseitin",
         filename="large_tseitin_n18.opb",
-        loader=lambda src: load(src, format="opb"),
+        load_format="opb",
         expected_vars=27,
         expected_constraints=72,
     ),
     LargerInstanceCase(
         id="mps-linear",
         filename="large_linear.mps",
-        loader=lambda src: load(src, format="mps"),
+        load_format="mps",
         expected_vars=12,
         expected_constraints=24,
-        load_needs=("pyscipopt",),
     ),
     LargerInstanceCase(
         id="lp-linear",
         filename="large_linear.lp",
-        loader=lambda src: load(src, format="lp"),
+        load_format="lp",
         expected_vars=12,
         expected_constraints=24,
-        load_needs=("pyscipopt",),
     ),
     LargerInstanceCase(
         id="cip-linear",
         filename="large_linear.cip",
-        loader=lambda src: load(src, format="cip"),
+        load_format="cip",
         expected_vars=12,
         expected_constraints=24,
-        load_needs=("pyscipopt",),
     ),
     LargerInstanceCase(
         id="fzn-linear",
         filename="large_linear.fzn",
-        loader=lambda src: load(src, format="fzn"),
+        load_format="fzn",
         expected_vars=12,
         expected_constraints=24,
-        load_needs=("pyscipopt",),
     ),
     LargerInstanceCase(
         id="pip-linear",
         filename="large_linear.pip",
-        loader=lambda src: load(src, format="pip"),
+        load_format="pip",
         expected_vars=12,
         expected_constraints=24,
-        load_needs=("pyscipopt",),
     ),
     LargerInstanceCase(
         id="xcsp3-same-queens-knights",
         filename="large_same_queens_knights_05.xml",
-        loader=lambda src: load(src, format="xcsp3"),
+        load_format="xcsp3",
         expected_vars=77,
         expected_constraints=102,
-        load_needs=("pycsp3",),
     ),
 ]
 
 
 def _larger_params():
-    return _params(LARGER_INSTANCE_CASES, "load_needs")
+    return _params(LARGER_INSTANCE_CASES, "load")
 
 
 def _larger_string_params():
-    return _params([case for case in LARGER_INSTANCE_CASES if case.string_load], "load_needs")
+    return _params([case for case in LARGER_INSTANCE_CASES if case.string_load], "load")
 
 
 LARGER_WRITER_ONLY_FILES = [
@@ -617,18 +641,18 @@ class TestLargerInstance:
 
     @pytest.mark.parametrize("case", _larger_params())
     def test_from_file(self, case):
-        self._check(case, case.loader(_fixture(case.filename)))
+        self._check(case, load(_fixture(case.filename), format=case.load_format))
 
     @pytest.mark.parametrize("case", _larger_string_params())
     def test_from_string(self, case):
         with open(_fixture(case.filename), "r") as f:
             text = f.read()
-        self._check(case, case.loader(text))
+        self._check(case, load(text, format=case.load_format))
 
     @pytest.mark.parametrize("case", _larger_string_params())
     def test_from_textio(self, case):
         with open(_fixture(case.filename), "r") as f:
-            self._check(case, case.loader(f))
+            self._check(case, load(f, format=case.load_format))
 
     @pytest.mark.parametrize("case_id,filename", LARGER_WRITER_ONLY_FILES)
     def test_writer_only_file_exists(self, case_id, filename):
