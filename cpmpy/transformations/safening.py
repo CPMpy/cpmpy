@@ -67,8 +67,8 @@ def no_partial_functions(lst_of_expr: list[Expression],
         _toplevel (None): DEPRECATED
         _nbc (None): DEPRECATED
         safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
-                                    a solver does not support unsafe values in it's API (e.g., OR-Tools for `div`), 
-                                    or when the solver does not support the global function, and it needs to be decomposed.
+                                    a solver supports the global function natively (not decomposed) but does not accept
+                                    unsafe values in its API (e.g., OR-Tools for `div`).
     """
 
     assert _toplevel is None, "no_partial_functions:  argument '_toplevel' is deprecated, do not use/modify it"
@@ -77,27 +77,31 @@ def no_partial_functions(lst_of_expr: list[Expression],
     if safen_toplevel is None:
         safen_toplevel = frozenset()
 
-    changed, new_lst, todo_toplevel, nbc = _no_partial_functions(lst_of_expr, is_toplevel=True, safen_toplevel=safen_toplevel)
-    if not changed:
-        return lst_of_expr  # return original list
+    todolist: list[Expression] = [] # these still need to be safened
+    newlist: list[Expression] = []
+    changed = False
+    for expr in lst_of_expr:
 
-    # we are the highest 'nearest Boolean context', so add the nbc constraints to the toplevel
-    if len(nbc) > 0:
-        todo_toplevel = todo_toplevel + nbc
-
-    # new toplevel constraints may need to be safened too
-    while len(todo_toplevel):
-        changed, decomp, next_toplevel, next_nbc = _no_partial_functions(todo_toplevel, is_toplevel=True, safen_toplevel=safen_toplevel)
-        if not changed:
-            new_lst.extend(todo_toplevel)
-            break
-
-        # changed, loop again
-        new_lst.extend(decomp)
-        todo_toplevel = next_toplevel + next_nbc  # toplevel constraints may have introduced nested lists or ands
-
-    return new_lst
-    
+        if expr.has_subexpr():
+            args_changed, newargs, toplevel, nbc = _no_partial_functions(expr.args, is_toplevel=True, safen_toplevel=safen_toplevel)
+            if args_changed:
+                changed = True
+                if len(toplevel) > 0:
+                    todolist.extend(toplevel)
+                if len(nbc) > 0:
+                    todolist.extend(nbc)
+                
+                expr = copy(expr)
+                expr.update_args(newargs)
+        
+        newlist.append(expr)
+        
+    if len(todolist) > 0:
+        return newlist + no_partial_functions(todolist, safen_toplevel=safen_toplevel)
+    elif changed:
+        return newlist
+    else:
+        return lst_of_expr
 
 def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_toplevel: AbstractSet[str]) -> tuple[bool, list[Expression], list[Expression], list[Expression]]:
     """
@@ -109,7 +113,8 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
         lst_of_expr (list[Expression]): list of CPMpy expressions
         is_toplevel (bool): whether ``lst_of_expr`` is the toplevel list of constraints.
         safen_toplevel (set[str]): list of expression types that need to be safened, even when toplevel. Used when
-                                        a solver does not support unsafe values in its API (e.g., OR-Tools for `div`).
+                                        a solver supports the global function natively but does not accept unsafe 
+                                        values in its API (e.g., OR-Tools for `div`).
 
     Returns:
         tuple[bool, list[Expression], list[Expression], list[Expression]]
@@ -127,15 +132,12 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
     for i, cpm_expr in enumerate(lst_of_expr):
 
         if is_any_list(cpm_expr):
-            assert not is_toplevel, "Lists in lists is only allowed for arguments (e.g. of global constraints)." \
-                                    "Make sure to run func:`cpmpy.transformations.normalize.toplevel_list` first."
-
             if isinstance(cpm_expr, NDVarArray) and not cpm_expr.has_subexpr():
                 pass  # no subexpressions, nothing to do
             elif isinstance(cpm_expr, np.ndarray) and cpm_expr.dtype != object:
                 pass  # only constants, nothing to do
             else:
-                rec_changed, rec_expr, rec_toplevel, rec_nbc = _no_partial_functions(cpm_expr, is_toplevel=False, safen_toplevel=safen_toplevel)
+                rec_changed, rec_expr, rec_toplevel, rec_nbc = _no_partial_functions(cpm_expr, is_toplevel=is_toplevel, safen_toplevel=safen_toplevel)
                 if rec_changed:
                     cpm_expr = rec_expr
                     toplevel.extend(rec_toplevel)
@@ -148,7 +150,8 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
 
             # safen its arguments first
             if cpm_expr.has_subexpr():
-                rec_changed, newargs, rec_toplevel, rec_nbc= _no_partial_functions(cpm_expr.args, is_toplevel=False, safen_toplevel=safen_toplevel)
+                stays_toplevel = is_toplevel and not cpm_expr.is_bool()
+                rec_changed, newargs, rec_toplevel, rec_nbc= _no_partial_functions(cpm_expr.args, is_toplevel=stays_toplevel, safen_toplevel=safen_toplevel)
                 if rec_changed:
                     cpm_expr = copy(cpm_expr)
                     cpm_expr.update_args(newargs)
@@ -156,7 +159,7 @@ def _no_partial_functions(lst_of_expr: ListLike[Any], is_toplevel: bool, safen_t
                     nbc_for_each_expr[i].extend(rec_nbc)
                     changed = True
 
-            if cpm_expr.is_bool() and not is_toplevel and len(nbc_for_each_expr[i]) > 0: # filled nbc in recursive call
+            if cpm_expr.is_bool() and len(nbc_for_each_expr[i]) > 0: # filled nbc in recursive call
                 # add guards to this Boolean expression
                 cpm_expr = cpm_all(nbc_for_each_expr[i]) & cpm_expr
                 nbc_for_each_expr[i] = [] # handled, no need to bring to previous rec level

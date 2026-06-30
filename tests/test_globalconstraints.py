@@ -882,25 +882,23 @@ class TestGlobal:
         }
         assert set(map(str, decomposed)) == expected
 
-        # should raise a warning if we don't safen first
-        with pytest.warns(UserWarning, match=".*unsafe.*"):
-            val, decomp = elem.decompose()
-            expected = {
-                # actual decomposition
-                '(x == 0) -> (IV2 == 0)',
-                '(x == 1) -> (IV2 == 1)',
-                'x >= 0', 'x < 3'
-            }
-            assert set(map(str, decomp)) == expected
+        # decomposition should safen
+        val, decomp = elem.decompose()
+        expected = {
+            # actual decomposition
+            '(x == 0) -> (IV2 == 0)',
+            '(x == 1) -> (IV2 == 1)',
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
 
         # also for linear decomp
-        with pytest.warns(UserWarning, match=".*unsafe.*"):
-            val, decomp = elem.decompose_linear()
-            expected = {
-                'x >= 0', 'x < 3'
-            }
-            assert set(map(str, decomp)) == expected
-            assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
+        val, decomp = elem.decompose_linear()
+        expected = {
+            'x >= 0', 'x < 3'
+        }
+        assert set(map(str, decomp)) == expected
+        assert str(val) == "sum([0, 1] * [x == 0, x == 1])"
 
     def test_multid_element_index_dom_mismatched(self):
         """

@@ -81,7 +81,7 @@ class CPM_template(SolverInterface):
 
     # [GUIDELINE] list all supported global constraints and global functions
     #           (e.g., 'alldifferent', 'max', 'element', ...)
-    supported_global_constraints = frozenset({'alldifferent', 'max', 'element'})
+    supported_global_constraints = frozenset({'alldifferent', 'max', 'element', 'div'})
     # [GUIDELINE] list all global constraints supported in reified context (or half-reified if transformed)
     #           (e.g., 'alldifferent' if your solver supports `b -> AllDifferent(X)`)
     supported_reified_global_constraints = frozenset()
@@ -408,7 +408,8 @@ class CPM_template(SolverInterface):
         # apply transformations
         # XXX chose the transformations your solver needs, see cpmpy/transformations/
         cpm_cons = toplevel_list(cpm_expr)
-        cpm_cons = no_partial_functions(cpm_cons)  # to also safen at toplevel, add: `, safen_toplevel={"element", "nd_element", "div", "mod"})`
+        cpm_cons = no_partial_functions(cpm_cons) # if the solver requires supported partial function globals to be safened, use the follwing instead:
+        # cpm_cons = no_partial_functions(cpm_cons, safen_toplevel=frozenset({"element", "nd_element", "div", "mod"}))        
         cpm_cons = push_down_negation(cpm_cons)
         cpm_cons = decompose_in_tree(cpm_cons,
                                      supported=self.supported_global_constraints,

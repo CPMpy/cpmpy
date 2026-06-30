@@ -126,6 +126,9 @@ class GlobalFunction(Expression):
             and use other global constraints as long as
             it does not create a circular dependency.
 
+            For partial functions, the decomposition should enforce the function is always defined.
+            E.g., the decomposition for Division enforces that the divisios is not zero.
+
         Returns:
             tuple[Expression, list[Expression]]: A tuple containing the numerical expression and a list of constraints defining auxiliary variables
         """
@@ -533,8 +536,7 @@ class Division(GlobalFunction):
         y_lb, y_ub = get_bounds(y)
         if y_lb <= 0 <= y_ub:
             safen = [y != 0]
-            warnings.warn(f"Division constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
-
+            
         r = intvar(*get_bounds(x % y))  # remainder
         _div = intvar(*self.get_bounds())
         return _div, safen + [(x == (y * _div) + r), abs(r) < abs(y), abs(y) * abs(_div) <= abs(x)]
@@ -626,7 +628,6 @@ class Modulo(GlobalFunction):
         y_lb, y_ub = get_bounds(y)
         if y_lb <= 0 <= y_ub:
             safen = [y != 0]
-            warnings.warn(f"Modulo constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         _mod = intvar(*self.get_bounds())
         k = intvar(*get_bounds((x - _mod) // y))  # integer quotient (multiplier)
@@ -824,7 +825,6 @@ class Element(GlobalFunction):
         defining = []
         if not (idx_lb >= 0 and idx_ub < len(arr)):
             defining += [idx >= 0, idx < len(arr)]
-            warnings.warn(f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         aux = intvar(*self.get_bounds())
 
@@ -848,7 +848,6 @@ class Element(GlobalFunction):
         defining = []
         if not (idx_lb >= 0 and idx_ub < len(arr)):
             defining += [idx >= 0, idx < len(arr)]
-            warnings.warn(f"Element constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
 
         lb, ub = max(idx_lb, 0), min(idx_ub, len(arr)-1)
         return cp.sum((idx == i)*arr[i] for i in range(lb, ub+1)), defining
@@ -957,7 +956,6 @@ class NDElement(GlobalFunction):
             lb, ub = dim_var.get_bounds()
 
             if lb < 0 or ub >= dim_size:
-                warnings.warn(f"NDElement constraint is unsafe, and will be forced to be total by this decomposition. If you are using {self} in a nested context, this is not valid, and you need to safen first using cpmpy.transformations.safening.no_partial_functions")
                 defining += [dim_var >= 0, dim_var < dim_size]
 
             flat_index.append(dim_var * math.prod(shape[dim_idx+1:]))  # Xi*(D(i+1)*...*Dn)
