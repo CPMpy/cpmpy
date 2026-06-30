@@ -345,14 +345,16 @@ def load_dimacs(dimacs: Union[str, os.PathLike, TextIO], open: Callable = builti
         if nr_vars_declared is not None:
             assert max_var <= nr_vars_declared, f"Expected at most {nr_vars_declared} variables (from p-line) but found literal index {max_var}"
 
-        if nr_vars > 0:
-            bvs: NDVarArray = cp.boolvar(shape=(nr_vars,))
-            for cl in clauses:
-                lits = []
-                for lit_id in cl:
-                    bv = bvs[abs(lit_id)-1]
-                    lits.append(bv if lit_id > 0 else ~bv)
-                m += cp.any(lits)
+        bvs: NDVarArray = cp.boolvar(shape=(nr_vars,))
+        for cl in clauses:
+            if len(cl) == 0:
+                m += cp.BoolVal(False)
+                continue
+            lits = []
+            for lit_id in cl:
+                bv = bvs[abs(lit_id)-1]
+                lits.append(bv if lit_id > 0 else ~bv)
+            m += cp.any(lits)
 
         if nr_cls_declared is not None:
             assert len(m.constraints) == nr_cls_declared, f"Number of clauses was declared in p-line as {nr_cls_declared}, but was {len(m.constraints)}"

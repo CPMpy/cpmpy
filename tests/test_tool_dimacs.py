@@ -16,7 +16,6 @@ from cpmpy.tools.io.dimacs import load_dimacs, write_dimacs
 
 
 DATA_DIR = Path(__file__).parent / "data" / "io"
-CNF_BASIC = "p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n"
 TSEITIN_CNF_PATH = DATA_DIR / "tseitin_n18.cnf"
 TSEITIN_CNF = TSEITIN_CNF_PATH.read_text()
 
@@ -42,7 +41,7 @@ def _assert_unsat(model):
 class TestLoadCNF:
 
     def test_basic(self):
-        model = load_dimacs(CNF_BASIC)
+        model = load_dimacs("p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
         bvs = _vars(model)
 
         assert str(model) == str(cp.Model(
@@ -104,10 +103,6 @@ class TestLoadCNF:
         model = load_dimacs("p cnf 2 2\n1 0\n0")
         _assert_unsat(model)
 
-    @pytest.mark.xfail(
-        reason="empty clauses are dropped when nr_vars==0; the model should be UNSAT",
-        strict=True,
-    )
     def test_empty_clauses(self):
         model = load_dimacs("p cnf 0 2\n0\n0")
         assert not model.solve()
