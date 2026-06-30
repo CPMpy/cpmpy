@@ -150,21 +150,31 @@ def load_scip(instance: Union[str, os.PathLike, TextIO], open:Callable = builtin
             cpm_vars = [var_map[v.name] for v in cons_vars] # convert to CPMpy variables
             cpm_sum = cp.sum(var*coeff for (var,coeff) in zip(cpm_vars, cons_coeff)) # Ax
 
-            lhs = scip.getLhs(cons) # lhs of the constraint
-            rhs = scip.getRhs(cons) # rhs of the constraint
+            lhs = scip.getLhs(cons) # lower bound of the constraint (-infinity if one-sided)
+            rhs = scip.getRhs(cons) # upper bound of the constraint (+infinity if one-sided)
 
-            # convert to integer bounds
-            _lhs = int(math.ceil(lhs))
-            _rhs = int(math.floor(rhs))
-            if _lhs != int(lhs) or _rhs != int(rhs):
-                if assume_integer:
-                    warnings.warn(f"Constraint {cons.name} has non-integer bounds. CPMpy will assume it is integer.")
-                else:
-                    raise ValueError(f"Constraint {cons.name} has non-integer bounds. CPMpy does not support non-integer bounds.")
+            # SCIP encodes an open side with +/- infinity (a large sentinel, e.g. 1e20).
+            # Such a side is not a real bound, so it must not be turned into a constraint
+            # (materialising it would also overflow solver integer limits).
+            has_lhs = not scip.isInfinity(-lhs)
+            has_rhs = not scip.isInfinity(rhs)
 
-            # add the constraint to the model
-            model += _lhs <= cpm_sum
-            model += cpm_sum <= _rhs
+            def _check_integer(bound, rounded):
+                if rounded != bound:
+                    if assume_integer:
+                        warnings.warn(f"Constraint {cons.name} has non-integer bounds. CPMpy will assume it is integer.")
+                    else:
+                        raise ValueError(f"Constraint {cons.name} has non-integer bounds. CPMpy does not support non-integer bounds.")
+
+            # add the (finite) constraint bound(s) to the model
+            if has_lhs:
+                _lhs = math.ceil(lhs)
+                _check_integer(lhs, _lhs)
+                model += int(_lhs) <= cpm_sum
+            if has_rhs:
+                _rhs = math.floor(rhs)
+                _check_integer(rhs, _rhs)
+                model += cpm_sum <= int(_rhs)
 
         else: 
             raise ValueError(f"Unsupported constraint type: {ctype}")
