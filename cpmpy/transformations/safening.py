@@ -93,12 +93,9 @@ def no_partial_functions(lst_of_expr: list[Expression],
                 
                 expr = copy(expr)
                 expr.update_args(newargs)
-                newlist.append(expr)
-            else:
-                newlist.append(expr)
-        else:
-            newlist.append(expr)
-    
+        
+        newlist.append(expr)
+        
     if len(todolist) > 0:
         return newlist + no_partial_functions(todolist, safen_toplevel=safen_toplevel)
     elif changed:
