@@ -30,9 +30,6 @@ def write_dimacs(model, fname=None, encoding="auto"):
         Writes CPMpy model to DIMACS format
         Uses the "to_cnf" transformation from CPMpy
 
-        .. todo::
-            TODO: implement pseudoboolean constraints in to_cnf
-
         :param model: a CPMpy model
         :param fname: optional, file name to write the DIMACS output to
         :param encoding: the encoding used for `int2bool`, choose from ("auto", "direct", "order", or "binary")
