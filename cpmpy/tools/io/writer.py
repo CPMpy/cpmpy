@@ -17,11 +17,13 @@ from typing import Callable, Optional, List, Union
 from functools import partial
 import warnings
 import os
+import builtins
+
 import cpmpy as cp
-from .dimacs import write_dimacs
+from cpmpy.tools.io.dimacs import write_dimacs
 from cpmpy.tools.io.scip import write_scip
 from cpmpy.tools.io.opb import write_opb
-from cpmpy.tools.io.utils import _create_header, _derive_format
+from cpmpy.tools.io.utils import _derive_format
 
 # mapping format names to appropriate writer functions
 _writer_map: dict[str, Callable[..., str]] = {
@@ -89,6 +91,7 @@ def write(
     format: Optional[str] = None,
     verbose: bool = False,
     header: Optional[str] = None,
+    open: Callable = builtins.open,
     **kwargs,
 ) -> str:
     """
@@ -102,6 +105,10 @@ def write(
                                 Might raise a ValueError if the format is not supported.
         verbose (bool): Whether to print verbose output.
         header (Optional[str]): The header to put at the top of the file. If None, a default header will be created. Pass an empty string to skip adding a header.
+        open (Callable): callable to open the file for writing (default: builtin ``open``).
+            Called as ``open(path, "w")``. This mirrors the ``open=`` argument
+            in loaders and allows custom compression or I/O (e.g.
+            ``lambda p, mode='w': lzma.open(p, 'wt')``).
         **kwargs: Additional arguments to pass to the writer.
 
     Raises:
@@ -135,4 +142,4 @@ def write(
     if unsupported:
         warnings.warn(f"Unsupported kwargs: {unsupported}")
 
-    return writer(model, path=path, header=header, **filtered_kwargs)
+    return writer(model, path=path, header=header, open=open, **filtered_kwargs)
