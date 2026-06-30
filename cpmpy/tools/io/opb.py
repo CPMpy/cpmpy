@@ -34,8 +34,6 @@ Available annotators
 
 import os
 import re
-import sys
-import argparse
 import builtins
 from typing import Union, Optional, Callable, Any, TextIO
 from functools import reduce
@@ -388,46 +386,3 @@ def write_opb(
             f.write(contents)
         
     return contents
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Parse and solve an OPB model using CPMpy")
-    parser.add_argument("model", help="Path to an OPB file (or raw OPB string if --string is given)")
-    parser.add_argument("-s", "--solver", default=None, help="Solver name to use (default: CPMpy's default)")
-    parser.add_argument("--string", action="store_true", help="Interpret the first argument (model) as a raw OPB string instead of a file path")
-    parser.add_argument("-t", "--time-limit", type=int, default=None, help="Time limit for the solver in seconds (default: no limit)")
-    args = parser.parse_args()
-
-    # Build the CPMpy model
-    try:
-        if args.string:
-            model = load_opb(args.model)
-        else:
-            model = load_opb(os.path.expanduser(args.model))
-    except Exception as e:
-        sys.stderr.write(f"Error reading model: {e}\n")
-        if isinstance(e, AssertionError):
-            raise e
-        sys.exit(1)
-
-    # Solve the model
-    try:
-        if args.solver:
-            result = model.solve(solver=args.solver, time_limit=args.time_limit)
-        else:
-            result = model.solve(time_limit=args.time_limit)
-    except Exception as e:
-        sys.stderr.write(f"Error solving model: {e}\n")
-        sys.exit(1)
-
-    # Print results
-    print("Status:", model.status())
-    if result is not None:
-        if model.has_objective():
-            print("Objective:", model.objective_value())
-    else:
-        print("No solution found.")
-
-
-if __name__ == "__main__":
-    main()

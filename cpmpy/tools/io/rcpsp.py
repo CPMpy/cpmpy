@@ -19,9 +19,7 @@ List of functions
 
 
 import os
-import sys
 import builtins
-import argparse
 import cpmpy as cp
 from typing import Union, Callable, TextIO, Any
 from cpmpy.tools.io.utils import _handle_loader_input
@@ -169,44 +167,3 @@ def _model_rcpsp(jobs: dict[int, dict[str, Any]], resource_names: list[str], cap
     model.minimize(makespan)
 
     return model, (start, end, makespan)
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Parse and solve a PSPLIB RCPSP model using CPMpy")
-    parser.add_argument("model", help="Path to a PSPLIB RCPSP file (or raw RCPSP string if --string is given)")
-    parser.add_argument("-s", "--solver", default=None, help="Solver name to use (default: CPMpy's default)")
-    parser.add_argument("--string", action="store_true", help="Interpret the first argument (model) as a raw RCPSP string instead of a file path")
-    parser.add_argument("-t", "--time-limit", type=int, default=None, help="Time limit for the solver in seconds (default: no limit)")
-    args = parser.parse_args()
-
-    # Build the CPMpy model
-    try:
-        if args.string:
-            model = load_rcpsp(args.model)
-        else:
-            model = load_rcpsp(os.path.expanduser(args.model))
-    except Exception as e:
-        sys.stderr.write(f"Error reading model: {e}\n")
-        sys.exit(1)
-
-    # Solve the model
-    try:
-        if args.solver:
-            result = model.solve(solver=args.solver, time_limit=args.time_limit)
-        else:
-            result = model.solve(time_limit=args.time_limit)
-    except Exception as e:
-        sys.stderr.write(f"Error solving model: {e}\n")
-        sys.exit(1)
-
-    # Print results
-    print("Status:", model.status())
-    if result is not None:
-        if model.has_objective():
-            print("Objective:", model.objective_value())
-    else:
-        print("No solution found.")
-
-
-if __name__ == "__main__":
-    main()

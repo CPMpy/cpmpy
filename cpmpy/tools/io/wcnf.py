@@ -19,8 +19,6 @@ List of functions
 
 
 import os
-import sys
-import argparse
 import builtins
 import cpmpy as cp
 from typing import Union, Callable, TextIO
@@ -101,44 +99,3 @@ def load_wcnf(wcnf: Union[str, os.PathLike, TextIO], open:Callable=builtins.open
         setattr(model, "wcnf_max_var", nr_vars_declared if nr_vars_declared is not None else max(vars, default=0))
 
         return model
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Parse and solve a WCNF model using CPMpy")
-    parser.add_argument("model", help="Path to a WCNF file (or raw WCNF string if --string is given)")
-    parser.add_argument("-s", "--solver", default=None, help="Solver name to use (default: CPMpy's default)")
-    parser.add_argument("--string", action="store_true", help="Interpret the first argument (model) as a raw WCNF string instead of a file path")
-    parser.add_argument("-t", "--time-limit", type=int, default=None, help="Time limit for the solver in seconds (default: no limit)")
-    args = parser.parse_args()
-
-    # Build the CPMpy model
-    try:
-        if args.string:
-            model = load_wcnf(args.model)
-        else:
-            model = load_wcnf(os.path.expanduser(args.model))
-    except Exception as e:
-        sys.stderr.write(f"Error reading model: {e}\n")
-        sys.exit(1)
-
-    # Solve the model
-    try:
-        if args.solver:
-            result = model.solve(solver=args.solver, time_limit=args.time_limit)
-        else:
-            result = model.solve(time_limit=args.time_limit)
-    except Exception as e:
-        sys.stderr.write(f"Error solving model: {e}\n")
-        sys.exit(1)
-
-    # Print results
-    print("Status:", model.status())
-    if result is not None:
-        if model.has_objective():
-            print("Objective:", model.objective_value())
-    else:
-        print("No solution found.")
-
-
-if __name__ == "__main__":
-    main()

@@ -13,15 +13,20 @@ List of functions
 """
 
 from typing import Callable, List, Optional, Union, TextIO
+import argparse
 from functools import partial
 import os
 from pathlib import Path
+import sys
 import cpmpy as cp
-from .dimacs import load_dimacs
+from cpmpy.tools.io.dimacs import load_dimacs
 from cpmpy.tools.io.scip import load_scip
 from cpmpy.tools.io.wcnf import load_wcnf
 from cpmpy.tools.io.opb import load_opb
 from cpmpy.tools.io.xcsp3 import load_xcsp3
+from cpmpy.tools.io.jsplib import load_jsplib
+from cpmpy.tools.io.rcpsp import load_rcpsp
+from cpmpy.tools.io.nurserostering import load_nurserostering
 from cpmpy.tools.io.utils import _derive_format, _is_potential_path
 
 # mapping format names to appropriate loader functions
@@ -37,6 +42,9 @@ _loader_map: dict[str, Callable[..., cp.Model]] = {
     "cnf": partial(load_dimacs, type="cnf"),
     "wcnf": load_wcnf,
     "xcsp3": load_xcsp3,
+    "jsplib": load_jsplib,
+    "rcpsp": load_rcpsp,
+    "nurserostering": load_nurserostering,
 }
 
 
@@ -105,3 +113,40 @@ def load(instance: Union[str, os.PathLike, TextIO], format: Optional[str] = None
                 raise FileNotFoundError(instance)
         else:
             raise ValueError("Format must be provided when loading instance from a string.")
+
+def main():
+    parser = argparse.ArgumentParser(description="Load and solve a CPMpy model from a supported input format")
+    parser.add_argument("model", help="Path to an instance file, or raw instance content if --string is given")
+    parser.add_argument("-f", "--format", choices=load_formats(), default=None, help="Input format")
+    parser.add_argument("-s", "--solver", default=None, help="Solver name to use (default: CPMpy's default)")
+    parser.add_argument("--string", action="store_true", help="Interpret model as raw instance content instead of a file path")
+    parser.add_argument("-t", "--time-limit", type=int, default=None, help="Time limit for the solver in seconds (default: no limit)")
+    args = parser.parse_args()
+
+    source = args.model if args.string else os.path.expanduser(args.model)
+
+    try:
+        model = load(source, format=args.format)
+    except Exception as e:
+        sys.stderr.write(f"Error reading model: {e}\n")
+        sys.exit(1)
+
+    try:
+        if args.solver:
+            result = model.solve(solver=args.solver, time_limit=args.time_limit)
+        else:
+            result = model.solve(time_limit=args.time_limit)
+    except Exception as e:
+        sys.stderr.write(f"Error solving model: {e}\n")
+        sys.exit(1)
+
+    print("Status:", model.status())
+    if result is not None:
+        if model.has_objective():
+            print("Objective:", model.objective_value())
+    else:
+        print("No solution found.")
+
+
+if __name__ == "__main__":
+    main()
