@@ -1,34 +1,33 @@
 #!/usr/bin/env python
-# -*- coding:utf-8 -*-
 """
-Experiment: track how the PySAT transformation stack reshapes a model.
+Run the PySAT transformation stack on one pickled CPMpy model, stage by stage,
+and write a JSON record of per-stage model-size metrics.
 
-This replays the exact sequence of transformations used by
-:meth:`cpmpy.solvers.pysat.CPM_pysat.transform`, but stops after every stage to
-record three metrics on the intermediate constraint list:
+Usage:
+    python experiment_transformation.py --model-path path/to/model.pickle --out=result.json
+    python experiment_transformation.py --model-path path/to/model.pickle --memory-limit=8
 
-1. ``n_constraints``: the number of (top-level) constraints,
-2. ``n_integer``: the number of integer variables, and
-3. ``n_boolean``: the number of Boolean variables.
+Each stage records ``n_constraints``, ``n_integer``, ``n_boolean``, and
+``runtime`` (seconds). ``--memory-limit`` caps the process via
+``resource.RLIMIT_AS`` (gigabytes), same as ``run_model.py``.
 
-It then runs this over every pickled model in ``journal_experiments`` and
-aggregates the per-stage metrics into a single pandas DataFrame, indexed by the
-model's filename (without the ``.pickle`` suffix). The DataFrame has a 2-level
-column index ``(stage, metric)``.
+Without ``--out``, a timestamped JSON is written under ``transformation_results/``.
 """
+
+import argparse
+import gc
+import json
 import os
-import glob
+import resource
+import subprocess
+import sys
 import time
-from typing import Dict, Tuple
 
-import pandas as pd
-
+import cpmpy as cp
 from cpmpy import Model
 from cpmpy.solvers.pysat import CPM_pysat
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.expressions.variables import _BoolVarImpl, _IntVarImpl
-
-# transformations used by CPM_pysat.transform (mirrored here, stage by stage)
 from cpmpy.transformations.normalize import toplevel_list, simplify_boolean
 from cpmpy.transformations.safening import no_partial_functions
 from cpmpy.transformations.negation import push_down_negation
@@ -42,13 +41,32 @@ from cpmpy.transformations.flatten_model import flatten_constraint
 from cpmpy.transformations.reification import only_implies, only_bv_reifies
 from cpmpy.transformations.int2bool import int2bool
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(_HERE, "transformation_results")
 
-def _count_variables(cpm_cons) -> Tuple[int, int]:
-    """Number of (integer, Boolean) variables occurring in ``cpm_cons``."""
+
+def cpmpy_git_info():
+    """Return (commit hash, commit message) for the CPMpy checkout, or (None, None)."""
+    pkg_dir = os.path.dirname(os.path.abspath(cp.__file__))
+    try:
+        root = subprocess.run(
+            ["git", "-C", pkg_dir, "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=5, check=True,
+        ).stdout.strip()
+        out = subprocess.run(
+            ["git", "-C", root, "log", "-1", "--format=%H%n%s"],
+            capture_output=True, text=True, timeout=5, check=True,
+        ).stdout
+        commit, _, message = out.partition("\n")
+        return commit.strip(), message.rstrip("\n")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return None, None
+
+
+def count_variables(cpm_cons):
     n_integer = 0
     n_boolean = 0
     for v in get_variables(cpm_cons):
-        # note: _BoolVarImpl is not a subclass of _IntVarImpl, so this is exclusive
         if isinstance(v, _BoolVarImpl):
             n_boolean += 1
         elif isinstance(v, _IntVarImpl):
@@ -56,441 +74,142 @@ def _count_variables(cpm_cons) -> Tuple[int, int]:
     return n_integer, n_boolean
 
 
-def experiment_transformation(model: Model) -> Dict[str, Dict[str, int]]:
-    """Apply the PySAT transformation stack to ``model``, stage by stage.
+def record_stage(stages, stage, cpm_cons, runtime):
+    n_integer, n_boolean = count_variables(cpm_cons)
+    stages[stage] = {
+        "n_constraints": len(cpm_cons),
+        "n_integer": n_integer,
+        "n_boolean": n_boolean,
+        "runtime": runtime,
+    }
 
-    Arguments:
-        model: a CPMpy :class:`~cpmpy.model.Model`.
 
-    Returns:
-        A dictionary mapping a transformation-stage name to a dictionary of
-        metrics ``{"n_constraints": ..., "n_integer": ..., "n_boolean": ...}``
-        as measured after that stage. It also includes an ``"input"`` entry for
-        the untouched model constraints.
-    """
-    # an empty solver instance gives us the same state the transform() relies on
-    # (a fresh common-subexpression map, integer-encoding map, supported sets, ...)
+def run_transformation(model):
+    """Apply the PySAT transformation stack stage by stage; return stage metrics."""
     solver = CPM_pysat()
+    stages = {}
 
-    stats: Dict[str, Dict[str, int]] = {}
-
-    def record(stage: str, cpm_cons) -> None:
-        n_integer, n_boolean = _count_variables(cpm_cons)
-        stats[stage] = {
-            "n_constraints": len(cpm_cons),
-            "n_integer": n_integer,
-            "n_boolean": n_boolean,
-        }
-
-    def run_stage(stage: str, func, cpm_cons):
-        """Run a transformation, logging its name and runtime, and record stats."""
-        print(f"\t{stage}", end="", flush=True)
-        start = time.perf_counter()
-        cpm_cons = func(cpm_cons)
-        runtime = time.perf_counter() - start
-        print(f" ({runtime:.3f}s)", flush=True)
-        record(stage, cpm_cons)
-        return cpm_cons
-
-    # stage 0: the raw model constraints
     cpm_cons = list(model.constraints)
-    record("input", cpm_cons)
+    record_stage(stages, "input", cpm_cons, 0.0)
 
-    cpm_cons = run_stage("toplevel_list", toplevel_list, cpm_cons)
+    t0 = time.perf_counter()
+    cpm_cons = toplevel_list(cpm_cons)
+    record_stage(stages, "toplevel_list", cpm_cons, time.perf_counter() - t0)
 
-    cpm_cons = run_stage(
-        "no_partial_functions",
-        lambda c: no_partial_functions(c, safen_toplevel={"div", "mod", "element"}),
+    t0 = time.perf_counter()
+    cpm_cons = no_partial_functions(cpm_cons, safen_toplevel={"div", "mod", "element"})
+    record_stage(stages, "no_partial_functions", cpm_cons, time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
+    cpm_cons = push_down_negation(cpm_cons)
+    record_stage(stages, "push_down_negation", cpm_cons, time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
+    cpm_cons = decompose_linear(
         cpm_cons,
+        supported=solver.supported_global_constraints,
+        supported_reified=solver.supported_reified_global_constraints,
+        csemap=solver._csemap,
     )
+    record_stage(stages, "decompose_linear", cpm_cons, time.perf_counter() - t0)
 
-    cpm_cons = run_stage("push_down_negation", push_down_negation, cpm_cons)
+    t0 = time.perf_counter()
+    cpm_cons = simplify_boolean(cpm_cons)
+    record_stage(stages, "simplify_boolean", cpm_cons, time.perf_counter() - t0)
 
-    cpm_cons = run_stage(
-        "decompose_linear",
-        lambda c: decompose_linear(
-            c,
-            supported=solver.supported_global_constraints,
-            supported_reified=solver.supported_reified_global_constraints,
-            csemap=solver._csemap,
-        ),
+    t0 = time.perf_counter()
+    cpm_cons = flatten_constraint(cpm_cons, csemap=solver._csemap)
+    record_stage(stages, "flatten_constraint", cpm_cons, time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
+    cpm_cons = linearize_reified_variables(
+        cpm_cons, min_values=2, csemap=solver._csemap, ivarmap=solver.ivarmap
+    )
+    record_stage(stages, "linearize_reified_variables", cpm_cons, time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
+    cpm_cons = only_bv_reifies(cpm_cons, csemap=solver._csemap)
+    record_stage(stages, "only_bv_reifies", cpm_cons, time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
+    cpm_cons = only_implies(cpm_cons, csemap=solver._csemap)
+    record_stage(stages, "only_implies", cpm_cons, time.perf_counter() - t0)
+
+    t0 = time.perf_counter()
+    cpm_cons = linearize_constraint(
         cpm_cons,
+        supported=frozenset({"sum", "wsum", "->", "and", "or"}),
+        csemap=solver._csemap,
     )
+    record_stage(stages, "linearize_constraint", cpm_cons, time.perf_counter() - t0)
 
-    cpm_cons = run_stage("simplify_boolean", simplify_boolean, cpm_cons)
+    t0 = time.perf_counter()
+    cpm_cons = int2bool(cpm_cons, solver.ivarmap, encoding=solver.encoding, csemap=solver._csemap)
+    record_stage(stages, "int2bool", cpm_cons, time.perf_counter() - t0)
 
-    cpm_cons = run_stage(
-        "flatten_constraint",
-        lambda c: flatten_constraint(c, csemap=solver._csemap),
-        cpm_cons,
-    )
+    t0 = time.perf_counter()
+    cpm_cons = only_positive_coefficients(cpm_cons)
+    record_stage(stages, "only_positive_coefficients", cpm_cons, time.perf_counter() - t0)
 
-    cpm_cons = run_stage(
-        "linearize_reified_variables",
-        lambda c: linearize_reified_variables(
-            c, min_values=2, csemap=solver._csemap, ivarmap=solver.ivarmap
-        ),
-        cpm_cons,
-    )
-
-    cpm_cons = run_stage(
-        "only_bv_reifies",
-        lambda c: only_bv_reifies(c, csemap=solver._csemap),
-        cpm_cons,
-    )
-
-    cpm_cons = run_stage(
-        "only_implies",
-        lambda c: only_implies(c, csemap=solver._csemap),
-        cpm_cons,
-    )
-
-    cpm_cons = run_stage(
-        "linearize_constraint",
-        lambda c: linearize_constraint(
-            c,
-            supported=frozenset({"sum", "wsum", "->", "and", "or"}),
-            csemap=solver._csemap,
-        ),
-        cpm_cons,
-    )
-
-    cpm_cons = run_stage(
-        "int2bool",
-        lambda c: int2bool(
-            c, solver.ivarmap, encoding=solver.encoding, csemap=solver._csemap
-        ),
-        cpm_cons,
-    )
-
-    cpm_cons = run_stage(
-        "only_positive_coefficients", only_positive_coefficients, cpm_cons
-    )
-
-    return stats
+    return stages
 
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+def do_experiment(model_path):
+    """Load one model, run the transformation pipeline, return a JSON-serializable record."""
+    cpmpy_commit, cpmpy_commit_message = cpmpy_git_info()
+    record = {
+        "model": os.path.basename(model_path),
+        "model_path": os.path.abspath(model_path),
+        "cpmpy_commit": cpmpy_commit,
+        "cpmpy_commit_message": cpmpy_commit_message,
+        "stages": None,
+        "total_runtime": None,
+        "error": None,
+    }
 
-
-def run_experiments(models_dir: str = os.path.join(_HERE, "models")) -> pd.DataFrame:
-    """Run :func:`experiment_transformation` on every pickled model in a folder.
-
-    Arguments:
-        models_dir: directory containing ``*.pickle`` serialized CPMpy models.
-
-    Returns:
-        A pandas DataFrame indexed by the model filename (without the
-        ``.pickle`` suffix), with a 2-level column index ``(stage, metric)``
-        where metric is one of ``n_constraints``, ``n_integer``, ``n_boolean``.
-    """
-    rows = {}
-    for path in sorted(glob.glob(os.path.join(models_dir, "*.pickle"))):
-        name = os.path.splitext(os.path.basename(path))[0]
-        print(name)
-        try:
-            model = Model.from_file(path)
-            stats = experiment_transformation(model)
-        except Exception as e:  # keep going, report which model failed
-            print(f"\t[FAIL] {type(e).__name__}: {e}")
-            continue
-
-        row = {}
-        for stage, metrics in stats.items():
-            for metric, value in metrics.items():
-                row[(stage, metric)] = value
-        rows[name] = row
-
-    df = pd.DataFrame.from_dict(rows, orient="index")
-    df.columns = pd.MultiIndex.from_tuples(df.columns, names=["stage", "metric"])
-    df.index.name = "model"
-    return df
-
-
-def load_results(path: str = os.path.join(_HERE, "transformation_stats.csv")) -> pd.DataFrame:
-    """Read a previously saved results CSV back into a pandas DataFrame.
-
-    Reconstructs the same structure produced by :func:`run_experiments`: the
-    model name as index and a 2-level column index ``(stage, metric)``.
-
-    Arguments:
-        path: path to the CSV written by :func:`run_experiments`.
-
-    Returns:
-        A pandas DataFrame indexed by model name with a ``(stage, metric)``
-        column MultiIndex.
-    """
-    df = pd.read_csv(path, header=[0, 1], index_col=0)
-    df.index.name = "model"
-    df.columns.names = ["stage", "metric"]
-    return df
-
-def pretty_latex(df):
-
-    def latex_escape(label):
-        return str(label).replace("_", r"\_").replace("#", r"\#")
-
-    # move the 'metric' column level onto the rows: each model (instance) now
-    # gets one row per metric (#constraints / #integer vars / #bool vars),
-    # while the stages become the columns
-    df = df.stack(level="metric", future_stack=True)
-
-    # order the metric rows consistently within each instance
-    metric_order = ["n_constraints", "n_integer", "n_boolean"]
-    df = df.reindex(metric_order, level="metric")
-
-    # rename the metric row labels to something more compact
-    renames = dict(n_constraints="#cons", n_integer="#int", n_boolean="#bool")
-    df = df.rename(index=renames, level="metric")
-
-    # round the numbers to 0 decimal places
-    df = df.round(0)
-
-    # escape underscores and "#" signs in stage names, model names, and metrics
-    df = df.rename(index=latex_escape, columns=latex_escape)
-
-    # print latex
-    print(
-        df.to_latex(
-            index=True,
-            escape=False,
-            column_format=f"l|" + "c"*len(df.columns),
-        )
-    )
-
-
-def plot_transformation_stats(df, stages=None, save_basename="transformation_stats"):
-    """Visualize how the transformation pipeline reshapes the models.
-
-    Because absolute sizes differ by orders of magnitude across instances, most
-    panels normalize *per instance* (relative to the ``input`` stage), turning
-    raw counts into comparable "blow-up factors".
-
-    Produces a 3x2 figure:
-
-    1. absolute #constraints per stage (boxplot, log scale),
-    2. absolute #variables per stage (boxplot, log scale),
-    3. constraint blow-up factor per stage (boxplot, log scale),
-    4. variable blow-up factor per stage (boxplot, log scale),
-    5. absolute #constraints trajectory per instance (spaghetti, log scale),
-    6. boolean share of variables per stage (boxplot) -- exposes ``int2bool``.
-
-    Arguments:
-        df: DataFrame as returned by :func:`run_experiments` / :func:`load_results`
-            (model index, ``(stage, metric)`` column MultiIndex).
-        stages: optional ordered list of stages to include (defaults to all,
-            in pipeline order as they appear in ``df``).
-        save_basename: basename (without extension) for the saved figures;
-            written as ``<basename>.pdf`` and ``<basename>.png`` in this folder.
-
-    Returns:
-        The matplotlib Figure.
-    """
-    import tempfile
-    os.environ.setdefault("MPLCONFIGDIR", tempfile.gettempdir())
-    import numpy as np
-    import matplotlib
-    matplotlib.use("Agg")  # no display needed, just save to file
-    import matplotlib.pyplot as plt
-
-    # select stages (preserve the order in which they appear in the columns)
-    all_stages = list(dict.fromkeys(df.columns.get_level_values("stage")))
-    if stages is None:
-        stages = all_stages
-    else:
-        stages = [s for s in stages if s in all_stages]
-
-    # pull out per-metric tables: rows = instances, cols = stages
-    cons = df.xs("n_constraints", axis=1, level="metric")[stages]
-    ints = df.xs("n_integer", axis=1, level="metric")[stages]
-    bools = df.xs("n_boolean", axis=1, level="metric")[stages]
-    total_vars = ints + bools
-
-    # per-instance normalization relative to the first (input) stage
-    base_stage = stages[0]
-    cons_ratio = cons.div(cons[base_stage].replace(0, np.nan), axis=0)
-    vars_ratio = total_vars.div(total_vars[base_stage].replace(0, np.nan), axis=0)
-
-    # boolean share of variables (0 = all integer, 1 = all boolean)
-    bool_share = (bools / total_vars.replace(0, np.nan))
-
-    fig, axes = plt.subplots(3, 2, figsize=(16, 15))
-    box_style = dict(showfliers=True, patch_artist=True,
-                     boxprops=dict(facecolor="#cfe2f3", edgecolor="#225"),
-                     medianprops=dict(color="#cc0000", linewidth=2),
-                     flierprops=dict(marker="o", markersize=3, alpha=0.4))
-
-    def _boxplot(ax, data_df, title, ylabel, logy=False, hline=None):
-        # one box per stage, dropping NaNs
-        data = [data_df[s].dropna().values for s in stages]
-        ax.boxplot(data, labels=stages, **box_style)
-        if logy:
-            ax.set_yscale("log")
-        if hline is not None:
-            ax.axhline(hline, color="grey", linestyle="--", linewidth=1, zorder=0)
-        ax.set_title(title, fontweight="bold")
-        ax.set_ylabel(ylabel)
-        ax.tick_params(axis="x", rotation=60)
-        for lbl in ax.get_xticklabels():
-            lbl.set_horizontalalignment("right")
-        ax.grid(axis="y", alpha=0.3)
-
-    # 1) absolute #constraints (log scale handles the spread across instances)
-    _boxplot(axes[0, 0], cons,
-             "Absolute #constraints per stage",
-             "# constraints  (log)", logy=True)
-
-    # 2) absolute #variables
-    _boxplot(axes[0, 1], total_vars,
-             "Absolute #variables per stage",
-             "# variables  (log)", logy=True)
-
-    # 3) constraint blow-up factor
-    _boxplot(axes[1, 0], cons_ratio,
-             "Constraint blow-up per stage (relative to input)",
-             "# constraints / input  (log)", logy=True, hline=1.0)
-
-    # 4) variable blow-up factor
-    _boxplot(axes[1, 1], vars_ratio,
-             "Variable blow-up per stage (relative to input)",
-             "# variables / input  (log)", logy=True, hline=1.0)
-
-    # 5) absolute #constraints trajectory (spaghetti) with median
-    ax = axes[2, 0]
-    x = range(len(stages))
-    for _, row in cons.iterrows():
-        ax.plot(x, row.values, color="#888", alpha=0.25, linewidth=1)
-    ax.plot(x, cons.median(axis=0).values, color="#cc0000", linewidth=2.5,
-            marker="o", label="median")
-    ax.set_yscale("log")
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(stages, rotation=60, ha="right")
-    ax.set_title("Absolute #constraints per instance", fontweight="bold")
-    ax.set_ylabel("# constraints  (log)")
-    ax.grid(axis="y", alpha=0.3)
-    ax.legend()
-
-    # 6) boolean share of variables
-    _boxplot(axes[2, 1], bool_share,
-             "Boolean share of variables per stage",
-             "# bool / (# bool + # int)", logy=False)
-    axes[2, 1].set_ylim(-0.05, 1.05)
-
-    fig.suptitle("PySAT transformation pipeline: effect on model size",
-                 fontsize=15, fontweight="bold")
-    fig.tight_layout(rect=(0, 0, 1, 0.98))
-
-    pdf_path = os.path.join(_HERE, f"{save_basename}.pdf")
-    png_path = os.path.join(_HERE, f"{save_basename}.png")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    fig.savefig(png_path, dpi=150, bbox_inches="tight")
-    print(f"Saved figures to:\n  {pdf_path}\n  {png_path}")
-    return fig
-
-
-def plot_stats(df, stages=None, save_basename="transformation_absolute"):
-    
-    import tempfile
-    os.environ.setdefault("MPLCONFIGDIR", tempfile.gettempdir())
-    import matplotlib
-    matplotlib.use("Agg")  # no display needed, just save to file
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-
-    # select stages (preserve the order in which they appear in the columns)
-    all_stages = list(dict.fromkeys(df.columns.get_level_values("stage")))
-    if stages is None:
-        stages = all_stages
-    else:
-        stages = [s for s in stages if s in all_stages]
-
-    def _to_long(metric, value_name):
-        """Tidy (long-form) frame with columns [model, stage, <value_name>]."""
-        wide = df.xs(metric, axis=1, level="metric")[stages]
-        long = wide.reset_index().melt(
-            id_vars="model", var_name="stage", value_name=value_name
-        )
-        return long
-
-    def _save(fig, suffix):
-        pdf_path = os.path.join(_HERE, f"{save_basename}_{suffix}.pdf")
-        png_path = os.path.join(_HERE, f"{save_basename}_{suffix}.png")
-        fig.tight_layout()
-        # fig.savefig(pdf_path, bbox_inches="tight")
-        fig.savefig(png_path, dpi=150, bbox_inches="tight")
-        print(f"Saved figures to:\n  {pdf_path}\n  {png_path}")
-
-
-    # ---- figure 1: absolute #constraints ----
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    cons_long = _to_long("n_constraints", "value")
-    sns.ecdfplot(data=cons_long, x="value", hue = 'stage', hue_order=stages, stat="count", ax=ax)
-    ax.set_title("#constraints per stage", fontweight="bold")
-    ax.set_xlabel("# constraints  (log)")
-    ax.set_xscale("log")
-    ax.set_xlim(1, ax.get_xlim()[1])
-    ax.set_ylabel("Number of instances")
-    _save(fig, "constraints")
-
-    # ---- figure 2: absolute #variables, hue = int/bool ----
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ints_long = _to_long("n_integer", "value")
-    sns.ecdfplot(data=ints_long, x="value", hue = 'stage', hue_order=stages, stat="count", ax=ax)
-    ax.set_title("#integer variables per stage", fontweight="bold")
-    ax.set_xlabel("# integer variables  (log)")
-    ax.set_xscale("log")
-    ax.set_xlim(1, ax.get_xlim()[1])
-    ax.set_ylabel("Number of instances")
-    _save(fig, "variables_int")
-
-    # ---- figure 3: absolute #boolean variables per stage ----
-    fig, ax = plt.subplots(figsize=(10, 6))
-    bools_long = _to_long("n_boolean", "value")
-    sns.ecdfplot(data=bools_long, x="value", hue = 'stage', hue_order=stages, stat="count", ax=ax)
-    ax.set_title("#boolean variables per stage", fontweight="bold")
-    ax.set_xlabel("# boolean variables  (log)")
-    ax.set_xscale("log")
-    ax.set_xlim(1, ax.get_xlim()[1])
-    ax.set_ylabel("Number of instances")
-    _save(fig, "variables_bool")
+    try:
+        model = Model.from_file(model_path)
+        t0 = time.perf_counter()
+        stages = run_transformation(model)
+        record["stages"] = stages
+        record["total_runtime"] = time.perf_counter() - t0
+    except Exception as e:
+        gc.collect()
+        print("[experiment_transformation] error: {}".format(e), file=sys.stderr)
+        record["error"] = "{}: {}".format(type(e).__name__, e)
+    return record
 
 
 if __name__ == "__main__":
-    # pd.set_option("display.max_columns", None)
-    # pd.set_option("display.width", None)
-    # print(df)
-    import sys
-    if len(sys.argv) > 1:
-        models_path = sys.argv[1]
+    parser = argparse.ArgumentParser(
+        description="Run the PySAT transformation stack on one pickled model.")
+    parser.add_argument("--model-path", required=True, help="path to model.pickle")
+    parser.add_argument("--out", default=None, help="write JSON record to this path")
+    parser.add_argument("--memory-limit", type=int, default=None,
+                        dest="memory_limit_gb", help="memory cap in gigabytes (RLIMIT_AS)")
+    args = parser.parse_args()
+
+    if args.memory_limit_gb is not None:
+        print("Setting memory limit to {} GB".format(args.memory_limit_gb), file=sys.stderr)
+        limit_bytes = args.memory_limit_gb * 1024 * 1024 * 1024
+        try:
+            resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, resource.RLIM_INFINITY))
+        except (ValueError, OSError) as e:
+            print("Warning: could not set memory limit: {}".format(e), file=sys.stderr)
+
+    record = do_experiment(args.model_path)
+
+    if args.out is None:
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        model_name = os.path.splitext(os.path.basename(args.model_path))[0]
+        out_name = "{}_{}.json".format(model_name, int(time.time() * 1000))
+        out_path = os.path.join(OUTPUT_DIR, out_name)
     else:
-        models_path = os.path.join(_HERE, "models")
+        out_path = args.out
+        os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
 
-    df = run_experiments(models_path)
+    with open(out_path, "w") as f:
+        json.dump(record, f, indent=2)
 
-    out = os.path.join(_HERE, "transformation_stats.csv")
-    df.to_csv(out)
-    print(f"\nSaved results to {out}")
-
-    columns = [
-        "input",
-        "no_partial_functions",
-        "push_down_negation",
-        "decompose_linear",
-        "flatten_constraint",
-        "linearize_reified_variables",
-        "linearize_constraint",
-        "int2bool",
-    ]
-
-    df = load_results("transformation_stats.csv")
-    # print(df[columns])
-
-    pretty_latex(df[columns])
-
-    # the two plots of interest: absolute #constraints and absolute #variables
-    # (split by integer/boolean type)
-    plot_stats(df, stages=columns)
-
-    # the older, more detailed overview figure (kept for reference)
-    # plot_transformation_stats(df)
+    print("[experiment_transformation] wrote record to {}".format(out_path), file=sys.stderr)
+    print(json.dumps(record, indent=2))
