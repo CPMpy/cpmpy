@@ -7,6 +7,9 @@
 Helper functions for the PSPLIB RCPSP format.
 
 The PSPLIB RCPSP format is a textual format to represent Resource-Constrained Project Scheduling problems.
+More can be read about it here: 
+
+- https://www.om-db.wi.tum.de/psplib/geninfo.php
 
 
 =================

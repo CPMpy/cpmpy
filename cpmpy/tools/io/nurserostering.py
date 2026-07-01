@@ -7,6 +7,10 @@
 Helper functions for the Nurse Rostering format.
 
 The Nurse Rostering format is a textual format to represent Nurse Rostering problems.
+More can be read about it here: 
+
+- https://schedulingbenchmarks.org/nrp/
+
 
 =================
 List of functions

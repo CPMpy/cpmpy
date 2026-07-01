@@ -6,6 +6,10 @@
 """
 Helper functions for the WCNF format.
 
+WCNF is a textual format to represent MaxSAT problems.
+More can be read about it here:
+
+- https://maxsat-evaluations.github.io/
 
 =================
 List of functions

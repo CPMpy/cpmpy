@@ -6,6 +6,10 @@
 """
 Loader for the JSPLib format.
 
+More can be read about it here: 
+
+- https://github.com/tamy0612/JSPLIB
+
 
 =================
 List of functions
