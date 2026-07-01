@@ -103,7 +103,6 @@ def _model_jsplib(task_to_machines: np.ndarray, task_durations: np.ndarray) -> t
     makespan = cp.intvar(0, task_durations.sum(), name="makespan") # extremely bad upperbound... TODO
 
     model = cp.Model()
-    model.add(start + task_durations == end)
     model.add(end[:,:-1] <= start[:,1:]) # precedences
 
     for machine in set(task_to_machines.flat):
