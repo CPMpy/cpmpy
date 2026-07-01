@@ -185,11 +185,11 @@ class VeriPBAnnotator(BooleanEncodingAnnotator):
                 names.append(_veripb_safe_name(_safe_name(v)))
         return names
 
-def _safe_name(v):
+def _safe_name(v: Any) -> str:
     """Best-effort variable label for unexpected objects (e.g. lists)."""
     return getattr(v, "name", str(v))
 
-def _veripb_safe_name(name):
+def _veripb_safe_name(name: str) -> str:
     """VeriPB does not support commas in variable names."""
     s = str(name)
     return s.replace(", ", "][").replace(",", "][")
