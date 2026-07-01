@@ -57,7 +57,6 @@
 """
 from __future__ import annotations
 
-import math
 from collections.abc import Iterable
 import threading
 import warnings # for deprecation warning
@@ -846,9 +845,8 @@ def _is_invalid_name(name: Any) -> bool:
         else:
             id = int(name[len(_IV_PREFIX):])
             if _IntVarImpl.counter > id:
-                return True
-            else:
-                return False
+                warnings.warn(f"Creating a variable with name {name} that is already in use. Both variables will be linked together. If not intended this could lead to unexpected behavior.")
+            return False
     
     elif name.startswith(_BV_PREFIX):
         if _get_strict_variable_name_check():
@@ -856,12 +854,11 @@ def _is_invalid_name(name: Any) -> bool:
         else:
             id = int(name[len(_BV_PREFIX):])
             if _BoolVarImpl.counter > id:
-                return True
-            else:
-                return False
+                # TODO: reduce warning frequency? Now reported for every variable
+                warnings.warn(f"Creating a variable with name {name} that is already in use. Both variables will be linked together. If not intended this could lead to unexpected behavior.")
+            return False
     
-    else:
-        return False
+    return False
 
 def _get_strict_variable_name_check():
     return _VAR_NAME_CHECK_STATE.strict
@@ -899,4 +896,6 @@ def _ignore_strict_variable_name_check():
             with _ignore_strict_variable_name_check():
                 ... create CPMpy model based on file contents here ...
     """
+    if _IntVarImpl.counter > 0 or _BoolVarImpl.counter > 0:
+        warnings.warn("Loading a model whilst there are already variables created. This could lead to unexpected behavior due to variables with the same name being linked together.")
     return _IgnoreStrictVariableNameCheck()

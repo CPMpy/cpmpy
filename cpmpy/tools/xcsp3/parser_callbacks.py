@@ -93,7 +93,6 @@ class CallbacksCPMPy(Callbacks):
         'in': (2, lambda x, y: cp.InDomain(x, y)),  # could be mixed context here!
         'notin': (2, lambda x, y: xglobals.NotInDomain(x, y)),  # could be mixed context here!
         'set': (0, lambda x: list(set(x))),
-        # TODO 'notin' is the only other set operator (negative indomain)
         # Logic
         "not": (1, lambda x: ~x),
         "and": (0, lambda x: cp.all(x)),
