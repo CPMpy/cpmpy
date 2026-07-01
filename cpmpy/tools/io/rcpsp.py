@@ -157,20 +157,20 @@ def _model_rcpsp(jobs: dict[int, dict[str, Any]], resource_names: list[str], cap
 
     # ensure capacity is not exceeded
     for resource in resource_names:
-        model += cp.Cumulative(
+        model.add(cp.Cumulative(
             start=start,
             duration=durations,
             end=end,
             demand=[jobs[j][resource] for j in job_order],
             capacity=capacities[resource],
-        )
+        ))
 
     # enforce precedences
     for idx, jobnr in enumerate(job_order):
         for succ in jobs[jobnr]["successors"]:
-            model += end[idx] <= start[succ - 1]  # job ids start at idx 1
+            model.add(end[idx] <= start[succ - 1])  # job ids start at idx 1
 
-    model += end <= makespan
+    model.add(end <= makespan)
     model.minimize(makespan)
 
     return model, (start, end, makespan)
