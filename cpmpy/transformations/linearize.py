@@ -485,7 +485,7 @@ def canonical_comparison(lst_of_expr: ListLike[Expression]) -> list[Expression]:
                 
                 # 2) add collected variables to lhs
                 if isinstance(lhs, _NumVarImpl) or (isinstance(lhs, Operator) and (lhs.name == "sum" or lhs.name == "wsum")):
-                    lhs = lhs + lhs2
+                    lhs = Operator("sum", [lhs, lhs2])
                 else:
                     raise ValueError(f"unexpected expression on lhs of expression, should be sum, wsum or intvar but got {lhs}")
 
