@@ -11,6 +11,17 @@ Through annotation, we can keep track of this mapping and later recover it.
 Additionally, some formats don't support arbitrary variable naming. In DIMACS for example, 
 variables are referenced by integer IDs. Annotation again allows us to keep track of the original 
 variable names. 
+
+===============
+List of classes
+===============
+
+.. autosummary::
+    :nosignatures:
+
+    BooleanEncodingAnnotator
+    SugarAnnotator
+    VeriPBAnnotator
 """
 
 from abc import ABC, abstractmethod
@@ -71,6 +82,17 @@ class SugarAnnotator(BooleanEncodingAnnotator):
     """
 
     def annotate(self, vars: list[Any], ivarmap: dict[str, IntVarEnc]) -> list[str]:
+        """
+        Return Sugar-style names for Boolean encoding variables.
+
+        Arguments:
+            vars: Boolean encoding variables.
+            ivarmap: Integer encoding map populated by the int2bool transformation.
+
+        Returns:
+            Sugar-style names in the same order as ``vars``.
+        """       
+
         reverse = _build_reverse_map(ivarmap)
         lines = []
 
@@ -132,6 +154,17 @@ class VeriPBAnnotator(BooleanEncodingAnnotator):
     """
 
     def annotate(self, vars: list[Any], ivarmap: dict[str, IntVarEnc]) -> list[str]:
+        """
+        Return VeriPB-safe names for Boolean encoding variables.
+
+        Arguments:
+            vars: Boolean encoding variables.
+            ivarmap: Integer encoding map populated by the int2bool transformation.
+
+        Returns:
+            VeriPB-safe names in the same order as ``vars``.
+        """
+        
         reverse = _build_reverse_map(ivarmap)
         names = []
         for v in vars:
