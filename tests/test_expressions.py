@@ -266,6 +266,15 @@ class TestMul:
         assert yx.shape == (3,)
         assert all(a is y or b is y for a, b in (e.args for e in yx))
 
+    def test_scalar_expr_with_numpy_array(self):
+        e = sum(cp.boolvar(3))
+        y = np.array([1, 2, 3])
+        ey, ye = e * y, y * e
+        assert isinstance(ey, NDVarArray)
+        assert ey.shape == ye.shape == (3,)
+        for a, b in zip(ey, ye):
+            assert str(a) == str(b)
+
     def test_nullarg_mul(self):
         x = intvar(0,5,shape=3, name="x")
         a = np.array([0,1,1], dtype=bool)

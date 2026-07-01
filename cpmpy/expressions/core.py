@@ -289,7 +289,9 @@ class Expression(object):
 
     # Comparisons
     def __eq__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__eq__(self)
         # BoolExpr == 1|true|0|false, common case, simply BoolExpr
         if self.is_bool() and is_num(other):
@@ -300,34 +302,46 @@ class Expression(object):
         return Comparison("==", self, other)
 
     def __ne__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__ne__(self)
         return Comparison("!=", self, other)
 
     def __lt__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__gt__(self)
         return Comparison("<", self, other)
 
     def __le__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__ge__(self)
         return Comparison("<=", self, other)
 
     def __gt__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__lt__(self)
         return Comparison(">", self, other)
 
     def __ge__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__le__(self)
         return Comparison(">=", self, other)
 
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
     def __and__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__rand__(self)
         # some simple constant removal
         if is_true_cst(other):
@@ -339,7 +353,9 @@ class Expression(object):
         return Operator("and", [self, other])
 
     def __rand__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__and__(self)
         # some simple constant removal
         if is_true_cst(other):
@@ -351,7 +367,9 @@ class Expression(object):
         return Operator("and", [other, self])
 
     def __or__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__ror__(self)
         # some simple constant removal
         if is_false_cst(other):
@@ -363,7 +381,9 @@ class Expression(object):
         return Operator("or", [self, other])
 
     def __ror__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__or__(self)
         # some simple constant removal
         if is_false_cst(other):
@@ -375,7 +395,9 @@ class Expression(object):
         return Operator("or", [other, self])
 
     def __xor__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__rxor__(self)
         # some simple constant removal
         if is_true_cst(other):
@@ -385,7 +407,9 @@ class Expression(object):
         return cp.Xor([self, other])
 
     def __rxor__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__xor__(self)
         # some simple constant removal
         if is_true_cst(other):
@@ -397,14 +421,18 @@ class Expression(object):
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
     def __add__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__radd__(self)
         if is_num(other) and other == 0:
             return self
         return Operator("sum", [self, other])
 
     def __radd__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__add__(self)
         if is_num(other) and other == 0:
             return self
@@ -412,7 +440,9 @@ class Expression(object):
 
     # subtraction
     def __sub__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__rsub__(self)
         # if is_num(other) and other == 0:
         #     return self
@@ -420,7 +450,9 @@ class Expression(object):
         return self.__add__(-other)
 
     def __rsub__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__sub__(self)
         # if is_num(other) and other == 0:
         #     return -self
@@ -429,14 +461,18 @@ class Expression(object):
     
     # multiplication: use GlobalFunction Multiplication so it can be decomposed (e.g. to linear)
     def __mul__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__rmul__(self)
         if is_num(other) and other == 1:
             return self
         return cp.Multiplication(self, other)
 
     def __rmul__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__mul__(self)
         if is_num(other) and other == 1:
             return self
@@ -455,24 +491,32 @@ class Expression(object):
         return self.__rfloordiv__(other)
 
     def __floordiv__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__rfloordiv__(self)
         if is_num(other) and other == 1:
             return self
         return cp.Division(self, other)
 
     def __rfloordiv__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__floordiv__(self)
         return cp.Division(other, self)
 
     def __mod__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__rmod__(self)
         return cp.Modulo(self, other)
 
     def __rmod__(self, other):
-        if isinstance(other, cp.expressions.variables.NDVarArray):
+        if isinstance(other, np.ndarray):
+            if not isinstance(other, cp.expressions.variables.NDVarArray):
+                other = cp.cpm_array(other)
             return other.__mod__(self)
         return cp.Modulo(other, self)
 
