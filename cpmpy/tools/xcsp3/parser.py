@@ -142,8 +142,6 @@ def main():
     else:
         print("No solution found.")
 
-# Backward compatibility alias
-read_xcsp3 = load_xcsp3
 
 if __name__ == "__main__":
     main()
