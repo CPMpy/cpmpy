@@ -75,6 +75,10 @@ def load_results(results_dir):
     df = pd.DataFrame(records)
     df['error'] = df['error'].fillna("OK")
 
+    memlimit = 8
+    print(f"Filering to runs with {memlimit}GB of memory")
+    df = df[df['memory_limit'] == memlimit]
+
     # fill baseline
     df["ablate"] = df["ablate"].fillna("baseline")
     df["variant"] = df["ablate"].map(VARIANT_LABEL).fillna(df["ablate"])
@@ -126,7 +130,7 @@ def plot_stats(df, figures_dir, subtitle=None, fname=None):
             
             sns.ecdfplot(data=solver_df, 
                          x=metric, hue="variant", ax=ax, hue_order=hue_order, stat="count")
-            ax.set_xscale("log")
+            #ax.set_xscale("log")
             ax.set_xlabel(STAT_METRICS[metric])
             ax.set_ylabel("Number of instances")
             
@@ -200,19 +204,15 @@ if __name__ == "__main__":
     df_csp = df[df['model_path'].str.startswith(CSP_prefix)]
     df_cop = df[df['model_path'].str.startswith(COP_prefix)]
 
-    for fname in sorted(df_cop['model'].unique()):
-        print(f"cp {fname.replace('.pickle', '')}_*.json ../xcsp3_2024_COP/")
 
+    #finished = get_finished_instances(df_csp)
+    #subtitle="XCSP3 2024 CSP"
+
+    #plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_csp24_{}")
+    #plot_stats(df_csp, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_csp24_{}")
+
+    finished = get_finished_instances(df_cop)
+    subtitle= "XCSP3 2024 COP"
     
-
-    # finished = get_finished_instances(df_csp)
-    # subtitle="XCSP3 2024 CSP"
-
-    # plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_csp24_{}")
-    # plot_stats(df_csp, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_csp24_{}")
-
-    # finished = get_finished_instances(df_cop)
-    # subtitle= "XCSP3 2024 COP"
-    
-    # plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_cop24_{}")
-    # plot_stats(df_cop, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_cop24_{}")
+    plot_runtime(finished, figures_dir=figures_dir, runtime_col="runtime", subtitle=subtitle, fname="ablation_cop24_{}")
+    plot_stats(df_cop, figures_dir=figures_dir, subtitle=subtitle, fname="ablation_stats_cop24_{}")
