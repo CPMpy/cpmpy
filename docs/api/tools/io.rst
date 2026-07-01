@@ -67,11 +67,14 @@ Format-specific loaders and writers:
 .. toctree::
     :maxdepth: 1
 
+    io/dimacs
+    io/jsplib
+    io/nurserostering
     io/opb
+    io/rcpsp
     io/scip
     io/wcnf
-    io/dimacs
     io/xcsp3
-    io/jsplib
-    io/rcpsp
-    io/nurserostering
+    
+    
+    
