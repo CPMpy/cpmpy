@@ -633,8 +633,7 @@ import cpmpy as cp
 from cpmpy.tools.io import load, write
 
 # Load an instance from a file
-model = load("instance.opb")
-jobshop_model = load("ft06.jsp", format="jsplib")
+model = load("ft06.jsp", format="jsplib")
 
 # Or write your own model to a file/string
 x = cp.boolvar(shape=3, name="x")
