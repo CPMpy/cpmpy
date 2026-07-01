@@ -616,7 +616,10 @@ LARGER_INSTANCE_CASES = [
         filename="jsplib_ft06.txt",
         load_format="jsplib",
         expected_vars=73,
-        expected_constraints=9,
+        # 1 precedence + 6 NoOverlap (one per machine) + 1 makespan constraint.
+        # The start+duration==end link is enforced by NoOverlap, so it is not added
+        # separately (see cpmpy/tools/io/jsplib.py).
+        expected_constraints=8,
     ),
     LargerInstanceCase(
         id="rcpsp-j3013-1",
