@@ -243,6 +243,18 @@ class TestMul:
         assert expr.is_lhs_num is False
         assert expr.args[0] is x and expr.args[1] is y
 
+    def test_nullarg_mul(self):
+        x = intvar(0,5,shape=3, name="x")
+        a = np.array([0,1,1], dtype=bool)
+
+        prod = x * a
+
+        assert isinstance(prod, NDVarArray)
+        for expr in prod:
+            assert isinstance(expr, Expression) or expr == 0
+
+class TestArrayExpressions:
+
     def test_scalar_expr_with_ndarray(self):
         x = intvar(0, 5, shape=3, name=tuple("abc"))
         y = intvar(0, 5, name="y")
@@ -274,18 +286,6 @@ class TestMul:
         assert ey.shape == ye.shape == (3,)
         for a, b in zip(ey, ye):
             assert str(a) == str(b)
-
-    def test_nullarg_mul(self):
-        x = intvar(0,5,shape=3, name="x")
-        a = np.array([0,1,1], dtype=bool)
-
-        prod = x * a
-
-        assert isinstance(prod, NDVarArray)
-        for expr in prod:
-            assert isinstance(expr, Expression) or expr == 0
-
-class TestArrayExpressions:
 
     def test_sum(self):
         x = intvar(0,5,shape=10, name="x")
