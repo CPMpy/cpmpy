@@ -414,7 +414,7 @@ def count_transform_stats(solver, cpm_expr):
         "n_boolean": n_bool,
     }
 
-def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_after_transform=False):
+def do_solve(model_path, solver_name, ablate, time_limit, memory_limit, solver_kwargs, stop_after_transform=False):
     """Load a pickled model, optionally patch the transform, solve, return a record."""
     model = cp.Model.from_file(model_path)
     sname = solver_name
@@ -432,6 +432,7 @@ def do_solve(model_path, solver_name, ablate, time_limit, solver_kwargs, stop_af
         "solver": solver_name,
         "solver_kwargs": solver_kwargs,
         "time_limit": time_limit,
+        "memory_limit": memory_limit,
         "ablate": ablate,
         "stop_after_transform": stop_after_transform,
         "cpmpy_commit": cpmpy_commit,
@@ -544,7 +545,8 @@ if __name__ == "__main__":
     record = do_solve(model_path=model_path, 
                       solver_name=solver_name, 
                       ablate=ablate, 
-                      time_limit=time_limit, 
+                      time_limit=time_limit,
+                      memory_limit=memory_limit_gb,
                       solver_kwargs=solver_kwargs,
                       stop_after_transform=stop_after_transform)
 
