@@ -21,15 +21,6 @@ List of functions
     load_opb
     write_opb
 
-====================
-Available annotators
-====================
-
-.. autosummary::
-    :nosignatures:
-
-    annotate_x
-    annotate_extended
 """
 
 
@@ -48,7 +39,7 @@ from cpmpy.transformations.to_opb import to_opb, to_opb_objective
 from cpmpy.expressions.variables import NegBoolView, _ignore_strict_variable_name_check
 from cpmpy.expressions.core import Operator, Comparison
 from cpmpy.model import _update_variable_counters
-from cpmpy.tools.io.annotate import AnnotationCallable
+from cpmpy.tools.io.annotate_bool import BooleanEncodingAnnotator
 from cpmpy.tools.io.utils import _create_header, _handle_loader_input
 
 
@@ -250,27 +241,28 @@ def load_opb(opb: Union[str, os.PathLike, TextIO], open:Callable = builtins.open
 
         return model
 
-def annotate_extended(vars, ivarmap: dict[str, Any]) -> list[str]:
-    """
-    Annotate CPMpy variables as OPB ``x<int>`` identifiers.
-    """
-    return [f'"{v.name}"' for v in vars]
+# Non-extended (unquoted) VeriPB identifiers:
+#  - start with an underscore or an ASCII letter (A-Z, a-z);
+#  - continue with A-Z, a-z, 0-9, or []{}_^ (square/curly brackets, underscore, caret);
+#  - be at least two characters long (and contain no spaces).
+_VERIPB_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9\[\]{}_^]+\Z")
 
-def annotate_x(vars, ivarmap: dict[str, Any]) -> list[str]:
+def _check_veripb_name(name: str) -> None:
     """
-    Annotate CPMpy variables as OPB ``x<int>`` identifiers.
+    Validate a variable name for use as an unquoted VeriPB identifier.
 
-    For solvers that only accept ``x<int>`` variable names, pass
-    ``annotate=annotate_x`` to :func:`write_opb` (default).
-
-    Arguments:
-        vars: Boolean variables occurring in the exported OPB model.
-        ivarmap: Integer encoding map populated during OPB transformation.
-
-    Returns:
-        OPB variable names ``x1``, ``x2``, ..., in the same order as ``vars``.
+    Raises:
+        ValueError: if ``name`` is not a valid VeriPB identifier.
     """
-    return [f"x{i+1}" for i, _ in enumerate(vars)]
+    if not _VERIPB_NAME_RE.match(name):
+        raise ValueError(
+            "A variable name for the OPB output is not a valid VeriPB identifier "
+            f"(e.g. {name!r}): it must start with an underscore or a letter, continue "
+            "with A-Z, a-z, 0-9, or []{}_^, and be at least two characters long. "
+            "Rename the offending variable, use a different annotator, or "
+            'switch to naming="restricted" to write competition-style x1, x2, ... '
+            "names (with the original names preserved in comments)."
+        )
 
 def _wsum_to_str(cpm_expr, varmap):
     """
@@ -299,8 +291,9 @@ def write_opb(
         path:Optional[Union[str, os.PathLike]] = None, 
         encoding:str="auto", 
         header:Optional[str] = None, 
-        open:Callable = partial(builtins.open, mode="w"), 
-        annotate: AnnotationCallable = annotate_extended
+        open:Callable = partial(builtins.open, mode="w"),
+        annotate_bool: Optional[BooleanEncodingAnnotator] = None,
+        naming: str = "restricted"
     ) -> str:
     """
     Export a CPMpy model to the OPB (Pseudo-Boolean) format.
@@ -321,10 +314,30 @@ def write_opb(
             Called as ``open(path, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
-        annotate (AnnotationCallable): variable annotation strategy with shape
-            ``annotate(vars, ivarmap) -> list[str]`` mapping each Boolean
-            variable to an OPB identifier. Default: extended quoted names
-            (:func:`annotate_extended`).
+        annotate_bool (BooleanEncodingAnnotator, optional): encoding annotator, annotates 
+            boolean variables with names describing how they contribute to an encoded integer variable.
+            Depending on the `naming` scheme, these names are written as comments or used directly as 
+            variable names.
+        naming (str): how variables are named in the OPB output. One of:
+
+            - ``"restricted"`` (default): competition-style ``x1``, ``x2``, ... identifiers. 
+              Annotations, if provided, are written as comments.
+            - ``"extended"``: allows arbitrary variable names, but wraps them in quotes.
+            - ``"veripb"``: VeriPB-safe variable names.
+
+    .. note::
+        The ``"restricted"`` naming scheme is the most widely supported and 
+        compatible with most OPB parsers. The ``"extended"`` naming scheme is 
+        more flexible and allows arbitrary characters, but is not as widely 
+        supported. The ``"veripb"`` naming scheme follows the VeriPB convention;
+
+        - start with an underscore or an ASCII letter (A-Z, a-z);
+        - continue with A-Z, a-z, 0-9, or []{}_^ (square/curly brackets, underscore, caret);
+        - be at least two characters long 
+        - contain no spaces
+
+        Any variable name that does not follow these rules will be rejected.
+            
 
     Returns:
         str: The OPB string (as it is optionally written to a file).
@@ -368,9 +381,28 @@ def write_opb(
         header_lines = ["* " + line for line in str(header).splitlines()]
         out.extend(header_lines)
 
-    # Map variables to OPB variable names
-    varmap = {v: ann for v, ann in zip(all_vars, annotate(all_vars, ivarmap))}
-    
+    # Descriptive names from the encoding annotator (or None if no annotator)
+    names = annotate_bool.annotate(all_vars, ivarmap) if annotate_bool is not None else None
+
+    # Map variables to OPB variable names according to the chosen naming scheme
+    if naming == "restricted":
+        # Competition-style x<i> identifiers; descriptive names go to comments.
+        varmap = {v: f"x{i+1}" for i, v in enumerate(all_vars)}
+        if names is not None:
+            out.extend(f"* x{i+1} {names[i]}" for i in range(len(all_vars)))
+    else:
+        base = names if names is not None else [v.name for v in all_vars]
+        if naming == "extended":
+            # Quoted names allow arbitrary characters.
+            varmap = {v: f'"{base[i]}"' for i, v in enumerate(all_vars)}
+        elif naming == "veripb":
+            # Unquoted names; characters must be valid VeriPB identifiers.
+            for nm in base:
+                _check_veripb_name(nm)
+            varmap = {v: base[i] for i, v in enumerate(all_vars)}
+        else:
+            raise ValueError(f"Unknown naming {naming!r}; choose 'restricted', 'extended', or 'veripb'")
+
     # Write objective, if present
     if model.objective_ is not None:
         objective_str = _wsum_to_str(opb_obj, varmap)

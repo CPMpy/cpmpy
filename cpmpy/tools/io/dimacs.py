@@ -72,7 +72,7 @@ from cpmpy.transformations.to_cnf import to_cnf, to_cnf_objective
 from cpmpy.transformations.get_variables import get_variables
 from cpmpy.transformations.cse import CSEMap
 from cpmpy.transformations.int2bool import IntVarEnc
-from cpmpy.tools.io.annotate import AnnotationCallable
+from cpmpy.tools.io.annotate_bool import BooleanEncodingAnnotator
 from cpmpy.tools.io.utils import _create_header, _handle_loader_input
 
 
@@ -81,8 +81,8 @@ def write_dimacs(
         path: Optional[Union[str, os.PathLike]] = None, 
         encoding: str = "auto", 
         p_header: bool = False, header : Optional[str] = None, 
-        open: Callable = partial(builtins.open, mode="w"), 
-        annotate: Optional[AnnotationCallable] = None
+        open: Callable = partial(builtins.open, mode="w"),
+        annotate_bool: Optional[BooleanEncodingAnnotator] = None
     ) -> str:
     """
     Writes a CPMpy model to DIMACS format.
@@ -106,9 +106,10 @@ def write_dimacs(
             Called as ``open(path, "w")``. This mirrors the ``open=`` argument
             in loaders and allows custom compression or I/O (e.g.
             ``lambda p, mode='w': lzma.open(p, 'wt')``).
-        annotate (AnnotationCallable, optional): variable annotation strategy with
-            shape ``annotate(vars, ivarmap) -> list[str]``. Controls how DIMACS
-            literal IDs are mapped back to original CPMpy variables.
+        annotate_bool (BooleanEncodingAnnotator, optional): encoding annotator, annotates 
+            boolean variables with names describing how they contribute to an encoded integer variable.
+            When provided, each DIMACS literal ID is mapped back to that name via a
+            ``c <id> <name>`` comment line. When ``None``, no comments are written.              
     """
 
     if header is None:
@@ -199,14 +200,11 @@ def write_dimacs(
             out += f"{w} {lit} 0\n"
 
     # Write annotations to DIMACS string
-    if annotate is not None:
-        if callable(annotate):
-            comments = annotate(vars, ivarmap)
-            if comments:
-                comment_block = "\n".join(f"c {i+1} " + c for i,c in enumerate(comments)) + "\n"
-                out = comment_block + out
-        else:
-            raise ValueError(f"Expected a Callable annotate, but got {type(annotate)}")
+    if annotate_bool is not None:
+        comments = annotate_bool.annotate(vars, ivarmap)
+        if comments:
+            comment_block = "\n".join(f"c {i+1} " + c for i,c in enumerate(comments)) + "\n"
+            out = comment_block + out
 
     # Optional p-header
     if p_header:

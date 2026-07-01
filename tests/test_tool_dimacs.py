@@ -12,7 +12,7 @@ import cpmpy as cp
 from cpmpy.solvers.solver_interface import ExitStatus
 from cpmpy.transformations.get_variables import get_variables_model
 
-from cpmpy.tools.io.annotate import annotate_cpmpy, annotate_sugar, annotate_veripb
+from cpmpy.tools.io.annotate_bool import SugarAnnotator, VeriPBAnnotator
 from cpmpy.tools.io.dimacs import load_dimacs, write_dimacs
 
 
@@ -226,15 +226,12 @@ class TestWriteCNF:
     @pytest.mark.parametrize(
         "encoding,annotate,expected",
         [
-            pytest.param("direct", annotate_cpmpy, {"x=1", "x=2", "x=3", "b"}, id="cpmpy-direct"),
-            pytest.param("order", annotate_cpmpy, {"x>=2", "x>=3", "b"}, id="cpmpy-order"),
-            pytest.param("binary", annotate_cpmpy, {"x[bit=0]", "x[bit=1]", "b"}, id="cpmpy-binary"),
-            pytest.param("direct", annotate_sugar, {"px=1", "px=2", "px=3", "b"}, id="sugar-direct"),
-            pytest.param("order", annotate_sugar, {"px,2", "px,3", "b"}, id="sugar-order"),
-            pytest.param("binary", annotate_sugar, {"px#0", "px#1", "b"}, id="sugar-binary"),
-            pytest.param("direct", annotate_veripb, {"x_eq_1", "x_eq_2", "x_eq_3", "b"}, id="veripb-direct"),
-            pytest.param("order", annotate_veripb, {"x_ge_2", "x_ge_3", "b"}, id="veripb-order"),
-            pytest.param("binary", annotate_veripb, {"x_bit0", "x_bit1", "b"}, id="veripb-binary"),
+            pytest.param("direct", SugarAnnotator(), {"px=1", "px=2", "px=3", "b"}, id="sugar-direct"),
+            pytest.param("order", SugarAnnotator(), {"px,2", "px,3", "b"}, id="sugar-order"),
+            pytest.param("binary", SugarAnnotator(), {"px#0", "px#1", "b"}, id="sugar-binary"),
+            pytest.param("direct", VeriPBAnnotator(), {"x_eq_1", "x_eq_2", "x_eq_3", "b"}, id="veripb-direct"),
+            pytest.param("order", VeriPBAnnotator(), {"x_ge_2", "x_ge_3", "b"}, id="veripb-order"),
+            pytest.param("binary", VeriPBAnnotator(), {"x_bit0", "x_bit1", "b"}, id="veripb-binary"),
         ],
     )
     def test_annotate_writer_comments_for_integer_encodings(self, encoding, annotate, expected):
@@ -242,7 +239,7 @@ class TestWriteCNF:
         b = cp.boolvar(name="b")
         model = cp.Model(x >= 2, b)
 
-        text = write_dimacs(model, encoding=encoding, annotate=annotate, header="")
+        text = write_dimacs(model, encoding=encoding, annotate_bool=annotate, header="")
 
         assert expected <= _annotation_names(text)
 
