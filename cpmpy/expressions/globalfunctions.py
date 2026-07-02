@@ -870,7 +870,8 @@ class Element(GlobalFunction):
         Returns:
             str: String representation of the Element global function.
         """
-        return f"{self.args[0]}[{self.args[1]}]"
+        with np.printoptions(linewidth=np.inf, threshold=np.inf):
+            return f"{self.args[0]}[{self.args[1]}]"
 
 
 class NDElement(GlobalFunction):
@@ -982,7 +983,8 @@ class NDElement(GlobalFunction):
         """
         arr, *indices = self.args
         idx_repr = ", ".join(str(i) for i in indices)
-        return f"{arr}[{idx_repr}]"
+        with np.printoptions(linewidth=np.inf, threshold=np.inf):
+            return f"{arr}[{idx_repr}]"
 
 def element(arg_list):
     """
