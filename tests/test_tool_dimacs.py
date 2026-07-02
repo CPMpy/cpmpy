@@ -28,7 +28,8 @@ class TestCNFTool:
 
     def test_read_cnf(self):
         model = self.dimacs_to_model("p cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
-        bvs = sorted(get_variables_model(model), key=str)
+        # DIMACS variable i is BV<i>; sort numerically (str sort puts BV10 before BV8)
+        bvs = sorted(get_variables_model(model), key=lambda v: int(v.name[2:]))
         assert str(model) == str(cp.Model(
             cp.any([~bvs[1], ~bvs[2]]), cp.any([bvs[2], bvs[1],bvs[0]]), ~bvs[0]) \
                          )
@@ -45,7 +46,7 @@ class TestCNFTool:
 
     def test_with_comments(self):
         model = self.dimacs_to_model("c this file starts with some comments\nc\np cnf 3 3\n-2 -3 0\n3 2 1 0\n-1 0\n")
-        vars = sorted(get_variables_model(model), key=str)
+        vars = sorted(get_variables_model(model), key=lambda v: int(v.name[2:]))
 
         sols = set()
         addsol = lambda : sols.add(tuple([v.value() for v in vars]))
