@@ -691,7 +691,7 @@ class NDVarArray(np.ndarray):
             # unwrap numpy 'generic' scalar to is Python int item, so int <= np.int64 does not return NotImplemented
             getattr(s, attr)(o.item() if isinstance(o, np.generic) else o, **kwargs)
             for s, o in zip(self.flat, other.flat)
-        ]).reshape(self.shape)
+        ]).reshape(self.shape) # type: ignore # typing is wrong, reshape returns NDVarArray
 
     # VECTORIZED comparisons
     def __eq__(self, other):
