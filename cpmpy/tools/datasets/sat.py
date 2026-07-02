@@ -1,7 +1,5 @@
 """
 The SAT Competition provides benchmark instances in DIMACS CNF format.
-Instances are fetched from benchmark-database.de via ``getinstances``.
-Each returned line is an instance URL, usually served as XZ-compressed DIMACS.
 Origin: https://benchmark-database.de/
 """
 

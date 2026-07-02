@@ -12,7 +12,7 @@ from typing import Any, Optional, Dict, Callable
 import builtins
 
 from cpmpy.tools.datasets.core import FileDataset
-from cpmpy.tools.io.rcpsp import _parse_rcpsp
+from cpmpy.tools.io.rcpsp import parse_rcpsp
 
 class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
     """
@@ -76,7 +76,7 @@ class PSPLibDataset(FileDataset):  # torch.utils.data.Dataset compatible
         """
         Parse a PSPLIB RCPSP instance into job data and capacities.
         """
-        return _parse_rcpsp(instance, open=cls.open)
+        return parse_rcpsp(instance, open=cls.open)
 
     def categories(self) -> Dict[str, Any]:
         return {
