@@ -84,6 +84,7 @@
         FloatSum
 
 """
+import sys
 import warnings  # for deprecation warning
 import math
 from typing import Optional, Iterable, NoReturn, Final, cast
@@ -870,7 +871,7 @@ class Element(GlobalFunction):
         Returns:
             str: String representation of the Element global function.
         """
-        with np.printoptions(linewidth=np.inf, threshold=np.inf):
+        with np.printoptions(linewidth=sys.maxsize, threshold=sys.maxsize):
             return f"{self.args[0]}[{self.args[1]}]"
 
 
@@ -983,7 +984,7 @@ class NDElement(GlobalFunction):
         """
         arr, *indices = self.args
         idx_repr = ", ".join(str(i) for i in indices)
-        with np.printoptions(linewidth=np.inf, threshold=np.inf):
+        with np.printoptions(linewidth=sys.maxsize, threshold=sys.maxsize):
             return f"{arr}[{idx_repr}]"
 
 def element(arg_list):
