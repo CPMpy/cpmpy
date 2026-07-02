@@ -676,15 +676,20 @@ class NDVarArray(np.ndarray):
         if not isinstance(other, np.ndarray):
             other = np.asarray(other)
         try:
-            other = np.broadcast_to(other, self.shape)
+            broadcast_shape = np.broadcast_shapes(other.shape, self.shape)
         except ValueError as e:
             raise ValueError(
                 f"operands could not be broadcast together with shapes {self.shape} {other.shape}"
             ) from e
+        if broadcast_shape != self.shape:
+            raise ValueError(
+                f"other with shape {other.shape} could not be broadcast to self with shape {self.shape}"
+            )
+        other = np.broadcast_to(other, self.shape)
         # s.__eq__(o) <-> getattr(s, '__eq__')(o)
-        # unwrap numpy scalars so e.g. int <= np.int64 does not return NotImplemented
         return cpm_array([
-            getattr(s, attr)(o if not isinstance(o, np.generic) else o.item(), **kwargs)
+            # unwrap numpy 'generic' scalar to is Python int item, so int <= np.int64 does not return NotImplemented
+            getattr(s, attr)(o.item() if isinstance(o, np.generic) else o, **kwargs)
             for s, o in zip(self.flat, other.flat)
         ]).reshape(self.shape)
 
