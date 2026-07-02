@@ -13,7 +13,7 @@ jobs:
           python-version: '3.10'
       - name: Install dependencies
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements.txt ]; then pip install --upgrade -r requirements.txt; fi
           pip install ".[type, test]"
       - name: Run Mypy
         uses: liskin/gh-problem-matcher-wrap@v2 # wrap mypy output as annotations
