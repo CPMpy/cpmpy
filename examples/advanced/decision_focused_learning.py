@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     # Training configuration
     lr = 0.01
-    num_epochs = 5  # kept low so the example test finishes quickly; increase (e.g. 15) for better accuracy
+    num_epochs = 3  # kept low so the example test finishes quickly; increase (e.g. 15) for better accuracy
 
     
     # Generate data
