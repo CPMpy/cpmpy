@@ -308,28 +308,28 @@ class Expression(object):
             return other.__ne__(self)
         return Comparison("!=", self, other)
 
-    def __lt__(self, other: ExprLike | np.ndarray):
+    def __lt__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
             return other.__gt__(self)
         return Comparison("<", self, other)
 
-    def __le__(self, other: ExprLike | np.ndarray):
+    def __le__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
             return other.__ge__(self)
         return Comparison("<=", self, other)
 
-    def __gt__(self, other: ExprLike | np.ndarray):
+    def __gt__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
             return other.__lt__(self)
         return Comparison(">", self, other)
 
-    def __ge__(self, other: ExprLike | np.ndarray):
+    def __ge__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -338,7 +338,7 @@ class Expression(object):
 
     # Boolean Operators
     # Implements bitwise operations & | ^ and ~ (and, or, xor, not)
-    def __and__(self, other: BoolExprLike | np.ndarray):
+    def __and__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -352,7 +352,7 @@ class Expression(object):
                             f"E.g. always write (x==2)&(y<5).")
         return Operator("and", [self, other])
 
-    def __rand__(self, other: BoolExprLike | np.ndarray):
+    def __rand__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -366,7 +366,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)&(y<5).")
         return Operator("and", [other, self])
 
-    def __or__(self, other: BoolExprLike | np.ndarray):
+    def __or__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -380,7 +380,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [self, other])
 
-    def __ror__(self, other: BoolExprLike | np.ndarray):
+    def __ror__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -394,7 +394,7 @@ class Expression(object):
                             f"did you forget to put brackets? E.g. always write (x==2)|(y<5).")
         return Operator("or", [other, self])
 
-    def __xor__(self, other: BoolExprLike | np.ndarray):
+    def __xor__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -406,7 +406,7 @@ class Expression(object):
             return self
         return cp.Xor([self, other])
 
-    def __rxor__(self, other: BoolExprLike | np.ndarray):
+    def __rxor__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -420,7 +420,7 @@ class Expression(object):
 
     # Mathematical Operators, including 'r'everse if it exists
     # Addition
-    def __add__(self, other: ExprLike | np.ndarray):
+    def __add__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -429,7 +429,7 @@ class Expression(object):
             return self
         return Operator("sum", [self, other])
 
-    def __radd__(self, other: ExprLike | np.ndarray):
+    def __radd__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -439,7 +439,7 @@ class Expression(object):
         return Operator("sum", [other, self])
 
     # subtraction
-    def __sub__(self, other: ExprLike | np.ndarray):
+    def __sub__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -451,7 +451,7 @@ class Expression(object):
         # return Operator("sub", [self, other])
         return self.__add__(-other)
 
-    def __rsub__(self, other: ExprLike | np.ndarray):
+    def __rsub__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -462,7 +462,7 @@ class Expression(object):
         return (-self).__radd__(other)
     
     # multiplication: use GlobalFunction Multiplication so it can be decomposed (e.g. to linear)
-    def __mul__(self, other: ExprLike | np.ndarray):
+    def __mul__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -471,7 +471,7 @@ class Expression(object):
             return self
         return cp.Multiplication(self, other)
 
-    def __rmul__(self, other: ExprLike | np.ndarray):
+    def __rmul__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -492,7 +492,7 @@ class Expression(object):
         warnings.warn("We only support floordivision, use // instead of /", SyntaxWarning)
         return self.__rfloordiv__(other)
 
-    def __floordiv__(self, other: ExprLike | np.ndarray):
+    def __floordiv__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
@@ -501,21 +501,21 @@ class Expression(object):
             return self
         return cp.Division(self, other)
 
-    def __rfloordiv__(self, other: ExprLike | np.ndarray):
+    def __rfloordiv__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
             return other.__floordiv__(self)
         return cp.Division(other, self)
 
-    def __mod__(self, other: ExprLike | np.ndarray):
+    def __mod__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
             return other.__rmod__(self)
         return cp.Modulo(self, other)
 
-    def __rmod__(self, other: ExprLike | np.ndarray):
+    def __rmod__(self, other):
         if isinstance(other, np.ndarray):
             if not isinstance(other, cp.expressions.variables.NDVarArray):
                 other = cp.cpm_array(other)
